@@ -129,7 +129,7 @@ personal-accounting/
 Your site will be available at:
 
 ```text
-https://yourusername.github.io/personal-accounting
+https://ainlamyae.github.io/ledger
 ```
 
 ---

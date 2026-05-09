@@ -99,7 +99,7 @@ Track income, expenses, account balances, and financial trends while keeping all
 ## Project Structure
 
 ```text
-personal-accounting/
+ledger/
 │
 ├── index.html
 ├── styles.css
@@ -129,7 +129,7 @@ personal-accounting/
 Your site will be available at:
 
 ```text
-https://yourusername.github.io/personal-accounting
+https://ainlamyae.github.io/ledger
 ```
 
 ---
@@ -169,5 +169,3 @@ https://yourusername.github.io/personal-accounting
 ## License
 
 No license
-
-MIT License

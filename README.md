@@ -99,7 +99,7 @@ Track income, expenses, account balances, and financial trends while keeping all
 ## Project Structure
 
 ```text
-personal-accounting/
+ledger/
 │
 ├── index.html
 ├── styles.css

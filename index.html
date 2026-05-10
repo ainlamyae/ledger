@@ -4,231 +4,79 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ledger</title>
-
-<style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: system-ui, sans-serif;
-    background: #f5f7fb;
-    color: #1f2937;
-}
-
-header {
-    background: white;
-    padding: 1rem 2rem;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-header h1 {
-    font-size: 1.5rem;
-}
-
-.container {
-    max-width: 1200px;
-    margin: auto;
-    padding: 2rem;
-}
-
-.cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.card {
-    background: white;
-    border-radius: 12px;
-    padding: 1.25rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,.08);
-}
-
-.card h3 {
-    color: #6b7280;
-    font-size: .9rem;
-    margin-bottom: .5rem;
-}
-
-.card .value {
-    font-size: 2rem;
-    font-weight: 700;
-}
-
-.grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-}
-
-.panel {
-    background: white;
-    border-radius: 12px;
-    padding: 1.25rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,.08);
-}
-
-.panel h2 {
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-th,
-td {
-    padding: .75rem;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-th {
-    color: #6b7280;
-}
-
-.income {
-    color: #16a34a;
-}
-
-.expense {
-    color: #dc2626;
-}
-
-.account {
-    display: flex;
-    justify-content: space-between;
-    padding: .75rem 0;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.account:last-child {
-    border-bottom: none;
-}
-
-.chart {
-    height: 220px;
-    display: flex;
-    align-items: end;
-    gap: 12px;
-    margin-top: 1rem;
-}
-
-.bar {
-    flex: 1;
-    background: #3b82f6;
-    border-radius: 8px 8px 0 0;
-}
-
-.month {
-    text-align: center;
-    margin-top: .5rem;
-    font-size: .85rem;
-}
-
-@media (max-width: 900px) {
-    .grid {
-        grid-template-columns: 1fr;
-    }
-}
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
 
 <header>
     <h1>Ledger</h1>
+    <div class="header-actions">
+        <span id="last-updated" class="last-updated"></span>
+        <button id="refresh-btn" class="btn" hidden>Refresh</button>
+        <button id="signin-btn" class="btn">Sign in with Google</button>
+        <button id="signout-btn" class="btn" hidden>Sign out</button>
+    </div>
 </header>
 
-<div class="container">
+<div id="gate" class="gate">
+    <div class="gate-card">
+        <h2>Sign in to view your ledger</h2>
+        <p>Your data lives in your private "Ledger Database" Google Sheet. Sign in with the Google account that owns it to continue.</p>
+        <button id="gate-signin-btn" class="btn btn-primary">Sign in with Google</button>
+        <p id="auth-status" class="status" hidden></p>
+    </div>
+</div>
+
+<div id="dashboard" class="container" hidden>
+
+    <p id="dashboard-loading" class="status status-info" hidden>Loading your data…</p>
 
     <div class="cards">
         <div class="card">
             <h3>Total Net Worth</h3>
-            <div class="value">$42,580</div>
+            <div class="value" id="net-worth">—</div>
         </div>
 
         <div class="card">
-            <h3>Income (June)</h3>
-            <div class="value income">$5,800</div>
+            <h3 id="income-label">Income</h3>
+            <div class="value income" id="income-value">—</div>
         </div>
 
         <div class="card">
-            <h3>Expenses (June)</h3>
-            <div class="value expense">$2,145</div>
+            <h3 id="expenses-label">Expenses</h3>
+            <div class="value expense" id="expenses-value">—</div>
         </div>
 
         <div class="card">
             <h3>Monthly Savings</h3>
-            <div class="value">$3,655</div>
+            <div class="value" id="savings-value">—</div>
         </div>
     </div>
+
+    <div class="panel">
+        <h2>Accounts</h2>
+
+        <div id="accounts-panel"></div>
+    </div>
+
+    <div style="height:1rem"></div>
 
     <div class="grid">
 
         <div class="panel">
-            <h2>Cash Flow (Last 6 Months)</h2>
+            <h2>Income vs Expenses (Last 12 Months)</h2>
 
-            <div class="chart">
-                <div style="flex:1">
-                    <div class="bar" style="height:120px"></div>
-                    <div class="month">Jan</div>
-                </div>
-
-                <div style="flex:1">
-                    <div class="bar" style="height:150px"></div>
-                    <div class="month">Feb</div>
-                </div>
-
-                <div style="flex:1">
-                    <div class="bar" style="height:180px"></div>
-                    <div class="month">Mar</div>
-                </div>
-
-                <div style="flex:1">
-                    <div class="bar" style="height:160px"></div>
-                    <div class="month">Apr</div>
-                </div>
-
-                <div style="flex:1">
-                    <div class="bar" style="height:200px"></div>
-                    <div class="month">May</div>
-                </div>
-
-                <div style="flex:1">
-                    <div class="bar" style="height:220px"></div>
-                    <div class="month">Jun</div>
-                </div>
+            <div class="chart-box">
+                <canvas id="income-expense-chart"></canvas>
             </div>
         </div>
 
         <div class="panel">
-            <h2>Accounts</h2>
+            <h2>Expense Breakdown (<span id="expense-breakdown-month"></span>)</h2>
 
-            <div class="account">
-                <span>Chequing</span>
-                <strong>$6,520</strong>
-            </div>
-
-            <div class="account">
-                <span>Savings</span>
-                <strong>$28,400</strong>
-            </div>
-
-            <div class="account">
-                <span>Cash</span>
-                <strong>$260</strong>
-            </div>
-
-            <div class="account">
-                <span>Credit Card</span>
-                <strong>-$1,120</strong>
+            <div class="chart-box">
+                <canvas id="expense-breakdown-chart"></canvas>
             </div>
         </div>
 
@@ -237,58 +85,101 @@ th {
     <div style="height:1rem"></div>
 
     <div class="panel">
-        <h2>Recent Transactions</h2>
+        <h2>Cumulative Savings Over Time</h2>
 
-        <table>
-            <thead>
-            <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Amount</th>
-            </tr>
-            </thead>
+        <div class="chart-box">
+            <canvas id="savings-trend-chart"></canvas>
+        </div>
+    </div>
 
-            <tbody>
-            <tr>
-                <td>2026-06-09</td>
-                <td>Salary</td>
-                <td>Income</td>
-                <td class="income">+$2,900</td>
-            </tr>
+    <div style="height:1rem"></div>
 
-            <tr>
-                <td>2026-06-08</td>
-                <td>Groceries</td>
-                <td>Food</td>
-                <td class="expense">-$84</td>
-            </tr>
+    <div class="panel">
+        <h2>Expense Breakdown Over Time</h2>
 
-            <tr>
-                <td>2026-06-07</td>
-                <td>Internet Bill</td>
-                <td>Utilities</td>
-                <td class="expense">-$65</td>
-            </tr>
+        <div class="chart-box">
+            <canvas id="expense-breakdown-trend-chart"></canvas>
+        </div>
+    </div>
 
-            <tr>
-                <td>2026-06-06</td>
-                <td>Gas</td>
-                <td>Transportation</td>
-                <td class="expense">-$48</td>
-            </tr>
+    <div style="height:1rem"></div>
 
-            <tr>
-                <td>2026-06-05</td>
-                <td>Freelance Project</td>
-                <td>Income</td>
-                <td class="income">+$850</td>
-            </tr>
-            </tbody>
-        </table>
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Transactions</h2>
+            <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
+        </div>
+
+        <div class="filters">
+            <input type="text" id="tx-search" placeholder="Search payee, description, account, category...">
+            <select id="tx-category-filter"></select>
+        </div>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Payee</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th></th>
+                </tr>
+                </thead>
+
+                <tbody id="transactions-body"></tbody>
+            </table>
+        </div>
+
+        <div class="pagination" id="tx-pagination"></div>
     </div>
 
 </div>
 
+<div id="tx-modal" class="modal" hidden>
+    <div class="modal-card">
+        <h2 id="tx-modal-title">Add Transaction</h2>
+
+        <form id="tx-form">
+            <label>Date
+                <input type="date" id="tx-date" required>
+            </label>
+            <label>Account
+                <select id="tx-account" required></select>
+            </label>
+            <label>Payee
+                <input type="text" id="tx-payee" required>
+            </label>
+            <label>Description
+                <input type="text" id="tx-description">
+            </label>
+            <label>Amount
+                <input type="number" step="0.01" id="tx-amount" required>
+            </label>
+            <label>Category
+                <select id="tx-category" required></select>
+            </label>
+
+            <p class="hint">Use a positive amount for income, negative for expenses.</p>
+            <p id="tx-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="tx-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="sheets.js"></script>
+<script src="cache.js"></script>
+<script src="charts.js"></script>
+<script src="transactions.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

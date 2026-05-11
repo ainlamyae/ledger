@@ -23,9 +23,8 @@ The existing workbook has 8 sheets, ~10,500 transactions spanning 2018–2026:
 - **Dates stored as text** (`'2018.09.05'`) instead of real date values — breaks sorting/filtering and Sheets API date math.
 - **Inconsistent account naming**: `Hossein`, `TDV`/`TDD`/`TDC`, `RBCV`/`RBCM`/`RBCD`, etc. — needs a canonical account list with dropdown validation.
 - **Inconsistent category casing**: `Tax` vs `TAX`.
-- **No Income/Expense/Transfer distinction** — credit card payments and inter-account transfers are mixed in with real income/expenses, which can double-count cash flow.
 - **Personal IOUs mixed with real accounts** (`Hossein`, `Borna`, `Reza`, `Amin`, `Mostafa`, `Ali Asghar`, `Ehsan`, `Parsapour`, `Conica`, `Basiri + Mazaheri`) — these are people who owe/are owed money, not financial institutions.
-- **`Report` sheet is a static manual summary** — better computed dynamically in the frontend so it always reflects the latest data.
+- **`Report` formulas already expect a `Transactions` sheet that doesn't exist** — its `SUMIFS` formulas reference `Transactions!A:A` (date), `Transactions!E:E` (amount), `Transactions!F:F` (category), but the workbook only has `Detail`. Rebuilding `Detail` as `Transactions` with that exact column layout makes `Report` work again, computed live by Google Sheets — no frontend aggregation needed.
 
 ---
 
@@ -40,23 +39,19 @@ A single Google Sheet ("Ledger Database") with the following tabs, shared **only
 | Account | Text | From `Accounts` dropdown |
 | Payee | Text | Merchant / person / institution |
 | Description | Text | Optional detail |
+| Amount | Number | Positive = income, negative = expense. The sign alone defines the type — no separate Income/Expense/Transfer column. Transfers between own accounts aren't recorded. |
 | Category | Text | From `Categories` dropdown |
-| Type | Text | `Income` / `Expense` / `Transfer` |
-| Amount | Number | Positive for income, negative for expense |
-| Notes | Text | Optional |
+
+Column order (A–F) matches what `Report`'s `SUMIFS` formulas already expect (`E` = Amount, `F` = Category).
 
 ### 2. `Accounts`
+A lookup/reference list only — used to check that each transaction's `Account` value matches a real, known account. Not used for balance calculations.
+
 | Column | Type | Notes |
 |---|---|---|
 | Account Name | Text | Canonical name (data validation source for `Transactions`) |
 | Institution | Text | e.g. Wealthsimple, CIBC, RBC, Tangerine |
-| Type | Text | Chequing / Savings / Credit / Cash / Investment / Loan / Person (IOU) |
-| Currency | Text | Default CAD |
-| Opening Balance | Number | Starting balance before first tracked transaction |
-| Opening Date | Date | |
-| Active | Boolean | Hide closed accounts from dashboard |
-
-Current balance per account = `Opening Balance + SUMIF(Transactions, Account)` — computed live, no manual upkeep.
+| Type | Text | Chequing / Savings / Credit / Cash / Investment / Person (IOU) |
 
 ### 3. `Categories`
 | Column | Type | Notes |
@@ -67,46 +62,13 @@ Current balance per account = `Opening Balance + SUMIF(Transactions, Account)` �
 | Color | Text | Hex color for charts |
 | Monthly Budget | Number | Optional, used in v2 budget tracking |
 
-### 4. `Investments` (replaces `RRSP`, extensible to other accounts)
-| Column | Type | Notes |
-|---|---|---|
-| Date | Date | |
-| Account | Text | e.g. RRSP, TFSA, FHSA |
-| Fund | Text | Fund name |
-| Units | Number | |
-| Unit Price | Number | |
-| Amount | Number | |
-| Contribution Type | Text | Member / Employer / Personal |
+### Future tabs (optional, add later)
 
-### 5. `Medical`
-| Column | Type | Notes |
-|---|---|---|
-| Date | Date | |
-| Provider | Text | |
-| Service | Text | |
-| Submitted | Number | |
-| Eligible | Number | |
-| Paid by Plan | Number | |
-| Out of Pocket | Number | Auto-flows into `Transactions` as a single Medical-category row |
+`RRSP`, `Medical`, `Hydro`, `Rent`, and `CELPiPi` are out of scope for the initial schema. Each can later become its own tab following the `Transactions` column conventions, or simply be entered as rows in `Transactions` under the right `Category`.
 
-### 6. `Utilities` (replaces `Hydro`, generalized)
-| Column | Type | Notes |
-|---|---|---|
-| Date | Date | |
-| Utility | Text | Electricity / Gas / Water / Internet |
-| Amount | Number | |
-| Period Days | Number | |
-| Daily Cost | Number | Computed `=Amount/Period Days` |
-| Notes | Text | |
+### `Report` and `Balance`
 
-### 7. `Settings`
-| Key | Value |
-|---|---|
-| Currency | CAD |
-| Locale | en-CA |
-| Spreadsheet Version | schema version, for migration scripts |
-
-The `Balance` and `Report` sheets are **dropped** — net worth, balances, and monthly summaries are computed live in the frontend from `Transactions`, `Accounts`, and `Investments`.
+`Report` stays and remains formula-driven (`SUMIFS` against `Transactions`), so it's always computed by Google Sheets and reflects the latest data with zero frontend aggregation. `Balance` (net worth snapshot) remains a separate, manually-maintained reference sheet.
 
 ---
 
@@ -203,9 +165,11 @@ ledger/
 ## Implementation Plan
 
 ### Phase 0 — Data migration & schema setup
-- [ ] Create the new "Ledger Database" Google Sheet with tabs from the data model above
-- [ ] Write a one-off migration script (Node or Python, run locally — not part of the deployed app) to import & clean `Accounting.xlsx` → new sheet
-- [ ] Add data validation dropdowns for `Account` and `Category` columns
+- [ ] Rebuild `Detail` as `Transactions` with columns `Date | Account | Payee | Description | Amount | Category` (matches what `Report`'s `SUMIFS` formulas already expect)
+- [ ] Clean data per the *Issues* list (real dates, canonical account names, consistent category casing)
+- [ ] Create the `Accounts` (validation list) and `Categories` tabs
+- [ ] Add data validation dropdowns for `Account` and `Category` columns in `Transactions`
+- [ ] Verify `Report`'s `SUMIFS` formulas recalculate correctly against the renamed sheet
 
 ### Phase 1 — Auth & API plumbing
 - [ ] Set up Google Cloud project + OAuth Client ID
@@ -217,10 +181,10 @@ ledger/
 - [ ] Add a sign-in gate; show dashboard only after auth succeeds
 
 ### Phase 3 — Read-only dashboard (MVP)
-- [ ] Fetch `Transactions`, `Accounts`, `Categories`
-- [ ] Compute net worth, monthly income/expenses, savings rate client-side
+- [ ] Fetch `Report` for net worth, monthly income/expenses, and savings rate (already pre-aggregated by Google Sheets)
+- [ ] Fetch `Transactions` for the recent transactions table
 - [ ] Replace hardcoded cards/table in `index.html` with live data
-- [ ] `charts.js`: cash flow chart (last 6–12 months) from real data
+- [ ] `charts.js`: cash flow chart (last 6–12 months) from `Report`
 
 ### Phase 4 — Transaction management (CRUD)
 - [ ] Add-transaction form → append row to `Transactions`
@@ -229,14 +193,12 @@ ledger/
 
 ### Phase 5 — Reports & analytics
 - [ ] Expense breakdown by category (donut chart) and by `Group`
-- [ ] Income vs expense trend (Chart.js line/bar, real monthly aggregates)
-- [ ] Account balance history over time
+- [ ] Income vs expense trend (Chart.js line/bar) from `Report`
+- [ ] Cumulative savings trend over time (from `Report`)
 
-### Phase 6 — Account & specialty tracking
-- [ ] Accounts page: computed balances, add/edit accounts
-- [ ] Investments page (`Investments` tab): contributions over time
-- [ ] Utilities page (`Utilities` tab): cost-per-day trend
-- [ ] Medical claims tracker
+### Phase 6 — Account management
+- [ ] Accounts page: manage the validation list (add/edit known account names)
+- [ ] Optional future tabs (investments, medical, utilities) — see *Future tabs*
 
 ### Phase 7 — Performance & polish
 - [ ] Cache sheet data client-side (localStorage/IndexedDB) with manual refresh + TTL

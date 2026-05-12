@@ -14,10 +14,10 @@
     <h1>Ledger</h1>
     <nav id="main-nav" class="nav" hidden>
         <a href="#overview">Overview</a>
-        <a href="#accounts">Accounts</a>
         <a href="#charts">Charts</a>
         <a href="#trends">Trends</a>
         <a href="#transactions">Transactions</a>
+        <a href="#accounts">Accounts</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -28,11 +28,35 @@
 </header>
 
 <div id="gate" class="gate">
-    <div class="gate-card">
-        <h2>Sign in to view your ledger</h2>
-        <p>Your data lives in your private "Ledger Database" Google Sheet. Sign in with the Google account that owns it to continue.</p>
-        <button id="gate-signin-btn" class="btn btn-primary">Sign in with Google</button>
-        <p id="auth-status" class="status" hidden></p>
+    <div class="landing">
+        <div class="landing-hero">
+            <h1>Take control of your finances</h1>
+            <p>Ledger is a private, serverless personal finance dashboard. Track your accounts, transactions, and spending trends — all while your data stays in your own Google Sheet.</p>
+            <button id="gate-signin-btn" class="btn btn-primary">Sign in with Google</button>
+            <p id="auth-status" class="status" hidden></p>
+        </div>
+
+        <div class="landing-features">
+            <div class="landing-feature">
+                <h3>Visual Dashboards</h3>
+                <p>See your net worth, income vs. expenses, and category breakdowns at a glance.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Spending Insights</h3>
+                <p>Compare last month's spending to your 4-month and 12-month averages, category by category.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Transaction Management</h3>
+                <p>Add, edit, search, and filter transactions, with CSV import/export.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Private by Design</h3>
+                <p>Your financial data lives in your own private Google Sheet — never on a third-party server.</p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -62,34 +86,15 @@
         </div>
     </div>
 
-    <div class="panel" id="accounts">
-        <h2>Accounts</h2>
+    <div class="panel" id="category-comparison-panel">
+        <h2>Spending vs Yearly Average</h2>
+        <p class="hint">Last month's spending per category compared to your 4-month and 12-month averages. Red means you spent more than your yearly average, green means less.</p>
 
-        <div id="accounts-panel"></div>
-    </div>
-
-    <div style="height:1rem"></div>
-
-    <div class="panel">
-        <div class="panel-header">
-            <h2>Manage Accounts</h2>
-            <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
+        <div class="chart-box chart-box-tall">
+            <canvas id="category-comparison-chart"></canvas>
         </div>
 
-        <div class="table-responsive">
-            <table id="accounts-table">
-                <thead>
-                <tr>
-                    <th class="sortable" data-sort="name">Account Name</th>
-                    <th class="sortable" data-sort="institution">Institution</th>
-                    <th class="sortable" data-sort="type">Type</th>
-                    <th></th>
-                </tr>
-                </thead>
-
-                <tbody id="accounts-list-body"></tbody>
-            </table>
-        </div>
+        <div id="category-comparison"></div>
     </div>
 
     <div style="height:1rem"></div>
@@ -116,21 +121,21 @@
 
     <div style="height:1rem"></div>
 
-    <div class="panel" id="trends">
-        <h2>Cumulative Savings Over Time</h2>
-
-        <div class="chart-box">
-            <canvas id="savings-trend-chart"></canvas>
-        </div>
-    </div>
-
-    <div style="height:1rem"></div>
-
     <div class="panel">
         <h2>Expense Breakdown Over Time</h2>
 
         <div class="chart-box">
             <canvas id="expense-breakdown-trend-chart"></canvas>
+        </div>
+    </div>
+
+    <div style="height:1rem"></div>
+
+    <div class="panel" id="trends">
+        <h2>Cumulative Savings Over Time</h2>
+
+        <div class="chart-box">
+            <canvas id="savings-trend-chart"></canvas>
         </div>
     </div>
 
@@ -170,6 +175,38 @@
         </div>
 
         <div class="pagination" id="tx-pagination"></div>
+    </div>
+
+    <div style="height:1rem"></div>
+
+    <div class="panel" id="accounts">
+        <h2>Accounts</h2>
+
+        <div id="accounts-panel"></div>
+    </div>
+
+    <div style="height:1rem"></div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Manage Accounts</h2>
+            <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
+        </div>
+
+        <div class="table-responsive">
+            <table id="accounts-table">
+                <thead>
+                <tr>
+                    <th class="sortable" data-sort="name">Account Name</th>
+                    <th class="sortable" data-sort="institution">Institution</th>
+                    <th class="sortable" data-sort="type">Type</th>
+                    <th></th>
+                </tr>
+                </thead>
+
+                <tbody id="accounts-list-body"></tbody>
+            </table>
+        </div>
     </div>
 
 </div>

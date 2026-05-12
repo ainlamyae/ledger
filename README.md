@@ -100,16 +100,20 @@ Because the Sheets API call is made with the signed-in user's own OAuth token, o
 ```text
 ledger/
 │
-├── index.html        # Dashboard shell + sign-in gate
-├── styles.css         # Extracted from current inline <style>
-├── app.js              # App init, view routing, state
-├── auth.js             # Google Identity Services sign-in/out, token storage
-├── sheets.js           # Sheets API wrapper (batchGet, append, update, delete)
-├── charts.js           # Chart.js setup for cash flow, category breakdown, etc.
-├── config.js           # Client ID + Spreadsheet ID + sheet/range names
+├── index.html              # Dashboard shell + sign-in gate
+├── favicon.svg             # Browser tab icon
 ├── assets/
-│   └── icons/
-├── Accounting.xlsx     # local source data — gitignored, never pushed
+│   ├── style/
+│   │   └── styles.css      # Extracted from former inline <style>
+│   └── script/
+│       ├── app.js          # App init, view routing, state
+│       ├── auth.js         # Google Identity Services sign-in/out, token storage
+│       ├── cache.js         # Local cache for fetched report/transaction data
+│       ├── sheets.js       # Sheets API wrapper (batchGet, append, update, delete)
+│       ├── charts.js       # Chart.js setup for cash flow, category breakdown, etc.
+│       ├── transactions.js # Transactions table, filters, add/edit/delete
+│       └── config.js       # Client ID + Spreadsheet ID + sheet/range names
+├── Accounting.xlsx         # local source data — gitignored, never pushed
 ├── .gitignore
 └── README.md
 ```
@@ -171,8 +175,8 @@ ledger/
 - [x] Cumulative savings trend over time (from `Report`)
 
 ### Phase 6 — Account management
-- [ ] Accounts page: manage the validation list (add/edit known account names)
-- [ ] Optional future tabs (investments, medical, utilities) — see *Future tabs*
+- [x] Accounts page: manage the validation list (add/edit known account names)
+- [ ] Optional future tabs (medical, utilities) — see *Future tabs*
 
 ### Phase 7 — Performance & polish
 - [x] Cache sheet data client-side (localStorage/IndexedDB) with manual refresh + TTL
@@ -182,9 +186,7 @@ ledger/
 
 ### Phase 8 — Future (v2/v3)
 - [ ] Budget tracking by category
-- [ ] Recurring transaction templates
-- [ ] CSV import/export
-- [ ] AI-generated insights / forecasting
+- [x] CSV import/export
 
 ---
 

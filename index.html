@@ -4,17 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ledger</title>
-<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style/styles.css">
 </head>
 
 <body>
 
 <header>
     <h1>Ledger</h1>
+    <nav id="main-nav" class="nav" hidden>
+        <a href="#overview">Overview</a>
+        <a href="#accounts">Accounts</a>
+        <a href="#charts">Charts</a>
+        <a href="#trends">Trends</a>
+        <a href="#transactions">Transactions</a>
+    </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
         <button id="refresh-btn" class="btn" hidden>Refresh</button>
-        <button id="signin-btn" class="btn">Sign in with Google</button>
+        <button id="signin-btn" class="btn">Sign in</button>
         <button id="signout-btn" class="btn" hidden>Sign out</button>
     </div>
 </header>
@@ -32,7 +40,7 @@
 
     <p id="dashboard-loading" class="status status-info" hidden>Loading your data…</p>
 
-    <div class="cards">
+    <div class="cards" id="overview">
         <div class="card">
             <h3>Total Net Worth</h3>
             <div class="value" id="net-worth">—</div>
@@ -54,7 +62,7 @@
         </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="accounts">
         <h2>Accounts</h2>
 
         <div id="accounts-panel"></div>
@@ -62,7 +70,31 @@
 
     <div style="height:1rem"></div>
 
-    <div class="grid">
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Manage Accounts</h2>
+            <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
+        </div>
+
+        <div class="table-responsive">
+            <table id="accounts-table">
+                <thead>
+                <tr>
+                    <th class="sortable" data-sort="name">Account Name</th>
+                    <th class="sortable" data-sort="institution">Institution</th>
+                    <th class="sortable" data-sort="type">Type</th>
+                    <th></th>
+                </tr>
+                </thead>
+
+                <tbody id="accounts-list-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="height:1rem"></div>
+
+    <div class="grid" id="charts">
 
         <div class="panel">
             <h2>Income vs Expenses (Last 12 Months)</h2>
@@ -84,7 +116,7 @@
 
     <div style="height:1rem"></div>
 
-    <div class="panel">
+    <div class="panel" id="trends">
         <h2>Cumulative Savings Over Time</h2>
 
         <div class="chart-box">
@@ -104,10 +136,15 @@
 
     <div style="height:1rem"></div>
 
-    <div class="panel">
+    <div class="panel" id="transactions">
         <div class="panel-header">
             <h2>Transactions</h2>
-            <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
+            <div class="panel-actions">
+                <button id="export-csv-btn" class="btn">Export CSV</button>
+                <button id="import-csv-btn" class="btn">Import CSV</button>
+                <input type="file" id="import-csv-input" accept=".csv" hidden>
+                <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
+            </div>
         </div>
 
         <div class="filters">
@@ -172,14 +209,48 @@
     </div>
 </div>
 
+<div id="account-modal" class="modal" hidden>
+    <div class="modal-card">
+        <h2 id="account-modal-title">Add Account</h2>
+
+        <form id="account-form">
+            <label>Account Name
+                <input type="text" id="account-name" required>
+            </label>
+            <label>Institution
+                <input type="text" id="account-institution">
+            </label>
+            <label>Type
+                <select id="account-type">
+                    <option>Chequing</option>
+                    <option>Savings</option>
+                    <option>Credit</option>
+                    <option>Cash</option>
+                    <option>Investment</option>
+                    <option>Person (IOU)</option>
+                </select>
+            </label>
+
+            <p id="account-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="account-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="sheets.js"></script>
-<script src="cache.js"></script>
-<script src="charts.js"></script>
-<script src="transactions.js"></script>
-<script src="app.js"></script>
+<script src="assets/script/config.js"></script>
+<script src="assets/script/auth.js"></script>
+<script src="assets/script/sheets.js"></script>
+<script src="assets/script/cache.js"></script>
+<script src="assets/script/charts.js"></script>
+<script src="assets/script/transactions.js"></script>
+<script src="assets/script/accounts.js"></script>
+<script src="assets/script/csv.js"></script>
+<script src="assets/script/app.js"></script>
 </body>
 </html>

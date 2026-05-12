@@ -4,6 +4,15 @@
     box-sizing: border-box;
 }
 
+:root {
+    --color-nav: #0d2e4f;
+    --color-nav-hover: #4279ad;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     font-family: system-ui, sans-serif;
     background: #f5f7fb;
@@ -11,32 +20,118 @@ body {
 }
 
 header {
-    background: white;
-    padding: 1rem 2rem;
-    border-bottom: 1px solid #e5e7eb;
+    background: var(--color-nav);
+    padding: .75rem 1.5rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 header h1 {
-    font-size: 1.5rem;
+    flex-shrink: 0;
+    color: #fff;
+}
+
+.nav {
+    display: flex;
+    gap: 1.25rem;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+    display: none;
+}
+
+.nav[hidden] {
+    display: none;
+}
+
+.nav a {
+    position: relative;
+    display: block;
+    color: rgba(255, 255, 255, .78);
+    text-decoration: none;
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .5rem .25rem;
+    transition: color .25s ease;
+}
+
+.nav a::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    right: 50%;
+    bottom: 4px;
+    height: 2px;
+    border-radius: 2px;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, .9), 0 0 16px var(--color-nav-hover);
+    opacity: 0;
+    transition: left .3s ease, right .3s ease, opacity .3s ease;
+}
+
+.nav a:hover,
+.nav a.active {
+    color: #fff;
+}
+
+.nav a:hover::after,
+.nav a.active::after {
+    left: 12%;
+    right: 12%;
+    opacity: 1;
+}
+
+.header-actions {
+    flex-shrink: 0;
+}
+
+#overview,
+#accounts,
+#charts,
+#trends,
+#transactions {
+    scroll-margin-top: 65px;
+}
+
+header h1 {
+    font-size: 1.25rem;
 }
 
 .header-actions {
     display: flex;
     align-items: center;
-    gap: .75rem;
+    gap: .5rem;
 }
 
 .last-updated {
-    color: #6b7280;
-    font-size: .85rem;
+    color: rgba(255, 255, 255, .65);
+    font-size: .8rem;
+}
+
+header .btn {
+    background: transparent;
+    border-color: rgba(255, 255, 255, .35);
+    color: #fff;
+}
+
+header .btn:hover {
+    background: var(--color-nav-hover);
+    border-color: var(--color-nav-hover);
 }
 
 .btn {
     font: inherit;
-    padding: .5rem 1rem;
+    font-size: .85rem;
+    padding: .4rem .75rem;
     border-radius: 8px;
     border: 1px solid #e5e7eb;
     background: white;
@@ -171,6 +266,12 @@ header h1 {
     margin-bottom: 0;
 }
 
+.panel-actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
 .filters {
     display: flex;
     gap: .5rem;
@@ -217,6 +318,19 @@ th {
     color: #6b7280;
 }
 
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+th.sortable:hover {
+    color: #3b82f6;
+}
+
+.sort-indicator {
+    font-size: .75rem;
+}
+
 .income {
     color: #16a34a;
 }
@@ -228,12 +342,29 @@ th {
 .account {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
     padding: .75rem 0;
     border-bottom: 1px solid #e5e7eb;
 }
 
 .account:last-child {
     border-bottom: none;
+}
+
+.account-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.account-balance-input {
+    width: 110px;
+    font: inherit;
+    padding: .35rem .5rem;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    text-align: right;
 }
 
 .chart-box {
@@ -274,7 +405,8 @@ td .btn {
     margin-bottom: 1rem;
 }
 
-#tx-form label {
+#tx-form label,
+#account-form label {
     display: block;
     margin-bottom: 1rem;
     font-size: .9rem;
@@ -282,7 +414,9 @@ td .btn {
 }
 
 #tx-form input,
-#tx-form select {
+#tx-form select,
+#account-form input,
+#account-form select {
     display: block;
     width: 100%;
     margin-top: .25rem;
@@ -317,19 +451,41 @@ td .btn {
     }
 
     header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: .75rem;
-        padding: 1rem;
+        padding: .5rem .75rem;
+        gap: .35rem;
     }
 
     header h1 {
-        font-size: 1.25rem;
+        font-size: 1rem;
     }
 
     .header-actions {
-        width: 100%;
-        flex-wrap: wrap;
+        gap: .35rem;
+    }
+
+    .last-updated {
+        display: none;
+    }
+
+    .btn {
+        font-size: .8rem;
+        padding: .35rem .6rem;
+    }
+
+    .nav {
+        gap: .6rem;
+    }
+
+    .nav a {
+        font-size: .75rem;
+    }
+
+    #overview,
+    #accounts,
+    #charts,
+    #trends,
+    #transactions {
+        scroll-margin-top: 50px;
     }
 
     .gate {
@@ -355,6 +511,14 @@ td .btn {
 
     .panel {
         padding: 1rem;
+    }
+
+    .account {
+        flex-wrap: wrap;
+    }
+
+    .account-balance-input {
+        width: 90px;
     }
 
     .panel-header {

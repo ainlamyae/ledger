@@ -108,6 +108,24 @@ async function loadReport(forceRefresh) {
     .map((c) => ({ name: c.name, value: Math.abs(current[c.index] || 0), color: categoryColors[c.name] || '#9ca3af' }))
     .filter((c) => c.value > 0);
 
+  const sumCategory = (months, name) => months.reduce((acc, month) => {
+    const entry = month.categories.find((cat) => cat.name === name);
+    return acc + (entry ? entry.value : 0);
+  }, 0);
+
+  const recentCategoryTrend = categoryTrend.slice(-12);
+  const quarterCategoryTrend = categoryTrend.slice(-4);
+  const categoryComparison = EXPENSE_CATEGORY_COLUMNS
+    .map((c) => {
+      const lastMonth = Math.abs(current[c.index] || 0);
+      const yearAvg = recentCategoryTrend.length ? sumCategory(recentCategoryTrend, c.name) / recentCategoryTrend.length : 0;
+      const quarterAvg = quarterCategoryTrend.length ? sumCategory(quarterCategoryTrend, c.name) / quarterCategoryTrend.length : 0;
+      const diff = lastMonth - yearAvg;
+      const pct = yearAvg > 0 ? (diff / yearAvg) * 100 : (lastMonth > 0 ? 100 : 0);
+      return { name: c.name, color: categoryColors[c.name] || '#9ca3af', lastMonth, quarterAvg, yearAvg, diff, pct };
+    })
+    .filter((c) => c.lastMonth > 0 || c.quarterAvg > 0 || c.yearAvg > 0);
+
   const { netWorth, accounts } = parseBalance(balanceRows);
 
   const report = {
@@ -119,6 +137,7 @@ async function loadReport(forceRefresh) {
     savingsTrend,
     categoryTrend,
     categoryBreakdown,
+    categoryComparison,
     netWorth,
     accounts,
   };
@@ -138,6 +157,59 @@ function renderSummaryCards(data) {
   savingsEl.textContent = formatCurrency(data.saved);
   savingsEl.classList.toggle('income', data.saved >= 0);
   savingsEl.classList.toggle('expense', data.saved < 0);
+}
+
+function renderCategoryComparison(categories) {
+  const container = document.getElementById('category-comparison');
+  container.innerHTML = '';
+
+  if (!categories.length) {
+    container.innerHTML = '<p class="hint">No category data yet.</p>';
+    return;
+  }
+
+  categories.forEach((cat) => {
+    const row = document.createElement('div');
+    row.className = 'cat-compare-row';
+
+    const name = document.createElement('div');
+    name.className = 'cat-compare-name';
+
+    const dot = document.createElement('span');
+    dot.className = 'cat-dot';
+    dot.style.background = cat.color;
+
+    name.append(dot, document.createTextNode(cat.name));
+
+    const values = document.createElement('div');
+    values.className = 'cat-compare-values';
+
+    const last = document.createElement('span');
+    last.textContent = formatCurrency(cat.lastMonth);
+
+    const quarter = document.createElement('span');
+    quarter.className = 'cat-compare-avg';
+    quarter.textContent = `4mo avg ${formatCurrency(cat.quarterAvg)}`;
+
+    const avg = document.createElement('span');
+    avg.className = 'cat-compare-avg';
+    avg.textContent = `12mo avg ${formatCurrency(cat.yearAvg)}`;
+
+    const change = document.createElement('span');
+    change.className = 'cat-compare-change';
+    if (Math.abs(cat.diff) < 0.005) {
+      change.textContent = '0%';
+      change.classList.add('flat');
+    } else {
+      const sign = cat.diff > 0 ? '+' : '';
+      change.textContent = `${sign}${cat.pct.toFixed(0)}%`;
+      change.classList.add(cat.diff > 0 ? 'increase' : 'decrease');
+    }
+
+    values.append(last, quarter, avg, change);
+    row.append(name, values);
+    container.appendChild(row);
+  });
 }
 
 function renderAccountsPanel(accounts) {
@@ -267,6 +339,8 @@ async function loadDashboard(forceRefresh = false) {
     const report = await loadReport(forceRefresh);
     currentReport = report;
     renderSummaryCards(report);
+    renderCategoryComparisonChart(report.categoryComparison);
+    renderCategoryComparison(report.categoryComparison);
     renderAccountsPanel(report.accounts);
     renderIncomeExpenseChart(report.last12);
     renderExpenseBreakdownChart(report.categoryBreakdown, report.month);

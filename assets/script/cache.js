@@ -23,3 +23,19 @@ function clearCache() {
     .filter((key) => key.startsWith(CACHE_PREFIX))
     .forEach((key) => localStorage.removeItem(key));
 }
+
+async function hardRefresh() {
+  clearCache();
+
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+  }
+
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((reg) => reg.unregister()));
+  }
+
+  location.reload();
+}

@@ -8,6 +8,7 @@ let transactionsSheetId = null;
 let editingRow = null;
 let currentPage = 1;
 let listenersAttached = false;
+let txSort = { key: null, dir: 1 };
 
 async function initTransactions(forceRefresh = false) {
   let lists = forceRefresh ? null : getCached('lists');
@@ -15,10 +16,14 @@ async function initTransactions(forceRefresh = false) {
   if (!lists) {
     const [meta, listsResp] = await Promise.all([
       getSpreadsheetMetadata(),
-      batchGetValues([`${CONFIG.SHEETS.ACCOUNTS}!A2:A`, `${CONFIG.SHEETS.CATEGORIES}!A2:A`], VALUE_PARAMS),
+      batchGetValues([`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.CATEGORIES}!A2:A`], VALUE_PARAMS),
     ]);
 
     const sheet = meta.sheets.find((s) => s.properties.title === CONFIG.SHEETS.TRANSACTIONS);
+    if (!sheet) {
+      const available = meta.sheets.map((s) => s.properties.title).join(', ');
+      throw new Error(`Sheet tab "${CONFIG.SHEETS.TRANSACTIONS}" not found. Available tabs: ${available}`);
+    }
     lists = {
       transactionsSheetId: sheet.properties.sheetId,
       accountOptions: (listsResp.valueRanges[0].values || []).map((r) => r[0]).filter(Boolean),
@@ -47,7 +52,45 @@ async function initTransactions(forceRefresh = false) {
       currentPage = 1;
       renderTransactions();
     });
+    setupTransactionSorting();
   }
+}
+
+function setupTransactionSorting() {
+  document.querySelectorAll('#transactions-table th.sortable').forEach((th) => {
+    const label = document.createElement('span');
+    label.textContent = th.textContent;
+
+    const indicator = document.createElement('span');
+    indicator.className = 'sort-indicator';
+
+    th.textContent = '';
+    th.append(label, indicator);
+
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (txSort.key === key) {
+        txSort.dir *= -1;
+      } else {
+        txSort.key = key;
+        txSort.dir = 1;
+      }
+      updateTransactionSortIndicators();
+      currentPage = 1;
+      renderTransactions();
+    });
+  });
+}
+
+function updateTransactionSortIndicators() {
+  document.querySelectorAll('#transactions-table th.sortable').forEach((th) => {
+    const indicator = th.querySelector('.sort-indicator');
+    if (th.dataset.sort === txSort.key) {
+      indicator.textContent = txSort.dir === 1 ? ' ▲' : ' ▼';
+    } else {
+      indicator.textContent = '';
+    }
+  });
 }
 
 async function refreshTransactions(forceRefresh = false) {
@@ -73,7 +116,7 @@ async function refreshTransactions(forceRefresh = false) {
 
 async function refreshAccountOptions() {
   const { valueRanges } = await batchGetValues(
-    [`${CONFIG.SHEETS.ACCOUNTS}!A2:A`, `${CONFIG.SHEETS.CATEGORIES}!A2:A`],
+    [`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.CATEGORIES}!A2:A`],
     VALUE_PARAMS
   );
 
@@ -105,7 +148,7 @@ function getFilteredTransactions() {
   const search = document.getElementById('tx-search').value.trim().toLowerCase();
   const category = document.getElementById('tx-category-filter').value;
 
-  return allTransactions
+  const filtered = allTransactions
     .filter((t) => !category || t.category === category)
     .filter((t) => {
       if (!search) return true;
@@ -115,8 +158,15 @@ function getFilteredTransactions() {
         t.account.toLowerCase().includes(search) ||
         t.category.toLowerCase().includes(search)
       );
-    })
-    .reverse();
+    });
+
+  if (!txSort.key) return filtered.reverse();
+
+  const { key, dir } = txSort;
+  return [...filtered].sort((a, b) => {
+    if (key === 'amount') return (a.amount - b.amount) * dir;
+    return String(a[key]).localeCompare(String(b[key]), undefined, { sensitivity: 'base' }) * dir;
+  });
 }
 
 function renderTransactions() {
@@ -152,12 +202,16 @@ function renderTransactions() {
     const actionsCell = document.createElement('td');
     const editBtn = document.createElement('button');
     editBtn.className = 'btn';
-    editBtn.textContent = 'Edit';
+    editBtn.textContent = '✏️';
+    editBtn.title = 'Edit';
+    editBtn.setAttribute('aria-label', 'Edit');
     editBtn.addEventListener('click', () => openTransactionForm(t));
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn';
-    deleteBtn.textContent = 'Delete';
+    deleteBtn.textContent = '🗑️';
+    deleteBtn.title = 'Delete';
+    deleteBtn.setAttribute('aria-label', 'Delete');
     deleteBtn.addEventListener('click', () => deleteTransaction(t.row));
 
     actionsCell.append(editBtn, deleteBtn);

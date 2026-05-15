@@ -16,22 +16,25 @@ A single Google Sheet ("Ledger Database") with the following tabs, shared **only
 | Column | Type | Notes |
 |---|---|---|
 | Date | Date | ISO format, real date cell |
-| Account | Text | From `Accounts` dropdown |
+| Account | Text | From `Account Balance` dropdown |
 | Payee | Text | Merchant / person / institution |
 | Description | Text | Optional detail |
 | Amount | Number | Positive = income, negative = expense. The sign alone defines the type — no separate Income/Expense/Transfer column. Transfers between own accounts aren't recorded. |
 | Category | Text | From `Categories` dropdown |
 
-Column order (A–F) matches what `Report`'s `SUMIFS` formulas already expect (`E` = Amount, `F` = Category).
+Column order (A–F) matches what `Monthly Summary`'s `SUMIFS` formulas already expect (`E` = Amount, `F` = Category).
 
-### 2. `Accounts`
-A lookup/reference list only — used to check that each transaction's `Account` value matches a real, known account. Not used for balance calculations.
+### 2. `Account Balance`
+Net worth snapshot + account validation list combined into one tab.
 
-| Column | Type | Notes |
+| Cell/Column | Type | Notes |
 |---|---|---|
-| Account Name | Text | Canonical name (data validation source for `Transactions`) |
-| Institution | Text | e.g. Wealthsimple, CIBC, RBC, Tangerine |
-| Type | Text | Chequing / Savings / Credit / Cash / Investment / Person (IOU) |
+| D1 | Number (formula) | Net worth total, e.g. `=ROUND(SUM(D3:D100),2)` — widened beyond the current row count to leave headroom for new accounts |
+| Row 2 | Header | `Account \| Institute \| Type \| Balance` |
+| A3:A | Text | Account name (data validation source for `Transactions`, and the dashboard's Accounts table) |
+| B3:B | Text | Institution, e.g. Wealthsimple, CIBC, RBC, Tangerine |
+| C3:C | Text | Type — Cash / Chequing / Checking / Saving / Credit / Investment / Investment (Managed) / Person / Other |
+| D3:D | Number | Account balance (manually maintained, or a formula referencing e.g. `GOOGLEFINANCE`); `"Closed"` (text) for retired accounts — excluded from the dashboard accounts panel |
 
 ### 3. `Categories`
 | Column | Type | Notes |
@@ -39,10 +42,14 @@ A lookup/reference list only — used to check that each transaction's `Account`
 | Category | Text | e.g. Grocery, Transportation, Medical |
 | Color | Text | Hex color for charts |
 
+### Helper tabs (formula-only)
+- **`Benchmarks`** — "Last Month / Last Quarter Average / Last Year Average / Lifelong Average" rollups of `Monthly Summary`, per category. Read directly by `app.js` for the "Spending Trend" chart — the dashboard never recomputes these averages itself (with 10k+ transaction rows, re-deriving them client-side would be wasteful when Google Sheets already computes them).
+- **`Reconciliation`** — reconciles `Monthly Summary`'s cumulative savings against `Account Balance`'s net worth total (`'Account Balance'!D1`). Not read by the app.
+- **`Chart`** — native Google Sheets charts (visual reference only; the live dashboard uses its own Chart.js charts). Not read by the app.
 
-### `Report` and `Balance`
+### `Monthly Summary`
 
-`Report` stays and remains formula-driven (`SUMIFS` against `Transactions`), so it's always computed by Google Sheets and reflects the latest data with zero frontend aggregation. `Balance` (net worth snapshot) remains a separate, manually-maintained reference sheet.
+`Monthly Summary` stays and remains formula-driven (`SUMIFS` against `Transactions`), so it's always computed by Google Sheets and reflects the latest data with zero frontend aggregation. Row 1 is the header; data rows start at row 2.
 
 ---
 
@@ -69,18 +76,21 @@ A lookup/reference list only — used to check that each transaction's `Account`
      └───────────────────────────┘    └─────────────────┬──────────────────┘
                                                           │ 4. read / write
                                                           ▼
-                                  ┌──────────────────────────────────────────┐
-                                  │     "Ledger Database" Google Sheet         │
-                                  │     (private; shared with owner only)      │
+                                  ┌─────────────────────────────────────────────┐
+                                  │       "Ledger Database" Google Sheet        │
+                                  │      (private; shared with owner only)      │
                                   │                                             │
-                                  │  ┌────────────┐ ┌─────────┐ ┌────────────┐ │
-                                  │  │Transactions│ │ Accounts│ │ Categories │ │
-                                  │  └────────────┘ └─────────┘ └────────────┘ │
-                                  │  ┌────────────┐ ┌─────────┐               │
-                                  │  │   Report   │ │ Balance │               │
-                                  │  │ (formulas) │ │(manual) │               │
-                                  │  └────────────┘ └─────────┘               │
-                                  └──────────────────────────────────────────┘
+                                  │ ┌──────────────┐ ┌─────────────────┐        │
+                                  │ │ Transactions │ │ Account Balance │        │
+                                  │ └──────────────┘ └─────────────────┘        │
+                                  │ ┌─────────────────┐ ┌────────────┐          │
+                                  │ │ Monthly Summary │ │ Categories │          │
+                                  │ │   (formulas)    │ │            │          │
+                                  │ └─────────────────┘ └────────────┘          │
+                                  │ ┌────────────┐ ┌────────────────┐ ┌───────┐ │
+                                  │ │ Benchmarks │ │ Reconciliation │ │ Chart │ │
+                                  │ └────────────┘ └────────────────┘ └───────┘ │
+                                  └─────────────────────────────────────────────┘
 ```
 
 Because every Sheets API call carries the signed-in user's own OAuth token, only accounts the spreadsheet has been shared with (i.e., the owner) can ever read or write data — even though the static site and `config.js` (Client ID + Spreadsheet ID) are public.
@@ -95,9 +105,9 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh | `initAuth`, `signIn`, `signOut`, `getAccessToken` |
 | 3 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL | `getCached`, `setCached`, `clearCache` |
-| 5 | `charts.js` | Chart.js renderers (income/expense, category breakdown, savings trend, category comparison) | `render*Chart` |
-| 6 | `transactions.js` | Transactions table: list, search/filter, pagination, add/edit/delete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
-| 7 | `accounts.js` | "Manage Accounts" validation list: CRUD + sortable table | `initAccountManager` |
+| 5 | `charts.js` | Chart.js renderers for the 4 dashboard charts: Spending Trend (bar vs. `Benchmarks` averages), Income vs Expenses Over Time (stepped area), Expense Breakdown Over Time (stacked bar, y-axis capped so outlier months don't flatten the rest), Cumulative Savings Over Time (line) | `render*Chart` |
+| 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
+| 7 | `accounts.js` | Accounts table: merged balance + validation-list view (Name/Institution/Type/Balance), sortable, CRUD with inline balance editing | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |
 | 9 | `app.js` | Orchestration: report aggregation, dashboard rendering, scroll-spy nav, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange` |
 
@@ -109,13 +119,13 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 3. On success, `handleAuthChange(token)` swaps the landing page for the dashboard and calls `loadDashboard()`.
 
 **Dashboard load**
-4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or calls `batchGetValues` for the `Report`, `Balance`, and `Categories` ranges in one round trip, then derives summary cards, the last-12-months chart data, category breakdown, savings trend, and the category comparison (last month vs. 4-/12-month averages).
+4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or calls `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, and `Categories` ranges in one round trip, then derives the summary cards, the income/expense and cumulative-savings trends (full history), the per-category expense breakdown over time, and the Spending Trend comparison (last month vs. quarter/year/lifelong averages, read directly from `Benchmarks`).
 5. `initTransactions()` and `initAccountManager()` similarly check cache (`ledger_cache_transactions`, `ledger_cache_lists`, `ledger_cache_account-list`, `ledger_cache_accounts-meta`) before calling the Sheets API.
-6. `charts.js` renders all Chart.js canvases; `app.js` renders the summary cards, accounts panel, and category comparison list.
+6. `charts.js` renders all four Chart.js canvases; `app.js` renders the summary cards; `accounts.js` renders the Accounts table.
 
 **Writes** (add/edit/delete transaction or account, edit balance, CSV import)
 7. UI actions call `appendValues` / `updateValues` / `batchUpdate` directly against the spreadsheet.
-8. On success, the relevant cache key is refreshed (`refreshTransactions(true)`, `refreshAccountsList(true)`, `refreshBalances()`, etc.) so the UI reflects the change immediately without a full page reload.
+8. On success, the relevant cache key is refreshed (`refreshTransactions(true)`, `refreshAccountsList(true)`, `refreshNetWorth()`, etc.) so the UI reflects the change immediately without a full page reload.
 9. The manual **Refresh** button calls `clearCache()` then `loadDashboard(true)`, forcing a full re-fetch of everything.
 
 ### Configuration Reference
@@ -125,11 +135,12 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | Key | Example | Notes |
 |---|---|---|
 | `CLIENT_ID` | `*.apps.googleusercontent.com` | OAuth 2.0 Web Client ID; must allow the GitHub Pages origin |
-| `SPREADSHEET_ID` | `1dDuXPry...` | The "Ledger Database" spreadsheet ID |
+| `SPREADSHEET_ID` | (from the sheet's URL) | The "Ledger Database" spreadsheet ID |
 | `SHEETS.TRANSACTIONS` | `Transactions` | Tab name for transaction rows |
-| `SHEETS.REPORT` | `Report` | Tab name for the formula-driven monthly report |
-| `SHEETS.BALANCE` | `Balance` | Tab name for the manual net-worth/account balances sheet |
-| `SHEETS.ACCOUNTS` | `Accounts` | Tab name for the account validation list |
+| `SHEETS.REPORT` | `Monthly Summary` | Tab name for the formula-driven monthly report |
+| `SHEETS.BENCHMARKS` | `Benchmarks` | Tab name for the pre-computed per-category spending averages |
+| `SHEETS.BALANCE` | `Account Balance` | Tab name for the net-worth/account balances sheet |
+| `SHEETS.ACCOUNTS` | `Account Balance` | Same tab as `BALANCE` — account validation list lives in columns B-D |
 | `SHEETS.CATEGORIES` | `Categories` | Tab name for category names + chart colors |
 
 These IDs are not secrets — see *Privacy & Security*.
@@ -138,22 +149,23 @@ These IDs are not secrets — see *Privacy & Security*.
 
 | Range | Used in | Purpose |
 |---|---|---|
-| `Report!A3:N114` | `app.js` | Monthly income/expense/category data, cumulative savings |
-| `Balance!A1:B26` | `app.js` | Net worth (`A5`) + per-account balances (`A7:B26`) |
+| `'Monthly Summary'!A2:L149` | `app.js` | Monthly income/expense/category data, cumulative savings (row 1 is the header) |
+| `'Benchmarks'!A1:K5` | `app.js` | Pre-computed Last Month / Last Quarter / Last Year / Lifelong Average per category for the "Spending Trend" chart |
+| `'Account Balance'!A1:D1` | `app.js` | Net worth total (`D1`) for the summary card |
 | `Categories!A2:B` | `app.js` | Category name → chart color |
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows (Date, Account, Payee, Description, Amount, Category) |
-| `Accounts!A2:C` | `accounts.js` | Account Name, Institution, Type |
-| `Accounts!A2:A`, `Categories!A2:A` | `transactions.js` | Dropdown option lists for the transaction form |
+| `'Account Balance'!A3:D100` | `accounts.js` | Account Name, Institution, Type, Balance |
+| `'Account Balance'!A3:A100`, `Categories!A2:A` | `transactions.js` | Dropdown option lists for the transaction form |
 
 **Client-side cache (`localStorage`, 5-minute TTL via `cache.js`):**
 
 | Cache key | Set by | Contents |
 |---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report object (cards, charts, accounts, category comparison) |
+| `ledger_cache_report` | `app.js` | Aggregated report object (summary cards, chart data, Spending Trend comparison) |
 | `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + account/category dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
-| `ledger_cache_accounts-meta` | `accounts.js` | Accounts sheet ID |
-| `ledger_cache_account-list` | `accounts.js` | Raw `Accounts!A2:C` rows |
+| `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |
+| `ledger_cache_account-list` | `accounts.js` | Raw `'Account Balance'!A3:D100` rows |
 
 **Auth token (`localStorage`, separate from the cache above):**
 
@@ -199,12 +211,12 @@ ledger/
 │       ├── auth.js         # Google Identity Services sign-in/out, token storage
 │       ├── cache.js         # Local cache for fetched report/transaction data
 │       ├── sheets.js       # Sheets API wrapper (batchGet, append, update, delete)
-│       ├── charts.js       # Chart.js setup for cash flow, category breakdown, etc.
-│       ├── transactions.js # Transactions table, filters, add/edit/delete
-│       ├── accounts.js     # Manage Accounts: validation list CRUD + sorting
+│       ├── charts.js       # Chart.js setup: Spending Trend, Income vs Expenses, Expense Breakdown, Cumulative Savings
+│       ├── transactions.js # Transactions table, filters, sorting, add/edit/delete
+│       ├── accounts.js     # Accounts table: balances + validation list, CRUD + sorting
 │       ├── csv.js          # CSV export/import for transactions
 │       └── config.js       # Client ID + Spreadsheet ID + sheet/range names
-├── Accounting.xlsx         # local source data — gitignored, never pushed
+├── Accounting.xlsx          # local source data — gitignored, never pushed
 ├── .gitignore
 └── README.md
 ```
@@ -228,56 +240,6 @@ ledger/
    - These values are not secrets — access is enforced by Google's per-user OAuth consent + the spreadsheet's sharing settings, not by hiding these IDs.
 
 4. **Deploy** (see Deployment section below).
-
----
-
-## Implementation Plan
-
-### Phase 0 — Data migration & schema setup
-- [x] Rebuild `Transactions` with columns `Date | Account | Payee | Description | Amount | Category` (matches what `Report`'s `SUMIFS` formulas already expect)
-- [x] Clean data per the *Issues* list (real dates, canonical account names, consistent category casing)
-- [x] Create the `Accounts` (validation list) and `Categories` tabs
-- [x] Add data validation dropdowns for `Account` and `Category` columns in `Transactions`
-- [x] Verify `Report`'s `SUMIFS` formulas recalculate correctly against the renamed sheet
-
-### Phase 1 — Auth & API plumbing
-- [x] Set up Google Cloud project + OAuth Client ID
-- [x] `auth.js`: sign-in/sign-out with Google Identity Services, token persistence
-- [x] `sheets.js`: `batchGet`/`values.get` wrapper, `append`/`update` for writes
-
-### Phase 2 — Frontend scaffold
-- [x] Split current monolithic `index.html` into `index.html` + `styles.css` + `app.js`
-- [x] Add a sign-in gate; show dashboard only after auth succeeds
-
-### Phase 3 — Read-only dashboard (MVP)
-- [x] Fetch `Report` for net worth, monthly income/expenses, and savings rate (already pre-aggregated by Google Sheets)
-- [x] Fetch `Transactions` for the recent transactions table
-- [x] Replace hardcoded cards/table in `index.html` with live data
-- [x] `charts.js`: cash flow chart (last 6–12 months) from `Report`
-
-### Phase 4 — Transaction management (CRUD)
-- [x] Add-transaction form → append row to `Transactions`
-- [x] Edit/delete transaction → update/delete row by tracked row index
-- [x] Client-side search/filter over fetched transactions (with pagination — 10k+ rows)
-
-### Phase 5 — Reports & analytics
-- [x] Expense breakdown by category (donut chart)
-- [x] Income vs expense trend (Chart.js line/bar) from `Report`
-- [x] Cumulative savings trend over time (from `Report`)
-
-### Phase 6 — Account management
-- [x] Accounts page: manage the validation list (add/edit known account names)
-- [ ] Optional future tabs (medical, utilities) — see *Future tabs*
-
-### Phase 7 — Performance & polish
-- [x] Cache sheet data client-side (localStorage/IndexedDB) with manual refresh + TTL
-- [x] Loading/error states for auth & API failures
-- [x] Virtualized/paginated transactions table
-- [x] Mobile responsiveness pass
-
-### Phase 8 — Future (v2/v3)
-- [ ] Budget tracking by category
-- [x] CSV import/export
 
 ---
 

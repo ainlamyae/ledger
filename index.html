@@ -18,7 +18,6 @@
     <nav id="main-nav" class="nav" hidden>
         <a href="#overview">Overview</a>
         <a href="#charts">Charts</a>
-        <a href="#trends">Trends</a>
         <a href="#transactions">Transactions</a>
         <a href="#accounts">Accounts</a>
     </nav>
@@ -90,37 +89,22 @@
         </div>
     </div>
 
-    <div class="panel" id="category-comparison-panel">
-        <h2>Spending vs Yearly Average</h2>
-        <p class="hint">Last month's spending per category compared to your 4-month and 12-month averages. Red means you spent more than your yearly average, green means less.</p>
+    <div class="panel">
+        <h2>Spending Trend</h2>
 
-        <div class="chart-box chart-box-tall">
-            <canvas id="category-comparison-chart"></canvas>
+        <div class="chart-box">
+            <canvas id="spending-trend-chart"></canvas>
         </div>
-
-        <div id="category-comparison"></div>
     </div>
 
     <div style="height:1rem"></div>
 
-    <div class="grid" id="charts">
+    <div class="panel" id="charts">
+        <h2>Income vs Expenses Over Time</h2>
 
-        <div class="panel">
-            <h2>Income vs Expenses (Last 12 Months)</h2>
-
-            <div class="chart-box">
-                <canvas id="income-expense-chart"></canvas>
-            </div>
+        <div class="chart-box">
+            <canvas id="income-expense-chart"></canvas>
         </div>
-
-        <div class="panel">
-            <h2>Expense Breakdown (<span id="expense-breakdown-month"></span>)</h2>
-
-            <div class="chart-box">
-                <canvas id="expense-breakdown-chart"></canvas>
-            </div>
-        </div>
-
     </div>
 
     <div style="height:1rem"></div>
@@ -135,7 +119,7 @@
 
     <div style="height:1rem"></div>
 
-    <div class="panel" id="trends">
+    <div class="panel">
         <h2>Cumulative Savings Over Time</h2>
 
         <div class="chart-box">
@@ -162,14 +146,14 @@
         </div>
 
         <div class="table-responsive">
-            <table>
+            <table id="transactions-table">
                 <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Payee</th>
-                    <th>Description</th>
-                    <th>Category</th>
-                    <th>Amount</th>
+                    <th class="sortable" data-sort="date">Date</th>
+                    <th class="sortable" data-sort="payee">Payee</th>
+                    <th class="sortable" data-sort="description">Description</th>
+                    <th class="sortable" data-sort="category">Category</th>
+                    <th class="sortable" data-sort="amount">Amount</th>
                     <th></th>
                 </tr>
                 </thead>
@@ -184,16 +168,8 @@
     <div style="height:1rem"></div>
 
     <div class="panel" id="accounts">
-        <h2>Accounts</h2>
-
-        <div id="accounts-panel"></div>
-    </div>
-
-    <div style="height:1rem"></div>
-
-    <div class="panel">
         <div class="panel-header">
-            <h2>Manage Accounts</h2>
+            <h2>Accounts</h2>
             <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
         </div>
 
@@ -204,6 +180,7 @@
                     <th class="sortable" data-sort="name">Account Name</th>
                     <th class="sortable" data-sort="institution">Institution</th>
                     <th class="sortable" data-sort="type">Type</th>
+                    <th class="sortable" data-sort="balance">Balance</th>
                     <th></th>
                 </tr>
                 </thead>
@@ -270,6 +247,9 @@
                     <option>Investment</option>
                     <option>Person (IOU)</option>
                 </select>
+            </label>
+            <label>Balance
+                <input type="number" step="0.01" id="account-balance" required>
             </label>
 
             <p id="account-form-error" class="status" hidden></p>

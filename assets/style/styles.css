@@ -102,7 +102,6 @@ header h1 {
     flex-shrink: 0;
 }
 
-#overview,
 #accounts,
 #charts,
 #transactions {
@@ -487,7 +486,6 @@ td .btn {
         font-size: .75rem;
     }
 
-    #overview,
     #accounts,
     #charts,
     #transactions {

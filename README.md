@@ -12,7 +12,7 @@ Track income, expenses, account balances, investments, and financial trends whil
 
 A single Google Sheet ("Ledger Database") with the following tabs, shared **only with your own Google account** (private):
 
-### 1. `Transactions` (replaces `Detail` + `Rent` + `CELPiPi`)
+### 1. `Transactions`
 | Column | Type | Notes |
 |---|---|---|
 | Date | Date | ISO format, real date cell |

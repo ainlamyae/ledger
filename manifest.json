@@ -1,0 +1,14 @@
+{
+  "name": "Ledger",
+  "short_name": "Ledger",
+  "description": "Private, serverless personal finance dashboard.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#0d2e4f",
+  "icons": [
+    { "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "assets/apple-touch-icon.png", "type": "image/png", "sizes": "180x180" }
+  ]
+}

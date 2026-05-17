@@ -277,6 +277,8 @@ function openTransactionForm(transaction) {
   populateSelect(document.getElementById('tx-account'), accountOptions, transaction ? transaction.account : '');
   populateSelect(document.getElementById('tx-category'), categoryOptions, transaction ? transaction.category : '');
 
+  document.getElementById('tx-save-add-btn').hidden = !!transaction;
+
   document.getElementById('tx-form-error').hidden = true;
   document.getElementById('tx-modal').hidden = false;
 }
@@ -288,6 +290,8 @@ function closeTransactionForm() {
 
 async function submitTransactionForm(event) {
   event.preventDefault();
+
+  const keepOpen = event.submitter?.id === 'tx-save-add-btn';
 
   const values = [[
     document.getElementById('tx-date').value,
@@ -304,8 +308,16 @@ async function submitTransactionForm(event) {
     } else {
       await appendValues(TRANSACTIONS_RANGE, values);
     }
-    closeTransactionForm();
     await refreshTransactions(true);
+
+    if (keepOpen) {
+      document.getElementById('tx-description').value = '';
+      document.getElementById('tx-amount').value = '';
+      document.getElementById('tx-form-error').hidden = true;
+      document.getElementById('tx-description').focus();
+    } else {
+      closeTransactionForm();
+    }
   } catch (err) {
     const errorEl = document.getElementById('tx-form-error');
     errorEl.textContent = err.message;

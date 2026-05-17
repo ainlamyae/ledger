@@ -144,13 +144,10 @@ function renderAccountsList() {
 function openAccountForm(account) {
   editingAccountRow = account ? account.row : null;
 
-  const typeSelect = document.getElementById('account-type');
-  const validTypes = [...typeSelect.options].map((o) => o.value);
-
   document.getElementById('account-modal-title').textContent = account ? 'Edit Account' : 'Add Account';
   document.getElementById('account-name').value = account ? account.name : '';
   document.getElementById('account-institution').value = account ? account.institution : '';
-  typeSelect.value = account && validTypes.includes(account.type) ? account.type : validTypes[0];
+  document.getElementById('account-type').value = account ? account.type : '';
   document.getElementById('account-balance').value = account ? account.balance : 0;
 
   document.getElementById('account-form-error').hidden = true;

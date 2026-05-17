@@ -18,6 +18,7 @@
 }
 
 html {
+    font-size: 15px;
     scroll-behavior: smooth;
 }
 
@@ -44,11 +45,14 @@ header {
 header h1 {
     flex-shrink: 0;
     color: #fff;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
 }
 
 .nav {
     display: flex;
-    gap: 1.25rem;
+    gap: .5rem;
     flex: 1;
     min-width: 0;
     overflow-x: auto;
@@ -249,33 +253,33 @@ header .btn:hover {
 .container {
     flex: 1;
     width: 100%;
-    max-width: 1200px;
+    max-width: 900px;
     margin: auto;
     padding: 2rem;
 }
 
 .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+    gap: .75rem;
     margin-bottom: 2rem;
 }
 
 .card {
     background: white;
     border-radius: 12px;
-    padding: 1.25rem;
+    padding: 1rem;
     box-shadow: 0 1px 3px rgba(0,0,0,.08);
 }
 
 .card h3 {
     color: var(--color-text-muted);
-    font-size: .9rem;
+    font-size: .85rem;
     margin-bottom: .5rem;
 }
 
 .card .value {
-    font-size: 2rem;
+    font-size: 1.6rem;
     font-weight: 700;
 }
 
@@ -482,6 +486,10 @@ td .btn {
     color: var(--color-text);
 }
 
+#account-type::-webkit-calendar-picker-indicator {
+    display: none !important;
+}
+
 .hint {
     color: var(--color-text-muted);
     font-size: .85rem;
@@ -490,6 +498,7 @@ td .btn {
 
 .modal-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: .5rem;
 }
@@ -514,6 +523,14 @@ td .btn {
         font-size: 1rem;
     }
 
+    .logo-text {
+        display: none;
+    }
+
+    .logo-icon {
+        font-size: 1.25rem;
+    }
+
     .header-actions {
         gap: .35rem;
     }
@@ -528,7 +545,7 @@ td .btn {
     }
 
     .nav {
-        gap: .6rem;
+        gap: .4rem;
     }
 
     .nav a {
@@ -580,11 +597,24 @@ td .btn {
     }
 
     .chart-box {
-        height: 160px;
+        height: 240px;
     }
 
     .donut-grid {
         grid-template-columns: repeat(2, 1fr);
+        gap: .75rem;
+    }
+
+    .donut-item h3 {
+        font-size: .8rem;
+    }
+
+    .chart-box-donut {
+        height: 140px;
+    }
+
+    .donut-legend {
+        gap: .5rem .75rem;
     }
 
     .filters {

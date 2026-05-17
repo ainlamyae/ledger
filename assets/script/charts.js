@@ -83,6 +83,63 @@ function renderSpendingTrendChart(categories) {
   });
 }
 
+const SPENDING_BREAKDOWN_PERIODS = [
+  { key: 'lastMonth', canvasId: 'spending-breakdown-lastmonth-chart' },
+  { key: 'quarterAvg', canvasId: 'spending-breakdown-quarter-chart' },
+  { key: 'yearAvg', canvasId: 'spending-breakdown-year-chart' },
+  { key: 'lifelongAvg', canvasId: 'spending-breakdown-lifelong-chart' },
+];
+
+const spendingBreakdownCharts = {};
+
+function renderSpendingBreakdownCharts(categories) {
+  const legend = document.getElementById('spending-breakdown-legend');
+  legend.innerHTML = '';
+  categories.forEach((c) => {
+    const item = document.createElement('span');
+    item.className = 'donut-legend-item';
+
+    const swatch = document.createElement('span');
+    swatch.className = 'donut-legend-swatch';
+    swatch.style.backgroundColor = c.color;
+
+    item.append(swatch, document.createTextNode(c.name));
+    legend.appendChild(item);
+  });
+
+  SPENDING_BREAKDOWN_PERIODS.forEach(({ key, canvasId }) => {
+    const ctx = document.getElementById(canvasId);
+    if (spendingBreakdownCharts[canvasId]) spendingBreakdownCharts[canvasId].destroy();
+    if (categories.length === 0) return;
+
+    const data = categories.map((c) => c[key]);
+    const total = data.reduce((sum, v) => sum + v, 0);
+
+    spendingBreakdownCharts[canvasId] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: categories.map((c) => c.name),
+        datasets: [{ data, backgroundColor: categories.map((c) => c.color) }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (item) => {
+                const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
+                return `${item.label}: ${formatCurrency(item.raw)} (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+}
+
 let savingsTrendChart = null;
 
 function renderSavingsTrendChart(months) {

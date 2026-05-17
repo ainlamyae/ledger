@@ -383,8 +383,49 @@ th.sortable:hover {
 
 .chart-box {
     position: relative;
-    height: 360px;
+    height: 200px;
     margin-top: 1rem;
+}
+
+.donut-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.donut-item h3 {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: .9rem;
+    margin-bottom: .5rem;
+}
+
+.chart-box-donut {
+    margin-top: 0;
+}
+
+.donut-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .75rem 1.25rem;
+    margin-top: 1.25rem;
+}
+
+.donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .85rem;
+    color: var(--color-text-muted);
+}
+
+.donut-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
 }
 
 td .btn {
@@ -539,7 +580,11 @@ td .btn {
     }
 
     .chart-box {
-        height: 300px;
+        height: 160px;
+    }
+
+    .donut-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .filters {

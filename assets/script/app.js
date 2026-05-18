@@ -139,6 +139,8 @@ function renderSummaryCards(data) {
   document.getElementById('expenses-label').textContent = `Expenses (${data.month})`;
   document.getElementById('expenses-value').textContent = formatCurrency(data.expenses);
 
+  document.getElementById('cashflow-label').textContent = `Net Cash Flow (${data.month})`;
+
   const savingsEl = document.getElementById('savings-value');
   savingsEl.textContent = formatCurrency(data.saved);
   savingsEl.classList.toggle('income', data.saved >= 0);

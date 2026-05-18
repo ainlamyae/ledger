@@ -4,6 +4,11 @@ function renderIncomeExpenseChart(months) {
   const ctx = document.getElementById('income-expense-chart');
   if (incomeExpenseChart) incomeExpenseChart.destroy();
 
+  renderCategoryLegend('income-expense-legend', [
+    { name: 'Income', color: '#16a34a' },
+    { name: 'Expenses', color: '#dc2626' },
+  ]);
+
   incomeExpenseChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -16,6 +21,7 @@ function renderIncomeExpenseChart(months) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true } },
     },
   });
@@ -29,6 +35,8 @@ function renderExpenseBreakdownTrendChart(months) {
   if (months.length === 0) return;
 
   const categories = months[0].categories;
+
+  renderCategoryLegend('expense-breakdown-trend-legend', categories);
 
   // Cap the y-axis at 1.2x the second-highest monthly total so a single
   // outlier month doesn't squash every other month's bars into a sliver.
@@ -49,6 +57,7 @@ function renderExpenseBreakdownTrendChart(months) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
       scales: {
         x: { stacked: true },
         y: { stacked: true, beginAtZero: true, max: yMax },
@@ -59,26 +68,63 @@ function renderExpenseBreakdownTrendChart(months) {
 
 let spendingTrendChart = null;
 
+// Convert a category's hex color to rgba so each of the 4 period bars for a
+// category shares its hue, distinguished by opacity (most recent = most opaque).
+function hexToRgba(hex, alpha) {
+  const value = hex.replace('#', '');
+  const full = value.length === 3 ? value.split('').map((ch) => ch + ch).join('') : value;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const SPENDING_TREND_PERIODS = [
+  { key: 'lastMonth', label: 'Last Month', alpha: 1 },
+  { key: 'quarterAvg', label: 'Last Quarter Average', alpha: 0.7 },
+  { key: 'yearAvg', label: 'Last Year Average', alpha: 0.45 },
+  { key: 'lifelongAvg', label: 'Lifelong Average', alpha: 0.25 },
+];
+
+// Renders the shared category-color swatch legend used under the
+// Spending vs. Benchmarks and Spending Breakdown by Category charts.
+function renderCategoryLegend(containerId, categories) {
+  const legend = document.getElementById(containerId);
+  legend.innerHTML = '';
+  categories.forEach((c) => {
+    const item = document.createElement('span');
+    item.className = 'donut-legend-item';
+
+    const swatch = document.createElement('span');
+    swatch.className = 'donut-legend-swatch';
+    swatch.style.backgroundColor = c.color;
+
+    item.append(swatch, document.createTextNode(c.name));
+    legend.appendChild(item);
+  });
+}
+
 function renderSpendingTrendChart(categories) {
   const ctx = document.getElementById('spending-trend-chart');
   if (spendingTrendChart) spendingTrendChart.destroy();
+
+  renderCategoryLegend('spending-trend-legend', categories);
   if (categories.length === 0) return;
 
   spendingTrendChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: categories.map((c) => c.name),
-      datasets: [
-        { label: 'Last Month', data: categories.map((c) => c.lastMonth), backgroundColor: '#1d4ed8' },
-        { label: 'Last Quarter Average', data: categories.map((c) => c.quarterAvg), backgroundColor: '#3b82f6' },
-        { label: 'Last Year Average', data: categories.map((c) => c.yearAvg), backgroundColor: '#93c5fd' },
-        { label: 'Lifelong Average', data: categories.map((c) => c.lifelongAvg), backgroundColor: '#dbeafe' },
-      ],
+      datasets: SPENDING_TREND_PERIODS.map((p) => ({
+        label: p.label,
+        data: categories.map((c) => c[p.key]),
+        backgroundColor: categories.map((c) => hexToRgba(c.color, p.alpha)),
+      })),
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true } },
+      scales: { x: { ticks: { display: false } }, y: { beginAtZero: true } },
     },
   });
 }
@@ -93,19 +139,7 @@ const SPENDING_BREAKDOWN_PERIODS = [
 const spendingBreakdownCharts = {};
 
 function renderSpendingBreakdownCharts(categories) {
-  const legend = document.getElementById('spending-breakdown-legend');
-  legend.innerHTML = '';
-  categories.forEach((c) => {
-    const item = document.createElement('span');
-    item.className = 'donut-legend-item';
-
-    const swatch = document.createElement('span');
-    swatch.className = 'donut-legend-swatch';
-    swatch.style.backgroundColor = c.color;
-
-    item.append(swatch, document.createTextNode(c.name));
-    legend.appendChild(item);
-  });
+  renderCategoryLegend('spending-breakdown-legend', categories);
 
   SPENDING_BREAKDOWN_PERIODS.forEach(({ key, canvasId }) => {
     const ctx = document.getElementById(canvasId);

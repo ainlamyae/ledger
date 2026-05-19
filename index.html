@@ -50,6 +50,8 @@
     </div>
 </header>
 
+<div class="top-banner">"And will provide for him from where he does not expect."</div>
+
 <div id="gate" class="gate">
     <div class="landing">
         <div class="landing-hero">
@@ -184,11 +186,33 @@
     <div style="height:.5rem"></div>
 
     <div class="panel">
+        <h2>Savings Rate Trend</h2>
+
+        <div class="chart-box">
+            <canvas id="savings-rate-chart"></canvas>
+        </div>
+    </div>
+
+    <div style="height:.5rem"></div>
+
+    <div class="panel">
         <h2>Cumulative Savings Over Time</h2>
 
         <div class="chart-box">
             <canvas id="savings-trend-chart"></canvas>
         </div>
+    </div>
+
+    <div style="height:.5rem"></div>
+
+    <div class="panel">
+        <h2>Account Composition</h2>
+
+        <div class="chart-box">
+            <canvas id="account-composition-chart"></canvas>
+        </div>
+
+        <div class="donut-legend" id="account-composition-legend"></div>
     </div>
 
     <div style="height:.5rem"></div>
@@ -214,6 +238,7 @@
                 <thead>
                 <tr>
                     <th class="sortable" data-sort="date">Date</th>
+                    <th class="sortable" data-sort="account">Account</th>
                     <th class="sortable" data-sort="payee">Payee</th>
                     <th class="sortable" data-sort="description">Description</th>
                     <th class="sortable" data-sort="category">Category</th>
@@ -258,7 +283,7 @@
 
 <footer class="site-footer">
     <p>
-        &copy; <span id="footer-year"></span> ALI. All rights reserved.
+        &copy; <span id="footer-year"></span> All rights reserved.
         <span class="footer-divider">•</span>
         Designed &amp; Developed by
         <a href="https://ainlamyae.github.io" target="_blank" rel="noopener">

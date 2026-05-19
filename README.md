@@ -26,6 +26,8 @@ A private, serverless personal finance dashboard. Ledger reads and writes direct
 
 Ledger is a single-page application that authenticates the user with their own Google account, then reads and writes a private "Ledger" Google Sheet via the Sheets API v4. All aggregation, charting, filtering, sorting, and CRUD logic runs client-side in vanilla JavaScript — there is no build step and no server component to deploy or maintain.
 
+![Ledger dashboard screenshot](assets/images/dashboard-screenshot.png)
+
 ## Features
 
 - **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Net Cash Flow.
@@ -34,6 +36,8 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Spending Trend by Category** — stacked bar chart of spending by category, month over month.
 - **Income vs Expenses Over Time** — stepped area chart of the full transaction history.
 - **Cumulative Savings Over Time** — running total of savings as a line chart.
+- **Savings Rate Trend** — monthly savings rate (saved ÷ income, as a %) as a line chart.
+- **Account Composition** — nested donut chart: the inner ring shows each account type's share of total balance, the outer ring breaks that down by individual account (shaded by its type's color).
 - **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export.
 - **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
@@ -48,6 +52,8 @@ Category-based charts (Spending vs. Benchmarks, Spending Breakdown by Category, 
 ### System Diagram
 
 Ledger is a static site that talks directly to Google's APIs from the browser. There is no application server in the request path.
+
+![Ledger system architecture diagram](assets/images/architecture-diagram.png)
 
 ```text
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -90,7 +96,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh | `initAuth`, `signIn`, `signOut`, `getAccessToken` |
 | 3 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, plus hard-refresh (cache + Cache Storage + service workers) | `getCached`, `setCached`, `clearCache`, `hardRefresh` |
-| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart` |
+| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid and the nested Account Composition donut | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderSavingsRateChart`, `renderAccountCompositionChart` |
 | 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
 | 7 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |
@@ -161,9 +167,11 @@ Net worth snapshot and the account list, combined in one tab.
 | A | Month label |
 | B | Income |
 | C | Expenses |
-| D–J | Per-category expense totals (7 categories: Fee, Grocery, Transportation, Personal & Household, Medical, Application, Donation) |
+| D onward | Per-category expense totals — one column per row in `Categories`, matched by header name (see below) |
 | K | Saved (income − expenses) |
 | L | Cumulative savings |
+
+`app.js` reads row 1 as headers and matches each name in `Categories` column A against both the `Monthly Summary` and `Benchmarks` headers to find its column. Adding or renaming a category only requires updating the `Categories` sheet and adding a matching column/header to `Monthly Summary` and `Benchmarks` — no code changes needed.
 
 ### `Benchmarks` (formula-driven)
 
@@ -286,7 +294,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 
 | Range | Used in | Purpose |
 |---|---|---|
-| `'Monthly Summary'!A2:L149` | `app.js` | Monthly income/expense/category data, cumulative savings |
+| `'Monthly Summary'!A1:Z149` | `app.js` | Header row (for dynamic category column matching) plus monthly income/expense/category data and cumulative savings |
 | `'Benchmarks'!A1:K5` | `app.js` | Per-category spending averages for the Spending vs. Benchmarks chart and Spending Breakdown by Category donuts |
 | `'Account Balance'!A1:D1` | `app.js` | Total Savings figure (`D1`) for the summary card |
 | `Categories!A2:B` | `app.js` | Category name → chart color |

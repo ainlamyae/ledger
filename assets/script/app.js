@@ -1,18 +1,7 @@
-const REPORT_RANGE = `'${CONFIG.SHEETS.REPORT}'!A2:L149`;
+const REPORT_RANGE = `'${CONFIG.SHEETS.REPORT}'!A1:Z149`;
 const BENCHMARKS_RANGE = `'${CONFIG.SHEETS.BENCHMARKS}'!A1:K5`;
 const BALANCE_RANGE = `'${CONFIG.SHEETS.BALANCE}'!A1:D1`;
 const CATEGORIES_RANGE = `${CONFIG.SHEETS.CATEGORIES}!A2:B`;
-
-// Monthly Summary columns D-J hold per-category expense totals.
-const EXPENSE_CATEGORY_COLUMNS = [
-  { name: 'Fee', index: 3 },
-  { name: 'Grocery', index: 4 },
-  { name: 'Transportation', index: 5 },
-  { name: 'Personal & Household', index: 6 },
-  { name: 'Medical', index: 7 },
-  { name: 'Application', index: 8 },
-  { name: 'Donation', index: 9 },
-];
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -63,39 +52,29 @@ async function loadReport(forceRefresh) {
   const balanceRows = valueRanges[2].values || [];
   const categoryRows = valueRanges[3].values || [];
 
-  let activeIndex = reportRows.length - 1;
-  for (let i = reportRows.length - 1; i >= 0; i--) {
-    if (reportRows[i][1] || reportRows[i][2]) {
+  // Row 1 of Monthly Summary holds column headers (Income, Expenses, one
+  // column per spending category, Saved, Cumulative) — used below to find
+  // each category's column dynamically instead of a hardcoded index.
+  const monthlyHeader = reportRows[0] || [];
+  const monthlyRows = reportRows.slice(1);
+
+  const monthlyCols = {};
+  monthlyHeader.forEach((name, i) => { if (name) monthlyCols[name] = i; });
+
+  let activeIndex = monthlyRows.length - 1;
+  for (let i = monthlyRows.length - 1; i >= 0; i--) {
+    if (monthlyRows[i][1] || monthlyRows[i][2]) {
       activeIndex = i;
       break;
     }
   }
 
-  const current = reportRows[activeIndex];
+  const current = monthlyRows[activeIndex];
 
   const categoryColors = {};
   categoryRows.forEach((row) => {
     if (row[0]) categoryColors[row[0]] = row[1] || '#9ca3af';
   });
-
-  const incomeExpenseTrend = reportRows
-    .slice(0, activeIndex + 1)
-    .map((row) => ({ label: row[0], income: row[1] || 0, expenses: row[2] || 0 }));
-
-  const savingsTrend = reportRows
-    .slice(0, activeIndex + 1)
-    .map((row) => ({ label: row[0], cumulative: row[11] || 0 }));
-
-  const categoryTrend = reportRows
-    .slice(0, activeIndex + 1)
-    .map((row) => ({
-      label: row[0],
-      categories: EXPENSE_CATEGORY_COLUMNS.map((c) => ({
-        name: c.name,
-        value: Math.abs(row[c.index] || 0),
-        color: categoryColors[c.name] || '#9ca3af',
-      })),
-    }));
 
   // Benchmarks!A1:K5 — row 1 is the header (B-K = Income..Saved column names),
   // rows 2-5 are Last Month / Last Quarter Average / Last Year Average / Lifelong Average,
@@ -104,9 +83,48 @@ async function loadReport(forceRefresh) {
   (benchmarkRows[0] || []).forEach((name, i) => { if (name) benchmarkCols[name] = i; });
   const [, lastMonthRow = [], quarterAvgRow = [], yearAvgRow = [], lifelongAvgRow = []] = benchmarkRows;
 
-  const categoryComparison = EXPENSE_CATEGORY_COLUMNS
+  // Every row in the Categories sheet becomes a chart category as long as
+  // its name also appears as a column header in both Monthly Summary and
+  // Benchmarks — no hardcoded category list or column indices.
+  const categoryColumns = categoryRows
+    .map((row) => row[0])
+    .filter((name) => name && monthlyCols[name] !== undefined && benchmarkCols[name] !== undefined)
+    .map((name) => ({ name, monthlyIndex: monthlyCols[name], benchmarkIndex: benchmarkCols[name] }));
+
+  const incomeExpenseTrend = monthlyRows
+    .slice(0, activeIndex + 1)
+    .map((row) => ({ label: row[0], income: row[1] || 0, expenses: row[2] || 0 }));
+
+  const savingsTrend = monthlyRows
+    .slice(0, activeIndex + 1)
+    .map((row) => ({ label: row[0], cumulative: row[11] || 0 }));
+
+  // Months with near-zero income would otherwise produce extreme ratios
+  // (e.g. -8000%) when expenses exceed that income, so the rate is clamped
+  // to 0-100% — the tooltip still shows the actual amount saved/overspent.
+  const savingsRateTrend = monthlyRows
+    .slice(0, activeIndex + 1)
+    .map((row) => {
+      const income = row[1] || 0;
+      const saved = row[10] || 0;
+      const rate = income ? (saved / income) * 100 : 0;
+      return { label: row[0], rate: Math.max(0, Math.min(100, rate)), saved };
+    });
+
+  const categoryTrend = monthlyRows
+    .slice(0, activeIndex + 1)
+    .map((row) => ({
+      label: row[0],
+      categories: categoryColumns.map((c) => ({
+        name: c.name,
+        value: Math.abs(row[c.monthlyIndex] || 0),
+        color: categoryColors[c.name] || '#9ca3af',
+      })),
+    }));
+
+  const categoryComparison = categoryColumns
     .map((c) => {
-      const col = benchmarkCols[c.name];
+      const col = c.benchmarkIndex;
       const lastMonth = Math.abs(lastMonthRow[col] || 0);
       const quarterAvg = Math.abs(quarterAvgRow[col] || 0);
       const yearAvg = Math.abs(yearAvgRow[col] || 0);
@@ -123,6 +141,7 @@ async function loadReport(forceRefresh) {
     saved: current[10] || 0,
     incomeExpenseTrend,
     savingsTrend,
+    savingsRateTrend,
     categoryTrend,
     categoryComparison,
     netWorth,
@@ -204,6 +223,7 @@ async function loadDashboard(forceRefresh = false) {
       renderIncomeExpenseChart(report.incomeExpenseTrend);
       renderExpenseBreakdownTrendChart(report.categoryTrend);
       renderSavingsTrendChart(report.savingsTrend);
+      renderSavingsRateChart(report.savingsRateTrend);
       setLastUpdated();
     }),
     initTransactions(forceRefresh),
@@ -235,6 +255,16 @@ function setupScrollSpy() {
   }, { rootMargin: '-50% 0px -50% 0px' });
 
   sections.forEach((section) => observer.observe(section));
+
+  // The cards row above #charts can push its midpoint past the viewport's
+  // center line, so the observer never fires for it near the top of the
+  // page. Force the first nav link active once the user scrolls back up.
+  window.addEventListener('scroll', () => {
+    if (window.scrollY < sections[0].offsetTop) {
+      navLinks.forEach((link) => link.classList.remove('active'));
+      navLinks[0].classList.add('active');
+    }
+  });
 }
 
 window.addEventListener('load', () => {

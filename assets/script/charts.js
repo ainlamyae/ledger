@@ -124,6 +124,11 @@ function renderSpendingTrendChart(categories) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      plugins: {
+        // Clicking a legend entry normally toggles that dataset's visibility —
+        // keep all 4 period bars always visible and ignore legend clicks.
+        legend: { onClick: () => {} },
+      },
       scales: { x: { ticks: { display: false } }, y: { beginAtZero: true } },
     },
   });
@@ -174,6 +179,85 @@ function renderSpendingBreakdownCharts(categories) {
   });
 }
 
+let accountCompositionChart = null;
+
+const ACCOUNT_TYPE_PALETTE = ['#3b82f6', '#16a34a', '#f59e0b', '#dc2626', '#8b5cf6', '#0ea5e9', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
+
+// Nested doughnut: inner ring = totals per account type, outer ring = each
+// individual account, shaded with its type's color. Slice sizes use the
+// absolute balance so debt accounts (negative balances) still render as a
+// normal positive-size slice rather than breaking the chart.
+function renderAccountCompositionChart(accounts) {
+  const ctx = document.getElementById('account-composition-chart');
+  if (accountCompositionChart) accountCompositionChart.destroy();
+  if (accounts.length === 0) return;
+
+  const types = [];
+  const byType = new Map();
+  accounts.forEach((a) => {
+    const type = a.type || 'Other';
+    if (!byType.has(type)) {
+      byType.set(type, []);
+      types.push(type);
+    }
+    byType.get(type).push(a);
+  });
+
+  const typeColors = {};
+  types.forEach((type, i) => { typeColors[type] = ACCOUNT_TYPE_PALETTE[i % ACCOUNT_TYPE_PALETTE.length]; });
+
+  const accountLabels = [];
+  const accountValues = [];
+  const accountColors = [];
+  const typeLabels = [];
+  const typeValues = [];
+  const typeColorList = [];
+
+  types.forEach((type) => {
+    const group = byType.get(type);
+    typeLabels.push(type);
+    typeValues.push(group.reduce((sum, a) => sum + Math.abs(a.balance), 0));
+    typeColorList.push(typeColors[type]);
+
+    group.forEach((a, i) => {
+      accountLabels.push(a.name);
+      accountValues.push(Math.abs(a.balance));
+      accountColors.push(hexToRgba(typeColors[type], Math.max(0.35, 1 - i * 0.18)));
+    });
+  });
+
+  const total = typeValues.reduce((sum, v) => sum + v, 0);
+
+  renderCategoryLegend('account-composition-legend', types.map((t) => ({ name: t, color: typeColors[t] })));
+
+  accountCompositionChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: accountLabels,
+      datasets: [
+        { data: accountValues, backgroundColor: accountColors, labels: accountLabels, weight: 1 },
+        { data: typeValues, backgroundColor: typeColorList, labels: typeLabels, weight: 1 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const name = item.dataset.labels[item.dataIndex];
+              const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
+              return `${name}: ${formatCurrency(item.raw)} (${pct}%)`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 let savingsTrendChart = null;
 
 function renderSavingsTrendChart(months) {
@@ -199,6 +283,46 @@ function renderSavingsTrendChart(months) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: false } },
+    },
+  });
+}
+
+let savingsRateChart = null;
+
+function renderSavingsRateChart(months) {
+  const ctx = document.getElementById('savings-rate-chart');
+  if (savingsRateChart) savingsRateChart.destroy();
+
+  savingsRateChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: months.map((m) => m.label),
+      datasets: [{
+        label: 'Savings Rate',
+        data: months.map((m) => m.rate),
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22, 163, 74, .1)',
+        fill: 'origin',
+        tension: 0.4,
+        pointRadius: 0,
+        segment: {
+          borderColor: (ctx) => (ctx.p0.parsed.y <= 0 || ctx.p1.parsed.y <= 0) ? '#dc2626' : '#16a34a',
+          backgroundColor: (ctx) => (ctx.p0.parsed.y <= 0 || ctx.p1.parsed.y <= 0) ? 'rgba(220, 38, 38, .1)' : 'rgba(22, 163, 74, .1)',
+        },
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => `Savings Rate: ${item.raw.toFixed(1)}% (Saved: ${formatCurrency(months[item.dataIndex].saved)})`,
+          },
+        },
+      },
+      scales: { y: { min: 0, max: 100, ticks: { callback: (value) => `${value}%` } } },
     },
   });
 }

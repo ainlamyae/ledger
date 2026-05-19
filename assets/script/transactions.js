@@ -186,6 +186,9 @@ function renderTransactions() {
     const dateCell = document.createElement('td');
     dateCell.textContent = t.date;
 
+    const accountCell = document.createElement('td');
+    accountCell.textContent = t.account;
+
     const payeeCell = document.createElement('td');
     payeeCell.textContent = t.payee;
 
@@ -216,7 +219,7 @@ function renderTransactions() {
 
     actionsCell.append(editBtn, deleteBtn);
 
-    tr.append(dateCell, payeeCell, descCell, categoryCell, amountCell, actionsCell);
+    tr.append(dateCell, accountCell, payeeCell, descCell, categoryCell, amountCell, actionsCell);
     tbody.appendChild(tr);
   });
 

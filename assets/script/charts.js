@@ -179,6 +179,85 @@ function renderSpendingBreakdownCharts(categories) {
   });
 }
 
+const TYPE_BREAKDOWN_CATEGORIES = ['Grocery', 'Household', 'Personal', 'Transportation', 'Housing'];
+const TYPE_BREAKDOWN_PERIODS = [
+  { key: 'lastMonth', suffix: 'lastmonth' },
+  { key: 'lastQuarter', suffix: 'lastquarter' },
+  { key: 'lastYear', suffix: 'lastyear' },
+  { key: 'lifelong', suffix: 'lifelong' },
+];
+const TYPE_BREAKDOWN_OTHER_COLOR = '#9ca3af';
+
+const typeBreakdownCharts = {};
+
+// One donut per category per period (20 total), each showing that
+// category's Types as a share of its overall total for that period.
+// The gap between the category total (Insight's blank-Type row) and the
+// sum of its named Types becomes an "Untyped" slice.
+function renderTypeBreakdownCharts(typeBreakdown) {
+  // Order each category's panel by lifelong spend (highest first) so the
+  // biggest-impact categories surface at the top of the section.
+  const orderedCategories = [...TYPE_BREAKDOWN_CATEGORIES].sort((a, b) => {
+    const lifelongA = (typeBreakdown[a]?.total?.lifelong) || 0;
+    const lifelongB = (typeBreakdown[b]?.total?.lifelong) || 0;
+    return lifelongB - lifelongA;
+  });
+
+  orderedCategories.forEach((category) => {
+    const section = document.getElementById(`type-breakdown-${category.toLowerCase()}-section`);
+    if (section) section.parentElement.appendChild(section);
+  });
+
+  orderedCategories.forEach((category) => {
+    const data = typeBreakdown[category];
+    if (!data) return;
+
+    // Sort once by lifelong spend (largest first) so the legend and every
+    // period's donut share the same slice order and colors.
+    const types = [...data.types].sort((a, b) => b.lifelong - a.lifelong);
+    const colors = types.map((_, i) => `hsl(${Math.round((i * 360) / types.length)}, 65%, 55%)`);
+
+    renderCategoryLegend(`type-breakdown-${category.toLowerCase()}-legend`, [
+      ...types.map((t, i) => ({ name: t.name, color: colors[i] })),
+      { name: 'Untyped', color: TYPE_BREAKDOWN_OTHER_COLOR },
+    ]);
+
+    TYPE_BREAKDOWN_PERIODS.forEach(({ key, suffix }) => {
+      const canvasId = `type-breakdown-${category.toLowerCase()}-${suffix}-chart`;
+      const ctx = document.getElementById(canvasId);
+      if (typeBreakdownCharts[canvasId]) typeBreakdownCharts[canvasId].destroy();
+
+      const typedTotal = types.reduce((sum, t) => sum + t[key], 0);
+      const total = (data.total && data.total[key]) || typedTotal;
+      const untyped = Math.max(0, total - typedTotal);
+
+      const labels = [...types.map((t) => t.name), 'Untyped'];
+      const values = [...types.map((t) => t[key]), untyped];
+      const sliceColors = [...colors, TYPE_BREAKDOWN_OTHER_COLOR];
+
+      typeBreakdownCharts[canvasId] = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: values, backgroundColor: sliceColors }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (item) => {
+                  const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
+                  return `${item.label}: ${formatCurrency(item.raw)} (${pct}%)`;
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+  });
+}
+
 let accountCompositionChart = null;
 
 const ACCOUNT_TYPE_PALETTE = ['#3b82f6', '#16a34a', '#f59e0b', '#dc2626', '#8b5cf6', '#0ea5e9', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];

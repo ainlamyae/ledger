@@ -425,11 +425,25 @@ th.sortable:hover {
     min-width: 0;
 }
 
-.donut-item h3 {
+.donut-item h3,
+.donut-item h4 {
     text-align: center;
     color: var(--color-text-muted);
     font-size: .9rem;
     margin-bottom: .5rem;
+}
+
+.type-breakdown-category {
+    margin-bottom: 1.5rem;
+}
+
+.type-breakdown-category:last-child {
+    margin-bottom: 0;
+}
+
+.type-breakdown-category > h3 {
+    font-size: 1rem;
+    margin-bottom: .25rem;
 }
 
 .chart-box-donut {
@@ -627,7 +641,8 @@ td .btn {
         gap: .75rem;
     }
 
-    .donut-item h3 {
+    .donut-item h3,
+    .donut-item h4 {
         font-size: .8rem;
     }
 

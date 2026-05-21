@@ -133,6 +133,15 @@ async function loadReport(forceRefresh) {
     .filter((name) => name && monthlyCols[name] >= 3 && benchmarkCols[name] !== undefined)
     .map((name) => ({ name, monthlyIndex: monthlyCols[name], benchmarkIndex: benchmarkCols[name] }));
 
+  // Order categories by lifelong-average spend (highest first) so every
+  // category-based chart (trend, comparison, breakdown) ranks consistently
+  // by overall impact rather than the fixed Categories-sheet order.
+  const orderedCategoryColumns = [...categoryColumns].sort((a, b) => {
+    const lifelongA = Math.abs(lifelongAvgRow[a.benchmarkIndex] || 0);
+    const lifelongB = Math.abs(lifelongAvgRow[b.benchmarkIndex] || 0);
+    return lifelongB - lifelongA;
+  });
+
   const incomeExpenseTrend = monthlyRows
     .slice(0, activeIndex + 1)
     .map((row) => ({ label: row[0], income: row[1] || 0, expenses: row[2] || 0 }));
@@ -157,14 +166,14 @@ async function loadReport(forceRefresh) {
     .slice(0, activeIndex + 1)
     .map((row) => ({
       label: row[0],
-      categories: categoryColumns.map((c) => ({
+      categories: orderedCategoryColumns.map((c) => ({
         name: c.name,
         value: Math.abs(row[c.monthlyIndex] || 0),
         color: categoryColors[c.name] || '#9ca3af',
       })),
     }));
 
-  const categoryComparison = categoryColumns
+  const categoryComparison = orderedCategoryColumns
     .map((c) => {
       const col = c.benchmarkIndex;
       const lastMonth = Math.abs(lastMonthRow[col] || 0);

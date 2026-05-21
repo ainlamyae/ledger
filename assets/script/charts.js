@@ -271,16 +271,29 @@ function renderAccountCompositionChart(accounts) {
   if (accountCompositionChart) accountCompositionChart.destroy();
   if (accounts.length === 0) return;
 
-  const types = [];
   const byType = new Map();
   accounts.forEach((a) => {
     const type = a.type || 'Other';
-    if (!byType.has(type)) {
-      byType.set(type, []);
-      types.push(type);
-    }
+    if (!byType.has(type)) byType.set(type, []);
     byType.get(type).push(a);
   });
+
+  const typeAbsTotals = new Map();
+  const typeNetTotals = new Map();
+  byType.forEach((group, type) => {
+    typeAbsTotals.set(type, group.reduce((sum, acc) => sum + Math.abs(acc.balance), 0));
+    typeNetTotals.set(type, group.reduce((sum, acc) => sum + acc.balance, 0));
+  });
+
+  // Highest net balance first, so the inner ring ranks account types by
+  // overall amount rather than the fixed order they appear in the Accounts
+  // sheet — types with a negative net balance (e.g. Credit/debt) sort to
+  // the end instead of by their absolute size. Types with a zero absolute
+  // total (e.g. accounts that net to zero) are dropped so they don't show
+  // up as an empty legend entry.
+  const types = [...byType.keys()]
+    .filter((type) => typeAbsTotals.get(type) > 0)
+    .sort((a, b) => typeNetTotals.get(b) - typeNetTotals.get(a));
 
   const typeColors = {};
   types.forEach((type, i) => { typeColors[type] = ACCOUNT_TYPE_PALETTE[i % ACCOUNT_TYPE_PALETTE.length]; });
@@ -295,7 +308,7 @@ function renderAccountCompositionChart(accounts) {
   types.forEach((type) => {
     const group = byType.get(type);
     typeLabels.push(type);
-    typeValues.push(group.reduce((sum, a) => sum + Math.abs(a.balance), 0));
+    typeValues.push(typeAbsTotals.get(type));
     typeColorList.push(typeColors[type]);
 
     group.forEach((a, i) => {

@@ -112,6 +112,33 @@ async function refreshTransactions(forceRefresh = false) {
     category: row[5] || '',
   }));
   renderTransactions();
+  populateAutocompleteOptions();
+}
+
+// Fills the Payee/Description datalists with previously used values so the
+// browser can suggest and auto-correct entries (including voice dictation)
+// against the user's own history. Most frequently used values come first.
+function populateAutocompleteOptions() {
+  const fillDatalist = (datalistId, values) => {
+    const counts = new Map();
+    values.forEach((value) => {
+      if (!value) return;
+      counts.set(value, (counts.get(value) || 0) + 1);
+    });
+
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value]) => value);
+
+    const datalist = document.getElementById(datalistId);
+    datalist.innerHTML = '';
+    sorted.forEach((value) => {
+      const option = document.createElement('option');
+      option.value = value;
+      datalist.appendChild(option);
+    });
+  };
+
+  fillDatalist('tx-payee-options', allTransactions.map((t) => t.payee));
+  fillDatalist('tx-description-options', allTransactions.map((t) => t.description));
 }
 
 async function refreshAccountOptions() {

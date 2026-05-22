@@ -53,6 +53,8 @@ function setSignedInUI(signedIn) {
   document.getElementById('signin-btn').hidden = signedIn;
   document.getElementById('signout-btn').hidden = !signedIn;
   document.getElementById('refresh-btn').hidden = !signedIn;
+  document.getElementById('toggle-panels-fab').hidden = !signedIn;
+  document.getElementById('top-banner').hidden = !signedIn;
 }
 
 function handleAuthChange(token, error) {
@@ -293,6 +295,88 @@ async function loadDashboard(forceRefresh = false) {
   loading.hidden = true;
 }
 
+// Each panel's <h2> toggles its own content, and the FAB flips every panel
+// at once between fully expanded and fully collapsed.
+function setupPanelToggles() {
+  const panels = [...document.querySelectorAll('#dashboard .panel')];
+
+  panels.forEach((panel) => {
+    const heading = panel.querySelector('h2');
+    if (!heading) return;
+
+    const icon = document.createElement('span');
+    icon.className = 'panel-toggle-icon';
+    icon.textContent = '▾';
+    heading.prepend(icon);
+
+    panel.classList.add('collapsed');
+    heading.addEventListener('click', () => panel.classList.toggle('collapsed'));
+  });
+
+  const fab = document.getElementById('toggle-panels-fab');
+  fab.textContent = '⊞';
+  fab.title = 'Expand all panels';
+  fab.setAttribute('aria-label', fab.title);
+
+  // Base the action on the panels' current state (any expanded -> collapse
+  // all, otherwise expand all) so the FAB always reflects reality in one
+  // click, even after individual panels or nav links changed it.
+  fab.addEventListener('click', () => {
+    const shouldCollapse = panels.some((panel) => !panel.classList.contains('collapsed'));
+    panels.forEach((panel) => panel.classList.toggle('collapsed', shouldCollapse));
+    fab.textContent = shouldCollapse ? '⊞' : '⊟';
+    fab.title = shouldCollapse ? 'Expand all panels' : 'Collapse all panels';
+    fab.setAttribute('aria-label', fab.title);
+  });
+
+  // Jumping to a section via the nav also expands its panel(s), since
+  // everything starts collapsed. "Charts" covers every chart panel up to
+  // (but not including) the Transactions panel.
+  const transactionsIndex = panels.findIndex((p) => p.id === 'transactions');
+
+  document.querySelectorAll('#main-nav a').forEach((link) => {
+    link.addEventListener('click', () => {
+      const target = document.querySelector(link.getAttribute('href'));
+      if (!target) return;
+
+      if (target.id === 'charts') {
+        panels.slice(0, transactionsIndex).forEach((p) => p.classList.remove('collapsed'));
+      } else {
+        target.classList.remove('collapsed');
+      }
+    });
+  });
+}
+
+function setupThemeToggle() {
+  const btn = document.getElementById('theme-toggle-btn');
+
+  const updateButton = (dark) => {
+    btn.textContent = dark ? '☀️' : '🌙';
+    btn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    btn.setAttribute('aria-label', btn.title);
+  };
+
+  updateButton(document.documentElement.dataset.theme === 'dark');
+
+  btn.addEventListener('click', () => {
+    const dark = document.documentElement.dataset.theme !== 'dark';
+
+    if (dark) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('ledger_theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.removeItem('ledger_theme');
+    }
+
+    updateButton(dark);
+    applyChartTheme();
+
+    if (!document.getElementById('dashboard').hidden) loadDashboard(false);
+  });
+}
+
 function setupScrollSpy() {
   const navLinks = [...document.querySelectorAll('#main-nav a')];
   const sections = navLinks
@@ -335,6 +419,9 @@ window.addEventListener('load', () => {
 
   initCsvControls();
   setupScrollSpy();
+  setupPanelToggles();
+  setupThemeToggle();
+  applyChartTheme();
 
   document.getElementById('footer-year').textContent = new Date().getFullYear();
 });

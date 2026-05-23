@@ -170,18 +170,6 @@ async function loadReport(forceRefresh) {
     .slice(0, activeIndex + 1)
     .map((row) => ({ label: row[0], cumulative: row[cumulativeIndex] || 0 }));
 
-  // Months with near-zero income would otherwise produce extreme ratios
-  // (e.g. -8000%) when expenses exceed that income, so the rate is clamped
-  // to 0-100% — the tooltip still shows the actual amount saved/overspent.
-  const savingsRateTrend = monthlyRows
-    .slice(0, activeIndex + 1)
-    .map((row) => {
-      const income = row[1] || 0;
-      const saved = row[savedIndex] || 0;
-      const rate = income ? (saved / income) * 100 : 0;
-      return { label: row[0], rate: Math.max(0, Math.min(100, rate)), saved };
-    });
-
   const categoryTrend = monthlyRows
     .slice(0, activeIndex + 1)
     .map((row) => ({
@@ -213,7 +201,6 @@ async function loadReport(forceRefresh) {
     saved: current[savedIndex] || 0,
     incomeExpenseTrend,
     savingsTrend,
-    savingsRateTrend,
     categoryTrend,
     categoryComparison,
     // Monthly Summary has one row per month from the first month of data
@@ -315,7 +302,6 @@ async function loadDashboard(forceRefresh = false) {
       renderIncomeExpenseChart(report.incomeExpenseTrend);
       renderExpenseBreakdownTrendChart(report.categoryTrend);
       renderSavingsTrendChart(report.savingsTrend);
-      renderSavingsRateChart(report.savingsRateTrend);
       renderReconciliationStatus(report.missingAmount);
       setLastUpdated();
     }),

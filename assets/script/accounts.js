@@ -6,6 +6,25 @@ let editingAccountRow = null;
 let accountListenersAttached = false;
 let accountSort = { key: null, dir: 1 };
 
+// Lets the Balance field accept a simple arithmetic expression — optionally
+// prefixed with "=" — so quick calculations (e.g. "=5000-1234.56" for credit
+// card spend = limit minus remaining balance) don't need a separate
+// calculator. Returns null if the input isn't a valid number/expression.
+function evaluateBalanceExpression(input) {
+  const expr = input.trim().replace(/^=/, '');
+  if (!expr) return 0;
+  if (!/^[0-9+\-*/().\s]+$/.test(expr)) return null;
+
+  try {
+    const result = Function(`"use strict"; return (${expr});`)();
+    // Round to the nearest cent so float arithmetic (e.g. 0.1 + 0.2) doesn't
+    // write sub-cent precision to the sheet.
+    return typeof result === 'number' && Number.isFinite(result) ? Math.round(result * 100) / 100 : null;
+  } catch {
+    return null;
+  }
+}
+
 async function initAccountManager(forceRefresh = false) {
   let meta = forceRefresh ? null : getCached('accounts-meta');
 
@@ -149,7 +168,7 @@ function openAccountForm(account) {
   document.getElementById('account-name').value = account ? account.name : '';
   document.getElementById('account-institution').value = account ? account.institution : '';
   document.getElementById('account-type').value = account ? account.type : '';
-  document.getElementById('account-balance').value = account ? account.balance : 0;
+  document.getElementById('account-balance').value = account ? account.balance.toFixed(2) : '0.00';
 
   document.getElementById('account-form-error').hidden = true;
   document.getElementById('account-modal').hidden = false;
@@ -163,11 +182,19 @@ function closeAccountForm() {
 async function submitAccountForm(event) {
   event.preventDefault();
 
+  const balance = evaluateBalanceExpression(document.getElementById('account-balance').value);
+  if (balance === null) {
+    const errorEl = document.getElementById('account-form-error');
+    errorEl.textContent = 'Balance must be a number or a simple expression, e.g. =5000-1234.56';
+    errorEl.hidden = false;
+    return;
+  }
+
   const values = [[
     document.getElementById('account-name').value,
     document.getElementById('account-institution').value,
     document.getElementById('account-type').value,
-    Number(document.getElementById('account-balance').value) || 0,
+    balance,
   ]];
 
   try {

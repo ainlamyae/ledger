@@ -1,13 +1,23 @@
 const REPORT_RANGE = `'${CONFIG.SHEETS.REPORT}'!A1:Z149`;
-const BENCHMARKS_RANGE = `'${CONFIG.SHEETS.BENCHMARKS}'!A1:K5`;
 const BALANCE_RANGE = `'${CONFIG.SHEETS.BALANCE}'!A1:D1`;
-const CATEGORIES_RANGE = `${CONFIG.SHEETS.CATEGORIES}!A2:B`;
 const INSIGHT_RANGE = `${CONFIG.SHEETS.INSIGHT}!A2:F200`;
+const RECONCILIATION_RANGE = `'${CONFIG.SHEETS.RECONCILIATION}'!B5`;
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
+// Amounts are hidden by default each time the dashboard loads; clicking
+// the privacy FAB reveals them for the rest of the session.
+let privacyMode = true;
+
+// Replaces every digit with '*', so masked values keep their currency
+// symbol, sign, and separators (e.g. "$1,234.56" -> "$*,***.**").
+function maskDigits(str) {
+  return String(str).replace(/[0-9]/g, '*');
+}
+
 function formatCurrency(value) {
-  return CURRENCY_FORMAT.format(value);
+  const formatted = CURRENCY_FORMAT.format(value);
+  return privacyMode ? maskDigits(formatted) : formatted;
 }
 
 let currentReport = null;
@@ -37,7 +47,10 @@ function parseTypeBreakdown(insightRows) {
 
     if (!breakdown[category]) breakdown[category] = { types: [], total: null };
     if (type) {
-      breakdown[category].types.push({ name: type, ...stats });
+      // Skip types that have never had any spend (e.g. a retired type whose
+      // Insight row still exists with all-zero figures) so they don't clutter
+      // the legend/donuts.
+      if (stats.lifelong) breakdown[category].types.push({ name: type, ...stats });
     } else {
       breakdown[category].total = stats;
     }
@@ -54,6 +67,7 @@ function setSignedInUI(signedIn) {
   document.getElementById('signout-btn').hidden = !signedIn;
   document.getElementById('refresh-btn').hidden = !signedIn;
   document.getElementById('toggle-panels-fab').hidden = !signedIn;
+  document.getElementById('privacy-toggle-fab').hidden = !signedIn;
   document.getElementById('top-banner').hidden = !signedIn;
 }
 
@@ -78,12 +92,26 @@ async function loadReport(forceRefresh) {
     if (cached) return cached;
   }
 
-  const { valueRanges } = await batchGetValues([REPORT_RANGE, BENCHMARKS_RANGE, BALANCE_RANGE, CATEGORIES_RANGE, INSIGHT_RANGE], VALUE_PARAMS);
+  const { valueRanges } = await batchGetValues(
+    [REPORT_RANGE, BALANCE_RANGE, INSIGHT_RANGE, RECONCILIATION_RANGE],
+    VALUE_PARAMS
+  );
   const reportRows = valueRanges[0].values || [];
-  const benchmarkRows = valueRanges[1].values || [];
-  const balanceRows = valueRanges[2].values || [];
-  const categoryRows = valueRanges[3].values || [];
-  const insightRows = valueRanges[4].values || [];
+  const balanceRows = valueRanges[1].values || [];
+  const insightRows = valueRanges[2].values || [];
+  const reconciliationRows = valueRanges[3].values || [];
+
+  // Insight!A2:F200 lists each category once per Type plus one blank-Type
+  // total row, so collapse column A to a unique, order-preserving list.
+  const categoryNames = [];
+  insightRows.forEach((row) => {
+    if (row[0] && !categoryNames.includes(row[0])) categoryNames.push(row[0]);
+  });
+
+  // The blank-Type row's Last Month/Last Quarter/Last Year/Lifelong columns
+  // are each category's overall spend — the same figures the old Benchmarks
+  // sheet duplicated, so they double as the per-category benchmarks too.
+  const typeBreakdown = parseTypeBreakdown(insightRows);
 
   // Row 1 of Monthly Summary holds column headers (Income, Expenses, one
   // column per spending category, Saved, Cumulative) — used below to find
@@ -113,36 +141,26 @@ async function loadReport(forceRefresh) {
 
   const current = monthlyRows[activeIndex];
 
-  const categoryColors = {};
-  categoryRows.forEach((row) => {
-    if (row[0]) categoryColors[row[0]] = row[1] || '#9ca3af';
-  });
+  // Every category in Insight becomes a chart category as long as its name
+  // also appears as a column header in Monthly Summary — no hardcoded
+  // category list or column indices. Columns A-C (Month, Income, Expenses)
+  // are excluded since "Income" may also appear as an Insight category but
+  // isn't a spending category.
+  const categoryColumns = categoryNames
+    .filter((name) => monthlyCols[name] >= 3)
+    .map((name) => ({ name, monthlyIndex: monthlyCols[name] }));
 
-  // Benchmarks!A1:K5 — row 1 is the header (B-K = Income..Saved column names),
-  // rows 2-5 are Last Month / Last Quarter Average / Last Year Average / Lifelong Average,
-  // already pre-computed by spreadsheet formulas.
-  const benchmarkCols = {};
-  (benchmarkRows[0] || []).forEach((name, i) => { if (name) benchmarkCols[name] = i; });
-  const [, lastMonthRow = [], quarterAvgRow = [], yearAvgRow = [], lifelongAvgRow = []] = benchmarkRows;
-
-  // Every row in the Categories sheet becomes a chart category as long as
-  // its name also appears as a column header in both Monthly Summary and
-  // Benchmarks — no hardcoded category list or column indices. Columns A-C
-  // (Month, Income, Expenses) are excluded since "Income" is also a row in
-  // the Categories sheet but isn't a spending category.
-  const categoryColumns = categoryRows
-    .map((row) => row[0])
-    .filter((name) => name && monthlyCols[name] >= 3 && benchmarkCols[name] !== undefined)
-    .map((name) => ({ name, monthlyIndex: monthlyCols[name], benchmarkIndex: benchmarkCols[name] }));
-
-  // Order categories by lifelong-average spend (highest first) so every
+  // Order categories by lifelong spend (highest first) so every
   // category-based chart (trend, comparison, breakdown) ranks consistently
-  // by overall impact rather than the fixed Categories-sheet order.
-  const orderedCategoryColumns = [...categoryColumns].sort((a, b) => {
-    const lifelongA = Math.abs(lifelongAvgRow[a.benchmarkIndex] || 0);
-    const lifelongB = Math.abs(lifelongAvgRow[b.benchmarkIndex] || 0);
-    return lifelongB - lifelongA;
-  });
+  // by overall impact rather than Insight's row order, then assign each a
+  // distinct color spread evenly around the color wheel.
+  const orderedCategoryColumns = [...categoryColumns]
+    .sort((a, b) => {
+      const lifelongA = Math.abs(typeBreakdown[a.name]?.total?.lifelong || 0);
+      const lifelongB = Math.abs(typeBreakdown[b.name]?.total?.lifelong || 0);
+      return lifelongB - lifelongA;
+    })
+    .map((c, i, arr) => ({ ...c, color: `hsl(${Math.round((i * 360) / arr.length)}, 65%, 55%)` }));
 
   const incomeExpenseTrend = monthlyRows
     .slice(0, activeIndex + 1)
@@ -171,22 +189,22 @@ async function loadReport(forceRefresh) {
       categories: orderedCategoryColumns.map((c) => ({
         name: c.name,
         value: Math.abs(row[c.monthlyIndex] || 0),
-        color: categoryColors[c.name] || '#9ca3af',
+        color: c.color,
       })),
     }));
 
   const categoryComparison = orderedCategoryColumns
     .map((c) => {
-      const col = c.benchmarkIndex;
-      const lastMonth = Math.abs(lastMonthRow[col] || 0);
-      const quarterAvg = Math.abs(quarterAvgRow[col] || 0);
-      const yearAvg = Math.abs(yearAvgRow[col] || 0);
-      const lifelongAvg = Math.abs(lifelongAvgRow[col] || 0);
-      return { name: c.name, color: categoryColors[c.name] || '#9ca3af', lastMonth, quarterAvg, yearAvg, lifelongAvg };
+      const total = typeBreakdown[c.name]?.total || {};
+      const lastMonth = Math.abs(total.lastMonth || 0);
+      const quarterAvg = Math.abs(total.lastQuarter || 0);
+      const yearAvg = Math.abs(total.lastYear || 0);
+      const lifelongAvg = Math.abs(total.lifelong || 0);
+      return { name: c.name, color: c.color, lastMonth, quarterAvg, yearAvg, lifelongAvg };
     });
 
   const netWorth = parseBalance(balanceRows);
-  const typeBreakdown = parseTypeBreakdown(insightRows);
+  const missingAmount = Number(reconciliationRows[0]?.[0]) || 0;
 
   const report = {
     month: current[0],
@@ -198,8 +216,13 @@ async function loadReport(forceRefresh) {
     savingsRateTrend,
     categoryTrend,
     categoryComparison,
+    // Monthly Summary has one row per month from the first month of data
+    // through the current month, so its row count doubles as the number of
+    // months to divide the Lifelong total by for a monthly average.
+    totalMonths: activeIndex + 1,
     typeBreakdown,
     netWorth,
+    missingAmount,
   };
 
   setCached('report', report);
@@ -219,6 +242,19 @@ function renderSummaryCards(data) {
   savingsEl.textContent = formatCurrency(data.saved);
   savingsEl.classList.toggle('income', data.saved >= 0);
   savingsEl.classList.toggle('expense', data.saved < 0);
+}
+
+// 'Reconciliation'!B5 is the Sheet's pre-computed gap between recorded
+// account balances and transaction history. Non-zero means an account
+// balance is wrong or a transaction is missing.
+function renderReconciliationStatus(missingAmount) {
+  const el = document.getElementById('reconciliation-status');
+  const isReconciled = Math.abs(missingAmount) < 0.005;
+
+  el.textContent = isReconciled
+    ? '✅ Reconciled'
+    : `⚠️ Reconciliation off by ${formatCurrency(missingAmount)} — check account balances or look for a missing transaction`;
+  el.classList.toggle('warning', !isReconciled);
 }
 
 async function refreshNetWorth() {
@@ -273,13 +309,14 @@ async function loadDashboard(forceRefresh = false) {
     loadReport(forceRefresh).then((report) => {
       currentReport = report;
       renderSummaryCards(report);
-      renderSpendingTrendChart(report.categoryComparison);
+      renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
       renderSpendingBreakdownCharts(report.categoryComparison);
       renderTypeBreakdownCharts(report.typeBreakdown);
       renderIncomeExpenseChart(report.incomeExpenseTrend);
       renderExpenseBreakdownTrendChart(report.categoryTrend);
       renderSavingsTrendChart(report.savingsTrend);
       renderSavingsRateChart(report.savingsRateTrend);
+      renderReconciliationStatus(report.missingAmount);
       setLastUpdated();
     }),
     initTransactions(forceRefresh),
@@ -384,6 +421,27 @@ function setupThemeToggle() {
   });
 }
 
+// Masks every formatted amount on the page (cards, tables, chart ticks,
+// and chart tooltips) by re-rendering from cached data with formatCurrency
+// in masked mode.
+function setupPrivacyToggle() {
+  const btn = document.getElementById('privacy-toggle-fab');
+
+  const updateButton = () => {
+    btn.textContent = privacyMode ? '🙈' : '👁️';
+    btn.title = privacyMode ? 'Show amounts' : 'Hide amounts';
+    btn.setAttribute('aria-label', btn.title);
+  };
+
+  updateButton();
+
+  btn.addEventListener('click', () => {
+    privacyMode = !privacyMode;
+    updateButton();
+    if (!document.getElementById('dashboard').hidden) loadDashboard(false);
+  });
+}
+
 function setupScrollSpy() {
   const navLinks = [...document.querySelectorAll('#main-nav a')];
   const sections = navLinks
@@ -428,6 +486,7 @@ window.addEventListener('load', () => {
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();
+  setupPrivacyToggle();
   applyChartTheme();
 
   document.getElementById('footer-year').textContent = new Date().getFullYear();

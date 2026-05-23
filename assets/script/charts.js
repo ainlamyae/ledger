@@ -5,6 +5,14 @@ function applyChartTheme() {
   const dark = document.documentElement.dataset.theme === 'dark';
   Chart.defaults.color = dark ? '#94a3b8' : '#6b7280';
   Chart.defaults.borderColor = dark ? '#334155' : '#e5e7eb';
+
+  // Masks numeric axis labels (e.g. dollar amounts) when privacy mode is
+  // on. Reads privacyMode at call time, so toggling it later just requires
+  // recreating the charts (loadDashboard already destroys/rebuilds them).
+  Chart.defaults.scales.linear.ticks.callback = function (value) {
+    const label = this.getLabelForValue(value);
+    return privacyMode ? maskDigits(label) : label;
+  };
 }
 
 let incomeExpenseChart = null;
@@ -88,15 +96,25 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// Same idea as hexToRgba, but for the hsl(...) category colors generated in
+// app.js — applies the period's opacity to the category's hue.
+function hslWithAlpha(hsl, alpha) {
+  return hsl.replace('hsl(', 'hsla(').replace(')', `, ${alpha})`);
+}
+
+// Divisors that turn each period's total into a monthly average. Lifelong
+// has no fixed divisor here — it's divided by the actual number of months
+// of data (passed into renderSpendingTrendChart) since the dashboard went
+// live.
 const SPENDING_TREND_PERIODS = [
-  { key: 'lastMonth', label: 'Last Month', alpha: 1 },
-  { key: 'quarterAvg', label: 'Last Quarter Average', alpha: 0.7 },
-  { key: 'yearAvg', label: 'Last Year Average', alpha: 0.45 },
-  { key: 'lifelongAvg', label: 'Lifelong Average', alpha: 0.25 },
+  { key: 'lastMonth', label: 'Last Month', alpha: 1, months: 1 },
+  { key: 'quarterAvg', label: 'Last Quarter Average', alpha: 0.7, months: 3 },
+  { key: 'yearAvg', label: 'Last Year Average', alpha: 0.45, months: 12 },
+  { key: 'lifelongAvg', label: 'Lifelong Average', alpha: 0.25, months: null },
 ];
 
 // Renders the shared category-color swatch legend used under the
-// Spending vs. Benchmarks and Spending Breakdown by Category charts.
+// Average Monthly Spending by Category and Spending Breakdown by Category charts.
 function renderCategoryLegend(containerId, categories) {
   const legend = document.getElementById(containerId);
   legend.innerHTML = '';
@@ -113,7 +131,7 @@ function renderCategoryLegend(containerId, categories) {
   });
 }
 
-function renderSpendingTrendChart(categories) {
+function renderSpendingTrendChart(categories, totalMonths) {
   const ctx = document.getElementById('spending-trend-chart');
   if (spendingTrendChart) spendingTrendChart.destroy();
 
@@ -126,8 +144,8 @@ function renderSpendingTrendChart(categories) {
       labels: categories.map((c) => c.name),
       datasets: SPENDING_TREND_PERIODS.map((p) => ({
         label: p.label,
-        data: categories.map((c) => c[p.key]),
-        backgroundColor: categories.map((c) => hexToRgba(c.color, p.alpha)),
+        data: categories.map((c) => c[p.key] / (p.months || totalMonths || 1)),
+        backgroundColor: categories.map((c) => hslWithAlpha(c.color, p.alpha)),
       })),
     },
     options: {
@@ -137,6 +155,11 @@ function renderSpendingTrendChart(categories) {
         // Clicking a legend entry normally toggles that dataset's visibility —
         // keep all 4 period bars always visible and ignore legend clicks.
         legend: { onClick: () => {} },
+        tooltip: {
+          callbacks: {
+            label: (item) => `${item.dataset.label}: ${formatCurrency(item.raw)}`,
+          },
+        },
       },
       scales: { x: { ticks: { display: false } }, y: { beginAtZero: true } },
     },
@@ -178,7 +201,7 @@ function renderSpendingBreakdownCharts(categories) {
             callbacks: {
               label: (item) => {
                 const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
-                return `${item.label}: ${formatCurrency(item.raw)} (${pct}%)`;
+                return `${item.label}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
               },
             },
           },
@@ -256,7 +279,7 @@ function renderTypeBreakdownCharts(typeBreakdown) {
               callbacks: {
                 label: (item) => {
                   const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
-                  return `${item.label}: ${formatCurrency(item.raw)} (${pct}%)`;
+                  return `${item.label}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
                 },
               },
             },
@@ -350,7 +373,7 @@ function renderAccountCompositionChart(accounts) {
             label: (item) => {
               const name = item.dataset.labels[item.dataIndex];
               const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
-              return `${name}: ${formatCurrency(item.raw)} (${pct}%)`;
+              return `${name}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
             },
           },
         },
@@ -419,11 +442,14 @@ function renderSavingsRateChart(months) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (item) => `Savings Rate: ${item.raw.toFixed(1)}% (Saved: ${formatCurrency(months[item.dataIndex].saved)})`,
+            label: (item) => {
+              const rate = item.raw.toFixed(1);
+              return `Savings Rate: ${privacyMode ? maskDigits(rate) : rate}% (Saved: ${formatCurrency(months[item.dataIndex].saved)})`;
+            },
           },
         },
       },
-      scales: { y: { min: 0, max: 100, ticks: { callback: (value) => `${value}%` } } },
+      scales: { y: { min: 0, max: 100, ticks: { callback: (value) => `${privacyMode ? maskDigits(value) : value}%` } } },
     },
   });
 }

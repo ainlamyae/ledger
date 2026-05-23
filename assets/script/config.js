@@ -4,10 +4,9 @@ const CONFIG = {
   SHEETS: {
     TRANSACTIONS: 'Transactions',
     REPORT: 'Monthly Summary',
-    BENCHMARKS: 'Benchmarks',
     BALANCE: 'Account Balance',
     ACCOUNTS: 'Account Balance',
-    CATEGORIES: 'Categories',
     INSIGHT: 'Insight',
+    RECONCILIATION: 'Reconciliation',
   },
 };

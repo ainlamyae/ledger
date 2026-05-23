@@ -509,6 +509,17 @@ th.sortable:hover {
     color: var(--color-expense);
 }
 
+.reconciliation-status {
+    font-size: .9rem;
+    color: var(--color-text-muted);
+    margin-right: 1.5rem;
+}
+
+.reconciliation-status.warning {
+    color: var(--color-expense);
+    font-weight: 600;
+}
+
 .chart-box {
     position: relative;
     height: 180px;

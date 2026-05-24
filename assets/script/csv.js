@@ -1,6 +1,7 @@
 const CSV_HEADER = ['Date', 'Account', 'Payee', 'Description', 'Amount', 'Category'];
 
 let csvListenersAttached = false;
+let exportFilterCount = 0;
 
 function csvEscape(value) {
   const str = String(value ?? '');
@@ -8,11 +9,205 @@ function csvEscape(value) {
   return str;
 }
 
-function exportTransactionsCSV() {
+// Field-specific operator lists for the export filter builder. Amount is
+// numeric (comparison operators); the rest are plain text (substring/exact
+// match), matched case-insensitively.
+const EXPORT_FILTER_FIELDS = {
+  account: { label: 'Account', type: 'text', list: 'export-account-options' },
+  payee: { label: 'Payee', type: 'text', list: 'tx-payee-options' },
+  description: { label: 'Description', type: 'text', list: 'tx-description-options' },
+  category: { label: 'Category', type: 'text', list: 'tx-category-options' },
+  amount: { label: 'Amount', type: 'number', list: null },
+};
+
+const EXPORT_FILTER_OPERATORS = {
+  text: [
+    { value: 'contains', label: 'Contains' },
+    { value: 'not_contains', label: 'Does not contain' },
+    { value: 'equals', label: 'Equals' },
+    { value: 'not_equals', label: 'Not equals' },
+  ],
+  number: [
+    { value: 'eq', label: '=' },
+    { value: 'neq', label: '≠' },
+    { value: 'gt', label: '>' },
+    { value: 'gte', label: '>=' },
+    { value: 'lt', label: '<' },
+    { value: 'lte', label: '<=' },
+  ],
+};
+
+function exportFilterMatches(transaction, filter) {
+  if (!String(filter.value).trim()) return true;
+
+  const fieldDef = EXPORT_FILTER_FIELDS[filter.field];
+  const rawValue = transaction[filter.field];
+
+  if (fieldDef.type === 'number') {
+    const target = Number(filter.value);
+    if (Number.isNaN(target)) return true;
+    const amount = Number(rawValue) || 0;
+    switch (filter.operator) {
+      case 'eq': return amount === target;
+      case 'neq': return amount !== target;
+      case 'gt': return amount > target;
+      case 'gte': return amount >= target;
+      case 'lt': return amount < target;
+      case 'lte': return amount <= target;
+      default: return true;
+    }
+  }
+
+  const haystack = String(rawValue || '').toLowerCase();
+  const needle = filter.value.trim().toLowerCase();
+  switch (filter.operator) {
+    case 'contains': return haystack.includes(needle);
+    case 'not_contains': return !haystack.includes(needle);
+    case 'equals': return haystack === needle;
+    case 'not_equals': return haystack !== needle;
+    default: return true;
+  }
+}
+
+// Combines filters left to right with each row's own join type (AND/OR),
+// e.g. [A, {OR, B}, {AND, C}] evaluates as (A OR B) AND C.
+function transactionMatchesExportFilters(transaction, filters) {
+  if (filters.length === 0) return true;
+
+  let result = exportFilterMatches(transaction, filters[0]);
+  for (let i = 1; i < filters.length; i++) {
+    const match = exportFilterMatches(transaction, filters[i]);
+    result = filters[i].join === 'OR' ? (result || match) : (result && match);
+  }
+  return result;
+}
+
+function getExportFilters() {
+  return [...document.querySelectorAll('.export-filter-row')].map((row) => ({
+    join: row.dataset.join || 'AND',
+    field: row.querySelector('.export-filter-field').value,
+    operator: row.querySelector('.export-filter-operator').value,
+    value: row.querySelector('.export-filter-value').value,
+  }));
+}
+
+function renderExportFilterOperators(row) {
+  const field = row.querySelector('.export-filter-field').value;
+  const fieldDef = EXPORT_FILTER_FIELDS[field];
+  const operatorSelect = row.querySelector('.export-filter-operator');
+  operatorSelect.innerHTML = '';
+  EXPORT_FILTER_OPERATORS[fieldDef.type].forEach(({ value, label }) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    operatorSelect.appendChild(option);
+  });
+
+  const valueInput = row.querySelector('.export-filter-value');
+  valueInput.type = fieldDef.type === 'number' ? 'number' : 'text';
+  if (fieldDef.type === 'number') {
+    valueInput.removeAttribute('list');
+    valueInput.step = '0.01';
+  } else {
+    valueInput.setAttribute('list', fieldDef.list);
+    valueInput.removeAttribute('step');
+  }
+}
+
+function addExportFilterRow() {
+  const isFirst = exportFilterCount === 0;
+  exportFilterCount++;
+
+  const row = document.createElement('div');
+  row.className = 'export-filter-row';
+  row.dataset.join = 'AND';
+
+  if (!isFirst) {
+    const joinSelect = document.createElement('select');
+    joinSelect.className = 'export-filter-join';
+    ['AND', 'OR'].forEach((value) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      joinSelect.appendChild(option);
+    });
+    joinSelect.addEventListener('change', () => { row.dataset.join = joinSelect.value; });
+    row.appendChild(joinSelect);
+  }
+
+  const fieldSelect = document.createElement('select');
+  fieldSelect.className = 'export-filter-field';
+  Object.entries(EXPORT_FILTER_FIELDS).forEach(([value, { label }]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    fieldSelect.appendChild(option);
+  });
+
+  const operatorSelect = document.createElement('select');
+  operatorSelect.className = 'export-filter-operator';
+
+  const valueInput = document.createElement('input');
+  valueInput.className = 'export-filter-value';
+  valueInput.placeholder = 'Value';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn export-filter-remove';
+  removeBtn.textContent = '×';
+  removeBtn.title = 'Remove filter';
+  removeBtn.setAttribute('aria-label', 'Remove filter');
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+    exportFilterCount--;
+  });
+
+  fieldSelect.addEventListener('change', () => renderExportFilterOperators(row));
+
+  row.append(fieldSelect, operatorSelect, valueInput, removeBtn);
+  document.getElementById('export-filters').appendChild(row);
+  renderExportFilterOperators(row);
+}
+
+function openExportModal() {
+  document.getElementById('export-filters').innerHTML = '';
+  exportFilterCount = 0;
+  document.getElementById('export-date-from').value = '';
+  document.getElementById('export-date-to').value = '';
+
+  const accountDatalist = document.getElementById('export-account-options');
+  accountDatalist.innerHTML = '';
+  accountOptions.forEach((name) => {
+    const option = document.createElement('option');
+    option.value = name;
+    accountDatalist.appendChild(option);
+  });
+
+  document.getElementById('export-modal').hidden = false;
+}
+
+function closeExportModal() {
+  document.getElementById('export-modal').hidden = true;
+}
+
+function exportTransactionsCSV(event) {
+  event.preventDefault();
+
+  const dateFrom = document.getElementById('export-date-from').value;
+  const dateTo = document.getElementById('export-date-to').value;
+  const filters = getExportFilters();
+
   const rows = allTransactions
+    .filter((t) => (!dateFrom || t.date >= dateFrom) && (!dateTo || t.date <= dateTo))
+    .filter((t) => transactionMatchesExportFilters(t, filters))
     .slice()
     .sort((a, b) => a.row - b.row)
     .map((t) => [t.date, t.account, t.payee, t.description, t.amount, t.category]);
+
+  if (rows.length === 0) {
+    alert('No transactions match the selected filters.');
+    return;
+  }
 
   const csv = [CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
 
@@ -25,6 +220,7 @@ function exportTransactionsCSV() {
   link.click();
 
   URL.revokeObjectURL(url);
+  closeExportModal();
 }
 
 function parseCSV(text) {
@@ -100,7 +296,10 @@ function initCsvControls() {
   if (csvListenersAttached) return;
   csvListenersAttached = true;
 
-  document.getElementById('export-csv-btn').addEventListener('click', exportTransactionsCSV);
+  document.getElementById('export-csv-btn').addEventListener('click', openExportModal);
+  document.getElementById('export-cancel-btn').addEventListener('click', closeExportModal);
+  document.getElementById('export-add-filter-btn').addEventListener('click', addExportFilterRow);
+  document.getElementById('export-form').addEventListener('submit', exportTransactionsCSV);
 
   const fileInput = document.getElementById('import-csv-input');
   document.getElementById('import-csv-btn').addEventListener('click', () => fileInput.click());

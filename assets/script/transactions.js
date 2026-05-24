@@ -141,6 +141,10 @@ function populateAutocompleteOptions() {
 
   fillDatalist('tx-payee-options', allTransactions.map((t) => t.payee));
   fillDatalist('tx-description-options', allTransactions.map((t) => t.description));
+  // Categories come from both the Insight sheet's known list and whatever
+  // has actually been typed on past transactions (e.g. "Income"), so the
+  // suggestions aren't limited to a hardcoded or sheet-only set.
+  fillDatalist('tx-category-options', [...categoryOptions, ...allTransactions.map((t) => t.category)]);
 }
 
 async function refreshAccountOptions() {
@@ -264,7 +268,9 @@ function renderPagination(totalPages) {
 
   const prev = document.createElement('button');
   prev.className = 'btn';
-  prev.textContent = 'Prev';
+  prev.textContent = '⬅️';
+  prev.title = 'Previous page';
+  prev.setAttribute('aria-label', 'Previous page');
   prev.disabled = currentPage === 1;
   prev.addEventListener('click', () => {
     currentPage--;
@@ -272,11 +278,13 @@ function renderPagination(totalPages) {
   });
 
   const info = document.createElement('span');
-  info.textContent = `Page ${currentPage} of ${totalPages}`;
+  info.textContent = `${currentPage} of ${totalPages}`;
 
   const next = document.createElement('button');
   next.className = 'btn';
-  next.textContent = 'Next';
+  next.textContent = '➡️';
+  next.title = 'Next page';
+  next.setAttribute('aria-label', 'Next page');
   next.disabled = currentPage === totalPages;
   next.addEventListener('click', () => {
     currentPage++;
@@ -309,7 +317,7 @@ function openTransactionForm(transaction) {
   document.getElementById('tx-amount').value = transaction ? transaction.amount : '';
 
   populateSelect(document.getElementById('tx-account'), accountOptions, transaction ? transaction.account : '');
-  populateSelect(document.getElementById('tx-category'), categoryOptions, transaction ? transaction.category : '');
+  document.getElementById('tx-category').value = transaction ? transaction.category : '';
 
   document.getElementById('tx-save-add-btn').hidden = !!transaction;
 

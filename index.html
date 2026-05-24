@@ -117,41 +117,47 @@
     <div class="panel" id="charts">
         <h2>Spending by Category</h2>
 
-        <div class="chart-box">
-            <canvas id="spending-trend-chart"></canvas>
-        </div>
-
-        <div class="donut-grid">
-            <div class="donut-item">
-                <h3>Last Month</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-lastmonth-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-item">
-                <h3>Last Quarter Average</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-quarter-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-item">
-                <h3>Last Year Average</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-year-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-item">
-                <h3>Lifelong Average</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-lifelong-chart"></canvas>
-                </div>
+        <div class="panel-section">
+            <h3>Average Monthly Spending by Category</h3>
+            <div class="chart-box">
+                <canvas id="spending-trend-chart"></canvas>
             </div>
         </div>
 
-        <div class="donut-legend" id="spending-trend-legend"></div>
+        <div class="panel-section">
+            <h3>Spending Breakdown by Category</h3>
+            <div class="donut-grid">
+                <div class="donut-item">
+                    <h4>Last Month</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-lastmonth-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Last Quarter Average</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-quarter-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Last Year Average</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-year-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Lifelong Average</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-lifelong-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="donut-legend" id="spending-trend-legend"></div>
+        </div>
     </div>
 
     <div style="height:.5rem"></div>
@@ -398,6 +404,7 @@
                 <canvas id="account-composition-chart"></canvas>
             </div>
             <div class="donut-legend" id="account-composition-legend"></div>
+            <div class="donut-legend" id="account-composition-institution-legend"></div>
         </div>
 
         <div class="table-responsive">
@@ -461,7 +468,8 @@
                 <input type="number" step="0.01" id="tx-amount" required>
             </label>
             <label>Category
-                <select id="tx-category" required></select>
+                <input type="text" id="tx-category" list="tx-category-options" required>
+                <datalist id="tx-category-options"></datalist>
             </label>
 
             <p class="hint">Use a positive amount for income, negative for expenses.</p>
@@ -512,6 +520,35 @@
             <div class="modal-actions">
                 <button type="button" id="account-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="export-modal" class="modal" hidden>
+    <div class="modal-card modal-card-wide">
+        <h2>Export CSV</h2>
+
+        <form id="export-form">
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="export-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="export-date-to">
+                </label>
+            </div>
+
+            <div id="export-filters"></div>
+            <datalist id="export-account-options"></datalist>
+
+            <button type="button" id="export-add-filter-btn" class="btn">+ Add Filter</button>
+
+            <p class="hint">Leave the date range empty to include all dates. Filters with no value are ignored.</p>
+
+            <div class="modal-actions">
+                <button type="button" id="export-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Export</button>
             </div>
         </form>
     </div>

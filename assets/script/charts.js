@@ -15,6 +15,15 @@ function applyChartTheme() {
   };
 }
 
+// Fixed width for the y-axis label column on the three Trend charts, so
+// their plot areas (and thus their y-axes) line up vertically even though
+// each chart's values have a different number of digits.
+const TREND_Y_AXIS_WIDTH = 64;
+
+function fixTrendYAxisWidth(scale) {
+  scale.width = TREND_Y_AXIS_WIDTH;
+}
+
 let incomeExpenseChart = null;
 
 function renderIncomeExpenseChart(months) {
@@ -39,7 +48,7 @@ function renderIncomeExpenseChart(months) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } },
+      scales: { y: { beginAtZero: true, afterFit: fixTrendYAxisWidth } },
     },
   });
 }
@@ -77,7 +86,7 @@ function renderExpenseBreakdownTrendChart(months) {
       plugins: { legend: { display: false } },
       scales: {
         x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, max: yMax },
+        y: { stacked: true, beginAtZero: true, max: yMax, afterFit: fixTrendYAxisWidth },
       },
     },
   });
@@ -446,7 +455,7 @@ function renderSavingsTrendChart(months) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: false } },
+      scales: { y: { beginAtZero: false, afterFit: fixTrendYAxisWidth } },
     },
   });
 }

@@ -349,6 +349,9 @@ function setupPanelToggles() {
 
     panel.classList.add('collapsed');
     heading.addEventListener('click', () => {
+      // A click that ends a text-selection drag (e.g. the user selecting the
+      // heading's label) shouldn't also toggle the panel.
+      if (window.getSelection().toString()) return;
       panel.classList.toggle('collapsed');
       updateFab();
     });

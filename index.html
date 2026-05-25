@@ -404,6 +404,7 @@
                 <canvas id="account-composition-chart"></canvas>
             </div>
             <div class="donut-legend" id="account-composition-legend"></div>
+            <div class="donut-legend" id="account-composition-institution-legend"></div>
         </div>
 
         <div class="table-responsive">
@@ -467,7 +468,8 @@
                 <input type="number" step="0.01" id="tx-amount" required>
             </label>
             <label>Category
-                <select id="tx-category" required></select>
+                <input type="text" id="tx-category" list="tx-category-options" required>
+                <datalist id="tx-category-options"></datalist>
             </label>
 
             <p class="hint">Use a positive amount for income, negative for expenses.</p>
@@ -518,6 +520,35 @@
             <div class="modal-actions">
                 <button type="button" id="account-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="export-modal" class="modal" hidden>
+    <div class="modal-card modal-card-wide">
+        <h2>Export CSV</h2>
+
+        <form id="export-form">
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="export-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="export-date-to">
+                </label>
+            </div>
+
+            <div id="export-filters"></div>
+            <datalist id="export-account-options"></datalist>
+
+            <button type="button" id="export-add-filter-btn" class="btn">+ Add Filter</button>
+
+            <p class="hint">Leave the date range empty to include all dates. Filters with no value are ignored.</p>
+
+            <div class="modal-actions">
+                <button type="button" id="export-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Export</button>
             </div>
         </form>
     </div>

@@ -59,23 +59,26 @@ function parseTypeBreakdown(insightRows) {
   return breakdown;
 }
 
-function setSignedInUI(signedIn) {
-  document.getElementById('gate').hidden = signedIn;
-  document.getElementById('dashboard').hidden = !signedIn;
-  document.getElementById('main-nav').hidden = !signedIn;
-  document.getElementById('signin-btn').hidden = signedIn;
-  document.getElementById('signout-btn').hidden = !signedIn;
-  document.getElementById('refresh-btn').hidden = !signedIn;
-  document.getElementById('toggle-panels-fab').hidden = !signedIn;
-  document.getElementById('privacy-toggle-fab').hidden = !signedIn;
-  document.getElementById('top-banner').hidden = !signedIn;
+// 'signedOut' -> the landing/sign-in gate.
+// 'needsFile' -> signed in, but no spreadsheet selected yet (new user, or
+//   returning user who cleared storage / switched browsers).
+// 'dashboard' -> signed in with a spreadsheet selected; the normal app.
+function setUIState(state) {
+  document.getElementById('gate').hidden = state !== 'signedOut';
+  document.getElementById('file-gate').hidden = state !== 'needsFile';
+  document.getElementById('dashboard').hidden = state !== 'dashboard';
+  document.getElementById('main-nav').hidden = state !== 'dashboard';
+  document.getElementById('signin-btn').hidden = state !== 'signedOut';
+  document.getElementById('account-menu').hidden = state === 'signedOut';
+  document.getElementById('refresh-btn').hidden = state !== 'dashboard';
+  document.getElementById('toggle-panels-fab').hidden = state !== 'dashboard';
+  document.getElementById('privacy-toggle-fab').hidden = state !== 'dashboard';
+  document.getElementById('top-banner').hidden = state !== 'dashboard';
 }
 
 function handleAuthChange(token, error) {
-  setSignedInUI(token !== null);
-
   const status = document.getElementById('auth-status');
-  if (error) {
+  if (error && !error.silent) {
     status.hidden = false;
     status.textContent = `Sign-in failed: ${error.type || error.error || 'unknown error'}${error.message ? ` — ${error.message}` : ''}`;
   } else {
@@ -83,7 +86,129 @@ function handleAuthChange(token, error) {
     status.textContent = '';
   }
 
-  if (token) loadDashboard();
+  if (!token) {
+    setUIState('signedOut');
+    return;
+  }
+
+  populateAccountMenu();
+
+  if (getActiveSpreadsheetId()) {
+    setUIState('dashboard');
+    loadDashboard();
+  } else {
+    setUIState('needsFile');
+  }
+}
+
+// Shows the signed-in account's picture (or initials, if it has none/fails
+// to load) and name/email in the header dropdown.
+async function populateAccountMenu() {
+  const info = await fetchUserInfo();
+  if (!info) return;
+
+  const img = document.getElementById('account-avatar-img');
+  const fallback = document.getElementById('account-avatar-fallback');
+
+  if (info.picture) {
+    img.src = info.picture;
+    img.hidden = false;
+    fallback.hidden = true;
+  } else {
+    img.hidden = true;
+    fallback.hidden = false;
+    fallback.textContent = (info.name || info.email || '?').trim().charAt(0).toUpperCase();
+  }
+
+  document.getElementById('account-menu-name').textContent = info.name || '';
+  document.getElementById('account-menu-email').textContent = info.email || '';
+}
+
+function setupAccountMenu() {
+  const menu = document.getElementById('account-menu');
+  const btn = document.getElementById('account-menu-btn');
+  const dropdown = document.getElementById('account-menu-dropdown');
+
+  const closeMenu = () => {
+    dropdown.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !dropdown.hidden;
+    dropdown.hidden = isOpen;
+    btn.setAttribute('aria-expanded', String(!isOpen));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!menu.contains(e.target)) closeMenu();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMenu();
+  });
+
+  document.getElementById('signout-btn').addEventListener('click', closeMenu);
+
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    closeMenu();
+    clearCache();
+    loadDashboard(true);
+  });
+
+  document.getElementById('clear-cache-btn').addEventListener('click', () => {
+    closeMenu();
+    hardRefresh();
+  });
+
+  document.getElementById('open-sheet-btn').addEventListener('click', () => {
+    closeMenu();
+    window.open(`https://docs.google.com/spreadsheets/d/${getActiveSpreadsheetId()}/edit`, '_blank');
+  });
+
+  document.getElementById('switch-sheet-btn').addEventListener('click', async () => {
+    closeMenu();
+    try {
+      await pickSpreadsheet();
+      setUIState('dashboard');
+      loadDashboard();
+    } catch (err) {
+      if (err.message !== 'cancelled') alert(`Couldn't switch spreadsheet: ${err.message}`);
+    }
+  });
+
+  document.getElementById('rename-sheet-btn').addEventListener('click', async () => {
+    closeMenu();
+    try {
+      const currentName = await getActiveSpreadsheetName();
+      const newName = prompt('Rename your Ledger spreadsheet', currentName);
+      if (!newName || newName === currentName) return;
+      await renameActiveSpreadsheet(newName);
+    } catch (err) {
+      alert(`Couldn't rename the spreadsheet: ${err.message}`);
+    }
+  });
+}
+
+function showFileGateStatus(message) {
+  const status = document.getElementById('file-gate-status');
+  status.hidden = false;
+  status.textContent = message;
+}
+
+function setupFileGate() {
+  document.getElementById('get-template-btn').addEventListener('click', openTemplateCopyLink);
+
+  document.getElementById('select-sheet-btn').addEventListener('click', async () => {
+    try {
+      await pickSpreadsheet();
+      setUIState('dashboard');
+      loadDashboard();
+    } catch (err) {
+      if (err.message !== 'cancelled') showFileGateStatus(`Couldn't select that file: ${err.message}`);
+    }
+  });
 }
 
 async function loadReport(forceRefresh) {
@@ -235,13 +360,18 @@ function renderSummaryCards(data) {
 // account balances and transaction history. Non-zero means an account
 // balance is wrong or a transaction is missing.
 function renderReconciliationStatus(missingAmount) {
-  const el = document.getElementById('reconciliation-status');
   const isReconciled = Math.abs(missingAmount) < 0.005;
 
+  const el = document.getElementById('reconciliation-status');
   el.textContent = isReconciled
     ? '✅ Reconciled'
     : `⚠️ Reconciliation off by ${formatCurrency(missingAmount)} — check account balances or look for a missing transaction`;
   el.classList.toggle('warning', !isReconciled);
+
+  const card = document.getElementById('reconciliation-value');
+  card.textContent = isReconciled ? '✅' : formatCurrency(missingAmount);
+  card.classList.toggle('income', isReconciled);
+  card.classList.toggle('expense', !isReconciled);
 }
 
 async function refreshNetWorth() {
@@ -307,6 +437,7 @@ async function loadDashboard(forceRefresh = false) {
     }),
     initTransactions(forceRefresh),
     initAccountManager(forceRefresh),
+    initTimeSheet(forceRefresh),
   ]);
 
   const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
@@ -366,17 +497,16 @@ function setupPanelToggles() {
   });
 
   // Jumping to a section via the nav also expands its panel(s), since
-  // everything starts collapsed. "Charts" covers every chart panel up to
-  // (but not including) the Transactions panel.
-  const transactionsIndex = panels.findIndex((p) => p.id === 'transactions');
-
+  // everything starts collapsed. "Charts" and "Accounts" are panel-groups
+  // wrapping multiple .panel children, so expand all of them; other nav
+  // targets are a single .panel and expand directly.
   document.querySelectorAll('#main-nav a').forEach((link) => {
     link.addEventListener('click', () => {
       const target = document.querySelector(link.getAttribute('href'));
       if (!target) return;
 
-      if (target.id === 'charts') {
-        panels.slice(0, transactionsIndex).forEach((p) => p.classList.remove('collapsed'));
+      if (target.classList.contains('panel-group')) {
+        target.querySelectorAll('.panel').forEach((p) => p.classList.remove('collapsed'));
       } else {
         target.classList.remove('collapsed');
       }
@@ -467,14 +597,10 @@ window.addEventListener('load', () => {
   initAuth(handleAuthChange);
 
   document.getElementById('signin-btn').addEventListener('click', signIn);
-  document.getElementById('gate-signin-btn').addEventListener('click', signIn);
   document.getElementById('signout-btn').addEventListener('click', signOut);
-  document.getElementById('refresh-btn').addEventListener('click', () => {
-    clearCache();
-    loadDashboard(true);
-  });
-  document.getElementById('clear-cache-btn').addEventListener('click', hardRefresh);
 
+  setupFileGate();
+  setupAccountMenu();
   initCsvControls();
   setupScrollSpy();
   setupPanelToggles();

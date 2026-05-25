@@ -45,11 +45,31 @@
         <a href="#charts">Charts</a>
         <a href="#transactions">Transactions</a>
         <a href="#accounts">Accounts</a>
+        <a href="#timesheet">Time Sheet</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
-        <button id="signout-btn" class="btn" title="Sign out" aria-label="Sign out" hidden>🚪</button>
+
+        <div id="account-menu" class="account-menu" hidden>
+            <button id="account-menu-btn" class="account-avatar-btn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+                <img id="account-avatar-img" class="account-avatar" alt="" hidden>
+                <span id="account-avatar-fallback" class="account-avatar account-avatar-fallback"></span>
+            </button>
+
+            <div id="account-menu-dropdown" class="account-menu-dropdown" hidden>
+                <div class="account-menu-info">
+                    <div id="account-menu-name" class="account-menu-name"></div>
+                    <div id="account-menu-email" class="account-menu-email"></div>
+                </div>
+                <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
+                <button id="clear-cache-btn" class="account-menu-item">Clear cache</button>
+                <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
+                <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
+                <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
+                <button id="signout-btn" class="account-menu-item account-menu-item-divider">Sign out</button>
+            </div>
+        </div>
     </div>
 </header>
 
@@ -60,7 +80,7 @@
         <div class="landing-hero">
             <h1>Take control of your finances</h1>
             <p>Ledger is a private, serverless personal finance dashboard. Track your accounts, transactions, and spending trends — all while your data stays in your own Google Sheet.</p>
-            <button id="gate-signin-btn" class="btn btn-primary">Sign in with Google</button>
+            <p class="hint">Use the 🔑 sign-in button in the top-right to get started.</p>
             <p id="auth-status" class="status" hidden></p>
         </div>
 
@@ -84,6 +104,18 @@
                 <h3>Private by Design</h3>
                 <p>Your financial data lives in your own private Google Sheet — never on a third-party server.</p>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="file-gate" class="gate" hidden>
+    <div class="landing">
+        <div class="landing-hero">
+            <h1>Connect your Ledger spreadsheet</h1>
+            <p>New here? Make your own copy of the Ledger template, then select it below. Already have one? Select it directly.</p>
+            <button id="get-template-btn" class="btn">Get the Template</button>
+            <button id="select-sheet-btn" class="btn btn-primary">Select my Ledger</button>
+            <p id="file-gate-status" class="status" hidden></p>
         </div>
     </div>
 </div>
@@ -112,9 +144,17 @@
             <h3 id="cashflow-label">Net Cash Flow</h3>
             <div class="value" id="savings-value">—</div>
         </div>
+
+        <div class="card">
+            <h3>Reconciled</h3>
+            <div class="value" id="reconciliation-value">—</div>
+        </div>
     </div>
 
-    <div class="panel" id="charts">
+    <section id="charts" class="panel-group">
+        <h2 class="panel-group-title">Charts</h2>
+
+        <div class="panel">
         <h2>Spending by Category</h2>
 
         <div class="panel-section">
@@ -324,7 +364,7 @@
     <div style="height:.5rem"></div>
 
     <div class="panel">
-        <h2>Trend</h2>
+        <h2>Lifelong Trend</h2>
 
         <div class="panel-section">
             <h3>Spending Trend by Category</h3>
@@ -349,57 +389,99 @@
             </div>
         </div>
     </div>
+    </section>
 
     <div style="height:.5rem"></div>
 
-    <div class="panel" id="transactions">
-        <div class="panel-header">
+    <section id="transactions" class="panel-group">
+        <h2 class="panel-group-title">Transactions</h2>
+
+        <div class="panel">
             <h2>Transactions</h2>
+
             <div class="panel-actions">
-                <button id="export-csv-btn" class="btn">Export CSV</button>
                 <button id="import-csv-btn" class="btn">Import CSV</button>
                 <input type="file" id="import-csv-input" accept=".csv" hidden>
                 <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
             </div>
+
+            <div class="filters">
+                <input type="text" id="tx-search" placeholder="Search payee, description, account, category...">
+                <select id="tx-category-filter"></select>
+            </div>
+
+            <div class="table-responsive">
+                <table id="transactions-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th class="sortable" data-sort="account">Account</th>
+                        <th class="sortable" data-sort="payee">Payee</th>
+                        <th class="sortable" data-sort="description">Description</th>
+                        <th class="sortable" data-sort="category">Category</th>
+                        <th class="sortable" data-sort="amount">Amount</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+
+                    <tbody id="transactions-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="tx-pagination"></div>
         </div>
 
-        <div class="filters">
-            <input type="text" id="tx-search" placeholder="Search payee, description, account, category...">
-            <select id="tx-category-filter"></select>
+        <div class="panel">
+            <h2>Report Transactions</h2>
+
+            <form id="export-form">
+                <div class="export-date-range">
+                    <label>From
+                        <input type="date" id="export-date-from">
+                    </label>
+                    <label>To
+                        <input type="date" id="export-date-to">
+                    </label>
+                </div>
+
+                <div id="export-filters"></div>
+                <datalist id="export-account-options"></datalist>
+
+                <button type="button" id="export-add-filter-btn" class="btn">+ Add Filter</button>
+            </form>
+
+            <div class="table-responsive">
+                <table id="export-preview-table">
+                    <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Account</th>
+                        <th>Payee</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                    </tr>
+                    </thead>
+
+                    <tbody id="export-preview-body"></tbody>
+                </table>
+            </div>
+
+            <p id="export-summary-text" class="hint export-summary-text"></p>
+
+            <div class="export-actions">
+                <button id="export-csv-btn" class="btn btn-primary" disabled>Export CSV</button>
+            </div>
         </div>
-
-        <div class="table-responsive">
-            <table id="transactions-table">
-                <thead>
-                <tr>
-                    <th class="sortable" data-sort="date">Date</th>
-                    <th class="sortable" data-sort="account">Account</th>
-                    <th class="sortable" data-sort="payee">Payee</th>
-                    <th class="sortable" data-sort="description">Description</th>
-                    <th class="sortable" data-sort="category">Category</th>
-                    <th class="sortable" data-sort="amount">Amount</th>
-                    <th></th>
-                </tr>
-                </thead>
-
-                <tbody id="transactions-body"></tbody>
-            </table>
-        </div>
-
-        <div class="pagination" id="tx-pagination"></div>
-    </div>
+    </section>
 
     <div style="height:.5rem"></div>
 
-    <div class="panel" id="accounts">
-        <div class="panel-header">
-            <h2>Accounts</h2>
-            <span id="reconciliation-status" class="reconciliation-status"></span>
-            <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
-        </div>
+    <section id="accounts" class="panel-group">
+        <h2 class="panel-group-title">Accounts</h2>
 
-        <div class="panel-section">
-            <h3>Account Composition</h3>
+        <div class="panel">
+            <h2>Account Composition</h2>
             <div class="chart-box">
                 <canvas id="account-composition-chart"></canvas>
             </div>
@@ -407,30 +489,79 @@
             <div class="donut-legend" id="account-composition-institution-legend"></div>
         </div>
 
-        <div class="table-responsive">
-            <table id="accounts-table">
-                <thead>
-                <tr>
-                    <th class="sortable" data-sort="name">Account Name</th>
-                    <th class="sortable" data-sort="institution">Institution</th>
-                    <th class="sortable" data-sort="type">Type</th>
-                    <th class="sortable" data-sort="balance">Balance</th>
-                    <th></th>
-                </tr>
-                </thead>
+        <div class="panel">
+            <h2>Account List</h2>
 
-                <tbody id="accounts-list-body"></tbody>
-            </table>
+            <div class="panel-actions">
+                <span id="reconciliation-status" class="reconciliation-status"></span>
+                <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
+            </div>
+
+            <div class="table-responsive">
+                <table id="accounts-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="name">Account Name</th>
+                        <th class="sortable" data-sort="institution">Institution</th>
+                        <th class="sortable" data-sort="type">Type</th>
+                        <th class="sortable" data-sort="balance">Balance</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+
+                    <tbody id="accounts-list-body"></tbody>
+                </table>
+            </div>
         </div>
-    </div>
+    </section>
+
+    <div style="height:.5rem"></div>
+
+    <section id="timesheet" class="panel-group">
+        <h2 class="panel-group-title">Time Sheet</h2>
+
+        <div class="panel">
+            <h2>Time Log</h2>
+
+            <div class="panel-actions">
+                <button id="log-today-btn" class="btn btn-primary">Log a Day</button>
+            </div>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="timesheet-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="timesheet-date-to">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="timesheet-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th>Day</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Break</th>
+                        <th>Duration</th>
+                        <th>Task</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+
+                    <tbody id="timesheet-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
 
 </div>
 
 <div class="fab-stack">
     <button id="theme-toggle-btn" class="fab" title="Switch to dark mode" aria-label="Switch to dark mode">🌙</button>
     <button id="privacy-toggle-fab" class="fab" title="Hide amounts" aria-label="Hide amounts" hidden>👁️</button>
-    <button id="refresh-btn" class="fab" title="Refresh" aria-label="Refresh" hidden>🔄</button>
-    <button id="clear-cache-btn" class="fab" title="Clear cached data and reload the latest version of the app" aria-label="Clear cache">🧹</button>
     <button id="toggle-panels-fab" class="fab" title="Collapse all panels" aria-label="Collapse all panels" hidden>⊟</button>
 </div>
 
@@ -465,14 +596,14 @@
                 <datalist id="tx-description-options"></datalist>
             </label>
             <label>Amount
-                <input type="number" step="0.01" id="tx-amount" required>
+                <input type="text" inputmode="decimal" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2" required>
             </label>
             <label>Category
                 <input type="text" id="tx-category" list="tx-category-options" required>
                 <datalist id="tx-category-options"></datalist>
             </label>
 
-            <p class="hint">Use a positive amount for income, negative for expenses.</p>
+            <p class="hint">Use a positive amount for income, negative for expenses. You can also enter an expression, e.g. =-9.97-1.30 or -32/2.</p>
             <p id="tx-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
@@ -525,44 +656,53 @@
     </div>
 </div>
 
-<div id="export-modal" class="modal" hidden>
-    <div class="modal-card modal-card-wide">
-        <h2>Export CSV</h2>
+<div id="timesheet-modal" class="modal" hidden>
+    <div class="modal-card">
+        <h2 id="timesheet-modal-title">Log Time</h2>
 
-        <form id="export-form">
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="export-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="export-date-to">
-                </label>
-            </div>
+        <form id="timesheet-form">
+            <label>Date
+                <input type="date" id="timesheet-date" required>
+            </label>
+            <label class="timesheet-holiday-label">
+                <input type="checkbox" id="timesheet-holiday">
+                Holiday / day off
+            </label>
+            <label>Start
+                <input type="time" id="timesheet-start">
+            </label>
+            <label>End
+                <input type="time" id="timesheet-end">
+            </label>
+            <label>Break
+                <input type="time" id="timesheet-break" value="00:00">
+            </label>
+            <label>Task
+                <textarea id="timesheet-task" rows="3" placeholder="e.g. Federal Statutory Holiday"></textarea>
+            </label>
 
-            <div id="export-filters"></div>
-            <datalist id="export-account-options"></datalist>
-
-            <button type="button" id="export-add-filter-btn" class="btn">+ Add Filter</button>
-
-            <p class="hint">Leave the date range empty to include all dates. Filters with no value are ignored.</p>
+            <p id="timesheet-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="export-cancel-btn" class="btn">Cancel</button>
-                <button type="submit" class="btn btn-primary">Export</button>
+                <button type="button" id="timesheet-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
     </div>
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="assets/script/config.js"></script>
 <script src="assets/script/auth.js"></script>
+<script src="assets/script/drive.js"></script>
 <script src="assets/script/sheets.js"></script>
 <script src="assets/script/cache.js"></script>
 <script src="assets/script/charts.js"></script>
 <script src="assets/script/transactions.js"></script>
 <script src="assets/script/accounts.js"></script>
+<script src="assets/script/timesheet.js"></script>
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/app.js"></script>
 </body>

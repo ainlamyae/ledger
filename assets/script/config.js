@@ -1,6 +1,12 @@
 const CONFIG = {
-  CLIENT_ID: '595319886726-n0a776t8iekd604tq0vbk9rfanj5u1c5.apps.googleusercontent.com',
-  SPREADSHEET_ID: '1J7slZtVg0Pg8Xs81mVvjsf5637q2xQFVSHCbXlr1p-Q',
+  CLIENT_ID: '595319886726-ru931qdehli1ki94lrqshdi3o9art3qo.apps.googleusercontent.com',
+  // Master template every new user's personal copy is cloned from (Drive
+  // file ID). Shared as "Anyone with the link can view" — not a secret.
+  TEMPLATE_SPREADSHEET_ID: '1PW5VxnnyXekvudOam9bXv7onFhThC273',
+  // Google Cloud "API key" credential (Cloud Console > Credentials), needed
+  // to initialize the Picker API. Not the same as CLIENT_ID. Not a secret —
+  // restrict it to the Picker API and your origins in the Cloud Console.
+  PICKER_API_KEY: 'AIzaSyAS2ru2zPxVdr-dfM-5c5YkyYeMLsioA1c',
   SHEETS: {
     TRANSACTIONS: 'Transactions',
     REPORT: 'Monthly Summary',
@@ -8,5 +14,6 @@ const CONFIG = {
     ACCOUNTS: 'Account Balance',
     INSIGHT: 'Insight',
     RECONCILIATION: 'Reconciliation',
+    TIMESHEET: 'eTimeSheet',
   },
 };

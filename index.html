@@ -405,6 +405,11 @@
                 <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
             </div>
 
+            <div class="panel-actions" id="tx-bulk-actions" hidden>
+                <span id="tx-bulk-summary"></span>
+                <button id="tx-bulk-delete-btn" class="btn">🗑️ Delete Selected</button>
+            </div>
+
             <div class="filters">
                 <input type="text" id="tx-search" placeholder="Search payee, description, account, category...">
                 <select id="tx-category-filter"></select>
@@ -414,6 +419,7 @@
                 <table id="transactions-table">
                     <thead>
                     <tr>
+                        <th><input type="checkbox" id="tx-select-all" aria-label="Select all transactions on this page"></th>
                         <th class="sortable" data-sort="date">Date</th>
                         <th class="sortable" data-sort="account">Account</th>
                         <th class="sortable" data-sort="payee">Payee</th>
@@ -520,6 +526,46 @@
     <section id="timesheet" class="panel-group">
         <h2 class="panel-group-title">Time Sheet</h2>
 
+        <div id="timesheet-reminder-banner" class="info-banner" hidden>
+            <span>You haven't logged today's hours yet.</span>
+            <button id="timesheet-reminder-log-btn" class="btn">Log a Day</button>
+            <button id="timesheet-reminder-enable-btn" class="btn" hidden>🔔 Enable reminders</button>
+        </div>
+
+        <div class="panel">
+            <h2>Work Pattern Analysis</h2>
+
+            <div class="donut-grid">
+                <div class="donut-item">
+                    <h4>Start Time Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-start-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>End Time Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-end-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Duration Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-duration-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Average Hours per Day</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-daily-average-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="panel">
             <h2>Time Log</h2>
 
@@ -563,6 +609,11 @@
     <button id="theme-toggle-btn" class="fab" title="Switch to dark mode" aria-label="Switch to dark mode">🌙</button>
     <button id="privacy-toggle-fab" class="fab" title="Hide amounts" aria-label="Hide amounts" hidden>👁️</button>
     <button id="toggle-panels-fab" class="fab" title="Collapse all panels" aria-label="Collapse all panels" hidden>⊟</button>
+</div>
+
+<div id="undo-toast" class="toast" hidden>
+    <span id="undo-toast-message"></span>
+    <button id="undo-toast-btn" class="btn">Undo</button>
 </div>
 
 <footer class="site-footer">
@@ -688,6 +739,21 @@
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div id="shortcuts-modal" class="modal" hidden>
+    <div class="modal-card">
+        <h2>Keyboard Shortcuts</h2>
+        <ul class="shortcuts-list">
+            <li><kbd>/</kbd> Focus transaction search</li>
+            <li><kbd>n</kbd> Add transaction</li>
+            <li><kbd>Esc</kbd> Close open modal/menu</li>
+            <li><kbd>?</kbd> Toggle this help</li>
+        </ul>
+        <div class="modal-actions">
+            <button type="button" id="shortcuts-close-btn" class="btn">Close</button>
+        </div>
     </div>
 </div>
 

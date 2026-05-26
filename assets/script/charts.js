@@ -447,6 +447,169 @@ function renderAccountCompositionChart(accounts) {
   });
 }
 
+function mean(values) {
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+function stdDev(values, avg) {
+  const variance = values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+function minutesToClock(mins) {
+  const wrapped = ((Math.round(mins) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+}
+
+// Chart.js has no built-in distribution plot, so this buckets `values` into
+// `binCount` equal-width bins spanning their own min/max, then fits a normal
+// curve to the same mean/stdev and scales it so its peak matches the
+// histogram's tallest bar (the curve is a shape overlay, not a second count
+// axis).
+function buildDistribution(values, binCount, formatLabel) {
+  if (values.length === 0) return null;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values) > min ? Math.max(...values) : min + 1;
+  const avg = mean(values);
+  const sd = stdDev(values, avg);
+  const binWidth = (max - min) / binCount;
+
+  const counts = new Array(binCount).fill(0);
+  values.forEach((v) => {
+    const idx = Math.min(binCount - 1, Math.floor((v - min) / binWidth));
+    counts[idx]++;
+  });
+
+  const labels = counts.map((_, i) => formatLabel(min + binWidth * (i + 0.5)));
+
+  const peakCount = Math.max(...counts);
+  const normalPdf = (x) => (sd ? (1 / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-((x - avg) ** 2) / (2 * sd ** 2)) : 0);
+  const peakPdf = normalPdf(avg) || 1;
+  const curve = counts.map((_, i) => (normalPdf(min + binWidth * (i + 0.5)) / peakPdf) * peakCount);
+
+  return { labels, counts, curve };
+}
+
+const distributionCharts = {};
+
+function renderDistributionChart(canvasId, dist) {
+  const ctx = document.getElementById(canvasId);
+  if (distributionCharts[canvasId]) distributionCharts[canvasId].destroy();
+  if (!dist) return;
+
+  distributionCharts[canvasId] = new Chart(ctx, {
+    data: {
+      labels: dist.labels,
+      datasets: [
+        { type: 'bar', label: 'Days', data: dist.counts, backgroundColor: 'rgba(59, 130, 246, .5)', order: 2 },
+        { type: 'line', label: 'Normal Distribution', data: dist.curve, borderColor: '#dc2626', pointRadius: 0, tension: .4, order: 1 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { filter: (item) => item.dataset.label === 'Days', callbacks: { label: (item) => `${item.raw} day(s)` } },
+      },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+}
+
+function renderTimesheetDistributionCharts(entries) {
+  const worked = entries.filter((e) => e.start && e.end);
+
+  renderDistributionChart('timesheet-start-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.start)), 10, minutesToClock));
+  renderDistributionChart('timesheet-end-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.end)), 10, minutesToClock));
+
+  // Weekends and holidays/off days aren't representative work shifts, and a
+  // negative duration (end-before-start, or a break longer than the shift)
+  // is a mis-keyed entry — exclude all of them so they can't skew the
+  // histogram into bins that don't reflect a normal workday.
+  const durations = worked
+    .filter((e) => !isWeekend(e.date))
+    .map((e) => computeDurationMinutes(e.start, e.end, e.breakMinutes) / 60)
+    .filter((h) => h >= 0);
+  renderDistributionChart('timesheet-duration-distribution-chart', buildDistribution(durations, 10, (h) => `${h.toFixed(1)}h`));
+}
+
+function isHolidayEntry(entry) {
+  return !!entry && !entry.start && !entry.end && !!entry.task;
+}
+
+// Total worked hours within the trailing `days` (or, for the lifelong
+// period, since the first logged entry) divided by the working days that
+// have elapsed in that window — weekends and marked holidays/days off are
+// excluded from both the numerator and the denominator, so they don't pull
+// the average down. A weekday with no entry at all still counts as a
+// working day with 0 hours (it's a missed log, not time off).
+function averageDailyHours(entries, days) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let windowStart;
+  if (days) {
+    windowStart = new Date(today);
+    windowStart.setDate(windowStart.getDate() - (days - 1));
+  } else {
+    if (entries.length === 0) return 0;
+    windowStart = entries.reduce((min, e) => (dateFromIso(e.date) < min ? dateFromIso(e.date) : min), dateFromIso(entries[0].date));
+  }
+
+  const byDate = new Map(entries.map((e) => [e.date, e]));
+
+  let totalMinutes = 0;
+  let workingDays = 0;
+  const cursor = new Date(windowStart);
+  while (cursor <= today) {
+    const iso = isoFromDate(cursor);
+    if (!isWeekend(iso)) {
+      const entry = byDate.get(iso);
+      if (!isHolidayEntry(entry)) {
+        workingDays++;
+        if (entry?.start && entry?.end) totalMinutes += computeDurationMinutes(entry.start, entry.end, entry.breakMinutes) || 0;
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return workingDays ? totalMinutes / 60 / workingDays : 0;
+}
+
+let timesheetDailyAverageChart = null;
+
+function renderTimesheetDailyAverageChart(entries) {
+  const ctx = document.getElementById('timesheet-daily-average-chart');
+  if (timesheetDailyAverageChart) timesheetDailyAverageChart.destroy();
+  if (entries.length === 0) return;
+
+  const periods = [
+    { label: 'Last Week', days: 7 },
+    { label: 'Last Month', days: 30 },
+    { label: 'Last Year', days: 365 },
+    { label: 'Lifelong', days: null },
+  ];
+
+  timesheetDailyAverageChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: periods.map((p) => p.label),
+      datasets: [{ label: 'Avg Hours/Day', data: periods.map((p) => averageDailyHours(entries, p.days)), backgroundColor: '#3b82f6' }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (item) => `${item.raw.toFixed(1)}h/day` } },
+      },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
 let savingsTrendChart = null;
 
 function renderSavingsTrendChart(months) {

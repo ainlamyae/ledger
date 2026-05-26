@@ -35,9 +35,13 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Spending Breakdown by Type** — for each spending category, four donut charts (Last Month, Last Quarter, Last Year, Lifelong) breaking that category's spend down by `Type`, a free-text prefix convention in the `Transactions` `Description` field (e.g. "Bread - milk and eggs"), pre-aggregated by formulas in the `Insight` sheet. Panels are ordered by lifelong spend (highest first), and each donut includes an "Untyped" slice for spending without a recognized prefix.
 - **Trend** — three charts in one panel: **Spending Trend by Category** (stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Spending by Category), **Income vs. Expenses Trend** (stepped area chart of the full transaction history), and **Cumulative Savings Trend** (running total of savings as a line chart).
 - **Transactions** — searchable, filterable, sortable, paginated (⬅️/➡️) table with add/edit/delete and CSV import. The Payee, Description, and Category fields all autocomplete from your transaction history and the `Insight` category list (most-used values first) instead of a fixed dropdown, helping correct typos or voice-dictation mistakes and letting you type a brand-new category (e.g. "Income") on the fly. Long Payee/Description values are truncated with an ellipsis (hover to see the full text). The Amount field accepts a simple arithmetic expression (optionally prefixed with `=`, e.g. `=-9.97-1.30` to add tax, or `-32/2` to split a charge); results are rounded to the nearest cent.
+- **Bulk transaction operations** — a checkbox per row (plus a header "select all") shows a running count and total (privacy-mode aware) of the selected transactions and a Delete Selected button. Bulk delete issues one `batchUpdate` with a `deleteDimension` request per row, ordered highest-row-first so earlier deletes in the same call can't invalidate later ones. Selection clears whenever the underlying view changes (search/filter/sort/page) but survives an unrelated re-render.
+- **Undo for deletes** — deleting a transaction (single or bulk) shows a toast with an Undo button for a few seconds; undoing re-appends the deleted row(s) — they land back at the end of the sheet rather than their original position, since Sheets addresses rows by position and the delete has already shifted everything below them.
+- **Keyboard shortcuts** — `/` focuses the transaction search box, `n` opens Add Transaction, `Esc` closes whichever modal (or the account menu) is open, and `?` toggles a shortcuts-help overlay. All except `Esc` are ignored while focus is in any text field, so they never fire while typing.
 - **Report Transactions** — a dedicated panel (alongside the Transactions list, in the same panel group) with a From/To date range and a filter builder: each row picks a field (Account, Payee, Description, Category, Amount), an operator (Contains/Equals/etc. for text fields, =, ≠, >, >=, <, <= for Amount), and a value. Rows after the first get an AND/OR selector, evaluated left to right, so filters can be combined (e.g. Category contains "Grocery" OR Category contains "Household", AND Amount < 0). The matching transactions and their total preview live as you adjust the filters — nothing renders until you touch a filter, so opening the panel doesn't pay the cost of listing every transaction — and the Export CSV button writes exactly what's previewed.
 - **Accounts** — the Account Composition donut chart (a 3-ring nested donut: the inner ring shows each account type's share of total balance shaded by type, the middle ring breaks that down by institution — each institution has one fixed color, even if its accounts span multiple types — and the outer ring by individual account, shaded by its institution's color; both rings use colors spread evenly around the color wheel so no two entries share a color, however many there are. Account types and institutions are both ordered by absolute balance highest first, so a type or institution with a large negative net — e.g. Credit/debt — still ranks by its size rather than sorting last; types and institutions with a zero balance total are omitted), followed by the Account List panel: a sortable table of balances by institution/type, with add/edit/delete, inline Total Savings recalculation, and a reconciliation status (✅ Reconciled, or ⚠️ with the gap amount if recorded balances don't match transaction history — also surfaced as the "Reconciled" summary card). The Balance field accepts the same arithmetic-expression syntax as the transaction Amount field.
-- **Panel groups** — Charts, Transactions, and Accounts each wrap their related panels in a bordered group with one heading; clicking that nav link (Charts/Transactions/Accounts) expands every panel in its group at once.
+- **Time Sheet** — a "Log a Day" button opens a modal to record a day's Start/End time, Break, and an optional Task note (a weekday with no times but a Task note is treated as a holiday/day off; one with neither is flagged as a missed entry). A reminder banner appears whenever today is a weekday with nothing logged yet, with its own "Log a Day" shortcut and an opt-in "Enable reminders" button — browsers require a direct user gesture to grant `Notification` permission, so it's never requested automatically; once granted, an OS-level notification fires once per day (guarded via `localStorage`) instead of only the in-page banner. The **Work Pattern Analysis** panel renders four charts above the log: histograms — each with a fitted normal-distribution curve overlay — of Start Time, End Time, and Duration across weekday work shifts (weekends, holidays/days off, and mis-keyed negative durations are excluded), plus a bar chart of Average Hours per Day over Last Week/Last Month/Last Year/Lifelong, averaged only over working days so weekends and holidays don't pull the average down. Below that, the Time Log table lists entries within a From/To date range, sortable by Date, with computed Duration and inline edit.
+- **Panel groups** — Charts, Transactions, Accounts, and Time Sheet each wrap their related panels in a bordered group with one heading; clicking that nav link expands every panel in its group at once.
 - **Collapsible panels** — every chart/table panel is collapsed by default; click its title to expand or collapse it (dragging to select the title's text does not toggle it). A floating "expand/collapse all" button toggles every panel at once.
 - **Privacy mode** — a floating 🙈/👁️ button masks every dollar amount across the summary cards, tables, and charts by replacing each digit with `*` (e.g. `$1,234.56` → `$*,***.**`). Amounts are hidden by default each time you sign in; click the button to reveal them for the rest of the session.
 - **Dark mode** — a floating 🌙/☀️ button switches the whole app — including charts and the landing page — between light and dark themes, persisted in `localStorage`.
@@ -101,11 +105,12 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 3 | `drive.js` | Per-user spreadsheet selection: opens Sheets' "make a copy" link for the template, Google Picker for selecting/confirming a file, `localStorage`-backed active spreadsheet ID | `openTemplateCopyLink`, `pickSpreadsheet`, `getActiveSpreadsheetId`, `setActiveSpreadsheetId`, `clearActiveSpreadsheetId` |
 | 4 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) against the active spreadsheet ID | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 5 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, hard-refresh (cache + Cache Storage + service workers), and the shared numeric-expression evaluator used by the Balance and Amount fields | `getCached`, `setCached`, `clearCache`, `hardRefresh`, `evaluateNumberExpression` |
-| 6 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, and the nested Account Composition donut | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderAccountCompositionChart` |
-| 7 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete, Payee/Description/Category autocomplete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
+| 6 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, the nested Account Composition donut, and the Time Sheet Work Pattern Analysis charts (Start/End Time and Duration histograms with a normal-curve overlay, plus the Average Hours per Day bar chart) | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderAccountCompositionChart`, `renderTimesheetDistributionCharts`, `renderTimesheetDailyAverageChart` |
+| 7 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete, Payee/Description/Category autocomplete, multi-select bulk delete with selected-row sum | `initTransactions`, `refreshTransactions`, `refreshAccountOptions`, `bulkDeleteTransactions`, `restoreTransactions` |
 | 8 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
-| 9 | `csv.js` | CSV import for transactions, plus the Report Transactions live preview/export (date range + AND/OR field filters) | `initCsvControls` |
-| 10 | `app.js` | Orchestration: report aggregation, dashboard rendering, file-selection gate, scroll-spy nav, collapsible panels, dark mode toggle, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange` |
+| 9 | `timesheet.js` | Time Sheet: Time Log table (date-range filter, sortable, add/edit), holiday/missed-entry detection, client-side Duration computation, the data feeding the Work Pattern Analysis charts, and the today-not-logged reminder banner/notification | `initTimeSheet`, `refreshTimeSheet`, `getFilteredTimeEntries`, `checkTimesheetReminder` |
+| 10 | `csv.js` | CSV import for transactions, plus the Report Transactions live preview/export (date range + AND/OR field filters) | `initCsvControls` |
+| 11 | `app.js` | Orchestration: report aggregation, dashboard rendering, file-selection gate, scroll-spy nav, collapsible panels, dark mode toggle, app-level keyboard shortcuts, the shared undo toast, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange`, `setupKeyboardShortcuts`, `showUndoToast` |
 
 ### Data Flow
 
@@ -120,8 +125,8 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 
 **Dashboard load**
 4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Account Balance`, `Insight`, and `Reconciliation` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, the Spending by Category comparisons, the per-category `Type` breakdown for the Spending Breakdown by Type donuts, and the reconciliation status shown above the Accounts table.
-5. `initTransactions()` and `initAccountManager()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API.
-6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending by Category breakdown grid, and the per-category Spending Breakdown by Type donut grids; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
+5. `initTransactions()`, `initAccountManager()`, and `initTimeSheet()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API.
+6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, and the Time Sheet Work Pattern Analysis charts; `app.js` renders the summary cards; `accounts.js`, `transactions.js`, and `timesheet.js` render their tables.
 
 **Writes** (add/edit/delete transaction or account, edit balance, CSV import)
 7. UI actions call `appendValues` / `updateValues` / `batchUpdate` directly against the spreadsheet.
@@ -192,6 +197,22 @@ Cell `H1` holds `=TODAY()`, the single anchor date that every period's `EOMONTH(
 
 For each category, the blank-`Type` row's totals are used as that category's overall spend; the gap between that total and the sum of its named `Type` rows becomes the "Untyped" donut slice. `Type` rows with a Lifelong value of `0` (a retired Type with no historical spend) are excluded entirely, so removing a Type from active use doesn't leave an empty entry in the legend. The 5 categories shown (Grocery, Household, Personal, Transportation, Housing) are a fixed list in `charts.js` (`TYPE_BREAKDOWN_CATEGORIES`) — adding a new category requires adding its rows to `Insight`, the category name to that constant, and a matching donut-grid block in `index.html`.
 
+### `eTimeSheet`
+
+One row per logged calendar day, oldest first. Data rows start at row 2.
+
+| Column | Type | Notes |
+|---|---|---|
+| A — Date | Date | ISO format |
+| B — Day | Text | Weekday name; only written when a brand-new row is appended, never read back |
+| C — Start | Text | `HH:MM`, blank for a holiday/day off |
+| D — End | Text | `HH:MM`, blank for a holiday/day off |
+| E — Break | Number (minutes) | Break length; pre-existing Excel-style `H:MM`/`H:MM:SS` duration cells are also parsed |
+| F — Duration | — | Never read or written by the app — `timesheet.js` always computes worked time client-side from Start/End/Break |
+| G — Task | Text | Free-text note. On a weekday with no Start/End, a non-blank Task marks the day as a holiday/day off; blank instead flags a missed entry |
+
+A weekend day (Saturday/Sunday) with no Start/End is neither a holiday nor a missed entry — it's just not logged. Logging a new date that leaves a gap since the last logged date backfills every missing day in between with a blank row first, keeping one row per calendar day.
+
 ### `Reconciliation` (formula-driven)
 
 A single reconciliation check comparing recorded account balances against transaction history.
@@ -242,6 +263,7 @@ ledger/
 │       ├── charts.js         # Chart.js renderers
 │       ├── transactions.js   # Transactions table: filters, sorting, CRUD
 │       ├── accounts.js       # Accounts table: balances + CRUD
+│       ├── timesheet.js      # Time Sheet: Time Log table + Work Pattern Analysis chart data
 │       ├── csv.js            # CSV export/import for transactions
 │       └── app.js            # Orchestration, report aggregation, scroll-spy nav
 ├── LICENSE
@@ -280,6 +302,7 @@ const CONFIG = {
     ACCOUNTS: 'Account Balance',
     INSIGHT: 'Insight',
     RECONCILIATION: 'Reconciliation',
+    TIMESHEET: 'eTimeSheet',
   },
 };
 ```
@@ -324,6 +347,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
 | `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
 | `'Account Balance'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete suggestions for the transaction form |
+| `eTimeSheet!A2:G` | `timesheet.js` | Time Log rows; read for the table, Work Pattern Analysis charts, and gap backfill, appended/updated on add or edit |
 
 **Client-side cache (`localStorage`, 5-minute TTL via `cache.js`):**
 
@@ -334,6 +358,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
 | `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |
 | `ledger_cache_account-list` | `accounts.js` | Raw `'Account Balance'!A3:D100` rows |
+| `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:G` rows |
 
 **Auth and file selection (`localStorage`, separate from the cache above):**
 
@@ -341,6 +366,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 |---|---|---|
 | `ledger_token` | `auth.js` | `{ token, expiresAt }` — OAuth access token + expiry, enables silent refresh |
 | `ledger_spreadsheet_id` | `drive.js` | The signed-in user's chosen spreadsheet's Drive file ID — every Sheets API call in `sheets.js` targets this ID, not a fixed constant |
+| `ledger_last_reminder_notified` | `timesheet.js` | Today's date once the Time Sheet OS notification has fired, so it only fires once per day rather than on every reload |
 
 ---
 

@@ -9,6 +9,7 @@ let editingRow = null;
 let currentPage = 1;
 let listenersAttached = false;
 let txSort = { key: null, dir: 1 };
+let selectedRows = new Set();
 
 async function initTransactions(forceRefresh = false) {
   let lists = forceRefresh ? null : getCached('lists');
@@ -48,13 +49,37 @@ async function initTransactions(forceRefresh = false) {
     document.getElementById('tx-form').addEventListener('submit', submitTransactionForm);
     document.getElementById('tx-search').addEventListener('input', () => {
       currentPage = 1;
+      selectedRows.clear();
       renderTransactions();
     });
     document.getElementById('tx-category-filter').addEventListener('change', () => {
       currentPage = 1;
+      selectedRows.clear();
       renderTransactions();
     });
     setupTransactionSorting();
+    setupBulkActions();
+  }
+}
+
+function setupBulkActions() {
+  document.getElementById('tx-select-all').addEventListener('change', (e) => {
+    const pageRows = getFilteredTransactions().slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    pageRows.forEach((t) => (e.target.checked ? selectedRows.add(t.row) : selectedRows.delete(t.row)));
+    renderTransactions();
+  });
+
+  document.getElementById('tx-bulk-delete-btn').addEventListener('click', bulkDeleteTransactions);
+}
+
+function updateBulkActionsUI() {
+  const bar = document.getElementById('tx-bulk-actions');
+  const selected = allTransactions.filter((t) => selectedRows.has(t.row));
+
+  bar.hidden = selected.length === 0;
+  if (selected.length > 0) {
+    const total = selected.reduce((sum, t) => sum + t.amount, 0);
+    document.getElementById('tx-bulk-summary').textContent = `${selected.length} selected — total ${formatCurrency(total)}`;
   }
 }
 
@@ -79,6 +104,7 @@ function setupTransactionSorting() {
       }
       updateTransactionSortIndicators();
       currentPage = 1;
+      selectedRows.clear();
       renderTransactions();
     });
   });
@@ -219,6 +245,19 @@ function renderTransactions() {
   pageItems.forEach((t) => {
     const tr = document.createElement('tr');
 
+    const checkboxCell = document.createElement('td');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = selectedRows.has(t.row);
+    checkbox.setAttribute('aria-label', 'Select transaction');
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) selectedRows.add(t.row);
+      else selectedRows.delete(t.row);
+      updateBulkActionsUI();
+      updateSelectAllCheckbox(pageItems);
+    });
+    checkboxCell.appendChild(checkbox);
+
     const dateCell = document.createElement('td');
     dateCell.textContent = t.date;
 
@@ -257,11 +296,20 @@ function renderTransactions() {
 
     actionsCell.append(editBtn, deleteBtn);
 
-    tr.append(dateCell, accountCell, payeeCell, descCell, categoryCell, amountCell, actionsCell);
+    tr.append(checkboxCell, dateCell, accountCell, payeeCell, descCell, categoryCell, amountCell, actionsCell);
     tbody.appendChild(tr);
   });
 
+  updateSelectAllCheckbox(pageItems);
+  updateBulkActionsUI();
   renderPagination(totalPages);
+}
+
+function updateSelectAllCheckbox(pageItems) {
+  const selectAll = document.getElementById('tx-select-all');
+  const selectedOnPage = pageItems.filter((t) => selectedRows.has(t.row)).length;
+  selectAll.checked = pageItems.length > 0 && selectedOnPage === pageItems.length;
+  selectAll.indeterminate = selectedOnPage > 0 && selectedOnPage < pageItems.length;
 }
 
 function renderPagination(totalPages) {
@@ -277,6 +325,7 @@ function renderPagination(totalPages) {
   prev.disabled = currentPage === 1;
   prev.addEventListener('click', () => {
     currentPage--;
+    selectedRows.clear();
     renderTransactions();
   });
 
@@ -291,6 +340,7 @@ function renderPagination(totalPages) {
   next.disabled = currentPage === totalPages;
   next.addEventListener('click', () => {
     currentPage++;
+    selectedRows.clear();
     renderTransactions();
   });
 
@@ -381,6 +431,8 @@ async function submitTransactionForm(event) {
 async function deleteTransaction(row) {
   if (!confirm('Delete this transaction?')) return;
 
+  const tx = allTransactions.find((t) => t.row === row);
+
   try {
     await batchUpdate([{
       deleteDimension: {
@@ -388,7 +440,47 @@ async function deleteTransaction(row) {
       },
     }]);
     await refreshTransactions(true);
+    if (tx) showUndoToast('Transaction deleted.', () => restoreTransactions([tx]));
   } catch (err) {
     alert(`Failed to delete: ${err.message}`);
+  }
+}
+
+async function bulkDeleteTransactions() {
+  const selected = allTransactions.filter((t) => selectedRows.has(t.row));
+  if (selected.length === 0) return;
+  if (!confirm(`Delete ${selected.length} selected transaction(s)?`)) return;
+
+  // Descending by row so each request's startIndex/endIndex is still valid
+  // by the time the API processes the next one in the same batchUpdate call.
+  const requests = [...selected]
+    .sort((a, b) => b.row - a.row)
+    .map((t) => ({
+      deleteDimension: {
+        range: { sheetId: transactionsSheetId, dimension: 'ROWS', startIndex: t.row - 1, endIndex: t.row },
+      },
+    }));
+
+  try {
+    await batchUpdate(requests);
+    selectedRows.clear();
+    await refreshTransactions(true);
+    showUndoToast(`${selected.length} transaction(s) deleted.`, () => restoreTransactions(selected));
+  } catch (err) {
+    alert(`Failed to delete: ${err.message}`);
+  }
+}
+
+// Restores deleted transactions by re-appending their data — they land back
+// at the end of the sheet rather than their original row, since Sheets rows
+// are addressed by position and deleteDimension has already shifted
+// everything below them.
+async function restoreTransactions(txs) {
+  const values = txs.map((t) => [t.date, t.account, t.payee, t.description, t.amount, t.category]);
+  try {
+    await appendValues(TRANSACTIONS_RANGE, values);
+    await refreshTransactions(true);
+  } catch (err) {
+    alert(`Failed to restore: ${err.message}`);
   }
 }

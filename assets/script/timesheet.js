@@ -325,7 +325,12 @@ async function submitTimesheetForm(event) {
   const holiday = document.getElementById('timesheet-holiday').checked;
   const start = holiday ? '' : document.getElementById('timesheet-start').value;
   const end = holiday ? '' : document.getElementById('timesheet-end').value;
-  const breakMinutes = holiday ? 0 : (timeToMinutes(document.getElementById('timesheet-break').value) || 0);
+  // Written as an "H:MM" time string, not a raw minutes count: some Break
+  // cells carry pre-existing Excel-style duration formatting, and Sheets
+  // reinterprets a plain integer written into those as a count of days
+  // (e.g. 15 minutes becomes a 15-day duration). A time-string literal
+  // parses correctly under that formatting either way.
+  const breakValue = holiday ? '00:00' : (document.getElementById('timesheet-break').value || '00:00');
   const task = document.getElementById('timesheet-task').value;
 
   const errorEl = document.getElementById('timesheet-form-error');
@@ -341,11 +346,11 @@ async function submitTimesheetForm(event) {
     if (existing) {
       // Two calls so Duration (F), sitting between Break (E) and Task (G),
       // is never touched.
-      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!C${existing.row}:E${existing.row}`, [[start, end, breakMinutes]]);
+      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!C${existing.row}:E${existing.row}`, [[start, end, breakValue]]);
       await updateValues(`${CONFIG.SHEETS.TIMESHEET}!G${existing.row}`, [[task]]);
     } else {
       await backfillMissingDates(date);
-      await appendValues(TIMESHEET_RANGE, [[date, dayNameFromDate(date), start, end, breakMinutes, '', task]]);
+      await appendValues(TIMESHEET_RANGE, [[date, dayNameFromDate(date), start, end, breakValue, '', task]]);
     }
 
     await refreshTimeSheet(true);

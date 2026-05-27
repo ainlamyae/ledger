@@ -516,6 +516,7 @@ kbd {
 
 .panel-group-title {
     margin: 0 0 .25rem;
+    text-align: center;
 }
 
 .panel-group .panel {
@@ -620,6 +621,10 @@ kbd {
     gap: .5rem;
     flex-wrap: wrap;
     margin-bottom: 1rem;
+}
+
+.panel-actions[hidden] {
+    display: none;
 }
 
 .filters {
@@ -853,6 +858,7 @@ td .btn {
 }
 
 #tx-form label,
+#tx-bulk-edit-form label,
 #account-form label,
 #timesheet-form label {
     display: block;
@@ -863,6 +869,8 @@ td .btn {
 
 #tx-form input,
 #tx-form select,
+#tx-bulk-edit-form input,
+#tx-bulk-edit-form select,
 #account-form input,
 #account-form select,
 #timesheet-form input,
@@ -880,6 +888,7 @@ td .btn {
 }
 
 #tx-form select,
+#tx-bulk-edit-form select,
 #account-form select,
 #timesheet-form select {
     width: auto;

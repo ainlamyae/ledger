@@ -24,6 +24,17 @@ function fixTrendYAxisWidth(scale) {
   scale.width = TREND_Y_AXIS_WIDTH;
 }
 
+// Rounds a computed axis max up to the nearest "nice" number (1/2/5 times a
+// power of ten, e.g. 4327 -> 5000) so explicit y-axis caps don't show an
+// arbitrary value with no clean gridlines.
+function niceAxisMax(value) {
+  if (value <= 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const residual = value / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude;
+}
+
 let incomeExpenseChart = null;
 
 function renderIncomeExpenseChart(months) {
@@ -68,7 +79,7 @@ function renderExpenseBreakdownTrendChart(months) {
   // outlier month doesn't squash every other month's bars into a sliver.
   const totals = months.map((m) => m.categories.reduce((sum, c) => sum + c.value, 0));
   const sortedTotals = [...totals].sort((a, b) => b - a);
-  const yMax = (sortedTotals[1] ?? sortedTotals[0]) * 1.2;
+  const yMax = niceAxisMax((sortedTotals[1] ?? sortedTotals[0]) * 1.2);
 
   expenseBreakdownTrendChart = new Chart(ctx, {
     type: 'bar',
@@ -491,6 +502,21 @@ function buildDistribution(values, binCount, formatLabel) {
   return { labels, counts, curve };
 }
 
+// Shared across all 4 Work Pattern Analysis bar charts so bars look the same
+// thickness regardless of how many bars/bins each one happens to have (the
+// 3 histograms have 10 bins, the Average Hours per Day chart has 5).
+const WORK_PATTERN_BAR_THICKNESS = 18;
+
+// Fixed height for the x-axis label row on the same 4 charts, so their plot
+// areas line up even though Average Hours per Day's labels ("Last Quarter",
+// "Last Year"...) are longer than the histograms' clock-time/hour labels and
+// would otherwise wrap or reserve more vertical space, shrinking its bars.
+const WORK_PATTERN_X_AXIS_HEIGHT = 80;
+
+function fixWorkPatternXAxisHeight(scale) {
+  scale.height = WORK_PATTERN_X_AXIS_HEIGHT;
+}
+
 const distributionCharts = {};
 
 function renderDistributionChart(canvasId, dist) {
@@ -502,7 +528,7 @@ function renderDistributionChart(canvasId, dist) {
     data: {
       labels: dist.labels,
       datasets: [
-        { type: 'bar', label: 'Days', data: dist.counts, backgroundColor: 'rgba(59, 130, 246, .5)', order: 2 },
+        { type: 'bar', label: 'Days', data: dist.counts, backgroundColor: 'rgba(59, 130, 246, .5)', order: 2, maxBarThickness: WORK_PATTERN_BAR_THICKNESS },
         { type: 'line', label: 'Normal Distribution', data: dist.curve, borderColor: '#dc2626', pointRadius: 0, tension: .4, order: 1 },
       ],
     },
@@ -513,7 +539,10 @@ function renderDistributionChart(canvasId, dist) {
         legend: { display: false },
         tooltip: { filter: (item) => item.dataset.label === 'Days', callbacks: { label: (item) => `${item.raw} day(s)` } },
       },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      scales: {
+        x: { afterFit: fixWorkPatternXAxisHeight },
+        y: { beginAtZero: true, ticks: { precision: 0 } },
+      },
     },
   });
 }
@@ -588,6 +617,7 @@ function renderTimesheetDailyAverageChart(entries) {
   const periods = [
     { label: 'Last Week', days: 7 },
     { label: 'Last Month', days: 30 },
+    { label: 'Last Quarter', days: 90 },
     { label: 'Last Year', days: 365 },
     { label: 'Lifelong', days: null },
   ];
@@ -596,7 +626,7 @@ function renderTimesheetDailyAverageChart(entries) {
     type: 'bar',
     data: {
       labels: periods.map((p) => p.label),
-      datasets: [{ label: 'Avg Hours/Day', data: periods.map((p) => averageDailyHours(entries, p.days)), backgroundColor: '#3b82f6' }],
+      datasets: [{ label: 'Avg Hours/Day', data: periods.map((p) => averageDailyHours(entries, p.days)), backgroundColor: '#3b82f6', maxBarThickness: WORK_PATTERN_BAR_THICKNESS }],
     },
     options: {
       responsive: true,
@@ -605,7 +635,10 @@ function renderTimesheetDailyAverageChart(entries) {
         legend: { display: false },
         tooltip: { callbacks: { label: (item) => `${item.raw.toFixed(1)}h/day` } },
       },
-      scales: { y: { beginAtZero: true } },
+      scales: {
+        x: { afterFit: fixWorkPatternXAxisHeight, ticks: { maxRotation: 90, minRotation: 90 } },
+        y: { beginAtZero: true },
+      },
     },
   });
 }

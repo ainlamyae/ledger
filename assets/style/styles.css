@@ -516,6 +516,7 @@ kbd {
 
 .panel-group-title {
     margin: 0 0 .25rem;
+    text-align: center;
 }
 
 .panel-group .panel {

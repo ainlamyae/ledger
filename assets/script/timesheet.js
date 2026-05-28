@@ -90,7 +90,13 @@ async function initTimeSheet(forceRefresh = false) {
     });
     document.getElementById('timesheet-cancel-btn').addEventListener('click', closeTimesheetForm);
     document.getElementById('timesheet-form').addEventListener('submit', submitTimesheetForm);
-    document.getElementById('timesheet-holiday').addEventListener('change', toggleTimesheetHolidayFields);
+    document.getElementById('timesheet-holiday').addEventListener('change', () => {
+      toggleTimesheetHolidayFields();
+      updateTimesheetLiveDuration();
+    });
+    ['timesheet-start', 'timesheet-end', 'timesheet-break'].forEach((id) => {
+      document.getElementById(id).addEventListener('input', updateTimesheetLiveDuration);
+    });
     document.getElementById('timesheet-date-from').addEventListener('input', renderTimesheetList);
     document.getElementById('timesheet-date-to').addEventListener('input', renderTimesheetList);
     setupTimesheetSorting();
@@ -272,6 +278,20 @@ function toggleTimesheetHolidayFields() {
   });
 }
 
+function updateTimesheetLiveDuration() {
+  const liveDuration = document.getElementById('timesheet-live-duration');
+  if (document.getElementById('timesheet-holiday').checked) {
+    liveDuration.textContent = '🏖 Holiday';
+    return;
+  }
+
+  const start = document.getElementById('timesheet-start').value;
+  const end = document.getElementById('timesheet-end').value;
+  const breakMinutes = parseBreakMinutes(document.getElementById('timesheet-break').value);
+  const durationMin = computeDurationMinutes(start, end, breakMinutes);
+  liveDuration.textContent = durationMin !== null ? minutesToHm(durationMin) : '—';
+}
+
 function openTimesheetForm(dateStr) {
   const existing = allTimeEntries.find((e) => e.date === dateStr);
 
@@ -285,6 +305,7 @@ function openTimesheetForm(dateStr) {
   const isHoliday = !!(existing && !existing.start && !existing.end && existing.task);
   document.getElementById('timesheet-holiday').checked = isHoliday;
   toggleTimesheetHolidayFields();
+  updateTimesheetLiveDuration();
 
   document.getElementById('timesheet-form-error').hidden = true;
   document.getElementById('timesheet-modal').hidden = false;

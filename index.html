@@ -144,11 +144,6 @@
             <h3 id="cashflow-label">Net Cash Flow</h3>
             <div class="value" id="savings-value">—</div>
         </div>
-
-        <div class="card">
-            <h3>Reconciled</h3>
-            <div class="value" id="reconciliation-value">—</div>
-        </div>
     </div>
 
     <section id="charts" class="panel-group">
@@ -385,6 +380,31 @@
             </div>
         </div>
     </div>
+
+    <div class="panel">
+        <h2>Common</h2>
+
+        <div class="panel-section">
+            <h3>Most Common Payees</h3>
+            <div class="chart-box">
+                <canvas id="common-payee-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>Most Common Expense Descriptions</h3>
+            <div class="chart-box">
+                <canvas id="common-description-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>Total Spend by Payee</h3>
+            <div class="chart-box">
+                <canvas id="payee-spend-chart"></canvas>
+            </div>
+        </div>
+    </div>
     </section>
 
     <div style="height:.5rem"></div>
@@ -414,8 +434,8 @@
                         <th class="sortable" data-sort="date">Date</th>
                         <th class="sortable" data-sort="account">Account</th>
                         <th class="sortable" data-sort="payee">Payee</th>
-                        <th class="sortable" data-sort="description">Description</th>
                         <th class="sortable" data-sort="category">Category</th>
+                        <th class="sortable" data-sort="description">Description</th>
                         <th class="sortable" data-sort="amount">Amount</th>
                         <th></th>
                     </tr>
@@ -460,8 +480,8 @@
                         <th>Date</th>
                         <th>Account</th>
                         <th>Payee</th>
-                        <th>Description</th>
                         <th>Category</th>
+                        <th>Description</th>
                         <th>Amount</th>
                     </tr>
                     </thead>
@@ -639,16 +659,16 @@
                 <input type="text" id="tx-payee" list="tx-payee-options" required>
                 <datalist id="tx-payee-options"></datalist>
             </label>
+            <label>Category
+                <input type="text" id="tx-category" list="tx-category-options" required>
+                <datalist id="tx-category-options"></datalist>
+            </label>
             <label>Description
                 <input type="text" id="tx-description" list="tx-description-options">
                 <datalist id="tx-description-options"></datalist>
             </label>
             <label>Amount
                 <input type="text" inputmode="decimal" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2" required>
-            </label>
-            <label>Category
-                <input type="text" id="tx-category" list="tx-category-options" required>
-                <datalist id="tx-category-options"></datalist>
             </label>
 
             <p class="hint">Use a positive amount for income, negative for expenses. You can also enter an expression, e.g. =-9.97-1.30 or -32/2.</p>
@@ -679,14 +699,14 @@
             <label>Payee
                 <input type="text" id="tx-bulk-payee" list="tx-payee-options">
             </label>
+            <label>Category
+                <input type="text" id="tx-bulk-category" list="tx-category-options">
+            </label>
             <label>Description
                 <input type="text" id="tx-bulk-description" list="tx-description-options">
             </label>
             <label>Amount
                 <input type="text" inputmode="decimal" id="tx-bulk-amount" placeholder="e.g. -45.50 or =-9.97-1.30">
-            </label>
-            <label>Category
-                <input type="text" id="tx-bulk-category" list="tx-category-options">
             </label>
 
             <p class="hint">Leave a field blank to keep each transaction's existing value.</p>
@@ -762,6 +782,7 @@
             <label>Break
                 <input type="time" id="timesheet-break" value="00:00">
             </label>
+            <p>Log Time: <span id="timesheet-live-duration">—</span></p>
             <label>Task
                 <textarea id="timesheet-task" rows="3" placeholder="e.g. Federal Statutory Holiday"></textarea>
             </label>

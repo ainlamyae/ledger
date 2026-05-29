@@ -137,9 +137,9 @@ async function refreshTransactions(forceRefresh = false) {
     date: row[0] || '',
     account: row[1] || '',
     payee: row[2] || '',
-    description: row[3] || '',
-    amount: Number(row[4]) || 0,
-    category: row[5] || '',
+    category: row[3] || '',
+    description: row[4] || '',
+    amount: Number(row[5]) || 0,
   }));
   renderTransactions();
   populateAutocompleteOptions();
@@ -298,7 +298,7 @@ function renderTransactions() {
 
     actionsCell.append(editBtn, deleteBtn);
 
-    tr.append(checkboxCell, dateCell, accountCell, payeeCell, descCell, categoryCell, amountCell, actionsCell);
+    tr.append(checkboxCell, dateCell, accountCell, payeeCell, categoryCell, descCell, amountCell, actionsCell);
     tbody.appendChild(tr);
   });
 
@@ -402,9 +402,9 @@ async function submitTransactionForm(event) {
     document.getElementById('tx-date').value,
     document.getElementById('tx-account').value,
     document.getElementById('tx-payee').value,
+    document.getElementById('tx-category').value,
     document.getElementById('tx-description').value,
     amount,
-    document.getElementById('tx-category').value,
   ]];
 
   try {
@@ -505,7 +505,7 @@ async function submitBulkEditForm(event) {
     await Promise.all(selected.map((t) => {
       const merged = { ...t, ...patch };
       return updateValues(`${CONFIG.SHEETS.TRANSACTIONS}!A${t.row}:F${t.row}`,
-        [[merged.date, merged.account, merged.payee, merged.description, merged.amount, merged.category]]);
+        [[merged.date, merged.account, merged.payee, merged.category, merged.description, merged.amount]]);
     }));
 
     selectedRows.clear();
@@ -525,7 +525,7 @@ async function restoreBulkEdit(snapshots) {
   try {
     await Promise.all(snapshots.map((t) =>
       updateValues(`${CONFIG.SHEETS.TRANSACTIONS}!A${t.row}:F${t.row}`,
-        [[t.date, t.account, t.payee, t.description, t.amount, t.category]])));
+        [[t.date, t.account, t.payee, t.category, t.description, t.amount]])));
     await refreshTransactions(true);
   } catch (err) {
     alert(`Failed to restore: ${err.message}`);
@@ -580,7 +580,7 @@ async function bulkDeleteTransactions() {
 // are addressed by position and deleteDimension has already shifted
 // everything below them.
 async function restoreTransactions(txs) {
-  const values = txs.map((t) => [t.date, t.account, t.payee, t.description, t.amount, t.category]);
+  const values = txs.map((t) => [t.date, t.account, t.payee, t.category, t.description, t.amount]);
   try {
     await appendValues(TRANSACTIONS_RANGE, values);
     await refreshTransactions(true);

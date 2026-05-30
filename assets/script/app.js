@@ -20,6 +20,19 @@ function formatCurrency(value) {
   return privacyMode ? maskDigits(formatted) : formatted;
 }
 
+// Shared by the Transactions, Accounts, and Time Log tables for the "no
+// rows to show" case, so an empty sheet (or filter with no matches) doesn't
+// just render a blank table.
+function renderEmptyRow(colspan, message) {
+  const tr = document.createElement('tr');
+  const td = document.createElement('td');
+  td.colSpan = colspan;
+  td.className = 'empty-state';
+  td.textContent = message;
+  tr.appendChild(td);
+  return tr;
+}
+
 let undoToastTimer = null;
 
 // Shared by single and bulk transaction delete. Re-showing the toast before
@@ -148,11 +161,44 @@ async function populateAccountMenu() {
   document.getElementById('account-menu-email').textContent = info.email || '';
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'account-modal', 'timesheet-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
   modal.hidden = !modal.hidden;
+}
+
+function getOpenModal() {
+  return SHORTCUT_MODAL_IDS.map((id) => document.getElementById(id)).find((m) => m && !m.hidden);
+}
+
+function focusableElements(container) {
+  return [...container.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )].filter((el) => el.offsetParent !== null);
+}
+
+// Each modal manages its own hidden flag from wherever it's opened/closed
+// (transactions.js, accounts.js, timesheet.js, etc.) — rather than touching
+// every call site, watch the `hidden` attribute here to move focus into the
+// modal on open and back to whatever triggered it on close, so keyboard and
+// screen-reader users land somewhere sensible either way.
+function setupModalFocusManagement() {
+  SHORTCUT_MODAL_IDS.forEach((id) => {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+
+    let lastFocused = null;
+    new MutationObserver(() => {
+      if (!modal.hidden) {
+        lastFocused = document.activeElement;
+        focusableElements(modal)[0]?.focus();
+      } else if (lastFocused) {
+        lastFocused.focus();
+        lastFocused = null;
+      }
+    }).observe(modal, { attributes: true, attributeFilter: ['hidden'] });
+  });
 }
 
 // Global shortcuts. Escape always works (even while focus is inside a
@@ -163,8 +209,27 @@ function toggleShortcutsHelp() {
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      const openModal = SHORTCUT_MODAL_IDS.map((id) => document.getElementById(id)).find((m) => !m.hidden);
+      const openModal = getOpenModal();
       if (openModal) openModal.hidden = true;
+      return;
+    }
+
+    // Trap Tab/Shift+Tab inside whichever modal is open, so focus can't
+    // escape to the page behind the overlay.
+    if (e.key === 'Tab') {
+      const openModal = getOpenModal();
+      if (!openModal) return;
+      const focusable = focusableElements(openModal);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
       return;
     }
 
@@ -183,6 +248,7 @@ function setupKeyboardShortcuts() {
   });
 
   document.getElementById('shortcuts-close-btn').addEventListener('click', toggleShortcutsHelp);
+  setupModalFocusManagement();
 }
 
 function setupAccountMenu() {
@@ -538,12 +604,27 @@ function setupPanelToggles() {
     panel.classList.add('panel-enter');
 
     panel.classList.add('collapsed');
+    heading.setAttribute('role', 'button');
+    heading.setAttribute('tabindex', '0');
+    heading.setAttribute('aria-expanded', 'false');
+
+    const toggle = () => {
+      panel.classList.toggle('collapsed');
+      heading.setAttribute('aria-expanded', String(!panel.classList.contains('collapsed')));
+      updateFab();
+    };
+
     heading.addEventListener('click', () => {
       // A click that ends a text-selection drag (e.g. the user selecting the
       // heading's label) shouldn't also toggle the panel.
       if (window.getSelection().toString()) return;
-      panel.classList.toggle('collapsed');
-      updateFab();
+      toggle();
+    });
+    heading.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
     });
   });
 

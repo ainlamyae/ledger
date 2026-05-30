@@ -43,6 +43,7 @@ function setupAccountSorting() {
 
     th.textContent = '';
     th.append(label, indicator);
+    th.setAttribute('tabindex', '0');
 
     th.addEventListener('click', () => {
       const key = th.dataset.sort;
@@ -54,6 +55,12 @@ function setupAccountSorting() {
       }
       updateAccountSortIndicators();
       renderAccountsList();
+    });
+    th.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        th.click();
+      }
     });
   });
 }
@@ -104,7 +111,12 @@ function renderAccountsList() {
   const tbody = document.getElementById('accounts-list-body');
   tbody.innerHTML = '';
 
-  getSortedAccounts().forEach((account) => {
+  const sortedAccounts = getSortedAccounts();
+  if (sortedAccounts.length === 0) {
+    tbody.appendChild(renderEmptyRow(5, 'No accounts yet — add your first one above.'));
+  }
+
+  sortedAccounts.forEach((account) => {
     const tr = document.createElement('tr');
 
     const nameCell = document.createElement('td');

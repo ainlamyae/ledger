@@ -39,8 +39,9 @@ function loadStoredToken() {
 }
 
 function storeToken(token, expiresInSeconds) {
-  const expiresAt = Date.now() + expiresInSeconds * 1000;
+  const expiresAt = Date.now() + (expiresInSeconds || 3600) * 1000;
   localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
+  localStorage.setItem(CONSENTED_STORAGE_KEY, '1');
   scheduleTokenRefresh(expiresAt);
 }
 
@@ -67,6 +68,15 @@ function initAuth(onAuthChange) {
 
       if (response.error) {
         console.error('OAuth error:', response);
+        // Silent refresh failed while user is signed in — keep them signed in
+        // and retry after a backoff rather than logging them out mid-session.
+        if (wasSilent && accessToken) {
+          refreshTimer = setTimeout(() => {
+            pendingSilent = true;
+            tokenClient.requestAccessToken({ prompt: 'none' });
+          }, 2 * 60 * 1000);
+          return;
+        }
         accessToken = null;
         authChangeHandler(null, { ...response, silent: wasSilent });
         return;
@@ -79,6 +89,14 @@ function initAuth(onAuthChange) {
       const wasSilent = pendingSilent;
       pendingSilent = false;
       console.error('OAuth flow error:', err);
+      // Same: don't log out mid-session from a silent refresh failure.
+      if (wasSilent && accessToken) {
+        refreshTimer = setTimeout(() => {
+          pendingSilent = true;
+          tokenClient.requestAccessToken({ prompt: 'none' });
+        }, 2 * 60 * 1000);
+        return;
+      }
       authChangeHandler(null, { ...err, silent: wasSilent });
     },
   });
@@ -100,9 +118,12 @@ function initAuth(onAuthChange) {
 }
 
 function signIn() {
-  // 'consent' forces the picker on first sign-in; afterwards an empty
-  // prompt lets GIS silently refresh using the existing session.
-  tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+  // First-time users (no prior consent stored) need 'consent' to grant OAuth
+  // permissions. Returning users already have Google-side consent, so '' lets
+  // GIS use the browser's active Google session — Chrome can often satisfy
+  // this without any visible UI or with a single account-picker click.
+  const hasConsented = localStorage.getItem(CONSENTED_STORAGE_KEY);
+  tokenClient.requestAccessToken({ prompt: hasConsented ? '' : 'consent' });
 }
 
 function signOut() {
@@ -112,6 +133,9 @@ function signOut() {
   }
   accessToken = null;
   localStorage.removeItem(TOKEN_STORAGE_KEY);
+  // Clear the consent flag too: a different person may sign in next on this
+  // browser and needs to go through their own consent flow.
+  localStorage.removeItem(CONSENTED_STORAGE_KEY);
   // A different person may sign in next on this browser — don't hand them
   // the previous user's spreadsheet selection.
   clearActiveSpreadsheetId();

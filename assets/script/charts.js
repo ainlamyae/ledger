@@ -223,39 +223,86 @@ function renderSpendingBreakdownCharts(categories) {
   });
 }
 
-const TYPE_BREAKDOWN_CATEGORIES = ['Grocery', 'Household', 'Personal', 'Transportation', 'Housing'];
 const TYPE_BREAKDOWN_PERIODS = [
-  { key: 'lastMonth', suffix: 'lastmonth' },
-  { key: 'lastQuarter', suffix: 'lastquarter' },
-  { key: 'lastYear', suffix: 'lastyear' },
-  { key: 'lifelong', suffix: 'lifelong' },
+  { key: 'lastMonth', suffix: 'lastmonth', label: 'Last Month' },
+  { key: 'lastQuarter', suffix: 'lastquarter', label: 'Last Quarter' },
+  { key: 'lastYear', suffix: 'lastyear', label: 'Last Year' },
+  { key: 'lifelong', suffix: 'lifelong', label: 'Lifelong' },
 ];
 const TYPE_BREAKDOWN_OTHER_COLOR = '#9ca3af';
 
 const typeBreakdownCharts = {};
 
-// One donut per category per period (20 total), each showing that
-// category's Types as a share of its overall total for that period.
-// The gap between the category total (Insight's blank-Type row) and the
-// sum of its named Types becomes an "Untyped" slice.
-function renderTypeBreakdownCharts(typeBreakdown) {
-  // Order each category's panel by absolute lifelong spend (highest first)
-  // so the biggest-impact categories surface at the top of the section,
-  // regardless of sign.
-  const orderedCategories = [...TYPE_BREAKDOWN_CATEGORIES].sort((a, b) => {
-    const lifelongA = Math.abs((typeBreakdown[a]?.total?.lifelong) || 0);
-    const lifelongB = Math.abs((typeBreakdown[b]?.total?.lifelong) || 0);
-    return lifelongB - lifelongA;
+// Builds the DOM for one category's panel (heading + 4 period donuts +
+// legend) from scratch, so the set of panels reflects whatever categories
+// the Insight tab actually defines rather than a hardcoded list.
+function buildTypeBreakdownSection(category) {
+  const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+  const section = document.createElement('div');
+  section.className = 'type-breakdown-category';
+  section.id = `type-breakdown-${slug}-section`;
+
+  const heading = document.createElement('h3');
+  heading.textContent = category;
+  section.appendChild(heading);
+
+  const grid = document.createElement('div');
+  grid.className = 'donut-grid';
+
+  TYPE_BREAKDOWN_PERIODS.forEach(({ suffix, label }) => {
+    const item = document.createElement('div');
+    item.className = 'donut-item';
+
+    const h4 = document.createElement('h4');
+    h4.textContent = label;
+
+    const chartBox = document.createElement('div');
+    chartBox.className = 'chart-box chart-box-donut';
+
+    const canvas = document.createElement('canvas');
+    canvas.id = `type-breakdown-${slug}-${suffix}-chart`;
+
+    chartBox.appendChild(canvas);
+    item.append(h4, chartBox);
+    grid.appendChild(item);
   });
 
-  orderedCategories.forEach((category) => {
-    const section = document.getElementById(`type-breakdown-${category.toLowerCase()}-section`);
-    if (section) section.parentElement.appendChild(section);
-  });
+  section.appendChild(grid);
+
+  const legend = document.createElement('div');
+  legend.className = 'donut-legend';
+  legend.id = `type-breakdown-${slug}-legend`;
+  section.appendChild(legend);
+
+  return section;
+}
+
+// One donut per category per period, each showing that category's Types as
+// a share of its overall total for that period. Only categories with at
+// least one named Type get a panel — categories Insight tracks as a single
+// total (no Type breakdown) wouldn't have anything to show. The gap between
+// the category total (Insight's blank-Type row) and the sum of its named
+// Types becomes an "Untyped" slice.
+function renderTypeBreakdownCharts(typeBreakdown) {
+  // Order panels by absolute lifelong spend (highest first) so the
+  // biggest-impact categories surface at the top of the section, regardless
+  // of sign.
+  const orderedCategories = Object.keys(typeBreakdown)
+    .filter((category) => typeBreakdown[category].types.length > 0)
+    .sort((a, b) => {
+      const lifelongA = Math.abs((typeBreakdown[a]?.total?.lifelong) || 0);
+      const lifelongB = Math.abs((typeBreakdown[b]?.total?.lifelong) || 0);
+      return lifelongB - lifelongA;
+    });
+
+  const container = document.getElementById('type-breakdown-container');
+  container.innerHTML = '';
 
   orderedCategories.forEach((category) => {
     const data = typeBreakdown[category];
-    if (!data) return;
+
+    container.appendChild(buildTypeBreakdownSection(category));
 
     // Sort once by absolute lifelong spend (largest first) so the legend and
     // every period's donut share the same slice order and colors, regardless
@@ -263,13 +310,15 @@ function renderTypeBreakdownCharts(typeBreakdown) {
     const types = [...data.types].sort((a, b) => Math.abs(b.lifelong) - Math.abs(a.lifelong));
     const colors = types.map((_, i) => `hsl(${Math.round((i * 360) / types.length)}, 65%, 55%)`);
 
-    renderCategoryLegend(`type-breakdown-${category.toLowerCase()}-legend`, [
+    const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    renderCategoryLegend(`type-breakdown-${slug}-legend`, [
       ...types.map((t, i) => ({ name: t.name, color: colors[i] })),
       { name: 'Untyped', color: TYPE_BREAKDOWN_OTHER_COLOR },
     ]);
 
     TYPE_BREAKDOWN_PERIODS.forEach(({ key, suffix }) => {
-      const canvasId = `type-breakdown-${category.toLowerCase()}-${suffix}-chart`;
+      const canvasId = `type-breakdown-${slug}-${suffix}-chart`;
       const ctx = document.getElementById(canvasId);
       if (typeBreakdownCharts[canvasId]) typeBreakdownCharts[canvasId].destroy();
 
@@ -555,7 +604,8 @@ function renderDistributionChart(canvasId, dist) {
 }
 
 function renderTimesheetDistributionCharts(entries) {
-  const worked = entries.filter((e) => e.start && e.end);
+  const today = isoFromDate(new Date());
+  const worked = entries.filter((e) => e.start && e.end && e.date !== today);
 
   renderDistributionChart('timesheet-start-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.start)), 10, minutesToClock));
   renderDistributionChart('timesheet-end-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.end)), 10, minutesToClock));
@@ -599,7 +649,7 @@ function averageDailyHours(entries, days) {
   let totalMinutes = 0;
   let workingDays = 0;
   const cursor = new Date(windowStart);
-  while (cursor <= today) {
+  while (cursor < today) {
     const iso = isoFromDate(cursor);
     if (!isWeekend(iso)) {
       const entry = byDate.get(iso);
@@ -679,7 +729,7 @@ function renderSavingsTrendChart(months) {
   });
 }
 
-const COMMON_CHART_LIMIT = 25;
+const COMMON_CHART_LIMIT = 36;
 
 // Counts how many transactions share each value of `field`, ignoring blanks,
 // and returns the top N as {label, count} sorted highest first.

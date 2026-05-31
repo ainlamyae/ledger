@@ -140,6 +140,26 @@ function setupTimesheetSorting() {
   });
 }
 
+// Defaults the filter to 28 days (4 weeks) ending on the Saturday of the
+// week that is 2 weeks from today, but only the first time — never stomps a
+// date range the user already set themselves.
+function setDefaultTimesheetDateRange() {
+  const fromInput = document.getElementById('timesheet-date-from');
+  const toInput = document.getElementById('timesheet-date-to');
+  if (fromInput.value || toInput.value) return;
+
+  const today = new Date();
+  const twoWeeksOut = new Date(today);
+  twoWeeksOut.setDate(today.getDate() + 14);
+  const daysToSaturday = (6 - twoWeeksOut.getDay() + 7) % 7;
+  const toDate = new Date(twoWeeksOut);
+  toDate.setDate(twoWeeksOut.getDate() + daysToSaturday);
+  const fromDate = new Date(toDate);
+  fromDate.setDate(toDate.getDate() - 27);
+  fromInput.value = isoFromDate(fromDate);
+  toInput.value = isoFromDate(toDate);
+}
+
 // Start/End/Break/Date are read and written as plain text/numbers the app
 // fully owns (e.g. "09:00", not an Excel time-of-day cell), the same way
 // Transactions' Date column is a plain ISO string. Day (B) and Duration (F)
@@ -166,6 +186,7 @@ async function refreshTimeSheet(forceRefresh = false) {
     }))
     .filter((e) => e.date);
 
+  setDefaultTimesheetDateRange();
   renderTimesheetList();
   renderTimesheetDistributionCharts(allTimeEntries);
   renderTimesheetDailyAverageChart(allTimeEntries);

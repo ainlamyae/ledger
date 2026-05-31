@@ -10,6 +10,7 @@ let currentPage = 1;
 let listenersAttached = false;
 let txSort = { key: null, dir: 1 };
 let selectedRows = new Set();
+let transactionsDirtyFromAdd = false;
 
 async function initTransactions(forceRefresh = false) {
   let lists = forceRefresh ? null : getCached('lists');
@@ -47,6 +48,16 @@ async function initTransactions(forceRefresh = false) {
     document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionForm());
     document.getElementById('tx-cancel-btn').addEventListener('click', closeTransactionForm);
     document.getElementById('tx-form').addEventListener('submit', submitTransactionForm);
+
+    // Deferred full refresh when the modal closes after a keepOpen add sequence.
+    // Covers all close paths: Cancel button, Escape key, and normal Save.
+    new MutationObserver(() => {
+      const modal = document.getElementById('tx-modal');
+      if (modal.hidden && transactionsDirtyFromAdd) {
+        transactionsDirtyFromAdd = false;
+        refreshTransactions(true);
+      }
+    }).observe(document.getElementById('tx-modal'), { attributes: true, attributeFilter: ['hidden'] });
     document.getElementById('tx-search').addEventListener('input', () => {
       currentPage = 1;
       selectedRows.clear();
@@ -427,14 +438,20 @@ async function submitTransactionForm(event) {
     } else {
       await appendValues(TRANSACTIONS_RANGE, values);
     }
-    await refreshTransactions(true);
-
     if (keepOpen) {
+      // Optimistic local append — no API re-fetch, no datalist rebuild, no .focus() call.
+      // Rebuilding datalists while a form input is focused freezes iOS WebKit.
+      // The deferred MutationObserver on tx-modal triggers a full refresh on close.
+      const [date, account, payee, category, description, amt] = values[0];
+      const nextRow = allTransactions.length > 0 ? allTransactions[allTransactions.length - 1].row + 1 : 2;
+      allTransactions.push({ row: nextRow, date, account, payee, category, description, amount: amt });
+      renderTransactions();
       document.getElementById('tx-description').value = '';
       document.getElementById('tx-amount').value = '';
       document.getElementById('tx-form-error').hidden = true;
-      document.getElementById('tx-description').focus();
+      transactionsDirtyFromAdd = true;
     } else {
+      await refreshTransactions(true);
       closeTransactionForm();
     }
   } catch (err) {

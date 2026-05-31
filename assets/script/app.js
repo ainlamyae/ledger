@@ -469,12 +469,12 @@ async function loadReport(forceRefresh) {
 
 function renderSummaryCards(data) {
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
-  document.getElementById('income-label').textContent = 'Income';
+  document.getElementById('income-label').textContent = 'Monthly Income';
   document.getElementById('income-value').textContent = formatCurrency(data.income);
-  document.getElementById('expenses-label').textContent = 'Expenses';
+  document.getElementById('expenses-label').textContent = 'Monthly Expenditure';
   document.getElementById('expenses-value').textContent = formatCurrency(data.expenses);
 
-  document.getElementById('cashflow-label').textContent = 'Net Cash Flow';
+  document.getElementById('cashflow-label').textContent = 'Monthly Cash Flow';
 
   const savingsEl = document.getElementById('savings-value');
   savingsEl.textContent = formatCurrency(data.saved);

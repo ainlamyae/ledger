@@ -461,6 +461,15 @@ function renderWellnessSleepChart() {
   });
 }
 
+// Convert any activity amount to minutes so steps and timed entries
+// are comparable on the same chart. ~100 steps/min is a typical walking pace.
+function toActivityMinutes(amount, unit) {
+  const u = (unit || '').toLowerCase().trim();
+  if (u === 'steps' || u === 'step') return Math.round(amount / 100);
+  if (u === 'hr' || u === 'hour' || u === 'hours') return Math.round(amount * 60);
+  return amount; // 'min' or unknown — use as-is
+}
+
 function renderWellnessActivityChart() {
   const ctx = document.getElementById('wellness-activity-chart');
   if (wellnessActivityChart) wellnessActivityChart.destroy();
@@ -469,7 +478,10 @@ function renderWellnessActivityChart() {
   const byDate = new Map();
   allWellnessEntries
     .filter((e) => e.category === 'Activity' && e.amount !== null)
-    .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
+    .forEach((e) => {
+      const mins = toActivityMinutes(e.amount, e.unit);
+      byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
+    });
 
   const activityData = dates.map((d) => byDate.get(d) || 0);
   const hasData = activityData.some((v) => v > 0);
@@ -501,7 +513,7 @@ function renderWellnessActivityChart() {
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: (v) => v.toLocaleString() },
+          ticks: { callback: (v) => `${v} min` },
         },
       },
     },

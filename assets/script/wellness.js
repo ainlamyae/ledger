@@ -348,18 +348,31 @@ function renderWellnessWeightChart() {
   if (entries.length === 0) return;
 
   wellnessWeightChart = new Chart(ctx, {
-    type: 'line',
     data: {
       labels: entries.map((e) => e.date),
-      datasets: [{
-        label: 'Weight',
-        data: entries.map((e) => e.amount),
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59, 130, 246, .1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-      }],
+      datasets: [
+        {
+          type: 'line',
+          label: 'Weight',
+          data: entries.map((e) => e.amount),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, .1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: '82 kg goal',
+          data: new Array(entries.length).fill(82),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
     },
     options: {
       responsive: true,
@@ -388,14 +401,27 @@ function renderWellnessCaloriesChart() {
     .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
   wellnessCaloriesChart = new Chart(ctx, {
-    type: 'bar',
     data: {
       labels: dates,
-      datasets: [{
-        label: 'Calories',
-        data: dates.map((d) => byDate.get(d) || 0),
-        backgroundColor: '#f59e0b',
-      }],
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Calories',
+          data: dates.map((d) => byDate.get(d) || 0),
+          backgroundColor: '#f59e0b',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: '2000 kcal target',
+          data: new Array(7).fill(2000),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
     },
     options: {
       responsive: true,
@@ -488,14 +514,27 @@ function renderWellnessActivityChart() {
   const hasData = activityData.some((v) => v > 0);
 
   wellnessActivityChart = new Chart(ctx, {
-    type: 'bar',
     data: {
       labels: dates,
-      datasets: [{
-        label: 'Activity',
-        data: activityData,
-        backgroundColor: '#10b981',
-      }],
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Activity',
+          data: activityData,
+          backgroundColor: '#10b981',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: '100 min target',
+          data: new Array(7).fill(100),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
     },
     options: {
       responsive: true,

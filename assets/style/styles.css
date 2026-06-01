@@ -936,13 +936,46 @@ td .btn {
     margin-top: 0 !important;
 }
 
-.timesheet-holiday-badge {
+.timesheet-weekend {
+    background: rgba(99, 102, 241, 0.07);
     color: var(--color-text-muted);
+}
+
+.timesheet-holiday {
+    background: rgba(245, 158, 11, 0.09);
+}
+
+.timesheet-holiday-badge {
+    color: #b45309;
     font-style: italic;
+}
+
+:root[data-theme="dark"] .timesheet-holiday-badge {
+    color: #fbbf24;
 }
 
 .timesheet-no-entry {
     color: var(--color-text-muted);
+}
+
+.weight-projection-wrap {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.weight-projection-wrap h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.9rem;
+    color: var(--color-heading);
+}
+
+.weight-eta {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin: 4px 0 0;
+    min-height: 1.2em;
 }
 
 #account-type::-webkit-calendar-picker-indicator {

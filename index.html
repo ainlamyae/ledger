@@ -8,22 +8,22 @@
 <meta http-equiv="Expires" content="0">
 <title>Ledger</title>
 
-<meta name="description" content="Ledger is a private, serverless personal finance dashboard. Track net worth, income, expenses, and spending trends — all backed by your own Google Sheet.">
+<meta name="description" content="Ledger is a private, serverless personal life dashboard. Track net worth, expenditure, time, and health — all backed by your own Google Sheet.">
 <link rel="canonical" href="https://ainlamyae.github.io/ledger/">
 <meta name="theme-color" content="#0d2e4f">
 
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ainlamyae.github.io/ledger/">
 <meta property="og:site_name" content="Ledger">
-<meta property="og:title" content="Ledger — Private Personal Finance Dashboard">
-<meta property="og:description" content="Private, serverless personal finance dashboard. Track net worth, income, expenses, and spending trends — all backed by your own Google Sheet.">
+<meta property="og:title" content="Ledger — Private Personal Life Dashboard">
+<meta property="og:description" content="Private, serverless personal life dashboard. Track net worth, expenditure, time, and health — all backed by your own Google Sheet.">
 <meta property="og:image" content="https://ainlamyae.github.io/ledger/assets/images/social-preview.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Ledger — Private Personal Finance Dashboard">
-<meta name="twitter:description" content="Private, serverless personal finance dashboard. Track net worth, income, expenses, and spending trends — all backed by your own Google Sheet.">
+<meta name="twitter:title" content="Ledger — Private Personal Life Dashboard">
+<meta name="twitter:description" content="Private, serverless personal life dashboard. Track net worth, expenditure, time, and health — all backed by your own Google Sheet.">
 <meta name="twitter:image" content="https://ainlamyae.github.io/ledger/assets/images/social-preview.png">
 
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -40,13 +40,13 @@
 <body>
 
 <header>
-    <h1><span class="logo-icon" aria-hidden="true">💰</span><span class="logo-text">Ledger</span></h1>
+    <h1><span class="logo-icon" aria-hidden="true">📊</span><span class="logo-text">Ledger</span></h1>
     <nav id="main-nav" class="nav" hidden>
-        <a href="#charts">Charts</a>
-        <a href="#transactions">Transactions</a>
-        <a href="#accounts">Accounts</a>
-        <a href="#timesheet">Time Sheet</a>
-        <a href="#wellness">Wellness Log</a>
+        <a href="#charts">Analytics</a>
+        <a href="#transactions">Journal</a>
+        <a href="#accounts">Portfolio</a>
+        <a href="#timesheet">Time Tracker</a>
+        <a href="#wellness">Health Tracker</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -79,31 +79,41 @@
 <div id="gate" class="gate">
     <div class="landing">
         <div class="landing-hero">
-            <h1>Take control of your finances</h1>
-            <p>Ledger is a private, serverless personal finance dashboard. Track your accounts, transactions, and spending trends — all while your data stays in your own Google Sheet.</p>
+            <h1>Your personal life dashboard</h1>
+            <p>Manage your money, hours, and health in one place — powered by your own Google Sheet, with no third-party servers.</p>
             <p class="hint">Use the 🔑 sign-in button in the top-right to get started.</p>
             <p id="auth-status" class="status" hidden></p>
         </div>
 
         <div class="landing-features">
             <div class="landing-feature">
-                <h3>Visual Dashboards</h3>
-                <p>See your net worth, income vs. expenses, and category breakdowns at a glance.</p>
+                <h3>Analytics Dashboard</h3>
+                <p>See your net worth, monthly cash flow, and portfolio allocation at a glance — with Revenue vs. Expenditure and Cumulative Net Worth trends.</p>
             </div>
 
             <div class="landing-feature">
-                <h3>Spending Insights</h3>
-                <p>Compare last month's spending to your 4-month and 12-month averages, category by category.</p>
+                <h3>Expenditure Insights</h3>
+                <p>Compare this month's expenditure to quarterly and yearly averages, category by category — with type-level breakdowns and a Spending Patterns panel.</p>
             </div>
 
             <div class="landing-feature">
-                <h3>Transaction Management</h3>
-                <p>Add, edit, search, and filter transactions, with CSV import/export.</p>
+                <h3>Journal</h3>
+                <p>Add, edit, search, filter, and bulk-edit entries in your Transaction History. Undo deletes, export Custom Reports to CSV, and autocomplete payees and categories.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Time Tracker</h3>
+                <p>Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Health Tracker</h3>
+                <p>Track Body Weight, Caloric Intake, Physical Activity, and Rest & Recovery. Charts show your last 7 days versus daily targets, and a Weight Forecast projects your goal arrival date.</p>
             </div>
 
             <div class="landing-feature">
                 <h3>Private by Design</h3>
-                <p>Your financial data lives in your own private Google Sheet — never on a third-party server.</p>
+                <p>Your data lives in your own private Google Sheet — never on a third-party server. Privacy mode masks all amounts on screen at a keystroke.</p>
             </div>
         </div>
     </div>
@@ -127,28 +137,28 @@
 
     <div class="cards">
         <div class="card">
-            <h3>Total Savings</h3>
+            <h3>Net Worth</h3>
             <div class="value" id="net-worth">—</div>
         </div>
 
         <div class="card">
-            <h3 id="income-label">Income</h3>
+            <h3 id="income-label">Monthly Income</h3>
             <div class="value income" id="income-value">—</div>
         </div>
 
         <div class="card">
-            <h3 id="expenses-label">Expenses</h3>
+            <h3 id="expenses-label">Monthly Expenditure</h3>
             <div class="value expense" id="expenses-value">—</div>
         </div>
 
         <div class="card">
-            <h3 id="cashflow-label">Net Cash Flow</h3>
+            <h3 id="cashflow-label">Monthly Cash Flow</h3>
             <div class="value" id="savings-value">—</div>
         </div>
     </div>
 
     <section id="charts" class="panel-group">
-        <h2 class="panel-group-title">Charts</h2>
+        <h2 class="panel-group-title">Analytics</h2>
 
         <div class="panel">
         <h2>Spending by Category</h2>
@@ -202,10 +212,10 @@
     </div>
 
     <div class="panel">
-        <h2>Lifelong Trend</h2>
+        <h2>Historical Trends</h2>
 
         <div class="panel-section">
-            <h3>Spending Trend by Category</h3>
+            <h3>Category Expenditure Trend</h3>
             <div class="chart-box">
                 <canvas id="expense-breakdown-trend-chart"></canvas>
             </div>
@@ -213,7 +223,7 @@
         </div>
 
         <div class="panel-section">
-            <h3>Income vs. Expenses Trend</h3>
+            <h3>Revenue vs. Expenditure</h3>
             <div class="chart-box">
                 <canvas id="income-expense-chart"></canvas>
             </div>
@@ -221,7 +231,7 @@
         </div>
 
         <div class="panel-section">
-            <h3>Cumulative Savings Trend</h3>
+            <h3>Cumulative Net Worth</h3>
             <div class="chart-box">
                 <canvas id="savings-trend-chart"></canvas>
             </div>
@@ -229,24 +239,24 @@
     </div>
 
     <div class="panel">
-        <h2>Common</h2>
+        <h2>Spending Patterns</h2>
 
         <div class="panel-section">
-            <h3>Most Common Expense Descriptions</h3>
+            <h3>Top Expense Descriptions</h3>
             <div class="chart-box">
                 <canvas id="common-description-chart"></canvas>
             </div>
         </div>
 
         <div class="panel-section">
-            <h3>Most Common Payees</h3>
+            <h3>Top Payees</h3>
             <div class="chart-box">
                 <canvas id="common-payee-chart"></canvas>
             </div>
         </div>
 
         <div class="panel-section">
-            <h3>Total Spend by Payee</h3>
+            <h3>Payee Expenditure</h3>
             <div class="chart-box">
                 <canvas id="payee-spend-chart"></canvas>
             </div>
@@ -257,10 +267,10 @@
     <div style="height:.5rem"></div>
 
     <section id="transactions" class="panel-group">
-        <h2 class="panel-group-title">Transactions</h2>
+        <h2 class="panel-group-title">Journal</h2>
 
         <div class="panel">
-            <h2>Transactions</h2>
+            <h2>Transaction History</h2>
 
             <div class="panel-actions">
                 <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
@@ -302,7 +312,7 @@
         </div>
 
         <div class="panel">
-            <h2>Report Transactions</h2>
+            <h2>Custom Report</h2>
 
             <form id="export-form">
                 <div class="export-date-range">
@@ -348,10 +358,10 @@
     <div style="height:.5rem"></div>
 
     <section id="accounts" class="panel-group">
-        <h2 class="panel-group-title">Accounts</h2>
+        <h2 class="panel-group-title">Portfolio</h2>
 
         <div class="panel">
-            <h2>Account Composition</h2>
+            <h2>Portfolio Allocation</h2>
             <div class="chart-box">
                 <canvas id="account-composition-chart"></canvas>
             </div>
@@ -360,7 +370,7 @@
         </div>
 
         <div class="panel">
-            <h2>Account List</h2>
+            <h2>Account Summary</h2>
 
             <div class="panel-actions">
                 <span id="reconciliation-status" class="reconciliation-status"></span>
@@ -388,7 +398,7 @@
     <div style="height:.5rem"></div>
 
     <section id="timesheet" class="panel-group">
-        <h2 class="panel-group-title">Time Sheet</h2>
+        <h2 class="panel-group-title">Time Tracker</h2>
 
         <div id="timesheet-reminder-banner" class="info-banner" hidden>
             <span>You haven't logged today's hours yet.</span>
@@ -397,32 +407,32 @@
         </div>
 
         <div class="panel">
-            <h2>Work Pattern Analysis</h2>
+            <h2>Work Analytics</h2>
 
             <div class="donut-grid">
                 <div class="donut-item">
-                    <h4>Start Time Distribution</h4>
+                    <h4>Arrival Distribution</h4>
                     <div class="chart-box">
                         <canvas id="timesheet-start-distribution-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>End Time Distribution</h4>
+                    <h4>Departure Distribution</h4>
                     <div class="chart-box">
                         <canvas id="timesheet-end-distribution-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Duration Distribution</h4>
+                    <h4>Hours Worked Distribution</h4>
                     <div class="chart-box">
                         <canvas id="timesheet-duration-distribution-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Average Hours per Day</h4>
+                    <h4>Daily Hours Average</h4>
                     <div class="chart-box">
                         <canvas id="timesheet-daily-average-chart"></canvas>
                     </div>
@@ -431,7 +441,7 @@
         </div>
 
         <div class="panel">
-            <h2>Time Log</h2>
+            <h2>Work Log</h2>
 
             <div class="panel-actions">
                 <button id="log-today-btn" class="btn btn-primary">Log a Day</button>
@@ -472,47 +482,55 @@
     <div style="height:.5rem"></div>
 
     <section id="wellness" class="panel-group">
-        <h2 class="panel-group-title">Wellness Log</h2>
+        <h2 class="panel-group-title">Health Tracker</h2>
 
         <div class="panel">
-            <h2>Wellness Charts</h2>
+            <h2>Health Metrics</h2>
 
             <div class="donut-grid">
                 <div class="donut-item">
-                    <h4>Weight Trend</h4>
+                    <h4>Body Weight</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-weight-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Daily Calories</h4>
+                    <h4>Caloric Intake</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-calories-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Activity</h4>
+                    <h4>Physical Activity</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-activity-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Sleep Duration</h4>
+                    <h4>Rest &amp; Recovery</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-sleep-chart"></canvas>
                     </div>
                 </div>
             </div>
+
+            <div class="weight-projection-wrap">
+                <h4>Weight Forecast</h4>
+                <div class="chart-box">
+                    <canvas id="wellness-projection-chart"></canvas>
+                </div>
+                <p id="weight-projection-eta" class="weight-eta"></p>
+            </div>
         </div>
 
         <div class="panel">
-            <h2>Wellness Log</h2>
+            <h2>Health Log</h2>
 
             <div class="panel-actions">
-                <button id="add-wellness-btn" class="btn btn-primary">+ Add Entry</button>
+                <button id="add-wellness-btn" class="btn btn-primary">+ Log Entry</button>
             </div>
 
             <div class="filters">
@@ -735,7 +753,7 @@
 
 <div id="wellness-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-modal-title" hidden>
     <div class="modal-card">
-        <h2 id="wellness-modal-title">Add Entry</h2>
+        <h2 id="wellness-modal-title">Log Entry</h2>
 
         <form id="wellness-form">
             <label>Date
@@ -747,10 +765,10 @@
             <label>Category
                 <select id="wellness-category" required>
                     <option value="">— Select —</option>
-                    <option>Sleep</option>
                     <option>Weight</option>
                     <option>Calories</option>
                     <option>Activity</option>
+                    <option>Sleep</option>
                 </select>
             </label>
             <label>Description

@@ -35,7 +35,7 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Spending Breakdown by Type** — for each spending category that has at least one `Type` recorded in `Insight`, four donut charts (Last Month, Last Quarter, Last Year, Lifelong) breaking that category's spend down by `Type`, a free-text prefix convention in the `Transactions` `Description` field (e.g. "Bread - milk and eggs"), pre-aggregated by formulas in the `Insight` sheet. Panels are built dynamically from whatever categories/Types `Insight` defines (no hardcoded list), ordered by lifelong spend (highest first), and each donut includes an "Untyped" slice for spending without a recognized prefix.
 - **Historical Trends** — three charts in one panel: **Category Expenditure Trend** (stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Spending by Category), **Revenue vs. Expenditure** (stepped area chart of the full transaction history), and **Cumulative Net Worth** (running total of savings as a line chart).
 - **Spending Patterns** — a panel of three bar charts derived straight from transaction history (income rows excluded): **Top Expense Descriptions** and **Top Payees** (record counts, top 36), and **Payee Expenditure** (summed expense amounts, top 36 by absolute total, bars colored green/red for net income/expense).
-- **Transaction History** — searchable, filterable, sortable, paginated (⬅️/➡️) table with add/edit/delete. CSV import also exists (`csv.js`) but its button is hidden from the UI by default. The Payee, Description, and Category fields all autocomplete from your transaction history and the `Insight` category list (most-used values first) instead of a fixed dropdown, helping correct typos or voice-dictation mistakes and letting you type a brand-new category (e.g. "Income") on the fly. Long Payee/Description values are truncated with an ellipsis (hover to see the full text). The Amount field accepts a simple arithmetic expression (optionally prefixed with `=`, e.g. `=-9.97-1.30` to add tax, or `-32/2` to split a charge); results are rounded to the nearest cent.
+- **Transaction History** — searchable, filterable, sortable, paginated (⬅️/➡️) table with add/edit/delete/duplicate (Duplicate opens the edit form pre-filled from that row, so a similar new entry can be filled in and saved without retyping everything). CSV import also exists (`csv.js`) but its button is hidden from the UI by default. The Payee, Description, and Category fields all autocomplete from your transaction history and the `Insight` category list (most-used values first) instead of a fixed dropdown, helping correct typos or voice-dictation mistakes and letting you type a brand-new category (e.g. "Income") on the fly. Long Payee/Description values are truncated with an ellipsis (hover to see the full text). The Amount field accepts a simple arithmetic expression (optionally prefixed with `=`, e.g. `=-9.97-1.30` to add tax, or `-32/2` to split a charge); results are rounded to the nearest cent.
 - **Bulk transaction operations** — a checkbox per row (plus a header "select all") shows a running count and total (privacy-mode aware) of the selected transactions below the table, alongside ✏️ Edit Selected and 🗑️ Delete Selected buttons. Edit Selected opens a form pre-filled with whichever fields are identical across every selected transaction (a field that differs is left blank); only fields you actually fill in are applied to all selected rows, so e.g. recategorizing a batch doesn't touch their dates or amounts. Bulk delete issues one `batchUpdate` with a `deleteDimension` request per row, ordered highest-row-first so earlier deletes in the same call can't invalidate later ones. Selection clears whenever the underlying view changes (search/filter/sort/page) but survives an unrelated re-render.
 - **Undo for bulk edit and deletes** — editing or deleting a transaction (single or bulk) shows a toast with an Undo button for a few seconds. Undoing a delete re-appends the deleted row(s) — they land back at the end of the sheet rather than their original position, since Sheets addresses rows by position and the delete has already shifted everything below them. Undoing a bulk edit writes each transaction's original values back in place instead, since those rows were never removed.
 - **Keyboard shortcuts** — `/` focuses the transaction search box, `n` opens Add Transaction, `Esc` closes whichever modal (or the account menu) is open, and `?` toggles a shortcuts-help overlay. All except `Esc` are ignored while focus is in any text field, so they never fire while typing.
@@ -43,13 +43,14 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Custom Report** — a dedicated panel (alongside the Transaction History panel, in the same panel group) with a From/To date range and a filter builder: each row picks a field (Account, Payee, Description, Category, Amount), an operator (Contains/Equals/etc. for text fields, =, ≠, >, >=, <, <= for Amount), and a value. Rows after the first get an AND/OR selector, evaluated left to right, so filters can be combined (e.g. Category contains "Grocery" OR Category contains "Household", AND Amount < 0). The matching transactions and their total preview live as you adjust the filters — nothing renders until you touch a filter, so opening the panel doesn't pay the cost of listing every transaction — and the Export CSV button writes exactly what's previewed.
 - **Portfolio** — the Portfolio Allocation donut chart (a 3-ring nested donut: the inner ring shows each account type's share of total balance shaded by type, the middle ring breaks that down by institution — each institution has one fixed color, even if its accounts span multiple types — and the outer ring by individual account, shaded by its institution's color; both rings use colors spread evenly around the color wheel so no two entries share a color, however many there are. Account types and institutions are both ordered by absolute balance highest first, so a type or institution with a large negative net — e.g. Credit/debt — still ranks by its size rather than sorting last; types and institutions with a zero balance total are omitted), followed by the Account Summary panel: a sortable table of balances by institution/type, with add/edit/delete, inline Net Worth recalculation, and a reconciliation status (✅ Reconciled, or ⚠️ with the gap amount if recorded balances don't match transaction history). The Balance field accepts the same arithmetic-expression syntax as the transaction Amount field.
 - **Time Tracker** — a "Log a Day" button opens a modal to record a day's Start/End time, Break, and an optional Task note (a weekday with no times but a Task note is treated as a holiday/day off; one with neither is flagged as a missed entry). The modal shows a live "Log Time" duration preview that recomputes as Start/End/Break change (or shows "🏖 Holiday" once that checkbox is ticked), so you see the computed hours before saving. A reminder banner appears whenever today is a weekday with nothing logged yet, with its own "Log a Day" shortcut and an opt-in "Enable reminders" button — browsers require a direct user gesture to grant `Notification` permission, so it's never requested automatically; once granted, an OS-level notification fires once per day (guarded via `localStorage`) instead of only the in-page banner. The **Work Analytics** panel renders four charts above the log: histograms — each with a fitted normal-distribution curve overlay, bars shown as a % of all logged days (so the curve's height tracks the bars regardless of sample size; the tooltip still shows the underlying day count) — of Arrival Distribution, Departure Distribution, and Hours Worked Distribution across weekday work shifts (weekends, holidays/days off, and mis-keyed negative durations are excluded), plus a bar chart of Daily Hours Average over Last Week/Last Month/Last Quarter/Last Year/Lifelong, averaged only over working days so weekends and holidays don't pull the average down. All four charts share the same bar thickness and x-axis label-row height regardless of how many bars/bins each has, so they line up evenly side by side; Daily Hours Average's longer period labels are rotated vertical to fit that shared height without overlapping or clipping. Below that, the Work Log table lists entries within a From/To date range, sortable by Date, with computed Duration and inline edit, paginated at 14 entries per page (⬅️/➡️); changing the date range or sort order resets to page 1.
-- **Panel groups** — Analytics, Journal, Portfolio, and Time Tracker each wrap their related panels in a bordered group with one heading; clicking that nav link expands every panel in its group at once.
+- **Panel groups** — Journal, Portfolio, Time Tracker, Health Tracker, and Contacts each wrap their related panels in a bordered group with one heading; clicking that nav link expands every panel in its group at once.
 - **Collapsible panels** — every chart/table panel is collapsed by default; click its title to expand or collapse it (dragging to select the title's text does not toggle it). A floating "expand/collapse all" button toggles every panel at once.
 - **Privacy mode** — a floating 🙈/👁️ button masks every dollar amount across the summary cards, tables, and charts by replacing each digit with `*` (e.g. `$1,234.56` → `$*,***.**`). Amounts are hidden by default each time you sign in; click the button to reveal them for the rest of the session.
 - **Dark mode** — a floating 🌙/☀️ button switches the whole app — including charts and the landing page — between light and dark themes, persisted in `localStorage`.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches). A `ledger_consented` flag in `localStorage` tracks whether this browser has previously completed the OAuth consent flow — returning users get `prompt: ''` (Google can satisfy this silently or with a single account-picker click) while first-time users always go through the full consent prompt. Cleared on sign-out so a different person signing in on the same browser always gets their own consent flow. A tab left open also renews its own access token silently a few minutes before the ~1-hour expiry; if a silent refresh fails mid-session (e.g. a brief network blip), the app retries after a 2-minute backoff rather than signing the user out.
 - **Account menu** — once signed in, the header shows the Google account's avatar (or initials, if it has none); clicking it opens a dropdown with the account's name/email and a Sign out button.
 - **Health Tracker** — a dedicated section (accessible from the nav) for tracking health metrics across four categories: **Body Weight** (full-history line chart with a red dashed target line), **Caloric Intake** (last-7-days bar chart, total per day, with a 2,000 kcal target line), **Rest & Recovery** (last-7-days bar chart with an 8 hr target line), and **Physical Activity** (last-7-days bar chart normalized to minutes — steps entries are converted at 100 steps/min, hour entries are multiplied by 60 — with a 100 min target line). A **Weight Forecast** chart below the four metrics projects your trajectory toward your weight goal using a multi-factor model (caloric balance, activity, and sleep quality), with a predicted arrival date. Below the charts, a filterable/sortable **Health Log** table (date range + category filter, sortable by date, paginated at 28 entries per page ⬅️/➡️) with add/edit/delete/duplicate. The Log Entry form is category-aware: selecting a category pre-fills the unit field and populates a datalist of Description suggestions sourced from your past entries for that category (most-used first), falling back to built-in defaults. The Amount field accepts arithmetic expressions (same syntax as Journal). Backed by a `Wellness Log` sheet tab in the same Google Sheet as all other data.
+- **Contacts** — a searchable, sortable, paginated Contact List table (name, phone, email, tags) with add/edit/delete; the full record (prefix, birthday, up to 3 phones/2 emails, address with Province/Region for tax purposes, Website/LinkedIn/2 Telegram links, Tags, and a free-text Note) is edited in the Add/Edit Contact modal. Backed by a `Contacts` sheet tab. A checkbox column plus a bulk-actions bar let you select multiple rows to **export just the selection** (CSV formatted for Google/Phone Contacts or Outlook), **bulk-delete**, or **merge 2+ contacts into one** (fields already filled on the target row are kept, blanks are filled in from the others, and phone/email/Telegram lists are combined and deduplicated) — handy for cleaning up near-duplicates. `scripts/merge_contacts.py` is a one-time local tool that merges a Google Contacts export, an old manual spreadsheet, and a JSON contacts list into one deduplicated starting point for this tab — see its module docstring and the `Contacts` entry under [Data Model](#data-model) for the merge/dedup logic.
 - **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; manual refresh and clear-cache controls are available as floating buttons.
 
 Category-based charts (Spending by Category, Category Expenditure Trend, Spending Breakdown by Type) all assign each category/type a color spread evenly around the color wheel, ordered by highest-to-lowest absolute spend.
@@ -116,7 +117,8 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 9 | `timesheet.js` | Time Tracker: Work Log table (date-range filter, sortable, add/edit), holiday/missed-entry detection, client-side Duration computation, the data feeding the Work Analytics charts, and the today-not-logged reminder banner/notification | `initTimeSheet`, `refreshTimeSheet`, `getFilteredTimeEntries`, `checkTimesheetReminder` |
 | 10 | `csv.js` | CSV import for transactions, plus the Custom Report live preview/export (date range + AND/OR field filters) | `initCsvControls` |
 | 11 | `wellness.js` | Health Tracker: Body Weight/Caloric Intake/Rest & Recovery/Physical Activity charts (with red-dashed target lines), Weight Forecast projection chart, filterable/sortable Health Log table, category-aware Log Entry form with history-based autocomplete, step-to-minute conversion for Activity entries | `initWellness`, `refreshWellness` |
-| 12 | `app.js` | Orchestration: report aggregation, dashboard rendering, file-selection gate, scroll-spy nav, collapsible panels, dark mode toggle, app-level keyboard shortcuts, modal focus management (focus-on-open/restore-on-close, Tab trapping), the shared empty-state table row helper, the shared undo toast, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange`, `setupKeyboardShortcuts`, `setupModalFocusManagement`, `renderEmptyRow`, `showUndoToast` |
+| 12 | `contacts.js` | Contacts: searchable/sortable Contact List table, add/edit/delete, multi-select bulk export/delete/merge, CSV export for Google/Phone import and Outlook import | `initContacts`, `refreshContacts` |
+| 13 | `app.js` | Orchestration: report aggregation, dashboard rendering, file-selection gate, scroll-spy nav, collapsible panels, dark mode toggle, app-level keyboard shortcuts, modal focus management (focus-on-open/restore-on-close, Tab trapping), the shared empty-state table row helper, the shared undo toast, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange`, `setupKeyboardShortcuts`, `setupModalFocusManagement`, `renderEmptyRow`, `showUndoToast` |
 
 ### Data Flow
 
@@ -235,6 +237,51 @@ One row per wellness measurement, newest appended last. Data rows start at row 2
 
 The Activity chart normalizes all entries to minutes before plotting (steps ÷ 100, hours × 60), so step-count and duration entries are comparable on the same axis.
 
+### `Contacts`
+
+One row per contact. Data rows start at row 2. Not present in the template by default — see `scripts/merge_contacts.py` for a one-time tool that merges a Google Contacts export, an old manual sheet, and a JSON contacts list into a deduplicated starting point for this tab.
+
+| Column | Type | Notes |
+|---|---|---|
+| A — First Name | Text | |
+| B — Middle Name | Text | |
+| C — Last Name | Text | |
+| D — Prefix | Text | e.g. `Dr.`, `Prof.`, `Mr.` |
+| E — Tags | Text | Comma-separated, e.g. `UW, Family` |
+| F — Birthday | Date | ISO format; used for birthday reminders |
+| G/H/I — Phone 1/2/3 | Text | No label column — first slot is the primary number |
+| J/K — Email 1/2 | Text | |
+| L — Street Address | Text | |
+| M — City | Text | |
+| N — Province/Region | Text | Drives applicable tax rate on receipts/quotes |
+| O — Postal Code | Text | |
+| P — Country | Text | |
+| Q — Website | URL | Personal/company site |
+| R — LinkedIn | URL | |
+| S/T — Telegram / Telegram 2 | URL | |
+| U — Note | Text | Free-text; also where the merge script folds in anything that overflowed a slot (4th+ phone, 3rd+ email, etc.) |
+
+### `Settings` (optional, user-managed)
+
+A plain key-value tab for personal parameters that would otherwise be hardcoded — currently the 4 Health Tracker targets. Not present in the template by default; the app works with today's defaults until a user adds it. Data rows start at row 2.
+
+| Column | Type | Notes |
+|---|---|---|
+| A — Key | Text | `UPPER_SNAKE_CASE`, matched by code (e.g. `WEIGHT_GOAL_KG`) |
+| B — Value | Number | The parameter's value |
+| C — Notes | Text | Free-text, human-only — never read by the app |
+
+Recognized keys today, with their fallback if the tab or a row is missing:
+
+| Key | Default | Used for |
+|---|---|---|
+| `WEIGHT_GOAL_KG` | `82` | Weight Forecast chart goal line and ETA projection |
+| `CALORIE_TARGET_KCAL` | `2000` | Caloric Intake chart target line; caloric-balance input for the Weight Forecast projection |
+| `SLEEP_TARGET_HOURS` | `8` | Rest & Recovery chart target line; sleep-quality factor in the Weight Forecast projection |
+| `ACTIVITY_TARGET_MIN` | `100` | Physical Activity chart target line |
+
+Each key falls back independently — a missing tab, a missing row, or a non-numeric Value only affects that one parameter, never the rest of the dashboard. This tab is meant to grow (e.g. a future API key or SMTP setting is just another row) but is read over the same OAuth-authenticated Sheets API as every other tab — as private as the rest of the workbook, not extra-protected secret storage.
+
 ### `Reconciliation` (formula-driven)
 
 A single reconciliation check comparing recorded account balances against transaction history.
@@ -326,6 +373,9 @@ const CONFIG = {
     INSIGHT: 'Insight',
     RECONCILIATION: 'Reconciliation',
     TIMESHEET: 'eTimeSheet',
+    WELLNESS: 'Wellness Log',
+    CONTACTS: 'Contacts',
+    SETTINGS: 'Settings',
   },
 };
 ```
@@ -372,6 +422,8 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | `'Account Balance'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete suggestions for the transaction form |
 | `eTimeSheet!A2:G` | `timesheet.js` | Work Log rows; read for the table, Work Analytics charts, and gap backfill, appended/updated on add or edit |
 | `'Wellness Log'!A2:G` | `wellness.js` | Health Log entries; read for all charts and the Health Log table, appended on add, updated on edit, deleted via `batchUpdate` |
+| `'Contacts'!A2:U` | `contacts.js` | Contact rows; read for the Contact List table, appended on add, updated on edit, deleted via `batchUpdate` |
+| `Settings!A2:C` | `app.js` | Optional personal-parameter overrides (e.g. Health Tracker targets); missing tab/row falls back to hardcoded defaults |
 
 **Client-side cache (`localStorage`, 5-minute TTL via `cache.js`):**
 
@@ -384,6 +436,8 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | `ledger_cache_account-list` | `accounts.js` | Raw `'Account Balance'!A3:D100` rows |
 | `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:G` rows |
 | `ledger_cache_wellness` | `wellness.js` | Raw `'Wellness Log'!A2:G` rows |
+| `ledger_cache_contacts` | `contacts.js` | Raw `'Contacts'!A2:U` rows |
+| `ledger_cache_settings` | `app.js` | Parsed `Settings` key-value map (`{}` if the tab is absent) |
 
 **Auth and file selection (`localStorage`, separate from the cache above):**
 

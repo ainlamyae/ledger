@@ -1,6 +1,12 @@
 const WELLNESS_RANGE = `'${CONFIG.SHEETS.WELLNESS}'!A2:G`;
 const W_PAGE_SIZE = 28;
-const WEIGHT_GOAL_KG = 82;
+
+// Fallback defaults used until the user adds a 'Settings' tab — identical
+// to today's hardcoded values, so nothing changes for anyone who hasn't.
+const WEIGHT_GOAL_KG_DEFAULT = 82;
+const CALORIE_TARGET_KCAL_DEFAULT = 2000;
+const SLEEP_TARGET_HOURS_DEFAULT = 8;
+const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 
 const CATEGORY_DEFAULTS = {
   Sleep:    { unit: 'hr',   descriptions: ['Sleep Duration'] },
@@ -363,6 +369,8 @@ function renderWellnessWeightChart() {
   const ctx = document.getElementById('wellness-weight-chart');
   if (wellnessWeightChart) wellnessWeightChart.destroy();
 
+  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
+
   const dates = lastNDates(7);
   const byDate = new Map();
   allWellnessEntries
@@ -387,8 +395,8 @@ function renderWellnessWeightChart() {
         },
         {
           type: 'line',
-          label: `${WEIGHT_GOAL_KG} kg goal`,
-          data: new Array(7).fill(WEIGHT_GOAL_KG),
+          label: `${weightGoal} kg goal`,
+          data: new Array(7).fill(weightGoal),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -417,6 +425,8 @@ function renderWellnessCaloriesChart() {
   const ctx = document.getElementById('wellness-calories-chart');
   if (wellnessCaloriesChart) wellnessCaloriesChart.destroy();
 
+  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+
   const dates = lastNDates(7);
   const byDate = new Map();
   allWellnessEntries
@@ -436,8 +446,8 @@ function renderWellnessCaloriesChart() {
         },
         {
           type: 'line',
-          label: '2000 kcal target',
-          data: new Array(7).fill(2000),
+          label: `${calorieTarget} kcal target`,
+          data: new Array(7).fill(calorieTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -465,6 +475,8 @@ function renderWellnessSleepChart() {
   const ctx = document.getElementById('wellness-sleep-chart');
   if (wellnessSleepChart) wellnessSleepChart.destroy();
 
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
   const dates = lastNDates(7);
   const byDate = new Map();
   allWellnessEntries
@@ -486,8 +498,8 @@ function renderWellnessSleepChart() {
         },
         {
           type: 'line',
-          label: '8 hr target',
-          data: new Array(7).fill(8),
+          label: `${sleepTarget} hr target`,
+          data: new Array(7).fill(sleepTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -524,6 +536,8 @@ function renderWellnessActivityChart() {
   const ctx = document.getElementById('wellness-activity-chart');
   if (wellnessActivityChart) wellnessActivityChart.destroy();
 
+  const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
+
   const dates = lastNDates(7);
   const byDate = new Map();
   allWellnessEntries
@@ -549,8 +563,8 @@ function renderWellnessActivityChart() {
         },
         {
           type: 'line',
-          label: '100 min target',
-          data: new Array(7).fill(100),
+          label: `${activityTarget} min target`,
+          data: new Array(7).fill(activityTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -594,6 +608,10 @@ function linearRegressionSlope(xs, ys) {
 }
 
 function calcProjection() {
+  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
+  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayIso = wIsoFromDate(today);
@@ -608,7 +626,7 @@ function calcProjection() {
   if (weightEntries.length < 2) return null;
 
   const lastWeight = weightEntries[weightEntries.length - 1].amount;
-  if (Math.abs(lastWeight - WEIGHT_GOAL_KG) < 0.1) return { status: 'reached' };
+  if (Math.abs(lastWeight - weightGoal) < 0.1) return { status: 'reached' };
 
   const recentEntries = allWellnessEntries.filter((e) => e.date >= cutoffIso && e.date <= todayIso);
 
@@ -633,14 +651,14 @@ function calcProjection() {
   let method;
 
   if (caloriesByDate.size > 0 || activityByDate.size > 0) {
-    const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : 2000;
+    const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
     const avgActivityMins = activityByDate.size > 0 ? avg(activityByDate) : 0;
-    const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : 8;
+    const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
 
     // Negative balance = caloric deficit = weight loss
-    const balance = avgCalories - (2000 + avgActivityMins * 5);
+    const balance = avgCalories - (calorieTarget + avgActivityMins * 5);
     const baseSlope = balance / 7700;
-    const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / 8));
+    const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
     slope = baseSlope * sleepRatio;
 
     const allPresent = caloriesByDate.size > 0 && activityByDate.size > 0 && sleepByDate.size > 0;
@@ -654,10 +672,10 @@ function calcProjection() {
 
   if (slope === 0) return { status: 'no-change', method };
 
-  const goingDown = WEIGHT_GOAL_KG < lastWeight;
+  const goingDown = weightGoal < lastWeight;
   if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method };
 
-  const daysToGoal = Math.round((WEIGHT_GOAL_KG - lastWeight) / slope);
+  const daysToGoal = Math.round((weightGoal - lastWeight) / slope);
   const etaDate = new Date(today);
   etaDate.setDate(today.getDate() + daysToGoal);
 
@@ -669,10 +687,10 @@ function calcProjection() {
     projectedPoints.push({ date: wIsoFromDate(pd), weight: Math.round((lastWeight + slope * d) * 10) / 10 });
   }
   if (daysToGoal <= 365) {
-    projectedPoints.push({ date: wIsoFromDate(etaDate), weight: WEIGHT_GOAL_KG });
+    projectedPoints.push({ date: wIsoFromDate(etaDate), weight: weightGoal });
   }
 
-  return { status: 'ok', slope, daysToGoal, etaDate, projectedPoints, method };
+  return { status: 'ok', slope, daysToGoal, etaDate, projectedPoints, method, weightGoal };
 }
 
 function renderWellnessProjectionChart() {
@@ -736,8 +754,8 @@ function renderWellnessProjectionChart() {
           order: 2,
         },
         {
-          label: `${WEIGHT_GOAL_KG} kg goal`,
-          data: allLabels.map(() => WEIGHT_GOAL_KG),
+          label: `${proj.weightGoal} kg goal`,
+          data: allLabels.map(() => proj.weightGoal),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -767,5 +785,5 @@ function renderWellnessProjectionChart() {
   const etaStr = proj.etaDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const note = proj.method === 'weight-only' ? ' · weight trend only'
     : proj.method === 'partial' ? ' · partial habit data' : '';
-  etaEl.textContent = `Projected to reach ${WEIGHT_GOAL_KG} kg on ${etaStr} (~${proj.daysToGoal} days)${note}`;
+  etaEl.textContent = `Projected to reach ${proj.weightGoal} kg on ${etaStr} (~${proj.daysToGoal} days)${note}`;
 }

@@ -314,6 +314,13 @@ function renderTransactions() {
     editBtn.setAttribute('aria-label', 'Edit');
     editBtn.addEventListener('click', () => openTransactionForm(t));
 
+    const dupBtn = document.createElement('button');
+    dupBtn.className = 'btn';
+    dupBtn.textContent = '📋';
+    dupBtn.title = 'Duplicate';
+    dupBtn.setAttribute('aria-label', 'Duplicate');
+    dupBtn.addEventListener('click', () => openTransactionForm(t, true));
+
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn';
     deleteBtn.textContent = '🗑️';
@@ -321,7 +328,7 @@ function renderTransactions() {
     deleteBtn.setAttribute('aria-label', 'Delete');
     deleteBtn.addEventListener('click', () => deleteTransaction(t.row));
 
-    actionsCell.append(editBtn, deleteBtn);
+    actionsCell.append(editBtn, dupBtn, deleteBtn);
 
     tr.append(checkboxCell, dateCell, accountCell, payeeCell, categoryCell, descCell, amountCell, actionsCell);
     tbody.appendChild(tr);
@@ -387,10 +394,11 @@ function populateSelect(select, options, selected) {
   });
 }
 
-function openTransactionForm(transaction) {
-  editingRow = transaction ? transaction.row : null;
+function openTransactionForm(transaction, duplicate = false) {
+  editingRow = (transaction && !duplicate) ? transaction.row : null;
 
-  document.getElementById('tx-modal-title').textContent = transaction ? 'Edit Transaction' : 'Add Transaction';
+  const title = duplicate ? 'Duplicate Transaction' : (transaction ? 'Edit Transaction' : 'Add Transaction');
+  document.getElementById('tx-modal-title').textContent = title;
   document.getElementById('tx-date').value = transaction ? transaction.date : new Date().toISOString().slice(0, 10);
   document.getElementById('tx-payee').value = transaction ? transaction.payee : '';
   document.getElementById('tx-description').value = transaction ? transaction.description : '';
@@ -399,7 +407,9 @@ function openTransactionForm(transaction) {
   populateSelect(document.getElementById('tx-account'), accountOptions, transaction ? transaction.account : '');
   document.getElementById('tx-category').value = transaction ? transaction.category : '';
 
-  document.getElementById('tx-save-add-btn').hidden = !!transaction;
+  // A duplicate is a new row (like Add), not an in-place edit, so "Save & Add
+  // Another" should be offered just like it is for a brand-new transaction.
+  document.getElementById('tx-save-add-btn').hidden = !!transaction && !duplicate;
 
   document.getElementById('tx-form-error').hidden = true;
   document.getElementById('tx-modal').hidden = false;

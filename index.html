@@ -46,7 +46,6 @@
         <a href="#accounts">Portfolio</a>
         <a href="#timesheet">Time Tracker</a>
         <a href="#wellness">Health Tracker</a>
-        <a href="#contacts">Contacts</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -113,7 +112,12 @@
 
             <div class="landing-feature">
                 <h3>Contacts</h3>
-                <p>Keep names, phones, emails, addresses, birthdays, and social links (LinkedIn, Telegram) in one searchable Contact List. Bulk-select rows to export CSVs for Google/Phone or Outlook, or merge duplicate entries into one.</p>
+                <p>Keep a searchable Contact List with names, phones, emails, addresses, birthdays, and social links. Bulk-select rows to export CSVs for Google/Phone or Outlook, or merge duplicate entries into one.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Travel &amp; Applications</h3>
+                <p>Log every trip and see a Time Spent by Country breakdown plus a world map of visited countries. Track immigration/visa applications from submission through every status update to final decision.</p>
             </div>
 
             <div class="landing-feature">
@@ -575,8 +579,72 @@
 
     <div style="height:.5rem"></div>
 
-    <section id="contacts" class="panel-group">
-        <h2 class="panel-group-title">Contacts</h2>
+    <section id="other" class="panel-group">
+        <h2 class="panel-group-title">Other</h2>
+
+        <div class="panel">
+            <h2>Travel Insights</h2>
+
+            <div class="donut-grid travel-insights-grid">
+                <div class="donut-item">
+                    <h4>Time Spent by Country</h4>
+                    <ul id="travel-country-days-list" class="country-tiles"></ul>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Countries Visited</h4>
+                    <div class="chart-box chart-box-map">
+                        <canvas id="travel-world-map-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Travel List</h2>
+
+            <div class="panel-actions">
+                <button id="add-travel-btn" class="btn btn-primary">+ Add Travel Entry</button>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="travel-search" placeholder="Search country, city, port, via, reason, detail...">
+            </div>
+
+            <div class="table-responsive">
+                <table id="travel-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th class="sortable" data-sort="type">Type</th>
+                        <th class="sortable" data-sort="countryCity">Country, City</th>
+                        <th class="sortable" data-sort="port">Port</th>
+                        <th>Via</th>
+                        <th>Reason</th>
+                        <th>Detail</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="travel-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="travel-pagination"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Applications</h2>
+
+            <div class="panel-actions">
+                <button id="add-application-btn" class="btn btn-primary">+ Add Application</button>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="applications-search" placeholder="Search type, app number, status...">
+            </div>
+
+            <div id="applications-list"></div>
+        </div>
 
         <div class="panel">
             <h2>Contact List</h2>
@@ -920,6 +988,79 @@
     </div>
 </div>
 
+<div id="travel-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="travel-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="travel-modal-title">Add Travel Entry</h2>
+
+        <form id="travel-form">
+            <label>Country, City
+                <input type="text" id="travel-country-city" placeholder="e.g. Canada, Toronto" required>
+            </label>
+            <label>Port
+                <input type="text" id="travel-port" placeholder="e.g. Pearson International Airport (YYZ)">
+            </label>
+            <label>Type
+                <select id="travel-type" required>
+                    <option value="">— Select —</option>
+                    <option value="Departure">Departure</option>
+                    <option value="Arival">Arrival</option>
+                </select>
+            </label>
+            <label>Via
+                <input type="text" id="travel-via" placeholder="e.g. Flight, Bus">
+            </label>
+            <label>Date
+                <input type="date" id="travel-date" required>
+            </label>
+            <label>Time
+                <input type="time" id="travel-time">
+            </label>
+            <label>Reason
+                <input type="text" id="travel-reason" placeholder="e.g. Tourism, PR">
+            </label>
+            <label>Detail
+                <input type="text" id="travel-detail">
+            </label>
+
+            <p id="travel-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="travel-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="application-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="application-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="application-modal-title">Add Application</h2>
+
+        <form id="application-form">
+            <label>Type
+                <input type="text" id="application-type" placeholder="e.g. Visa 6, Work Permit" required>
+            </label>
+            <label>App Number
+                <input type="text" id="application-number" required>
+            </label>
+            <label>Submitted Date
+                <input type="date" id="application-date" required>
+            </label>
+            <label>Action
+                <input type="text" id="application-action" value="Submited" required>
+            </label>
+
+            <p class="hint">Delay and status updates are calculated/tracked directly in the Sheet as the application progresses.</p>
+            <p id="application-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="application-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="shortcuts-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" hidden>
     <div class="modal-card">
         <h2 id="shortcuts-modal-title">Keyboard Shortcuts</h2>
@@ -938,6 +1079,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4"></script>
 <script src="assets/script/config.js"></script>
 <script src="assets/script/auth.js"></script>
 <script src="assets/script/drive.js"></script>
@@ -950,6 +1092,8 @@
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/wellness.js"></script>
 <script src="assets/script/contacts.js"></script>
+<script src="assets/script/travel.js"></script>
+<script src="assets/script/applications.js"></script>
 <script src="assets/script/app.js"></script>
 </body>
 </html>

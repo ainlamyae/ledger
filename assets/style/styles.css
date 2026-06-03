@@ -744,6 +744,81 @@ th.sortable:hover {
     font-size: .75rem;
 }
 
+.app-card {
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    margin-bottom: .6rem;
+    overflow: hidden;
+}
+
+.app-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+    padding: .6rem .75rem;
+    cursor: pointer;
+}
+
+.app-card-toggle-icon {
+    margin-top: .1rem;
+}
+
+.app-card.collapsed .app-card-toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.app-card-title {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    flex: 1;
+}
+
+.app-card-meta {
+    font-size: .85rem;
+    color: var(--color-text-muted);
+}
+
+.app-card-actions {
+    display: flex;
+    gap: .25rem;
+}
+
+.app-card-body {
+    padding: 0 .75rem .75rem 2rem;
+    max-height: 2000px;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height .3s ease, opacity .25s ease, padding .3s ease;
+}
+
+.app-card.collapsed .app-card-body {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.app-history {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+}
+
+.app-history li {
+    display: flex;
+    gap: .75rem;
+    font-size: .9rem;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: .3rem;
+}
+
+.app-history-date {
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
 .income {
     color: var(--color-income);
 }
@@ -772,6 +847,52 @@ th.sortable:hover {
 
 .chart-box canvas {
     max-width: 100%;
+}
+
+.donut-grid.travel-insights-grid {
+    grid-template-columns: 3fr 1fr;
+}
+
+@media (max-width: 820px) {
+    .donut-grid.travel-insights-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.chart-box.chart-box-map {
+    height: auto;
+    aspect-ratio: 3 / 2;
+}
+
+.country-tiles {
+    list-style: none;
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: .6rem;
+}
+
+.country-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .2rem;
+    padding: .6rem .3rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    text-align: center;
+}
+
+.country-tile-flag {
+    font-size: 1.7rem;
+    line-height: 1;
+}
+
+.country-tile-duration {
+    color: var(--color-text-muted);
+    font-size: .8rem;
+    white-space: nowrap;
 }
 
 .donut-grid {
@@ -892,7 +1013,9 @@ td .btn {
 #account-form label,
 #timesheet-form label,
 #wellness-form label,
-#contact-form label {
+#contact-form label,
+#travel-form label,
+#application-form label {
     display: block;
     margin-bottom: .6rem;
     font-size: .9rem;
@@ -913,7 +1036,11 @@ td .btn {
 #wellness-form textarea,
 #contact-form input,
 #contact-form select,
-#contact-form textarea {
+#contact-form textarea,
+#travel-form input,
+#travel-form select,
+#application-form input,
+#application-form select {
     display: block;
     width: 100%;
     margin-top: .25rem;
@@ -929,7 +1056,8 @@ td .btn {
 #tx-bulk-edit-form select,
 #account-form select,
 #timesheet-form select,
-#wellness-form select {
+#wellness-form select,
+#travel-form select {
     width: auto;
     min-width: 45%;
 }

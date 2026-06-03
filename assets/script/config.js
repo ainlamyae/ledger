@@ -18,5 +18,7 @@ const CONFIG = {
     WELLNESS: 'Wellness Log',
     CONTACTS: 'Contacts',
     SETTINGS: 'Settings',
+    TRAVEL: 'Travel',
+    APPLICATIONS: 'Applications',
   },
 };

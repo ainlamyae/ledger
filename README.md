@@ -1,6 +1,6 @@
 # Ledger
 
-A private, serverless personal finance dashboard. Ledger reads and writes directly to a Google Sheet you own — there is no backend, no database, and no third-party data store. The site is public on GitHub Pages and usable by anyone with a Google account: each user clones their own copy of the Ledger template and the app talks only to that copy, scoped via Google Drive's per-file `drive.file` permission — the financial data behind it is only ever accessible to the Google account that owns that particular spreadsheet.
+A private, serverless personal life dashboard — finances, time tracking, health, contacts, travel, and immigration/visa applications in one place. Ledger reads and writes directly to a Google Sheet you own — there is no backend, no database, and no third-party data store. The site is public on GitHub Pages and usable by anyone with a Google account: each user clones their own copy of the Ledger template and the app talks only to that copy, scoped via Google Drive's per-file `drive.file` permission — the data behind it is only ever accessible to the Google account that owns that particular spreadsheet.
 
 ## Table of Contents
 
@@ -43,13 +43,15 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Custom Report** — a dedicated panel (alongside the Transaction History panel, in the same panel group) with a From/To date range and a filter builder: each row picks a field (Account, Payee, Description, Category, Amount), an operator (Contains/Equals/etc. for text fields, =, ≠, >, >=, <, <= for Amount), and a value. Rows after the first get an AND/OR selector, evaluated left to right, so filters can be combined (e.g. Category contains "Grocery" OR Category contains "Household", AND Amount < 0). The matching transactions and their total preview live as you adjust the filters — nothing renders until you touch a filter, so opening the panel doesn't pay the cost of listing every transaction — and the Export CSV button writes exactly what's previewed.
 - **Portfolio** — the Portfolio Allocation donut chart (a 3-ring nested donut: the inner ring shows each account type's share of total balance shaded by type, the middle ring breaks that down by institution — each institution has one fixed color, even if its accounts span multiple types — and the outer ring by individual account, shaded by its institution's color; both rings use colors spread evenly around the color wheel so no two entries share a color, however many there are. Account types and institutions are both ordered by absolute balance highest first, so a type or institution with a large negative net — e.g. Credit/debt — still ranks by its size rather than sorting last; types and institutions with a zero balance total are omitted), followed by the Account Summary panel: a sortable table of balances by institution/type, with add/edit/delete, inline Net Worth recalculation, and a reconciliation status (✅ Reconciled, or ⚠️ with the gap amount if recorded balances don't match transaction history). The Balance field accepts the same arithmetic-expression syntax as the transaction Amount field.
 - **Time Tracker** — a "Log a Day" button opens a modal to record a day's Start/End time, Break, and an optional Task note (a weekday with no times but a Task note is treated as a holiday/day off; one with neither is flagged as a missed entry). The modal shows a live "Log Time" duration preview that recomputes as Start/End/Break change (or shows "🏖 Holiday" once that checkbox is ticked), so you see the computed hours before saving. A reminder banner appears whenever today is a weekday with nothing logged yet, with its own "Log a Day" shortcut and an opt-in "Enable reminders" button — browsers require a direct user gesture to grant `Notification` permission, so it's never requested automatically; once granted, an OS-level notification fires once per day (guarded via `localStorage`) instead of only the in-page banner. The **Work Analytics** panel renders four charts above the log: histograms — each with a fitted normal-distribution curve overlay, bars shown as a % of all logged days (so the curve's height tracks the bars regardless of sample size; the tooltip still shows the underlying day count) — of Arrival Distribution, Departure Distribution, and Hours Worked Distribution across weekday work shifts (weekends, holidays/days off, and mis-keyed negative durations are excluded), plus a bar chart of Daily Hours Average over Last Week/Last Month/Last Quarter/Last Year/Lifelong, averaged only over working days so weekends and holidays don't pull the average down. All four charts share the same bar thickness and x-axis label-row height regardless of how many bars/bins each has, so they line up evenly side by side; Daily Hours Average's longer period labels are rotated vertical to fit that shared height without overlapping or clipping. Below that, the Work Log table lists entries within a From/To date range, sortable by Date, with computed Duration and inline edit, paginated at 14 entries per page (⬅️/➡️); changing the date range or sort order resets to page 1.
-- **Panel groups** — Journal, Portfolio, Time Tracker, Health Tracker, and Contacts each wrap their related panels in a bordered group with one heading; clicking that nav link expands every panel in its group at once.
+- **Panel groups** — Journal, Portfolio, Time Tracker, and Health Tracker each wrap their related panels in a bordered group with one heading, linked from the top nav; clicking that link expands every panel in its group at once. **Other** is a fifth panel group (Travel Insights + Travel List, Applications, and Contact List) that isn't linked from the nav — it's reached by scrolling.
 - **Collapsible panels** — every chart/table panel is collapsed by default; click its title to expand or collapse it (dragging to select the title's text does not toggle it). A floating "expand/collapse all" button toggles every panel at once.
 - **Privacy mode** — a floating 🙈/👁️ button masks every dollar amount across the summary cards, tables, and charts by replacing each digit with `*` (e.g. `$1,234.56` → `$*,***.**`). Amounts are hidden by default each time you sign in; click the button to reveal them for the rest of the session.
 - **Dark mode** — a floating 🌙/☀️ button switches the whole app — including charts and the landing page — between light and dark themes, persisted in `localStorage`.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches). A `ledger_consented` flag in `localStorage` tracks whether this browser has previously completed the OAuth consent flow — returning users get `prompt: ''` (Google can satisfy this silently or with a single account-picker click) while first-time users always go through the full consent prompt. Cleared on sign-out so a different person signing in on the same browser always gets their own consent flow. A tab left open also renews its own access token silently a few minutes before the ~1-hour expiry; if a silent refresh fails mid-session (e.g. a brief network blip), the app retries after a 2-minute backoff rather than signing the user out.
 - **Account menu** — once signed in, the header shows the Google account's avatar (or initials, if it has none); clicking it opens a dropdown with the account's name/email and a Sign out button.
 - **Health Tracker** — a dedicated section (accessible from the nav) for tracking health metrics across four categories: **Body Weight** (full-history line chart with a red dashed target line), **Caloric Intake** (last-7-days bar chart, total per day, with a 2,000 kcal target line), **Rest & Recovery** (last-7-days bar chart with an 8 hr target line), and **Physical Activity** (last-7-days bar chart normalized to minutes — steps entries are converted at 100 steps/min, hour entries are multiplied by 60 — with a 100 min target line). A **Weight Forecast** chart below the four metrics projects your trajectory toward your weight goal using a multi-factor model (caloric balance, activity, and sleep quality), with a predicted arrival date. Below the charts, a filterable/sortable **Health Log** table (date range + category filter, sortable by date, paginated at 28 entries per page ⬅️/➡️) with add/edit/delete/duplicate. The Log Entry form is category-aware: selecting a category pre-fills the unit field and populates a datalist of Description suggestions sourced from your past entries for that category (most-used first), falling back to built-in defaults. The Amount field accepts arithmetic expressions (same syntax as Journal). Backed by a `Wellness Log` sheet tab in the same Google Sheet as all other data.
+- **Travel** — a searchable, sortable Travel List table (Country/City, Port, Type, Via, Date, Time, Reason, Detail) with add/edit/delete, backed by a `Travel` sheet tab. Above the table, a **Travel Insights** panel derives two views from that same log: a **Time Spent by Country** grid of flag-emoji tiles (hover for country name + duration) computed by pairing each Arrival with its closing Departure (an open-ended final Arrival counts as an ongoing stay, credited up to today), and a **Countries Visited** choropleth world map (Chart.js + `chartjs-chart-geo`, world borders from `world-atlas`) highlighting every visited country. If a `BIRTH_DATE` key is set in `Settings` and the very first Travel row is a Departure, the years lived in the home country before that first trip are credited too, rather than being silently dropped just because the log itself only starts at the first trip ever taken.
+- **Applications** — an Applications panel tracking immigration/visa applications as expandable cards, one per application (Type, App Number, Submitted date, latest status), each expanding to its full status-update history. Add creates a new application header row only — status updates and the Delay figure are managed directly in the Sheet, since the Delay formula's cell references are hand-maintained per application. New applications are inserted at the top of the sheet's data (not appended after it) so the sheet's whole-column footer formulas (`Total Waiting time`, `Total Time in Canada`) shift down intact instead of a new row landing after them. Backed by an `Applications` sheet tab.
 - **Contacts** — a searchable, sortable, paginated Contact List table (name, phone, email, tags) with add/edit/delete; the full record (prefix, birthday, up to 3 phones/2 emails, address with Province/Region for tax purposes, Website/LinkedIn/2 Telegram links, Tags, and a free-text Note) is edited in the Add/Edit Contact modal. Backed by a `Contacts` sheet tab. A checkbox column plus a bulk-actions bar let you select multiple rows to **export just the selection** (CSV formatted for Google/Phone Contacts or Outlook), **bulk-delete**, or **merge 2+ contacts into one** (fields already filled on the target row are kept, blanks are filled in from the others, and phone/email/Telegram lists are combined and deduplicated) — handy for cleaning up near-duplicates. `scripts/merge_contacts.py` is a one-time local tool that merges a Google Contacts export, an old manual spreadsheet, and a JSON contacts list into one deduplicated starting point for this tab — see its module docstring and the `Contacts` entry under [Data Model](#data-model) for the merge/dedup logic.
 - **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; manual refresh and clear-cache controls are available as floating buttons.
 
@@ -111,14 +113,16 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 3 | `drive.js` | Per-user spreadsheet selection: opens Sheets' "make a copy" link for the template, Google Picker for selecting/confirming a file, `localStorage`-backed active spreadsheet ID | `openTemplateCopyLink`, `pickSpreadsheet`, `getActiveSpreadsheetId`, `setActiveSpreadsheetId`, `clearActiveSpreadsheetId` |
 | 4 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) against the active spreadsheet ID | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 5 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, hard-refresh (cache + Cache Storage + service workers), and the shared numeric-expression evaluator used by the Balance and Amount fields | `getCached`, `setCached`, `clearCache`, `hardRefresh`, `evaluateNumberExpression` |
-| 6 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, the nested Portfolio Allocation donut, the Work Analytics charts (Arrival/Departure/Hours Worked Distribution histograms with a normal-curve overlay, plus the Daily Hours Average bar chart), and the Spending Patterns panel's Top Payees/Top Expense Descriptions and Payee Expenditure bar charts | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderAccountCompositionChart`, `renderTimesheetDistributionCharts`, `renderTimesheetDailyAverageChart`, `renderCommonPayeeChart`, `renderCommonDescriptionChart`, `renderPayeeSpendChart` |
+| 6 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, the nested Portfolio Allocation donut, the Work Analytics charts (Arrival/Departure/Hours Worked Distribution histograms with a normal-curve overlay, plus the Daily Hours Average bar chart), the Spending Patterns panel's Top Payees/Top Expense Descriptions and Payee Expenditure bar charts, the Time Spent by Country flag-tile computation, and the Countries Visited choropleth world map | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderAccountCompositionChart`, `renderTimesheetDistributionCharts`, `renderTimesheetDailyAverageChart`, `renderCommonPayeeChart`, `renderCommonDescriptionChart`, `renderPayeeSpendChart`, `computeCountryDays`, `getVisitedCountries`, `renderCountryDaysList`, `renderWorldMapChart` |
 | 7 | `transactions.js` | Transaction History table: list, search/filter, sortable columns, pagination, add/edit/delete, Payee/Description/Category autocomplete, multi-select bulk edit/delete with selected-row sum | `initTransactions`, `refreshTransactions`, `refreshAccountOptions`, `bulkDeleteTransactions`, `restoreTransactions`, `openBulkEditForm`, `submitBulkEditForm` |
 | 8 | `accounts.js` | Account Summary table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 9 | `timesheet.js` | Time Tracker: Work Log table (date-range filter, sortable, add/edit), holiday/missed-entry detection, client-side Duration computation, the data feeding the Work Analytics charts, and the today-not-logged reminder banner/notification | `initTimeSheet`, `refreshTimeSheet`, `getFilteredTimeEntries`, `checkTimesheetReminder` |
 | 10 | `csv.js` | CSV import for transactions, plus the Custom Report live preview/export (date range + AND/OR field filters) | `initCsvControls` |
 | 11 | `wellness.js` | Health Tracker: Body Weight/Caloric Intake/Rest & Recovery/Physical Activity charts (with red-dashed target lines), Weight Forecast projection chart, filterable/sortable Health Log table, category-aware Log Entry form with history-based autocomplete, step-to-minute conversion for Activity entries | `initWellness`, `refreshWellness` |
 | 12 | `contacts.js` | Contacts: searchable/sortable Contact List table, add/edit/delete, multi-select bulk export/delete/merge, CSV export for Google/Phone import and Outlook import | `initContacts`, `refreshContacts` |
-| 13 | `app.js` | Orchestration: report aggregation, dashboard rendering, file-selection gate, scroll-spy nav, collapsible panels, dark mode toggle, app-level keyboard shortcuts, modal focus management (focus-on-open/restore-on-close, Tab trapping), the shared empty-state table row helper, the shared undo toast, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange`, `setupKeyboardShortcuts`, `setupModalFocusManagement`, `renderEmptyRow`, `showUndoToast` |
+| 13 | `travel.js` | Travel: sortable/searchable Travel List table, add/edit/delete, and pairing Arrival/Departure rows into the Time Spent by Country and Countries Visited data `charts.js` renders | `initTravel`, `refreshTravel` |
+| 14 | `applications.js` | Applications: parses `Applications`' header-row-plus-status-updates grouping into cards, searchable, add (inserts at the top of the sheet)/edit/delete (removes a whole application's row range) | `initApplications`, `refreshApplications`, `parseApplications` |
+| 15 | `app.js` | Orchestration: report aggregation, dashboard rendering, file-selection gate, scroll-spy nav, collapsible panels, dark mode toggle, app-level keyboard shortcuts, modal focus management (focus-on-open/restore-on-close, Tab trapping), the shared empty-state table row helper, the shared undo toast, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange`, `setupKeyboardShortcuts`, `setupModalFocusManagement`, `renderEmptyRow`, `showUndoToast` |
 
 ### Data Flow
 
@@ -133,7 +137,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 
 **Dashboard load**
 4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Account Balance`, `Insight`, and `Reconciliation` ranges, then derives the summary cards, the Revenue vs. Expenditure and Cumulative Net Worth trends, the Category Expenditure Trend over time, the Spending by Category comparisons, the per-category `Type` breakdown for the Spending Breakdown by Type donuts, and the reconciliation status shown above the Account Summary table.
-5. `initTransactions()`, `initAccountManager()`, and `initTimeSheet()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API. Once `initTransactions()` resolves, `app.js` renders the Spending Patterns panel's three charts (Top Payees, Top Expense Descriptions, Payee Expenditure) from the loaded transaction list.
+5. `initTransactions()`, `initAccountManager()`, `initTimeSheet()`, `initWellness()`, `initContacts()`, `initTravel()`, and `initApplications()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API. Once `initTransactions()` resolves, `app.js` renders the Spending Patterns panel's three charts (Top Payees, Top Expense Descriptions, Payee Expenditure) from the loaded transaction list. Once `initTravel()` resolves, it derives and renders the Time Spent by Country and Countries Visited data from the loaded Travel rows.
 6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, and the Work Analytics charts; `app.js` renders the summary cards; `accounts.js`, `transactions.js`, and `timesheet.js` render their tables.
 
 **Writes** (add/edit/delete transaction or account, edit balance, CSV import)
@@ -261,14 +265,45 @@ One row per contact. Data rows start at row 2. Not present in the template by de
 | S/T — Telegram / Telegram 2 | URL | |
 | U — Note | Text | Free-text; also where the merge script folds in anything that overflowed a slot (4th+ phone, 3rd+ email, etc.) |
 
+### `Travel`
+
+One row per border-crossing event (an Arrival or a Departure), oldest first. Data rows start at row 2.
+
+| Column | Type | Notes |
+|---|---|---|
+| A — Country, City | Text | e.g. `Canada, Toronto` — only the part before the comma is used as the country name (flag lookup, world map, Time Spent by Country totals) |
+| B — Port | Text | Airport/border checkpoint/terminal name |
+| C — Type | Text | `Departure` or `Arival` (sic — matched case-insensitively; anything not "Departure" is treated as an Arrival) |
+| D — Via | Text | e.g. `Flight`, `Bus`; blank on Arrival rows |
+| E — Date | Date | ISO format |
+| F — Time | Text | `HH:MM`, optional — combined with Date so a same-day round trip still nets a real sub-day duration instead of rounding to 0 |
+| G — Reason | Text | e.g. `Tourism`, `Student`, `Work`; blank on Departure rows |
+| H — Detail | Text | Free-text, e.g. an itinerary note or employer/school name |
+
+`charts.js`'s `computeCountryDays()` walks the rows in order: an Arrival opens a stay in that country, and the next Departure (regardless of its own Country/City, since it's wherever that stay was) closes it and credits the elapsed time to the country the stay opened in; a trailing Arrival with no following Departure is an ongoing stay credited up to today. Since the log only starts at the first trip ever taken, a `BIRTH_DATE` key in `Settings` lets the years lived at home before that first trip count too (see below).
+
+### `Applications`
+
+Not a flat table — each application is a header row (Delay, Date, Action, Type, App Number all set) optionally followed by status-update rows that only carry Date + Action, until the next application's header row starts. Data rows start at row 2.
+
+| Column | Type | Notes |
+|---|---|---|
+| A — Delay (in Days) | Number (formula) | Header rows only — a hand-maintained formula referencing that specific application's own first and last logged row, e.g. `=DATEVALUE(B17)-DATEVALUE(B2)`. Left blank by the app when adding a new application, since there's no "last row" yet to reference. |
+| B — Date | Date | ISO format |
+| C — Action | Text | e.g. `Submited` (header row), or a status update like `IRCC Application Received` |
+| D — Type | Text | Header rows only, e.g. `Visa 5`, `Post-graduation Work Permit` |
+| E — App Number | Text | Header rows only |
+
+The sheet's last two rows are whole-column footer formulas (`Total Waiting time` = `SUM` of every Delay, `Total Time in Canada` = a running `DATEDIF`), not data — `applications.js`'s `parseApplications()` skips any row whose Action contains "Total" so they're never mistaken for a status update. Adding a new application via the UI inserts a fresh row 2 (rather than appending after the existing data) so those footer formulas' ranges shift down and stay correct instead of a new row landing after them.
+
 ### `Settings` (optional, user-managed)
 
-A plain key-value tab for personal parameters that would otherwise be hardcoded — currently the 4 Health Tracker targets. Not present in the template by default; the app works with today's defaults until a user adds it. Data rows start at row 2.
+A plain key-value tab for personal parameters that would otherwise be hardcoded — currently the 4 Health Tracker targets plus `BIRTH_DATE`. Not present in the template by default; the app works with today's defaults until a user adds it. Data rows start at row 2.
 
 | Column | Type | Notes |
 |---|---|---|
 | A — Key | Text | `UPPER_SNAKE_CASE`, matched by code (e.g. `WEIGHT_GOAL_KG`) |
-| B — Value | Number | The parameter's value |
+| B — Value | Number or Text | Numeric for the Health Tracker targets; `BIRTH_DATE` is the one text/date-valued key (read via `getSettingString()` rather than `getSetting()`) |
 | C — Notes | Text | Free-text, human-only — never read by the app |
 
 Recognized keys today, with their fallback if the tab or a row is missing:
@@ -279,6 +314,7 @@ Recognized keys today, with their fallback if the tab or a row is missing:
 | `CALORIE_TARGET_KCAL` | `2000` | Caloric Intake chart target line; caloric-balance input for the Weight Forecast projection |
 | `SLEEP_TARGET_HOURS` | `8` | Rest & Recovery chart target line; sleep-quality factor in the Weight Forecast projection |
 | `ACTIVITY_TARGET_MIN` | `100` | Physical Activity chart target line |
+| `BIRTH_DATE` | *(none — feature skipped)* | ISO date, e.g. `1991-02-12`. If set and the first `Travel` row is a Departure, credits the home country with the time from this date to that first Departure in the Time Spent by Country breakdown |
 
 Each key falls back independently — a missing tab, a missing row, or a non-numeric Value only affects that one parameter, never the rest of the dashboard. This tab is meant to grow (e.g. a future API key or SMTP setting is just another row) but is read over the same OAuth-authenticated Sheets API as every other tab — as private as the rest of the workbook, not extra-protected secret storage.
 
@@ -300,7 +336,7 @@ A single reconciliation check comparing recorded account balances against transa
 | Layer | Choice |
 |---|---|
 | Frontend | HTML5, CSS3, vanilla JavaScript (ES6+) — no framework, no build step |
-| Charts | [Chart.js](https://www.chartjs.org/) |
+| Charts | [Chart.js](https://www.chartjs.org/), plus [chartjs-chart-geo](https://github.com/sgratzl/chartjs-chart-geo) + a [world-atlas](https://github.com/topojson/world-atlas) topojson dataset (both CDN-loaded) for the Countries Visited choropleth map |
 | Authentication | [Google Identity Services](https://developers.google.com/identity) (GIS), OAuth 2.0 token flow, `drive.file` + `userinfo.email`/`userinfo.profile` scopes |
 | File selection | [Google Picker API](https://developers.google.com/drive/picker) |
 | Data store | Google Sheets API v4 |
@@ -335,6 +371,9 @@ ledger/
 │       ├── timesheet.js      # Time Sheet: Time Log table + Work Pattern Analysis chart data
 │       ├── csv.js            # CSV export/import for transactions
 │       ├── wellness.js       # Wellness Log: charts, log table, CRUD
+│       ├── contacts.js       # Contacts: Contact List table, CRUD, bulk export/delete/merge
+│       ├── travel.js         # Travel List table + CRUD; feeds Time Spent by Country / Countries Visited
+│       ├── applications.js   # Applications: parses header+status-update rows into cards, CRUD
 │       └── app.js            # Orchestration, report aggregation, scroll-spy nav
 ├── LICENSE
 └── README.md
@@ -376,6 +415,8 @@ const CONFIG = {
     WELLNESS: 'Wellness Log',
     CONTACTS: 'Contacts',
     SETTINGS: 'Settings',
+    TRAVEL: 'Travel',
+    APPLICATIONS: 'Applications',
   },
 };
 ```
@@ -423,7 +464,9 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | `eTimeSheet!A2:G` | `timesheet.js` | Work Log rows; read for the table, Work Analytics charts, and gap backfill, appended/updated on add or edit |
 | `'Wellness Log'!A2:G` | `wellness.js` | Health Log entries; read for all charts and the Health Log table, appended on add, updated on edit, deleted via `batchUpdate` |
 | `'Contacts'!A2:U` | `contacts.js` | Contact rows; read for the Contact List table, appended on add, updated on edit, deleted via `batchUpdate` |
-| `Settings!A2:C` | `app.js` | Optional personal-parameter overrides (e.g. Health Tracker targets); missing tab/row falls back to hardcoded defaults |
+| `'Travel'!A2:H` | `travel.js` | Travel rows; read for the Travel List table and the Time Spent by Country / Countries Visited data, appended on add, updated on edit, deleted via `batchUpdate` |
+| `'Applications'!A2:E` | `applications.js` | Application header + status-update rows, grouped client-side into cards; new applications inserted at row 2 via `batchUpdate`, edited in place, deleted (whole row range) via `batchUpdate` |
+| `Settings!A2:C` | `app.js` | Optional personal-parameter overrides (e.g. Health Tracker targets, `BIRTH_DATE`); missing tab/row falls back to hardcoded defaults |
 
 **Client-side cache (`localStorage`, 5-minute TTL via `cache.js`):**
 
@@ -437,6 +480,8 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:G` rows |
 | `ledger_cache_wellness` | `wellness.js` | Raw `'Wellness Log'!A2:G` rows |
 | `ledger_cache_contacts` | `contacts.js` | Raw `'Contacts'!A2:U` rows |
+| `ledger_cache_travel` | `travel.js` | Raw `'Travel'!A2:H` rows |
+| `ledger_cache_applications` | `applications.js` | Raw `'Applications'!A2:E` rows |
 | `ledger_cache_settings` | `app.js` | Parsed `Settings` key-value map (`{}` if the tab is absent) |
 
 **Auth and file selection (`localStorage`, separate from the cache above):**

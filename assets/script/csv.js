@@ -2,10 +2,6 @@ const CSV_HEADER = ['Date', 'Account', 'Payee', 'Category', 'Amount', 'Descripti
 
 let csvListenersAttached = false;
 let exportFilterCount = 0;
-// The preview list stays empty (and unrendered) until the user actually
-// touches a date or filter, so loading/refreshing transactions never pays
-// the cost of building a full-list preview nobody asked for.
-let exportActivated = false;
 
 function csvEscape(value) {
   const str = String(value ?? '');
@@ -119,7 +115,6 @@ function renderExportFilterOperators(row) {
 }
 
 function addExportFilterRow() {
-  exportActivated = true;
   const isFirst = exportFilterCount === 0;
   exportFilterCount++;
 
@@ -138,7 +133,7 @@ function addExportFilterRow() {
     });
     joinSelect.addEventListener('change', () => {
       row.dataset.join = joinSelect.value;
-      renderExportPreview();
+      resetTransactionsPageAndRender();
     });
     row.appendChild(joinSelect);
   }
@@ -154,12 +149,12 @@ function addExportFilterRow() {
 
   const operatorSelect = document.createElement('select');
   operatorSelect.className = 'export-filter-operator';
-  operatorSelect.addEventListener('change', renderExportPreview);
+  operatorSelect.addEventListener('change', resetTransactionsPageAndRender);
 
   const valueInput = document.createElement('input');
   valueInput.className = 'export-filter-value';
   valueInput.placeholder = 'Value';
-  valueInput.addEventListener('input', renderExportPreview);
+  valueInput.addEventListener('input', resetTransactionsPageAndRender);
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
@@ -170,18 +165,18 @@ function addExportFilterRow() {
   removeBtn.addEventListener('click', () => {
     row.remove();
     exportFilterCount--;
-    renderExportPreview();
+    resetTransactionsPageAndRender();
   });
 
   fieldSelect.addEventListener('change', () => {
     renderExportFilterOperators(row);
-    renderExportPreview();
+    resetTransactionsPageAndRender();
   });
 
   row.append(fieldSelect, operatorSelect, valueInput, removeBtn);
   document.getElementById('export-filters').appendChild(row);
   renderExportFilterOperators(row);
-  renderExportPreview();
+  resetTransactionsPageAndRender();
 }
 
 // Keeps the filter builder's account suggestions in sync with whatever
@@ -196,70 +191,8 @@ function syncExportAccountOptions() {
   });
 }
 
-function getMatchingExportTransactions() {
-  const dateFrom = document.getElementById('export-date-from').value;
-  const dateTo = document.getElementById('export-date-to').value;
-  const filters = getExportFilters();
-
-  return allTransactions
-    .filter((t) => (!dateFrom || t.date >= dateFrom) && (!dateTo || t.date <= dateTo))
-    .filter((t) => transactionMatchesExportFilters(t, filters))
-    .slice()
-    .sort((a, b) => a.row - b.row);
-}
-
-// Marks the preview as user-activated, then renders it. Use this from
-// listeners on the actual filter/date controls; plain renderExportPreview()
-// is for refreshes (e.g. after editing a transaction) that should only
-// update an already-visible preview, not switch on a hidden one.
-function activateExportPreview() {
-  exportActivated = true;
-  renderExportPreview();
-}
-
-// Live preview of whatever the date range + filters currently match, so the
-// user can see exactly what they're about to export before exporting it.
-// Stays empty until activateExportPreview() runs once, so loading/refreshing
-// transactions never pays the cost of building a full-list preview nobody
-// asked for.
-function renderExportPreview() {
-  const tbody = document.getElementById('export-preview-body');
-
-  if (!exportActivated) {
-    tbody.innerHTML = '';
-    document.getElementById('export-summary-text').textContent =
-      'Set a date range or add a filter above to preview matching transactions.';
-    document.getElementById('export-csv-btn').disabled = true;
-    return;
-  }
-
-  const matches = getMatchingExportTransactions();
-  tbody.innerHTML = '';
-
-  matches.forEach((t) => {
-    const tr = document.createElement('tr');
-    [t.date, t.account, t.payee, t.category, t.description].forEach((value) => {
-      const td = document.createElement('td');
-      td.textContent = value;
-      tr.appendChild(td);
-    });
-
-    const amountCell = document.createElement('td');
-    amountCell.textContent = formatCurrency(t.amount);
-    amountCell.className = t.amount >= 0 ? 'income' : 'expense';
-    tr.appendChild(amountCell);
-
-    tbody.appendChild(tr);
-  });
-
-  const total = matches.reduce((sum, t) => sum + t.amount, 0);
-  document.getElementById('export-summary-text').textContent =
-    `${matches.length} transaction${matches.length === 1 ? '' : 's'} — total ${formatCurrency(total)}`;
-  document.getElementById('export-csv-btn').disabled = matches.length === 0;
-}
-
 function exportTransactionsCSV() {
-  const rows = getMatchingExportTransactions()
+  const rows = getFilteredTransactions()
     .map((t) => [t.date, t.account, t.payee, t.category, t.amount, t.description]);
 
   if (rows.length === 0) {
@@ -356,8 +289,6 @@ function initCsvControls() {
   document.getElementById('export-csv-btn').addEventListener('click', exportTransactionsCSV);
   document.getElementById('export-add-filter-btn').addEventListener('click', addExportFilterRow);
   document.getElementById('export-form').addEventListener('submit', (e) => e.preventDefault());
-  document.getElementById('export-date-from').addEventListener('input', activateExportPreview);
-  document.getElementById('export-date-to').addEventListener('input', activateExportPreview);
 
   const fileInput = document.getElementById('import-csv-input');
   document.getElementById('import-csv-btn').addEventListener('click', () => fileInput.click());

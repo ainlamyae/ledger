@@ -58,16 +58,16 @@ async function initTransactions(forceRefresh = false) {
         refreshTransactions(true);
       }
     }).observe(document.getElementById('tx-modal'), { attributes: true, attributeFilter: ['hidden'] });
-    document.getElementById('tx-search').addEventListener('input', () => {
-      currentPage = 1;
-      selectedRows.clear();
-      renderTransactions();
+    document.getElementById('tx-search').addEventListener('input', resetTransactionsPageAndRender);
+    document.getElementById('tx-category-filter').addEventListener('change', resetTransactionsPageAndRender);
+    document.getElementById('export-date-from').addEventListener('input', resetTransactionsPageAndRender);
+    document.getElementById('export-date-to').addEventListener('input', resetTransactionsPageAndRender);
+
+    document.getElementById('tx-advanced-filters-toggle').addEventListener('click', () => {
+      const panel = document.getElementById('tx-advanced-filters');
+      panel.hidden = !panel.hidden;
     });
-    document.getElementById('tx-category-filter').addEventListener('change', () => {
-      currentPage = 1;
-      selectedRows.clear();
-      renderTransactions();
-    });
+
     setupTransactionSorting();
     setupBulkActions();
   }
@@ -162,7 +162,6 @@ async function refreshTransactions(forceRefresh = false) {
   renderTransactions();
   populateAutocompleteOptions();
   syncExportAccountOptions();
-  renderExportPreview();
 }
 
 // Fills the Payee/Description datalists with previously used values so the
@@ -229,6 +228,9 @@ function populateCategoryFilter() {
 function getFilteredTransactions() {
   const search = document.getElementById('tx-search').value.trim().toLowerCase();
   const category = document.getElementById('tx-category-filter').value;
+  const dateFrom = document.getElementById('export-date-from').value;
+  const dateTo = document.getElementById('export-date-to').value;
+  const advancedFilters = getExportFilters();
 
   const filtered = allTransactions
     .filter((t) => !category || t.category === category)
@@ -240,7 +242,9 @@ function getFilteredTransactions() {
         t.account.toLowerCase().includes(search) ||
         t.category.toLowerCase().includes(search)
       );
-    });
+    })
+    .filter((t) => (!dateFrom || t.date >= dateFrom) && (!dateTo || t.date <= dateTo))
+    .filter((t) => transactionMatchesExportFilters(t, advancedFilters));
 
   if (!txSort.key) return filtered.reverse();
 
@@ -251,8 +255,25 @@ function getFilteredTransactions() {
   });
 }
 
+// Reflects the *full* filtered set (all matches, not just the current
+// page) so it always matches what Export CSV will actually produce.
+function updateFilterSummary(filtered) {
+  const total = filtered.reduce((sum, t) => sum + t.amount, 0);
+  document.getElementById('export-summary-text').textContent =
+    `${filtered.length} transaction${filtered.length === 1 ? '' : 's'} — total ${formatCurrency(total)}`;
+}
+
+// Shared by every filter control (search, category, date range, advanced
+// filters) — a changed filter invalidates the current page/selection.
+function resetTransactionsPageAndRender() {
+  currentPage = 1;
+  selectedRows.clear();
+  renderTransactions();
+}
+
 function renderTransactions() {
   const filtered = getFilteredTransactions();
+  updateFilterSummary(filtered);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   currentPage = Math.min(currentPage, totalPages);
 

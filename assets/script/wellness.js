@@ -722,14 +722,32 @@ function renderWellnessProjectionChart() {
   const lastDate = histLabels[histLabels.length - 1];
   const lastWeight = weightEntries[weightEntries.length - 1].amount;
 
+  // Daily history followed by weekly (then a single distant ETA) projected
+  // points must NOT be spaced as equal category ticks — that visually
+  // implies every gap is the same length. Plot on a true linear axis (day
+  // offset from the first date) instead, so a week gap actually takes up
+  // 7x the width of a one-day gap.
+  //
+  // Parse/format in UTC throughout: `new Date("YYYY-MM-DD")` parses as UTC
+  // midnight, and formatting that back with the LOCAL timezone can roll it
+  // back a day in any negative-UTC-offset zone — staying in UTC end-to-end
+  // avoids that mismatch.
+  const parseIsoDateUTC = (dateStr) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const firstDateMs = parseIsoDateUTC(allLabels[0]);
+  const dayOffset = (dateStr) => Math.round((parseIsoDateUTC(dateStr) - firstDateMs) / 86400000);
+  const offsetToDateLabel = (offset) =>
+    new Date(firstDateMs + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
   wellnessProjectionChart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: allLabels,
       datasets: [
         {
           label: 'Actual Weight',
-          data: allLabels.map((d) => histMap.get(d) ?? null),
+          data: allLabels.map((d) => ({ x: dayOffset(d), y: histMap.get(d) ?? null })),
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59,130,246,0.08)',
           fill: false,
@@ -741,9 +759,10 @@ function renderWellnessProjectionChart() {
         {
           label: 'Projected',
           data: allLabels.map((d) => {
-            if (d < lastDate) return null;
-            if (d === lastDate) return lastWeight;
-            return projMap.get(d) ?? null;
+            let y = null;
+            if (d === lastDate) y = lastWeight;
+            else if (d > lastDate) y = projMap.get(d) ?? null;
+            return { x: dayOffset(d), y };
           }),
           borderColor: '#6366f1',
           borderDash: [6, 4],
@@ -755,7 +774,7 @@ function renderWellnessProjectionChart() {
         },
         {
           label: `${proj.weightGoal} kg goal`,
-          data: allLabels.map(() => proj.weightGoal),
+          data: allLabels.map((d) => ({ x: dayOffset(d), y: proj.weightGoal })),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -770,9 +789,13 @@ function renderWellnessProjectionChart() {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
+        tooltip: { callbacks: { title: (items) => offsetToDateLabel(items[0].parsed.x) } },
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 10, maxRotation: 0 } },
+        x: {
+          type: 'linear',
+          ticks: { maxTicksLimit: 10, maxRotation: 0, callback: offsetToDateLabel },
+        },
         y: {
           beginAtZero: false,
           afterFit: fixTrendYAxisWidth,

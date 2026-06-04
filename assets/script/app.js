@@ -592,6 +592,7 @@ async function loadDashboard(forceRefresh = false) {
   // Never throws (see loadSettings) — must resolve before initWellness
   // renders so its target-line charts see the user's values, if any.
   currentSettings = await loadSettings(forceRefresh);
+  applySettingsToWidgets();
 
   // Report, transactions, and accounts are independent API calls — fetch
   // them concurrently so the dashboard doesn't wait on three round trips
@@ -804,6 +805,7 @@ window.addEventListener('load', () => {
   setupPrivacyToggle();
   setupKeyboardShortcuts();
   applyChartTheme();
+  initWidgets();
 
   document.getElementById('footer-year').textContent = new Date().getFullYear();
 });

@@ -97,6 +97,30 @@ function latestStatus(app) {
   return app.updates[app.updates.length - 1];
 }
 
+// A bare "YYYY-MM-DD" string (what the sheet gives us) is parsed by `new
+// Date()` as UTC midnight, not local midnight — comparing that against a
+// local "today" silently shifts the date back a day in any negative-UTC
+// timezone (e.g. it never matches "today" in Waterloo). Parse the y/m/d
+// parts directly into a local Date to avoid that.
+function isSameDayAsToday(dateStr) {
+  if (!dateStr) return false;
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr).trim());
+  const d = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(dateStr);
+
+  return !Number.isNaN(d.getTime()) && d.toDateString() === new Date().toDateString();
+}
+
+// An application counts as "ongoing" as long as its most recent activity —
+// the submission itself, or any status update — is dated today. Once an
+// application is closed, its last recorded date stops moving forward, so
+// after the day it closed it will no longer match today's date.
+function isApplicationOngoing(app) {
+  return isSameDayAsToday(app.date) || app.updates.some((u) => isSameDayAsToday(u.date));
+}
+
 function renderApplicationsList() {
   const container = document.getElementById('applications-list');
   container.innerHTML = '';
@@ -114,97 +138,114 @@ function renderApplicationsList() {
     return;
   }
 
-  filtered.forEach((app) => {
-    const card = document.createElement('div');
-    card.className = 'app-card';
-    if (!expandedApplicationRows.has(app.headerRow)) card.classList.add('collapsed');
+  const ongoing = filtered.filter(isApplicationOngoing);
+  const closed = filtered.filter((app) => !isApplicationOngoing(app));
 
-    const header = document.createElement('div');
-    header.className = 'app-card-header';
-    header.setAttribute('role', 'button');
-    header.setAttribute('tabindex', '0');
-    header.setAttribute('aria-expanded', String(!card.classList.contains('collapsed')));
+  const renderGroup = (title, apps) => {
+    if (apps.length === 0) return;
 
-    const icon = document.createElement('span');
-    icon.className = 'panel-toggle-icon app-card-toggle-icon';
-    icon.textContent = '▾';
+    const heading = document.createElement('h3');
+    heading.className = 'applications-group-title';
+    heading.textContent = `${title} (${apps.length})`;
+    container.appendChild(heading);
 
-    const title = document.createElement('div');
-    title.className = 'app-card-title';
-    const status = latestStatus(app);
+    apps.forEach((app) => container.appendChild(buildApplicationCard(app)));
+  };
 
-    const titleMain = document.createElement('strong');
-    titleMain.textContent = `${app.type} — ${app.appNumber}`;
-    const titleMeta = document.createElement('span');
-    titleMeta.className = 'app-card-meta';
-    titleMeta.textContent = `Submitted ${app.date}${app.delayDays !== '' ? ` · Delay ${app.delayDays}d` : ''} · Latest: ${status.action} (${status.date})`;
+  renderGroup('Ongoing', ongoing);
+  renderGroup('Closed', closed);
+}
 
-    title.append(titleMain, titleMeta);
+function buildApplicationCard(app) {
+  const card = document.createElement('div');
+  card.className = 'app-card';
+  if (!expandedApplicationRows.has(app.headerRow)) card.classList.add('collapsed');
 
-    const actions = document.createElement('div');
-    actions.className = 'app-card-actions';
+  const header = document.createElement('div');
+  header.className = 'app-card-header';
+  header.setAttribute('role', 'button');
+  header.setAttribute('tabindex', '0');
+  header.setAttribute('aria-expanded', String(!card.classList.contains('collapsed')));
 
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn';
-    editBtn.textContent = '✏️';
-    editBtn.title = 'Edit';
-    editBtn.setAttribute('aria-label', 'Edit');
-    editBtn.addEventListener('click', (e) => { e.stopPropagation(); openApplicationForm(app); });
+  const icon = document.createElement('span');
+  icon.className = 'panel-toggle-icon app-card-toggle-icon';
+  icon.textContent = '▾';
 
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn';
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.title = 'Delete';
-    deleteBtn.setAttribute('aria-label', 'Delete');
-    deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteApplication(app); });
+  const title = document.createElement('div');
+  title.className = 'app-card-title';
+  const status = latestStatus(app);
 
-    actions.append(editBtn, deleteBtn);
-    header.append(icon, title, actions);
+  const titleMain = document.createElement('strong');
+  titleMain.textContent = `${app.type} — ${app.appNumber}`;
+  const titleMeta = document.createElement('span');
+  titleMeta.className = 'app-card-meta';
+  titleMeta.textContent = `Submitted ${app.date}${app.delayDays !== '' ? ` · Delay ${app.delayDays}d` : ''} · Latest: ${status.action} (${status.date})`;
 
-    const toggle = () => {
-      card.classList.toggle('collapsed');
-      const expanded = !card.classList.contains('collapsed');
-      header.setAttribute('aria-expanded', String(expanded));
-      if (expanded) expandedApplicationRows.add(app.headerRow);
-      else expandedApplicationRows.delete(app.headerRow);
-    };
+  title.append(titleMain, titleMeta);
 
-    header.addEventListener('click', () => {
-      if (window.getSelection().toString()) return;
-      toggle();
-    });
-    header.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
-    });
+  const actions = document.createElement('div');
+  actions.className = 'app-card-actions';
 
-    const body = document.createElement('div');
-    body.className = 'app-card-body';
+  const editBtn = document.createElement('button');
+  editBtn.className = 'btn';
+  editBtn.textContent = '✏️';
+  editBtn.title = 'Edit';
+  editBtn.setAttribute('aria-label', 'Edit');
+  editBtn.addEventListener('click', (e) => { e.stopPropagation(); openApplicationForm(app); });
 
-    if (app.updates.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'hint';
-      empty.textContent = 'No status updates recorded yet.';
-      body.appendChild(empty);
-    } else {
-      const list = document.createElement('ul');
-      list.className = 'app-history';
-      app.updates.forEach((u) => {
-        const item = document.createElement('li');
-        const date = document.createElement('span');
-        date.className = 'app-history-date';
-        date.textContent = u.date;
-        const action = document.createElement('span');
-        action.className = 'app-history-action';
-        action.textContent = u.action;
-        item.append(date, action);
-        list.appendChild(item);
-      });
-      body.appendChild(list);
-    }
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn';
+  deleteBtn.textContent = '🗑️';
+  deleteBtn.title = 'Delete';
+  deleteBtn.setAttribute('aria-label', 'Delete');
+  deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteApplication(app); });
 
-    card.append(header, body);
-    container.appendChild(card);
+  actions.append(editBtn, deleteBtn);
+  header.append(icon, title, actions);
+
+  const toggle = () => {
+    card.classList.toggle('collapsed');
+    const expanded = !card.classList.contains('collapsed');
+    header.setAttribute('aria-expanded', String(expanded));
+    if (expanded) expandedApplicationRows.add(app.headerRow);
+    else expandedApplicationRows.delete(app.headerRow);
+  };
+
+  header.addEventListener('click', () => {
+    if (window.getSelection().toString()) return;
+    toggle();
   });
+  header.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+  });
+
+  const body = document.createElement('div');
+  body.className = 'app-card-body';
+
+  if (app.updates.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'hint';
+    empty.textContent = 'No status updates recorded yet.';
+    body.appendChild(empty);
+  } else {
+    const list = document.createElement('ul');
+    list.className = 'app-history';
+    app.updates.forEach((u) => {
+      const item = document.createElement('li');
+      const date = document.createElement('span');
+      date.className = 'app-history-date';
+      date.textContent = u.date;
+      const action = document.createElement('span');
+      action.className = 'app-history-action';
+      action.textContent = u.action;
+      item.append(date, action);
+      list.appendChild(item);
+    });
+    body.appendChild(list);
+  }
+
+  card.append(header, body);
+  return card;
 }
 
 const APPLICATION_FIELD_IDS = ['type', 'number', 'date', 'action'];

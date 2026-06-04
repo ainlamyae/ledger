@@ -42,10 +42,10 @@
 <header>
     <h1><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></h1>
     <nav id="main-nav" class="nav" hidden>
+        <a href="#wellness">Health Tracker</a>
+        <a href="#timesheet">Time Tracker</a>
         <a href="#transactions">Journal</a>
         <a href="#accounts">Portfolio</a>
-        <a href="#timesheet">Time Tracker</a>
-        <a href="#wellness">Health Tracker</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -79,12 +79,37 @@
     <div class="landing">
         <div class="landing-hero">
             <h1>Your personal life dashboard</h1>
-            <p>Manage your money, hours, and health in one place — powered by your own Google Sheet, with no third-party servers.</p>
+            <p>Money, time, health, travel, and contacts — all in one dashboard, backed by your own Google Sheet with no third-party servers.</p>
             <p class="hint">Use the 🔑 sign-in button in the top-right to get started.</p>
             <p id="auth-status" class="status" hidden></p>
         </div>
 
         <div class="landing-features">
+            <div class="landing-feature">
+                <h3>At a Glance</h3>
+                <p>A live clock with a second time zone, today's date in three calendars, and the local weather — right above your numbers, no sign-in required.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Health Tracker</h3>
+                <p>Track Body Weight, Caloric Intake, Physical Activity, and Rest & Recovery. Charts show your last 7 days versus daily targets, and a Weight Forecast projects your goal arrival date.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Time Tracker</h3>
+                <p>Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Journal</h3>
+                <p>Add, edit, search, filter, sort, and bulk-edit your Transaction History, with autocomplete for payees and categories and an undo on every delete. Flip on Advanced Filters for a date range plus AND/OR field rules, and export exactly what's filtered to CSV.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Portfolio</h3>
+                <p>Track every account's balance in one Account Summary, see your allocation by type and institution in a nested donut chart, and get an instant reconciliation check against your transaction history.</p>
+            </div>
+
             <div class="landing-feature">
                 <h3>Analytics Dashboard</h3>
                 <p>See your net worth, monthly cash flow, and portfolio allocation at a glance — with Revenue vs. Expenditure and Cumulative Net Worth trends.</p>
@@ -96,28 +121,13 @@
             </div>
 
             <div class="landing-feature">
-                <h3>Journal</h3>
-                <p>Add, edit, search, filter, and bulk-edit entries in your Transaction History. Undo deletes, export Custom Reports to CSV, and autocomplete payees and categories.</p>
-            </div>
-
-            <div class="landing-feature">
-                <h3>Time Tracker</h3>
-                <p>Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts.</p>
-            </div>
-
-            <div class="landing-feature">
-                <h3>Health Tracker</h3>
-                <p>Track Body Weight, Caloric Intake, Physical Activity, and Rest & Recovery. Charts show your last 7 days versus daily targets, and a Weight Forecast projects your goal arrival date.</p>
+                <h3>Travel &amp; Applications</h3>
+                <p>Log every trip and see a Time Spent by Country breakdown plus a world map of visited countries. Track immigration/visa applications — grouped into Ongoing and Closed — from submission through every status update to final decision.</p>
             </div>
 
             <div class="landing-feature">
                 <h3>Contacts</h3>
                 <p>Keep a searchable Contact List with names, phones, emails, addresses, birthdays, and social links. Bulk-select rows to export CSVs for Google/Phone or Outlook, or merge duplicate entries into one.</p>
-            </div>
-
-            <div class="landing-feature">
-                <h3>Travel &amp; Applications</h3>
-                <p>Log every trip and see a Time Spent by Country breakdown plus a world map of visited countries. Track immigration/visa applications from submission through every status update to final decision.</p>
             </div>
 
             <div class="landing-feature">
@@ -144,6 +154,66 @@
 
     <p id="dashboard-loading" class="status status-info" hidden>Loading your data…</p>
 
+    <div class="widget-cards">
+        <div class="widget-card" id="widget-clock">
+            <h3>Time</h3>
+            <div class="widget-row widget-clock-row">
+                <span id="widget-clock-time" class="widget-clock-time-value">—</span>
+                <div class="location-picker" id="location-picker">
+                    <button type="button" id="widget-clock-location-btn" class="location-picker-btn"></button>
+
+                    <div class="location-picker-dropdown" id="location-picker-dropdown" hidden>
+                        <button type="button" id="location-auto-btn" class="account-menu-item">📍 Use my location (auto-detect)</button>
+
+                        <div class="location-picker-manual">
+                            <input type="text" id="location-manual-input" placeholder="Enter a city…">
+                            <button type="button" id="location-manual-btn" class="btn">Set</button>
+                        </div>
+
+                        <p id="location-picker-status" class="status status-info" hidden></p>
+                    </div>
+                </div>
+            </div>
+            <div class="widget-row widget-clock-row">
+                <span id="widget-clock-isfahan">—</span>
+                <div class="location-picker" id="second-clock-picker">
+                    <button type="button" id="second-clock-location-btn" class="location-picker-btn"></button>
+
+                    <div class="location-picker-dropdown" id="second-clock-dropdown" hidden>
+                        <div class="location-picker-manual">
+                            <input type="text" id="second-clock-manual-input" placeholder="Enter a city…">
+                            <button type="button" id="second-clock-manual-btn" class="btn">Set</button>
+                        </div>
+
+                        <p id="second-clock-status" class="status status-info" hidden></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="widget-card" id="widget-date">
+            <h3>Date</h3>
+            <div class="widget-row" id="widget-date-gregorian">—</div>
+            <div class="widget-row" id="widget-date-shamsi">—</div>
+            <div class="widget-row" id="widget-date-ghamari">—</div>
+        </div>
+
+        <div class="widget-card" id="widget-prayer">
+            <h3>Azan</h3>
+            <div class="widget-row"><span>Sobh</span><span id="widget-prayer-fajr">—</span></div>
+            <div class="widget-row"><span>Zohr</span><span id="widget-prayer-dhuhr">—</span></div>
+            <div class="widget-row"><span>Maghreb</span><span id="widget-prayer-maghrib">—</span></div>
+            <p id="widget-prayer-status" class="status status-info" hidden></p>
+        </div>
+
+        <div class="widget-card" id="widget-weather">
+            <h3>Weather</h3>
+            <div class="widget-row" id="widget-weather-current">—</div>
+            <div class="widget-forecast" id="widget-weather-forecast"></div>
+            <p id="widget-weather-status" class="status status-info" hidden></p>
+        </div>
+    </div>
+
     <div class="cards">
         <div class="card">
             <h3>Net Worth</h3>
@@ -165,6 +235,185 @@
             <div class="value" id="savings-value">—</div>
         </div>
     </div>
+
+    <section id="wellness" class="panel-group">
+        <h2 class="panel-group-title">Health Tracker</h2>
+
+        <div class="panel">
+            <h2>Health Metrics</h2>
+
+            <div class="donut-grid">
+                <div class="donut-item">
+                    <h4>Body Weight</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="wellness-weight-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Caloric Intake</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="wellness-calories-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Physical Activity</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="wellness-activity-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Rest &amp; Recovery</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="wellness-sleep-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="weight-projection-wrap">
+                <h4>Weight Forecast</h4>
+                <div class="chart-box">
+                    <canvas id="wellness-projection-chart"></canvas>
+                </div>
+                <p id="weight-projection-eta" class="weight-eta"></p>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Health Log</h2>
+
+            <div class="panel-actions">
+                <button id="add-wellness-btn" class="btn btn-primary">+ Log Entry</button>
+            </div>
+
+            <div class="filters">
+                <select id="wellness-category-filter">
+                    <option value="">All Categories</option>
+                    <option>Sleep</option>
+                    <option>Weight</option>
+                    <option>Calories</option>
+                    <option>Activity</option>
+                </select>
+            </div>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="wellness-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="wellness-date-to">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="wellness-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th>Time</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Unit</th>
+                        <th>Notes</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="wellness-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="wellness-pagination"></div>
+        </div>
+    </section>
+
+    <div style="height:.5rem"></div>
+
+    <section id="timesheet" class="panel-group">
+        <h2 class="panel-group-title">Time Tracker</h2>
+
+        <div id="timesheet-reminder-banner" class="info-banner" hidden>
+            <span>You haven't logged today's hours yet.</span>
+            <button id="timesheet-reminder-log-btn" class="btn">Log a Day</button>
+            <button id="timesheet-reminder-enable-btn" class="btn" hidden>🔔 Enable reminders</button>
+        </div>
+
+        <div class="panel">
+            <h2>Work Analytics</h2>
+
+            <div class="donut-grid">
+                <div class="donut-item">
+                    <h4>Arrival Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-start-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Departure Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-end-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Hours Worked Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-duration-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Daily Hours Average</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-daily-average-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Work Log</h2>
+
+            <div class="panel-actions">
+                <button id="log-today-btn" class="btn btn-primary">Log a Day</button>
+            </div>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="timesheet-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="timesheet-date-to">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="timesheet-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th>Day</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Break</th>
+                        <th>Duration</th>
+                        <th>Task</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+
+                    <tbody id="timesheet-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="ts-pagination"></div>
+        </div>
+    </section>
+
+    <div style="height:.5rem"></div>
 
     <section id="transactions" class="panel-group">
         <h2 class="panel-group-title">Journal</h2>
@@ -278,6 +527,8 @@
             <div class="panel-actions">
                 <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
                 <input type="file" id="import-csv-input" accept=".csv" hidden>
+                <button id="tx-advanced-filters-toggle" class="btn">Advanced Filters</button>
+                <button id="export-csv-btn" class="btn">Export CSV</button>
                 <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
             </div>
 
@@ -285,6 +536,26 @@
                 <input type="text" id="tx-search" placeholder="Search payee, description, account, category...">
                 <select id="tx-category-filter"></select>
             </div>
+
+            <div id="tx-advanced-filters" hidden>
+                <form id="export-form">
+                    <div class="export-date-range">
+                        <label>From
+                            <input type="date" id="export-date-from">
+                        </label>
+                        <label>To
+                            <input type="date" id="export-date-to">
+                        </label>
+                    </div>
+
+                    <div id="export-filters"></div>
+                    <datalist id="export-account-options"></datalist>
+
+                    <button type="button" id="export-add-filter-btn" class="btn">+ Add Filter</button>
+                </form>
+            </div>
+
+            <p id="export-summary-text" class="hint export-summary-text"></p>
 
             <div class="table-responsive">
                 <table id="transactions-table">
@@ -312,49 +583,6 @@
             </div>
 
             <div class="pagination" id="tx-pagination"></div>
-        </div>
-
-        <div class="panel">
-            <h2>Custom Report</h2>
-
-            <form id="export-form">
-                <div class="export-date-range">
-                    <label>From
-                        <input type="date" id="export-date-from">
-                    </label>
-                    <label>To
-                        <input type="date" id="export-date-to">
-                    </label>
-                </div>
-
-                <div id="export-filters"></div>
-                <datalist id="export-account-options"></datalist>
-
-                <button type="button" id="export-add-filter-btn" class="btn">+ Add Filter</button>
-            </form>
-
-            <div class="table-responsive">
-                <table id="export-preview-table">
-                    <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Account</th>
-                        <th>Payee</th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Amount</th>
-                    </tr>
-                    </thead>
-
-                    <tbody id="export-preview-body"></tbody>
-                </table>
-            </div>
-
-            <p id="export-summary-text" class="hint export-summary-text"></p>
-
-            <div class="export-actions">
-                <button id="export-csv-btn" class="btn btn-primary" disabled>Export CSV</button>
-            </div>
         </div>
     </section>
 
@@ -395,185 +623,6 @@
                     <tbody id="accounts-list-body"></tbody>
                 </table>
             </div>
-        </div>
-    </section>
-
-    <div style="height:.5rem"></div>
-
-    <section id="timesheet" class="panel-group">
-        <h2 class="panel-group-title">Time Tracker</h2>
-
-        <div id="timesheet-reminder-banner" class="info-banner" hidden>
-            <span>You haven't logged today's hours yet.</span>
-            <button id="timesheet-reminder-log-btn" class="btn">Log a Day</button>
-            <button id="timesheet-reminder-enable-btn" class="btn" hidden>🔔 Enable reminders</button>
-        </div>
-
-        <div class="panel">
-            <h2>Work Analytics</h2>
-
-            <div class="donut-grid">
-                <div class="donut-item">
-                    <h4>Arrival Distribution</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-start-distribution-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Departure Distribution</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-end-distribution-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Hours Worked Distribution</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-duration-distribution-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Daily Hours Average</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-daily-average-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>Work Log</h2>
-
-            <div class="panel-actions">
-                <button id="log-today-btn" class="btn btn-primary">Log a Day</button>
-            </div>
-
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="timesheet-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="timesheet-date-to">
-                </label>
-            </div>
-
-            <div class="table-responsive">
-                <table id="timesheet-table">
-                    <thead>
-                    <tr>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th>Day</th>
-                        <th>Start</th>
-                        <th>End</th>
-                        <th>Break</th>
-                        <th>Duration</th>
-                        <th>Task</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-
-                    <tbody id="timesheet-body"></tbody>
-                </table>
-            </div>
-
-            <div class="pagination" id="ts-pagination"></div>
-        </div>
-    </section>
-
-    <div style="height:.5rem"></div>
-
-    <section id="wellness" class="panel-group">
-        <h2 class="panel-group-title">Health Tracker</h2>
-
-        <div class="panel">
-            <h2>Health Metrics</h2>
-
-            <div class="donut-grid">
-                <div class="donut-item">
-                    <h4>Body Weight</h4>
-                    <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-weight-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Caloric Intake</h4>
-                    <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-calories-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Physical Activity</h4>
-                    <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-activity-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Rest &amp; Recovery</h4>
-                    <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-sleep-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="weight-projection-wrap">
-                <h4>Weight Forecast</h4>
-                <div class="chart-box">
-                    <canvas id="wellness-projection-chart"></canvas>
-                </div>
-                <p id="weight-projection-eta" class="weight-eta"></p>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>Health Log</h2>
-
-            <div class="panel-actions">
-                <button id="add-wellness-btn" class="btn btn-primary">+ Log Entry</button>
-            </div>
-
-            <div class="filters">
-                <select id="wellness-category-filter">
-                    <option value="">All Categories</option>
-                    <option>Sleep</option>
-                    <option>Weight</option>
-                    <option>Calories</option>
-                    <option>Activity</option>
-                </select>
-            </div>
-
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="wellness-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="wellness-date-to">
-                </label>
-            </div>
-
-            <div class="table-responsive">
-                <table id="wellness-table">
-                    <thead>
-                    <tr>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th>Time</th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Amount</th>
-                        <th>Unit</th>
-                        <th>Notes</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="wellness-body"></tbody>
-                </table>
-            </div>
-
-            <div class="pagination" id="wellness-pagination"></div>
         </div>
     </section>
 
@@ -1085,6 +1134,7 @@
 <script src="assets/script/drive.js"></script>
 <script src="assets/script/sheets.js"></script>
 <script src="assets/script/cache.js"></script>
+<script src="assets/script/widgets.js"></script>
 <script src="assets/script/charts.js"></script>
 <script src="assets/script/transactions.js"></script>
 <script src="assets/script/accounts.js"></script>

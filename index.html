@@ -273,7 +273,7 @@
             </div>
 
             <div class="weight-projection-wrap">
-                <h4>Weight Forecast</h4>
+                <h4>Weight Trend & Forecast</h4>
                 <div class="chart-box">
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
@@ -470,6 +470,31 @@
     </div>
 
     <div class="panel">
+        <h2>Spending Patterns</h2>
+
+        <div class="panel-section">
+            <h3>Top Expense Descriptions</h3>
+            <div class="chart-box">
+                <canvas id="common-description-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>Top Payees</h3>
+            <div class="chart-box">
+                <canvas id="common-payee-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>Payee Expenditure</h3>
+            <div class="chart-box">
+                <canvas id="payee-spend-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
         <h2>Historical Trends</h2>
 
         <div class="panel-section">
@@ -492,31 +517,6 @@
             <h3>Cumulative Net Worth</h3>
             <div class="chart-box">
                 <canvas id="savings-trend-chart"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <div class="panel">
-        <h2>Spending Patterns</h2>
-
-        <div class="panel-section">
-            <h3>Top Expense Descriptions</h3>
-            <div class="chart-box">
-                <canvas id="common-description-chart"></canvas>
-            </div>
-        </div>
-
-        <div class="panel-section">
-            <h3>Top Payees</h3>
-            <div class="chart-box">
-                <canvas id="common-payee-chart"></canvas>
-            </div>
-        </div>
-
-        <div class="panel-section">
-            <h3>Payee Expenditure</h3>
-            <div class="chart-box">
-                <canvas id="payee-spend-chart"></canvas>
             </div>
         </div>
     </div>
@@ -735,6 +735,27 @@
 
             <div class="pagination" id="contacts-pagination"></div>
         </div>
+
+        <div class="panel">
+            <h2>Settings</h2>
+
+            <div class="panel-actions">
+                <button id="add-setting-btn" class="btn btn-primary">+ Add</button>
+            </div>
+
+            <div class="table-responsive">
+                <table id="settings-table">
+                    <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="settings-body"></tbody>
+                </table>
+            </div>
+        </div>
     </section>
 
 </div>
@@ -872,6 +893,40 @@
 
             <div class="modal-actions">
                 <button type="button" id="account-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="setting-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="setting-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="setting-modal-title">Add Setting</h2>
+
+        <form id="setting-form">
+            <label>Key
+                <input type="text" id="setting-key" list="setting-key-options" required>
+                <datalist id="setting-key-options">
+                    <option>WEIGHT_GOAL_KG</option>
+                    <option>CALORIE_TARGET_KCAL</option>
+                    <option>SLEEP_TARGET_HOURS</option>
+                    <option>ACTIVITY_TARGET_MIN</option>
+                    <option>BIRTH_DATE</option>
+                    <option>WIDGET_DEFAULT_CITY</option>
+                    <option>WIDGET_SECOND_CLOCK_CITY</option>
+                </datalist>
+            </label>
+            <label>Value
+                <input type="text" id="setting-value">
+            </label>
+            <label>Notes
+                <input type="text" id="setting-notes" placeholder="Optional">
+            </label>
+
+            <p id="setting-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="setting-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1142,6 +1197,7 @@
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/wellness.js"></script>
 <script src="assets/script/contacts.js"></script>
+<script src="assets/script/settings-panel.js"></script>
 <script src="assets/script/travel.js"></script>
 <script src="assets/script/applications.js"></script>
 <script src="assets/script/app.js"></script>

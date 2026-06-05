@@ -111,7 +111,6 @@ function setUIState(state) {
   document.getElementById('refresh-btn').hidden = state !== 'dashboard';
   document.getElementById('toggle-panels-fab').hidden = state !== 'dashboard';
   document.getElementById('privacy-toggle-fab').hidden = state !== 'dashboard';
-  document.getElementById('top-banner').hidden = state !== 'dashboard';
 }
 
 function handleAuthChange(token, error) {
@@ -179,6 +178,18 @@ function focusableElements(container) {
   )].filter((el) => el.offsetParent !== null);
 }
 
+// Native date/time inputs pop their picker open the instant they receive
+// focus (as a full-screen wheel on mobile), so they make a poor landing spot
+// for auto-focus on modal open even though they're a fine Tab stop. Prefer
+// the first focusable field that won't do that; fall back to the true first
+// element if every field in the modal happens to be a date/time input.
+const AUTO_FOCUS_SKIP_TYPES = new Set(['date', 'time', 'month', 'week', 'datetime-local']);
+
+function initialFocusTarget(container) {
+  const focusable = focusableElements(container);
+  return focusable.find((el) => !(el.tagName === 'INPUT' && AUTO_FOCUS_SKIP_TYPES.has(el.type))) || focusable[0];
+}
+
 // Each modal manages its own hidden flag from wherever it's opened/closed
 // (transactions.js, accounts.js, timesheet.js, etc.) — rather than touching
 // every call site, watch the `hidden` attribute here to move focus into the
@@ -193,7 +204,7 @@ function setupModalFocusManagement() {
     new MutationObserver(() => {
       if (!modal.hidden) {
         lastFocused = document.activeElement;
-        focusableElements(modal)[0]?.focus();
+        initialFocusTarget(modal)?.focus();
       } else if (lastFocused) {
         lastFocused.focus();
         lastFocused = null;
@@ -589,15 +600,20 @@ async function loadDashboard(forceRefresh = false) {
   loading.hidden = false;
   clearDashboardError();
 
-  // Never throws (see loadSettings) — must resolve before initWellness
-  // renders so its target-line charts see the user's values, if any.
-  currentSettings = await loadSettings(forceRefresh);
-  applySettingsToWidgets();
+  // Never throws (see loadSettings). Settings fetches concurrently with
+  // every other module below instead of blocking them first — only
+  // initWellness (target-line charts) and initTravel (BIRTH_DATE credit)
+  // actually read currentSettings, so just those two wait on it.
+  const settingsPromise = loadSettings(forceRefresh).then((settings) => {
+    currentSettings = settings;
+    applySettingsToWidgets();
+  });
 
-  // Report, transactions, and accounts are independent API calls — fetch
-  // them concurrently so the dashboard doesn't wait on three round trips
-  // in sequence.
+  // Every module below is an independent API call — fetch them all
+  // concurrently so the dashboard doesn't wait on nine round trips in
+  // sequence.
   const results = await Promise.allSettled([
+    settingsPromise,
     loadReport(forceRefresh).then((report) => {
       currentReport = report;
       renderSummaryCards(report);
@@ -617,10 +633,10 @@ async function loadDashboard(forceRefresh = false) {
     }),
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
-    initWellness(forceRefresh),
+    settingsPromise.then(() => initWellness(forceRefresh)),
     initContacts(forceRefresh),
     initSettingsPanel(forceRefresh),
-    initTravel(forceRefresh),
+    settingsPromise.then(() => initTravel(forceRefresh)),
     initApplications(forceRefresh),
   ]);
 

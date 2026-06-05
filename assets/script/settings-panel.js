@@ -67,30 +67,13 @@ function renderSettingsList() {
   allSettingRows.forEach((setting) => {
     const tr = document.createElement('tr');
 
-    const keyCell = document.createElement('td');
-    keyCell.textContent = setting.key;
-
-    const valueCell = document.createElement('td');
-    valueCell.textContent = setting.value;
-
     const actionsCell = document.createElement('td');
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn';
-    editBtn.textContent = '✏️';
-    editBtn.title = 'Edit';
-    editBtn.setAttribute('aria-label', 'Edit');
-    editBtn.addEventListener('click', () => openSettingForm(setting));
+    actionsCell.append(
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openSettingForm(setting) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteSetting(setting.row) }),
+    );
 
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn';
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.title = 'Delete';
-    deleteBtn.setAttribute('aria-label', 'Delete');
-    deleteBtn.addEventListener('click', () => deleteSetting(setting.row));
-
-    actionsCell.append(editBtn, deleteBtn);
-
-    tr.append(keyCell, valueCell, actionsCell);
+    tr.append(makeCell(setting.key), makeCell(setting.value), actionsCell);
     tbody.appendChild(tr);
   });
 }
@@ -103,7 +86,7 @@ function openSettingForm(setting) {
   document.getElementById('setting-value').value = setting ? setting.value : '';
   document.getElementById('setting-notes').value = setting ? setting.notes : '';
 
-  document.getElementById('setting-form-error').hidden = true;
+  clearFieldError('setting-form-error');
   document.getElementById('setting-modal').hidden = false;
 }
 
@@ -117,9 +100,7 @@ async function submitSettingForm(event) {
 
   const key = document.getElementById('setting-key').value.trim();
   if (!key) {
-    const errorEl = document.getElementById('setting-form-error');
-    errorEl.textContent = 'Key is required.';
-    errorEl.hidden = false;
+    showFieldError('setting-form-error', 'Key is required.');
     return;
   }
 
@@ -140,16 +121,12 @@ async function submitSettingForm(event) {
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
   } catch (err) {
-    const errorEl = document.getElementById('setting-form-error');
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('setting-form-error', err.message);
   }
 }
 
 async function deleteSetting(row) {
-  if (!confirm('Delete this setting?')) return;
-
-  try {
+  await confirmAndDelete('Delete this setting?', async () => {
     await batchUpdate([{
       deleteDimension: {
         range: { sheetId: settingsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
@@ -158,7 +135,5 @@ async function deleteSetting(row) {
     await refreshSettingsList(true);
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
-  } catch (err) {
-    alert(`Failed to delete: ${err.message}`);
-  }
+  });
 }

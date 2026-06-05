@@ -35,18 +35,26 @@ function niceAxisMax(value) {
   return niceResidual * magnitude;
 }
 
+// Destroys `existingChart` if present, then constructs and returns a new
+// Chart.js instance from `config` — only used where destroy and construct are
+// unconditionally adjacent; render functions that skip construction on empty
+// data (to still clear a stale chart) keep their own manual destroy instead.
+function upsertChart(existingChart, ctx, config) {
+  if (existingChart) existingChart.destroy();
+  return new Chart(ctx, config);
+}
+
 let incomeExpenseChart = null;
 
 function renderIncomeExpenseChart(months) {
   const ctx = document.getElementById('income-expense-chart');
-  if (incomeExpenseChart) incomeExpenseChart.destroy();
 
   renderCategoryLegend('income-expense-legend', [
     { name: 'Income', color: '#16a34a' },
     { name: 'Expenses', color: '#dc2626' },
   ]);
 
-  incomeExpenseChart = new Chart(ctx, {
+  incomeExpenseChart = upsertChart(incomeExpenseChart, ctx, {
     type: 'line',
     data: {
       labels: months.map((m) => m.label),
@@ -320,7 +328,6 @@ function renderTypeBreakdownCharts(typeBreakdown) {
     TYPE_BREAKDOWN_PERIODS.forEach(({ key, suffix }) => {
       const canvasId = `type-breakdown-${slug}-${suffix}-chart`;
       const ctx = document.getElementById(canvasId);
-      if (typeBreakdownCharts[canvasId]) typeBreakdownCharts[canvasId].destroy();
 
       const typedTotal = types.reduce((sum, t) => sum + t[key], 0);
       const total = (data.total && data.total[key]) || typedTotal;
@@ -330,7 +337,7 @@ function renderTypeBreakdownCharts(typeBreakdown) {
       const values = [...types.map((t) => t[key]), untyped];
       const sliceColors = [...colors, TYPE_BREAKDOWN_OTHER_COLOR];
 
-      typeBreakdownCharts[canvasId] = new Chart(ctx, {
+      typeBreakdownCharts[canvasId] = upsertChart(typeBreakdownCharts[canvasId], ctx, {
         type: 'doughnut',
         data: { labels, datasets: [{ data: values, backgroundColor: sliceColors }] },
         options: {
@@ -505,6 +512,483 @@ function renderAccountCompositionChart(accounts) {
       },
     },
   });
+}
+
+// Fallback defaults used until the user adds a 'Settings' tab — identical
+// to today's hardcoded values, so nothing changes for anyone who hasn't.
+const WEIGHT_GOAL_KG_DEFAULT = 82;
+const CALORIE_TARGET_KCAL_DEFAULT = 2000;
+const SLEEP_TARGET_HOURS_DEFAULT = 8;
+const ACTIVITY_TARGET_MIN_DEFAULT = 100;
+
+let wellnessWeightChart = null;
+let wellnessCaloriesChart = null;
+let wellnessSleepChart = null;
+let wellnessActivityChart = null;
+let wellnessProjectionChart = null;
+
+function lastNDates(n) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (n - 1 - i));
+    return isoFromDate(d);
+  });
+}
+
+function renderWellnessCharts(entries) {
+  renderWellnessWeightChart(entries);
+  renderWellnessCaloriesChart(entries);
+  renderWellnessSleepChart(entries);
+  renderWellnessActivityChart(entries);
+  renderWellnessProjectionChart(entries);
+}
+
+function renderWellnessWeightChart(entries) {
+  const ctx = document.getElementById('wellness-weight-chart');
+
+  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
+
+  const dates = lastNDates(10);
+  const byDate = new Map();
+  entries
+    .filter((e) => e.category === 'Weight' && e.amount !== null)
+    .forEach((e) => byDate.set(e.date, e.amount));
+
+  wellnessWeightChart = upsertChart(wellnessWeightChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'line',
+          label: 'Weight',
+          data: dates.map((d) => byDate.get(d) ?? null),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, .1)',
+          fill: false,
+          tension: 0.3,
+          pointRadius: 3,
+          spanGaps: true,
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: `${weightGoal} kg goal`,
+          data: new Array(10).fill(weightGoal),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
+        y: {
+          beginAtZero: false,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: (v) => `${v} kg` },
+        },
+      },
+    },
+  });
+}
+
+function renderWellnessCaloriesChart(entries) {
+  const ctx = document.getElementById('wellness-calories-chart');
+
+  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+
+  const dates = lastNDates(10);
+  const byDate = new Map();
+  entries
+    .filter((e) => e.category === 'Calories' && e.amount !== null)
+    .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
+
+  wellnessCaloriesChart = upsertChart(wellnessCaloriesChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Calories',
+          data: dates.map((d) => byDate.get(d) || 0),
+          backgroundColor: '#f59e0b',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: `${calorieTarget} kcal target`,
+          data: new Array(10).fill(calorieTarget),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
+        y: {
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: (v) => `${v} kcal` },
+        },
+      },
+    },
+  });
+}
+
+function renderWellnessSleepChart(entries) {
+  const ctx = document.getElementById('wellness-sleep-chart');
+
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
+  const dates = lastNDates(10);
+  const byDate = new Map();
+  entries
+    .filter((e) => e.category === 'Sleep' && e.amount !== null)
+    .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
+
+  const sleepData = dates.map((d) => byDate.get(d) || 0);
+
+  wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Sleep',
+          data: sleepData,
+          backgroundColor: '#6366f1',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: `${sleepTarget} hr target`,
+          data: new Array(10).fill(sleepTarget),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
+        y: {
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: (v) => `${v} hr` },
+        },
+      },
+    },
+  });
+}
+
+// Convert any activity amount to minutes so steps and timed entries
+// are comparable on the same chart. ~100 steps/min is a typical walking pace.
+function toActivityMinutes(amount, unit) {
+  const u = (unit || '').toLowerCase().trim();
+  if (u === 'steps' || u === 'step') return Math.round(amount / 100);
+  if (u === 'hr' || u === 'hour' || u === 'hours') return Math.round(amount * 60);
+  return amount; // 'min' or unknown — use as-is
+}
+
+function renderWellnessActivityChart(entries) {
+  const ctx = document.getElementById('wellness-activity-chart');
+
+  const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
+
+  const dates = lastNDates(10);
+  const byDate = new Map();
+  entries
+    .filter((e) => e.category === 'Activity' && e.amount !== null)
+    .forEach((e) => {
+      const mins = toActivityMinutes(e.amount, e.unit);
+      byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
+    });
+
+  const activityData = dates.map((d) => byDate.get(d) || 0);
+  const hasData = activityData.some((v) => v > 0);
+
+  wellnessActivityChart = upsertChart(wellnessActivityChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Activity',
+          data: activityData,
+          backgroundColor: '#10b981',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: `${activityTarget} min target`,
+          data: new Array(10).fill(activityTarget),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: !hasData,
+          text: 'No activity logged yet — add a Walk, Run, or Workout entry to get started',
+          color: Chart.defaults.color,
+          font: { size: 12 },
+          padding: { top: 40 },
+        },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
+        y: {
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: (v) => `${v} min` },
+        },
+      },
+    },
+  });
+}
+
+function linearRegressionSlope(xs, ys) {
+  const n = xs.length;
+  const sumX = xs.reduce((a, b) => a + b, 0);
+  const sumY = ys.reduce((a, b) => a + b, 0);
+  const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0);
+  const sumX2 = xs.reduce((s, x) => s + x * x, 0);
+  const denom = n * sumX2 - sumX * sumX;
+  return denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+}
+
+function calcProjection(entries) {
+  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
+  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIso = isoFromDate(today);
+  const cutoff = new Date(today);
+  cutoff.setDate(today.getDate() - 14);
+  const cutoffIso = isoFromDate(cutoff);
+
+  const weightEntries = entries
+    .filter((e) => e.category === 'Weight' && e.amount !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (weightEntries.length < 2) return null;
+
+  const lastWeight = weightEntries[weightEntries.length - 1].amount;
+  if (Math.abs(lastWeight - weightGoal) < 0.1) return { status: 'reached' };
+
+  const recentEntries = entries.filter((e) => e.date >= cutoffIso && e.date <= todayIso);
+
+  const caloriesByDate = new Map();
+  const activityByDate = new Map();
+  const sleepByDate = new Map();
+
+  recentEntries.forEach((e) => {
+    if (e.category === 'Calories' && e.amount !== null) {
+      caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + e.amount);
+    } else if (e.category === 'Activity' && e.amount !== null) {
+      const mins = toActivityMinutes(e.amount, e.unit);
+      activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + mins);
+    } else if (e.category === 'Sleep' && e.amount !== null) {
+      sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
+    }
+  });
+
+  const avg = (map) => [...map.values()].reduce((a, b) => a + b, 0) / map.size;
+
+  let slope;
+  let method;
+
+  if (caloriesByDate.size > 0 || activityByDate.size > 0) {
+    const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
+    const avgActivityMins = activityByDate.size > 0 ? avg(activityByDate) : 0;
+    const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
+
+    // Negative balance = caloric deficit = weight loss
+    const balance = avgCalories - (calorieTarget + avgActivityMins * 5);
+    const baseSlope = balance / 7700;
+    const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
+    slope = baseSlope * sleepRatio;
+
+    const allPresent = caloriesByDate.size > 0 && activityByDate.size > 0 && sleepByDate.size > 0;
+    method = allPresent ? 'full' : 'partial';
+  } else {
+    const src = weightEntries.filter((e) => e.date >= cutoffIso);
+    const data = src.length >= 2 ? src : weightEntries;
+    slope = linearRegressionSlope(data.map((_, i) => i), data.map((e) => e.amount));
+    method = 'weight-only';
+  }
+
+  if (slope === 0) return { status: 'no-change', method };
+
+  const goingDown = weightGoal < lastWeight;
+  if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method };
+
+  const daysToGoal = Math.round((weightGoal - lastWeight) / slope);
+  const etaDate = new Date(today);
+  etaDate.setDate(today.getDate() + daysToGoal);
+
+  const cappedDays = Math.min(daysToGoal, 365);
+  const projectedPoints = [];
+  for (let d = 0; d <= cappedDays; d += 7) {
+    const pd = new Date(today);
+    pd.setDate(today.getDate() + d);
+    projectedPoints.push({ date: isoFromDate(pd), weight: Math.round((lastWeight + slope * d) * 10) / 10 });
+  }
+  if (daysToGoal <= 365) {
+    projectedPoints.push({ date: isoFromDate(etaDate), weight: weightGoal });
+  }
+
+  return { status: 'ok', slope, daysToGoal, etaDate, projectedPoints, method, weightGoal };
+}
+
+function renderWellnessProjectionChart(entries) {
+  const ctx = document.getElementById('wellness-projection-chart');
+  if (wellnessProjectionChart) wellnessProjectionChart.destroy();
+
+  const etaEl = document.getElementById('weight-projection-eta');
+  etaEl.textContent = '';
+
+  const weightEntries = entries
+    .filter((e) => e.category === 'Weight' && e.amount !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (weightEntries.length < 2) return;
+
+  const proj = calcProjection(entries);
+  if (!proj) return;
+
+  if (proj.status === 'reached') { etaEl.textContent = 'Goal reached! 🎉'; return; }
+  if (proj.status === 'no-change') { etaEl.textContent = 'No net change at current habits'; return; }
+  if (proj.status === 'wrong-direction') { etaEl.textContent = 'Current habits trend away from goal — projection unavailable'; return; }
+
+  const histLabels = weightEntries.map((e) => e.date);
+  const projLabels = proj.projectedPoints.map((p) => p.date);
+  const allLabels = [...new Set([...histLabels, ...projLabels])].sort();
+
+  const histMap = new Map(weightEntries.map((e) => [e.date, e.amount]));
+  const projMap = new Map(proj.projectedPoints.map((p) => [p.date, p.weight]));
+  const lastDate = histLabels[histLabels.length - 1];
+  const lastWeight = weightEntries[weightEntries.length - 1].amount;
+
+  // Daily history followed by weekly (then a single distant ETA) projected
+  // points must NOT be spaced as equal category ticks — that visually
+  // implies every gap is the same length. Plot on a true linear axis (day
+  // offset from the first date) instead, so a week gap actually takes up
+  // 7x the width of a one-day gap.
+  //
+  // Parse/format in UTC throughout: `new Date("YYYY-MM-DD")` parses as UTC
+  // midnight, and formatting that back with the LOCAL timezone can roll it
+  // back a day in any negative-UTC-offset zone — staying in UTC end-to-end
+  // avoids that mismatch.
+  const parseIsoDateUTC = (dateStr) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const firstDateMs = parseIsoDateUTC(allLabels[0]);
+  const dayOffset = (dateStr) => Math.round((parseIsoDateUTC(dateStr) - firstDateMs) / 86400000);
+  const offsetToDateLabel = (offset) =>
+    new Date(firstDateMs + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+  wellnessProjectionChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Actual Weight',
+          data: allLabels.map((d) => ({ x: dayOffset(d), y: histMap.get(d) ?? null })),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 2,
+          spanGaps: false,
+          order: 3,
+        },
+        {
+          label: 'Projected',
+          data: allLabels.map((d) => {
+            let y = null;
+            if (d === lastDate) y = lastWeight;
+            else if (d > lastDate) y = projMap.get(d) ?? null;
+            return { x: dayOffset(d), y };
+          }),
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,0.08)',
+          borderDash: [6, 4],
+          fill: true,
+          tension: 0,
+          pointRadius: 0,
+          spanGaps: false,
+          order: 2,
+        },
+        {
+          label: `${proj.weightGoal} kg goal`,
+          data: allLabels.map((d) => ({ x: dayOffset(d), y: proj.weightGoal })),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
+        tooltip: { callbacks: { title: (items) => offsetToDateLabel(items[0].parsed.x) } },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          ticks: { maxTicksLimit: 10, maxRotation: 0, callback: offsetToDateLabel },
+        },
+        y: {
+          beginAtZero: false,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: (v) => `${v} kg` },
+        },
+      },
+    },
+  });
+
+  const etaStr = proj.etaDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const note = proj.method === 'weight-only' ? ' · weight trend only'
+    : proj.method === 'partial' ? ' · partial habit data' : '';
+  etaEl.textContent = `Projected to reach ${proj.weightGoal} kg on ${etaStr} (~${proj.daysToGoal} days)${note}`;
 }
 
 function mean(values) {
@@ -704,9 +1188,8 @@ let savingsTrendChart = null;
 
 function renderSavingsTrendChart(months) {
   const ctx = document.getElementById('savings-trend-chart');
-  if (savingsTrendChart) savingsTrendChart.destroy();
 
-  savingsTrendChart = new Chart(ctx, {
+  savingsTrendChart = upsertChart(savingsTrendChart, ctx, {
     type: 'line',
     data: {
       labels: months.map((m) => m.label),
@@ -1032,15 +1515,13 @@ async function renderWorldMapChart(visitedCountries) {
   // rather than destroy a chart instance created after this call started.
   if (canvas.dataset.rendering === 'stale') return;
 
-  if (worldMapChart) { worldMapChart.destroy(); worldMapChart = null; }
-
   const countries = ChartGeo.topojson.feature(topology, topology.objects.countries).features;
   const visited = new Set(visitedCountries.map((c) => c.toLowerCase()));
   const dark = document.documentElement.dataset.theme === 'dark';
   const visitedColor = '#3b82f6';
   const unvisitedColor = dark ? '#334155' : '#e5e7eb';
 
-  worldMapChart = new Chart(canvas, {
+  worldMapChart = upsertChart(worldMapChart, canvas, {
     type: 'choropleth',
     data: {
       labels: countries.map((f) => f.properties.name),

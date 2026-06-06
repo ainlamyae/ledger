@@ -178,23 +178,13 @@ function focusableElements(container) {
   )].filter((el) => el.offsetParent !== null);
 }
 
-// Native date/time inputs pop their picker open the instant they receive
-// focus (as a full-screen wheel on mobile), so they make a poor landing spot
-// for auto-focus on modal open even though they're a fine Tab stop. Prefer
-// the first focusable field that won't do that; fall back to the true first
-// element if every field in the modal happens to be a date/time input.
-const AUTO_FOCUS_SKIP_TYPES = new Set(['date', 'time', 'month', 'week', 'datetime-local']);
-
-function initialFocusTarget(container) {
-  const focusable = focusableElements(container);
-  return focusable.find((el) => !(el.tagName === 'INPUT' && AUTO_FOCUS_SKIP_TYPES.has(el.type))) || focusable[0];
-}
-
 // Each modal manages its own hidden flag from wherever it's opened/closed
 // (transactions.js, accounts.js, timesheet.js, etc.) — rather than touching
-// every call site, watch the `hidden` attribute here to move focus into the
-// modal on open and back to whatever triggered it on close, so keyboard and
-// screen-reader users land somewhere sensible either way.
+// every call site, watch the `hidden` attribute here to send focus back to
+// whatever triggered the modal once it closes. Focus is deliberately left
+// alone on open: auto-focusing any field (even a plain text one) pops the
+// keyboard on mobile and, for date/time/select fields, the native picker —
+// so the form should just appear with nothing selected.
 function setupModalFocusManagement() {
   SHORTCUT_MODAL_IDS.forEach((id) => {
     const modal = document.getElementById(id);
@@ -204,7 +194,6 @@ function setupModalFocusManagement() {
     new MutationObserver(() => {
       if (!modal.hidden) {
         lastFocused = document.activeElement;
-        initialFocusTarget(modal)?.focus();
       } else if (lastFocused) {
         lastFocused.focus();
         lastFocused = null;

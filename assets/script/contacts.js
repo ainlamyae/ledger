@@ -158,12 +158,17 @@ function renderContactsList() {
     const allPhones = [c.phone1, c.phone2, c.phone3].filter(Boolean).join(', ');
     const allEmails = [c.email1, c.email2].filter(Boolean).join(', ');
 
+    // Names are masked character-by-character (like Notes elsewhere) since
+    // letters carry the identifying content; phone numbers are digit-masked
+    // (like currency) so the "(***) ***-****" shape stays recognizable while
+    // hiding the actual number; email is full-masked since the letters
+    // before the @ are exactly the sensitive part.
     tr.append(
       checkboxCell,
-      makeCell(c.first, fullName),
-      makeCell(c.last),
-      makeCell(c.phone1, allPhones),
-      makeCell(c.email1, allEmails),
+      makeCell(privacyMode ? maskText(c.first) : c.first, privacyMode ? maskText(fullName) : fullName),
+      makeCell(privacyMode ? maskText(c.last) : c.last),
+      makeCell(privacyMode ? maskDigits(c.phone1) : c.phone1, privacyMode ? maskDigits(allPhones) : allPhones),
+      makeCell(privacyMode ? maskText(c.email1) : c.email1, privacyMode ? maskText(allEmails) : allEmails),
       makeCell(c.tags),
     );
 

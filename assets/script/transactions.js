@@ -21,13 +21,8 @@ async function initTransactions(forceRefresh = false) {
       batchGetValues([`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.INSIGHT}!A2:A200`], VALUE_PARAMS),
     ]);
 
-    const sheet = meta.sheets.find((s) => s.properties.title === CONFIG.SHEETS.TRANSACTIONS);
-    if (!sheet) {
-      const available = meta.sheets.map((s) => s.properties.title).join(', ');
-      throw new Error(`Sheet tab "${CONFIG.SHEETS.TRANSACTIONS}" not found. Available tabs: ${available}`);
-    }
     lists = {
-      transactionsSheetId: sheet.properties.sheetId,
+      transactionsSheetId: findSheetId(meta, CONFIG.SHEETS.TRANSACTIONS),
       accountOptions: (listsResp.valueRanges[0].values || []).map((r) => r[0]).filter(Boolean),
       // Insight!A2:A200 repeats each category once per Type plus one
       // blank-Type total row, so collapse to a unique list.
@@ -97,47 +92,10 @@ function updateBulkActionsUI() {
 }
 
 function setupTransactionSorting() {
-  document.querySelectorAll('#transactions-table th.sortable').forEach((th) => {
-    const label = document.createElement('span');
-    label.textContent = th.textContent;
-
-    const indicator = document.createElement('span');
-    indicator.className = 'sort-indicator';
-
-    th.textContent = '';
-    th.append(label, indicator);
-    th.setAttribute('tabindex', '0');
-
-    th.addEventListener('click', () => {
-      const key = th.dataset.sort;
-      if (txSort.key === key) {
-        txSort.dir *= -1;
-      } else {
-        txSort.key = key;
-        txSort.dir = 1;
-      }
-      updateTransactionSortIndicators();
-      currentPage = 1;
-      selectedRows.clear();
-      renderTransactions();
-    });
-    th.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        th.click();
-      }
-    });
-  });
-}
-
-function updateTransactionSortIndicators() {
-  document.querySelectorAll('#transactions-table th.sortable').forEach((th) => {
-    const indicator = th.querySelector('.sort-indicator');
-    if (th.dataset.sort === txSort.key) {
-      indicator.textContent = txSort.dir === 1 ? ' ▲' : ' ▼';
-    } else {
-      indicator.textContent = '';
-    }
+  makeSortableHeaders('#transactions-table', txSort, () => {
+    currentPage = 1;
+    selectedRows.clear();
+    renderTransactions();
   });
 }
 
@@ -328,28 +286,11 @@ function renderTransactions() {
     amountCell.className = t.amount >= 0 ? 'income' : 'expense';
 
     const actionsCell = document.createElement('td');
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn';
-    editBtn.textContent = '✏️';
-    editBtn.title = 'Edit';
-    editBtn.setAttribute('aria-label', 'Edit');
-    editBtn.addEventListener('click', () => openTransactionForm(t));
-
-    const dupBtn = document.createElement('button');
-    dupBtn.className = 'btn';
-    dupBtn.textContent = '📋';
-    dupBtn.title = 'Duplicate';
-    dupBtn.setAttribute('aria-label', 'Duplicate');
-    dupBtn.addEventListener('click', () => openTransactionForm(t, true));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn';
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.title = 'Delete';
-    deleteBtn.setAttribute('aria-label', 'Delete');
-    deleteBtn.addEventListener('click', () => deleteTransaction(t.row));
-
-    actionsCell.append(editBtn, dupBtn, deleteBtn);
+    actionsCell.append(
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTransactionForm(t) }),
+      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openTransactionForm(t, true) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTransaction(t.row) }),
+    );
 
     tr.append(checkboxCell, dateCell, accountCell, payeeCell, categoryCell, descCell, amountCell, actionsCell);
     tbody.appendChild(tr);
@@ -368,38 +309,15 @@ function updateSelectAllCheckbox(pageItems) {
 }
 
 function renderPagination(totalPages) {
-  const container = document.getElementById('tx-pagination');
-  container.innerHTML = '';
-  if (totalPages <= 1) return;
-
-  const prev = document.createElement('button');
-  prev.className = 'btn';
-  prev.textContent = '⬅️';
-  prev.title = 'Previous page';
-  prev.setAttribute('aria-label', 'Previous page');
-  prev.disabled = currentPage === 1;
-  prev.addEventListener('click', () => {
-    currentPage--;
-    selectedRows.clear();
-    renderTransactions();
+  renderPager('tx-pagination', {
+    page: currentPage,
+    totalPages,
+    onChange: (p) => {
+      currentPage = p;
+      selectedRows.clear();
+      renderTransactions();
+    },
   });
-
-  const info = document.createElement('span');
-  info.textContent = `${currentPage} of ${totalPages}`;
-
-  const next = document.createElement('button');
-  next.className = 'btn';
-  next.textContent = '➡️';
-  next.title = 'Next page';
-  next.setAttribute('aria-label', 'Next page');
-  next.disabled = currentPage === totalPages;
-  next.addEventListener('click', () => {
-    currentPage++;
-    selectedRows.clear();
-    renderTransactions();
-  });
-
-  container.append(prev, info, next);
 }
 
 function populateSelect(select, options, selected) {
@@ -432,7 +350,7 @@ function openTransactionForm(transaction, duplicate = false) {
   // Another" should be offered just like it is for a brand-new transaction.
   document.getElementById('tx-save-add-btn').hidden = !!transaction && !duplicate;
 
-  document.getElementById('tx-form-error').hidden = true;
+  clearFieldError('tx-form-error');
   document.getElementById('tx-modal').hidden = false;
 }
 
@@ -448,9 +366,7 @@ async function submitTransactionForm(event) {
 
   const amount = evaluateNumberExpression(document.getElementById('tx-amount').value);
   if (amount === null) {
-    const errorEl = document.getElementById('tx-form-error');
-    errorEl.textContent = 'Amount must be a number or a simple expression, e.g. =-9.97-1.30';
-    errorEl.hidden = false;
+    showFieldError('tx-form-error', 'Amount must be a number or a simple expression, e.g. =-9.97-1.30');
     return;
   }
 
@@ -479,16 +395,14 @@ async function submitTransactionForm(event) {
       renderTransactions();
       document.getElementById('tx-description').value = '';
       document.getElementById('tx-amount').value = '';
-      document.getElementById('tx-form-error').hidden = true;
+      clearFieldError('tx-form-error');
       transactionsDirtyFromAdd = true;
     } else {
       await refreshTransactions(true);
       closeTransactionForm();
     }
   } catch (err) {
-    const errorEl = document.getElementById('tx-form-error');
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('tx-form-error', err.message);
   }
 }
 
@@ -518,7 +432,7 @@ function openBulkEditForm() {
   accountSelect.insertAdjacentHTML('afterbegin', '<option value="">— Leave unchanged —</option>');
   if (!sharedAccount) accountSelect.value = '';
 
-  document.getElementById('tx-bulk-edit-form-error').hidden = true;
+  clearFieldError('tx-bulk-edit-form-error');
   document.getElementById('tx-bulk-edit-modal').hidden = false;
 }
 
@@ -529,7 +443,6 @@ function closeBulkEditForm() {
 async function submitBulkEditForm(event) {
   event.preventDefault();
 
-  const errorEl = document.getElementById('tx-bulk-edit-form-error');
   const patch = {};
 
   const date = document.getElementById('tx-bulk-date').value;
@@ -547,16 +460,14 @@ async function submitBulkEditForm(event) {
   if (amountInput) {
     const amount = evaluateNumberExpression(amountInput);
     if (amount === null) {
-      errorEl.textContent = 'Amount must be a number or a simple expression, e.g. =-9.97-1.30';
-      errorEl.hidden = false;
+      showFieldError('tx-bulk-edit-form-error', 'Amount must be a number or a simple expression, e.g. =-9.97-1.30');
       return;
     }
     patch.amount = amount;
   }
 
   if (Object.keys(patch).length === 0) {
-    errorEl.textContent = 'Change at least one field.';
-    errorEl.hidden = false;
+    showFieldError('tx-bulk-edit-form-error', 'Change at least one field.');
     return;
   }
 
@@ -575,8 +486,7 @@ async function submitBulkEditForm(event) {
     closeBulkEditForm();
     showUndoToast(`${selected.length} transaction(s) updated.`, () => restoreBulkEdit(snapshots));
   } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('tx-bulk-edit-form-error', err.message);
   }
 }
 
@@ -595,11 +505,9 @@ async function restoreBulkEdit(snapshots) {
 }
 
 async function deleteTransaction(row) {
-  if (!confirm('Delete this transaction?')) return;
-
   const tx = allTransactions.find((t) => t.row === row);
 
-  try {
+  await confirmAndDelete('Delete this transaction?', async () => {
     await batchUpdate([{
       deleteDimension: {
         range: { sheetId: transactionsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
@@ -607,34 +515,29 @@ async function deleteTransaction(row) {
     }]);
     await refreshTransactions(true);
     if (tx) showUndoToast('Transaction deleted.', () => restoreTransactions([tx]));
-  } catch (err) {
-    alert(`Failed to delete: ${err.message}`);
-  }
+  });
 }
 
 async function bulkDeleteTransactions() {
   const selected = allTransactions.filter((t) => selectedRows.has(t.row));
   if (selected.length === 0) return;
-  if (!confirm(`Delete ${selected.length} selected transaction(s)?`)) return;
 
-  // Descending by row so each request's startIndex/endIndex is still valid
-  // by the time the API processes the next one in the same batchUpdate call.
-  const requests = [...selected]
-    .sort((a, b) => b.row - a.row)
-    .map((t) => ({
-      deleteDimension: {
-        range: { sheetId: transactionsSheetId, dimension: 'ROWS', startIndex: t.row - 1, endIndex: t.row },
-      },
-    }));
+  await confirmAndDelete(`Delete ${selected.length} selected transaction(s)?`, async () => {
+    // Descending by row so each request's startIndex/endIndex is still valid
+    // by the time the API processes the next one in the same batchUpdate call.
+    const requests = [...selected]
+      .sort((a, b) => b.row - a.row)
+      .map((t) => ({
+        deleteDimension: {
+          range: { sheetId: transactionsSheetId, dimension: 'ROWS', startIndex: t.row - 1, endIndex: t.row },
+        },
+      }));
 
-  try {
     await batchUpdate(requests);
     selectedRows.clear();
     await refreshTransactions(true);
     showUndoToast(`${selected.length} transaction(s) deleted.`, () => restoreTransactions(selected));
-  } catch (err) {
-    alert(`Failed to delete: ${err.message}`);
-  }
+  });
 }
 
 // Restores deleted transactions by re-appending their data — they land back

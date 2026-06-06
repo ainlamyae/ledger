@@ -77,11 +77,19 @@ function computePrayerTimes({ lat, lon, date, utcOffsetHours }) {
   const dhuhr = 12 - sun.equation + utcOffsetHours - lon / 15;
   const fajrOffset = sunAngleHours(TEHRAN_FAJR_ANGLE, lat, sun.declination);
   const maghribOffset = sunAngleHours(TEHRAN_MAGHRIB_ANGLE, lat, sun.declination);
+  const fajr = dhuhr - fajrOffset;
+  const maghrib = dhuhr + maghribOffset;
+
+  // Standard method: the midpoint between Maghrib and the next day's Fajr.
+  // Fajr barely shifts night to night, so today's Fajr + 24h stands in for
+  // tomorrow's without needing a second sun-position calculation.
+  const midnight = (maghrib + fajr + 24) / 2;
 
   return {
-    fajr: hoursToHHMM(dhuhr - fajrOffset),
+    fajr: hoursToHHMM(fajr),
     dhuhr: hoursToHHMM(dhuhr),
-    maghrib: hoursToHHMM(dhuhr + maghribOffset),
+    maghrib: hoursToHHMM(maghrib),
+    midnight: hoursToHHMM(midnight),
   };
 }
 
@@ -469,9 +477,9 @@ function renderClock() {
   }
 }
 
-// Renders {day} {MonthName} ({MonthNumber}) {year} for the given ICU
-// calendar system, e.g. "5 July (7) 2026" or "14 Tir (4) 1405".
-function formatCalendarDate(date, calendar) {
+// Returns { day, month, year } for the given ICU calendar system, e.g.
+// { day: '5', month: 'July (7)', year: '2026' } or { day: '14', month: 'Tir (4)', year: '1405' }.
+function formatCalendarDateParts(date, calendar) {
   const locale = `en-US-u-ca-${calendar}`;
   const numericParts = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric', year: 'numeric' }).formatToParts(date);
   const monthNameParts = new Intl.DateTimeFormat(locale, { month: 'long' }).formatToParts(date);
@@ -479,25 +487,51 @@ function formatCalendarDate(date, calendar) {
   const get = (parts, type) => (parts.find((p) => p.type === type) || {}).value;
 
   const day = get(numericParts, 'day');
-  const month = get(numericParts, 'month');
+  const monthNumber = get(numericParts, 'month');
   const year = get(numericParts, 'year');
   const monthName = get(monthNameParts, 'month');
 
-  return `${day} ${monthName} (${month}) ${year}`;
+  return { day, month: `${monthName} (${monthNumber})`, year };
 }
 
-function safeFormatCalendarDate(date, calendar) {
+function safeFormatCalendarDateParts(date, calendar) {
   try {
-    return formatCalendarDate(date, calendar);
+    return formatCalendarDateParts(date, calendar);
   } catch {
-    return '—';
+    return { day: '—', month: '—', year: '—' };
   }
 }
 
+// Renders each calendar's day/month/year into their own column so the three
+// rows (Gregorian/Shamsi/Ghamari) line up under each other.
+function renderDateWidgetRow(elementId, icon, date, calendar) {
+  const { day, month, year } = safeFormatCalendarDateParts(date, calendar);
+  const el = document.getElementById(elementId);
+  el.innerHTML = '';
+
+  const iconEl = document.createElement('span');
+  iconEl.className = 'widget-date-icon';
+  iconEl.textContent = icon;
+
+  const dayEl = document.createElement('span');
+  dayEl.className = 'widget-date-day';
+  dayEl.textContent = day;
+
+  const monthEl = document.createElement('span');
+  monthEl.className = 'widget-date-month';
+  monthEl.textContent = month;
+
+  const yearEl = document.createElement('span');
+  yearEl.className = 'widget-date-year';
+  yearEl.textContent = year;
+
+  el.append(iconEl, dayEl, monthEl, yearEl);
+}
+
 function renderDateWidget(date = new Date()) {
-  document.getElementById('widget-date-gregorian').textContent = `✝️ ${safeFormatCalendarDate(date, 'gregory')}`;
-  document.getElementById('widget-date-shamsi').textContent = `🌞 ${safeFormatCalendarDate(date, 'persian')}`;
-  document.getElementById('widget-date-ghamari').textContent = `🌜 ${safeFormatCalendarDate(date, 'islamic')}`;
+  renderDateWidgetRow('widget-date-gregorian', '✝️', date, 'gregory');
+  renderDateWidgetRow('widget-date-shamsi', '🌞', date, 'persian');
+  renderDateWidgetRow('widget-date-ghamari', '🌜', date, 'islamic');
 }
 
 function initPrayerWidget(location) {
@@ -515,6 +549,7 @@ function initPrayerWidget(location) {
   document.getElementById('widget-prayer-fajr').textContent = times.fajr;
   document.getElementById('widget-prayer-dhuhr').textContent = times.dhuhr;
   document.getElementById('widget-prayer-maghrib').textContent = times.maghrib;
+  document.getElementById('widget-prayer-midnight').textContent = times.midnight;
 }
 
 async function fetchWeather(lat, lon) {

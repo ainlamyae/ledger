@@ -9,10 +9,8 @@ let travelSheetId = null;
 let editingTravelRow = null;
 
 async function fetchTravelSheetId() {
-  const { sheets } = await getSpreadsheetMetadata();
-  const sheet = sheets.find((s) => s.properties.title === CONFIG.SHEETS.TRAVEL);
-  if (!sheet) throw new Error(`Sheet "${CONFIG.SHEETS.TRAVEL}" not found`);
-  return sheet.properties.sheetId;
+  const metadata = await getSpreadsheetMetadata();
+  return findSheetId(metadata, CONFIG.SHEETS.TRAVEL);
 }
 
 async function initTravel(forceRefresh = false) {
@@ -35,39 +33,9 @@ async function initTravel(forceRefresh = false) {
 }
 
 function setupTravelSorting() {
-  document.querySelectorAll('#travel-table th.sortable').forEach((th) => {
-    const label = document.createElement('span');
-    label.textContent = th.textContent;
-    const indicator = document.createElement('span');
-    indicator.className = 'sort-indicator';
-    th.textContent = '';
-    th.append(label, indicator);
-    th.setAttribute('tabindex', '0');
-
-    th.addEventListener('click', () => {
-      const key = th.dataset.sort;
-      if (travelSort.key === key) {
-        travelSort.dir *= -1;
-      } else {
-        travelSort.key = key;
-        travelSort.dir = 1;
-      }
-      updateTravelSortIndicators();
-      travelCurrentPage = 1;
-      renderTravelList();
-    });
-    th.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); }
-    });
-  });
-  updateTravelSortIndicators();
-}
-
-function updateTravelSortIndicators() {
-  document.querySelectorAll('#travel-table th.sortable').forEach((th) => {
-    const indicator = th.querySelector('.sort-indicator');
-    if (!indicator) return;
-    indicator.textContent = th.dataset.sort === travelSort.key ? (travelSort.dir === 1 ? ' ▲' : ' ▼') : '';
+  makeSortableHeaders('#travel-table', travelSort, () => {
+    travelCurrentPage = 1;
+    renderTravelList();
   });
 }
 
@@ -134,12 +102,6 @@ function renderTravelList() {
   pageItems.forEach((t) => {
     const tr = document.createElement('tr');
 
-    const makeCell = (text) => {
-      const td = document.createElement('td');
-      td.textContent = text;
-      return td;
-    };
-
     tr.append(
       makeCell(t.date),
       makeCell(t.type),
@@ -151,22 +113,10 @@ function renderTravelList() {
     );
 
     const actionsCell = document.createElement('td');
-
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn';
-    editBtn.textContent = '✏️';
-    editBtn.title = 'Edit';
-    editBtn.setAttribute('aria-label', 'Edit');
-    editBtn.addEventListener('click', () => openTravelForm(t));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn';
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.title = 'Delete';
-    deleteBtn.setAttribute('aria-label', 'Delete');
-    deleteBtn.addEventListener('click', () => deleteTravelEntry(t));
-
-    actionsCell.append(editBtn, deleteBtn);
+    actionsCell.append(
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTravelForm(t) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTravelEntry(t) }),
+    );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);
   });
@@ -175,30 +125,14 @@ function renderTravelList() {
 }
 
 function renderTravelPagination(totalPages) {
-  const container = document.getElementById('travel-pagination');
-  container.innerHTML = '';
-  if (totalPages <= 1) return;
-
-  const prev = document.createElement('button');
-  prev.className = 'btn';
-  prev.textContent = '⬅️';
-  prev.title = 'Previous page';
-  prev.setAttribute('aria-label', 'Previous page');
-  prev.disabled = travelCurrentPage === 1;
-  prev.addEventListener('click', () => { travelCurrentPage--; renderTravelList(); });
-
-  const info = document.createElement('span');
-  info.textContent = `${travelCurrentPage} of ${totalPages}`;
-
-  const next = document.createElement('button');
-  next.className = 'btn';
-  next.textContent = '➡️';
-  next.title = 'Next page';
-  next.setAttribute('aria-label', 'Next page');
-  next.disabled = travelCurrentPage === totalPages;
-  next.addEventListener('click', () => { travelCurrentPage++; renderTravelList(); });
-
-  container.append(prev, info, next);
+  renderPager('travel-pagination', {
+    page: travelCurrentPage,
+    totalPages,
+    onChange: (p) => {
+      travelCurrentPage = p;
+      renderTravelList();
+    },
+  });
 }
 
 const TRAVEL_FIELD_IDS = ['country-city', 'port', 'type', 'via', 'date', 'time', 'reason', 'detail'];
@@ -216,7 +150,7 @@ function openTravelForm(travel) {
     document.getElementById(`travel-${id}`).value = values[i];
   });
 
-  document.getElementById('travel-form-error').hidden = true;
+  clearFieldError('travel-form-error');
   document.getElementById('travel-modal').hidden = false;
 }
 
@@ -227,7 +161,6 @@ function closeTravelForm() {
 async function submitTravelForm(event) {
   event.preventDefault();
 
-  const errorEl = document.getElementById('travel-form-error');
   const rowData = TRAVEL_FIELD_IDS.map((id) => document.getElementById(`travel-${id}`).value.trim());
 
   try {
@@ -239,15 +172,12 @@ async function submitTravelForm(event) {
     await refreshTravel(true);
     closeTravelForm();
   } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('travel-form-error', err.message);
   }
 }
 
 async function deleteTravelEntry(travel) {
-  if (!confirm(`Delete this travel entry (${travel.countryCity || travel.port})?`)) return;
-
-  try {
+  await confirmAndDelete(`Delete this travel entry (${travel.countryCity || travel.port})?`, async () => {
     if (!travelSheetId) travelSheetId = await fetchTravelSheetId();
     await batchUpdate([{
       deleteDimension: {
@@ -260,7 +190,5 @@ async function deleteTravelEntry(travel) {
       },
     }]);
     await refreshTravel(true);
-  } catch (err) {
-    alert(`Couldn't delete travel entry: ${err.message}`);
-  }
+  }, "Couldn't delete travel entry");
 }

@@ -13,12 +13,13 @@ Split it into individual food items. For each item, provide:
 - "query": a plain, generic food name suitable for searching a nutrition database (not a brand name)
 - "grams": your best real-world estimate of the total gram weight for the stated amount
 - "kcalPer100gFallback": your best estimate of calories per 100g for this food
+- "proteinPer100gFallback": your best estimate of grams of protein per 100g for this food
 
-Do not calculate the total calories yourself — that happens outside this response.
+Do not calculate the total calories or protein yourself — that happens outside this response.
 Also rewrite the whole description as a short, standardized summary (e.g. "2 eggs, 1 toast, 1 tbsp butter").
 
 Respond with ONLY a JSON object, no other text, in exactly this shape:
-{"items": [{"query": "<generic food name>", "grams": <number>, "kcalPer100gFallback": <number>}, ...],
+{"items": [{"query": "<generic food name>", "grams": <number>, "kcalPer100gFallback": <number>, "proteinPer100gFallback": <number>}, ...],
  "notes": "<short standardized ingredient summary>"}`;
 
 async function groqExtractIngredients(notesText) {
@@ -70,7 +71,7 @@ async function groqExtractIngredients(notesText) {
   // invalid JSON, but the arithmetic itself is fine. Evaluate it ourselves
   // (exact, unlike asking the model to do it) rather than rejecting it.
   const jsonSlice = content.slice(jsonStart, jsonEnd + 1)
-    .replace(/("(?:grams|kcalPer100gFallback)"\s*:\s*)([^,}]+)/g, (match, prefix, rawValue) => {
+    .replace(/("(?:grams|kcalPer100gFallback|proteinPer100gFallback)"\s*:\s*)([^,}]+)/g, (match, prefix, rawValue) => {
       const trimmed = rawValue.trim();
       if (!Number.isNaN(Number(trimmed))) return match;
       if (!/^[\d.\s*+\-/()]+$/.test(trimmed)) return match;
@@ -98,9 +99,10 @@ async function groqExtractIngredients(notesText) {
     query: item.query,
     grams: parseFloat(item.grams),
     kcalPer100gFallback: parseFloat(item.kcalPer100gFallback),
+    proteinPer100gFallback: parseFloat(item.proteinPer100gFallback),
   }));
-  if (items.some((item) => !item.query || Number.isNaN(item.grams) || Number.isNaN(item.kcalPer100gFallback))) {
-    fail('an item is missing query/grams/kcalPer100gFallback');
+  if (items.some((item) => !item.query || Number.isNaN(item.grams) || Number.isNaN(item.kcalPer100gFallback) || Number.isNaN(item.proteinPer100gFallback))) {
+    fail('an item is missing query/grams/kcalPer100gFallback/proteinPer100gFallback');
   }
 
   return { items, notes: parsed.notes };

@@ -29,6 +29,7 @@ const PROJ_SETTING_KEYS = [
   'PROJ_CAL_KG_PER_KCAL_DAY',
   'PROJ_ACTIVITY_KG_PER_MIN_DAY',
   'PROJ_SLEEP_KG_PER_HOUR_DAY',
+  'PROJ_PROTEIN_KG_PER_G_DAY',
   'PROJ_CALIBRATED_AT',
   'PROJ_CALIBRATION_R2',
   'PROJ_CALIBRATION_SAMPLES',
@@ -80,11 +81,12 @@ function closeCalibrationModal() {
 // projection must agree on what "average calories" means, or the fitted
 // coefficients end up calibrated against a quantity calcProjection() never
 // actually feeds them.
-function buildCalibrationSamples(entries, sleepTarget) {
+function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
   const weightSums = new Map();
   const caloriesByDate = new Map();
   const activityByDate = new Map();
   const sleepByDate = new Map();
+  const proteinByDate = new Map();
 
   entries.forEach((e) => {
     if (e.amount === null) return;
@@ -93,8 +95,11 @@ function buildCalibrationSamples(entries, sleepTarget) {
       cur.sum += e.amount;
       cur.count += 1;
       weightSums.set(e.date, cur);
-    } else if (e.category === 'Calories') {
+    } else if (e.category === 'Calories' || e.category === 'Calories; Protein') {
       caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + e.amount);
+      if (e.category === 'Calories; Protein' && e.amount2 !== null) {
+        proteinByDate.set(e.date, (proteinByDate.get(e.date) || 0) + e.amount2);
+      }
     } else if (e.category === 'Activity') {
       const mins = toActivityMinutes(e.amount, e.unit);
       activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + mins);
@@ -134,6 +139,7 @@ function buildCalibrationSamples(entries, sleepTarget) {
 
     const actSlice = sliceByRange(activityByDate, dateA, dateB);
     const sleepSlice = sliceByRange(sleepByDate, dateA, dateB);
+    const proteinSlice = sliceByRange(proteinByDate, dateA, dateB);
 
     samples.push({
       days,
@@ -141,6 +147,7 @@ function buildCalibrationSamples(entries, sleepTarget) {
       avgCalories: avg(calSlice),
       avgActivityMins: actSlice.size > 0 ? avg(actSlice) : 0,
       avgSleepHours: sleepSlice.size > 0 ? avg(sleepSlice) : sleepTarget,
+      avgProteinG: proteinSlice.size > 0 ? avg(proteinSlice) : proteinTarget,
     });
   }
 
@@ -173,17 +180,17 @@ function solveLinearSystem(A, b) {
 
 // Weighted least squares (weight = days, capped, so one abnormally long gap
 // can't dominate the fit) of:
-//   ratePerDay ≈ β0 + β1·(avgCalories−calorieTarget) + β2·avgActivityMins + β3·(avgSleepHours−sleepTarget)
-// Centering calories/sleep on the user's existing target settings makes β0
-// a clean "baseline kg/day drift my logged habits don't explain" term
-// (adaptive thermogenesis / intake under-reporting / noise) — something the
-// generic formula has no provision for at all.
-function fitWeightedOLS(samples, calorieTarget, sleepTarget) {
-  const X = samples.map((s) => [1, s.avgCalories - calorieTarget, s.avgActivityMins, s.avgSleepHours - sleepTarget]);
+//   ratePerDay ≈ β0 + β1·(avgCalories−calorieTarget) + β2·avgActivityMins + β3·(avgSleepHours−sleepTarget) + β4·(avgProteinG−proteinTarget)
+// Centering calories/sleep/protein on the user's existing target settings
+// makes β0 a clean "baseline kg/day drift my logged habits don't explain"
+// term (adaptive thermogenesis / intake under-reporting / noise) —
+// something the generic formula has no provision for at all.
+function fitWeightedOLS(samples, calorieTarget, sleepTarget, proteinTarget) {
+  const X = samples.map((s) => [1, s.avgCalories - calorieTarget, s.avgActivityMins, s.avgSleepHours - sleepTarget, s.avgProteinG - proteinTarget]);
   const y = samples.map((s) => s.ratePerDay);
   const w = samples.map((s) => Math.min(s.days, PROJ_CALIBRATION_MAX_INTERVAL_WEIGHT_DAYS));
 
-  const k = 4;
+  const k = 5;
   const ATA = Array.from({ length: k }, () => new Array(k).fill(0));
   const ATy = new Array(k).fill(0);
 
@@ -202,13 +209,13 @@ function fitWeightedOLS(samples, calorieTarget, sleepTarget) {
   let ssRes = 0;
   let ssTot = 0;
   samples.forEach((_, i) => {
-    const yHat = beta[0] * X[i][0] + beta[1] * X[i][1] + beta[2] * X[i][2] + beta[3] * X[i][3];
+    const yHat = beta[0] * X[i][0] + beta[1] * X[i][1] + beta[2] * X[i][2] + beta[3] * X[i][3] + beta[4] * X[i][4];
     ssRes += w[i] * (y[i] - yHat) ** 2;
     ssTot += w[i] * (y[i] - yMeanW) ** 2;
   });
   const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
 
-  return { status: 'ok', beta0: beta[0], betaCal: beta[1], betaAct: beta[2], betaSleep: beta[3], r2, n: samples.length };
+  return { status: 'ok', beta0: beta[0], betaCal: beta[1], betaAct: beta[2], betaSleep: beta[3], betaProtein: beta[4], r2, n: samples.length };
 }
 
 // Guardrails independent of the fit-time solver succeeding — a technically
@@ -247,6 +254,7 @@ function validateCalibration(fit, samples) {
 function runCalibration() {
   const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
 
   const summary = document.getElementById('calibration-summary');
   const saveBtn = document.getElementById('calibration-save-btn');
@@ -254,14 +262,14 @@ function runCalibration() {
   saveBtn.disabled = true;
   lastCalibrationFit = null;
 
-  const { samples, excludedCount } = buildCalibrationSamples(allWellnessEntries, sleepTarget);
+  const { samples, excludedCount } = buildCalibrationSamples(allWellnessEntries, sleepTarget, proteinTarget);
 
   if (samples.length < PROJ_CALIBRATION_MIN_SAMPLES) {
     summary.innerHTML = `<p>Only ${samples.length} usable weigh-in interval(s) found (need at least ${PROJ_CALIBRATION_MIN_SAMPLES}, each with calorie logs covering at least half the interval). Log Weight alongside Calories more consistently, then try again.</p>`;
     return;
   }
 
-  const fit = fitWeightedOLS(samples, calorieTarget, sleepTarget);
+  const fit = fitWeightedOLS(samples, calorieTarget, sleepTarget, proteinTarget);
   if (fit.status !== 'ok') {
     summary.innerHTML = '<p>Could not fit a stable model from this history — try logging more varied calorie intake alongside your weigh-ins.</p>';
     return;
@@ -283,7 +291,8 @@ function runCalibration() {
     <tr><td>Energy density</td><td>${effectiveKcalPerKg !== null ? `~${effectiveKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(generic: 7,700)</span>` : 'n/a'}</td></tr>
     <tr><td>Activity</td><td>${activityKcalEquivPerMin !== null ? `~${activityKcalEquivPerMin} kcal/min-equivalent <span class="hint">(generic: 5)</span>` : `${(fit.betaAct * 1000).toFixed(1)} g/day per active minute`}</td></tr>
     <tr><td>Sleep</td><td>${(fit.betaSleep * 1000).toFixed(0)} g/day per hour above/below your ${sleepTarget} hr target</td></tr>
-    <tr><td>Baseline drift</td><td>${(fit.beta0 * 1000).toFixed(0)} g/day unexplained by logged intake/activity/sleep</td></tr>
+    <tr><td>Protein</td><td>${(fit.betaProtein * 1000).toFixed(0)} g/day per gram above/below your ${proteinTarget} g target</td></tr>
+    <tr><td>Baseline drift</td><td>${(fit.beta0 * 1000).toFixed(0)} g/day unexplained by logged intake/activity/sleep/protein</td></tr>
   </table>`;
 
   const validation = validateCalibration(fit, samples);
@@ -323,6 +332,7 @@ async function saveCalibratedGains() {
       PROJ_CAL_KG_PER_KCAL_DAY: fit.betaCal,
       PROJ_ACTIVITY_KG_PER_MIN_DAY: fit.betaAct,
       PROJ_SLEEP_KG_PER_HOUR_DAY: fit.betaSleep,
+      PROJ_PROTEIN_KG_PER_G_DAY: fit.betaProtein,
       PROJ_CALIBRATED_AT: new Date().toISOString().slice(0, 10),
       PROJ_CALIBRATION_R2: Math.round(fit.r2 * 1000) / 1000,
       PROJ_CALIBRATION_SAMPLES: fit.n,

@@ -73,7 +73,11 @@ function renderSettingsList() {
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteSetting(setting.row) }),
     );
 
-    tr.append(makeCell(setting.key), makeCell(setting.value), actionsCell);
+    // Full-masked (not just digits) since values include API keys and city
+    // names — letters carry just as much sensitive content as digits do
+    // here, unlike a plain number. The Key column (e.g. WEIGHT_GOAL_KG)
+    // isn't sensitive on its own and stays visible.
+    tr.append(makeCell(setting.key), makeCell(privacyMode ? maskText(setting.value) : setting.value), actionsCell);
     tbody.appendChild(tr);
   });
 }

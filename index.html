@@ -90,7 +90,12 @@
 
             <div class="landing-feature">
                 <h3>Health Tracker</h3>
-                <p>Track Body Weight, Caloric Intake, Physical Activity, and Rest & Recovery. Charts show your last 7 days versus daily targets, and a Weight Forecast projects your goal arrival date.</p>
+                <p>Track Body Weight, Caloric Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 7 days versus daily targets.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>Weight Forecast</h3>
+                <p>A Weight Forecast chart projects your goal arrival date, with a Calibrate button that fits the formula to your own logged history instead of generic constants.</p>
             </div>
 
             <div class="landing-feature">
@@ -246,14 +251,7 @@
         <div class="panel">
             <h2>Health Metrics</h2>
 
-            <div class="donut-grid">
-                <div class="donut-item">
-                    <h4>Body Weight</h4>
-                    <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-weight-chart"></canvas>
-                    </div>
-                </div>
-
+            <div class="donut-grid wellness-metrics-grid">
                 <div class="donut-item">
                     <h4>Caloric Intake</h4>
                     <div class="chart-box chart-box-donut">
@@ -277,7 +275,10 @@
             </div>
 
             <div class="weight-projection-wrap">
-                <h4>Weight Trend & Forecast</h4>
+                <div class="weight-projection-header">
+                    <h4>Weight Trend & Forecast</h4>
+                    <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
+                </div>
                 <div class="chart-box">
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
@@ -293,6 +294,7 @@
             </div>
 
             <div class="filters">
+                <input type="text" id="wellness-search" placeholder="Search description, notes, unit...">
                 <select id="wellness-category-filter">
                     <option value="">All Categories</option>
                     <option>Sleep</option>
@@ -376,6 +378,8 @@
                     </div>
                 </div>
             </div>
+
+            <p id="timesheet-overtime-summary" class="timesheet-overtime-summary"></p>
         </div>
 
         <div class="panel">
@@ -920,6 +924,13 @@
                     <option>WIDGET_SECOND_CLOCK_CITY</option>
                     <option>GROQ_API_KEY</option>
                     <option>USDA_FDC_API_KEY</option>
+                    <option>PROJ_BASELINE_KG_PER_DAY</option>
+                    <option>PROJ_CAL_KG_PER_KCAL_DAY</option>
+                    <option>PROJ_ACTIVITY_KG_PER_MIN_DAY</option>
+                    <option>PROJ_SLEEP_KG_PER_HOUR_DAY</option>
+                    <option>PROJ_CALIBRATED_AT</option>
+                    <option>PROJ_CALIBRATION_R2</option>
+                    <option>PROJ_CALIBRATION_SAMPLES</option>
                 </datalist>
             </label>
             <label>Value
@@ -936,6 +947,24 @@
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div id="calibration-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="calibration-modal-title" hidden>
+    <div class="modal-card modal-card-wide">
+        <h2 id="calibration-modal-title">Calibrate Weight Projection</h2>
+        <p class="hint">Fits your own historical weight, calorie, activity, and sleep logs to replace the forecast's built-in constants with ones tuned to your body — nothing changes until you click Save.</p>
+
+        <div id="calibration-summary"></div>
+
+        <p id="calibration-status" class="status" hidden></p>
+
+        <div class="modal-actions">
+            <button type="button" id="calibration-reset-btn" class="btn">Reset to Default</button>
+            <button type="button" id="calibration-cancel-btn" class="btn">Cancel</button>
+            <button type="button" id="calibration-run-btn" class="btn">Run Calibration</button>
+            <button type="button" id="calibration-save-btn" class="btn btn-primary" disabled>Save</button>
+        </div>
     </div>
 </div>
 
@@ -1211,6 +1240,7 @@
 <script src="assets/script/settings-panel.js"></script>
 <script src="assets/script/travel.js"></script>
 <script src="assets/script/applications.js"></script>
+<script src="assets/script/calibration.js"></script>
 <script src="assets/script/app.js"></script>
 </body>
 </html>

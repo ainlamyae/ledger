@@ -101,6 +101,9 @@ function setupWellnessBulkActions() {
     renderWellnessList();
   });
 
+  document.getElementById('wellness-bulk-edit-btn').addEventListener('click', openWellnessBulkEditForm);
+  document.getElementById('wellness-bulk-edit-cancel-btn').addEventListener('click', closeWellnessBulkEditForm);
+  document.getElementById('wellness-bulk-edit-form').addEventListener('submit', submitWellnessBulkEditForm);
   document.getElementById('wellness-bulk-recalc-btn').addEventListener('click', bulkRecalculateWellness);
   document.getElementById('wellness-bulk-merge-btn').addEventListener('click', mergeSelectedWellnessEntries);
 }
@@ -565,5 +568,67 @@ async function mergeSelectedWellnessEntries() {
     },
     "Couldn't merge entries",
   );
+}
+
+// A field is prefilled when every selected entry shares the same value for
+// it; otherwise it's left blank, meaning "leave unchanged" when
+// submitWellnessBulkEditForm reads it back.
+function sharedWellnessFieldValue(selected, field) {
+  const first = selected[0][field];
+  return selected.every((e) => e[field] === first) ? first : '';
+}
+
+function openWellnessBulkEditForm() {
+  const selected = allWellnessEntries.filter((e) => selectedWellnessRows.has(e.row));
+  if (selected.length === 0) return;
+
+  document.getElementById('wellness-bulk-category').value = sharedWellnessFieldValue(selected, 'category');
+  document.getElementById('wellness-bulk-description').value = sharedWellnessFieldValue(selected, 'description');
+  document.getElementById('wellness-bulk-notes').value = sharedWellnessFieldValue(selected, 'notes');
+
+  clearFieldError('wellness-bulk-edit-form-error');
+  document.getElementById('wellness-bulk-edit-modal').hidden = false;
+}
+
+function closeWellnessBulkEditForm() {
+  document.getElementById('wellness-bulk-edit-modal').hidden = true;
+}
+
+async function submitWellnessBulkEditForm(event) {
+  event.preventDefault();
+
+  const patch = {};
+  const category = document.getElementById('wellness-bulk-category').value;
+  if (category) patch.category = category;
+  const description = document.getElementById('wellness-bulk-description').value;
+  if (description) patch.description = description;
+  const notes = document.getElementById('wellness-bulk-notes').value;
+  if (notes) patch.notes = notes;
+
+  if (Object.keys(patch).length === 0) {
+    showFieldError('wellness-bulk-edit-form-error', 'Change at least one field.');
+    return;
+  }
+
+  const selected = allWellnessEntries.filter((e) => selectedWellnessRows.has(e.row));
+  const snapshots = selected.map((e) => ({
+    row: e.row, date: e.date, time: e.time, category: e.category,
+    description: e.description, amount: rawAmountString(e), unit: rawUnitString(e), notes: e.notes,
+  }));
+
+  try {
+    await Promise.all(selected.map((e) => {
+      const merged = { ...e, ...patch };
+      return updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:G${e.row}`,
+        [[merged.date, merged.time, merged.category, merged.description, rawAmountString(e), rawUnitString(e), merged.notes]]);
+    }));
+
+    selectedWellnessRows.clear();
+    await refreshWellness(true);
+    closeWellnessBulkEditForm();
+    showUndoToast(`${selected.length} entr${selected.length === 1 ? 'y' : 'ies'} updated.`, () => restoreWellnessSnapshots(snapshots));
+  } catch (err) {
+    showFieldError('wellness-bulk-edit-form-error', err.message);
+  }
 }
 

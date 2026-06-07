@@ -759,34 +759,52 @@ function computeBmi(weightKg, heightCm) {
   return Math.round((weightKg / (heightM * heightM)) * 10) / 10;
 }
 
+// Descriptions like "NEAT (Non-Exercise Activity Thermogenesis)" get
+// truncated to just "NEAT" for display — the parenthetical explanation
+// doesn't fit the legend/tooltip and isn't needed once you know the term.
+function shortActivityLabel(description) {
+  return description.split(' (')[0].trim();
+}
+
 function renderWellnessActivityChart(entries) {
   const ctx = document.getElementById('wellness-activity-chart');
 
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
 
   const dates = lastNDates(WELLNESS_METRICS_DAYS);
-  const byDate = new Map();
-  entries
-    .filter((e) => e.category === 'Activity' && e.amount !== null)
-    .forEach((e) => {
-      const mins = toActivityMinutes(e.amount, e.unit);
-      byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
-    });
+  const activityEntries = entries.filter((e) => e.category === 'Activity' && e.amount !== null);
 
-  const activityData = dates.map((d) => byDate.get(d) || 0);
-  const hasData = activityData.some((v) => v > 0);
+  // One stacked segment per description (e.g. NEAT / Resistance / Cardio)
+  // instead of a single summed bar, so each day's activity composition is
+  // visible at a glance, not just its total — evenly-spaced hues the same
+  // way renderAccountCompositionChart colors an arbitrary-length category list.
+  const descriptions = [...new Set(activityEntries.map((e) => e.description || 'Other'))].sort();
+  const byDescription = new Map(descriptions.map((d) => [d, new Map()]));
+  activityEntries.forEach((e) => {
+    const description = e.description || 'Other';
+    const mins = toActivityMinutes(e.amount, e.unit);
+    const byDate = byDescription.get(description);
+    byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
+  });
+
+  const descriptionColors = descriptions.map((_, i) => `hsl(${Math.round((i * 360) / descriptions.length)}, 65%, 55%)`);
+
+  const activityDatasets = descriptions.map((d, i) => ({
+    type: 'bar',
+    label: shortActivityLabel(d),
+    data: dates.map((date) => byDescription.get(d).get(date) || 0),
+    backgroundColor: descriptionColors[i],
+    stack: 'activity',
+    order: 2,
+  }));
+
+  const hasData = activityDatasets.some((ds) => ds.data.some((v) => v > 0));
 
   wellnessActivityChart = upsertChart(wellnessActivityChart, ctx, {
     data: {
       labels: dates,
       datasets: [
-        {
-          type: 'bar',
-          label: 'Activity',
-          data: activityData,
-          backgroundColor: '#10b981',
-          order: 2,
-        },
+        ...activityDatasets,
         {
           type: 'line',
           label: `${activityTarget} min target`,
@@ -802,7 +820,10 @@ function renderWellnessActivityChart(entries) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: {
+        // No legend — the small chart-box-donut area doesn't have room for
+        // one; hover the stacked segments (tooltip) to see each description.
         legend: { display: false },
         title: {
           display: !hasData,
@@ -814,8 +835,9 @@ function renderWellnessActivityChart(entries) {
         tooltip: { callbacks: { label: maskedValueTooltipLabel } },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
+        x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
         y: {
+          stacked: true,
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
           ticks: { callback: maskedUnitTick('min') },

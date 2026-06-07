@@ -520,6 +520,7 @@ const WEIGHT_GOAL_KG_DEFAULT = 82;
 const CALORIE_TARGET_KCAL_DEFAULT = 2000;
 const SLEEP_TARGET_HOURS_DEFAULT = 8;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
+const PROTEIN_TARGET_G_DEFAULT = 100;
 
 // Number of trailing days shown in the Health Metrics row (Caloric Intake,
 // Physical Activity, Rest & Recovery) — Body Weight has its own dedicated
@@ -530,6 +531,7 @@ const WELLNESS_METRICS_DAYS = 14;
 let wellnessCaloriesChart = null;
 let wellnessSleepChart = null;
 let wellnessActivityChart = null;
+let wellnessProteinChart = null;
 let wellnessProjectionChart = null;
 
 function lastNDates(n) {
@@ -543,10 +545,66 @@ function lastNDates(n) {
 }
 
 function renderWellnessCharts(entries) {
+  renderTodayGlanceCards(entries);
   renderWellnessCaloriesChart(entries);
   renderWellnessSleepChart(entries);
   renderWellnessActivityChart(entries);
+  renderWellnessProteinChart(entries);
   renderWellnessProjectionChart(entries);
+}
+
+// "Today at a glance" stat tiles above the 4 trend charts — the charts are
+// good for a 14-day trend but bad for "am I on track right now," so this
+// gives today's actual-vs-target for all four metrics in one glance instead
+// of reading the rightmost bar of four separate charts. Reuses the same
+// .card/.value/.income/.expense styling as the main dashboard's summary cards.
+function renderTodayGlanceCards(entries) {
+  const todayIso = isoFromDate(new Date());
+
+  let calories = null;
+  let protein = null;
+  let activityMins = null;
+  let sleepHours = null;
+
+  entries
+    .filter((e) => e.date === todayIso)
+    .forEach((e) => {
+      if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
+        calories = (calories ?? 0) + e.amount;
+      }
+      if (e.category === 'Calories; Protein' && e.amount2 !== null) {
+        protein = (protein ?? 0) + e.amount2;
+      }
+      if (e.category === 'Activity' && e.amount !== null) {
+        activityMins = (activityMins ?? 0) + toActivityMinutes(e.amount, e.unit);
+      }
+      if (e.category === 'Sleep' && e.amount !== null) {
+        sleepHours = (sleepHours ?? 0) + e.amount;
+      }
+    });
+  if (sleepHours !== null) sleepHours = Math.round(sleepHours * 10) / 10;
+
+  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
+  // Which direction is "good" differs per metric: at/under target is the
+  // win for Calories (a deficit target), at/over target is the win for
+  // Protein/Activity/Sleep.
+  setTodayGlanceTile('today-calories', calories, calorieTarget, 'kcal', calories !== null && calories <= calorieTarget);
+  setTodayGlanceTile('today-protein', protein, proteinTarget, 'g', protein !== null && protein >= proteinTarget);
+  setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
+  setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
+}
+
+function setTodayGlanceTile(idPrefix, value, target, unit, isGood) {
+  const el = document.getElementById(`${idPrefix}-value`);
+  el.classList.remove('income', 'expense');
+
+  const text = `${value !== null ? value : '—'} / ${target} ${unit}`;
+  el.textContent = privacyMode ? maskDigits(text) : text;
+  if (value !== null) el.classList.add(isGood ? 'income' : 'expense');
 }
 
 // Health Tracker charts show plain physical units (kcal/hr/min/kg), not
@@ -555,9 +613,17 @@ function renderWellnessCharts(entries) {
 // the same. These wrap a plain "${value} unit" tick/tooltip formatter so
 // both the axis and the tooltip (which would otherwise leak the exact
 // number on hover even with masked ticks) get masked identically.
-function maskedUnitTick(unit) {
+// decimals: null (default) just strips float noise without forcing trailing
+// zeros — right for the whole-number-ish charts (kcal/min/g). Pass a number
+// (e.g. 2 for BMI) to always show exactly that many decimal places instead.
+function maskedUnitTick(unit, decimals = null) {
   return (v) => {
-    const label = `${v} ${unit}`;
+    // Chart.js generates its own evenly-spaced tick values by repeated
+    // addition of a step size, which drifts into float noise (e.g.
+    // 32.400000000000006) on fractional-step axes like BMI — round before
+    // display so that noise never reaches the label.
+    const rounded = decimals !== null ? v.toFixed(decimals) : Math.round(v * 100) / 100;
+    const label = `${rounded} ${unit}`;
     return privacyMode ? maskDigits(label) : label;
   };
 }
@@ -576,7 +642,7 @@ function renderWellnessCaloriesChart(entries) {
   const dates = lastNDates(WELLNESS_METRICS_DAYS);
   const byDate = new Map();
   entries
-    .filter((e) => e.category === 'Calories' && e.amount !== null)
+    .filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null)
     .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
   wellnessCaloriesChart = upsertChart(wellnessCaloriesChart, ctx, {
@@ -685,6 +751,14 @@ function toActivityMinutes(amount, unit) {
   return amount; // 'min' or unknown — use as-is
 }
 
+// weightKg / heightM² — computed here (not asked of any LLM) since it's
+// shared by the Weight Trend & Forecast chart's BMI line and insight.js's
+// report data.
+function computeBmi(weightKg, heightCm) {
+  const heightM = heightCm / 100;
+  return Math.round((weightKg / (heightM * heightM)) * 10) / 10;
+}
+
 function renderWellnessActivityChart(entries) {
   const ctx = document.getElementById('wellness-activity-chart');
 
@@ -745,6 +819,59 @@ function renderWellnessActivityChart(entries) {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
           ticks: { callback: maskedUnitTick('min') },
+        },
+      },
+    },
+  });
+}
+
+function renderWellnessProteinChart(entries) {
+  const ctx = document.getElementById('wellness-protein-chart');
+
+  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+
+  const dates = lastNDates(WELLNESS_METRICS_DAYS);
+  const byDate = new Map();
+  entries
+    .filter((e) => e.category === 'Calories; Protein' && e.amount2 !== null)
+    .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
+
+  wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Protein',
+          data: dates.map((d) => byDate.get(d) || 0),
+          backgroundColor: '#0ea5e9',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: `${proteinTarget} g target`,
+          data: new Array(WELLNESS_METRICS_DAYS).fill(proteinTarget),
+          borderColor: '#dc2626',
+          borderDash: [4, 4],
+          pointRadius: 0,
+          tension: 0,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
+        y: {
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: maskedUnitTick('g') },
         },
       },
     },
@@ -813,19 +940,25 @@ const PROJ_SLOPE_CLAMP_KG_PER_DAY = 0.15;
 // Reads the 4 gains calibration.js's "Calibrate" flow can write to the
 // Settings tab. Returns null unless all 4 are present, so calcProjection()
 // falls back to the generic formula for anyone who hasn't calibrated.
+// betaProtein is read separately with a 0 (no effect) default rather than
+// added to that required set — an existing calibration from before protein
+// tracking existed stays valid as-is, and only starts factoring in protein
+// once the user next clicks Calibrate.
 function getCalibratedGains() {
   const beta0 = getSetting('PROJ_BASELINE_KG_PER_DAY', null);
   const betaCal = getSetting('PROJ_CAL_KG_PER_KCAL_DAY', null);
   const betaAct = getSetting('PROJ_ACTIVITY_KG_PER_MIN_DAY', null);
   const betaSleep = getSetting('PROJ_SLEEP_KG_PER_HOUR_DAY', null);
   if ([beta0, betaCal, betaAct, betaSleep].some((v) => v === null)) return null;
-  return { beta0, betaCal, betaAct, betaSleep };
+  const betaProtein = getSetting('PROJ_PROTEIN_KG_PER_G_DAY', 0);
+  return { beta0, betaCal, betaAct, betaSleep, betaProtein };
 }
 
 function calcProjection(entries) {
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
   const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -848,15 +981,19 @@ function calcProjection(entries) {
   const caloriesByDate = new Map();
   const activityByDate = new Map();
   const sleepByDate = new Map();
+  const proteinByDate = new Map();
 
   recentEntries.forEach((e) => {
-    if (e.category === 'Calories' && e.amount !== null) {
+    if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
       caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + e.amount);
     } else if (e.category === 'Activity' && e.amount !== null) {
       const mins = toActivityMinutes(e.amount, e.unit);
       activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + mins);
     } else if (e.category === 'Sleep' && e.amount !== null) {
       sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
+    }
+    if (e.category === 'Calories; Protein' && e.amount2 !== null) {
+      proteinByDate.set(e.date, (proteinByDate.get(e.date) || 0) + e.amount2);
     }
   });
 
@@ -868,13 +1005,15 @@ function calcProjection(entries) {
     const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
     const avgActivityMins = activityByDate.size > 0 ? avg(activityByDate) : 0;
     const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
+    const avgProtein = proteinByDate.size > 0 ? avg(proteinByDate) : proteinTarget;
 
     const gains = getCalibratedGains();
     if (gains) {
       slope = gains.beta0
         + gains.betaCal * (avgCalories - calorieTarget)
         + gains.betaAct * avgActivityMins
-        + gains.betaSleep * (avgSleep - sleepTarget);
+        + gains.betaSleep * (avgSleep - sleepTarget)
+        + gains.betaProtein * (avgProtein - proteinTarget);
       slope = Math.max(-PROJ_SLOPE_CLAMP_KG_PER_DAY, Math.min(PROJ_SLOPE_CLAMP_KG_PER_DAY, slope));
       calibrated = true;
     } else {
@@ -921,7 +1060,12 @@ function renderWellnessProjectionChart(entries) {
   const ctx = document.getElementById('wellness-projection-chart');
   if (wellnessProjectionChart) wellnessProjectionChart.destroy();
 
+  const meterWrap = document.getElementById('weight-progress-meter');
+  const meterFill = document.getElementById('weight-progress-meter-fill');
+  const meterPct = document.getElementById('weight-progress-meter-pct');
   const etaEl = document.getElementById('weight-projection-eta');
+  meterWrap.hidden = true;
+  meterPct.textContent = '';
   etaEl.textContent = '';
 
   const weightEntries = entries
@@ -930,8 +1074,26 @@ function renderWellnessProjectionChart(entries) {
 
   if (weightEntries.length < 2) return;
 
+  const startWeight = weightEntries[0].amount;
+  const lastWeight = weightEntries[weightEntries.length - 1].amount;
+
   const proj = calcProjection(entries);
   if (!proj) return;
+
+  // Progress meter: how far from the first logged weight to the goal —
+  // shown whenever there's a real start point and a distinct goal,
+  // regardless of trajectory status (even "wrong direction" is worth
+  // seeing visually, just in the danger color instead of the accent).
+  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
+  const totalDelta = startWeight - weightGoal;
+  if (Math.abs(totalDelta) >= 0.1) {
+    const pct = Math.max(0, Math.min(100, ((startWeight - lastWeight) / totalDelta) * 100));
+    meterWrap.hidden = false;
+    meterFill.style.width = `${pct}%`;
+    meterFill.classList.toggle('danger', proj.status === 'wrong-direction');
+    const pctText = `${Math.round(pct)}%`;
+    meterPct.textContent = privacyMode ? maskDigits(pctText) : pctText;
+  }
 
   if (proj.status === 'reached') { etaEl.textContent = 'Goal reached! 🎉'; return; }
   if (proj.status === 'no-change') { etaEl.textContent = 'No net change at current habits'; return; }
@@ -944,7 +1106,6 @@ function renderWellnessProjectionChart(entries) {
   const histMap = new Map(weightEntries.map((e) => [e.date, e.amount]));
   const projMap = new Map(proj.projectedPoints.map((p) => [p.date, p.weight]));
   const lastDate = histLabels[histLabels.length - 1];
-  const lastWeight = weightEntries[weightEntries.length - 1].amount;
 
   // Same-day duplicate weigh-ins (e.g. morning + evening) are averaged
   // before smoothing, rather than letting whichever entry happens to be
@@ -969,61 +1130,144 @@ function renderWellnessProjectionChart(entries) {
   const offsetToDateLabel = (offset) =>
     new Date(firstDateMs + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
+  const datasets = [
+    {
+      label: 'Actual Weight',
+      data: allLabels.map((d) => ({ x: dayOffset(d), y: histMap.get(d) ?? null })),
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.08)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 2,
+      spanGaps: false,
+      order: 3,
+    },
+    {
+      label: 'Weight Trend',
+      data: allLabels.map((d) => ({ x: dayOffset(d), y: trendMap.get(d) ?? null })),
+      borderColor: '#16a34a',
+      borderWidth: 2,
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+      spanGaps: false,
+      order: 4,
+    },
+    {
+      label: 'Projected',
+      data: allLabels.map((d) => {
+        let y = null;
+        if (d === lastDate) y = lastWeight;
+        else if (d > lastDate) y = projMap.get(d) ?? null;
+        return { x: dayOffset(d), y };
+      }),
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99,102,241,0.08)',
+      borderDash: [6, 4],
+      fill: true,
+      tension: 0,
+      pointRadius: 0,
+      spanGaps: false,
+      order: 2,
+    },
+    {
+      label: `${proj.weightGoal} kg goal`,
+      data: allLabels.map((d) => ({ x: dayOffset(d), y: proj.weightGoal })),
+      borderColor: '#dc2626',
+      borderDash: [4, 4],
+      pointRadius: 0,
+      tension: 0,
+      fill: false,
+      order: 1,
+    },
+  ];
+
+  // Only added when a height is on file — without it BMI can't be computed,
+  // and an axis with no real dataset behind it would just be a confusing
+  // empty scale, so the whole line+axis pair is skipped rather than shown broken.
+  const heightCm = getSetting('HEIGHT_CM', null);
+  if (heightCm !== null) {
+    datasets.push({
+      label: 'BMI',
+      data: allLabels.map((d) => {
+        const w = histMap.get(d);
+        return { x: dayOffset(d), y: w !== undefined ? computeBmi(w, heightCm) : null };
+      }),
+      yAxisID: 'y1',
+      borderColor: '#f59e0b',
+      borderWidth: 1.5,
+      borderDash: [2, 2],
+      fill: false,
+      tension: 0.3,
+      pointRadius: 1,
+      spanGaps: false,
+      order: 5,
+    });
+  }
+
+  // BMI = weight × (1 / heightM²) — a fixed linear rescale of weight, not an
+  // independent quantity. Left to auto-range on its own, Chart.js can pick a
+  // BMI axis span that doesn't correspond to the weight axis's span, so the
+  // BMI line visually drifts away from the weight lines even though they're
+  // mathematically locked together. Deriving y1's min/max from the exact
+  // same weight range as y (via computeBmi) keeps the two axes true parallel
+  // twins — same shape, consistent correspondence, whatever ruler you read.
+  // Rounded to whole kg (not just padded) — a fractional min/max (e.g.
+  // 81.8–94.3) breaks Chart.js's own "nice round numbers" tick algorithm,
+  // which is what produced clean 1kg-apart gridlines (94, 93, 92, …) before
+  // any explicit min/max was set. Flooring/ceiling to whole numbers keeps
+  // that same clean stepping while still fixing the axis bounds so y1 can
+  // be derived from them.
+  const weightValues = [...histMap.values(), ...trendMap.values(), ...projMap.values(), lastWeight, proj.weightGoal]
+    .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
+  const weightMin = Math.min(...weightValues);
+  const weightMax = Math.max(...weightValues);
+  const weightPad = Math.max(0.5, (weightMax - weightMin) * 0.08);
+  const yMin = Math.floor(weightMin - weightPad);
+  const yMax = Math.ceil(weightMax + weightPad);
+
+  const scales = {
+    x: {
+      type: 'linear',
+      ticks: { maxTicksLimit: 24, maxRotation: 45, minRotation: 0, autoSkip: true, callback: offsetToDateLabel },
+    },
+    y: {
+      min: yMin,
+      max: yMax,
+      afterFit: fixTrendYAxisWidth,
+      // Forced rather than left to Chart.js's auto step-size algorithm —
+      // once min/max are explicit (needed to lock the BMI axis to this same
+      // range), that algorithm stopped producing the clean constant 1kg
+      // steps it used to; pinning it directly guarantees 94, 93, 92, 91, …
+      // every time, independent of whatever heuristic picked the step before.
+      ticks: { stepSize: 1, callback: maskedUnitTick('kg') },
+    },
+  };
+  if (heightCm !== null) {
+    scales.y1 = {
+      // Left as the exact (non-rounded) BMI equivalent of yMin/yMax — this
+      // is what keeps the axis a true twin of the weight axis, pixel for
+      // pixel. Rounding these would reintroduce the earlier bug where the
+      // BMI line's position didn't correspond correctly to the weight axis.
+      min: computeBmi(yMin, heightCm),
+      max: computeBmi(yMax, heightCm),
+      position: 'right',
+      grid: { drawOnChartArea: false },
+      ticks: {
+        stepSize: 1,
+        // Chart.js's default ticks.includeBounds forces the exact min/max
+        // onto the axis as extra labels even when they land off the clean
+        // step grid (here: 25.3/33.2 alongside the evenly-stepped 27,28,29…)
+        // — turned off so only the evenly-spaced ticks are shown.
+        includeBounds: false,
+        callback: maskedUnitTick('BMI', 1),
+      },
+    };
+  }
+
   wellnessProjectionChart = new Chart(ctx, {
     type: 'line',
-    data: {
-      datasets: [
-        {
-          label: 'Actual Weight',
-          data: allLabels.map((d) => ({ x: dayOffset(d), y: histMap.get(d) ?? null })),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,0.08)',
-          fill: true,
-          tension: 0.3,
-          pointRadius: 2,
-          spanGaps: false,
-          order: 3,
-        },
-        {
-          label: 'Weight Trend',
-          data: allLabels.map((d) => ({ x: dayOffset(d), y: trendMap.get(d) ?? null })),
-          borderColor: '#16a34a',
-          borderWidth: 2,
-          fill: false,
-          tension: 0.3,
-          pointRadius: 0,
-          spanGaps: false,
-          order: 4,
-        },
-        {
-          label: 'Projected',
-          data: allLabels.map((d) => {
-            let y = null;
-            if (d === lastDate) y = lastWeight;
-            else if (d > lastDate) y = projMap.get(d) ?? null;
-            return { x: dayOffset(d), y };
-          }),
-          borderColor: '#6366f1',
-          backgroundColor: 'rgba(99,102,241,0.08)',
-          borderDash: [6, 4],
-          fill: true,
-          tension: 0,
-          pointRadius: 0,
-          spanGaps: false,
-          order: 2,
-        },
-        {
-          label: `${proj.weightGoal} kg goal`,
-          data: allLabels.map((d) => ({ x: dayOffset(d), y: proj.weightGoal })),
-          borderColor: '#dc2626',
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0,
-          fill: false,
-          order: 1,
-        },
-      ],
-    },
+    data: { datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -1051,17 +1295,7 @@ function renderWellnessProjectionChart(entries) {
           },
         },
       },
-      scales: {
-        x: {
-          type: 'linear',
-          ticks: { maxTicksLimit: 24, maxRotation: 45, minRotation: 0, autoSkip: true, callback: offsetToDateLabel },
-        },
-        y: {
-          beginAtZero: false,
-          afterFit: fixTrendYAxisWidth,
-          ticks: { callback: maskedUnitTick('kg') },
-        },
-      },
+      scales,
     },
   });
 

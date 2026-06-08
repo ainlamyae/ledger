@@ -348,6 +348,7 @@
 
             <div class="panel-actions" id="wellness-bulk-actions" hidden>
                 <span id="wellness-bulk-summary"></span>
+                <button id="wellness-bulk-edit-btn" class="btn" title="Edit Selected">✏️ Edit Selected</button>
                 <button id="wellness-bulk-recalc-btn" class="btn" title="Recalculate Selected">🧮 Recalculate Selected</button>
                 <button id="wellness-bulk-merge-btn" class="btn" title="Merge Selected">🔗 Merge Selected</button>
             </div>
@@ -1108,6 +1109,38 @@
             <div class="modal-actions">
                 <button type="button" id="wellness-calc-btn" class="btn">🧮 Calculate</button>
                 <button type="button" id="wellness-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="wellness-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-bulk-edit-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="wellness-bulk-edit-modal-title">Edit Selected Entries</h2>
+
+        <form id="wellness-bulk-edit-form" class="app-form">
+            <label>Category
+                <select id="wellness-bulk-category">
+                    <option value="">— Leave unchanged —</option>
+                    <option>Sleep</option>
+                    <option>Weight</option>
+                    <option>Activity</option>
+                    <option>Calories; Protein</option>
+                </select>
+            </label>
+            <label>Description
+                <input type="text" id="wellness-bulk-description">
+            </label>
+            <label>Notes
+                <textarea id="wellness-bulk-notes" rows="2"></textarea>
+            </label>
+
+            <p class="hint">Leave a field blank to keep each entry's existing value.</p>
+            <p id="wellness-bulk-edit-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>

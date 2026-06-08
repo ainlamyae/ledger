@@ -653,6 +653,7 @@
                 <table id="timesheet-table">
                     <thead>
                     <tr>
+                        <th>Company</th>
                         <th class="sortable" data-sort="date">Date</th>
                         <th>Day</th>
                         <th>Start</th>
@@ -1039,6 +1040,10 @@
         <h2 id="timesheet-modal-title">Log Time</h2>
 
         <form id="timesheet-form" class="app-form">
+            <label>Company
+                <input type="text" id="timesheet-company" list="timesheet-company-options">
+            </label>
+            <datalist id="timesheet-company-options"></datalist>
             <label>Date
                 <input type="date" id="timesheet-date" required>
             </label>

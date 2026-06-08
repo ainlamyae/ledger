@@ -19,6 +19,8 @@ textarea {
     --color-primary-hover: #2563eb;
     --color-income: #16a34a;
     --color-expense: #dc2626;
+    --color-time: #d97706;
+    --color-other: #7c3aed;
     --color-bg: #f5f7fb;
     --color-surface: #ffffff;
     --color-border: #e5e7eb;
@@ -370,7 +372,19 @@ header .btn:hover {
     padding: 1.25rem;
     text-align: left;
     box-shadow: var(--shadow-card);
+    border-left: 3px solid var(--color-border);
+    transition: var(--transition-colors), transform .2s ease, box-shadow .2s ease;
 }
+
+.landing-feature:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,.12);
+}
+
+.landing-feature-health   { border-left-color: var(--color-primary); }
+.landing-feature-finances { border-left-color: var(--color-income); }
+.landing-feature-time     { border-left-color: var(--color-time); }
+.landing-feature-other    { border-left-color: var(--color-other); }
 
 .landing-feature h3 {
     margin-bottom: .5rem;

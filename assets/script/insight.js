@@ -127,12 +127,12 @@ function gatherInsightMetrics(lookbackDays) {
 
     avgCalories: current.avgCalories,
     prevAvgCalories: previous.avgCalories,
-    calorieTarget: getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT),
+    calorieTarget: getCalorieTargetKcal(allWellnessEntries),
     caloriesDaysLogged: current.caloriesDaysLogged,
 
     avgProtein: current.avgProtein,
     prevAvgProtein: previous.avgProtein,
-    proteinTarget: getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT),
+    proteinTarget: getProteinTargetG(allWellnessEntries),
     proteinDaysLogged: current.proteinDaysLogged,
 
     avgActivityMins: current.avgActivityMins,

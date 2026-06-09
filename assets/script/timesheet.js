@@ -300,7 +300,9 @@ function renderTimesheetList() {
     const weekend = isWeekend(e.date);
 
     const companyCell = document.createElement('td');
-    companyCell.textContent = e.company;
+    const firstSpace = e.company.indexOf(' ');
+    companyCell.textContent = firstSpace === -1 ? e.company : `${e.company.slice(0, firstSpace)}…`;
+    companyCell.title = e.company;
 
     const dateCell = document.createElement('td');
     dateCell.textContent = e.date;

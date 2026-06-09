@@ -522,6 +522,64 @@ const SLEEP_TARGET_HOURS_DEFAULT = 8;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 const PROTEIN_TARGET_G_DEFAULT = 100;
 
+// Standard estimate for 1kg of body fat — the same generic energy density
+// calibration.js's un-calibrated formula and getCalorieTargetKcal() below
+// both fall back to until the user's own history is fitted via Calibrate.
+const GENERIC_KCAL_PER_KG_FAT = 7700;
+
+function latestWeightKg(entries) {
+  const weightEntries = entries
+    .filter((e) => e.category === 'Weight' && e.amount !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return weightEntries.length ? weightEntries[weightEntries.length - 1].amount : null;
+}
+
+// Protein's target can be a flat gram amount (PROTEIN_TARGET_G) or, if set,
+// a per-kg multiplier (PROTEIN_TARGET_G_PER_KG) applied to the most
+// recently logged Weight entry — e.g. 1.6 g/kg scales automatically as body
+// weight changes instead of needing to be updated by hand whenever it does.
+// The per-kg setting wins whenever it's present and a weight has been
+// logged; otherwise this falls back to the flat gram target.
+function getProteinTargetG(entries) {
+  const perKg = getSetting('PROTEIN_TARGET_G_PER_KG', null);
+  const weightKg = perKg !== null ? latestWeightKg(entries) : null;
+  if (weightKg !== null) return Math.round(weightKg * perKg);
+  return getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+}
+
+// Calorie target can be a flat kcal amount (CALORIE_TARGET_KCAL) or, if
+// HEIGHT_CM, BIRTH_DATE, SEX, ACTIVITY_MULTIPLIER, and WEEKLY_FAT_LOSS_KG
+// are all set (and a Weight entry has been logged), a calculated one:
+// Mifflin-St Jeor BMR × ACTIVITY_MULTIPLIER gives maintenance calories
+// (TDEE), then a daily deficit sized to hit WEEKLY_FAT_LOSS_KG is
+// subtracted — using the user's own calibrated energy density (the
+// Calibrate button) once available, falling back to the generic 7,700
+// kcal/kg otherwise, the same convention the Weight Trend & Forecast
+// projection already uses. Missing any one input falls back to the flat
+// CALORIE_TARGET_KCAL setting, same as protein above.
+function getCalorieTargetKcal(entries) {
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const activityMultiplier = getSetting('ACTIVITY_MULTIPLIER', null);
+  const weeklyFatLossKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
+  const weightKg = latestWeightKg(entries);
+
+  const haveAllInputs = heightCm !== null && age !== null && (sex === 'male' || sex === 'female')
+    && activityMultiplier !== null && weeklyFatLossKg !== null && weightKg !== null;
+
+  if (haveAllInputs) {
+    const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
+    const tdee = bmr * activityMultiplier;
+    const gains = getCalibratedGains();
+    const kcalPerKg = (gains && gains.betaCal > 0) ? 1 / gains.betaCal : GENERIC_KCAL_PER_KG_FAT;
+    const dailyDeficit = (weeklyFatLossKg * kcalPerKg) / 7;
+    return Math.round(tdee - dailyDeficit);
+  }
+
+  return getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+}
+
 // Number of trailing days shown in the Health Metrics row (Caloric Intake,
 // Physical Activity, Rest & Recovery) — Body Weight has its own dedicated
 // history in the Weight Trend & Forecast chart below, so it's not repeated
@@ -584,8 +642,8 @@ function renderTodayGlanceCards(entries) {
     });
   if (sleepHours !== null) sleepHours = Math.round(sleepHours * 10) / 10;
 
-  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
-  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  const calorieTarget = getCalorieTargetKcal(entries);
+  const proteinTarget = getProteinTargetG(entries);
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
@@ -637,7 +695,7 @@ function maskedValueTooltipLabel(item) {
 function renderWellnessCaloriesChart(entries) {
   const ctx = document.getElementById('wellness-calories-chart');
 
-  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+  const calorieTarget = getCalorieTargetKcal(entries);
 
   const dates = lastNDates(WELLNESS_METRICS_DAYS);
   const byDate = new Map();
@@ -850,7 +908,7 @@ function renderWellnessActivityChart(entries) {
 function renderWellnessProteinChart(entries) {
   const ctx = document.getElementById('wellness-protein-chart');
 
-  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  const proteinTarget = getProteinTargetG(entries);
 
   const dates = lastNDates(WELLNESS_METRICS_DAYS);
   const byDate = new Map();
@@ -978,9 +1036,9 @@ function getCalibratedGains() {
 
 function calcProjection(entries) {
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
-  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+  const calorieTarget = getCalorieTargetKcal(entries);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
-  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  const proteinTarget = getProteinTargetG(entries);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1041,7 +1099,7 @@ function calcProjection(entries) {
     } else {
       // Negative balance = caloric deficit = weight loss
       const balance = avgCalories - (calorieTarget + avgActivityMins * 5);
-      const baseSlope = balance / 7700;
+      const baseSlope = balance / GENERIC_KCAL_PER_KG_FAT;
       const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
       slope = baseSlope * sleepRatio;
     }

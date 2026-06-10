@@ -1262,36 +1262,24 @@ function renderWellnessProjectionChart(entries) {
     },
   ];
 
-  // Only added when a height is on file — without it BMI can't be computed,
-  // and an axis with no real dataset behind it would just be a confusing
-  // empty scale, so the whole line+axis pair is skipped rather than shown broken.
+  // Only set up when a height is on file — without it BMI can't be computed,
+  // and an axis with no correspondence to compute would just be a confusing
+  // empty scale, so the whole axis is skipped rather than shown broken.
+  // There's no separate BMI *line*: BMI is a fixed linear rescale of weight
+  // (see below), so a plotted BMI line would just exactly retrace the
+  // weight line pixel-for-pixel — the right-hand y1 axis alone already lets
+  // BMI be read straight off the existing weight line.
   const heightCm = getSetting('HEIGHT_CM', null);
-  if (heightCm !== null) {
-    datasets.push({
-      label: 'BMI',
-      data: allLabels.map((d) => {
-        const w = histMap.get(d);
-        return { x: dayOffset(d), y: w !== undefined ? computeBmi(w, heightCm) : null };
-      }),
-      yAxisID: 'y1',
-      borderColor: '#f59e0b',
-      borderWidth: 1.5,
-      borderDash: [2, 2],
-      fill: false,
-      tension: 0.3,
-      pointRadius: 1,
-      spanGaps: false,
-      order: 5,
-    });
-  }
 
   // BMI = weight × (1 / heightM²) — a fixed linear rescale of weight, not an
-  // independent quantity. Left to auto-range on its own, Chart.js can pick a
-  // BMI axis span that doesn't correspond to the weight axis's span, so the
-  // BMI line visually drifts away from the weight lines even though they're
-  // mathematically locked together. Deriving y1's min/max from the exact
-  // same weight range as y (via computeBmi) keeps the two axes true parallel
-  // twins — same shape, consistent correspondence, whatever ruler you read.
+  // independent quantity, which is exactly why there's no separate BMI line
+  // above: it would just retrace the weight line exactly. Left to auto-range
+  // on its own, Chart.js can pick a BMI axis span that doesn't correspond to
+  // the weight axis's span, so a given height on the chart would read as the
+  // wrong BMI off the right-hand axis even though the weight line there is
+  // correct. Deriving y1's min/max from the exact same weight range as y
+  // (via computeBmi) keeps the two axes true parallel twins — same shape,
+  // consistent correspondence, whatever ruler you read.
   // Rounded to whole kg (not just padded) — a fractional min/max (e.g.
   // 81.8–94.3) breaks Chart.js's own "nice round numbers" tick algorithm,
   // which is what produced clean 1kg-apart gridlines (94, 93, 92, …) before
@@ -1327,8 +1315,8 @@ function renderWellnessProjectionChart(entries) {
     scales.y1 = {
       // Left as the exact (non-rounded) BMI equivalent of yMin/yMax — this
       // is what keeps the axis a true twin of the weight axis, pixel for
-      // pixel. Rounding these would reintroduce the earlier bug where the
-      // BMI line's position didn't correspond correctly to the weight axis.
+      // pixel. Rounding these would reintroduce the earlier bug where a
+      // given height on the chart read as the wrong BMI off this axis.
       min: computeBmi(yMin, heightCm),
       max: computeBmi(yMax, heightCm),
       position: 'right',

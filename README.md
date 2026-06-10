@@ -169,5 +169,3 @@ https://ainlamyae.github.io/ledger
 ## License
 
 No license
-
-MIT License

@@ -77,6 +77,31 @@ function renderExpenseBreakdownTrendChart(months) {
   });
 }
 
+let categoryComparisonChart = null;
+
+function renderCategoryComparisonChart(categories) {
+  const ctx = document.getElementById('category-comparison-chart');
+  if (categoryComparisonChart) categoryComparisonChart.destroy();
+  if (categories.length === 0) return;
+
+  categoryComparisonChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: categories.map((c) => c.name),
+      datasets: [
+        { label: 'Last Month', data: categories.map((c) => c.lastMonth), backgroundColor: '#3b82f6' },
+        { label: '4-Month Avg', data: categories.map((c) => c.quarterAvg), backgroundColor: '#93c5fd' },
+        { label: '12-Month Avg', data: categories.map((c) => c.yearAvg), backgroundColor: '#9ca3af' },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
 let savingsTrendChart = null;
 
 function renderSavingsTrendChart(months) {

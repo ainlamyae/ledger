@@ -8,26 +8,6 @@ Track income, expenses, account balances, investments, and financial trends whil
 
 ---
 
-## Analysis of the Current Data (`Accounting.xlsx`)
-
-The existing workbook has 8 sheets, ~10,500 transactions spanning 2018–2026:
-
-| Sheet | Rows | Purpose | Notes |
-|---|---|---|---|
-| `Balance` | ~27 | Net worth snapshot: investments, account balances, credit cards, IOUs | Manually maintained, not derived |
-| `Report` | 150 | Monthly rollup by category (Income, Expenses, Saved, Cumulative Saving) | Looks like a manual/pivot summary of `Detail` |
-| `Detail` | 10,523 | Core transaction ledger: Date, Account, Payee, Description, Amount, Category | Main data source |
-
-### Issues found that the new schema should fix
-
-- **Dates stored as text** (`'2018.09.05'`) instead of real date values — breaks sorting/filtering and Sheets API date math.
-- **Inconsistent account naming**: `Hossein`, `TDV`/`TDD`/`TDC`, `RBCV`/`RBCM`/`RBCD`, etc. — needs a canonical account list with dropdown validation.
-- **Inconsistent category casing**: `Tax` vs `TAX`.
-- **Personal IOUs mixed with real accounts** (`Hossein`, `Borna`, `Reza`, `Amin`, `Mostafa`, `Ali Asghar`, `Ehsan`, `Parsapour`, `Conica`, `Basiri + Mazaheri`) — these are people who owe/are owed money, not financial institutions.
-- **`Report` formulas already expect a `Transactions` sheet that doesn't exist** — its `SUMIFS` formulas reference `Transactions!A:A` (date), `Transactions!E:E` (amount), `Transactions!F:F` (category), but the workbook only has `Detail`. Rebuilding `Detail` as `Transactions` with that exact column layout makes `Report` work again, computed live by Google Sheets — no frontend aggregation needed.
-
----
-
 ## Proposed Google Sheets Data Model
 
 A single Google Sheet ("Ledger Database") with the following tabs, shared **only with your own Google account** (private):
@@ -57,14 +37,8 @@ A lookup/reference list only — used to check that each transaction's `Account`
 | Column | Type | Notes |
 |---|---|---|
 | Category | Text | e.g. Grocery, Transportation, Medical |
-| Type | Text | Income / Expense |
-| Group | Text | Rollup grouping, e.g. "Living Expenses", "Discretionary", "Savings" |
 | Color | Text | Hex color for charts |
-| Monthly Budget | Number | Optional, used in v2 budget tracking |
 
-### Future tabs (optional, add later)
-
-`RRSP`, `Medical`, `Hydro`, `Rent`, and `CELPiPi` are out of scope for the initial schema. Each can later become its own tab following the `Transactions` column conventions, or simply be entered as rows in `Transactions` under the right `Category`.
 
 ### `Report` and `Balance`
 
@@ -146,7 +120,7 @@ ledger/
 
 1. **Create the Google Sheet**
    - New spreadsheet, add tabs per the *Proposed Google Sheets Data Model* above.
-   - Migrate data from `Accounting.xlsx` (clean dates, accounts, categories per the *Issues* list).
+   - Copy data from `Accounting.xlsx` (clean dates, accounts, categories per the *Issues* list).
    - Share it only with your own Google account (default — do nothing extra).
 
 2. **Google Cloud project**
@@ -165,7 +139,7 @@ ledger/
 ## Implementation Plan
 
 ### Phase 0 — Data migration & schema setup
-- [ ] Rebuild `Detail` as `Transactions` with columns `Date | Account | Payee | Description | Amount | Category` (matches what `Report`'s `SUMIFS` formulas already expect)
+- [ ] Rebuild `Transactions` with columns `Date | Account | Payee | Description | Amount | Category` (matches what `Report`'s `SUMIFS` formulas already expect)
 - [ ] Clean data per the *Issues* list (real dates, canonical account names, consistent category casing)
 - [ ] Create the `Accounts` (validation list) and `Categories` tabs
 - [ ] Add data validation dropdowns for `Account` and `Category` columns in `Transactions`
@@ -192,7 +166,7 @@ ledger/
 - [ ] Client-side search/filter over fetched transactions (with pagination — 10k+ rows)
 
 ### Phase 5 — Reports & analytics
-- [ ] Expense breakdown by category (donut chart) and by `Group`
+- [ ] Expense breakdown by category (donut chart)
 - [ ] Income vs expense trend (Chart.js line/bar) from `Report`
 - [ ] Cumulative savings trend over time (from `Report`)
 
@@ -207,7 +181,7 @@ ledger/
 - [ ] Mobile responsiveness pass
 
 ### Phase 8 — Future (v2/v3)
-- [ ] Budget tracking against `Categories.Monthly Budget`
+- [ ] Budget tracking by category
 - [ ] Recurring transaction templates
 - [ ] CSV import/export
 - [ ] AI-generated insights / forecasting

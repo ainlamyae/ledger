@@ -139,46 +139,46 @@ ledger/
 ## Implementation Plan
 
 ### Phase 0 — Data migration & schema setup
-- [ ] Rebuild `Transactions` with columns `Date | Account | Payee | Description | Amount | Category` (matches what `Report`'s `SUMIFS` formulas already expect)
-- [ ] Clean data per the *Issues* list (real dates, canonical account names, consistent category casing)
-- [ ] Create the `Accounts` (validation list) and `Categories` tabs
-- [ ] Add data validation dropdowns for `Account` and `Category` columns in `Transactions`
-- [ ] Verify `Report`'s `SUMIFS` formulas recalculate correctly against the renamed sheet
+- [x] Rebuild `Transactions` with columns `Date | Account | Payee | Description | Amount | Category` (matches what `Report`'s `SUMIFS` formulas already expect)
+- [x] Clean data per the *Issues* list (real dates, canonical account names, consistent category casing)
+- [x] Create the `Accounts` (validation list) and `Categories` tabs
+- [x] Add data validation dropdowns for `Account` and `Category` columns in `Transactions`
+- [x] Verify `Report`'s `SUMIFS` formulas recalculate correctly against the renamed sheet
 
 ### Phase 1 — Auth & API plumbing
-- [ ] Set up Google Cloud project + OAuth Client ID
-- [ ] `auth.js`: sign-in/sign-out with Google Identity Services, token persistence
-- [ ] `sheets.js`: `batchGet`/`values.get` wrapper, `append`/`update` for writes
+- [x] Set up Google Cloud project + OAuth Client ID
+- [x] `auth.js`: sign-in/sign-out with Google Identity Services, token persistence
+- [x] `sheets.js`: `batchGet`/`values.get` wrapper, `append`/`update` for writes
 
 ### Phase 2 — Frontend scaffold
-- [ ] Split current monolithic `index.html` into `index.html` + `styles.css` + `app.js`
-- [ ] Add a sign-in gate; show dashboard only after auth succeeds
+- [x] Split current monolithic `index.html` into `index.html` + `styles.css` + `app.js`
+- [x] Add a sign-in gate; show dashboard only after auth succeeds
 
 ### Phase 3 — Read-only dashboard (MVP)
-- [ ] Fetch `Report` for net worth, monthly income/expenses, and savings rate (already pre-aggregated by Google Sheets)
-- [ ] Fetch `Transactions` for the recent transactions table
-- [ ] Replace hardcoded cards/table in `index.html` with live data
-- [ ] `charts.js`: cash flow chart (last 6–12 months) from `Report`
+- [x] Fetch `Report` for net worth, monthly income/expenses, and savings rate (already pre-aggregated by Google Sheets)
+- [x] Fetch `Transactions` for the recent transactions table
+- [x] Replace hardcoded cards/table in `index.html` with live data
+- [x] `charts.js`: cash flow chart (last 6–12 months) from `Report`
 
 ### Phase 4 — Transaction management (CRUD)
-- [ ] Add-transaction form → append row to `Transactions`
-- [ ] Edit/delete transaction → update/delete row by tracked row index
-- [ ] Client-side search/filter over fetched transactions (with pagination — 10k+ rows)
+- [x] Add-transaction form → append row to `Transactions`
+- [x] Edit/delete transaction → update/delete row by tracked row index
+- [x] Client-side search/filter over fetched transactions (with pagination — 10k+ rows)
 
 ### Phase 5 — Reports & analytics
-- [ ] Expense breakdown by category (donut chart)
-- [ ] Income vs expense trend (Chart.js line/bar) from `Report`
-- [ ] Cumulative savings trend over time (from `Report`)
+- [x] Expense breakdown by category (donut chart)
+- [x] Income vs expense trend (Chart.js line/bar) from `Report`
+- [x] Cumulative savings trend over time (from `Report`)
 
 ### Phase 6 — Account management
 - [ ] Accounts page: manage the validation list (add/edit known account names)
 - [ ] Optional future tabs (investments, medical, utilities) — see *Future tabs*
 
 ### Phase 7 — Performance & polish
-- [ ] Cache sheet data client-side (localStorage/IndexedDB) with manual refresh + TTL
-- [ ] Loading/error states for auth & API failures
-- [ ] Virtualized/paginated transactions table
-- [ ] Mobile responsiveness pass
+- [x] Cache sheet data client-side (localStorage/IndexedDB) with manual refresh + TTL
+- [x] Loading/error states for auth & API failures
+- [x] Virtualized/paginated transactions table
+- [x] Mobile responsiveness pass
 
 ### Phase 8 — Future (v2/v3)
 - [ ] Budget tracking by category

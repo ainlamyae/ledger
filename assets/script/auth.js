@@ -6,12 +6,12 @@ let accessToken = null;
 let authChangeHandler = () => {};
 
 function loadStoredToken() {
-  const raw = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const raw = localStorage.getItem(TOKEN_STORAGE_KEY);
   if (!raw) return null;
 
   const { token, expiresAt } = JSON.parse(raw);
   if (Date.now() >= expiresAt) {
-    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
     return null;
   }
   return token;
@@ -19,12 +19,14 @@ function loadStoredToken() {
 
 function storeToken(token, expiresInSeconds) {
   const expiresAt = Date.now() + expiresInSeconds * 1000;
-  sessionStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
+  localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
 }
 
 function initAuth(onAuthChange) {
   authChangeHandler = onAuthChange;
   accessToken = loadStoredToken();
+
+  let silentAttempt = false;
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
@@ -33,20 +35,33 @@ function initAuth(onAuthChange) {
       if (response.error) {
         console.error('OAuth error:', response);
         accessToken = null;
-        authChangeHandler(null, response);
+        if (!silentAttempt) authChangeHandler(null, response);
+        silentAttempt = false;
         return;
       }
       accessToken = response.access_token;
       storeToken(accessToken, response.expires_in);
       authChangeHandler(accessToken);
+      silentAttempt = false;
     },
     error_callback: (err) => {
       console.error('OAuth flow error:', err);
-      authChangeHandler(null, err);
+      if (!silentAttempt) authChangeHandler(null, err);
+      silentAttempt = false;
     },
   });
 
-  if (accessToken) authChangeHandler(accessToken);
+  if (accessToken) {
+    authChangeHandler(accessToken);
+  } else {
+    // No valid cached token (e.g. expired, or first launch from a
+    // home-screen icon where sessionStorage didn't persist). Try a
+    // silent refresh against the existing Google session before
+    // falling back to the sign-in gate.
+    authChangeHandler(null);
+    silentAttempt = true;
+    tokenClient.requestAccessToken({ prompt: 'none' });
+  }
 }
 
 function signIn() {
@@ -60,7 +75,7 @@ function signOut() {
     google.accounts.oauth2.revoke(accessToken, () => {});
   }
   accessToken = null;
-  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
   authChangeHandler(null);
 }
 

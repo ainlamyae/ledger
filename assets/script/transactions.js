@@ -71,6 +71,19 @@ async function refreshTransactions(forceRefresh = false) {
   renderTransactions();
 }
 
+async function refreshAccountOptions() {
+  const { valueRanges } = await batchGetValues(
+    [`${CONFIG.SHEETS.ACCOUNTS}!A2:A`, `${CONFIG.SHEETS.CATEGORIES}!A2:A`],
+    VALUE_PARAMS
+  );
+
+  accountOptions = (valueRanges[0].values || []).map((r) => r[0]).filter(Boolean);
+  categoryOptions = (valueRanges[1].values || []).map((r) => r[0]).filter(Boolean);
+
+  setCached('lists', { transactionsSheetId, accountOptions, categoryOptions });
+  populateCategoryFilter();
+}
+
 function populateCategoryFilter() {
   const select = document.getElementById('tx-category-filter');
   select.innerHTML = '';

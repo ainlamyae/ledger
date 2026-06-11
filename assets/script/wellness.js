@@ -1,4 +1,4 @@
-const WELLNESS_RANGE = `'${CONFIG.SHEETS.WELLNESS}'!A2:G`;
+const WELLNESS_RANGE = `'${CONFIG.SHEETS.WELLNESS}'!A2:H`;
 const W_PAGE_SIZE = 28;
 
 const CATEGORY_DEFAULTS = {
@@ -29,6 +29,9 @@ function rawAmountString(e) {
 }
 function rawUnitString(e) {
   return e.unit2 ? `${e.unit}; ${e.unit2}` : e.unit;
+}
+function rawBreakdownString(e) {
+  return breakdownToJson(e.breakdown);
 }
 
 // Only food entries with ingredient text can be (re)estimated from Notes.
@@ -170,6 +173,20 @@ async function refreshWellness(forceRefresh = false) {
         amount = (rawAmount !== undefined && rawAmount !== '') ? Number(rawAmount) : null;
       }
 
+      // Saved by calorie-estimator.js's Calculate button (column H) so an
+      // existing entry's breakdown can be shown again on Edit without
+      // re-running Groq/USDA — invalid/blank just means "no breakdown yet",
+      // not a load error, so a corrupt cell degrades to [] rather than
+      // failing the whole row.
+      let breakdown = [];
+      if (row[7]) {
+        try {
+          breakdown = JSON.parse(row[7]);
+        } catch {
+          breakdown = [];
+        }
+      }
+
       return {
         row: i + 2,
         date: row[0] || '',
@@ -181,6 +198,7 @@ async function refreshWellness(forceRefresh = false) {
         unit,
         unit2,
         notes: row[6] || '',
+        breakdown,
       };
     })
     .filter((e) => e.date);
@@ -346,7 +364,17 @@ function openWellnessForm(entry, duplicate = false) {
     : document.getElementById('wellness-unit').value;
 
   clearFieldError('wellness-form-error');
-  hideCalcBreakdown();
+  // A saved breakdown (column H) is shown immediately on Edit/Duplicate —
+  // no need to re-run Groq/USDA just to see what Calculate found last time
+  // — and carried through untouched if the user hits Save without
+  // recalculating. Any other case (new entry, or an entry with none saved)
+  // just clears it, same as before.
+  if (entry && entry.breakdown.length && entry.category === 'Calories; Protein') {
+    currentCalcBreakdown = entry.breakdown;
+    renderCalcBreakdown(entry.breakdown, entry.amount, entry.amount2);
+  } else {
+    hideCalcBreakdown();
+  }
   document.getElementById('wellness-modal').hidden = false;
 }
 
@@ -419,11 +447,15 @@ async function submitWellnessForm(event) {
     amount = evaluated !== null ? evaluated : '';
   }
 
-  const rowData = [date, time, category, description, amount, unit, notes];
+  // Only a Calories; Protein entry can have a meaningful breakdown — if the
+  // category got changed away from it after a Calculate, don't carry a
+  // stale one along for the ride.
+  const breakdownStr = (category === 'Calories; Protein') ? breakdownToJson(currentCalcBreakdown) : '';
+  const rowData = [date, time, category, description, amount, unit, notes, breakdownStr];
 
   try {
     if (editingWellnessRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${editingWellnessRow}:G${editingWellnessRow}`, [rowData]);
+      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${editingWellnessRow}:H${editingWellnessRow}`, [rowData]);
     } else {
       await appendValues(WELLNESS_RANGE, [rowData]);
     }
@@ -457,8 +489,8 @@ async function deleteWellnessEntry(entry) {
 async function restoreWellnessSnapshots(snapshots) {
   try {
     await Promise.all(snapshots.map((s) =>
-      updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${s.row}:G${s.row}`,
-        [[s.date, s.time, s.category, s.description, s.amount, s.unit, s.notes]])));
+      updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${s.row}:H${s.row}`,
+        [[s.date, s.time, s.category, s.description, s.amount, s.unit, s.notes, s.breakdown]])));
     await refreshWellness(true);
   } catch (err) {
     alert(`Failed to restore: ${err.message}`);
@@ -482,15 +514,16 @@ async function bulkRecalculateWellness() {
   const snapshots = eligible.map((e) => ({
     row: e.row, date: e.date, time: e.time, category: e.category,
     description: e.description, amount: rawAmountString(e), unit: rawUnitString(e), notes: e.notes,
+    breakdown: rawBreakdownString(e),
   }));
 
   let done = 0;
   const succeededSnapshots = [];
   const results = await Promise.allSettled(eligible.map(async (e, i) => {
     try {
-      const { calories, protein } = await estimateCaloriesAndProtein(e.notes);
-      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:G${e.row}`,
-        [[e.date, e.time, 'Calories; Protein', e.description, `${calories}; ${protein}`, 'kcal; g', e.notes]]);
+      const { calories, protein, standardizedNotes, breakdown } = await estimateCaloriesAndProtein(e.notes);
+      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:H${e.row}`,
+        [[e.date, e.time, 'Calories; Protein', e.description, `${calories}; ${protein}`, 'kcal; g', standardizedNotes, breakdownToJson(breakdown)]]);
       succeededSnapshots.push(snapshots[i]);
     } finally {
       done++;
@@ -547,7 +580,11 @@ async function mergeSelectedWellnessEntries() {
   selected.forEach((e) => {
     if (e.notes && !notesParts.includes(e.notes)) notesParts.push(e.notes);
   });
-  const mergedNotes = notesParts.join('; ');
+  // One entry's ingredients per line (not "; ") — keeps each other entry's
+  // list intact as its own block rather than smearing them into one run-on
+  // line, and stays consistent with calorie-estimator.js's own one-line-per-
+  // ingredient standardized Notes format.
+  const mergedNotes = notesParts.join('\n');
 
   await confirmAndDelete(
     `Merge ${selected.length} ${category} entries into one (${target.date})? Amounts will be summed` +
@@ -556,8 +593,12 @@ async function mergeSelectedWellnessEntries() {
     async () => {
       if (!wellnessSheetId) wellnessSheetId = await fetchWellnessSheetId();
 
-      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${target.row}:G${target.row}`,
-        [[target.date, target.time, category, mergedDescription, mergedAmount, mergedUnit, mergedNotes]]);
+      // No breakdown carried over — combining several items' breakdowns
+      // meaningfully would need a fresh Calculate, not a text merge, so the
+      // merged row starts clean rather than keeping just the target's own
+      // (now only partially relevant) one.
+      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${target.row}:H${target.row}`,
+        [[target.date, target.time, category, mergedDescription, mergedAmount, mergedUnit, mergedNotes, '']]);
 
       const deleteRequests = others
         .map((e) => e.row)
@@ -620,13 +661,18 @@ async function submitWellnessBulkEditForm(event) {
   const snapshots = selected.map((e) => ({
     row: e.row, date: e.date, time: e.time, category: e.category,
     description: e.description, amount: rawAmountString(e), unit: rawUnitString(e), notes: e.notes,
+    breakdown: rawBreakdownString(e),
   }));
 
   try {
     await Promise.all(selected.map((e) => {
       const merged = { ...e, ...patch };
-      return updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:G${e.row}`,
-        [[merged.date, merged.time, merged.category, merged.description, rawAmountString(e), rawUnitString(e), merged.notes]]);
+      // A Notes patch invalidates the old breakdown (it no longer describes
+      // what's in the field) — anything else patched (category/description)
+      // leaves it as-is since Amount/Notes themselves aren't changing.
+      const breakdownStr = patch.notes ? '' : rawBreakdownString(e);
+      return updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:H${e.row}`,
+        [[merged.date, merged.time, merged.category, merged.description, rawAmountString(e), rawUnitString(e), merged.notes, breakdownStr]]);
     }));
 
     selectedWellnessRows.clear();

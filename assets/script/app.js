@@ -21,9 +21,24 @@ function formatCurrency(value) {
   return CURRENCY_FORMAT.format(value);
 }
 
+let currentReport = null;
+
+// Balance!A5 holds the net worth total; A7:B26 holds one row per account
+// (A = balance, B = account name).
+function parseBalance(balanceRows) {
+  const netWorth = (balanceRows[4] && balanceRows[4][0]) || 0;
+  const accounts = balanceRows
+    .slice(6)
+    .map((row, i) => ({ row: 7 + i, name: row && row[1], balance: (row && row[0]) || 0 }))
+    .filter((account) => account.name);
+
+  return { netWorth, accounts };
+}
+
 function setSignedInUI(signedIn) {
   document.getElementById('gate').hidden = signedIn;
   document.getElementById('dashboard').hidden = !signedIn;
+  document.getElementById('main-nav').hidden = !signedIn;
   document.getElementById('signin-btn').hidden = signedIn;
   document.getElementById('signout-btn').hidden = !signedIn;
   document.getElementById('refresh-btn').hidden = !signedIn;
@@ -93,11 +108,7 @@ async function loadReport(forceRefresh) {
     .map((c) => ({ name: c.name, value: Math.abs(current[c.index] || 0), color: categoryColors[c.name] || '#9ca3af' }))
     .filter((c) => c.value > 0);
 
-  const netWorth = (balanceRows[4] && balanceRows[4][0]) || 0;
-  const accounts = balanceRows
-    .slice(6)
-    .filter((row) => row && row[1])
-    .map((row) => ({ name: row[1], balance: row[0] || 0 }));
+  const { netWorth, accounts } = parseBalance(balanceRows);
 
   const report = {
     month: current[0],
@@ -132,21 +143,91 @@ function renderSummaryCards(data) {
 function renderAccountsPanel(accounts) {
   const container = document.getElementById('accounts-panel');
   container.innerHTML = '';
+  accounts.forEach((account) => container.appendChild(renderAccountRow(account)));
+}
 
-  accounts.forEach((account) => {
-    const row = document.createElement('div');
-    row.className = 'account';
+function renderAccountRow(account) {
+  const row = document.createElement('div');
+  row.className = 'account';
 
-    const name = document.createElement('span');
-    name.textContent = account.name;
+  const name = document.createElement('span');
+  name.textContent = account.name;
 
-    const value = document.createElement('strong');
-    value.textContent = formatCurrency(account.balance);
-    if (account.balance < 0) value.classList.add('expense');
+  const actions = document.createElement('div');
+  actions.className = 'account-actions';
 
-    row.append(name, value);
-    container.appendChild(row);
+  const value = document.createElement('strong');
+  value.textContent = formatCurrency(account.balance);
+  if (account.balance < 0) value.classList.add('expense');
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'btn';
+  editBtn.textContent = 'Edit';
+  editBtn.addEventListener('click', () => row.replaceWith(renderAccountEditRow(account)));
+
+  actions.append(value, editBtn);
+  row.append(name, actions);
+  return row;
+}
+
+function renderAccountEditRow(account) {
+  const row = document.createElement('div');
+  row.className = 'account';
+
+  const name = document.createElement('span');
+  name.textContent = account.name;
+
+  const actions = document.createElement('div');
+  actions.className = 'account-actions';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = '0.01';
+  input.value = account.balance;
+  input.className = 'account-balance-input';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn btn-primary';
+  saveBtn.textContent = 'Save';
+  saveBtn.addEventListener('click', async () => {
+    const balance = Number(input.value) || 0;
+    saveBtn.disabled = true;
+
+    try {
+      await updateValues(`${CONFIG.SHEETS.BALANCE}!A${account.row}`, [[balance]]);
+      await refreshBalances();
+    } catch (err) {
+      alert(`Failed to update balance: ${err.message}`);
+      saveBtn.disabled = false;
+    }
   });
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => row.replaceWith(renderAccountRow(account)));
+
+  actions.append(input, saveBtn, cancelBtn);
+  row.append(name, actions);
+
+  input.focus();
+  input.select();
+
+  return row;
+}
+
+async function refreshBalances() {
+  const resp = await getValues(BALANCE_RANGE, VALUE_PARAMS);
+  const { netWorth, accounts } = parseBalance(resp.values || []);
+
+  if (currentReport) {
+    currentReport.netWorth = netWorth;
+    currentReport.accounts = accounts;
+    setCached('report', currentReport);
+  }
+
+  document.getElementById('net-worth').textContent = formatCurrency(netWorth);
+  renderAccountsPanel(accounts);
 }
 
 function clearDashboardError() {
@@ -184,6 +265,7 @@ async function loadDashboard(forceRefresh = false) {
 
   try {
     const report = await loadReport(forceRefresh);
+    currentReport = report;
     renderSummaryCards(report);
     renderAccountsPanel(report.accounts);
     renderIncomeExpenseChart(report.last12);
@@ -203,7 +285,32 @@ async function loadDashboard(forceRefresh = false) {
     showDashboardError(err.message);
   }
 
+  try {
+    await initAccountManager(forceRefresh);
+  } catch (err) {
+    console.error('Failed to load accounts:', err);
+    showDashboardError(err.message);
+  }
+
   loading.hidden = true;
+}
+
+function setupScrollSpy() {
+  const navLinks = [...document.querySelectorAll('#main-nav a')];
+  const sections = navLinks
+    .map((link) => document.querySelector(link.getAttribute('href')))
+    .filter(Boolean);
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((link) => link.classList.remove('active'));
+      const activeLink = document.querySelector(`#main-nav a[href="#${entry.target.id}"]`);
+      if (activeLink) activeLink.classList.add('active');
+    });
+  }, { rootMargin: '-50% 0px -50% 0px' });
+
+  sections.forEach((section) => observer.observe(section));
 }
 
 window.addEventListener('load', () => {
@@ -216,4 +323,7 @@ window.addEventListener('load', () => {
     clearCache();
     loadDashboard(true);
   });
+
+  initCsvControls();
+  setupScrollSpy();
 });

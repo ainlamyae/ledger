@@ -397,6 +397,7 @@ window.addEventListener('load', () => {
     clearCache();
     loadDashboard(true);
   });
+  document.getElementById('clear-cache-btn').addEventListener('click', hardRefresh);
 
   initCsvControls();
   setupScrollSpy();

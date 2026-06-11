@@ -488,9 +488,9 @@ async function bulkRecalculateWellness() {
   const succeededSnapshots = [];
   const results = await Promise.allSettled(eligible.map(async (e, i) => {
     try {
-      const { calories, protein, notes: standardizedNotes } = await estimateCaloriesAndProtein(e.notes);
+      const { calories, protein } = await estimateCaloriesAndProtein(e.notes);
       await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:G${e.row}`,
-        [[e.date, e.time, 'Calories; Protein', e.description, `${calories}; ${protein}`, 'kcal; g', standardizedNotes]]);
+        [[e.date, e.time, 'Calories; Protein', e.description, `${calories}; ${protein}`, 'kcal; g', e.notes]]);
       succeededSnapshots.push(snapshots[i]);
     } finally {
       done++;

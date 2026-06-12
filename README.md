@@ -198,8 +198,9 @@ ledger/
 ├── robots.txt               # Search engine crawling rules
 ├── sitemap.xml              # Sitemap for search engines
 ├── assets/
-│   ├── social-preview.png   # Open Graph / Twitter card image
-│   ├── apple-touch-icon.png # iOS home-screen icon
+│   ├── images/
+│   │   ├── social-preview.png   # Open Graph / Twitter card image
+│   │   └── apple-touch-icon.png # iOS home-screen icon
 │   ├── style/
 │   │   └── styles.css       # All styling
 │   └── script/

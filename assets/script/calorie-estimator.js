@@ -11,6 +11,21 @@
 // implausible number, whether or not we've seen that specific failure mode yet.
 const WELLNESS_CALORIE_SANITY_CEILING = 3000;
 
+// The breakdown for whatever's currently in the Log Entry form — set by a
+// fresh 🧮 Calculate, or by wellness.js's openWellnessForm restoring a
+// previously-saved one when editing an existing entry (Wellness Log column
+// H — see refreshWellness). Read by submitWellnessForm at Save time so the
+// breakdown persists without needing to re-run Calculate. Cleared by
+// hideCalcBreakdown whenever it would no longer match what's in the form.
+let currentCalcBreakdown = [];
+
+// JSON-encodes a breakdown array for the Wellness Log's Breakdown column,
+// or '' for "nothing to save" (an empty cell reads back as [] either way —
+// see refreshWellness — so there's no ambiguity, just a tidier sheet).
+function breakdownToJson(breakdown) {
+  return (breakdown && breakdown.length) ? JSON.stringify(breakdown) : '';
+}
+
 // USDA search can rank a token-overlap false match above the actual food (e.g.
 // "soybeans" → "Oil, soybean" at 884 kcal/100g instead of the bean at ~140).
 // Trust a database candidate only if it's in the same ballpark as the model's
@@ -49,12 +64,35 @@ function splitNotesIntoSegments(notes) {
 // here, "100g egg white" would strip only "100" and leave "g egg white" as
 // the name — a real bug that banked a bogus "g egg white" row alongside an
 // existing "egg white" one instead of matching it.
-const INGREDIENT_UNIT_WORDS = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays|shot|shots';
+const INGREDIENT_UNIT_WORDS_BASE = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays|shot|shots';
+// "x" is a placeholder pseudo-unit (see below) — included in the LEADING
+// pattern only (not the trailing one) so a note already standardized once
+// (e.g. "1x apple") still parses correctly on a later re-Calculate, instead
+// of leaving "1x" stuck in the name.
+const INGREDIENT_UNIT_WORDS = `x|${INGREDIENT_UNIT_WORDS_BASE}`;
 const INGREDIENT_QUANTITY_PATTERN = new RegExp(
   `^\\s*([\\d.]+)(?:\\s*[-/]\\s*[\\d.]+)?\\s*(${INGREDIENT_UNIT_WORDS})?\\b\\.?\\s*`, 'i'
 );
+// A trailing descriptive unit word (e.g. "watermelon slice") is dropped too
+// — the leading pattern above only strips a unit stuck to the number, this
+// catches the same word when it shows up at the end of the name instead.
+const TRAILING_UNIT_PATTERN = new RegExp(`\\s+(?:${INGREDIENT_UNIT_WORDS_BASE})\\s*$`, 'i');
+// A generic size adjective right after the quantity (e.g. "1 small onion")
+// doesn't change what the food IS or its per-100g density — only its
+// weight, which an actual gram figure already conveys once Calculate
+// determines one — so it's dropped from the identity/name entirely rather
+// than kept as a second, redundant size signal alongside a real weight.
+// Deliberately excludes words like "mini" that usually denote a distinct
+// discrete product (a mini muffin has its own, quite different, calorie
+// count from a regular one — not just a smaller version of the same food).
+const SIZE_DESCRIPTOR_WORDS = 'extra small|extra large|small|medium|large|big|jumbo|tiny';
+const LEADING_DESCRIPTOR_PATTERN = new RegExp(`^(?:${SIZE_DESCRIPTOR_WORDS})\\s+`, 'i');
 function extractIngredientName(segment) {
-  return segment.replace(INGREDIENT_QUANTITY_PATTERN, '').trim();
+  return segment
+    .replace(INGREDIENT_QUANTITY_PATTERN, '')
+    .replace(LEADING_DESCRIPTOR_PATTERN, '')
+    .replace(TRAILING_UNIT_PATTERN, '')
+    .trim();
 }
 
 // A fixed real-world weight for a unit the AI otherwise has to guess at
@@ -63,11 +101,44 @@ function extractIngredientName(segment) {
 // estimate for it. Only "shot"/"shots" is hardcoded like this; other units
 // (cup, tbsp, ...) vary too much by ingredient density to do the same.
 const UNIT_TO_GRAMS = { shot: 30, shots: 30 };
+// Units naturally counted one-by-one (plus the "x" placeholder) — when the
+// user types one of these, the count is already known exactly from the
+// number they typed, so it's trusted over Groq's own "count" extraction,
+// which can (as observed with "spray") decide a unit isn't discrete at all
+// and silently fall back to a raw gram guess — ignoring a Nutrition Facts
+// row's own per-unit count entirely. Deliberately excludes weight/volume
+// units (g, cup, tbsp, ...): those describe a measured amount, not "how
+// many", so forcing a count from them wouldn't mean anything.
+const COUNT_LIKE_UNITS = new Set(['x', 'piece', 'pieces', 'serving', 'servings', 'scoop', 'scoops', 'slice', 'slices', 'spray', 'sprays', 'shot', 'shots']);
 function extractIngredientQuantity(segment) {
   const match = segment.match(INGREDIENT_QUANTITY_PATTERN);
   if (!match) return { quantity: null, unit: null };
   return { quantity: parseFloat(match[1]), unit: match[2] ? match[2].toLowerCase() : null };
 }
+
+// Canonical display form for the Notes standardization below — collapses
+// plurals/synonyms/abbreviation variants to one spelling (e.g. "shots" and
+// "shot" both -> "shot") so the same unit always reads the same way in a
+// saved note, regardless of how it was typed.
+const UNIT_CANONICAL = {
+  x: 'x',
+  g: 'g', gram: 'g', grams: 'g',
+  kg: 'kg', kilogram: 'kg', kilograms: 'kg',
+  mg: 'mg', milligram: 'mg', milligrams: 'mg',
+  oz: 'oz', ounce: 'oz', ounces: 'oz',
+  lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
+  ml: 'ml', milliliter: 'ml', milliliters: 'ml',
+  l: 'l', liter: 'l', liters: 'l', litre: 'l', litres: 'l',
+  cup: 'cup', cups: 'cup',
+  tbsp: 'tbsp', tbsps: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
+  tsp: 'tsp', tsps: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
+  slice: 'slice', slices: 'slice',
+  piece: 'piece', pieces: 'piece',
+  serving: 'serving', servings: 'serving',
+  scoop: 'scoop', scoops: 'scoop',
+  spray: 'spray', sprays: 'spray',
+  shot: 'shot', shots: 'shot',
+};
 
 // Pure calorie/protein estimation core — no DOM reads or writes — shared by
 // the single-entry Calculate button (below) and the Health Log table's bulk
@@ -111,19 +182,26 @@ async function estimateCaloriesAndProtein(notesText) {
   // to a specific segment, so fall back to "query" for just this item rather
   // than guess wrong.
   const segments = splitNotesIntoSegments(notes);
+  const pairingReliable = segments.length === items.length;
+  const segmentQuantities = pairingReliable ? segments.map(extractIngredientQuantity) : [];
   const resolvedNames = items.map((item, i) =>
-    (segments.length === items.length) ? extractIngredientName(segments[i]) : item.query
+    pairingReliable ? extractIngredientName(segments[i]) : item.query
   );
 
   // Override Groq's own gram-weight guess for units with a fixed real-world
-  // weight (currently just "shot" — see UNIT_TO_GRAMS) — deterministic and
-  // always right, instead of a per-call AI estimate for something that
-  // doesn't vary. Same 1:1 pairing guard as resolvedNames above.
-  if (segments.length === items.length) {
+  // weight (currently just "shot" — see UNIT_TO_GRAMS), and override its
+  // "count" for any discrete unit (see COUNT_LIKE_UNITS) with what the user
+  // actually typed — both deterministic and always right, instead of a
+  // per-call AI guess for something that isn't actually in question. Same
+  // 1:1 pairing guard as resolvedNames above.
+  if (pairingReliable) {
     items.forEach((item, i) => {
-      const { quantity, unit } = extractIngredientQuantity(segments[i]);
+      const { quantity, unit } = segmentQuantities[i];
       if (unit && UNIT_TO_GRAMS[unit]) {
         item.grams = (quantity ?? 1) * UNIT_TO_GRAMS[unit];
+      }
+      if (unit && COUNT_LIKE_UNITS.has(unit)) {
+        item.count = quantity ?? 1;
       }
     });
   }
@@ -138,6 +216,7 @@ async function estimateCaloriesAndProtein(notesText) {
   const perItemMacros = await Promise.all(items.map(async (item, i) => {
     const grams = item.grams;
     const name = resolvedNames[i];
+    const { quantity: originalQuantity, unit: originalUnit } = pairingReliable ? segmentQuantities[i] : { quantity: null, unit: null };
 
     // A previously-verified (or manually entered, brand-matched) row
     // always wins over a fresh guess — skip USDA/plausibility-checking
@@ -219,6 +298,24 @@ async function estimateCaloriesAndProtein(notesText) {
       }
     }
 
+    // Standardized Notes line for this item: if the user typed a real unit
+    // themselves (e.g. "50 g yogurt"), keep it — canonicalized and glued
+    // straight to the number, no space (e.g. "50g"). Otherwise there was
+    // just a bare count ("1 apple", "3 egg") — replace that placeholder
+    // with whatever Calculate actually determined: the real gram weight for
+    // a weight-resolved item (Nutrition Facts or USDA/AI), or the matched
+    // unit count for a count-resolved one, since that's more informative
+    // than leaving "1x" in the saved note once the real number is known.
+    let noteQuantity;
+    if (originalUnit) {
+      noteQuantity = `${originalQuantity ?? 1}${UNIT_CANONICAL[originalUnit] || originalUnit}`;
+    } else if (source === 'nutrition-table-count') {
+      noteQuantity = `${item.count ?? originalQuantity ?? 1}x`;
+    } else {
+      noteQuantity = amount;
+    }
+    const noteLine = `${noteQuantity} ${name}`;
+
     console.debug(`[calc] ${name}: ${JSON.stringify({
       query: item.query,
       grams,
@@ -231,7 +328,7 @@ async function estimateCaloriesAndProtein(notesText) {
       itemCalories,
       itemProtein,
     })}`);
-    return { name, amount, source, density, itemCalories, itemProtein };
+    return { name, amount, source, density, itemCalories, itemProtein, noteLine };
   }));
   const calories = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemCalories, 0));
   const protein = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemProtein, 0));
@@ -273,7 +370,11 @@ async function estimateCaloriesAndProtein(notesText) {
     await refreshNutrition(true);
   }
 
-  return { calories, protein, breakdown, usdaUnreachable };
+  // Deterministic reformat of the user's own text — no AI involved — one
+  // ingredient per line, quantity+unit glued with no space (e.g. "50g", "2x").
+  const standardizedNotes = perItemMacros.map((m) => m.noteLine).join('\n');
+
+  return { calories, protein, breakdown, standardizedNotes, usdaUnreachable };
 }
 
 // Renders the per-item breakdown table under Notes so the combined Amount
@@ -318,6 +419,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
 function hideCalcBreakdown() {
   document.getElementById('wellness-calc-breakdown').hidden = true;
   document.getElementById('wellness-calc-breakdown-body').innerHTML = '';
+  currentCalcBreakdown = [];
 }
 
 async function calculateWellnessCalories() {
@@ -335,7 +437,7 @@ async function calculateWellnessCalories() {
   clearFieldError('wellness-form-error');
 
   try {
-    const { calories, protein, breakdown, usdaUnreachable } = await estimateCaloriesAndProtein(notes);
+    const { calories, protein, breakdown, standardizedNotes, usdaUnreachable } = await estimateCaloriesAndProtein(notes);
 
     const description = document.getElementById('wellness-description').value;
     document.getElementById('wellness-category').value = 'Calories; Protein';
@@ -343,6 +445,8 @@ async function calculateWellnessCalories() {
     document.getElementById('wellness-description').value = description;
     document.getElementById('wellness-amount').value = `${calories}; ${protein}`;
     document.getElementById('wellness-unit').value = 'kcal; g';
+    document.getElementById('wellness-notes').value = standardizedNotes;
+    currentCalcBreakdown = breakdown;
     renderCalcBreakdown(breakdown, calories, protein);
 
     const warnings = [];

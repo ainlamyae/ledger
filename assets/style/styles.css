@@ -25,6 +25,9 @@ body {
     font-family: system-ui, sans-serif;
     background: var(--color-bg);
     color: var(--color-text);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 header {
@@ -127,6 +130,9 @@ header .btn {
     background: transparent;
     border-color: rgba(255, 255, 255, .35);
     color: #fff;
+    padding: .4rem .55rem;
+    font-size: 1rem;
+    line-height: 1;
 }
 
 header .btn:hover {
@@ -160,7 +166,7 @@ header .btn:hover {
 }
 
 .gate {
-    min-height: calc(100vh - 65px);
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -241,6 +247,8 @@ header .btn:hover {
 }
 
 .container {
+    flex: 1;
+    width: 100%;
     max-width: 1200px;
     margin: auto;
     padding: 2rem;
@@ -576,4 +584,26 @@ td .btn {
     .cards {
         grid-template-columns: 1fr;
     }
+}
+
+.site-footer {
+    flex-shrink: 0;
+    text-align: center;
+    padding: 1rem;
+    color: var(--color-text-muted);
+    font-size: .8rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.site-footer .footer-divider {
+    margin: 0 .35rem;
+}
+
+.site-footer a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    text-decoration: underline;
 }

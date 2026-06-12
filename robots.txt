@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ainlamyae.github.io/ledger/sitemap.xml

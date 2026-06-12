@@ -1506,6 +1506,10 @@ td .btn {
     max-width: 680px;
 }
 
+.modal-card-xwide {
+    max-width: 960px;
+}
+
 .insight-lookback-label {
     display: flex;
     align-items: center;

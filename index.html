@@ -35,7 +35,7 @@
 <body>
 
 <header>
-    <h1>Ledger</h1>
+    <h1><span class="logo-icon" aria-hidden="true">💰</span><span class="logo-text">Ledger</span></h1>
     <nav id="main-nav" class="nav" hidden>
         <a href="#charts">Charts</a>
         <a href="#transactions">Transactions</a>
@@ -290,6 +290,7 @@
 
             <div class="modal-actions">
                 <button type="button" id="tx-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" id="tx-save-add-btn" class="btn">Save &amp; Add Another</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -308,14 +309,20 @@
                 <input type="text" id="account-institution">
             </label>
             <label>Type
-                <select id="account-type">
-                    <option>Chequing</option>
-                    <option>Savings</option>
-                    <option>Credit</option>
+                <input type="text" id="account-type" list="account-type-options" required>
+                <datalist id="account-type-options">
                     <option>Cash</option>
+                    <option>Chequing</option>
+                    <option>Checking</option>
+                    <option>Saving</option>
+                    <option>Credit</option>
                     <option>Investment</option>
-                    <option>Person (IOU)</option>
-                </select>
+                    <option>Investment (Managed)</option>
+                    <option>Investment (Member)</option>
+                    <option>Investment (Employer)</option>
+                    <option>Person</option>
+                    <option>Other</option>
+                </datalist>
             </label>
             <label>Balance
                 <input type="number" step="0.01" id="account-balance" required>

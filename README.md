@@ -140,7 +140,7 @@ Net worth snapshot and the account list, combined in one tab.
 | Row 2 | Header | `Account \| Institute \| Type \| Balance` |
 | A3:A | Text | Account name — also the dropdown source for `Transactions` and the Accounts table |
 | B3:B | Text | Institution, e.g. a bank or brokerage name |
-| C3:C | Text | Type — one of `Chequing`, `Savings`, `Credit`, `Cash`, `Investment`, `Person (IOU)` |
+| C3:C | Text | Type — one of `Cash`, `Chequing`, `Checking`, `Saving`, `Credit`, `Investment`, `Investment (Managed)`, `Investment (Member)`, `Investment (Employer)`, `Person`, `Other` |
 | D3:D | Number | Account balance |
 
 ### `Categories`

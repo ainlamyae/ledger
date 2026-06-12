@@ -28,16 +28,18 @@ Ledger is a single-page application that authenticates the user with their own G
 
 ## Features
 
-- **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Monthly Net Cash Flow.
-- **Spending vs. Benchmarks** — last month's spending per category compared against quarterly, yearly, and lifelong averages.
+- **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Net Cash Flow.
+- **Spending vs. Benchmarks** — grouped bar chart comparing each category's Last Month, Last Quarter Average, Last Year Average, and Lifelong Average spending; each category's 4 bars are shaded from its own color (most recent = most opaque).
 - **Spending Breakdown by Category** — four donut charts showing each category's share of spending for last month, last quarter average, last year average, and lifelong average.
-- **Income vs Expenses Over Time** — stepped area chart of the full transaction history.
 - **Spending Trend by Category** — stacked bar chart of spending by category, month over month.
+- **Income vs Expenses Over Time** — stepped area chart of the full transaction history.
 - **Cumulative Savings Over Time** — running total of savings as a line chart.
 - **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export.
 - **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
 - **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; a manual refresh and a "clear cache" control are both available.
+
+Category-based charts (Spending vs. Benchmarks, Spending Breakdown by Category, Spending Trend by Category) all derive their colors from the same per-category colors in the `Categories` sheet.
 
 ---
 

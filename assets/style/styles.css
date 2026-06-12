@@ -260,9 +260,15 @@ header .btn:hover {
 
 .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: .75rem;
-    margin-bottom: 2rem;
+    margin-bottom: .75rem;
+}
+
+@media (max-width: 820px) {
+    .cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .card {
@@ -387,15 +393,26 @@ th.sortable:hover {
 
 .chart-box {
     position: relative;
-    height: 200px;
+    height: 180px;
     margin-top: 1rem;
+    min-width: 0;
 }
 
 .donut-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
     margin-top: 1rem;
+}
+
+@media (max-width: 820px) {
+    .donut-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.donut-item {
+    min-width: 0;
 }
 
 .donut-item h3 {
@@ -574,11 +591,6 @@ td .btn {
         padding: 1rem;
     }
 
-    .cards {
-        grid-template-columns: repeat(2, 1fr);
-        gap: .75rem;
-    }
-
     .card {
         padding: 1rem;
     }
@@ -601,7 +613,6 @@ td .btn {
     }
 
     .donut-grid {
-        grid-template-columns: repeat(2, 1fr);
         gap: .75rem;
     }
 

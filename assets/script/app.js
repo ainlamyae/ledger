@@ -198,6 +198,7 @@ async function loadDashboard(forceRefresh = false) {
       currentReport = report;
       renderSummaryCards(report);
       renderSpendingTrendChart(report.categoryComparison);
+      renderSpendingBreakdownCharts(report.categoryComparison);
       renderIncomeExpenseChart(report.incomeExpenseTrend);
       renderExpenseBreakdownTrendChart(report.categoryTrend);
       renderSavingsTrendChart(report.savingsTrend);

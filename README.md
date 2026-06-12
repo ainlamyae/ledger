@@ -28,13 +28,14 @@ Ledger is a single-page application that authenticates the user with their own G
 
 ## Features
 
-- **Net worth & monthly summary** — at-a-glance cards for net worth, monthly income, monthly expenses, and monthly savings.
-- **Spending Trend** — last month's spending per category compared against quarterly, yearly, and lifelong averages.
+- **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Monthly Net Cash Flow.
+- **Spending vs. Benchmarks** — last month's spending per category compared against quarterly, yearly, and lifelong averages.
+- **Spending Breakdown by Category** — four donut charts showing each category's share of spending for last month, last quarter average, last year average, and lifelong average.
 - **Income vs Expenses Over Time** — stepped area chart of the full transaction history.
-- **Expense Breakdown Over Time** — stacked bar chart of spending by category, month over month.
+- **Spending Trend by Category** — stacked bar chart of spending by category, month over month.
 - **Cumulative Savings Over Time** — running total of savings as a line chart.
 - **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export.
-- **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline net-worth recalculation.
+- **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
 - **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; a manual refresh and a "clear cache" control are both available.
 
@@ -87,7 +88,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh | `initAuth`, `signIn`, `signOut`, `getAccessToken` |
 | 3 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, plus hard-refresh (cache + Cache Storage + service workers) | `getCached`, `setCached`, `clearCache`, `hardRefresh` |
-| 5 | `charts.js` | Chart.js renderers for the 4 dashboard charts | `renderSpendingTrendChart`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart` |
+| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart` |
 | 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
 | 7 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |
@@ -101,9 +102,9 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 3. On success, `handleAuthChange(token)` swaps the landing page for the dashboard and calls `loadDashboard()`.
 
 **Dashboard load**
-4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, and `Categories` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category expense breakdown over time, and the Spending Trend comparison.
+4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, and `Categories` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, and the Spending vs. Benchmarks / Spending Breakdown by Category comparisons.
 5. `initTransactions()` and `initAccountManager()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API.
-6. `charts.js` renders all four Chart.js canvases; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
+6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts plus the 4-donut Spending Breakdown by Category grid; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
 
 **Writes** (add/edit/delete transaction or account, edit balance, CSV import)
 7. UI actions call `appendValues` / `updateValues` / `batchUpdate` directly against the spreadsheet.
@@ -135,11 +136,11 @@ Net worth snapshot and the account list, combined in one tab.
 
 | Cell/Column | Type | Notes |
 |---|---|---|
-| D1 | Number (formula) | Net worth total, e.g. `=ROUND(SUM(D3:D100),2)` |
+| D1 | Number (formula) | Total Savings, e.g. `=ROUND(SUM(D3:D100),2)` |
 | Row 2 | Header | `Account \| Institute \| Type \| Balance` |
 | A3:A | Text | Account name — also the dropdown source for `Transactions` and the Accounts table |
 | B3:B | Text | Institution, e.g. a bank or brokerage name |
-| C3:C | Text | Type — one of `Cash`, `Chequing`, `Checking`, `Saving`, `Credit`, `Investment`, `Investment (Managed)`, `Investment (Member)`, `Investment (Employer)`, `Person`, `Other` |
+| C3:C | Text | Type — one of `Chequing`, `Savings`, `Credit`, `Cash`, `Investment`, `Person (IOU)` |
 | D3:D | Number | Account balance |
 
 ### `Categories`
@@ -164,7 +165,7 @@ Net worth snapshot and the account list, combined in one tab.
 
 ### `Benchmarks` (formula-driven)
 
-Pre-computed per-category spending averages, read directly by `app.js` for the Spending Trend chart — re-deriving these client-side from thousands of transaction rows would be wasteful when Sheets already computes them.
+Pre-computed per-category spending averages, read directly by `app.js` for the Spending vs. Benchmarks chart and the Spending Breakdown by Category donuts — re-deriving these client-side from thousands of transaction rows would be wasteful when Sheets already computes them.
 
 | Row | Contents |
 |---|---|
@@ -284,8 +285,8 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | Range | Used in | Purpose |
 |---|---|---|
 | `'Monthly Summary'!A2:L149` | `app.js` | Monthly income/expense/category data, cumulative savings |
-| `'Benchmarks'!A1:K5` | `app.js` | Per-category spending averages for the Spending Trend chart |
-| `'Account Balance'!A1:D1` | `app.js` | Net worth total (`D1`) for the summary card |
+| `'Benchmarks'!A1:K5` | `app.js` | Per-category spending averages for the Spending vs. Benchmarks chart and Spending Breakdown by Category donuts |
+| `'Account Balance'!A1:D1` | `app.js` | Total Savings figure (`D1`) for the summary card |
 | `Categories!A2:B` | `app.js` | Category name → chart color |
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
 | `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
@@ -295,7 +296,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 
 | Cache key | Set by | Contents |
 |---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending Trend comparison) |
+| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending vs. Benchmarks comparison) |
 | `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + account/category dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
 | `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |

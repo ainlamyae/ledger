@@ -89,7 +89,7 @@
 
     <div class="cards">
         <div class="card">
-            <h3>Total Net Worth</h3>
+            <h3>Total Savings</h3>
             <div class="value" id="net-worth">—</div>
         </div>
 
@@ -104,13 +104,13 @@
         </div>
 
         <div class="card">
-            <h3>Monthly Savings</h3>
+            <h3>Monthly Net Cash Flow</h3>
             <div class="value" id="savings-value">—</div>
         </div>
     </div>
 
-    <div class="panel">
-        <h2>Spending Trend</h2>
+    <div class="panel" id="charts">
+        <h2>Spending vs. Benchmarks</h2>
 
         <div class="chart-box">
             <canvas id="spending-trend-chart"></canvas>
@@ -119,7 +119,45 @@
 
     <div style="height:1rem"></div>
 
-    <div class="panel" id="charts">
+    <div class="panel">
+        <h2>Spending Breakdown by Category</h2>
+
+        <div class="donut-grid">
+            <div class="donut-item">
+                <h3>Last Month</h3>
+                <div class="chart-box chart-box-donut">
+                    <canvas id="spending-breakdown-lastmonth-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="donut-item">
+                <h3>Last Quarter Average</h3>
+                <div class="chart-box chart-box-donut">
+                    <canvas id="spending-breakdown-quarter-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="donut-item">
+                <h3>Last Year Average</h3>
+                <div class="chart-box chart-box-donut">
+                    <canvas id="spending-breakdown-year-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="donut-item">
+                <h3>Lifelong Average</h3>
+                <div class="chart-box chart-box-donut">
+                    <canvas id="spending-breakdown-lifelong-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="donut-legend" id="spending-breakdown-legend"></div>
+    </div>
+
+    <div style="height:1rem"></div>
+
+    <div class="panel">
         <h2>Income vs Expenses Over Time</h2>
 
         <div class="chart-box">
@@ -130,7 +168,7 @@
     <div style="height:1rem"></div>
 
     <div class="panel">
-        <h2>Expense Breakdown Over Time</h2>
+        <h2>Spending Trend by Category</h2>
 
         <div class="chart-box">
             <canvas id="expense-breakdown-trend-chart"></canvas>

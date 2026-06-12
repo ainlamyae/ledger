@@ -1,5 +1,4 @@
 const ACCOUNTS_RANGE = `'${CONFIG.SHEETS.ACCOUNTS}'!A3:D100`;
-const ACCOUNT_TYPES = ['Cash', 'Chequing', 'Checking', 'Saving', 'Credit', 'Investment', 'Investment (Managed)', 'Investment (Member)', 'Investment (Employer)', 'Person', 'Other'];
 
 let allAccounts = [];
 let accountsSheetId = null;
@@ -145,10 +144,13 @@ function renderAccountsList() {
 function openAccountForm(account) {
   editingAccountRow = account ? account.row : null;
 
+  const typeSelect = document.getElementById('account-type');
+  const validTypes = [...typeSelect.options].map((o) => o.value);
+
   document.getElementById('account-modal-title').textContent = account ? 'Edit Account' : 'Add Account';
   document.getElementById('account-name').value = account ? account.name : '';
   document.getElementById('account-institution').value = account ? account.institution : '';
-  document.getElementById('account-type').value = account && ACCOUNT_TYPES.includes(account.type) ? account.type : ACCOUNT_TYPES[0];
+  typeSelect.value = account && validTypes.includes(account.type) ? account.type : validTypes[0];
   document.getElementById('account-balance').value = account ? account.balance : 0;
 
   document.getElementById('account-form-error').hidden = true;

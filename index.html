@@ -7,7 +7,28 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Ledger</title>
+
+<meta name="description" content="Ledger is a private, serverless personal finance dashboard. Track net worth, income, expenses, and spending trends — all backed by your own Google Sheet.">
+<link rel="canonical" href="https://ainlamyae.github.io/ledger/">
+<meta name="theme-color" content="#0d2e4f">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ainlamyae.github.io/ledger/">
+<meta property="og:site_name" content="Ledger">
+<meta property="og:title" content="Ledger — Private Personal Finance Dashboard">
+<meta property="og:description" content="Private, serverless personal finance dashboard. Track net worth, income, expenses, and spending trends — all backed by your own Google Sheet.">
+<meta property="og:image" content="https://ainlamyae.github.io/ledger/assets/social-preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Ledger — Private Personal Finance Dashboard">
+<meta name="twitter:description" content="Private, serverless personal finance dashboard. Track net worth, income, expenses, and spending trends — all backed by your own Google Sheet.">
+<meta name="twitter:image" content="https://ainlamyae.github.io/ledger/assets/social-preview.png">
+
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="assets/style/styles.css">
 </head>
 
@@ -22,10 +43,10 @@
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
-        <button id="refresh-btn" class="btn" hidden>Refresh</button>
-        <button id="clear-cache-btn" class="btn" title="Clear cached data and reload the latest version of the app">Clear Cache</button>
-        <button id="signin-btn" class="btn">Sign in</button>
-        <button id="signout-btn" class="btn" hidden>Sign out</button>
+        <button id="refresh-btn" class="btn" title="Refresh" aria-label="Refresh" hidden>🔄</button>
+        <button id="clear-cache-btn" class="btn" title="Clear cached data and reload the latest version of the app" aria-label="Clear cache">🧹</button>
+        <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
+        <button id="signout-btn" class="btn" title="Sign out" aria-label="Sign out" hidden>🚪</button>
     </div>
 </header>
 
@@ -190,6 +211,17 @@
     </div>
 
 </div>
+
+<footer class="site-footer">
+    <p>
+        &copy; <span id="footer-year"></span> ALI. All rights reserved.
+        <span class="footer-divider">•</span>
+        Designed &amp; Developed by
+        <a href="https://ainlamyae.github.io" target="_blank" rel="noopener">
+            ALI
+        </a>
+    </p>
+</footer>
 
 <div id="tx-modal" class="modal" hidden>
     <div class="modal-card">

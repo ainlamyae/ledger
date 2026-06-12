@@ -1,99 +1,81 @@
-# ledger
+# Ledger
 
-A lightweight, serverless personal accounting application built with GitHub Pages and Google Sheets.
+A private, serverless personal finance dashboard. Ledger reads and writes directly to a Google Sheet you own — there is no backend, no database, and no third-party data store. The site is public on GitHub Pages, but the financial data behind it is only ever accessible to the Google account that owns the spreadsheet.
 
-Track income, expenses, account balances, investments, and financial trends while keeping all data in your own private Google account. The site is public (GitHub Pages), but the data behind it stays private — accessible only to whoever signs in with the Google account that owns the spreadsheet.
+## Table of Contents
 
-> **Note:** `Accounting.xlsx` in this repo is a local working copy of real personal financial data. It is listed in `.gitignore` and must never be committed or pushed. It is used here only as a reference for designing the Google Sheets schema below.
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+  - [System Diagram](#system-diagram)
+  - [Frontend Module Map](#frontend-module-map)
+  - [Data Flow](#data-flow)
+- [Data Model](#data-model)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Deployment](#deployment)
+- [Configuration Reference](#configuration-reference)
+- [Caching Strategy](#caching-strategy)
+- [Security & Privacy](#security--privacy)
+- [License](#license)
 
 ---
 
-## Proposed Google Sheets Data Model
+## Overview
 
-A single Google Sheet ("Ledger Database") with the following tabs, shared **only with your own Google account** (private):
+Ledger is a single-page application that authenticates the user with their own Google account, then reads and writes a private "Ledger" Google Sheet via the Sheets API v4. All aggregation, charting, filtering, sorting, and CRUD logic runs client-side in vanilla JavaScript — there is no build step and no server component to deploy or maintain.
 
-### 1. `Transactions`
-| Column | Type | Notes |
-|---|---|---|
-| Date | Date | ISO format, real date cell |
-| Account | Text | From `Account Balance` dropdown |
-| Payee | Text | Merchant / person / institution |
-| Description | Text | Optional detail |
-| Amount | Number | Positive = income, negative = expense. The sign alone defines the type — no separate Income/Expense/Transfer column. Transfers between own accounts aren't recorded. |
-| Category | Text | From `Categories` dropdown |
+## Features
 
-Column order (A–F) matches what `Monthly Summary`'s `SUMIFS` formulas already expect (`E` = Amount, `F` = Category).
-
-### 2. `Account Balance`
-Net worth snapshot + account validation list combined into one tab.
-
-| Cell/Column | Type | Notes |
-|---|---|---|
-| D1 | Number (formula) | Net worth total, e.g. `=ROUND(SUM(D3:D100),2)` — widened beyond the current row count to leave headroom for new accounts |
-| Row 2 | Header | `Account \| Institute \| Type \| Balance` |
-| A3:A | Text | Account name (data validation source for `Transactions`, and the dashboard's Accounts table) |
-| B3:B | Text | Institution, e.g. Wealthsimple, CIBC, RBC, Tangerine |
-| C3:C | Text | Type — Cash / Chequing / Checking / Saving / Credit / Investment / Investment (Managed) / Person / Other |
-| D3:D | Number | Account balance (manually maintained, or a formula referencing e.g. `GOOGLEFINANCE`); `"Closed"` (text) for retired accounts — excluded from the dashboard accounts panel |
-
-### 3. `Categories`
-| Column | Type | Notes |
-|---|---|---|
-| Category | Text | e.g. Grocery, Transportation, Medical |
-| Color | Text | Hex color for charts |
-
-### Helper tabs (formula-only)
-- **`Benchmarks`** — "Last Month / Last Quarter Average / Last Year Average / Lifelong Average" rollups of `Monthly Summary`, per category. Read directly by `app.js` for the "Spending Trend" chart — the dashboard never recomputes these averages itself (with 10k+ transaction rows, re-deriving them client-side would be wasteful when Google Sheets already computes them).
-- **`Reconciliation`** — reconciles `Monthly Summary`'s cumulative savings against `Account Balance`'s net worth total (`'Account Balance'!D1`). Not read by the app.
-- **`Chart`** — native Google Sheets charts (visual reference only; the live dashboard uses its own Chart.js charts). Not read by the app.
-
-### `Monthly Summary`
-
-`Monthly Summary` stays and remains formula-driven (`SUMIFS` against `Transactions`), so it's always computed by Google Sheets and reflects the latest data with zero frontend aggregation. Row 1 is the header; data rows start at row 2.
+- **Net worth & monthly summary** — at-a-glance cards for net worth, monthly income, monthly expenses, and monthly savings.
+- **Spending Trend** — last month's spending per category compared against quarterly, yearly, and lifelong averages.
+- **Income vs Expenses Over Time** — stepped area chart of the full transaction history.
+- **Expense Breakdown Over Time** — stacked bar chart of spending by category, month over month.
+- **Cumulative Savings Over Time** — running total of savings as a line chart.
+- **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export.
+- **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline net-worth recalculation.
+- **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
+- **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; a manual refresh and a "clear cache" control are both available.
 
 ---
 
 ## Architecture
 
-### System Overview
+### System Diagram
+
+Ledger is a static site that talks directly to Google's APIs from the browser. There is no application server in the request path.
 
 ```text
-┌────────────────────────────────────────────────────────────────────┐
-│                          Browser (Client)                           │
-│                                                                       │
-│   GitHub Pages static site — index.html + assets/style + assets/script │
-│   Vanilla JS (ES6+), no build step, no backend server                │
-└───────────────────┬───────────────────────────────┬─────────────────┘
-                     │                               │
-                     │ 1. OAuth 2.0 token request    │ 3. REST calls
-                     │   (Google Identity Services)  │   Authorization: Bearer <token>
-                     ▼                               ▼
-     ┌───────────────────────────┐    ┌──────────────────────────────────┐
-     │  Google Identity Services  │    │      Google Sheets API v4         │
-     │  accounts.google.com       │    │      sheets.googleapis.com        │
-     │  - issues access token     │───▶│      (validates token + scope)    │
-     │  - scope: spreadsheets   2.│    │                                    │
-     └───────────────────────────┘    └─────────────────┬──────────────────┘
-                                                          │ 4. read / write
+┌───────────────────────────────────────────────────────────────────────┐
+│                            Browser (Client)                            │
+│                                                                         │
+│   GitHub Pages static site: index.html + assets/style + assets/script │
+│   Vanilla JS (ES6+), classic <script> tags, no build step             │
+└───────────────────┬─────────────────────────────┬─────────────────────┘
+                     │                             │
+   (1) OAuth 2.0 token request      (3) REST calls — Authorization: Bearer <token>
+       via Google Identity Services                │
+                     │                             │
+                     ▼                             ▼
+     ┌────────────────────────────┐   ┌─────────────────────────────────┐
+     │  Google Identity Services   │   │       Google Sheets API v4       │
+     │  accounts.google.com        │   │       sheets.googleapis.com      │
+     │  - issues OAuth access token│──▶│  (2) validates token + scope     │
+     │  - scope: .../spreadsheets  │   └────────────────┬──────────────────┘
+     └────────────────────────────┘                    │ (4) read / write
                                                           ▼
                                   ┌─────────────────────────────────────────────┐
-                                  │       "Ledger Database" Google Sheet        │
-                                  │      (private; shared with owner only)      │
-                                  │                                             │
-                                  │ ┌──────────────┐ ┌─────────────────┐        │
-                                  │ │ Transactions │ │ Account Balance │        │
-                                  │ └──────────────┘ └─────────────────┘        │
-                                  │ ┌─────────────────┐ ┌────────────┐          │
-                                  │ │ Monthly Summary │ │ Categories │          │
-                                  │ │   (formulas)    │ │            │          │
-                                  │ └─────────────────┘ └────────────┘          │
-                                  │ ┌────────────┐ ┌────────────────┐ ┌───────┐ │
-                                  │ │ Benchmarks │ │ Reconciliation │ │ Chart │ │
-                                  │ └────────────┘ └────────────────┘ └───────┘ │
-                                  └─────────────────────────────────────────────┘
+                                  │          "Ledger" Google Sheet               │
+                                  │       (private; shared with owner only)      │
+                                  │                                               │
+                                  │  Transactions    Account Balance             │
+                                  │  Categories      Monthly Summary (formulas)  │
+                                  │  Benchmarks (formulas)                       │
+                                  └───────────────────────────────────────────────┘
 ```
 
-Because every Sheets API call carries the signed-in user's own OAuth token, only accounts the spreadsheet has been shared with (i.e., the owner) can ever read or write data — even though the static site and `config.js` (Client ID + Spreadsheet ID) are public.
+Because every Sheets API call carries the signed-in user's own OAuth token, only the Google account the spreadsheet is shared with can ever read or write data — even though the static site and `config.js` (Client ID + Spreadsheet ID) are public.
 
 ### Frontend Module Map
 
@@ -104,64 +86,215 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 1 | `config.js` | `CONFIG`: Client ID, Spreadsheet ID, sheet tab names | `CONFIG` |
 | 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh | `initAuth`, `signIn`, `signOut`, `getAccessToken` |
 | 3 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
-| 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL | `getCached`, `setCached`, `clearCache` |
-| 5 | `charts.js` | Chart.js renderers for the 4 dashboard charts: Spending Trend (bar vs. `Benchmarks` averages), Income vs Expenses Over Time (stepped area), Expense Breakdown Over Time (stacked bar, y-axis capped so outlier months don't flatten the rest), Cumulative Savings Over Time (line) | `render*Chart` |
+| 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, plus hard-refresh (cache + Cache Storage + service workers) | `getCached`, `setCached`, `clearCache`, `hardRefresh` |
+| 5 | `charts.js` | Chart.js renderers for the 4 dashboard charts | `renderSpendingTrendChart`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart` |
 | 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
-| 7 | `accounts.js` | Accounts table: merged balance + validation-list view (Name/Institution/Type/Balance), sortable, CRUD with inline balance editing | `initAccountManager` |
+| 7 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |
 | 9 | `app.js` | Orchestration: report aggregation, dashboard rendering, scroll-spy nav, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange` |
 
 ### Data Flow
 
-**Page load / sign-in**
+**Sign-in**
 1. `app.js` calls `initAuth(handleAuthChange)`.
-2. `auth.js` checks `localStorage` for a non-expired token. If found, it's used immediately; if not, a *silent* `requestAccessToken({ prompt: 'none' })` is tried against the existing Google session (so PWA/home-screen users aren't forced to re-auth). Only if that fails does the landing page's "Sign in with Google" button trigger a full consent prompt.
+2. `auth.js` checks `localStorage` for a non-expired token. If found, it's used immediately. If not, a *silent* `requestAccessToken({ prompt: 'none' })` is tried against the existing Google session — only if that fails does the landing page's "Sign in with Google" button trigger a full consent prompt.
 3. On success, `handleAuthChange(token)` swaps the landing page for the dashboard and calls `loadDashboard()`.
 
 **Dashboard load**
-4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or calls `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, and `Categories` ranges in one round trip, then derives the summary cards, the income/expense and cumulative-savings trends (full history), the per-category expense breakdown over time, and the Spending Trend comparison (last month vs. quarter/year/lifelong averages, read directly from `Benchmarks`).
-5. `initTransactions()` and `initAccountManager()` similarly check cache (`ledger_cache_transactions`, `ledger_cache_lists`, `ledger_cache_account-list`, `ledger_cache_accounts-meta`) before calling the Sheets API.
-6. `charts.js` renders all four Chart.js canvases; `app.js` renders the summary cards; `accounts.js` renders the Accounts table.
+4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, and `Categories` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category expense breakdown over time, and the Spending Trend comparison.
+5. `initTransactions()` and `initAccountManager()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API.
+6. `charts.js` renders all four Chart.js canvases; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
 
 **Writes** (add/edit/delete transaction or account, edit balance, CSV import)
 7. UI actions call `appendValues` / `updateValues` / `batchUpdate` directly against the spreadsheet.
 8. On success, the relevant cache key is refreshed (`refreshTransactions(true)`, `refreshAccountsList(true)`, `refreshNetWorth()`, etc.) so the UI reflects the change immediately without a full page reload.
-9. The manual **Refresh** button calls `clearCache()` then `loadDashboard(true)`, forcing a full re-fetch of everything.
 
-### Configuration Reference
+**Manual refresh**
+9. The 🔄 Refresh button clears the cache and re-fetches everything. The 🧹 Clear Cache button additionally clears Cache Storage and unregisters any service workers, then reloads — for recovering from a stale deployed version.
 
-`assets/script/config.js`:
+---
 
-| Key | Example | Notes |
+## Data Model
+
+A single Google Sheet ("Ledger") with the following tabs, shared **only with the owner's Google account**.
+
+### `Transactions`
+
+| Column | Type | Notes |
 |---|---|---|
-| `CLIENT_ID` | `*.apps.googleusercontent.com` | OAuth 2.0 Web Client ID; must allow the GitHub Pages origin |
-| `SPREADSHEET_ID` | (from the sheet's URL) | The "Ledger Database" spreadsheet ID |
-| `SHEETS.TRANSACTIONS` | `Transactions` | Tab name for transaction rows |
-| `SHEETS.REPORT` | `Monthly Summary` | Tab name for the formula-driven monthly report |
-| `SHEETS.BENCHMARKS` | `Benchmarks` | Tab name for the pre-computed per-category spending averages |
-| `SHEETS.BALANCE` | `Account Balance` | Tab name for the net-worth/account balances sheet |
-| `SHEETS.ACCOUNTS` | `Account Balance` | Same tab as `BALANCE` — account validation list lives in columns B-D |
-| `SHEETS.CATEGORIES` | `Categories` | Tab name for category names + chart colors |
+| A — Date | Date | ISO format |
+| B — Account | Text | Must match a name in `Account Balance` column A |
+| C — Payee | Text | Merchant / person / institution |
+| D — Description | Text | Optional detail |
+| E — Amount | Number | Positive = income, negative = expense. The sign alone defines the type — there is no separate Income/Expense column. |
+| F — Category | Text | Must match a name in `Categories` column A |
 
-These IDs are not secrets — see *Privacy & Security*.
+### `Account Balance`
+
+Net worth snapshot and the account list, combined in one tab.
+
+| Cell/Column | Type | Notes |
+|---|---|---|
+| D1 | Number (formula) | Net worth total, e.g. `=ROUND(SUM(D3:D100),2)` |
+| Row 2 | Header | `Account \| Institute \| Type \| Balance` |
+| A3:A | Text | Account name — also the dropdown source for `Transactions` and the Accounts table |
+| B3:B | Text | Institution, e.g. a bank or brokerage name |
+| C3:C | Text | Type — one of `Cash`, `Chequing`, `Checking`, `Saving`, `Credit`, `Investment`, `Investment (Managed)`, `Investment (Member)`, `Investment (Employer)`, `Person`, `Other` |
+| D3:D | Number | Account balance |
+
+### `Categories`
+
+| Column | Type | Notes |
+|---|---|---|
+| A — Category | Text | e.g. Grocery, Transportation, Medical |
+| B — Color | Text | Hex color used for chart series |
+
+### `Monthly Summary` (formula-driven)
+
+`SUMIFS` against `Transactions`, recomputed automatically whenever transaction data changes — no client-side aggregation. Row 1 is the header; data rows start at row 2.
+
+| Column | Contents |
+|---|---|
+| A | Month label |
+| B | Income |
+| C | Expenses |
+| D–J | Per-category expense totals (7 categories: Fee, Grocery, Transportation, Personal & Household, Medical, Application, Donation) |
+| K | Saved (income − expenses) |
+| L | Cumulative savings |
+
+### `Benchmarks` (formula-driven)
+
+Pre-computed per-category spending averages, read directly by `app.js` for the Spending Trend chart — re-deriving these client-side from thousands of transaction rows would be wasteful when Sheets already computes them.
+
+| Row | Contents |
+|---|---|
+| 1 | Header — category names per column |
+| 2 | Last Month |
+| 3 | Last Quarter Average |
+| 4 | Last Year Average |
+| 5 | Lifelong Average |
+
+---
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Frontend | HTML5, CSS3, vanilla JavaScript (ES6+) — no framework, no build step |
+| Charts | [Chart.js](https://www.chartjs.org/) |
+| Authentication | [Google Identity Services](https://developers.google.com/identity) (GIS), OAuth 2.0 token flow, `spreadsheets` scope |
+| Data store | Google Sheets API v4 |
+| Hosting | GitHub Pages |
+
+---
+
+## Project Structure
+
+```text
+ledger/
+├── index.html              # Page shell: sign-in gate, dashboard, modals, footer
+├── favicon.svg              # Browser tab icon
+├── manifest.json            # Web app manifest (PWA/home-screen install)
+├── robots.txt               # Search engine crawling rules
+├── sitemap.xml              # Sitemap for search engines
+├── assets/
+│   ├── social-preview.png   # Open Graph / Twitter card image
+│   ├── apple-touch-icon.png # iOS home-screen icon
+│   ├── style/
+│   │   └── styles.css       # All styling
+│   └── script/
+│       ├── config.js        # Client ID + Spreadsheet ID + sheet/range names
+│       ├── auth.js           # Google Identity Services sign-in/out, token storage
+│       ├── sheets.js         # Sheets API wrapper (get, batchGet, append, update, batchUpdate)
+│       ├── cache.js          # localStorage cache + hard refresh
+│       ├── charts.js         # Chart.js renderers
+│       ├── transactions.js   # Transactions table: filters, sorting, CRUD
+│       ├── accounts.js       # Accounts table: balances + CRUD
+│       ├── csv.js            # CSV export/import for transactions
+│       └── app.js            # Orchestration, report aggregation, scroll-spy nav
+├── LICENSE
+└── README.md
+```
+
+---
+
+## Getting Started
+
+### 1. Create the Google Sheet
+
+Create a new spreadsheet named "Ledger" with the tabs described in [Data Model](#data-model). Share it only with your own Google account (the default — no extra action needed).
+
+### 2. Create a Google Cloud OAuth client
+
+1. Create a Google Cloud project and enable the **Google Sheets API**.
+2. Create an **OAuth 2.0 Client ID** (Web application).
+3. Add the origin(s) the app will be served from (e.g. `https://<your-username>.github.io`) as authorized JavaScript origins. For local development, also add `http://localhost:8000`.
+
+### 3. Configure the app
+
+Edit `assets/script/config.js`:
+
+```js
+const CONFIG = {
+  CLIENT_ID: '<your-client-id>.apps.googleusercontent.com',
+  SPREADSHEET_ID: '<your-spreadsheet-id>',
+  SHEETS: {
+    TRANSACTIONS: 'Transactions',
+    REPORT: 'Monthly Summary',
+    BENCHMARKS: 'Benchmarks',
+    BALANCE: 'Account Balance',
+    ACCOUNTS: 'Account Balance',
+    CATEGORIES: 'Categories',
+  },
+};
+```
+
+These values are not secrets — see [Security & Privacy](#security--privacy).
+
+### 4. Run locally
+
+No build step is required. Serve the directory with any static file server, e.g.:
+
+```sh
+python -m http.server 8000
+```
+
+Then open `http://localhost:8000`.
+
+---
+
+## Deployment
+
+The app is a static site — any static host works, but GitHub Pages requires zero configuration:
+
+1. Push the repository to GitHub.
+2. Open **Settings → Pages**.
+3. Under **Source**, select **Deploy from a branch**, branch `main`, folder `/ (root)`.
+4. Save. The site will be published at `https://<your-username>.github.io/<repo-name>`.
+
+Make sure that URL is added as an authorized JavaScript origin for the OAuth client (see [Getting Started](#getting-started)).
+
+---
+
+## Configuration Reference
 
 **Sheet ranges read/written by the app:**
 
 | Range | Used in | Purpose |
 |---|---|---|
-| `'Monthly Summary'!A2:L149` | `app.js` | Monthly income/expense/category data, cumulative savings (row 1 is the header) |
-| `'Benchmarks'!A1:K5` | `app.js` | Pre-computed Last Month / Last Quarter / Last Year / Lifelong Average per category for the "Spending Trend" chart |
+| `'Monthly Summary'!A2:L149` | `app.js` | Monthly income/expense/category data, cumulative savings |
+| `'Benchmarks'!A1:K5` | `app.js` | Per-category spending averages for the Spending Trend chart |
 | `'Account Balance'!A1:D1` | `app.js` | Net worth total (`D1`) for the summary card |
 | `Categories!A2:B` | `app.js` | Category name → chart color |
-| `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows (Date, Account, Payee, Description, Amount, Category) |
-| `'Account Balance'!A3:D100` | `accounts.js` | Account Name, Institution, Type, Balance |
+| `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
+| `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
 | `'Account Balance'!A3:A100`, `Categories!A2:A` | `transactions.js` | Dropdown option lists for the transaction form |
 
 **Client-side cache (`localStorage`, 5-minute TTL via `cache.js`):**
 
 | Cache key | Set by | Contents |
 |---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report object (summary cards, chart data, Spending Trend comparison) |
+| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending Trend comparison) |
 | `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + account/category dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
 | `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |
@@ -171,105 +304,29 @@ These IDs are not secrets — see *Privacy & Security*.
 
 | Key | Set by | Contents |
 |---|---|---|
-| `ledger_token` | `auth.js` | `{ token, expiresAt }` — OAuth access token + expiry, enables silent refresh on PWA relaunch |
+| `ledger_token` | `auth.js` | `{ token, expiresAt }` — OAuth access token + expiry, enables silent refresh |
 
 ---
 
-## Technology Stack
+## Caching Strategy
 
-### Frontend
-* HTML5
-* CSS3
-* JavaScript (ES6+, no framework/build step — keeps GitHub Pages deploy trivial)
-
-### Storage
-* Google Sheets ("Ledger Database" workbook, schema above)
-
-### Authentication
-* Google Identity Services (GIS) — OAuth 2.0 implicit/token flow, Sheets API scope only
-
-### Hosting
-* GitHub Pages
-
-### Visualization
-* Chart.js
+- `index.html` is served with `Cache-Control: no-cache, no-store, must-revalidate`, so the app shell is never stale.
+- All Sheets API responses are cached in `localStorage` for 5 minutes (`cache.js`), keyed per data set (see [Configuration Reference](#configuration-reference)).
+- Every write operation (add/edit/delete) immediately refreshes only the affected cache entries, so the UI updates without a full reload.
+- The 🔄 **Refresh** button clears the cache and re-fetches all data.
+- The 🧹 **Clear Cache** button additionally purges Cache Storage and unregisters any service workers before reloading — useful if a browser has pinned an old deployed version.
 
 ---
 
-## Project Structure
+## Security & Privacy
 
-```text
-ledger/
-│
-├── index.html              # Dashboard shell + sign-in gate
-├── favicon.svg             # Browser tab icon
-├── assets/
-│   ├── style/
-│   │   └── styles.css      # Extracted from former inline <style>
-│   └── script/
-│       ├── app.js          # App init, view routing, state
-│       ├── auth.js         # Google Identity Services sign-in/out, token storage
-│       ├── cache.js         # Local cache for fetched report/transaction data
-│       ├── sheets.js       # Sheets API wrapper (batchGet, append, update, delete)
-│       ├── charts.js       # Chart.js setup: Spending Trend, Income vs Expenses, Expense Breakdown, Cumulative Savings
-│       ├── transactions.js # Transactions table, filters, sorting, add/edit/delete
-│       ├── accounts.js     # Accounts table: balances + validation list, CRUD + sorting
-│       ├── csv.js          # CSV export/import for transactions
-│       └── config.js       # Client ID + Spreadsheet ID + sheet/range names
-├── Accounting.xlsx          # local source data — gitignored, never pushed
-├── .gitignore
-└── README.md
-```
-
----
-
-## Setup Guide (one-time)
-
-1. **Create the Google Sheet**
-   - New spreadsheet, add tabs per the *Proposed Google Sheets Data Model* above.
-   - Copy data from `Accounting.xlsx` (clean dates, accounts, categories per the *Issues* list).
-   - Share it only with your own Google account (default — do nothing extra).
-
-2. **Google Cloud project**
-   - Create a project, enable the **Google Sheets API**.
-   - Create an **OAuth 2.0 Client ID** (Web application).
-   - Add `https://ainlamyae.github.io` as an authorized JavaScript origin.
-
-3. **Configure the app**
-   - In `config.js`, set `CLIENT_ID` and `SPREADSHEET_ID`.
-   - These values are not secrets — access is enforced by Google's per-user OAuth consent + the spreadsheet's sharing settings, not by hiding these IDs.
-
-4. **Deploy** (see Deployment section below).
-
----
-
-## Deployment
-
-1. Push the repository to GitHub.
-2. Open **Settings → Pages**.
-3. Select:
-   * Source: Deploy from a branch
-   * Branch: `main`
-   * Folder: `/ (root)`
-4. Save.
-
-Your site will be available at:
-
-```text
-https://ainlamyae.github.io/ledger
-```
-
----
-
-## Privacy & Security
-
-* Data lives in a private Google Sheet, shared with no one but the owner.
-* Frontend uses per-user Google OAuth — visitors who aren't granted access to the sheet can sign in with their own Google account but the Sheets API will simply deny them.
-* No password storage, no custom backend server.
-* `Accounting.xlsx` (real personal data) stays local only — see `.gitignore`.
+- Financial data lives in a private Google Sheet, shared with no one but the owner.
+- The frontend authenticates with per-user Google OAuth (`spreadsheets` scope). Anyone can load the static site and sign in with their own Google account, but the Sheets API will simply deny access to a spreadsheet they don't own or have been shared.
+- `CLIENT_ID` and `SPREADSHEET_ID` in `config.js` are not secrets — access is enforced by Google's OAuth consent and the spreadsheet's sharing settings, not by hiding these IDs.
+- There is no backend, no password storage, and no third-party data store.
 
 ---
 
 ## License
 
-No license
+All rights reserved. See [LICENSE](LICENSE) — no permission is granted to copy, modify, or redistribute this project without the copyright holder's prior written consent.

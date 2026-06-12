@@ -26,6 +26,8 @@ A private, serverless personal finance dashboard. Ledger reads and writes direct
 
 Ledger is a single-page application that authenticates the user with their own Google account, then reads and writes a private "Ledger" Google Sheet via the Sheets API v4. All aggregation, charting, filtering, sorting, and CRUD logic runs client-side in vanilla JavaScript — there is no build step and no server component to deploy or maintain.
 
+![Ledger dashboard screenshot](assets/images/dashboard-screenshot.png)
+
 ## Features
 
 - **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Net Cash Flow.

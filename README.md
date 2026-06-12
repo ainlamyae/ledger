@@ -167,9 +167,11 @@ Net worth snapshot and the account list, combined in one tab.
 | A | Month label |
 | B | Income |
 | C | Expenses |
-| D–J | Per-category expense totals (7 categories: Fee, Grocery, Transportation, Personal & Household, Medical, Application, Donation) |
+| D onward | Per-category expense totals — one column per row in `Categories`, matched by header name (see below) |
 | K | Saved (income − expenses) |
 | L | Cumulative savings |
+
+`app.js` reads row 1 as headers and matches each name in `Categories` column A against both the `Monthly Summary` and `Benchmarks` headers to find its column. Adding or renaming a category only requires updating the `Categories` sheet and adding a matching column/header to `Monthly Summary` and `Benchmarks` — no code changes needed.
 
 ### `Benchmarks` (formula-driven)
 
@@ -292,7 +294,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 
 | Range | Used in | Purpose |
 |---|---|---|
-| `'Monthly Summary'!A2:L149` | `app.js` | Monthly income/expense/category data, cumulative savings |
+| `'Monthly Summary'!A1:Z149` | `app.js` | Header row (for dynamic category column matching) plus monthly income/expense/category data and cumulative savings |
 | `'Benchmarks'!A1:K5` | `app.js` | Per-category spending averages for the Spending vs. Benchmarks chart and Spending Breakdown by Category donuts |
 | `'Account Balance'!A1:D1` | `app.js` | Total Savings figure (`D1`) for the summary card |
 | `Categories!A2:B` | `app.js` | Category name → chart color |

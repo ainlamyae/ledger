@@ -97,6 +97,7 @@ async function refreshAccountsList(forceRefresh = false) {
   }));
 
   renderAccountsList();
+  renderAccountCompositionChart(allAccounts);
 }
 
 function renderAccountsList() {

@@ -36,6 +36,8 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Spending Trend by Category** — stacked bar chart of spending by category, month over month.
 - **Income vs Expenses Over Time** — stepped area chart of the full transaction history.
 - **Cumulative Savings Over Time** — running total of savings as a line chart.
+- **Savings Rate Trend** — monthly savings rate (saved ÷ income, as a %) as a line chart.
+- **Account Composition** — nested donut chart: the inner ring shows each account type's share of total balance, the outer ring breaks that down by individual account (shaded by its type's color).
 - **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export.
 - **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
@@ -50,6 +52,8 @@ Category-based charts (Spending vs. Benchmarks, Spending Breakdown by Category, 
 ### System Diagram
 
 Ledger is a static site that talks directly to Google's APIs from the browser. There is no application server in the request path.
+
+![Ledger system architecture diagram](assets/images/architecture-diagram.png)
 
 ```text
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -92,7 +96,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh | `initAuth`, `signIn`, `signOut`, `getAccessToken` |
 | 3 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, plus hard-refresh (cache + Cache Storage + service workers) | `getCached`, `setCached`, `clearCache`, `hardRefresh` |
-| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart` |
+| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid and the nested Account Composition donut | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderSavingsRateChart`, `renderAccountCompositionChart` |
 | 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
 | 7 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |

@@ -1,4 +1,5 @@
 const TOKEN_STORAGE_KEY = 'ledger_token';
+const CONSENTED_STORAGE_KEY = 'ledger_consented';
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
 let tokenClient = null;
@@ -26,8 +27,6 @@ function initAuth(onAuthChange) {
   authChangeHandler = onAuthChange;
   accessToken = loadStoredToken();
 
-  let silentAttempt = false;
-
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
     scope: SHEETS_SCOPE,
@@ -35,33 +34,24 @@ function initAuth(onAuthChange) {
       if (response.error) {
         console.error('OAuth error:', response);
         accessToken = null;
-        if (!silentAttempt) authChangeHandler(null, response);
-        silentAttempt = false;
+        authChangeHandler(null, response);
         return;
       }
       accessToken = response.access_token;
       storeToken(accessToken, response.expires_in);
       authChangeHandler(accessToken);
-      silentAttempt = false;
     },
     error_callback: (err) => {
       console.error('OAuth flow error:', err);
-      if (!silentAttempt) authChangeHandler(null, err);
-      silentAttempt = false;
+      authChangeHandler(null, err);
     },
   });
 
-  if (accessToken) {
-    authChangeHandler(accessToken);
-  } else {
-    // No valid cached token (e.g. expired, or first launch from a
-    // home-screen icon where sessionStorage didn't persist). Try a
-    // silent refresh against the existing Google session before
-    // falling back to the sign-in gate.
-    authChangeHandler(null);
-    silentAttempt = true;
-    tokenClient.requestAccessToken({ prompt: 'none' });
-  }
+  // No automatic popup here: requesting a token without a user gesture
+  // (even with prompt: 'none') opens a real browser window/tab, which
+  // flashes on desktop and fails outright on mobile Chrome. Fall back
+  // to the sign-in gate and let the user's tap drive the OAuth popup.
+  authChangeHandler(accessToken);
 }
 
 function signIn() {

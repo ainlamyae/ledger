@@ -1145,7 +1145,7 @@ th.sortable:hover {
 }
 
 .donut-grid.wellness-metrics-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: 1fr;
 }
 
 /* The 4 chart tiles get the same card framing as the 4 stat tiles above
@@ -1177,7 +1177,6 @@ th.sortable:hover {
 }
 
 @media (max-width: 820px) {
-    .donut-grid.wellness-metrics-grid,
     .today-glance-cards {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -1559,6 +1558,40 @@ td .btn {
 
 #insight-body strong {
     color: var(--color-text);
+}
+
+.food-insight-question-label {
+    display: block;
+    margin-bottom: .75rem;
+    font-size: .85rem;
+    color: var(--color-text-muted);
+}
+
+.food-insight-question-label textarea {
+    display: block;
+    width: 100%;
+    margin-top: .25rem;
+    font: inherit;
+    font-size: var(--input-font-size);
+    padding: .5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    resize: vertical;
+}
+
+#food-insight-table {
+    margin-bottom: 1rem;
+}
+
+#food-insight-body p {
+    margin: 0 0 1rem;
+    line-height: 1.55;
+}
+
+#food-insight-body p:last-child {
+    margin-bottom: 0;
 }
 
 .export-date-range {

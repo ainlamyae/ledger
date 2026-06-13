@@ -93,7 +93,7 @@
             <div class="landing-features-group-cards">
                 <div class="landing-feature landing-feature-health">
                     <h3>🩺 Health Tracker</h3>
-                    <p>Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 14 days versus daily targets.</p>
+                    <p>Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus daily targets.</p>
                 </div>
 
                 <div class="landing-feature landing-feature-health">
@@ -119,6 +119,11 @@
                 <div class="landing-feature landing-feature-health">
                     <h3>💡 AI Health Insight</h3>
                     <p>Get a plain-language read on your recent habits: a 7/14/30-day snapshot compared against your own targets and trend, reviewed by AI in a closable report — nothing is sent until you ask, and nothing is saved.</p>
+                </div>
+
+                <div class="landing-feature landing-feature-health">
+                    <h3>🥗 AI Food Insight</h3>
+                    <p>See every ingredient you've actually eaten over the last 7/14/30 days, totaled up by amount, calories, and protein — then ask AI a free-text question about it, like which vitamins or minerals your diet might be missing.</p>
                 </div>
             </div>
 
@@ -271,6 +276,29 @@
         <div class="panel">
             <h2>Health Metrics</h2>
 
+            <div class="weight-projection-wrap">
+                <div class="weight-projection-header">
+                    <h4>Weight Trend & Forecast</h4>
+                    <div class="weight-projection-actions">
+                        <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
+                        <button id="wellness-insight-btn" class="btn" title="Get an AI-generated read on your last 7 days">💡 Insight</button>
+                        <button id="food-insight-btn" class="btn" title="Get an AI-generated read on possible vitamin/mineral gaps in your recent food">🥗 Food Insight</button>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <canvas id="wellness-projection-chart"></canvas>
+                </div>
+                <div class="weight-progress-meter" id="weight-progress-meter" hidden>
+                    <div class="weight-progress-meter-track">
+                        <div class="weight-progress-meter-fill" id="weight-progress-meter-fill"></div>
+                    </div>
+                    <div class="weight-progress-meter-stats">
+                        <span id="weight-progress-meter-pct" class="weight-progress-meter-pct"></span>
+                        <span id="weight-projection-eta" class="weight-eta"></span>
+                    </div>
+                </div>
+            </div>
+
             <div class="donut-grid wellness-metrics-grid">
                 <div class="donut-item">
                     <h4>Caloric Intake</h4>
@@ -297,28 +325,6 @@
                     <h4>Rest &amp; Recovery</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-sleep-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="weight-projection-wrap">
-                <div class="weight-projection-header">
-                    <h4>Weight Trend & Forecast</h4>
-                    <div class="weight-projection-actions">
-                        <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
-                        <button id="wellness-insight-btn" class="btn" title="Get an AI-generated read on your last 7 days">💡 Insight</button>
-                    </div>
-                </div>
-                <div class="chart-box">
-                    <canvas id="wellness-projection-chart"></canvas>
-                </div>
-                <div class="weight-progress-meter" id="weight-progress-meter" hidden>
-                    <div class="weight-progress-meter-track">
-                        <div class="weight-progress-meter-fill" id="weight-progress-meter-fill"></div>
-                    </div>
-                    <div class="weight-progress-meter-stats">
-                        <span id="weight-progress-meter-pct" class="weight-progress-meter-pct"></span>
-                        <span id="weight-projection-eta" class="weight-eta"></span>
                     </div>
                 </div>
             </div>
@@ -1098,6 +1104,47 @@
     </div>
 </div>
 
+<div id="food-insight-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="food-insight-modal-title" hidden>
+    <div class="modal-card modal-card-wide">
+        <h2 id="food-insight-modal-title">🥗 Food Insight</h2>
+        <p class="hint">A one-time AI read on possible nutrient gaps in your recent food — closing this doesn't save or change anything.</p>
+
+        <label class="insight-lookback-label">Look back
+            <select id="food-insight-lookback">
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+            </select>
+        </label>
+
+        <div class="table-responsive">
+            <table id="food-insight-table">
+                <thead>
+                <tr>
+                    <th>Ingredient</th>
+                    <th>Amount</th>
+                    <th>Calories</th>
+                    <th>Protein (g)</th>
+                </tr>
+                </thead>
+                <tbody id="food-insight-ingredients-body"></tbody>
+            </table>
+        </div>
+
+        <label class="food-insight-question-label" for="food-insight-question">Ask a question (optional)
+            <textarea id="food-insight-question" rows="2" placeholder="e.g. Which vitamins or minerals might be missing?"></textarea>
+        </label>
+
+        <div id="food-insight-body"></div>
+        <p id="food-insight-status" class="status" hidden></p>
+
+        <div class="modal-actions">
+            <button type="button" id="food-insight-close-btn" class="btn">Close</button>
+            <button type="button" id="food-insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
+        </div>
+    </div>
+</div>
+
 <div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
     <div class="modal-card">
         <h2 id="timesheet-modal-title">Log Time</h2>
@@ -1455,6 +1502,7 @@
 <script src="assets/script/applications.js"></script>
 <script src="assets/script/calibration.js"></script>
 <script src="assets/script/insight.js"></script>
+<script src="assets/script/food-insight.js"></script>
 <script src="assets/script/app.js"></script>
 </body>
 </html>

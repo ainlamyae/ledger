@@ -67,6 +67,7 @@ async function initWellness(forceRefresh = false) {
     document.getElementById('wellness-cancel-btn').addEventListener('click', closeWellnessForm);
     document.getElementById('wellness-form').addEventListener('submit', submitWellnessForm);
     document.getElementById('wellness-category').addEventListener('change', onCategoryChange);
+    document.getElementById('wellness-is-pattern').addEventListener('change', syncWellnessPatternMode);
     document.getElementById('wellness-calc-btn').addEventListener('click', calculateWellnessCalories);
     // A real edit (not Calculate's own auto-fill, which sets .value
     // directly and doesn't fire 'input') means the shown breakdown no
@@ -200,11 +201,21 @@ async function refreshWellness(forceRefresh = false) {
         notes: row[6] || '',
         breakdown,
       };
-    })
-    .filter((e) => e.date);
+    });
+  // A blank date (column A) marks a reusable "pattern" row — a template a
+  // user can Duplicate and assign a real date to later, rather than a
+  // logged event. Kept in allWellnessEntries so it's editable/duplicable
+  // like any other row, but every chart/insight/calibration consumer must
+  // use getDatedWellnessEntries() instead so an undated template can never
+  // be mistaken for a logged sample (e.g. sorting first as the "earliest"
+  // date, or corrupting a calibration interval).
 
   renderWellnessList();
-  renderWellnessCharts(allWellnessEntries);
+  renderWellnessCharts(getDatedWellnessEntries());
+}
+
+function getDatedWellnessEntries() {
+  return allWellnessEntries.filter((e) => e.date);
 }
 
 function getFilteredWellnessEntries() {
@@ -214,7 +225,9 @@ function getFilteredWellnessEntries() {
   const catFilter = document.getElementById('wellness-category-filter').value;
 
   return allWellnessEntries
-    .filter((e) => (!dateFrom || e.date >= dateFrom) && (!dateTo || e.date <= dateTo))
+    // Pattern rows (no date) are date-agnostic templates, so an active
+    // date-range filter shouldn't hide them.
+    .filter((e) => !e.date || ((!dateFrom || e.date >= dateFrom) && (!dateTo || e.date <= dateTo)))
     .filter((e) => !catFilter || e.category === catFilter)
     .filter((e) => {
       if (!search) return true;
@@ -226,6 +239,8 @@ function getFilteredWellnessEntries() {
       );
     })
     .sort((a, b) => {
+      // Patterns always float to the top, regardless of sort direction.
+      if (!a.date !== !b.date) return a.date ? 1 : -1;
       const dateCmp = a.date.localeCompare(b.date);
       if (dateCmp !== 0) return dateCmp * wSort.dir;
       return a.time.localeCompare(b.time) * wSort.dir;
@@ -282,7 +297,7 @@ function renderWellnessList() {
 
     tr.append(
       checkboxCell,
-      makeCell(e.date),
+      makeCell(e.date || '🔁 Pattern'),
       makeCell(e.time || '—'),
       makeCell(e.category),
       makeCell(e.description),
@@ -340,6 +355,22 @@ function renderWellnessPagination(totalPages) {
   });
 }
 
+// Pattern entries carry no date, so the date input is disabled (and its
+// required attribute dropped) whenever "Save as reusable pattern" is
+// checked — disabled inputs don't submit their value, but submitWellnessForm
+// also blanks the date explicitly in case the browser still reports one.
+function syncWellnessPatternMode() {
+  const isPattern = document.getElementById('wellness-is-pattern').checked;
+  const dateInput = document.getElementById('wellness-entry-date');
+  dateInput.disabled = isPattern;
+  dateInput.required = !isPattern;
+  if (isPattern) {
+    dateInput.value = '';
+  } else if (!dateInput.value) {
+    dateInput.value = isoFromDate(new Date());
+  }
+}
+
 function openWellnessForm(entry, duplicate = false) {
   const now = new Date();
   const today = isoFromDate(now);
@@ -350,6 +381,8 @@ function openWellnessForm(entry, duplicate = false) {
   const title = duplicate ? 'Duplicate Entry' : (entry ? 'Edit Entry' : 'Log Entry');
   document.getElementById('wellness-modal-title').textContent = title;
   document.getElementById('wellness-entry-date').value = entry ? entry.date : today;
+  document.getElementById('wellness-is-pattern').checked = entry ? !entry.date : false;
+  syncWellnessPatternMode();
   document.getElementById('wellness-entry-time').value = entry ? entry.time : currentTime;
   document.getElementById('wellness-category').value = entry ? entry.category : '';
   document.getElementById('wellness-amount').value = entry ? rawAmountString(entry) : '';
@@ -419,7 +452,11 @@ function onCategoryChange() {
 async function submitWellnessForm(event) {
   event.preventDefault();
 
-  const date = document.getElementById('wellness-entry-date').value;
+  // Disabled inputs are excluded from .value in most browsers, but reading
+  // it explicitly here (rather than trusting that) keeps a pattern's date
+  // blank even if the checkbox and field ever fall out of sync.
+  const isPattern = document.getElementById('wellness-is-pattern').checked;
+  const date = isPattern ? '' : document.getElementById('wellness-entry-date').value;
   const time = document.getElementById('wellness-entry-time').value;
   const category = document.getElementById('wellness-category').value;
   const description = document.getElementById('wellness-description').value;

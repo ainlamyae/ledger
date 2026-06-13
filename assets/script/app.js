@@ -837,6 +837,7 @@ window.addEventListener('load', () => {
   initCsvControls();
   initCalibrationPanel();
   initInsightPanel();
+  initFoodInsightPanel();
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();

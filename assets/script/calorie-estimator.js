@@ -349,6 +349,11 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   const protein = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemProtein, 0));
   console.debug('[calc] total kcal:', calories, 'total protein g:', protein);
 
+  // Highest-calorie ingredient first — both the breakdown table and the
+  // standardized Notes below are built from this order, so what's saved to
+  // Notes matches what's shown on screen.
+  const sortedMacros = [...perItemMacros].sort((a, b) => b.itemCalories - a.itemCalories);
+
   // Per-item lines the modal shows after Calculate so the final Amount can
   // be sanity-checked by eye/pure arithmetic before saving, rather than
   // trusting the combined total blind — each row also names its source
@@ -362,7 +367,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     'usda/ai': 'USDA estimate',
     'usda-unreachable': 'AI estimate (offline)',
   };
-  const breakdown = perItemMacros.map((m) => ({
+  const breakdown = sortedMacros.map((m) => ({
     name: m.name,
     amount: m.amount,
     calories: Math.round(m.itemCalories),
@@ -391,7 +396,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 
   // Deterministic reformat of the user's own text — no AI involved — one
   // ingredient per line, quantity+unit glued with no space (e.g. "50g", "2x").
-  const standardizedNotes = perItemMacros.map((m) => m.noteLine).join('\n');
+  const standardizedNotes = sortedMacros.map((m) => m.noteLine).join('\n');
 
   return { calories, protein, breakdown, standardizedNotes, usdaUnreachable };
 }

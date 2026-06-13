@@ -580,11 +580,14 @@ function getCalorieTargetKcal(entries) {
   return getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
 }
 
-// Number of trailing days shown in the Health Metrics row (Caloric Intake,
-// Physical Activity, Rest & Recovery) — Body Weight has its own dedicated
-// history in the Weight Trend & Forecast chart below, so it's not repeated
-// here, and these 3 charts get the freed-up width to show more days.
-const WELLNESS_METRICS_DAYS = 14;
+// Number of trailing days shown in each Health Metrics chart (Caloric
+// Intake, Protein Intake, Physical Activity, Rest & Recovery) — Body Weight
+// has its own dedicated history in the Weight Trend & Forecast chart above,
+// so it's not repeated here. These charts are full-width (one per row)
+// rather than 4-across, so 84 days (12 weeks) fits comfortably; each render
+// function's x-axis already thins tick labels (autoSkip/maxTicksLimit), so
+// no other change is needed to keep them readable at this range.
+const WELLNESS_METRICS_DAYS = 84;
 
 let wellnessCaloriesChart = null;
 let wellnessSleepChart = null;
@@ -692,16 +695,29 @@ function maskedValueTooltipLabel(item) {
   return `${prefix}${privacyMode ? maskDigits(value) : value}`;
 }
 
+// Clipped version of lastNDates(maxDays) — starts at the earliest matching
+// entry instead of always padding out to a fixed trailing window, so a
+// shorter logging history isn't visually pushed to the right with empty
+// days on the left. Mirrors how the Weight Trend & Forecast chart's x-axis
+// above already starts at its own first logged entry (weightEntries[0].date)
+// rather than a fixed lookback.
+function trailingDatesForCategory(matchingEntries, maxDays) {
+  const capped = lastNDates(maxDays);
+  if (matchingEntries.length === 0) return capped;
+  const earliest = matchingEntries.reduce((min, e) => (e.date < min ? e.date : min), matchingEntries[0].date);
+  const from = earliest > capped[0] ? earliest : capped[0];
+  return capped.filter((d) => d >= from);
+}
+
 function renderWellnessCaloriesChart(entries) {
   const ctx = document.getElementById('wellness-calories-chart');
 
   const calorieTarget = getCalorieTargetKcal(entries);
 
-  const dates = lastNDates(WELLNESS_METRICS_DAYS);
+  const calorieEntries = entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
+  const dates = trailingDatesForCategory(calorieEntries, WELLNESS_METRICS_DAYS);
   const byDate = new Map();
-  entries
-    .filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null)
-    .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
+  calorieEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
   wellnessCaloriesChart = upsertChart(wellnessCaloriesChart, ctx, {
     data: {
@@ -717,7 +733,7 @@ function renderWellnessCaloriesChart(entries) {
         {
           type: 'line',
           label: `${calorieTarget} kcal target`,
-          data: new Array(WELLNESS_METRICS_DAYS).fill(calorieTarget),
+          data: new Array(dates.length).fill(calorieTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -750,11 +766,10 @@ function renderWellnessSleepChart(entries) {
 
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
-  const dates = lastNDates(WELLNESS_METRICS_DAYS);
+  const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
+  const dates = trailingDatesForCategory(sleepEntries, WELLNESS_METRICS_DAYS);
   const byDate = new Map();
-  entries
-    .filter((e) => e.category === 'Sleep' && e.amount !== null)
-    .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
+  sleepEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
   const sleepData = dates.map((d) => byDate.get(d) || 0);
 
@@ -772,7 +787,7 @@ function renderWellnessSleepChart(entries) {
         {
           type: 'line',
           label: `${sleepTarget} hr target`,
-          data: new Array(WELLNESS_METRICS_DAYS).fill(sleepTarget),
+          data: new Array(dates.length).fill(sleepTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -829,8 +844,8 @@ function renderWellnessActivityChart(entries) {
 
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
 
-  const dates = lastNDates(WELLNESS_METRICS_DAYS);
   const activityEntries = entries.filter((e) => e.category === 'Activity' && e.amount !== null);
+  const dates = trailingDatesForCategory(activityEntries, WELLNESS_METRICS_DAYS);
 
   // One stacked segment per description (e.g. NEAT / Resistance / Cardio)
   // instead of a single summed bar, so each day's activity composition is
@@ -866,7 +881,7 @@ function renderWellnessActivityChart(entries) {
         {
           type: 'line',
           label: `${activityTarget} min target`,
-          data: new Array(WELLNESS_METRICS_DAYS).fill(activityTarget),
+          data: new Array(dates.length).fill(activityTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -910,11 +925,10 @@ function renderWellnessProteinChart(entries) {
 
   const proteinTarget = getProteinTargetG(entries);
 
-  const dates = lastNDates(WELLNESS_METRICS_DAYS);
+  const proteinEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.amount2 !== null);
+  const dates = trailingDatesForCategory(proteinEntries, WELLNESS_METRICS_DAYS);
   const byDate = new Map();
-  entries
-    .filter((e) => e.category === 'Calories; Protein' && e.amount2 !== null)
-    .forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
+  proteinEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
 
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
     data: {
@@ -930,7 +944,7 @@ function renderWellnessProteinChart(entries) {
         {
           type: 'line',
           label: `${proteinTarget} g target`,
-          data: new Array(WELLNESS_METRICS_DAYS).fill(proteinTarget),
+          data: new Array(dates.length).fill(proteinTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,

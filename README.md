@@ -168,10 +168,10 @@ Net worth snapshot and the account list, combined in one tab.
 | B | Income |
 | C | Expenses |
 | D onward | Per-category expense totals — one column per row in `Categories`, matched by header name (see below) |
-| K | Saved (income − expenses) |
-| L | Cumulative savings |
+| Second-to-last | Saved (income − expenses) |
+| Last | Cumulative savings |
 
-`app.js` reads row 1 as headers and matches each name in `Categories` column A against both the `Monthly Summary` and `Benchmarks` headers to find its column. Adding or renaming a category only requires updating the `Categories` sheet and adding a matching column/header to `Monthly Summary` and `Benchmarks` — no code changes needed.
+`app.js` reads row 1 as headers and matches each name in `Categories` column A against both the `Monthly Summary` and `Benchmarks` headers to find its column — except "Income"/"Expenses" (columns B/C), which are excluded even if `Categories` also has a row with that name, since they aren't spending categories. `Saved` and `Cumulative` aren't matched by name; they're always taken as the last two columns of the data rows, so inserting a new category column anywhere before them doesn't break either chart. Adding or renaming a category only requires updating the `Categories` sheet and adding a matching column/header to `Monthly Summary` and `Benchmarks` — no code changes needed.
 
 ### `Benchmarks` (formula-driven)
 

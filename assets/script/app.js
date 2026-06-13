@@ -61,6 +61,15 @@ async function loadReport(forceRefresh) {
   const monthlyCols = {};
   monthlyHeader.forEach((name, i) => { if (name) monthlyCols[name] = i; });
 
+  // "Saved" and "Cumulative" are always the last two columns of Monthly
+  // Summary, regardless of how many category columns precede them. The
+  // Sheets API trims each row to its own last non-empty cell, so the header
+  // row's length isn't a reliable column count — use the widest data row
+  // instead, so adding/removing a category column doesn't break these.
+  const dataWidth = monthlyRows.reduce((max, row) => Math.max(max, row.length), 0);
+  const savedIndex = dataWidth - 2;
+  const cumulativeIndex = dataWidth - 1;
+
   let activeIndex = monthlyRows.length - 1;
   for (let i = monthlyRows.length - 1; i >= 0; i--) {
     if (monthlyRows[i][1] || monthlyRows[i][2]) {
@@ -85,10 +94,12 @@ async function loadReport(forceRefresh) {
 
   // Every row in the Categories sheet becomes a chart category as long as
   // its name also appears as a column header in both Monthly Summary and
-  // Benchmarks — no hardcoded category list or column indices.
+  // Benchmarks — no hardcoded category list or column indices. Columns A-C
+  // (Month, Income, Expenses) are excluded since "Income" is also a row in
+  // the Categories sheet but isn't a spending category.
   const categoryColumns = categoryRows
     .map((row) => row[0])
-    .filter((name) => name && monthlyCols[name] !== undefined && benchmarkCols[name] !== undefined)
+    .filter((name) => name && monthlyCols[name] >= 3 && benchmarkCols[name] !== undefined)
     .map((name) => ({ name, monthlyIndex: monthlyCols[name], benchmarkIndex: benchmarkCols[name] }));
 
   const incomeExpenseTrend = monthlyRows
@@ -97,7 +108,7 @@ async function loadReport(forceRefresh) {
 
   const savingsTrend = monthlyRows
     .slice(0, activeIndex + 1)
-    .map((row) => ({ label: row[0], cumulative: row[11] || 0 }));
+    .map((row) => ({ label: row[0], cumulative: row[cumulativeIndex] || 0 }));
 
   // Months with near-zero income would otherwise produce extreme ratios
   // (e.g. -8000%) when expenses exceed that income, so the rate is clamped
@@ -106,7 +117,7 @@ async function loadReport(forceRefresh) {
     .slice(0, activeIndex + 1)
     .map((row) => {
       const income = row[1] || 0;
-      const saved = row[10] || 0;
+      const saved = row[savedIndex] || 0;
       const rate = income ? (saved / income) * 100 : 0;
       return { label: row[0], rate: Math.max(0, Math.min(100, rate)), saved };
     });
@@ -138,7 +149,7 @@ async function loadReport(forceRefresh) {
     month: current[0],
     income: current[1] || 0,
     expenses: current[2] || 0,
-    saved: current[10] || 0,
+    saved: current[savedIndex] || 0,
     incomeExpenseTrend,
     savingsTrend,
     savingsRateTrend,

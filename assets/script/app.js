@@ -299,6 +299,17 @@ async function loadDashboard(forceRefresh = false) {
 // at once between fully expanded and fully collapsed.
 function setupPanelToggles() {
   const panels = [...document.querySelectorAll('#dashboard .panel')];
+  const fab = document.getElementById('toggle-panels-fab');
+
+  // Reflects the panels' actual current state, so the FAB's icon/title are
+  // correct no matter how that state changed — its own click, an individual
+  // panel heading, or a nav link.
+  const updateFab = () => {
+    const anyExpanded = panels.some((panel) => !panel.classList.contains('collapsed'));
+    fab.textContent = anyExpanded ? '⊟' : '⊞';
+    fab.title = anyExpanded ? 'Collapse all panels' : 'Expand all panels';
+    fab.setAttribute('aria-label', fab.title);
+  };
 
   panels.forEach((panel) => {
     const heading = panel.querySelector('h2');
@@ -310,23 +321,18 @@ function setupPanelToggles() {
     heading.prepend(icon);
 
     panel.classList.add('collapsed');
-    heading.addEventListener('click', () => panel.classList.toggle('collapsed'));
+    heading.addEventListener('click', () => {
+      panel.classList.toggle('collapsed');
+      updateFab();
+    });
   });
 
-  const fab = document.getElementById('toggle-panels-fab');
-  fab.textContent = '⊞';
-  fab.title = 'Expand all panels';
-  fab.setAttribute('aria-label', fab.title);
+  updateFab();
 
-  // Base the action on the panels' current state (any expanded -> collapse
-  // all, otherwise expand all) so the FAB always reflects reality in one
-  // click, even after individual panels or nav links changed it.
   fab.addEventListener('click', () => {
     const shouldCollapse = panels.some((panel) => !panel.classList.contains('collapsed'));
     panels.forEach((panel) => panel.classList.toggle('collapsed', shouldCollapse));
-    fab.textContent = shouldCollapse ? '⊞' : '⊟';
-    fab.title = shouldCollapse ? 'Expand all panels' : 'Collapse all panels';
-    fab.setAttribute('aria-label', fab.title);
+    updateFab();
   });
 
   // Jumping to a section via the nav also expands its panel(s), since
@@ -344,6 +350,7 @@ function setupPanelToggles() {
       } else {
         target.classList.remove('collapsed');
       }
+      updateFab();
     });
   });
 }

@@ -366,24 +366,11 @@ header .btn:hover {
 .landing-features {
     display: flex;
     flex-direction: column;
+    align-items: center;
     margin-top: 2.5rem;
 }
 
-/* One flex row per group (intro card, then each Health/Finances/Time/Other
-   group) instead of one shared CSS grid — a grid places items left-to-right
-   into shared column tracks, so a short group (Time has 1 card, Other has 2)
-   would occupy only the first track(s) and leave visible empty space on the
-   right. Flex + wrap + centered justification centers every row's cards as
-   a group instead, including a wrapped group's own last (possibly partial)
-   line. */
-.landing-features-group-cards {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1rem;
-}
-
-.landing-feature {
+.landing-intro-card {
     background: var(--color-surface);
     border-radius: var(--radius-lg);
     padding: 1.25rem;
@@ -391,49 +378,182 @@ header .btn:hover {
     box-shadow: var(--shadow-card);
     border-left: 3px solid var(--color-border);
     transition: var(--transition-colors), transform .2s ease, box-shadow .2s ease;
-    flex: 1 1 200px;
-    max-width: 320px;
+    max-width: 460px;
 }
 
-.landing-feature:hover {
+.landing-intro-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 18px rgba(0,0,0,.12);
 }
 
-.landing-feature-health   { border-left-color: var(--color-primary); }
-.landing-feature-finances { border-left-color: var(--color-income); }
-.landing-feature-time     { border-left-color: var(--color-time); }
-.landing-feature-other    { border-left-color: var(--color-other); }
-
-/* Section labels grouping the landing feature cards below by the same
-   Health/Finances/Time/Other split the dashboard itself uses — its
-   underline color echoes the border-left color its group's cards use, so
-   the label reads as that group's header at a glance. */
-.landing-features-group {
-    margin: 1.5rem 0 .75rem;
-    padding-bottom: .35rem;
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--color-heading);
-    border-bottom: 2px solid var(--color-border);
-}
-
-.landing-features-group-health   { border-bottom-color: var(--color-primary); }
-.landing-features-group-finances { border-bottom-color: var(--color-income); }
-.landing-features-group-time     { border-bottom-color: var(--color-time); }
-.landing-features-group-other    { border-bottom-color: var(--color-other); }
-
-.landing-feature h3 {
+.landing-intro-card h3 {
     margin-bottom: .5rem;
     color: var(--color-heading);
     font-size: 1rem;
 }
 
-.landing-feature p {
+.landing-intro-card p {
     color: var(--color-text-muted);
     font-size: .9rem;
     line-height: 1.5;
     margin: 0;
+}
+
+.node-graph-hint {
+    margin: 1.75rem 0 0;
+    font-size: .8rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* Each Health/Finances/Time/Other group renders as a small mind-map: a
+   round "hub" node for the group name, its feature nodes fanned out below,
+   and an SVG line from the hub to every node — drawn/redrawn by
+   landing-graph.js once layout settles, since a pure-CSS radial layout
+   can't track how many nodes wrap onto each line at a given viewport width. */
+.node-graph {
+    position: relative;
+    width: 100%;
+    max-width: 1100px;
+    margin: 2.75rem 0 0;
+}
+
+.node-graph-health   { --group-color: var(--color-primary); }
+.node-graph-finances { --group-color: var(--color-income); }
+.node-graph-time     { --group-color: var(--color-time); }
+.node-graph-other    { --group-color: var(--color-other); }
+
+.node-graph-lines {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.node-graph-lines line {
+    stroke: var(--group-color);
+    stroke-width: 1.5;
+    opacity: .3;
+}
+
+.node-graph-hub-wrap {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.node-graph-hub {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .1rem;
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 3px solid var(--group-color);
+    box-shadow: var(--shadow-card);
+}
+
+.node-graph-hub-icon {
+    font-size: 1.75rem;
+    line-height: 1;
+}
+
+.node-graph-hub-label {
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--color-heading);
+}
+
+.node-graph-spokes {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.1rem 1.25rem;
+}
+
+/* Health has 7 nodes — left to auto-width flex-wrap they pack 5-then-2
+   (however many narrow pills fit the row), which reads as an accident of
+   text length rather than a deliberate grouping. A fixed 4-per-row basis
+   forces a clean 4-then-3 instead, and flex-wrap centers each wrapped row
+   independently, so the second row of 3 centers itself under the first. */
+.node-graph-health .node-graph-node {
+    flex: 0 0 calc(25% - .9375rem);
+}
+
+.node-graph-node {
+    position: relative;
+    font: inherit;
+    font-weight: 600;
+    font-size: .85rem;
+    color: var(--color-heading);
+    text-align: center;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-top: 3px solid var(--group-color);
+    border-radius: var(--radius-lg);
+    padding: .7rem 1rem;
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition: var(--transition-colors), box-shadow .2s ease;
+}
+
+.node-graph-node:hover,
+.node-graph-node:focus-visible,
+.node-graph-node.is-open {
+    /* No transform here (e.g. a hover lift) — a transform on this element
+       would make it a new containing block for its .node-graph-tooltip
+       child's position: fixed, which then positions relative to this small
+       node box instead of the viewport and breaks landing-graph.js's px
+       math entirely. */
+    box-shadow: 0 8px 20px rgba(0,0,0,.15);
+    border-color: var(--group-color);
+    outline: none;
+}
+
+/* position: fixed rather than absolute-under-the-node: with several nodes
+   wrapped onto multiple rows (Health has 7), a tooltip anchored below its
+   own node would land on top of the row underneath it. landing-graph.js
+   sets top/left in px right before this becomes visible, flipping above
+   the node and clamping horizontally when the default placement would
+   collide with the viewport edge or the next row. */
+.node-graph-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    max-width: min(80vw, 260px);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-dropdown);
+    padding: .75rem .9rem;
+    font-size: .8rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+    text-align: left;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(.96);
+    transition: opacity .15s ease, transform .15s ease, visibility .15s;
+    z-index: 50;
+}
+
+.node-graph-node:hover .node-graph-tooltip,
+.node-graph-node:focus-visible .node-graph-tooltip,
+.node-graph-node.is-open .node-graph-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+    pointer-events: auto;
 }
 
 .status {
@@ -1362,25 +1482,13 @@ td .btn {
     resize: vertical;
 }
 
-.timesheet-holiday-label {
+.checkbox-inline-label {
     display: flex !important;
     align-items: center;
     gap: .5rem;
 }
 
-.timesheet-holiday-label input[type="checkbox"] {
-    display: inline-block !important;
-    width: auto !important;
-    margin-top: 0 !important;
-}
-
-.wellness-pattern-label {
-    display: flex !important;
-    align-items: center;
-    gap: .5rem;
-}
-
-.wellness-pattern-label input[type="checkbox"] {
+.checkbox-inline-label input[type="checkbox"] {
     display: inline-block !important;
     width: auto !important;
     margin-top: 0 !important;
@@ -1779,10 +1887,64 @@ td .btn {
         font-size: 1.5rem;
     }
 
-    .landing-feature {
-        flex-basis: 100%;
+    .landing-intro-card {
         max-width: none;
         padding: 1rem;
+    }
+
+    /* The fan-out graph loses its main draw (an at-a-glance web of related
+       features) once nodes stack to one per row anyway, and the connecting
+       lines get visually noisy at that width — so small screens fall back
+       to a plain grouped list: hub becomes a left-aligned section label,
+       nodes stack full-width, tooltip text is always visible instead of
+       hidden-until-hover (nothing to hover on a touchscreen). */
+    .node-graph-lines {
+        display: none;
+    }
+
+    .node-graph-hub-wrap {
+        justify-content: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .node-graph-hub {
+        flex-direction: row;
+        width: auto;
+        height: auto;
+        border-radius: var(--radius-md);
+        padding: .4rem .9rem;
+        gap: .4rem;
+    }
+
+    .node-graph-spokes {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .node-graph-node,
+    .node-graph-health .node-graph-node {
+        flex-basis: auto;
+        text-align: left;
+        cursor: default;
+        transform: none !important;
+    }
+
+    .node-graph-tooltip {
+        position: static;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transform: none;
+        width: auto;
+        max-width: none;
+        box-shadow: none;
+        border: none;
+        padding: .35rem 0 0;
+        margin: 0;
+    }
+
+    .node-graph-hint {
+        display: none;
     }
 
     .card {

@@ -2,6 +2,7 @@ const REPORT_RANGE = `'${CONFIG.SHEETS.REPORT}'!A1:Z149`;
 const BENCHMARKS_RANGE = `'${CONFIG.SHEETS.BENCHMARKS}'!A1:K5`;
 const BALANCE_RANGE = `'${CONFIG.SHEETS.BALANCE}'!A1:D1`;
 const CATEGORIES_RANGE = `${CONFIG.SHEETS.CATEGORIES}!A2:B`;
+const INSIGHT_RANGE = `${CONFIG.SHEETS.INSIGHT}!A2:F200`;
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -14,6 +15,35 @@ let currentReport = null;
 // 'Account Balance'!D1 holds the pre-computed net worth total.
 function parseBalance(balanceRows) {
   return (balanceRows[0] && balanceRows[0][3]) || 0;
+}
+
+// 'Insight'!A2:F200 — Category, Type, Last Month, Last Quarter, Last Year,
+// Lifelong, pre-computed by spreadsheet formulas. Rows with a blank Type
+// hold the category's overall total (used as the "Untyped" remainder).
+function parseTypeBreakdown(insightRows) {
+  const breakdown = {};
+
+  insightRows.forEach((row) => {
+    const category = row[0];
+    if (!category) return;
+
+    const type = row[1] || '';
+    const stats = {
+      lastMonth: row[2] || 0,
+      lastQuarter: row[3] || 0,
+      lastYear: row[4] || 0,
+      lifelong: row[5] || 0,
+    };
+
+    if (!breakdown[category]) breakdown[category] = { types: [], total: null };
+    if (type) {
+      breakdown[category].types.push({ name: type, ...stats });
+    } else {
+      breakdown[category].total = stats;
+    }
+  });
+
+  return breakdown;
 }
 
 function setSignedInUI(signedIn) {
@@ -46,11 +76,12 @@ async function loadReport(forceRefresh) {
     if (cached) return cached;
   }
 
-  const { valueRanges } = await batchGetValues([REPORT_RANGE, BENCHMARKS_RANGE, BALANCE_RANGE, CATEGORIES_RANGE], VALUE_PARAMS);
+  const { valueRanges } = await batchGetValues([REPORT_RANGE, BENCHMARKS_RANGE, BALANCE_RANGE, CATEGORIES_RANGE, INSIGHT_RANGE], VALUE_PARAMS);
   const reportRows = valueRanges[0].values || [];
   const benchmarkRows = valueRanges[1].values || [];
   const balanceRows = valueRanges[2].values || [];
   const categoryRows = valueRanges[3].values || [];
+  const insightRows = valueRanges[4].values || [];
 
   // Row 1 of Monthly Summary holds column headers (Income, Expenses, one
   // column per spending category, Saved, Cumulative) — used below to find
@@ -144,6 +175,7 @@ async function loadReport(forceRefresh) {
     });
 
   const netWorth = parseBalance(balanceRows);
+  const typeBreakdown = parseTypeBreakdown(insightRows);
 
   const report = {
     month: current[0],
@@ -155,6 +187,7 @@ async function loadReport(forceRefresh) {
     savingsRateTrend,
     categoryTrend,
     categoryComparison,
+    typeBreakdown,
     netWorth,
   };
 
@@ -231,6 +264,7 @@ async function loadDashboard(forceRefresh = false) {
       renderSummaryCards(report);
       renderSpendingTrendChart(report.categoryComparison);
       renderSpendingBreakdownCharts(report.categoryComparison);
+      renderTypeBreakdownCharts(report.typeBreakdown);
       renderIncomeExpenseChart(report.incomeExpenseTrend);
       renderExpenseBreakdownTrendChart(report.categoryTrend);
       renderSavingsTrendChart(report.savingsTrend);

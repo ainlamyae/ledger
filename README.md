@@ -33,6 +33,7 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Net Cash Flow.
 - **Spending vs. Benchmarks** — grouped bar chart comparing each category's Last Month, Last Quarter Average, Last Year Average, and Lifelong Average spending; each category's 4 bars are shaded from its own color (most recent = most opaque).
 - **Spending Breakdown by Category** — four donut charts showing each category's share of spending for last month, last quarter average, last year average, and lifelong average.
+- **Spending by Type** — for each spending category, four donut charts (Last Month, Last Quarter, Last Year, Lifelong) breaking that category's spend down by `Type`, a free-text prefix convention in the `Transactions` `Description` field (e.g. "Bread - milk and eggs"), pre-aggregated by formulas in the `Insight` sheet. Panels are ordered by lifelong spend (highest first), and each donut includes an "Untyped" slice for spending without a recognized prefix.
 - **Spending Trend by Category** — stacked bar chart of spending by category, month over month.
 - **Income vs Expenses Over Time** — stepped area chart of the full transaction history.
 - **Cumulative Savings Over Time** — running total of savings as a line chart.
@@ -81,6 +82,7 @@ Ledger is a static site that talks directly to Google's APIs from the browser. T
                                   │  Transactions    Account Balance             │
                                   │  Categories      Monthly Summary (formulas)  │
                                   │  Benchmarks (formulas)                       │
+                                  │  Insight (formulas)                          │
                                   └───────────────────────────────────────────────┘
 ```
 
@@ -96,7 +98,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh | `initAuth`, `signIn`, `signOut`, `getAccessToken` |
 | 3 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, plus hard-refresh (cache + Cache Storage + service workers) | `getCached`, `setCached`, `clearCache`, `hardRefresh` |
-| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid and the nested Account Composition donut | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderSavingsRateChart`, `renderAccountCompositionChart` |
+| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid, the per-category Spending by Type donut grids, and the nested Account Composition donut | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderSavingsRateChart`, `renderAccountCompositionChart` |
 | 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
 | 7 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |
@@ -110,9 +112,9 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 3. On success, `handleAuthChange(token)` swaps the landing page for the dashboard and calls `loadDashboard()`.
 
 **Dashboard load**
-4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, and `Categories` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, and the Spending vs. Benchmarks / Spending Breakdown by Category comparisons.
+4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, `Categories`, and `Insight` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, the Spending vs. Benchmarks / Spending Breakdown by Category comparisons, and the per-category `Type` breakdown for the Spending by Type donuts.
 5. `initTransactions()` and `initAccountManager()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API.
-6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts plus the 4-donut Spending Breakdown by Category grid; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
+6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending Breakdown by Category grid, and the per-category Spending by Type donut grids; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
 
 **Writes** (add/edit/delete transaction or account, edit balance, CSV import)
 7. UI actions call `appendValues` / `updateValues` / `batchUpdate` directly against the spreadsheet.
@@ -184,6 +186,23 @@ Pre-computed per-category spending averages, read directly by `app.js` for the S
 | 3 | Last Quarter Average |
 | 4 | Last Year Average |
 | 5 | Lifelong Average |
+
+### `Insight` (formula-driven)
+
+Per-category, per-`Type` spending breakdown used by the Spending by Type donuts. `Type` is not a separate column on `Transactions` — it's a free-text prefix convention on the `Description` field (e.g. a transaction with Description "Bread - milk and eggs" has Type "Bread"). Data rows start at row 2.
+
+| Column | Contents |
+|---|---|
+| A — Category | Must match a name in `Categories` column A |
+| B — Type | A `Description` prefix, or **blank** for a row holding that category's overall total |
+| C — Last Month | `-SUMIFS(...)` over `Transactions`, matching Category, `Description` starting with `Type` (via `Type&"*"`, or no Description filter if `Type` is blank), `Amount < 0`, and the date window for "last month" |
+| D — Last Quarter | Same, for the trailing 3-month window |
+| E — Last Year | Same, for the trailing 12-month window |
+| F — Lifelong | Same, with no date filter |
+
+Cell `H1` holds `=TODAY()`, the single anchor date that every period's `EOMONTH(...)`-based date window is computed relative to.
+
+For each category, the blank-`Type` row's totals are used as that category's overall spend; the gap between that total and the sum of its named `Type` rows becomes the "Untyped" donut slice. The 5 categories shown (Grocery, Household, Personal, Transportation, Housing) are a fixed list in `charts.js` (`TYPE_BREAKDOWN_CATEGORIES`) — adding a new category requires adding its rows to `Insight`, the category name to that constant, and a matching donut-grid block in `index.html`.
 
 ---
 
@@ -257,6 +276,7 @@ const CONFIG = {
     BALANCE: 'Account Balance',
     ACCOUNTS: 'Account Balance',
     CATEGORIES: 'Categories',
+    INSIGHT: 'Insight',
   },
 };
 ```
@@ -298,6 +318,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | `'Benchmarks'!A1:K5` | `app.js` | Per-category spending averages for the Spending vs. Benchmarks chart and Spending Breakdown by Category donuts |
 | `'Account Balance'!A1:D1` | `app.js` | Total Savings figure (`D1`) for the summary card |
 | `Categories!A2:B` | `app.js` | Category name → chart color |
+| `Insight!A2:F200` | `app.js` | Per-category, per-Type spend breakdown for the Spending by Type donuts |
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
 | `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
 | `'Account Balance'!A3:A100`, `Categories!A2:A` | `transactions.js` | Dropdown option lists for the transaction form |
@@ -306,7 +327,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 
 | Cache key | Set by | Contents |
 |---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending vs. Benchmarks comparison) |
+| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending vs. Benchmarks comparison, Spending by Type breakdown) |
 | `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + account/category dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
 | `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |

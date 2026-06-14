@@ -1,11 +1,14 @@
-// "🥗 Food Insight" button: aggregates every ingredient logged (via the
+// "🥗 Food Insight" panel: aggregates every ingredient logged (via the
 // Health Log's 🧮 Calculate breakdown) over a lookback window into one
 // per-ingredient total, then sends that list plus an optional free-text
-// question to Groq for a nutrient-gap read. Separate feature/modal from
+// question to Groq for a nutrient-gap read. Separate feature/panel from
 // insight.js by design — no vitamin/mineral data exists anywhere in this
 // app (usda.js only extracts kcal/protein), so this leans entirely on the
 // model's own general food-composition knowledge, same trust level the app
 // already extends it via item.kcalPer100gFallback in calorie-estimator.js.
+// Unlike insight.js, its last result IS persisted — to the Settings tab, as
+// FOOD_INSIGHT_LAST_RESULT/FOOD_INSIGHT_LAST_GENERATED_AT — so the panel
+// still shows something on a fresh page load instead of going blank.
 // Wired up by initFoodInsightPanel(), called from app.js.
 
 const FOOD_INSIGHT_LOOKBACK_DEFAULT = 7;
@@ -230,6 +233,21 @@ async function runFoodInsightGeneration(lookbackDays, question) {
     const text = await generateFoodInsight(lookbackDays, question);
     body.innerHTML = '';
     renderFoodInsightText(body, text);
+
+    // Persisted so a fresh page load still shows the last read instead of
+    // going blank — unlike insight.js's Wellness Insight, this is the one
+    // feature the user asked to survive a reload. Generation is still never
+    // automatic; this only fires from an explicit Send to AI click.
+    const generatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    try {
+      await saveSettingValues({
+        FOOD_INSIGHT_LAST_RESULT: text,
+        FOOD_INSIGHT_LAST_GENERATED_AT: generatedAt,
+      });
+      renderFoodInsightGeneratedAt(generatedAt);
+    } catch (saveErr) {
+      showFieldError('food-insight-status', `Generated, but couldn't save it: ${saveErr.message}`);
+    }
   } catch (err) {
     body.innerHTML = '';
     showFieldError('food-insight-status', err.message);
@@ -241,27 +259,41 @@ async function runFoodInsightGeneration(lookbackDays, question) {
   }
 }
 
-function openFoodInsightModal() {
-  document.getElementById('food-insight-modal').hidden = false;
-  clearFieldError('food-insight-status');
-  document.getElementById('food-insight-question').value = '';
-  renderFoodInsightPreview(currentFoodInsightLookbackDays());
-
-  const body = document.getElementById('food-insight-body');
-  body.innerHTML = '';
-  const placeholder = document.createElement('p');
-  placeholder.className = 'hint';
-  placeholder.textContent = 'Review the ingredients above, optionally ask a question, then click "Send to AI".';
-  body.appendChild(placeholder);
+function renderFoodInsightGeneratedAt(timestamp) {
+  const el = document.getElementById('food-insight-generated-at');
+  if (!timestamp) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.textContent = `Last generated ${timestamp}`;
 }
 
-function closeFoodInsightModal() {
-  document.getElementById('food-insight-modal').hidden = true;
+// Restores the last AI result (if any) from the Settings tab on page load,
+// so the panel shows the previous read instead of an empty placeholder.
+function renderSavedFoodInsight() {
+  const body = document.getElementById('food-insight-body');
+  const text = getSettingString('FOOD_INSIGHT_LAST_RESULT', null);
+
+  body.innerHTML = '';
+  if (!text) {
+    const placeholder = document.createElement('p');
+    placeholder.className = 'hint';
+    placeholder.textContent = 'Review the ingredients above, optionally ask a question, then click "Send to AI".';
+    body.appendChild(placeholder);
+    renderFoodInsightGeneratedAt(null);
+    return;
+  }
+
+  renderFoodInsightText(body, text);
+  renderFoodInsightGeneratedAt(getSettingString('FOOD_INSIGHT_LAST_GENERATED_AT', null));
 }
 
 function initFoodInsightPanel() {
-  document.getElementById('food-insight-btn').addEventListener('click', openFoodInsightModal);
-  document.getElementById('food-insight-close-btn').addEventListener('click', closeFoodInsightModal);
+  clearFieldError('food-insight-status');
+  renderFoodInsightPreview(currentFoodInsightLookbackDays());
+  renderSavedFoodInsight();
+
   document.getElementById('food-insight-generate-btn').addEventListener('click', () => {
     runFoodInsightGeneration(currentFoodInsightLookbackDays(), document.getElementById('food-insight-question').value);
   });

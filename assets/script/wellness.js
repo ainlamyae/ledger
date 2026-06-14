@@ -355,17 +355,20 @@ function renderWellnessPagination(totalPages) {
   });
 }
 
-// Pattern entries carry no date, so the date input is disabled (and its
-// required attribute dropped) whenever "Save as reusable pattern" is
-// checked — disabled inputs don't submit their value, but submitWellnessForm
-// also blanks the date explicitly in case the browser still reports one.
+// Pattern entries carry no date or time, so both inputs are disabled (and
+// the date's required attribute dropped) whenever "Pattern" is checked —
+// disabled inputs don't submit their value, but submitWellnessForm also
+// blanks them explicitly in case the browser still reports one.
 function syncWellnessPatternMode() {
   const isPattern = document.getElementById('wellness-is-pattern').checked;
   const dateInput = document.getElementById('wellness-entry-date');
+  const timeInput = document.getElementById('wellness-entry-time');
   dateInput.disabled = isPattern;
   dateInput.required = !isPattern;
+  timeInput.disabled = isPattern;
   if (isPattern) {
     dateInput.value = '';
+    timeInput.value = '';
   } else if (!dateInput.value) {
     dateInput.value = isoFromDate(new Date());
   }
@@ -381,9 +384,9 @@ function openWellnessForm(entry, duplicate = false) {
   const title = duplicate ? 'Duplicate Entry' : (entry ? 'Edit Entry' : 'Log Entry');
   document.getElementById('wellness-modal-title').textContent = title;
   document.getElementById('wellness-entry-date').value = entry ? entry.date : today;
+  document.getElementById('wellness-entry-time').value = entry ? entry.time : currentTime;
   document.getElementById('wellness-is-pattern').checked = entry ? !entry.date : false;
   syncWellnessPatternMode();
-  document.getElementById('wellness-entry-time').value = entry ? entry.time : currentTime;
   document.getElementById('wellness-category').value = entry ? entry.category : '';
   document.getElementById('wellness-amount').value = entry ? rawAmountString(entry) : '';
   document.getElementById('wellness-notes').value = entry ? entry.notes : '';
@@ -457,7 +460,7 @@ async function submitWellnessForm(event) {
   // blank even if the checkbox and field ever fall out of sync.
   const isPattern = document.getElementById('wellness-is-pattern').checked;
   const date = isPattern ? '' : document.getElementById('wellness-entry-date').value;
-  const time = document.getElementById('wellness-entry-time').value;
+  const time = isPattern ? '' : document.getElementById('wellness-entry-time').value;
   const category = document.getElementById('wellness-category').value;
   const description = document.getElementById('wellness-description').value;
   const amountRaw = document.getElementById('wellness-amount').value;

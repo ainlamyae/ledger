@@ -604,7 +604,12 @@ async function loadDashboard(forceRefresh = false) {
   const settingsPromise = loadSettings(forceRefresh).then((settings) => {
     currentSettings = settings;
     applySettingsToWidgets();
+    renderSavedFoodInsight();
+    renderSavedWellnessInsight();
   });
+
+  const wellnessPromise = settingsPromise.then(() => initWellness(forceRefresh));
+  const nutritionPromise = initNutrition(forceRefresh);
 
   // Every module below is an independent API call — fetch them all
   // concurrently so the dashboard doesn't wait on nine round trips in
@@ -630,8 +635,22 @@ async function loadDashboard(forceRefresh = false) {
     }),
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
-    settingsPromise.then(() => initWellness(forceRefresh)),
-    initNutrition(forceRefresh),
+    wellnessPromise.then(() => {
+      // The two AI-read panels' local (free) previews depend on wellness
+      // entries that just finished loading above — refresh them now rather
+      // than leaving whatever initFoodInsightPanel/initInsightPanel rendered
+      // at window 'load' time, before any data existed.
+      renderFoodInsightPreview(currentFoodInsightLookbackDays());
+      renderInsightDataPreview(currentInsightLookbackDays());
+    }),
+    nutritionPromise,
+    // Protein Source Rotation needs wellness (actual servings eaten),
+    // Nutrition Facts (live per-serving calories/protein), and settings
+    // (protein target) all loaded — refresh only once all three are in,
+    // rather than off just one of them like the two panels above.
+    Promise.all([wellnessPromise, nutritionPromise]).then(() => {
+      renderProteinRotationChart(currentProteinRotationLookbackDays());
+    }),
     initContacts(forceRefresh),
     initSettingsPanel(forceRefresh),
     settingsPromise.then(() => initTravel(forceRefresh)),
@@ -827,6 +846,11 @@ function setupScrollSpy() {
 }
 
 window.addEventListener('load', () => {
+  // Belt-and-suspenders alongside the head script's history.scrollRestoration
+  // = 'manual' — guarantees every load starts at the top even if the browser
+  // still tried to restore a prior scroll position before this fired.
+  window.scrollTo(0, 0);
+
   initAuth(handleAuthChange);
 
   document.getElementById('signin-btn').addEventListener('click', signIn);
@@ -838,6 +862,7 @@ window.addEventListener('load', () => {
   initCalibrationPanel();
   initInsightPanel();
   initFoodInsightPanel();
+  initProteinRotationPanel();
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();

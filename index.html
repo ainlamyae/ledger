@@ -34,6 +34,10 @@
     if (localStorage.getItem('ledger_theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
+    // Chrome restores the previous scroll position on a plain reload of the
+    // same page by default — always start at the top instead, since panels
+    // are collapsed/re-rendered fresh on every load anyway.
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 </script>
 </head>
 
@@ -75,20 +79,15 @@
 
 <div id="gate" class="gate">
     <div class="landing">
-        <div class="landing-hero">
-            <h1>Your personal life dashboard</h1>
-            <p>Health, finances, time tracking, travel, applications, and contacts — all in one dashboard, backed by your own Google Sheet with no third-party servers.</p>
-            <p id="auth-status" class="status" hidden></p>
+        <div class="landing-banner">
+            <div class="landing-banner-text">
+                <h1>Your personal life dashboard</h1>
+                <p>Health, finances, time tracking, travel, applications, and contacts — all in one dashboard, backed by your own Google Sheet with no third-party servers. A live clock with a second time zone, today's date in three calendars, and the local weather sit right above your numbers, and privacy mode masks every amount on screen at a keystroke.</p>
+            </div>
         </div>
+        <p id="auth-status" class="status" hidden></p>
 
         <div class="landing-features">
-            <div class="landing-intro-card">
-                <h3>🔒 At a Glance &amp; Private by Design</h3>
-                <p>A live clock with a second time zone, today's date in three calendars, and the local weather — right above your numbers. Your data lives in your own private Google Sheet — never on a third-party server. Privacy mode masks all amounts on screen at a keystroke.</p>
-            </div>
-
-            <p class="node-graph-hint">Hover or tap a feature to read what it does.</p>
-
             <div class="node-graph node-graph-health" aria-label="Health features">
                 <svg class="node-graph-lines" aria-hidden="true"></svg>
                 <div class="node-graph-hub-wrap">
@@ -119,12 +118,20 @@
                         <span class="node-graph-tooltip">The estimator remembers what it learns: every ingredient it looks up is saved to your own Nutrition Facts table, so the next mention is calculated instantly from a trusted value instead of re-estimated from scratch. Fine-tune any entry to match the exact brand you buy, and merge near-duplicates the AI phrased differently.</span>
                     </button>
                     <button type="button" class="node-graph-node">
-                        <span class="node-graph-node-title">💡 AI Health Insight</span>
-                        <span class="node-graph-tooltip">Get a plain-language read on your recent habits: a 7/14/30-day snapshot compared against your own targets and trend, reviewed by AI in a closable report — nothing is sent until you ask, and nothing is saved.</span>
+                        <span class="node-graph-node-title">📊 Body Composition Split</span>
+                        <span class="node-graph-tooltip">See how much of your day-to-day weight change is fat, muscle, or water — estimated from established body-composition formulas (Forbes, Deurenberg), not a guess.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🥗 AI Food Insight</span>
-                        <span class="node-graph-tooltip">See every ingredient you've actually eaten over the last 7/14/30 days, totaled up by amount, calories, and protein — then ask AI a free-text question about it, like which vitamins or minerals your diet might be missing.</span>
+                        <span class="node-graph-tooltip">See every ingredient you've actually eaten over the last 7/14/30 days, totaled up by amount, calories, and protein — then ask AI a free-text question about it, like which vitamins or minerals your diet might be missing. The report is saved and waiting for you next visit, not lost the moment you navigate away.</span>
+                    </button>
+                    <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">💡 AI Wellness Insight</span>
+                        <span class="node-graph-tooltip">Get a plain-language read on your recent habits: a 7/14/30-day snapshot compared against your own targets and trend, reviewed by AI — saved automatically, so it's still there next time instead of a one-off report you have to re-run.</span>
+                    </button>
+                    <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">🔄 Protein Source Rotation</span>
+                        <span class="node-graph-tooltip">Flag your go-to protein sources with a target share of your protein goal, and a chart shows what you've actually eaten from each recently vs. that live target — a low or empty bar means it's time to eat that one.</span>
                     </button>
                 </div>
             </div>
@@ -303,8 +310,6 @@
                     <h4>Weight Trend & Forecast</h4>
                     <div class="weight-projection-actions">
                         <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
-                        <button id="wellness-insight-btn" class="btn" title="Get an AI-generated read on your last 7 days">💡 Insight</button>
-                        <button id="food-insight-btn" class="btn" title="Get an AI-generated read on possible vitamin/mineral gaps in your recent food">🥗 Food Insight</button>
                     </div>
                 </div>
                 <div class="chart-box">
@@ -318,6 +323,15 @@
                         <span id="weight-progress-meter-pct" class="weight-progress-meter-pct"></span>
                         <span id="weight-projection-eta" class="weight-eta"></span>
                     </div>
+                </div>
+            </div>
+
+            <div class="weight-projection-wrap">
+                <div class="weight-projection-header">
+                    <h4>Body Composition Change</h4>
+                </div>
+                <div class="chart-box">
+                    <canvas id="wellness-composition-chart"></canvas>
                 </div>
             </div>
 
@@ -349,6 +363,85 @@
                         <canvas id="wellness-sleep-chart"></canvas>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="panel" id="food-insight-panel">
+            <h2>Food Insight</h2>
+            <p class="hint">An AI-generated read on possible nutrient gaps in your recent food.</p>
+
+            <label class="insight-lookback-label">Look back
+                <select id="food-insight-lookback">
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                </select>
+            </label>
+
+            <div class="table-responsive">
+                <table id="food-insight-table">
+                    <thead>
+                    <tr>
+                        <th>Ingredient</th>
+                        <th>Amount</th>
+                        <th>Calories</th>
+                        <th>Protein (g)</th>
+                    </tr>
+                    </thead>
+                    <tbody id="food-insight-ingredients-body"></tbody>
+                </table>
+            </div>
+
+            <label class="food-insight-question-label" for="food-insight-question">Ask a question (optional)
+                <textarea id="food-insight-question" rows="2" placeholder="e.g. Which vitamins or minerals might be missing?"></textarea>
+            </label>
+
+            <div class="panel-actions">
+                <button type="button" id="food-insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
+            </div>
+
+            <p id="food-insight-generated-at" class="hint" hidden></p>
+            <div id="food-insight-body"></div>
+            <p id="food-insight-status" class="status" hidden></p>
+        </div>
+
+        <div class="panel" id="wellness-insight-panel">
+            <h2>Wellness Insight</h2>
+            <p class="hint">An AI-generated read on your recent trends vs. the previous period — grounded in your weight trajectory, targets, and logging.</p>
+
+            <label class="insight-lookback-label">Look back
+                <select id="insight-lookback">
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                </select>
+            </label>
+
+            <div id="insight-data-preview" class="insight-data-preview"></div>
+
+            <div class="panel-actions">
+                <button type="button" id="insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
+            </div>
+
+            <p id="insight-generated-at" class="hint" hidden></p>
+            <div id="insight-body"></div>
+            <p id="insight-status" class="status" hidden></p>
+        </div>
+
+        <div class="panel" id="protein-rotation-panel">
+            <h2>Protein Source Rotation</h2>
+            <p class="hint">Actual protein eaten vs. your live target for each source — a low or empty bar means it's time for that one. Set an ingredient's Protein % on its Nutrition Facts row to track it here.</p>
+
+            <label class="insight-lookback-label">Look back
+                <select id="protein-rotation-lookback">
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="30">30 days</option>
+                </select>
+            </label>
+
+            <div class="chart-box">
+                <canvas id="protein-rotation-chart"></canvas>
             </div>
         </div>
 
@@ -428,7 +521,9 @@
                         <th>Amount</th>
                         <th class="sortable" data-sort="calories">Calories</th>
                         <th class="sortable" data-sort="protein">Protein</th>
+                        <th class="sortable" data-sort="proteinDensity" title="Grams of protein per 100 kcal — computed here, not stored — higher means a leaner protein source">Protein/100kcal</th>
                         <th class="sortable" data-sort="verified" title="Verified against the label on your own purchased ingredient">Verified</th>
+                        <th class="sortable" data-sort="proteinPercent" title="Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">Protein %</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -1102,72 +1197,6 @@
     </div>
 </div>
 
-<div id="insight-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="insight-modal-title" hidden>
-    <div class="modal-card modal-card-wide">
-        <h2 id="insight-modal-title">💡 Health Insight</h2>
-        <p class="hint">A one-time AI read on your recent data — closing this doesn't save or change anything.</p>
-
-        <label class="insight-lookback-label">Look back
-            <select id="insight-lookback">
-                <option value="7">7 days</option>
-                <option value="14">14 days</option>
-                <option value="30">30 days</option>
-            </select>
-        </label>
-
-        <div id="insight-data-preview" class="insight-data-preview"></div>
-
-        <div id="insight-body"></div>
-        <p id="insight-status" class="status" hidden></p>
-
-        <div class="modal-actions">
-            <button type="button" id="insight-close-btn" class="btn">Close</button>
-            <button type="button" id="insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
-        </div>
-    </div>
-</div>
-
-<div id="food-insight-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="food-insight-modal-title" hidden>
-    <div class="modal-card modal-card-wide">
-        <h2 id="food-insight-modal-title">🥗 Food Insight</h2>
-        <p class="hint">A one-time AI read on possible nutrient gaps in your recent food — closing this doesn't save or change anything.</p>
-
-        <label class="insight-lookback-label">Look back
-            <select id="food-insight-lookback">
-                <option value="7">7 days</option>
-                <option value="14">14 days</option>
-                <option value="30">30 days</option>
-            </select>
-        </label>
-
-        <div class="table-responsive">
-            <table id="food-insight-table">
-                <thead>
-                <tr>
-                    <th>Ingredient</th>
-                    <th>Amount</th>
-                    <th>Calories</th>
-                    <th>Protein (g)</th>
-                </tr>
-                </thead>
-                <tbody id="food-insight-ingredients-body"></tbody>
-            </table>
-        </div>
-
-        <label class="food-insight-question-label" for="food-insight-question">Ask a question (optional)
-            <textarea id="food-insight-question" rows="2" placeholder="e.g. Which vitamins or minerals might be missing?"></textarea>
-        </label>
-
-        <div id="food-insight-body"></div>
-        <p id="food-insight-status" class="status" hidden></p>
-
-        <div class="modal-actions">
-            <button type="button" id="food-insight-close-btn" class="btn">Close</button>
-            <button type="button" id="food-insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
-        </div>
-    </div>
-</div>
-
 <div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
     <div class="modal-card">
         <h2 id="timesheet-modal-title">Log Time</h2>
@@ -1213,12 +1242,12 @@
         <h2 id="wellness-modal-title">Log Entry</h2>
 
         <form id="wellness-form" class="app-form">
+            <label class="checkbox-inline-label" title="Reusable pattern: no date — always listed at the top, excluded from charts">
+                <input type="checkbox" id="wellness-is-pattern">
+                Pattern
+            </label>
             <label>Date
                 <input type="date" id="wellness-entry-date" required>
-            </label>
-            <label class="checkbox-inline-label">
-                <input type="checkbox" id="wellness-is-pattern">
-                Save as reusable pattern (no date — always listed at the top, excluded from charts)
             </label>
             <label>Time
                 <input type="time" id="wellness-entry-time">
@@ -1256,7 +1285,7 @@
                         <th>Protein</th>
                         <th>Density used</th>
                         <th>Source</th>
-                        <th>Save to Nutrition Facts</th>
+                        <th>Save</th>
                     </tr>
                     </thead>
                     <tbody id="wellness-calc-breakdown-body"></tbody>
@@ -1327,8 +1356,12 @@
                 <input type="checkbox" id="nutrition-verified">
                 Verified against the label on my own purchased ingredient
             </label>
+            <label>Protein %
+                <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
+            </label>
 
             <p class="hint">Amount needs either a weight in grams somewhere in it (e.g. "100g" or "1 scoop (32g)") or, for a food that's naturally counted in whole pieces, a leading count (e.g. "1 rice cake", "2 eggs") — either way Calculate can scale it to whatever quantity you actually logged.</p>
+            <p class="hint">Protein % sets what share of your protein target should come from this ingredient (e.g. 10 for "10% of my protein target") — since that target already updates live with your weight/activity, this ingredient's actual gram target moves with it automatically.</p>
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
@@ -1534,6 +1567,7 @@
 <script src="assets/script/calibration.js"></script>
 <script src="assets/script/insight.js"></script>
 <script src="assets/script/food-insight.js"></script>
+<script src="assets/script/protein-rotation.js"></script>
 <script src="assets/script/landing-graph.js"></script>
 <script src="assets/script/app.js"></script>
 </body>

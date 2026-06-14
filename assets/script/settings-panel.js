@@ -129,6 +129,37 @@ async function submitSettingForm(event) {
   }
 }
 
+// Writes key/value pairs to the Settings tab — updating rows that already
+// exist in place, appending new ones for keys seen for the first time — then
+// refreshes both the settings-panel list and currentSettings so callers see
+// their own write immediately. Shared by every feature that persists an
+// AI/computed result there (calibration.js, insight.js, food-insight.js).
+async function saveSettingValues(values) {
+  await initSettingsPanel(true);
+  if (settingsSheetMissing) {
+    throw new Error(`No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to save this.`);
+  }
+
+  const existingByKey = new Map(allSettingRows.map((r) => [r.key, r]));
+  const updates = [];
+  const newRows = [];
+
+  Object.entries(values).forEach(([key, value]) => {
+    const existing = existingByKey.get(key);
+    if (existing) {
+      updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes]]));
+    } else {
+      newRows.push([key, value, '']);
+    }
+  });
+
+  await Promise.all(updates);
+  if (newRows.length > 0) await appendValues(SETTINGS_PANEL_RANGE, newRows);
+
+  await refreshSettingsList(true);
+  currentSettings = await loadSettings(true);
+}
+
 async function deleteSetting(row) {
   await confirmAndDelete('Delete this setting?', async () => {
     await batchUpdate([{

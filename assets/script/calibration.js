@@ -316,18 +316,8 @@ async function saveCalibratedGains() {
   clearFieldError('calibration-status');
 
   try {
-    // Forces a fresh settingsSheetId/settingsSheetMissing/allSettingRows —
-    // more correct than trusting whatever settings-panel.js's own state
-    // happens to be, since it runs concurrently with this modal via
-    // loadDashboard()'s Promise.allSettled.
-    await initSettingsPanel(true);
-    if (settingsSheetMissing) {
-      showFieldError('calibration-status', `No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to save a calibration.`);
-      return;
-    }
-
     const fit = lastCalibrationFit;
-    const values = {
+    await saveSettingValues({
       PROJ_BASELINE_KG_PER_DAY: fit.beta0,
       PROJ_CAL_KG_PER_KCAL_DAY: fit.betaCal,
       PROJ_ACTIVITY_KG_PER_MIN_DAY: fit.betaAct,
@@ -336,26 +326,8 @@ async function saveCalibratedGains() {
       PROJ_CALIBRATED_AT: new Date().toISOString().slice(0, 10),
       PROJ_CALIBRATION_R2: Math.round(fit.r2 * 1000) / 1000,
       PROJ_CALIBRATION_SAMPLES: fit.n,
-    };
-
-    const existingByKey = new Map(allSettingRows.map((r) => [r.key, r]));
-    const updates = [];
-    const newRows = [];
-
-    Object.entries(values).forEach(([key, value]) => {
-      const existing = existingByKey.get(key);
-      if (existing) {
-        updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes]]));
-      } else {
-        newRows.push([key, value, '']);
-      }
     });
 
-    await Promise.all(updates);
-    if (newRows.length > 0) await appendValues(SETTINGS_PANEL_RANGE, newRows);
-
-    await refreshSettingsList(true);
-    currentSettings = await loadSettings(true);
     applySettingsToWidgets();
     renderWellnessProjectionChart(getDatedWellnessEntries());
 

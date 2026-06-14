@@ -1,12 +1,14 @@
-// Weight Trend & Forecast's "💡 Insight" button: sends a plain-language
+// "💡 Wellness Insight" panel (formerly "Insight"): sends a plain-language
 // snapshot of the user's recent data (current window + the immediately
 // preceding period of equal length, plus age/height/BMI, their own targets,
 // and the same weight-trajectory/calibration numbers the Weight Trend &
 // Forecast chart already computes) to Groq and shows the free-text response
-// in a dismissible modal. Purely a read — never runs automatically, nothing
-// it produces is saved, and unlike calorie-estimator.js's calls this one is
-// neither cached nor deterministic (it's advice text, not a number to
-// reproduce). Wired up by initInsightPanel(), called from app.js.
+// inline. Never runs automatically, and unlike calorie-estimator.js's calls
+// this one is neither cached nor deterministic (it's advice text, not a
+// number to reproduce) — but the last result IS persisted, to the Settings
+// tab as WELLNESS_INSIGHT_LAST_RESULT/WELLNESS_INSIGHT_LAST_GENERATED_AT, so
+// the panel still shows something on a fresh page load. Wired up by
+// initInsightPanel(), called from app.js.
 
 const INSIGHT_LOOKBACK_DEFAULT = 7;
 
@@ -254,18 +256,16 @@ async function generateWellnessInsight(lookbackDays) {
 }
 
 function initInsightPanel() {
-  document.getElementById('wellness-insight-btn').addEventListener('click', openInsightModal);
-  document.getElementById('insight-close-btn').addEventListener('click', closeInsightModal);
+  clearFieldError('insight-status');
+  renderInsightDataPreview(currentInsightLookbackDays());
+  renderSavedWellnessInsight();
+
   document.getElementById('insight-generate-btn').addEventListener('click', () => {
     runInsightGeneration(currentInsightLookbackDays());
   });
   document.getElementById('insight-lookback').addEventListener('change', () => {
     renderInsightDataPreview(currentInsightLookbackDays());
   });
-}
-
-function closeInsightModal() {
-  document.getElementById('insight-modal').hidden = true;
 }
 
 function currentInsightLookbackDays() {
@@ -314,8 +314,8 @@ function renderInsightText(container, text) {
   });
 }
 
-// Only runs on an explicit Send to AI click — opening the modal or changing
-// the lookback selector only updates the (free, local) data preview above.
+// Only runs on an explicit Send to AI click — changing the lookback selector
+// only updates the (free, local) data preview above.
 async function runInsightGeneration(lookbackDays) {
   const body = document.getElementById('insight-body');
   const btn = document.getElementById('insight-generate-btn');
@@ -338,6 +338,19 @@ async function runInsightGeneration(lookbackDays) {
     const text = await generateWellnessInsight(lookbackDays);
     body.innerHTML = '';
     renderInsightText(body, text);
+
+    // Persisted so a fresh page load still shows the last read instead of
+    // going blank — same pattern as food-insight.js's Food Insight panel.
+    const generatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    try {
+      await saveSettingValues({
+        WELLNESS_INSIGHT_LAST_RESULT: text,
+        WELLNESS_INSIGHT_LAST_GENERATED_AT: generatedAt,
+      });
+      renderInsightGeneratedAt(generatedAt);
+    } catch (saveErr) {
+      showFieldError('insight-status', `Generated, but couldn't save it: ${saveErr.message}`);
+    }
   } catch (err) {
     body.innerHTML = '';
     showFieldError('insight-status', err.message);
@@ -348,15 +361,32 @@ async function runInsightGeneration(lookbackDays) {
   }
 }
 
-function openInsightModal() {
-  document.getElementById('insight-modal').hidden = false;
-  clearFieldError('insight-status');
-  renderInsightDataPreview(currentInsightLookbackDays());
+function renderInsightGeneratedAt(timestamp) {
+  const el = document.getElementById('insight-generated-at');
+  if (!timestamp) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.textContent = `Last generated ${timestamp}`;
+}
 
+// Restores the last AI result (if any) from the Settings tab on page load,
+// so the panel shows the previous read instead of an empty placeholder.
+function renderSavedWellnessInsight() {
   const body = document.getElementById('insight-body');
+  const text = getSettingString('WELLNESS_INSIGHT_LAST_RESULT', null);
+
   body.innerHTML = '';
-  const placeholder = document.createElement('p');
-  placeholder.className = 'hint';
-  placeholder.textContent = 'Review the data above, then click "Send to AI" to get a read on it.';
-  body.appendChild(placeholder);
+  if (!text) {
+    const placeholder = document.createElement('p');
+    placeholder.className = 'hint';
+    placeholder.textContent = 'Review the data above, then click "Send to AI" to get a read on it.';
+    body.appendChild(placeholder);
+    renderInsightGeneratedAt(null);
+    return;
+  }
+
+  renderInsightText(body, text);
+  renderInsightGeneratedAt(getSettingString('WELLNESS_INSIGHT_LAST_GENERATED_AT', null));
 }

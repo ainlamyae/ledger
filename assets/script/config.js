@@ -8,5 +8,6 @@ const CONFIG = {
     BALANCE: 'Account Balance',
     ACCOUNTS: 'Account Balance',
     CATEGORIES: 'Categories',
+    INSIGHT: 'Insight',
   },
 };

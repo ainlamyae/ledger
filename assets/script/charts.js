@@ -1,3 +1,12 @@
+// Chart.js reads these global defaults when each chart is constructed, so
+// charts created after a theme switch automatically get legible axis/legend/
+// grid colors without per-chart options.
+function applyChartTheme() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  Chart.defaults.color = dark ? '#94a3b8' : '#6b7280';
+  Chart.defaults.borderColor = dark ? '#334155' : '#e5e7eb';
+}
+
 let incomeExpenseChart = null;
 
 function renderIncomeExpenseChart(months) {

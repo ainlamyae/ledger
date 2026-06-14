@@ -465,10 +465,12 @@
                 <select id="tx-account" required></select>
             </label>
             <label>Payee
-                <input type="text" id="tx-payee" required>
+                <input type="text" id="tx-payee" list="tx-payee-options" required>
+                <datalist id="tx-payee-options"></datalist>
             </label>
             <label>Description
-                <input type="text" id="tx-description">
+                <input type="text" id="tx-description" list="tx-description-options">
+                <datalist id="tx-description-options"></datalist>
             </label>
             <label>Amount
                 <input type="number" step="0.01" id="tx-amount" required>

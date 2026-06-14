@@ -30,6 +30,11 @@
 <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="assets/style/styles.css">
+<script>
+    if (localStorage.getItem('ledger_theme') === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+</script>
 </head>
 
 <body>
@@ -43,14 +48,12 @@
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
-        <button id="refresh-btn" class="btn" title="Refresh" aria-label="Refresh" hidden>🔄</button>
-        <button id="clear-cache-btn" class="btn" title="Clear cached data and reload the latest version of the app" aria-label="Clear cache">🧹</button>
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
         <button id="signout-btn" class="btn" title="Sign out" aria-label="Sign out" hidden>🚪</button>
     </div>
 </header>
 
-<div class="top-banner">"And will provide for him from where he does not expect."</div>
+<div id="top-banner" class="top-banner" hidden>"And will provide for him from where he does not expect."</div>
 
 <div id="gate" class="gate">
     <div class="landing">
@@ -335,7 +338,7 @@
     <div style="height:.5rem"></div>
 
     <div class="panel">
-        <h2>Income vs Expenses Trend</h2>
+        <h2>Income vs. Expenses Trend</h2>
 
         <div class="chart-box">
             <canvas id="income-expense-chart"></canvas>
@@ -440,6 +443,13 @@
         </div>
     </div>
 
+</div>
+
+<div class="fab-stack">
+    <button id="theme-toggle-btn" class="fab" title="Switch to dark mode" aria-label="Switch to dark mode">🌙</button>
+    <button id="refresh-btn" class="fab" title="Refresh" aria-label="Refresh" hidden>🔄</button>
+    <button id="clear-cache-btn" class="fab" title="Clear cached data and reload the latest version of the app" aria-label="Clear cache">🧹</button>
+    <button id="toggle-panels-fab" class="fab" title="Collapse all panels" aria-label="Collapse all panels" hidden>⊟</button>
 </div>
 
 <footer class="site-footer">

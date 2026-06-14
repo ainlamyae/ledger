@@ -218,9 +218,11 @@ function renderTransactions() {
 
     const payeeCell = document.createElement('td');
     payeeCell.textContent = t.payee;
+    payeeCell.title = t.payee;
 
     const descCell = document.createElement('td');
     descCell.textContent = t.description;
+    descCell.title = t.description;
 
     const categoryCell = document.createElement('td');
     categoryCell.textContent = t.category;

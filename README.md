@@ -35,14 +35,16 @@ Ledger is a single-page application that authenticates the user with their own G
 - **Spending Breakdown by Category** — four donut charts showing each category's share of spending for last month, last quarter average, last year average, and lifelong average. Legend and slices follow the same highest-to-lowest Lifelong Average order as Spending vs. Benchmarks.
 - **Spending Breakdown by Type** — for each spending category, four donut charts (Last Month, Last Quarter, Last Year, Lifelong) breaking that category's spend down by `Type`, a free-text prefix convention in the `Transactions` `Description` field (e.g. "Bread - milk and eggs"), pre-aggregated by formulas in the `Insight` sheet. Panels are ordered by lifelong spend (highest first), and each donut includes an "Untyped" slice for spending without a recognized prefix.
 - **Spending Trend by Category** — stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Spending vs. Benchmarks.
-- **Income vs Expenses Trend** — stepped area chart of the full transaction history.
+- **Income vs. Expenses Trend** — stepped area chart of the full transaction history.
 - **Cumulative Savings Trend** — running total of savings as a line chart.
 - **Savings Rate Trend** — monthly savings rate (saved ÷ income, as a %) as a line chart.
 - **Account Composition** — nested donut chart: the inner ring shows each account type's share of total balance, the outer ring breaks that down by individual account (shaded by its type's color). Account types are ordered by net balance, highest first (so e.g. negative-balance Credit types sort last), and types with a zero balance total are omitted.
-- **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export. The Payee and Description fields autocomplete from your transaction history (most-used values first), helping correct typos or voice-dictation mistakes.
+- **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export. The Payee and Description fields autocomplete from your transaction history (most-used values first), helping correct typos or voice-dictation mistakes. Long Payee/Description values are truncated with an ellipsis (hover to see the full text).
 - **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation.
+- **Collapsible panels** — every chart/table panel is collapsed by default; click its title to expand or collapse it. Clicking a nav link (Charts/Transactions/Accounts) expands the relevant panel(s), and a floating "expand/collapse all" button toggles every panel at once.
+- **Dark mode** — a floating 🌙/☀️ button switches the whole app — including charts and the landing page — between light and dark themes, persisted in `localStorage`.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
-- **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; a manual refresh and a "clear cache" control are both available.
+- **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; manual refresh and clear-cache controls are available as floating buttons.
 
 Category-based charts (Spending vs. Benchmarks, Spending Breakdown by Category, Spending Trend by Category) all derive their colors from the same per-category colors in the `Categories` sheet.
 
@@ -102,7 +104,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete, Payee/Description autocomplete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
 | 7 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |
-| 9 | `app.js` | Orchestration: report aggregation, dashboard rendering, scroll-spy nav, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange` |
+| 9 | `app.js` | Orchestration: report aggregation, dashboard rendering, scroll-spy nav, collapsible panels, dark mode toggle, wiring everything together on `window.load` | `loadDashboard`, `handleAuthChange` |
 
 ### Data Flow
 
@@ -121,7 +123,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 8. On success, the relevant cache key is refreshed (`refreshTransactions(true)`, `refreshAccountsList(true)`, `refreshNetWorth()`, etc.) so the UI reflects the change immediately without a full page reload.
 
 **Manual refresh**
-9. The 🔄 Refresh button clears the cache and re-fetches everything. The 🧹 Clear Cache button additionally clears Cache Storage and unregisters any service workers, then reloads — for recovering from a stale deployed version.
+9. The 🔄 Refresh and 🧹 Clear Cache buttons — part of the floating action button stack in the bottom-right corner — clear the cache and re-fetch everything; Clear Cache additionally clears Cache Storage and unregisters any service workers, then reloads — for recovering from a stale deployed version. The same stack also holds the 🌙/☀️ dark mode toggle and the expand/collapse-all panels button.
 
 ---
 
@@ -346,8 +348,8 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 - `index.html` is served with `Cache-Control: no-cache, no-store, must-revalidate`, so the app shell is never stale.
 - All Sheets API responses are cached in `localStorage` for 5 minutes (`cache.js`), keyed per data set (see [Configuration Reference](#configuration-reference)).
 - Every write operation (add/edit/delete) immediately refreshes only the affected cache entries, so the UI updates without a full reload.
-- The 🔄 **Refresh** button clears the cache and re-fetches all data.
-- The 🧹 **Clear Cache** button additionally purges Cache Storage and unregisters any service workers before reloading — useful if a browser has pinned an old deployed version.
+- The 🔄 **Refresh** button (floating, bottom-right) clears the cache and re-fetches all data.
+- The 🧹 **Clear Cache** button (floating, bottom-right) additionally purges Cache Storage and unregisters any service workers before reloading — useful if a browser has pinned an old deployed version.
 
 ---
 

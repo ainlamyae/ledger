@@ -761,7 +761,7 @@ function renderWellnessCaloriesChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
+        legend: { display: false },
         tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
@@ -776,6 +776,39 @@ function renderWellnessCaloriesChart(entries) {
   });
 }
 
+// Maps a clock time (minutes since midnight) onto a fixed 18:00 -> next-day
+// 12:00 axis (18 hours) so the y-axis can carry fixed "18:00".."12:00"
+// reference labels instead of autoscaling to whatever range of bedtimes
+// happens to be visible. Covers virtually every real bedtime/waketime;
+// daytime-only naps fall outside [0, 18] and are treated as a gap by the
+// caller rather than drawn wrapped/garbled.
+function sleepAxisValue(clockMin) {
+  return (((clockMin - 18 * 60) + 24 * 60) % (24 * 60)) / 60;
+}
+const SLEEP_AXIS_TICK_LABELS = { 0: '18:00', 3: '21:00', 6: '00:00', 9: '03:00', 12: '06:00', 15: '09:00', 18: '12:00' };
+function sleepAxisTickLabel(v) {
+  return SLEEP_AXIS_TICK_LABELS[v] ?? '';
+}
+
+function lerpHex(hexA, hexB, t) {
+  const a = [1, 3, 5].map((i) => parseInt(hexA.slice(i, i + 2), 16));
+  const b = [1, 3, 5].map((i) => parseInt(hexB.slice(i, i + 2), 16));
+  const rgb = a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  return `rgb(${rgb.join(',')})`;
+}
+
+// Red -> amber -> green as duration goes from "minimum" (half the target) up
+// to the target itself, reusing the app's own existing expense/calories/
+// income colors rather than inventing new ones. Duration at or below the
+// minimum is solid red; at or above target is solid green.
+function sleepStatusColor(durationHr, targetHr) {
+  const minHr = targetHr / 2;
+  const ratio = Math.min(1, Math.max(0, (durationHr - minHr) / (targetHr - minHr)));
+  return ratio < 0.5
+    ? lerpHex('#dc2626', '#f59e0b', ratio / 0.5)
+    : lerpHex('#f59e0b', '#16a34a', (ratio - 0.5) / 0.5);
+}
+
 function renderWellnessSleepChart(entries) {
   const ctx = document.getElementById('wellness-sleep-chart');
 
@@ -783,10 +816,30 @@ function renderWellnessSleepChart(entries) {
 
   const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
   const dates = trailingDatesForCategory(sleepEntries, WELLNESS_METRICS_DAYS);
-  const byDate = new Map();
-  sleepEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
-  const sleepData = dates.map((d) => byDate.get(d) || 0);
+  // Per date, only the single longest bed/wake-bearing entry is drawn (e.g.
+  // a nap logged separately from the night's sleep) — dates where no entry
+  // has bed/wake data (only ever a plain duration number) are left as a gap
+  // rather than falling back to the old bottom-anchored bar style.
+  const bestByDate = new Map();
+  sleepEntries.forEach((e) => {
+    if (e.sleepBedMin === null || e.sleepWakeMin === null) return;
+    const current = bestByDate.get(e.date);
+    if (!current || e.amount > current.amount) bestByDate.set(e.date, e);
+  });
+
+  const rangeByDate = new Map(); // date -> { bedMin, wakeMin, durationHr }
+  const barColors = [];
+  const sleepData = dates.map((d) => {
+    const e = bestByDate.get(d);
+    if (!e) { barColors.push(null); return null; }
+    const start = sleepAxisValue(e.sleepBedMin);
+    const end = sleepAxisValue(e.sleepWakeMin);
+    if (end <= start || start < 0 || start > 18 || end < 0 || end > 18) { barColors.push(null); return null; }
+    rangeByDate.set(d, { bedMin: e.sleepBedMin, wakeMin: e.sleepWakeMin, durationHr: e.amount });
+    barColors.push(sleepStatusColor(e.amount, sleepTarget));
+    return [start, end];
+  });
 
   wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
     data: {
@@ -796,18 +849,7 @@ function renderWellnessSleepChart(entries) {
           type: 'bar',
           label: 'Sleep',
           data: sleepData,
-          backgroundColor: '#6366f1',
-          order: 2,
-        },
-        {
-          type: 'line',
-          label: `${sleepTarget} hr target`,
-          data: new Array(dates.length).fill(sleepTarget),
-          borderColor: '#dc2626',
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0,
-          order: 1,
+          backgroundColor: barColors,
         },
       ],
     },
@@ -815,15 +857,26 @@ function renderWellnessSleepChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
-        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => formatIsoDateShort(items[0].label),
+            label: (item) => {
+              const r = rangeByDate.get(item.label);
+              if (!r) return '';
+              const text = `Bed ${formatClockTime24(r.bedMin)} / Wake ${formatClockTime24(r.wakeMin)} · ${r.durationHr} hr`;
+              return privacyMode ? maskDigits(text) : text;
+            },
+          },
+        },
       },
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
-          beginAtZero: true,
+          min: 0,
+          max: 18,
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: maskedUnitTick('hr') },
+          ticks: { stepSize: 3, callback: sleepAxisTickLabel },
         },
       },
     },
@@ -910,7 +963,7 @@ function renderWellnessActivityChart(entries) {
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
+        legend: { display: false },
         title: {
           display: !hasData,
           text: 'No activity logged yet — add a Walk, Run, or Workout entry to get started',
@@ -970,7 +1023,7 @@ function renderWellnessProteinChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
+        legend: { display: false },
         tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
@@ -1553,7 +1606,7 @@ function renderWellnessCompositionChart(entries) {
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
+        legend: { display: false },
         title: {
           display: !hasData,
           text: haveProfile

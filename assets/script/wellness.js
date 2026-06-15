@@ -19,11 +19,34 @@ function isCompositeCategory(category) {
   return category.includes(';');
 }
 
+// Parses "HH:MM" (1 or 2-digit hour) into minutes since midnight, or null if
+// malformed — the shared validator for both typing a Sleep bed/wake pair into
+// the Amount field and re-parsing it back out of the sheet on load.
+function parseClockTime(str) {
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(str.trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+function formatClockTime24(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+// Duration in hours between a bed time and a wake time, wrapping past
+// midnight (wake <= bed means the wake happened the next calendar day).
+function sleepDurationHours(bedMin, wakeMin) {
+  const diff = wakeMin <= bedMin ? wakeMin + 1440 - bedMin : wakeMin - bedMin;
+  return Math.round((diff / 60) * 10) / 10;
+}
+
 // Round-trips an entry's Amount/Unit back into the raw ';'-joined form the
 // sheet stores (or a plain value for non-composite entries) — used both to
 // repopulate the edit form and to snapshot a row before bulk Recalculate
 // overwrites it, so an undo can restore the exact original cell text.
 function rawAmountString(e) {
+  if (e.sleepBedMin !== null && e.sleepBedMin !== undefined && e.sleepWakeMin !== null && e.sleepWakeMin !== undefined) {
+    return `${formatClockTime24(e.sleepBedMin)}/${formatClockTime24(e.sleepWakeMin)}`;
+  }
   if (e.amount === null) return '';
   return e.amount2 !== null ? `${e.amount}; ${e.amount2}` : String(e.amount);
 }
@@ -160,6 +183,8 @@ async function refreshWellness(forceRefresh = false) {
       let amount2 = null;
       let unit = rawUnit;
       let unit2 = null;
+      let sleepBedMin = null;
+      let sleepWakeMin = null;
 
       if (isCompositeCategory(category)) {
         if (rawAmount !== undefined && rawAmount !== '') {
@@ -170,6 +195,21 @@ async function refreshWellness(forceRefresh = false) {
         const [u1, u2] = rawUnit.split(';').map((s) => s.trim());
         unit = u1 || '';
         unit2 = u2 || null;
+      } else if (category === 'Sleep' && typeof rawAmount === 'string' && rawAmount.includes('/')) {
+        // Bed/wake pair typed as "HH:MM/HH:MM" instead of a plain duration —
+        // a legacy plain-number Sleep cell comes back from UNFORMATTED_VALUE
+        // as a JS number, not a string, so the typeof check above already
+        // keeps this branch from ever misfiring on an old entry.
+        const [bedStr, wakeStr] = rawAmount.split('/').map((s) => s.trim());
+        const bedMin = parseClockTime(bedStr);
+        const wakeMin = parseClockTime(wakeStr);
+        if (bedMin !== null && wakeMin !== null) {
+          sleepBedMin = bedMin;
+          sleepWakeMin = wakeMin;
+          amount = sleepDurationHours(bedMin, wakeMin);
+        } else {
+          amount = null; // corrupt cell degrades gracefully, same as the breakdown JSON parse below
+        }
       } else {
         amount = (rawAmount !== undefined && rawAmount !== '') ? Number(rawAmount) : null;
       }
@@ -198,6 +238,8 @@ async function refreshWellness(forceRefresh = false) {
         amount2,
         unit,
         unit2,
+        sleepBedMin,
+        sleepWakeMin,
         notes: row[6] || '',
         breakdown,
       };
@@ -277,9 +319,11 @@ function renderWellnessList() {
     previousDate = e.date;
 
     const notesShort = e.notes.length > 20 ? `${e.notes.slice(0, 20)}…` : e.notes;
-    const amountText = e.amount !== null
-      ? (e.amount2 !== null ? `${e.amount} / ${e.amount2}` : String(e.amount))
-      : '—';
+    const amountText = e.category === 'Sleep' && e.sleepBedMin !== null
+      ? `${formatClockTime24(e.sleepBedMin)} / ${formatClockTime24(e.sleepWakeMin)}`
+      : e.amount !== null
+        ? (e.amount2 !== null ? `${e.amount} / ${e.amount2}` : String(e.amount))
+        : '—';
     const unitText = e.unit2 ? `${e.unit} / ${e.unit2}` : e.unit;
 
     const checkboxCell = document.createElement('td');
@@ -424,6 +468,8 @@ function onCategoryChange() {
   const defaults = CATEGORY_DEFAULTS[cat] || { unit: '', descriptions: [] };
 
   document.getElementById('wellness-unit').value = defaults.unit;
+  document.getElementById('wellness-amount').placeholder =
+    cat === 'Sleep' ? 'e.g. 7.5, or 23:30/07:00 for bed/wake' : '';
 
   // Historical descriptions for this category, sorted by frequency (most used first).
   // 'Calories' and 'Calories; Protein' share one history — they're the same kind
@@ -478,6 +524,18 @@ async function submitWellnessForm(event) {
       return;
     }
     amount = `${cal}; ${prot}`;
+  } else if (category === 'Sleep' && amountRaw.includes('/')) {
+    const parts = amountRaw.split('/').map((s) => s.trim());
+    const [bedMin, wakeMin] = parts.map((s) => parseClockTime(s));
+    if (parts.length !== 2 || bedMin === null || wakeMin === null) {
+      showFieldError('wellness-form-error', 'Bed/wake time must be HH:MM/HH:MM (e.g. 23:30/07:00).');
+      return;
+    }
+    if (bedMin === wakeMin) {
+      showFieldError('wellness-form-error', 'Bed and wake time cannot be the same.');
+      return;
+    }
+    amount = `${formatClockTime24(bedMin)}/${formatClockTime24(wakeMin)}`;
   } else {
     const evaluated = evaluateNumberExpression(amountRaw);
     if (amountRaw && evaluated === null) {

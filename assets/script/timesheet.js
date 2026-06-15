@@ -146,22 +146,21 @@ function setupTimesheetSorting() {
   });
 }
 
-// Defaults the filter to 28 days (4 weeks) ending on the Saturday of the
-// week that is 2 weeks from today, but only the first time — never stomps a
-// date range the user already set themselves.
+// Defaults the filter to 1 week back through 2 weeks out from today, but
+// only the first time — never stomps a date range the user already set
+// themselves. Anchored directly on today (not rounded to a weekday) so the
+// split is exactly 1 week back / 2 weeks out regardless of what day of the
+// week today happens to be.
 function setDefaultTimesheetDateRange() {
   const fromInput = document.getElementById('timesheet-date-from');
   const toInput = document.getElementById('timesheet-date-to');
   if (fromInput.value || toInput.value) return;
 
   const today = new Date();
-  const twoWeeksOut = new Date(today);
-  twoWeeksOut.setDate(today.getDate() + 14);
-  const daysToSaturday = (6 - twoWeeksOut.getDay() + 7) % 7;
-  const toDate = new Date(twoWeeksOut);
-  toDate.setDate(twoWeeksOut.getDate() + daysToSaturday);
-  const fromDate = new Date(toDate);
-  fromDate.setDate(toDate.getDate() - 27);
+  const fromDate = new Date(today);
+  fromDate.setDate(today.getDate() - 7);
+  const toDate = new Date(today);
+  toDate.setDate(today.getDate() + 14);
   fromInput.value = isoFromDate(fromDate);
   toInput.value = isoFromDate(toDate);
 }

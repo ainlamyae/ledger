@@ -612,6 +612,7 @@ function renderWellnessCharts(entries) {
   renderWellnessActivityChart(entries);
   renderWellnessProteinChart(entries);
   renderWellnessProjectionChart(entries);
+  renderWellnessCompositionChart(entries);
 }
 
 // "Today at a glance" stat tiles above the 4 trend charts — the charts are
@@ -760,7 +761,7 @@ function renderWellnessCaloriesChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
         tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
@@ -814,7 +815,7 @@ function renderWellnessSleepChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
         tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
@@ -909,9 +910,7 @@ function renderWellnessActivityChart(entries) {
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        // No legend — the small chart-box-donut area doesn't have room for
-        // one; hover the stacked segments (tooltip) to see each description.
-        legend: { display: false },
+        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
         title: {
           display: !hasData,
           text: 'No activity logged yet — add a Walk, Run, or Workout entry to get started',
@@ -971,7 +970,7 @@ function renderWellnessProteinChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
         tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
@@ -1401,6 +1400,140 @@ function renderWellnessProjectionChart(entries) {
   const calibNote = proj.calibrated ? ' · calibrated' : '';
   const etaLine = `Projected to reach ${proj.weightGoal} kg on ${etaStr} (~${proj.daysToGoal} days)${note}${calibNote}`;
   etaEl.textContent = privacyMode ? maskDigits(etaLine) : etaLine;
+}
+
+// Forbes' constant (kg) relating the fat-free share of ANY weight change to
+// current fat mass: ΔFFM/ΔBW = FORBES_C_KG / (FORBES_C_KG + fatMassKg) — the
+// leaner someone already is, the larger the fraction of their next kg lost
+// (or gained) is fat-free mass rather than fat. (Forbes 1987; see Hall 2007,
+// Br J Nutr, "Body fat and fat-free mass inter-relationships: Forbes's
+// theory revisited".)
+const FORBES_C_KG = 10.4;
+
+// Long-established fraction of fat-free mass that is water (Pace & Rathbun
+// 1945, ~0.73; confirmed ~0.70-0.76 across mammals and human cadaver
+// analysis in later reviews). The remaining ~27% of any fat-free mass
+// change is lean solids — protein and mineral — labeled "Muscle" below
+// since that's overwhelmingly what it represents day to day.
+const FFM_WATER_FRACTION = 0.73;
+
+// Deurenberg et al. 1991 (Br J Nutr) age/sex-specific body fat % prediction
+// from BMI alone — used here because no direct body-fat measurement (scale,
+// calipers, DEXA) exists anywhere in this app, same "best available
+// estimate" trust level as calorie-estimator.js's USDA/AI fallbacks.
+function estimateBodyFatPercent(weightKg, heightCm, age, sex) {
+  const bmi = weightKg / (heightCm / 100) ** 2;
+  const sexTerm = sex === 'male' ? 1 : 0;
+  return 1.20 * bmi + 0.23 * age - 10.8 * sexTerm - 5.4;
+}
+
+// Splits a measured weight change (kg, negative = loss) into fat / muscle /
+// water using Forbes' fat vs fat-free partition, then the fat-free portion's
+// established water fraction. This is a population-average estimate, not a
+// measurement — there's no way to actually observe this split from a scale
+// alone, which is why the chart's caption calls it out as such.
+function splitWeightChange(deltaKg, weightKg, heightCm, age, sex) {
+  const bfPercent = Math.max(3, Math.min(60, estimateBodyFatPercent(weightKg, heightCm, age, sex)));
+  const fatMassKg = weightKg * (bfPercent / 100);
+  const ffmFraction = FORBES_C_KG / (FORBES_C_KG + fatMassKg);
+
+  const fat = deltaKg * (1 - ffmFraction);
+  const ffm = deltaKg * ffmFraction;
+  return { fat, muscle: ffm * (1 - FFM_WATER_FRACTION), water: ffm * FFM_WATER_FRACTION };
+}
+
+// Same-day duplicate weigh-ins averaged together, same as
+// renderWellnessProjectionChart's weightByDate — one weight per logged date.
+function weightByDateMap(weightEntries) {
+  const sums = new Map();
+  weightEntries.forEach((e) => {
+    const cur = sums.get(e.date) || { sum: 0, count: 0 };
+    cur.sum += e.amount;
+    cur.count += 1;
+    sums.set(e.date, cur);
+  });
+  return new Map([...sums].map(([date, { sum, count }]) => [date, sum / count]));
+}
+
+let wellnessCompositionChart = null;
+
+function renderWellnessCompositionChart(entries) {
+  const ctx = document.getElementById('wellness-composition-chart');
+
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
+
+  const weightEntries = entries
+    .filter((e) => e.category === 'Weight' && e.amount !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Full trailing calendar range (same as every other wellness chart's own
+  // x-axis), not just the days that happen to have a weigh-in — a day with
+  // no logged weight (including the very first/last day of the window)
+  // still gets its own bar slot, just left empty (null), rather than being
+  // dropped from the axis entirely and compressing the date range.
+  const labels = haveProfile && weightEntries.length > 0 ? trailingDatesForCategory(weightEntries, WELLNESS_METRICS_DAYS) : [];
+  const weightByDate = weightByDateMap(weightEntries);
+
+  const fatData = [];
+  const muscleData = [];
+  const waterData = [];
+
+  let lastKnownDate = null;
+  labels.forEach((date) => {
+    const hasToday = weightByDate.has(date);
+    if (hasToday && lastKnownDate !== null) {
+      const delta = weightByDate.get(date) - weightByDate.get(lastKnownDate);
+      const split = splitWeightChange(delta, weightByDate.get(date), heightCm, age, sex);
+      fatData.push(Math.round(split.fat * 1000) / 1000);
+      muscleData.push(Math.round(split.muscle * 1000) / 1000);
+      waterData.push(Math.round(split.water * 1000) / 1000);
+    } else {
+      // No prior weigh-in to diff against (first logged day) or nothing
+      // logged today — an empty slot, not a zero-change bar.
+      fatData.push(null);
+      muscleData.push(null);
+      waterData.push(null);
+    }
+    if (hasToday) lastKnownDate = date;
+  });
+
+  const hasData = fatData.some((v) => v !== null);
+
+  wellnessCompositionChart = upsertChart(wellnessCompositionChart, ctx, {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar', label: 'Fat', data: fatData, backgroundColor: '#f97316', stack: 'composition' },
+        { type: 'bar', label: 'Muscle', data: muscleData, backgroundColor: '#8b5cf6', stack: 'composition' },
+        { type: 'bar', label: 'Water', data: waterData, backgroundColor: '#3b82f6', stack: 'composition' },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
+        title: {
+          display: !hasData,
+          text: haveProfile
+            ? 'Not enough weigh-ins yet to estimate a composition change'
+            : 'Add Height, Birth Date, and Sex in Settings to estimate this breakdown',
+          color: Chart.defaults.color,
+          font: { size: 12 },
+          padding: { top: 40 },
+        },
+        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
+      },
+      scales: {
+        x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        y: { stacked: true, afterFit: fixTrendYAxisWidth, ticks: { callback: maskedUnitTick('kg', 2) } },
+      },
+    },
+  });
 }
 
 function mean(values) {

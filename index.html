@@ -117,41 +117,47 @@
     <div class="panel" id="charts">
         <h2>Spending by Category</h2>
 
-        <div class="chart-box">
-            <canvas id="spending-trend-chart"></canvas>
-        </div>
-
-        <div class="donut-grid">
-            <div class="donut-item">
-                <h3>Last Month</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-lastmonth-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-item">
-                <h3>Last Quarter Average</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-quarter-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-item">
-                <h3>Last Year Average</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-year-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-item">
-                <h3>Lifelong Average</h3>
-                <div class="chart-box chart-box-donut">
-                    <canvas id="spending-breakdown-lifelong-chart"></canvas>
-                </div>
+        <div class="panel-section">
+            <h3>Average Monthly Spending by Category</h3>
+            <div class="chart-box">
+                <canvas id="spending-trend-chart"></canvas>
             </div>
         </div>
 
-        <div class="donut-legend" id="spending-trend-legend"></div>
+        <div class="panel-section">
+            <h3>Spending Breakdown by Category</h3>
+            <div class="donut-grid">
+                <div class="donut-item">
+                    <h4>Last Month</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-lastmonth-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Last Quarter Average</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-quarter-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Last Year Average</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-year-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Lifelong Average</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="spending-breakdown-lifelong-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="donut-legend" id="spending-trend-legend"></div>
+        </div>
     </div>
 
     <div style="height:.5rem"></div>

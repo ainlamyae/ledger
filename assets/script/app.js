@@ -334,7 +334,7 @@ function setupPanelToggles() {
     fab.setAttribute('aria-label', fab.title);
   };
 
-  panels.forEach((panel) => {
+  panels.forEach((panel, i) => {
     const heading = panel.querySelector('h2');
     if (!heading) return;
 
@@ -342,6 +342,10 @@ function setupPanelToggles() {
     icon.className = 'panel-toggle-icon';
     icon.textContent = '▾';
     heading.prepend(icon);
+
+    // Staggered fade/slide-in the first time the dashboard becomes visible.
+    panel.style.animationDelay = `${i * 70}ms`;
+    panel.classList.add('panel-enter');
 
     panel.classList.add('collapsed');
     heading.addEventListener('click', () => {

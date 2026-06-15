@@ -16,7 +16,7 @@ async function initTransactions(forceRefresh = false) {
   if (!lists) {
     const [meta, listsResp] = await Promise.all([
       getSpreadsheetMetadata(),
-      batchGetValues([`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.CATEGORIES}!A2:A`], VALUE_PARAMS),
+      batchGetValues([`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.INSIGHT}!A2:A200`], VALUE_PARAMS),
     ]);
 
     const sheet = meta.sheets.find((s) => s.properties.title === CONFIG.SHEETS.TRANSACTIONS);
@@ -27,7 +27,9 @@ async function initTransactions(forceRefresh = false) {
     lists = {
       transactionsSheetId: sheet.properties.sheetId,
       accountOptions: (listsResp.valueRanges[0].values || []).map((r) => r[0]).filter(Boolean),
-      categoryOptions: (listsResp.valueRanges[1].values || []).map((r) => r[0]).filter(Boolean),
+      // Insight!A2:A200 repeats each category once per Type plus one
+      // blank-Type total row, so collapse to a unique list.
+      categoryOptions: [...new Set((listsResp.valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))],
     };
     setCached('lists', lists);
   }
@@ -143,12 +145,12 @@ function populateAutocompleteOptions() {
 
 async function refreshAccountOptions() {
   const { valueRanges } = await batchGetValues(
-    [`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.CATEGORIES}!A2:A`],
+    [`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.INSIGHT}!A2:A200`],
     VALUE_PARAMS
   );
 
   accountOptions = (valueRanges[0].values || []).map((r) => r[0]).filter(Boolean);
-  categoryOptions = (valueRanges[1].values || []).map((r) => r[0]).filter(Boolean);
+  categoryOptions = [...new Set((valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))];
 
   setCached('lists', { transactionsSheetId, accountOptions, categoryOptions });
   populateCategoryFilter();

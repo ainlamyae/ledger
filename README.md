@@ -31,22 +31,23 @@ Ledger is a single-page application that authenticates the user with their own G
 ## Features
 
 - **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Net Cash Flow.
-- **Spending vs. Benchmarks** — grouped bar chart comparing each category's Last Month, Last Quarter Average, Last Year Average, and Lifelong Average spending; each category's 4 bars are shaded from its own color (most recent = most opaque). Categories are ordered by Lifelong Average spend, highest first.
-- **Spending Breakdown by Category** — four donut charts showing each category's share of spending for last month, last quarter average, last year average, and lifelong average. Legend and slices follow the same highest-to-lowest Lifelong Average order as Spending vs. Benchmarks.
+- **Average Monthly Spending by Category** — grouped bar chart comparing each category's average monthly spend over four periods: Last Month (as-is), Last Quarter Average (last quarter's total ÷ 3), Last Year Average (last year's total ÷ 12), and Lifelong Average (lifelong total ÷ total months of data); each category's 4 bars are shaded from its own color (most recent = most opaque). Categories are ordered by Lifelong Average spend, highest first.
+- **Spending Breakdown by Category** — four donut charts showing each category's share of spending for last month, last quarter average, last year average, and lifelong average. Legend and slices follow the same highest-to-lowest Lifelong Average order as Average Monthly Spending by Category.
 - **Spending Breakdown by Type** — for each spending category, four donut charts (Last Month, Last Quarter, Last Year, Lifelong) breaking that category's spend down by `Type`, a free-text prefix convention in the `Transactions` `Description` field (e.g. "Bread - milk and eggs"), pre-aggregated by formulas in the `Insight` sheet. Panels are ordered by lifelong spend (highest first), and each donut includes an "Untyped" slice for spending without a recognized prefix.
-- **Spending Trend by Category** — stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Spending vs. Benchmarks.
+- **Spending Trend by Category** — stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Average Monthly Spending by Category.
 - **Income vs. Expenses Trend** — stepped area chart of the full transaction history.
 - **Cumulative Savings Trend** — running total of savings as a line chart.
 - **Savings Rate Trend** — monthly savings rate (saved ÷ income, as a %) as a line chart.
 - **Account Composition** — nested donut chart: the inner ring shows each account type's share of total balance, the outer ring breaks that down by individual account (shaded by its type's color). Account types are ordered by net balance, highest first (so e.g. negative-balance Credit types sort last), and types with a zero balance total are omitted.
 - **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export. The Payee and Description fields autocomplete from your transaction history (most-used values first), helping correct typos or voice-dictation mistakes. Long Payee/Description values are truncated with an ellipsis (hover to see the full text).
-- **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation.
+- **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation. The Accounts panel header shows a reconciliation status (✅ Reconciled, or ⚠️ with the gap amount if recorded balances don't match transaction history). The Balance field accepts a simple arithmetic expression (optionally prefixed with `=`, e.g. `=5000-1234.56`) for quick calculations like credit card spend = limit minus remaining balance; results are rounded to the nearest cent.
 - **Collapsible panels** — every chart/table panel is collapsed by default; click its title to expand or collapse it. Clicking a nav link (Charts/Transactions/Accounts) expands the relevant panel(s), and a floating "expand/collapse all" button toggles every panel at once.
+- **Privacy mode** — a floating 🙈/👁️ button masks every dollar amount across the summary cards, tables, and charts by replacing each digit with `*` (e.g. `$1,234.56` → `$*,***.**`). Amounts are hidden by default each time you sign in; click the button to reveal them for the rest of the session.
 - **Dark mode** — a floating 🌙/☀️ button switches the whole app — including charts and the landing page — between light and dark themes, persisted in `localStorage`.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
 - **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; manual refresh and clear-cache controls are available as floating buttons.
 
-Category-based charts (Spending vs. Benchmarks, Spending Breakdown by Category, Spending Trend by Category) all derive their colors from the same per-category colors in the `Categories` sheet.
+Category-based charts (Average Monthly Spending by Category, Spending Breakdown by Category, Spending Trend by Category) all assign each category a color spread evenly around the color wheel, in the same highest-to-lowest Lifelong Average order used everywhere else.
 
 ---
 
@@ -82,9 +83,9 @@ Ledger is a static site that talks directly to Google's APIs from the browser. T
                                   │       (private; shared with owner only)      │
                                   │                                               │
                                   │  Transactions    Account Balance             │
-                                  │  Categories      Monthly Summary (formulas)  │
-                                  │  Benchmarks (formulas)                       │
+                                  │  Monthly Summary (formulas)                  │
                                   │  Insight (formulas)                          │
+                                  │  Reconciliation (formulas)                   │
                                   └───────────────────────────────────────────────┘
 ```
 
@@ -114,7 +115,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 3. On success, `handleAuthChange(token)` swaps the landing page for the dashboard and calls `loadDashboard()`.
 
 **Dashboard load**
-4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Benchmarks`, `Account Balance`, `Categories`, and `Insight` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, the Spending vs. Benchmarks / Spending Breakdown by Category comparisons, and the per-category `Type` breakdown for the Spending Breakdown by Type donuts.
+4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Account Balance`, `Insight`, and `Reconciliation` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, the Average Monthly Spending by Category / Spending Breakdown by Category comparisons, the per-category `Type` breakdown for the Spending Breakdown by Type donuts, and the reconciliation status shown above the Accounts table.
 5. `initTransactions()` and `initAccountManager()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API.
 6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending Breakdown by Category grid, and the per-category Spending Breakdown by Type donut grids; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
 
@@ -140,7 +141,7 @@ A single Google Sheet ("Ledger") with the following tabs, shared **only with the
 | C — Payee | Text | Merchant / person / institution |
 | D — Description | Text | Optional detail |
 | E — Amount | Number | Positive = income, negative = expense. The sign alone defines the type — there is no separate Income/Expense column. |
-| F — Category | Text | Must match a name in `Categories` column A |
+| F — Category | Text | Must match a category name in `Insight` column A |
 
 ### `Account Balance`
 
@@ -155,13 +156,6 @@ Net worth snapshot and the account list, combined in one tab.
 | C3:C | Text | Type — one of `Cash`, `Chequing`, `Checking`, `Saving`, `Credit`, `Investment`, `Investment (Managed)`, `Investment (Member)`, `Investment (Employer)`, `Person`, `Other` |
 | D3:D | Number | Account balance |
 
-### `Categories`
-
-| Column | Type | Notes |
-|---|---|---|
-| A — Category | Text | e.g. Grocery, Transportation, Medical |
-| B — Color | Text | Hex color used for chart series |
-
 ### `Monthly Summary` (formula-driven)
 
 `SUMIFS` against `Transactions`, recomputed automatically whenever transaction data changes — no client-side aggregation. Row 1 is the header; data rows start at row 2.
@@ -171,23 +165,11 @@ Net worth snapshot and the account list, combined in one tab.
 | A | Month label |
 | B | Income |
 | C | Expenses |
-| D onward | Per-category expense totals — one column per row in `Categories`, matched by header name (see below) |
+| D onward | Per-category expense totals — one column per category in `Insight` column A, matched by header name (see below) |
 | Second-to-last | Saved (income − expenses) |
 | Last | Cumulative savings |
 
-`app.js` reads row 1 as headers and matches each name in `Categories` column A against both the `Monthly Summary` and `Benchmarks` headers to find its column — except "Income"/"Expenses" (columns B/C), which are excluded even if `Categories` also has a row with that name, since they aren't spending categories. `Saved` and `Cumulative` aren't matched by name; they're always taken as the last two columns of the data rows, so inserting a new category column anywhere before them doesn't break either chart. Adding or renaming a category only requires updating the `Categories` sheet and adding a matching column/header to `Monthly Summary` and `Benchmarks` — no code changes needed.
-
-### `Benchmarks` (formula-driven)
-
-Pre-computed per-category spending averages, read directly by `app.js` for the Spending vs. Benchmarks chart and the Spending Breakdown by Category donuts — re-deriving these client-side from thousands of transaction rows would be wasteful when Sheets already computes them.
-
-| Row | Contents |
-|---|---|
-| 1 | Header — category names per column |
-| 2 | Last Month |
-| 3 | Last Quarter Average |
-| 4 | Last Year Average |
-| 5 | Lifelong Average |
+`app.js` reads row 1 as headers and matches each category name from `Insight` column A against the `Monthly Summary` headers to find its column — except "Income"/"Expenses" (columns B/C), which are excluded even if `Insight` also has a row with that name, since they aren't spending categories. `Saved` and `Cumulative` aren't matched by name; they're always taken as the last two columns of the data rows, so inserting a new category column anywhere before them doesn't break either chart. Adding or renaming a category only requires updating `Insight` and adding a matching column/header to `Monthly Summary` — no code changes needed.
 
 ### `Insight` (formula-driven)
 
@@ -195,7 +177,7 @@ Per-category, per-`Type` spending breakdown used by the Spending Breakdown by Ty
 
 | Column | Contents |
 |---|---|
-| A — Category | Must match a name in `Categories` column A |
+| A — Category | Category name. Column A is also the source of the category list used throughout the dashboard and the transaction form's Category dropdown — each unique value across all rows becomes one category. |
 | B — Type | A `Description` prefix, or **blank** for a row holding that category's overall total |
 | C — Last Month | `-SUMIFS(...)` over `Transactions`, matching Category, `Description` starting with `Type` (via `Type&"*"`, or no Description filter if `Type` is blank), `Amount < 0`, and the date window for "last month" |
 | D — Last Quarter | Same, for the trailing 3-month window |
@@ -204,7 +186,18 @@ Per-category, per-`Type` spending breakdown used by the Spending Breakdown by Ty
 
 Cell `H1` holds `=TODAY()`, the single anchor date that every period's `EOMONTH(...)`-based date window is computed relative to.
 
-For each category, the blank-`Type` row's totals are used as that category's overall spend; the gap between that total and the sum of its named `Type` rows becomes the "Untyped" donut slice. The 5 categories shown (Grocery, Household, Personal, Transportation, Housing) are a fixed list in `charts.js` (`TYPE_BREAKDOWN_CATEGORIES`) — adding a new category requires adding its rows to `Insight`, the category name to that constant, and a matching donut-grid block in `index.html`.
+For each category, the blank-`Type` row's totals are used as that category's overall spend; the gap between that total and the sum of its named `Type` rows becomes the "Untyped" donut slice. `Type` rows with a Lifelong value of `0` (a retired Type with no historical spend) are excluded entirely, so removing a Type from active use doesn't leave an empty entry in the legend. The 5 categories shown (Grocery, Household, Personal, Transportation, Housing) are a fixed list in `charts.js` (`TYPE_BREAKDOWN_CATEGORIES`) — adding a new category requires adding its rows to `Insight`, the category name to that constant, and a matching donut-grid block in `index.html`.
+
+### `Reconciliation` (formula-driven)
+
+A single reconciliation check comparing recorded account balances against transaction history.
+
+| Cell | Contents |
+|---|---|
+| A5 | Label — "Missing Amount" |
+| B5 | The discrepancy: non-zero means an `Account Balance` entry is wrong or a `Transactions` row is missing |
+
+`app.js` reads `B5` and shows a reconciliation status above the Accounts table — ✅ Reconciled if it's `0` (within half a cent), or ⚠️ with the discrepancy amount otherwise.
 
 ---
 
@@ -274,11 +267,10 @@ const CONFIG = {
   SHEETS: {
     TRANSACTIONS: 'Transactions',
     REPORT: 'Monthly Summary',
-    BENCHMARKS: 'Benchmarks',
     BALANCE: 'Account Balance',
     ACCOUNTS: 'Account Balance',
-    CATEGORIES: 'Categories',
     INSIGHT: 'Insight',
+    RECONCILIATION: 'Reconciliation',
   },
 };
 ```
@@ -317,19 +309,18 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 | Range | Used in | Purpose |
 |---|---|---|
 | `'Monthly Summary'!A1:Z149` | `app.js` | Header row (for dynamic category column matching) plus monthly income/expense/category data and cumulative savings |
-| `'Benchmarks'!A1:K5` | `app.js` | Per-category spending averages for the Spending vs. Benchmarks chart and Spending Breakdown by Category donuts |
 | `'Account Balance'!A1:D1` | `app.js` | Total Savings figure (`D1`) for the summary card |
-| `Categories!A2:B` | `app.js` | Category name → chart color |
-| `Insight!A2:F200` | `app.js` | Per-category, per-Type spend breakdown for the Spending Breakdown by Type donuts |
+| `Insight!A2:F200` | `app.js` | Per-category, per-Type spend breakdown for the Average Monthly Spending by Category chart, Spending Breakdown by Category donuts, and Spending Breakdown by Type donuts, and the source of the category list (column A) for chart category matching |
+| `'Reconciliation'!B5` | `app.js` | Missing Amount — non-zero means recorded account balances don't reconcile with transaction history (a transaction may be missing or a balance may be wrong) |
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
 | `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
-| `'Account Balance'!A3:A100`, `Categories!A2:A` | `transactions.js` | Dropdown option lists for the transaction form |
+| `'Account Balance'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Dropdown option lists for the transaction form |
 
 **Client-side cache (`localStorage`, 5-minute TTL via `cache.js`):**
 
 | Cache key | Set by | Contents |
 |---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending vs. Benchmarks comparison, Spending Breakdown by Type) |
+| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Average Monthly Spending by Category comparison, Spending Breakdown by Type) |
 | `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + account/category dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
 | `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |
@@ -359,6 +350,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 - The frontend authenticates with per-user Google OAuth (`spreadsheets` scope). Anyone can load the static site and sign in with their own Google account, but the Sheets API will simply deny access to a spreadsheet they don't own or have been shared.
 - `CLIENT_ID` and `SPREADSHEET_ID` in `config.js` are not secrets — access is enforced by Google's OAuth consent and the spreadsheet's sharing settings, not by hiding these IDs.
 - There is no backend, no password storage, and no third-party data store.
+- **Privacy mode** masks on-screen amounts by default (see [Features](#features)) for safer screen-sharing or use in public — this is a display-only toggle and doesn't affect what's stored in the spreadsheet.
 
 ---
 

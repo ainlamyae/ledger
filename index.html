@@ -115,19 +115,11 @@
     </div>
 
     <div class="panel" id="charts">
-        <h2>Average Monthly Spending by Category</h2>
+        <h2>Spending by Category</h2>
 
         <div class="chart-box">
             <canvas id="spending-trend-chart"></canvas>
         </div>
-
-        <div class="donut-legend" id="spending-trend-legend"></div>
-    </div>
-
-    <div style="height:.5rem"></div>
-
-    <div class="panel">
-        <h2>Spending Breakdown by Category</h2>
 
         <div class="donut-grid">
             <div class="donut-item">
@@ -159,7 +151,7 @@
             </div>
         </div>
 
-        <div class="donut-legend" id="spending-breakdown-legend"></div>
+        <div class="donut-legend" id="spending-trend-legend"></div>
     </div>
 
     <div style="height:.5rem"></div>
@@ -326,47 +318,30 @@
     <div style="height:.5rem"></div>
 
     <div class="panel">
-        <h2>Spending Trend by Category</h2>
+        <h2>Trend</h2>
 
-        <div class="chart-box">
-            <canvas id="expense-breakdown-trend-chart"></canvas>
+        <div class="panel-section">
+            <h3>Spending Trend by Category</h3>
+            <div class="chart-box">
+                <canvas id="expense-breakdown-trend-chart"></canvas>
+            </div>
+            <div class="donut-legend" id="expense-breakdown-trend-legend"></div>
         </div>
 
-        <div class="donut-legend" id="expense-breakdown-trend-legend"></div>
-    </div>
-
-    <div style="height:.5rem"></div>
-
-    <div class="panel">
-        <h2>Income vs. Expenses Trend</h2>
-
-        <div class="chart-box">
-            <canvas id="income-expense-chart"></canvas>
+        <div class="panel-section">
+            <h3>Income vs. Expenses Trend</h3>
+            <div class="chart-box">
+                <canvas id="income-expense-chart"></canvas>
+            </div>
+            <div class="donut-legend" id="income-expense-legend"></div>
         </div>
 
-        <div class="donut-legend" id="income-expense-legend"></div>
-    </div>
-
-    <div style="height:.5rem"></div>
-
-    <div class="panel">
-        <h2>Cumulative Savings Trend</h2>
-
-        <div class="chart-box">
-            <canvas id="savings-trend-chart"></canvas>
+        <div class="panel-section">
+            <h3>Cumulative Savings Trend</h3>
+            <div class="chart-box">
+                <canvas id="savings-trend-chart"></canvas>
+            </div>
         </div>
-    </div>
-
-    <div style="height:.5rem"></div>
-
-    <div class="panel">
-        <h2>Account Composition</h2>
-
-        <div class="chart-box">
-            <canvas id="account-composition-chart"></canvas>
-        </div>
-
-        <div class="donut-legend" id="account-composition-legend"></div>
     </div>
 
     <div style="height:.5rem"></div>
@@ -415,6 +390,14 @@
             <h2>Accounts</h2>
             <span id="reconciliation-status" class="reconciliation-status"></span>
             <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
+        </div>
+
+        <div class="panel-section">
+            <h3>Account Composition</h3>
+            <div class="chart-box">
+                <canvas id="account-composition-chart"></canvas>
+            </div>
+            <div class="donut-legend" id="account-composition-legend"></div>
         </div>
 
         <div class="table-responsive">

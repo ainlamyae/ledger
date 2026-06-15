@@ -565,6 +565,19 @@ th.sortable:hover {
     margin-bottom: .25rem;
 }
 
+.panel-section {
+    margin-bottom: 1.5rem;
+}
+
+.panel-section:last-child {
+    margin-bottom: 0;
+}
+
+.panel-section > h3 {
+    font-size: 1rem;
+    margin-bottom: .25rem;
+}
+
 .chart-box-donut {
     margin-top: 0;
 }

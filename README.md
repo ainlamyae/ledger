@@ -31,22 +31,18 @@ Ledger is a single-page application that authenticates the user with their own G
 ## Features
 
 - **Summary cards** — at-a-glance Total Savings, monthly income, monthly expenses, and Net Cash Flow.
-- **Average Monthly Spending by Category** — grouped bar chart comparing each category's average monthly spend over four periods: Last Month (as-is), Last Quarter Average (last quarter's total ÷ 3), Last Year Average (last year's total ÷ 12), and Lifelong Average (lifelong total ÷ total months of data); each category's 4 bars are shaded from its own color (most recent = most opaque). Categories are ordered by Lifelong Average spend, highest first.
-- **Spending Breakdown by Category** — four donut charts showing each category's share of spending for last month, last quarter average, last year average, and lifelong average. Legend and slices follow the same highest-to-lowest Lifelong Average order as Average Monthly Spending by Category.
+- **Spending by Category** — a grouped bar chart comparing each category's average monthly spend over four periods (Last Month as-is, Last Quarter Average ÷ 3, Last Year Average ÷ 12, and Lifelong Average ÷ total months of data; each category's 4 bars are shaded from its own color, most recent = most opaque), plus four donut charts breaking down each period's spending by category share. Both share one legend, and categories are ordered by Lifelong Average spend, highest first.
 - **Spending Breakdown by Type** — for each spending category, four donut charts (Last Month, Last Quarter, Last Year, Lifelong) breaking that category's spend down by `Type`, a free-text prefix convention in the `Transactions` `Description` field (e.g. "Bread - milk and eggs"), pre-aggregated by formulas in the `Insight` sheet. Panels are ordered by lifelong spend (highest first), and each donut includes an "Untyped" slice for spending without a recognized prefix.
-- **Spending Trend by Category** — stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Average Monthly Spending by Category.
-- **Income vs. Expenses Trend** — stepped area chart of the full transaction history.
-- **Cumulative Savings Trend** — running total of savings as a line chart.
-- **Account Composition** — nested donut chart: the inner ring shows each account type's share of total balance, the outer ring breaks that down by individual account (shaded by its type's color). Account types are ordered by net balance, highest first (so e.g. negative-balance Credit types sort last), and types with a zero balance total are omitted.
+- **Trend** — three charts in one panel: **Spending Trend by Category** (stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Spending by Category), **Income vs. Expenses Trend** (stepped area chart of the full transaction history), and **Cumulative Savings Trend** (running total of savings as a line chart).
 - **Transactions** — searchable, filterable, sortable, paginated table with add/edit/delete and CSV import/export. The Payee and Description fields autocomplete from your transaction history (most-used values first), helping correct typos or voice-dictation mistakes. Long Payee/Description values are truncated with an ellipsis (hover to see the full text).
-- **Accounts** — sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation. The Accounts panel header shows a reconciliation status (✅ Reconciled, or ⚠️ with the gap amount if recorded balances don't match transaction history). The Balance field accepts a simple arithmetic expression (optionally prefixed with `=`, e.g. `=5000-1234.56`) for quick calculations like credit card spend = limit minus remaining balance; results are rounded to the nearest cent.
+- **Accounts** — the Account Composition donut chart (a 3-ring nested donut: the inner ring shows each account type's share of total balance, the middle ring breaks that down by institution, and the outer ring by individual account, all shaded by their type's color; account types are ordered by net balance highest first — negative-balance Credit types sort last — and types with a zero balance total are omitted), followed by a sortable table of balances by institution/type, with add/edit/delete and inline Total Savings recalculation. The Accounts panel header shows a reconciliation status (✅ Reconciled, or ⚠️ with the gap amount if recorded balances don't match transaction history). The Balance field accepts a simple arithmetic expression (optionally prefixed with `=`, e.g. `=5000-1234.56`) for quick calculations like credit card spend = limit minus remaining balance; results are rounded to the nearest cent.
 - **Collapsible panels** — every chart/table panel is collapsed by default; click its title to expand or collapse it. Clicking a nav link (Charts/Transactions/Accounts) expands the relevant panel(s), and a floating "expand/collapse all" button toggles every panel at once.
 - **Privacy mode** — a floating 🙈/👁️ button masks every dollar amount across the summary cards, tables, and charts by replacing each digit with `*` (e.g. `$1,234.56` → `$*,***.**`). Amounts are hidden by default each time you sign in; click the button to reveal them for the rest of the session.
 - **Dark mode** — a floating 🌙/☀️ button switches the whole app — including charts and the landing page — between light and dark themes, persisted in `localStorage`.
 - **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches), with a full consent prompt only when needed.
 - **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; manual refresh and clear-cache controls are available as floating buttons.
 
-Category-based charts (Average Monthly Spending by Category, Spending Breakdown by Category, Spending Trend by Category) all assign each category a color spread evenly around the color wheel, in the same highest-to-lowest Lifelong Average order used everywhere else.
+Category-based charts (Spending by Category, Spending Trend by Category) all assign each category a color spread evenly around the color wheel, in the same highest-to-lowest Lifelong Average order used everywhere else.
 
 ---
 
@@ -100,7 +96,7 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 | 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh | `initAuth`, `signIn`, `signOut`, `getAccessToken` |
 | 3 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
 | 4 | `cache.js` | `localStorage`-backed cache with 5-minute TTL, plus hard-refresh (cache + Cache Storage + service workers) | `getCached`, `setCached`, `clearCache`, `hardRefresh` |
-| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending Breakdown by Category grid, the per-category Spending Breakdown by Type donut grids, and the nested Account Composition donut | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderAccountCompositionChart` |
+| 5 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, and the nested Account Composition donut | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderAccountCompositionChart` |
 | 6 | `transactions.js` | Transactions table: list, search/filter, sortable columns, pagination, add/edit/delete, Payee/Description autocomplete | `initTransactions`, `refreshTransactions`, `refreshAccountOptions` |
 | 7 | `accounts.js` | Accounts table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
 | 8 | `csv.js` | CSV export/import for transactions | `initCsvControls` |
@@ -114,9 +110,9 @@ Loaded as classic `<script>` tags (no bundler), in this order, sharing one globa
 3. On success, `handleAuthChange(token)` swaps the landing page for the dashboard and calls `loadDashboard()`.
 
 **Dashboard load**
-4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Account Balance`, `Insight`, and `Reconciliation` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, the Average Monthly Spending by Category / Spending Breakdown by Category comparisons, the per-category `Type` breakdown for the Spending Breakdown by Type donuts, and the reconciliation status shown above the Accounts table.
+4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Account Balance`, `Insight`, and `Reconciliation` ranges, then derives the summary cards, the income/expense and cumulative-savings trends, the per-category spending trend over time, the Spending by Category comparisons, the per-category `Type` breakdown for the Spending Breakdown by Type donuts, and the reconciliation status shown above the Accounts table.
 5. `initTransactions()` and `initAccountManager()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API.
-6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending Breakdown by Category grid, and the per-category Spending Breakdown by Type donut grids; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
+6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending by Category breakdown grid, and the per-category Spending Breakdown by Type donut grids; `app.js` renders the summary cards; `accounts.js` and `transactions.js` render their tables.
 
 **Writes** (add/edit/delete transaction or account, edit balance, CSV import)
 7. UI actions call `appendValues` / `updateValues` / `batchUpdate` directly against the spreadsheet.
@@ -309,7 +305,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 |---|---|---|
 | `'Monthly Summary'!A1:Z149` | `app.js` | Header row (for dynamic category column matching) plus monthly income/expense/category data and cumulative savings |
 | `'Account Balance'!A1:D1` | `app.js` | Total Savings figure (`D1`) for the summary card |
-| `Insight!A2:F200` | `app.js` | Per-category, per-Type spend breakdown for the Average Monthly Spending by Category chart, Spending Breakdown by Category donuts, and Spending Breakdown by Type donuts, and the source of the category list (column A) for chart category matching |
+| `Insight!A2:F200` | `app.js` | Per-category, per-Type spend breakdown for the Spending by Category bar chart and donuts, and the Spending Breakdown by Type donuts, and the source of the category list (column A) for chart category matching |
 | `'Reconciliation'!B5` | `app.js` | Missing Amount — non-zero means recorded account balances don't reconcile with transaction history (a transaction may be missing or a balance may be wrong) |
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
 | `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
@@ -319,7 +315,7 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 
 | Cache key | Set by | Contents |
 |---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Average Monthly Spending by Category comparison, Spending Breakdown by Type) |
+| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending by Category comparison, Spending Breakdown by Type) |
 | `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + account/category dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
 | `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |

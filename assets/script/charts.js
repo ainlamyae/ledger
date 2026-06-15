@@ -113,8 +113,8 @@ const SPENDING_TREND_PERIODS = [
   { key: 'lifelongAvg', label: 'Lifelong Average', alpha: 0.25, months: null },
 ];
 
-// Renders the shared category-color swatch legend used under the
-// Average Monthly Spending by Category and Spending Breakdown by Category charts.
+// Renders a category-color swatch legend, shared by several panels (e.g. the
+// Spending by Category bar chart + donuts).
 function renderCategoryLegend(containerId, categories) {
   const legend = document.getElementById(containerId);
   legend.innerHTML = '';
@@ -176,8 +176,6 @@ const SPENDING_BREAKDOWN_PERIODS = [
 const spendingBreakdownCharts = {};
 
 function renderSpendingBreakdownCharts(categories) {
-  renderCategoryLegend('spending-breakdown-legend', categories);
-
   SPENDING_BREAKDOWN_PERIODS.forEach(({ key, canvasId }) => {
     const ctx = document.getElementById(canvasId);
     if (spendingBreakdownCharts[canvasId]) spendingBreakdownCharts[canvasId].destroy();
@@ -199,6 +197,7 @@ function renderSpendingBreakdownCharts(categories) {
           legend: { display: false },
           tooltip: {
             callbacks: {
+              title: () => '',
               label: (item) => {
                 const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
                 return `${item.label}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
@@ -277,6 +276,7 @@ function renderTypeBreakdownCharts(typeBreakdown) {
             legend: { display: false },
             tooltip: {
               callbacks: {
+                title: () => '',
                 label: (item) => {
                   const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
                   return `${item.label}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
@@ -294,10 +294,11 @@ let accountCompositionChart = null;
 
 const ACCOUNT_TYPE_PALETTE = ['#3b82f6', '#16a34a', '#f59e0b', '#dc2626', '#8b5cf6', '#0ea5e9', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
 
-// Nested doughnut: inner ring = totals per account type, outer ring = each
-// individual account, shaded with its type's color. Slice sizes use the
-// absolute balance so debt accounts (negative balances) still render as a
-// normal positive-size slice rather than breaking the chart.
+// Nested doughnut: inner ring = totals per account type, middle ring =
+// totals per institution within each type, outer ring = each individual
+// account — all shaded with its type's color. Slice sizes use the absolute
+// balance so debt accounts (negative balances) still render as a normal
+// positive-size slice rather than breaking the chart.
 function renderAccountCompositionChart(accounts) {
   const ctx = document.getElementById('account-composition-chart');
   if (accountCompositionChart) accountCompositionChart.destroy();
@@ -333,6 +334,9 @@ function renderAccountCompositionChart(accounts) {
   const accountLabels = [];
   const accountValues = [];
   const accountColors = [];
+  const institutionLabels = [];
+  const institutionValues = [];
+  const institutionColors = [];
   const typeLabels = [];
   const typeValues = [];
   const typeColorList = [];
@@ -343,10 +347,31 @@ function renderAccountCompositionChart(accounts) {
     typeValues.push(typeAbsTotals.get(type));
     typeColorList.push(typeColors[type]);
 
-    group.forEach((a, i) => {
-      accountLabels.push(a.name);
-      accountValues.push(Math.abs(a.balance));
-      accountColors.push(hexToRgba(typeColors[type], Math.max(0.35, 1 - i * 0.18)));
+    // Group this type's accounts by institution, largest institution first,
+    // so the middle ring's slices line up with the outer ring's accounts.
+    const byInstitution = new Map();
+    group.forEach((a) => {
+      const institution = a.institution || 'Other';
+      if (!byInstitution.has(institution)) byInstitution.set(institution, []);
+      byInstitution.get(institution).push(a);
+    });
+
+    const institutions = [...byInstitution.entries()]
+      .map(([name, accts]) => ({ name, accts, abs: accts.reduce((sum, a) => sum + Math.abs(a.balance), 0) }))
+      .sort((a, b) => b.abs - a.abs);
+
+    institutions.forEach((institution, i) => {
+      institutionLabels.push(institution.name);
+      institutionValues.push(institution.abs);
+      institutionColors.push(hexToRgba(typeColors[type], Math.max(0.4, 0.75 - i * 0.15)));
+
+      [...institution.accts]
+        .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))
+        .forEach((a, j) => {
+          accountLabels.push(a.name);
+          accountValues.push(Math.abs(a.balance));
+          accountColors.push(hexToRgba(typeColors[type], Math.max(0.2, 0.5 - j * 0.1)));
+        });
     });
   });
 
@@ -354,24 +379,39 @@ function renderAccountCompositionChart(accounts) {
 
   renderCategoryLegend('account-composition-legend', types.map((t) => ({ name: t, color: typeColors[t] })));
 
+  // Indexed by datasetIndex (outer to inner: account, institution, type) so
+  // the tooltip can look up the right name for whichever ring is hovered,
+  // independent of how Chart.js handles the dataset config objects.
+  const ringLabels = [accountLabels, institutionLabels, typeLabels];
+
   accountCompositionChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: accountLabels,
       datasets: [
-        { data: accountValues, backgroundColor: accountColors, labels: accountLabels, weight: 1 },
-        { data: typeValues, backgroundColor: typeColorList, labels: typeLabels, weight: 1 },
+        { data: accountValues, backgroundColor: accountColors, weight: 1 },
+        { data: institutionValues, backgroundColor: institutionColors, weight: 1 },
+        { data: typeValues, backgroundColor: typeColorList, weight: 1 },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // Without this, hovering one ring's segment also matches the elements
+      // at the same dataIndex in the other two rings, producing 3 tooltip
+      // lines for a single hover. 'point' mode limits it to the arc actually
+      // under the cursor.
+      interaction: { mode: 'point' },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
+            // Suppress the default title, which otherwise looks up
+            // `data.labels` (the outer/account-ring names) by dataIndex —
+            // a meaningless value for middle/inner-ring items.
+            title: () => '',
             label: (item) => {
-              const name = item.dataset.labels[item.dataIndex];
+              const name = ringLabels[item.datasetIndex][item.dataIndex];
               const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
               return `${name}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
             },

@@ -19,7 +19,6 @@ textarea {
     --color-primary-hover: #2563eb;
     --color-income: #16a34a;
     --color-expense: #dc2626;
-    --color-time: #d97706;
     --color-other: #7c3aed;
     --color-bg: #f5f7fb;
     --color-surface: #ffffff;
@@ -423,7 +422,7 @@ header .btn:hover {
     margin-top: 2.5rem;
 }
 
-/* Each Health/Finances/Time/Other group renders as a small mind-map: a
+/* Each Health/Finances/Other group renders as a small mind-map: a
    round "hub" node for the group name, its feature nodes arranged in a ring
    around it, and an SVG line from the hub to every node. The ring itself is
    computed in JS (landing-graph.js's layoutNodesRadially), not pure CSS —
@@ -441,7 +440,6 @@ header .btn:hover {
 
 .node-graph-health   { --group-color: var(--color-primary); }
 .node-graph-finances { --group-color: var(--color-income); }
-.node-graph-time     { --group-color: var(--color-time); }
 .node-graph-other    { --group-color: var(--color-other); }
 
 .node-graph-lines {
@@ -1614,6 +1612,19 @@ td .btn {
     color: var(--color-text);
 }
 
+.weight-plateau-note {
+    font-size: .78rem;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin: 4px 0 0;
+    min-height: 1.2em;
+}
+
+.weight-plateau-note.warning {
+    color: var(--color-expense);
+    font-weight: 600;
+}
+
 .weight-progress-meter-stats .weight-eta {
     text-align: right;
     margin: 0;
@@ -1628,6 +1639,23 @@ td .btn {
     color: var(--color-text-muted);
     font-size: .85rem;
     margin-bottom: 1rem;
+}
+
+.workout-day + .workout-day {
+    margin-top: 1.75rem;
+}
+
+.workout-day h4 {
+    margin-bottom: .5rem;
+}
+
+.workout-check-col {
+    width: 44px;
+    text-align: center;
+}
+
+.workout-check-cell {
+    text-align: center;
 }
 
 .modal-actions {

@@ -48,7 +48,6 @@
     <nav id="main-nav" class="nav" hidden>
         <a href="#health">Health</a>
         <a href="#finances">Finances</a>
-        <a href="#time">Time</a>
         <a href="#other">Other</a>
     </nav>
     <div class="header-actions">
@@ -107,7 +106,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📉 Weight Forecast</span>
-                        <span class="node-graph-tooltip">A Weight Forecast chart projects your goal arrival date from a multi-factor model of caloric balance, activity, and sleep. Click ⚙️ Calibrate to fit that model to your own logged weight, calorie, activity, and sleep history — instead of generic population constants — previewing the fit and a confidence score before you commit.</span>
+                        <span class="node-graph-tooltip">A Weight Forecast chart projects your goal arrival date from a multi-factor model of caloric balance, activity, and sleep. Click ⚙️ Calibrate to fit that model to your own logged weight, calorie, activity, and sleep history — instead of generic population constants — previewing the fit and a confidence score before you commit. A plateau alert flags when your trend has held flat for about 10 days, so a stall doesn't go unnoticed.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🍽️ AI Calorie &amp; Protein Estimator</span>
@@ -132,6 +131,10 @@
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🔄 Protein Source Rotation</span>
                         <span class="node-graph-tooltip">Flag your go-to protein sources with a target share of your protein goal, and a chart shows what you've actually eaten from each recently vs. that live target — a low or empty bar means it's time to eat that one.</span>
+                    </button>
+                    <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">🏋️ Strength Training Plan</span>
+                        <span class="node-graph-tooltip">A Push/Pull/Legs gym plan with the machine, sets, reps, and rest for every exercise. Tick off what you actually did — even mixed across days — and log it straight to your Health Log, with the duration estimated automatically from what you ticked.</span>
                     </button>
                 </div>
             </div>
@@ -164,22 +167,6 @@
                 </div>
             </div>
 
-            <div class="node-graph node-graph-time" aria-label="Time features">
-                <svg class="node-graph-lines" aria-hidden="true"></svg>
-                <div class="node-graph-hub-wrap">
-                    <div class="node-graph-hub">
-                        <span class="node-graph-hub-icon" aria-hidden="true">⏱️</span>
-                        <span class="node-graph-hub-label">Time</span>
-                    </div>
-                </div>
-                <div class="node-graph-spokes">
-                    <button type="button" class="node-graph-node">
-                        <span class="node-graph-node-title">⏱️ Time Tracker</span>
-                        <span class="node-graph-tooltip">Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts. A reminder banner (with optional browser notifications) catches a day you forgot to log, and an overtime alert flags when your pace runs past an 8h/day average.</span>
-                    </button>
-                </div>
-            </div>
-
             <div class="node-graph node-graph-other" aria-label="Other features">
                 <svg class="node-graph-lines" aria-hidden="true"></svg>
                 <div class="node-graph-hub-wrap">
@@ -189,6 +176,10 @@
                     </div>
                 </div>
                 <div class="node-graph-spokes">
+                    <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">⏱️ Time Tracker</span>
+                        <span class="node-graph-tooltip">Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts. A reminder banner (with optional browser notifications) catches a day you forgot to log, and an overtime alert flags when your pace runs past an 8h/day average.</span>
+                    </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">✈️ Travel &amp; Applications</span>
                         <span class="node-graph-tooltip">Log every trip and see a Time Spent by Country breakdown plus a world map of visited countries. Track immigration/visa applications — grouped into Ongoing and Closed — from submission through every status update to final decision.</span>
@@ -324,6 +315,7 @@
                         <span id="weight-projection-eta" class="weight-eta"></span>
                     </div>
                 </div>
+                <p id="weight-plateau-note" class="weight-plateau-note"></p>
             </div>
 
             <div class="weight-projection-wrap">
@@ -442,6 +434,153 @@
 
             <div class="chart-box">
                 <canvas id="protein-rotation-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="panel" id="workout-plan-panel">
+            <h2>Strength Training Plan</h2>
+            <p class="hint">A Push/Pull/Legs split for the gym. Tick off what you actually did, then log the session straight to your Health Log — duration is estimated from the ticked sets, reps, and rest, and you can edit anything (including the time) before saving.</p>
+
+            <div class="workout-day">
+                <h4>Day 1 — Legs</h4>
+                <div class="table-responsive">
+                    <table id="workout-table-legs" data-day="Leg Day">
+                        <thead>
+                        <tr>
+                            <th>Exercise (machine)</th>
+                            <th>Sets × Reps</th>
+                            <th>Rest</th>
+                            <th class="workout-check-col">Done</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Leg Press</td>
+                            <td>3 × 10–12</td>
+                            <td>90 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
+                        </tr>
+                        <tr>
+                            <td>Leg Extension (quads)</td>
+                            <td>3 × 12–15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Leg Curl (hamstrings)</td>
+                            <td>3 × 12–15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Hip Abduction/Adduction machine</td>
+                            <td>2 × 15</td>
+                            <td>45–60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="15" data-rest="53"></td>
+                        </tr>
+                        <tr>
+                            <td>Calf Raise machine</td>
+                            <td>3 × 15–20</td>
+                            <td>45–60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="18" data-rest="53"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="workout-day">
+                <h4>Day 2 — Push (chest, shoulders, triceps)</h4>
+                <div class="table-responsive">
+                    <table id="workout-table-push" data-day="Push Day">
+                        <thead>
+                        <tr>
+                            <th>Exercise (machine)</th>
+                            <th>Sets × Reps</th>
+                            <th>Rest</th>
+                            <th class="workout-check-col">Done</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Chest Press machine</td>
+                            <td>3 × 10–12</td>
+                            <td>90 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
+                        </tr>
+                        <tr>
+                            <td>Shoulder Press machine</td>
+                            <td>3 × 10–12</td>
+                            <td>90 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
+                        </tr>
+                        <tr>
+                            <td>Pec Deck / Chest Fly machine</td>
+                            <td>2 × 12–15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Lateral Raise machine (or cable)</td>
+                            <td>2 × 12–15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Cable Tricep Pushdown</td>
+                            <td>3 × 12–15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="workout-day">
+                <h4>Day 3 — Pull (back, biceps)</h4>
+                <div class="table-responsive">
+                    <table id="workout-table-pull" data-day="Pull Day">
+                        <thead>
+                        <tr>
+                            <th>Exercise (machine)</th>
+                            <th>Sets × Reps</th>
+                            <th>Rest</th>
+                            <th class="workout-check-col">Done</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Lat Pulldown</td>
+                            <td>3 × 10–12</td>
+                            <td>90 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
+                        </tr>
+                        <tr>
+                            <td>Seated Row machine</td>
+                            <td>3 × 10–12</td>
+                            <td>90 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
+                        </tr>
+                        <tr>
+                            <td>Rear Delt Fly machine (or cable)</td>
+                            <td>2 × 12–15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Cable Bicep Curl</td>
+                            <td>3 × 12–15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-actions">
+                <button type="button" id="log-workout-btn" class="btn btn-primary">Log Workout</button>
             </div>
         </div>
 
@@ -771,8 +910,8 @@
 
     <div style="height:.5rem"></div>
 
-    <section id="time" class="panel-group">
-        <h2 class="panel-group-title">Time</h2>
+    <section id="other" class="panel-group">
+        <h2 class="panel-group-title">Other</h2>
 
         <div id="timesheet-reminder-banner" class="info-banner" hidden>
             <span>You haven't logged today's hours yet.</span>
@@ -854,12 +993,6 @@
 
             <div class="pagination" id="ts-pagination"></div>
         </div>
-    </section>
-
-    <div style="height:.5rem"></div>
-
-    <section id="other" class="panel-group">
-        <h2 class="panel-group-title">Other</h2>
 
         <div class="panel">
             <h2>Travel Insights</h2>
@@ -1560,6 +1693,7 @@
 <script src="assets/script/timesheet.js"></script>
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/wellness.js"></script>
+<script src="assets/script/strength-plan.js"></script>
 <script src="assets/script/contacts.js"></script>
 <script src="assets/script/settings-panel.js"></script>
 <script src="assets/script/travel.js"></script>
@@ -1569,6 +1703,7 @@
 <script src="assets/script/food-insight.js"></script>
 <script src="assets/script/protein-rotation.js"></script>
 <script src="assets/script/landing-graph.js"></script>
+<script src="assets/script/gate.js"></script>
 <script src="assets/script/app.js"></script>
 </body>
 </html>

@@ -1,45 +1,61 @@
-// The gym plan tables in the Health section (Leg/Push/Pull day) each tick
-// off the exercises actually done, then hand a computed duration + notes
-// straight to the existing Health Log "Log Entry" modal (wellness.js) —
-// this module never writes to the sheet itself, it only pre-fills that
-// modal's fields and lets the user review/edit before saving, same as any
-// other manual entry.
+// The Activity Plan panel's tables (Leg/Push/Pull strength days, plus the
+// NEAT table below them) each tick off what was actually done, then hand a
+// computed duration + notes straight to the existing Health Log "Log Entry"
+// modal (wellness.js) — this module never writes to the sheet itself, it
+// only pre-fills that modal's fields and lets the user review/edit before
+// saving, same as any other manual entry.
 
-// Seconds per rep at a controlled lifting tempo, and a flat per-exercise
-// allowance for walking to/adjusting the next machine — both rough
-// estimates the user can freely overwrite in the modal's Amount field
-// before saving, this just saves typing on the common case.
+// Seconds per rep at a controlled lifting tempo for a strength row — a rough
+// estimate the user can freely overwrite in the modal's Amount field before
+// saving, this just saves typing on the common case. Only time actually
+// under tension counts toward duration/calories (see estimateWorkoutMinutes
+// below) — rest between sets, warm-up, and moving between machines are real
+// gym-visit time but aren't activity, so they're deliberately left out
+// rather than inflating the logged number.
 const WORKOUT_REP_SEC = 3;
-const WORKOUT_TRANSITION_SEC = 90;
-const WORKOUT_WARMUP_SEC = 300;
 
-// Sums (sets × reps × rep time) + (rests between sets) for every ticked
-// row, plus one transition gap between each ticked exercise and a fixed
-// warm-up allowance — mirrors how the sets/reps/rest table was reasoned
-// about above, just applied only to what was actually done today.
+// A ticked row's own active seconds: sets × reps × rep time for a strength
+// row (data-sets/data-reps), a flat data-minutes for a fixed-duration NEAT
+// row (Swim), or data-steps converted via the same steps↔minutes ratio the
+// Activity chart already uses (toActivityMinutes, charts.js — ~100
+// steps/min) for a step-count row (Walk) — net of rest either way, so the
+// total is time actually spent moving, not time spent at the gym.
+function activeSecondsForBox(box) {
+  if (box.dataset.steps !== undefined) return toActivityMinutes(Number(box.dataset.steps), 'steps') * 60;
+  if (box.dataset.minutes !== undefined) return Number(box.dataset.minutes) * 60;
+  const sets = Number(box.dataset.sets);
+  const reps = Number(box.dataset.reps);
+  return sets * reps * WORKOUT_REP_SEC;
+}
+
 function estimateWorkoutMinutes(checkedBoxes) {
-  let seconds = WORKOUT_WARMUP_SEC;
-
-  checkedBoxes.forEach((box, i) => {
-    const sets = Number(box.dataset.sets);
-    const reps = Number(box.dataset.reps);
-    const rest = Number(box.dataset.rest);
-    seconds += sets * reps * WORKOUT_REP_SEC + (sets - 1) * rest;
-    if (i > 0) seconds += WORKOUT_TRANSITION_SEC;
-  });
-
+  const seconds = checkedBoxes.reduce((sum, box) => sum + activeSecondsForBox(box), 0);
   return Math.max(1, Math.round(seconds / 60));
 }
 
-// One combined button below all three tables (rather than one per table)
-// since a real gym session often mixes exercises across Leg/Push/Pull days
-// — each table's ticked rows become their own "Day: exercise, exercise"
-// clause in the notes, so the mix is still legible even though it's logged
-// as a single entry.
+// One combined button below every table (rather than one per table) since a
+// real session often mixes strength exercises across Leg/Push/Pull days with
+// a NEAT/Cardio activity. Grouped by table here so describeWorkout can tell
+// whether any strength day was ticked — the Notes lines themselves (below,
+// in logWorkout) are flat, with no per-table/day label.
 function collectCheckedByDay() {
   return [...document.querySelectorAll('.workout-day table')]
     .map((table) => ({ day: table.dataset.day, boxes: [...table.querySelectorAll('.workout-check:checked')] }))
     .filter((group) => group.boxes.length > 0);
+}
+
+const STRENGTH_DAY_NAMES = new Set(['Leg Day', 'Push Day', 'Pull Day', 'Dumbbell Day']);
+
+// Description defaults to "Strength Training" whenever any strength exercise
+// is ticked (even alongside a NEAT/Cardio activity — it's the dominant,
+// longer part of most mixed sessions). A strength-free session instead names
+// the table(s) it came from — "NEAT" or "Cardio" (or "NEAT + Cardio" if both
+// were ticked) — not the specific activity ticked within them (e.g. "Walk"),
+// since NEAT/Cardio may hold more than one activity later and the table name
+// is the stable category.
+function describeWorkout(groups) {
+  if (groups.some((g) => STRENGTH_DAY_NAMES.has(g.day))) return 'Strength Training';
+  return groups.map((g) => g.day).join(' + ');
 }
 
 function logWorkout() {
@@ -51,17 +67,33 @@ function logWorkout() {
 
   const allBoxes = groups.flatMap((group) => group.boxes);
   const minutes = estimateWorkoutMinutes(allBoxes);
-  const notes = groups
-    .map((group) => `${group.day}: ${group.boxes.map((box) => box.closest('tr').children[0].textContent.trim()).join(', ')}`)
-    .join('; ');
+  const notes = allBoxes
+    .map((box) => {
+      const cells = box.closest('tr').children;
+      const name = cells[0].textContent.trim();
+      let quantity;
+      if (box.dataset.steps !== undefined) quantity = `${box.dataset.steps}step`;
+      else if (box.dataset.minutes !== undefined) quantity = `${box.dataset.minutes}min`;
+      else quantity = cells[1].textContent.trim().replace(/\s*×\s*/, '×');
+      return `${quantity}  ${name}`;
+    })
+    .join('\n');
 
   openWellnessForm(null);
   document.getElementById('wellness-category').value = 'Activity';
   onCategoryChange();
-  document.getElementById('wellness-description').value = 'Strength Training';
+  document.getElementById('wellness-description').value = describeWorkout(groups);
   document.getElementById('wellness-unit').value = 'min';
   document.getElementById('wellness-amount').value = String(minutes);
   document.getElementById('wellness-notes').value = notes;
+
+  // Immediately run the same Activity Calculate the 🧮 button triggers
+  // (activity-estimator.js) so the modal opens already showing the real
+  // duration/calorie-burn pair instead of making the user click Calculate
+  // themselves right after Log Workout filled the note in. If it can't run
+  // (e.g. no Weight logged yet) it leaves the plain-minutes prefill above in
+  // place and surfaces its own error explaining why.
+  calculateWellnessActivity();
 }
 
 function initWorkoutPlan() {

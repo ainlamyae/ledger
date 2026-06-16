@@ -222,13 +222,16 @@ Going well: what's on track, including any improvement vs. the previous period.
 Needs attention: what's off track, including any decline vs. the previous period. Specifically check whether calories are in a deficit while protein is below target — if so, call out that this risks losing muscle instead of fat, which slows real (fat) progress even when the scale moves.
 Suggestions: 2-4 concrete, specific next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — do not run them together in one line.
 
+If an additional question from the user is included after the data, also answer it directly in a fifth section, "Answer: text".
+
 Keep the whole report under 250 words.`;
 
-async function generateWellnessInsight(lookbackDays) {
+async function generateWellnessInsight(lookbackDays, question) {
   const apiKey = getSettingString('GROQ_API_KEY', null);
   if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
 
-  const userMessage = formatInsightPrompt(gatherInsightMetrics(lookbackDays));
+  let userMessage = formatInsightPrompt(gatherInsightMetrics(lookbackDays));
+  if (question && question.trim()) userMessage += `\n\nAdditional question: ${question.trim()}`;
 
   const res = await fetch(GROQ_API, {
     method: 'POST',
@@ -261,7 +264,7 @@ function initInsightPanel() {
   renderSavedWellnessInsight();
 
   document.getElementById('insight-generate-btn').addEventListener('click', () => {
-    runInsightGeneration(currentInsightLookbackDays());
+    runInsightGeneration(currentInsightLookbackDays(), document.getElementById('insight-question').value);
   });
   document.getElementById('insight-lookback').addEventListener('change', () => {
     renderInsightDataPreview(currentInsightLookbackDays());
@@ -286,7 +289,7 @@ function renderInsightDataPreview(lookbackDays) {
   });
 }
 
-const INSIGHT_SECTION_LABELS = ['Overview', 'Going well', 'Needs attention', 'Suggestions'];
+const INSIGHT_SECTION_LABELS = ['Overview', 'Going well', 'Needs attention', 'Suggestions', 'Answer'];
 
 // One <p> per line (blank lines dropped) rather than per blank-line-separated
 // block — the prompt asks for each of the 4 sections, and each numbered
@@ -316,10 +319,11 @@ function renderInsightText(container, text) {
 
 // Only runs on an explicit Send to AI click — changing the lookback selector
 // only updates the (free, local) data preview above.
-async function runInsightGeneration(lookbackDays) {
+async function runInsightGeneration(lookbackDays, question) {
   const body = document.getElementById('insight-body');
   const btn = document.getElementById('insight-generate-btn');
   const select = document.getElementById('insight-lookback');
+  const textarea = document.getElementById('insight-question');
 
   body.innerHTML = '';
   clearFieldError('insight-status');
@@ -331,11 +335,12 @@ async function runInsightGeneration(lookbackDays) {
 
   btn.disabled = true;
   select.disabled = true;
+  textarea.disabled = true;
   const originalLabel = btn.textContent;
   btn.textContent = 'Generating…';
 
   try {
-    const text = await generateWellnessInsight(lookbackDays);
+    const text = await generateWellnessInsight(lookbackDays, question);
     body.innerHTML = '';
     renderInsightText(body, text);
 
@@ -357,6 +362,7 @@ async function runInsightGeneration(lookbackDays) {
   } finally {
     btn.disabled = false;
     select.disabled = false;
+    textarea.disabled = false;
     btn.textContent = originalLabel;
   }
 }

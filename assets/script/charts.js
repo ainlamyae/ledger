@@ -24,6 +24,24 @@ function fixTrendYAxisWidth(scale) {
   if (scale.width < TREND_Y_AXIS_WIDTH) scale.width = TREND_Y_AXIS_WIDTH;
 }
 
+// An invisible right-hand axis reserving the exact same TREND_Y_AXIS_WIDTH
+// as a real right axis (Weight Trend & Forecast's BMI line, Physical
+// Activity's calories-burned dots) — so a chart with no real right axis
+// still gets the same plot-area width and x-axis tick spacing as the two
+// that do, instead of stretching further right and misaligning the date
+// labels across the Health Metrics section. A fresh object per call since
+// Chart.js's afterFit mutates the live scale instance it's handed, not this
+// config object, but a factory avoids relying on that being safe forever.
+function ghostRightAxis() {
+  return {
+    position: 'right',
+    afterFit: fixTrendYAxisWidth,
+    grid: { drawOnChartArea: false, drawTicks: false },
+    border: { display: false },
+    ticks: { display: false },
+  };
+}
+
 // Rounds a computed axis max up to the nearest "nice" number (1/2/5 times a
 // power of ten, e.g. 4327 -> 5000) so explicit y-axis caps don't show an
 // arbitrary value with no clean gridlines.
@@ -527,6 +545,14 @@ const PROTEIN_TARGET_G_DEFAULT = 100;
 // both fall back to until the user's own history is fitted via Calibrate.
 const GENERIC_KCAL_PER_KG_FAT = 7700;
 
+// Flat calorie-burn-per-active-minute estimate — used only as a per-day
+// fallback (below, and in calibration.js's buildCalibrationSamples) for an
+// Activity entry with no real Calculate-derived kcal (amount2) of its own,
+// e.g. an older entry logged before that existed. Any entry that does carry
+// a real kcal figure uses that instead, in both the calibrated and generic
+// projection formulas.
+const GENERIC_KCAL_PER_ACTIVE_MIN = 5;
+
 function latestWeightKg(entries) {
   const weightEntries = entries
     .filter((e) => e.category === 'Weight' && e.amount !== null)
@@ -637,7 +663,7 @@ function renderTodayGlanceCards(entries) {
       if (e.category === 'Calories; Protein' && e.amount2 !== null) {
         protein = (protein ?? 0) + e.amount2;
       }
-      if (e.category === 'Activity' && e.amount !== null) {
+      if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
         activityMins = (activityMins ?? 0) + toActivityMinutes(e.amount, e.unit);
       }
       if (e.category === 'Sleep' && e.amount !== null) {
@@ -771,6 +797,7 @@ function renderWellnessCaloriesChart(entries) {
           afterFit: fixTrendYAxisWidth,
           ticks: { callback: maskedUnitTick('kcal') },
         },
+        y1: ghostRightAxis(),
       },
     },
   });
@@ -878,6 +905,7 @@ function renderWellnessSleepChart(entries) {
           afterFit: fixTrendYAxisWidth,
           ticks: { stepSize: 3, callback: sleepAxisTickLabel },
         },
+        y1: ghostRightAxis(),
       },
     },
   });
@@ -912,7 +940,7 @@ function renderWellnessActivityChart(entries) {
 
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
 
-  const activityEntries = entries.filter((e) => e.category === 'Activity' && e.amount !== null);
+  const activityEntries = entries.filter((e) => (e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null);
   const dates = trailingDatesForCategory(activityEntries, WELLNESS_METRICS_DAYS);
 
   // One stacked segment per description (e.g. NEAT / Resistance / Cardio)
@@ -928,6 +956,17 @@ function renderWellnessActivityChart(entries) {
     byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
   });
 
+  // Calories burned (Activity; Calories entries' amount2) summed per day —
+  // surfaced as an extra tooltip line rather than a second y-axis: minutes
+  // plotted as its own dot-per-day series on a dedicated right-hand axis
+  // (requested explicitly — minutes and kcal are different scales, so this
+  // is a deliberate dual-axis chart rather than the usual single-axis default).
+  const caloriesByDate = new Map();
+  activityEntries.forEach((e) => {
+    if (e.amount2 === null) return;
+    caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + e.amount2);
+  });
+
   const descriptionColors = descriptions.map((_, i) => `hsl(${Math.round((i * 360) / descriptions.length)}, 65%, 55%)`);
 
   const activityDatasets = descriptions.map((d, i) => ({
@@ -941,22 +980,42 @@ function renderWellnessActivityChart(entries) {
 
   const hasData = activityDatasets.some((ds) => ds.data.some((v) => v > 0));
 
+  // Dot-per-day series rather than a connected line — each day's calorie
+  // burn is its own independent figure (some days have none logged at all,
+  // which a connected line would misleadingly bridge over as a trend).
+  const caloriesDataset = {
+    type: 'line',
+    label: 'Calories burned',
+    data: dates.map((date) => (caloriesByDate.has(date) ? caloriesByDate.get(date) : null)),
+    yAxisID: 'y1',
+    showLine: false,
+    pointRadius: 5,
+    pointHoverRadius: 7,
+    pointBackgroundColor: '#7c3aed',
+    pointBorderColor: '#fff',
+    pointBorderWidth: 1.5,
+    order: 0,
+  };
+
+  // Excluded from the tooltip via the filter callback below — it's a fixed
+  // reference line, not a per-day value, so repeating "90 min target" on
+  // every hover added noise without telling you anything new each time.
+  const targetLineDataset = {
+    type: 'line',
+    label: `${activityTarget} min target`,
+    data: new Array(dates.length).fill(activityTarget),
+    borderColor: '#dc2626',
+    borderDash: [4, 4],
+    pointRadius: 0,
+    tension: 0,
+    order: 1,
+    isTargetLine: true,
+  };
+
   wellnessActivityChart = upsertChart(wellnessActivityChart, ctx, {
     data: {
       labels: dates,
-      datasets: [
-        ...activityDatasets,
-        {
-          type: 'line',
-          label: `${activityTarget} min target`,
-          data: new Array(dates.length).fill(activityTarget),
-          borderColor: '#dc2626',
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0,
-          order: 1,
-        },
-      ],
+      datasets: [...activityDatasets, targetLineDataset, caloriesDataset],
     },
     options: {
       responsive: true,
@@ -971,7 +1030,13 @@ function renderWellnessActivityChart(entries) {
           font: { size: 12 },
           padding: { top: 40 },
         },
-        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
+        tooltip: {
+          filter: (item) => !item.dataset.isTargetLine && item.raw !== null,
+          callbacks: {
+            title: (items) => formatIsoDateShort(items[0].label),
+            label: maskedValueTooltipLabel,
+          },
+        },
       },
       scales: {
         x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
@@ -980,6 +1045,13 @@ function renderWellnessActivityChart(entries) {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
           ticks: { callback: maskedUnitTick('min') },
+        },
+        y1: {
+          position: 'right',
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          grid: { drawOnChartArea: false },
+          ticks: { color: '#7c3aed', callback: maskedUnitTick('kcal') },
         },
       },
     },
@@ -1033,6 +1105,7 @@ function renderWellnessProteinChart(entries) {
           afterFit: fixTrendYAxisWidth,
           ticks: { callback: maskedUnitTick('g') },
         },
+        y1: ghostRightAxis(),
       },
     },
   });
@@ -1130,11 +1203,16 @@ const PROJ_SLOPE_CLAMP_KG_PER_DAY = 0.15;
 // betaProtein is read separately with a 0 (no effect) default rather than
 // added to that required set — an existing calibration from before protein
 // tracking existed stays valid as-is, and only starts factoring in protein
-// once the user next clicks Calibrate.
+// once the user next clicks Calibrate. PROJ_ACTIVITY_KG_PER_KCAL_DAY was
+// PROJ_ACTIVITY_KG_PER_MIN_DAY (kg/day per activity MINUTE) before activity
+// entries could carry a real calorie-burn figure — renamed rather than
+// reinterpreted in place, so an old per-minute calibration under the old key
+// simply reads as "not calibrated" (safe fallback to the generic formula)
+// instead of silently applying a per-minute coefficient to a now-kcal input.
 function getCalibratedGains() {
   const beta0 = getSetting('PROJ_BASELINE_KG_PER_DAY', null);
   const betaCal = getSetting('PROJ_CAL_KG_PER_KCAL_DAY', null);
-  const betaAct = getSetting('PROJ_ACTIVITY_KG_PER_MIN_DAY', null);
+  const betaAct = getSetting('PROJ_ACTIVITY_KG_PER_KCAL_DAY', null);
   const betaSleep = getSetting('PROJ_SLEEP_KG_PER_HOUR_DAY', null);
   if ([beta0, betaCal, betaAct, betaSleep].some((v) => v === null)) return null;
   const betaProtein = getSetting('PROJ_PROTEIN_KG_PER_G_DAY', 0);
@@ -1166,16 +1244,21 @@ function calcProjection(entries) {
   const recentEntries = entries.filter((e) => e.date >= cutoffIso && e.date <= todayIso);
 
   const caloriesByDate = new Map();
-  const activityByDate = new Map();
+  const activityKcalByDate = new Map();
   const sleepByDate = new Map();
   const proteinByDate = new Map();
 
   recentEntries.forEach((e) => {
     if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
       caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + e.amount);
-    } else if (e.category === 'Activity' && e.amount !== null) {
+    } else if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
+      // Real Calculate-derived kcal (amount2) when this entry has one —
+      // otherwise the same flat per-minute estimate the un-calibrated
+      // formula below always used, so an older entry without a kcal figure
+      // still contributes something rather than nothing.
       const mins = toActivityMinutes(e.amount, e.unit);
-      activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + mins);
+      const kcal = e.amount2 !== null ? e.amount2 : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
+      activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
     } else if (e.category === 'Sleep' && e.amount !== null) {
       sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
     }
@@ -1188,9 +1271,9 @@ function calcProjection(entries) {
   let method;
   let calibrated = false;
 
-  if (caloriesByDate.size > 0 || activityByDate.size > 0) {
+  if (caloriesByDate.size > 0 || activityKcalByDate.size > 0) {
     const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
-    const avgActivityMins = activityByDate.size > 0 ? avg(activityByDate) : 0;
+    const avgActivityKcal = activityKcalByDate.size > 0 ? avg(activityKcalByDate) : 0;
     const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
     const avgProtein = proteinByDate.size > 0 ? avg(proteinByDate) : proteinTarget;
 
@@ -1198,20 +1281,23 @@ function calcProjection(entries) {
     if (gains) {
       slope = gains.beta0
         + gains.betaCal * (avgCalories - calorieTarget)
-        + gains.betaAct * avgActivityMins
+        + gains.betaAct * avgActivityKcal
         + gains.betaSleep * (avgSleep - sleepTarget)
         + gains.betaProtein * (avgProtein - proteinTarget);
       slope = Math.max(-PROJ_SLOPE_CLAMP_KG_PER_DAY, Math.min(PROJ_SLOPE_CLAMP_KG_PER_DAY, slope));
       calibrated = true;
     } else {
-      // Negative balance = caloric deficit = weight loss
-      const balance = avgCalories - (calorieTarget + avgActivityMins * 5);
+      // Negative balance = caloric deficit = weight loss. avgActivityKcal
+      // already folds in the *5-per-minute estimate for any entry lacking
+      // a real kcal figure, so it's added here directly rather than
+      // re-deriving it from minutes.
+      const balance = avgCalories - (calorieTarget + avgActivityKcal);
       const baseSlope = balance / GENERIC_KCAL_PER_KG_FAT;
       const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
       slope = baseSlope * sleepRatio;
     }
 
-    const allPresent = caloriesByDate.size > 0 && activityByDate.size > 0 && sleepByDate.size > 0;
+    const allPresent = caloriesByDate.size > 0 && activityKcalByDate.size > 0 && sleepByDate.size > 0;
     method = allPresent ? 'full' : 'partial';
   } else {
     const src = weightEntries.filter((e) => e.date >= cutoffIso);
@@ -1437,6 +1523,7 @@ function renderWellnessProjectionChart(entries) {
       min: computeBmi(yMin, heightCm),
       max: computeBmi(yMax, heightCm),
       position: 'right',
+      afterFit: fixTrendYAxisWidth,
       grid: { drawOnChartArea: false },
       ticks: {
         stepSize: 1,
@@ -1621,6 +1708,7 @@ function renderWellnessCompositionChart(entries) {
       scales: {
         x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: { stacked: true, afterFit: fixTrendYAxisWidth, ticks: { callback: maskedUnitTick('kg', 2) } },
+        y1: ghostRightAxis(),
       },
     },
   });

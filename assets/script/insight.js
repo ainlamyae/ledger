@@ -10,7 +10,9 @@
 // the panel still shows something on a fresh page load. Wired up by
 // initInsightPanel(), called from app.js.
 
-const INSIGHT_LOOKBACK_DEFAULT = 7;
+// Default span of the From/To date pickers on first load — otherwise
+// identical in meaning to the old fixed 7-day lookback.
+const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
 
 // Whole-years-old as of today; null if BIRTH_DATE isn't set or unparseable.
 function ageFromBirthDate(birthDateStr) {
@@ -26,21 +28,22 @@ function ageFromBirthDate(birthDateStr) {
   return age;
 }
 
-// The n days immediately before lastNDates(n) (charts.js) — same local-date
-// construction, just shifted back by n, so current vs. previous period
-// comparisons can't drift a day apart from a UTC/local mismatch.
-function previousNDates(n) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - (2 * n - 1 - i));
-    return isoFromDate(d);
-  });
+// The days immediately before [fromIso, toIso], same length as that range —
+// so current vs. previous period comparisons stay apples-to-apples for any
+// custom range the user picks, not just a fixed lookback from today.
+function previousDateRange(fromIso, toIso) {
+  const current = datesInRange(fromIso, toIso);
+  if (!current.length) return [];
+
+  const prevTo = dateFromIso(fromIso);
+  prevTo.setDate(prevTo.getDate() - 1);
+  const prevFrom = new Date(prevTo);
+  prevFrom.setDate(prevTo.getDate() - (current.length - 1));
+  return datesInRange(isoFromDate(prevFrom), isoFromDate(prevTo));
 }
 
 // Aggregates getDatedWellnessEntries() over an arbitrary set of dates (a
-// lastNDates or previousNDates result) the same way calcProjection()/
+// datesInRange or previousDateRange result) the same way calcProjection()/
 // buildCalibrationSamples() do (charts.js/calibration.js) — shared so the
 // current and previous period get identical aggregation logic.
 function aggregateWindow(dates) {
@@ -116,9 +119,19 @@ function aggregateWindow(dates) {
   };
 }
 
-function gatherInsightMetrics(lookbackDays) {
-  const current = aggregateWindow(lastNDates(lookbackDays));
-  const previous = aggregateWindow(previousNDates(lookbackDays));
+// Human-readable stand-in for the old "last N days" phrasing — since the
+// range is now an arbitrary user-picked From/To rather than always ending
+// today, the label needs the actual dates to stay accurate.
+function formatDateRangeLabel(fromIso, toIso, dayCount) {
+  return `${fromIso} to ${toIso}, ${dayCount} day${dayCount === 1 ? '' : 's'}`;
+}
+
+function gatherInsightMetrics(fromIso, toIso) {
+  const dates = datesInRange(fromIso, toIso);
+  const lookbackDays = dates.length;
+  const rangeLabel = formatDateRangeLabel(fromIso, toIso, lookbackDays);
+  const current = aggregateWindow(dates);
+  const previous = aggregateWindow(previousDateRange(fromIso, toIso));
 
   const weightEntries = getDatedWellnessEntries()
     .filter((e) => e.category === 'Weight' && e.amount !== null)
@@ -137,6 +150,7 @@ function gatherInsightMetrics(lookbackDays) {
 
   return {
     lookbackDays,
+    rangeLabel,
     age: ageFromBirthDate(getSettingString('BIRTH_DATE', null)),
     heightCm,
     currentWeightKg,
@@ -203,17 +217,17 @@ function formatActivityBreakdownLines(m) {
       const coverage = cur.daysLogged < m.lookbackDays ? ` [only ${cur.daysLogged}/${m.lookbackDays} days logged]` : '';
       const kcalNow = cur.avgKcal !== null ? `, ${cur.avgKcal} kcal/day burned` : '';
       const kcalPrev = prev && prev.avgKcal !== null ? `, ${prev.avgKcal} kcal/day burned` : '';
-      const trend = prev ? ` — previous ${m.lookbackDays} days: ${prev.avgMins} min/day${kcalPrev}` : ' — previous period: not logged';
-      return `Avg activity — ${description} (last ${m.lookbackDays} days): ${cur.avgMins} min/day${kcalNow}${trend}${coverage}`;
+      const trend = prev ? ` — previous period: ${prev.avgMins} min/day${kcalPrev}` : ' — previous period: not logged';
+      return `Avg activity — ${description} (${m.rangeLabel}): ${cur.avgMins} min/day${kcalNow}${trend}${coverage}`;
     });
 }
 
 function formatInsightPrompt(m) {
   const line = (label, value, unit, target, daysLogged, prevValue) => {
-    if (value === null) return `${label} (last ${m.lookbackDays} days): not logged this period`;
+    if (value === null) return `${label} (${m.rangeLabel}): not logged this period`;
     const coverage = daysLogged < m.lookbackDays ? ` [only ${daysLogged}/${m.lookbackDays} days logged]` : '';
-    const trend = prevValue !== null ? ` — previous ${m.lookbackDays} days: ${prevValue}${unit}` : '';
-    return `${label} (last ${m.lookbackDays} days): ${value}${unit} (target: ${target}${unit})${trend}${coverage}`;
+    const trend = prevValue !== null ? ` — previous period: ${prevValue}${unit}` : '';
+    return `${label} (${m.rangeLabel}): ${value}${unit} (target: ${target}${unit})${trend}${coverage}`;
   };
 
   // Bespoke rather than built from the generic line() helper above, since
@@ -221,12 +235,12 @@ function formatInsightPrompt(m) {
   // riding alongside its primary one (minutes) — line() only has room for
   // one value + one target.
   const activityTotalLine = (() => {
-    if (m.avgActivityMins === null) return `Avg activity total (last ${m.lookbackDays} days): not logged this period`;
+    if (m.avgActivityMins === null) return `Avg activity total (${m.rangeLabel}): not logged this period`;
     const coverage = m.activityDaysLogged < m.lookbackDays ? ` [only ${m.activityDaysLogged}/${m.lookbackDays} days logged]` : '';
     const kcalNow = m.avgActivityKcal !== null ? `, ${m.avgActivityKcal} kcal/day burned` : '';
     const kcalPrev = m.prevAvgActivityKcal !== null ? `, ${m.prevAvgActivityKcal} kcal/day burned` : '';
-    const trend = m.prevAvgActivityMins !== null ? ` — previous ${m.lookbackDays} days: ${m.prevAvgActivityMins} min/day${kcalPrev}` : '';
-    return `Avg activity total (last ${m.lookbackDays} days): ${m.avgActivityMins} min/day${kcalNow} (target: ${m.activityTarget} min/day)${trend}${coverage}`;
+    const trend = m.prevAvgActivityMins !== null ? ` — previous period: ${m.prevAvgActivityMins} min/day${kcalPrev}` : '';
+    return `Avg activity total (${m.rangeLabel}): ${m.avgActivityMins} min/day${kcalNow} (target: ${m.activityTarget} min/day)${trend}${coverage}`;
   })();
 
   const lines = [
@@ -263,11 +277,11 @@ If an additional question from the user is included after the data, also answer 
 
 Keep the whole report under 250 words.`;
 
-async function generateWellnessInsight(lookbackDays, question) {
+async function generateWellnessInsight(fromIso, toIso, question) {
   const apiKey = getSettingString('GROQ_API_KEY', null);
   if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
 
-  let userMessage = formatInsightPrompt(gatherInsightMetrics(lookbackDays));
+  let userMessage = formatInsightPrompt(gatherInsightMetrics(fromIso, toIso));
   if (question && question.trim()) userMessage += `\n\nAdditional question: ${question.trim()}`;
 
   const res = await fetch(GROQ_API, {
@@ -295,31 +309,32 @@ async function generateWellnessInsight(lookbackDays, question) {
   return data.choices[0].message.content;
 }
 
+// Set by initInsightPanel() to the getter initDateRangeControl() (charts.js)
+// returns — the one shared From/To wiring also used by protein-rotation.js.
+let getInsightDateRange = () => ({ from: null, to: null });
+
 function initInsightPanel() {
   clearFieldError('insight-status');
-  renderInsightDataPreview(currentInsightLookbackDays());
+  getInsightDateRange = initDateRangeControl('insight-date-from', 'insight-date-to', INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
+    renderInsightDataPreview(getInsightDateRange());
+  });
+  renderInsightDataPreview(getInsightDateRange());
   renderSavedWellnessInsight();
 
   document.getElementById('insight-generate-btn').addEventListener('click', () => {
-    runInsightGeneration(currentInsightLookbackDays(), document.getElementById('insight-question').value);
+    const { from, to } = getInsightDateRange();
+    runInsightGeneration(from, to, document.getElementById('insight-question').value);
   });
-  document.getElementById('insight-lookback').addEventListener('change', () => {
-    renderInsightDataPreview(currentInsightLookbackDays());
-  });
-}
-
-function currentInsightLookbackDays() {
-  return Number(document.getElementById('insight-lookback').value) || INSIGHT_LOOKBACK_DEFAULT;
 }
 
 // Shows exactly what formatInsightPrompt() would send to Groq, in plain
 // language, so nothing about the request is a black box — this is our own
 // computed text (not model output), rendered before Send to AI is ever
-// clicked and refreshed live as the lookback selector changes.
-function renderInsightDataPreview(lookbackDays) {
+// clicked and refreshed live as the date range changes.
+function renderInsightDataPreview({ from, to }) {
   const preview = document.getElementById('insight-data-preview');
   preview.innerHTML = '';
-  formatInsightPrompt(gatherInsightMetrics(lookbackDays)).split('\n').forEach((line) => {
+  formatInsightPrompt(gatherInsightMetrics(from, to)).split('\n').forEach((line) => {
     const p = document.createElement('p');
     p.textContent = line;
     preview.appendChild(p);
@@ -354,12 +369,13 @@ function renderInsightText(container, text) {
   });
 }
 
-// Only runs on an explicit Send to AI click — changing the lookback selector
-// only updates the (free, local) data preview above.
-async function runInsightGeneration(lookbackDays, question) {
+// Only runs on an explicit Send to AI click — changing the date range only
+// updates the (free, local) data preview above.
+async function runInsightGeneration(fromIso, toIso, question) {
   const body = document.getElementById('insight-body');
   const btn = document.getElementById('insight-generate-btn');
-  const select = document.getElementById('insight-lookback');
+  const fromEl = document.getElementById('insight-date-from');
+  const toEl = document.getElementById('insight-date-to');
   const textarea = document.getElementById('insight-question');
 
   body.innerHTML = '';
@@ -367,17 +383,18 @@ async function runInsightGeneration(lookbackDays, question) {
 
   const loading = document.createElement('p');
   loading.className = 'hint';
-  loading.textContent = `Analyzing your last ${lookbackDays} days…`;
+  loading.textContent = `Analyzing ${fromIso} to ${toIso}…`;
   body.appendChild(loading);
 
   btn.disabled = true;
-  select.disabled = true;
+  fromEl.disabled = true;
+  toEl.disabled = true;
   textarea.disabled = true;
   const originalLabel = btn.textContent;
   btn.textContent = 'Generating…';
 
   try {
-    const text = await generateWellnessInsight(lookbackDays, question);
+    const text = await generateWellnessInsight(fromIso, toIso, question);
     body.innerHTML = '';
     renderInsightText(body, text);
 
@@ -398,7 +415,8 @@ async function runInsightGeneration(lookbackDays, question) {
     showFieldError('insight-status', err.message);
   } finally {
     btn.disabled = false;
-    select.disabled = false;
+    fromEl.disabled = false;
+    toEl.disabled = false;
     textarea.disabled = false;
     btn.textContent = originalLabel;
   }

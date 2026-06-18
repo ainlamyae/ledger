@@ -348,7 +348,6 @@ header .btn:hover {
     padding: .35rem 0;
     font-size: 1.1rem;
     cursor: pointer;
-    user-select: none;
 }
 
 .panel-header {
@@ -712,6 +711,78 @@ td .btn {
     gap: .5rem;
 }
 
+.modal-card-wide {
+    max-width: 680px;
+}
+
+.export-date-range {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.export-date-range label {
+    flex: 1;
+    display: block;
+    font-size: .9rem;
+    color: var(--color-text-muted);
+}
+
+.export-date-range input {
+    display: block;
+    width: 100%;
+    margin-top: .25rem;
+    font: inherit;
+    padding: .5rem;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+.export-filter-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .5rem;
+}
+
+.export-filter-row select,
+.export-filter-row input {
+    font: inherit;
+    padding: .5rem;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+.export-filter-row .export-filter-join {
+    flex: 0 0 4.5rem;
+}
+
+.export-filter-row .export-filter-field {
+    flex: 0 0 7.5rem;
+}
+
+.export-filter-row .export-filter-operator {
+    flex: 0 0 8rem;
+}
+
+.export-filter-row .export-filter-value {
+    flex: 1;
+    min-width: 0;
+}
+
+.export-filter-row .export-filter-remove {
+    flex: 0 0 auto;
+    padding: .4rem .6rem;
+}
+
+#export-add-filter-btn {
+    margin-bottom: 1rem;
+}
+
 @media (max-width: 900px) {
     .grid {
         grid-template-columns: 1fr;
@@ -831,6 +902,16 @@ td .btn {
 
     .pagination {
         flex-wrap: wrap;
+    }
+
+    .export-filter-row {
+        flex-wrap: wrap;
+    }
+
+    .export-filter-row .export-filter-field,
+    .export-filter-row .export-filter-operator,
+    .export-filter-row .export-filter-value {
+        flex: 1 1 100%;
     }
 
     th,

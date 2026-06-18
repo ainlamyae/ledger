@@ -94,19 +94,9 @@ function renderExpenseBreakdownTrendChart(months) {
 
 let spendingTrendChart = null;
 
-// Convert a category's hex color to rgba so each of the 4 period bars for a
-// category shares its hue, distinguished by opacity (most recent = most opaque).
-function hexToRgba(hex, alpha) {
-  const value = hex.replace('#', '');
-  const full = value.length === 3 ? value.split('').map((ch) => ch + ch).join('') : value;
-  const r = parseInt(full.slice(0, 2), 16);
-  const g = parseInt(full.slice(2, 4), 16);
-  const b = parseInt(full.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-// Same idea as hexToRgba, but for the hsl(...) category colors generated in
-// app.js — applies the period's opacity to the category's hue.
+// Applies an opacity to an hsl(...) color string, e.g. so each of the 4
+// period bars for a category shares its hue, distinguished by opacity (most
+// recent = most opaque).
 function hslWithAlpha(hsl, alpha) {
   return hsl.replace('hsl(', 'hsla(').replace(')', `, ${alpha})`);
 }
@@ -170,7 +160,10 @@ function renderSpendingTrendChart(categories, totalMonths) {
           },
         },
       },
-      scales: { x: { ticks: { display: false } }, y: { beginAtZero: true } },
+      scales: {
+        x: { ticks: { display: false }, border: { width: 3 } },
+        y: { beginAtZero: true },
+      },
     },
   });
 }
@@ -235,11 +228,12 @@ const typeBreakdownCharts = {};
 // The gap between the category total (Insight's blank-Type row) and the
 // sum of its named Types becomes an "Untyped" slice.
 function renderTypeBreakdownCharts(typeBreakdown) {
-  // Order each category's panel by lifelong spend (highest first) so the
-  // biggest-impact categories surface at the top of the section.
+  // Order each category's panel by absolute lifelong spend (highest first)
+  // so the biggest-impact categories surface at the top of the section,
+  // regardless of sign.
   const orderedCategories = [...TYPE_BREAKDOWN_CATEGORIES].sort((a, b) => {
-    const lifelongA = (typeBreakdown[a]?.total?.lifelong) || 0;
-    const lifelongB = (typeBreakdown[b]?.total?.lifelong) || 0;
+    const lifelongA = Math.abs((typeBreakdown[a]?.total?.lifelong) || 0);
+    const lifelongB = Math.abs((typeBreakdown[b]?.total?.lifelong) || 0);
     return lifelongB - lifelongA;
   });
 
@@ -252,9 +246,10 @@ function renderTypeBreakdownCharts(typeBreakdown) {
     const data = typeBreakdown[category];
     if (!data) return;
 
-    // Sort once by lifelong spend (largest first) so the legend and every
-    // period's donut share the same slice order and colors.
-    const types = [...data.types].sort((a, b) => b.lifelong - a.lifelong);
+    // Sort once by absolute lifelong spend (largest first) so the legend and
+    // every period's donut share the same slice order and colors, regardless
+    // of sign (e.g. a type that nets to refunds still ranks by its size).
+    const types = [...data.types].sort((a, b) => Math.abs(b.lifelong) - Math.abs(a.lifelong));
     const colors = types.map((_, i) => `hsl(${Math.round((i * 360) / types.length)}, 65%, 55%)`);
 
     renderCategoryLegend(`type-breakdown-${category.toLowerCase()}-legend`, [
@@ -301,13 +296,12 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
 let accountCompositionChart = null;
 
-const ACCOUNT_TYPE_PALETTE = ['#3b82f6', '#16a34a', '#f59e0b', '#dc2626', '#8b5cf6', '#0ea5e9', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
-
-// Nested doughnut: inner ring = totals per account type, middle ring =
-// totals per institution within each type, outer ring = each individual
-// account — all shaded with its type's color. Slice sizes use the absolute
-// balance so debt accounts (negative balances) still render as a normal
-// positive-size slice rather than breaking the chart.
+// Nested doughnut: inner ring = totals per account type (shaded by type),
+// middle ring = totals per institution (each institution has one fixed
+// color, even if its accounts span multiple types), outer ring = each
+// individual account (shaded by its institution's color). Slice sizes use
+// the absolute balance so debt accounts (negative balances) still render as
+// a normal positive-size slice rather than breaking the chart.
 function renderAccountCompositionChart(accounts) {
   const ctx = document.getElementById('account-composition-chart');
   if (accountCompositionChart) accountCompositionChart.destroy();
@@ -321,24 +315,40 @@ function renderAccountCompositionChart(accounts) {
   });
 
   const typeAbsTotals = new Map();
-  const typeNetTotals = new Map();
   byType.forEach((group, type) => {
     typeAbsTotals.set(type, group.reduce((sum, acc) => sum + Math.abs(acc.balance), 0));
-    typeNetTotals.set(type, group.reduce((sum, acc) => sum + acc.balance, 0));
   });
 
-  // Highest net balance first, so the inner ring ranks account types by
-  // overall amount rather than the fixed order they appear in the Accounts
-  // sheet — types with a negative net balance (e.g. Credit/debt) sort to
-  // the end instead of by their absolute size. Types with a zero absolute
-  // total (e.g. accounts that net to zero) are dropped so they don't show
-  // up as an empty legend entry.
+  // Largest absolute balance first, so the inner ring (and its legend) ranks
+  // account types by overall size regardless of sign — debt accounts with a
+  // large negative balance still rank near the top. Types with a zero
+  // absolute total (e.g. accounts that net to zero) are dropped so they
+  // don't show up as an empty legend entry.
   const types = [...byType.keys()]
     .filter((type) => typeAbsTotals.get(type) > 0)
-    .sort((a, b) => typeNetTotals.get(b) - typeNetTotals.get(a));
+    .sort((a, b) => typeAbsTotals.get(b) - typeAbsTotals.get(a));
+
+  // Evenly-spaced hues around the color wheel so every entry gets a distinct
+  // color no matter how many there are, instead of cycling through (and
+  // repeating) a fixed-size palette once the count exceeds it.
+  const distinctColors = (count) => Array.from({ length: count }, (_, i) => `hsl(${Math.round((i * 360) / count)}, 65%, 55%)`);
 
   const typeColors = {};
-  types.forEach((type, i) => { typeColors[type] = ACCOUNT_TYPE_PALETTE[i % ACCOUNT_TYPE_PALETTE.length]; });
+  distinctColors(types.length).forEach((color, i) => { typeColors[types[i]] = color; });
+
+  // One fixed color per institution (regardless of which type(s) its
+  // accounts fall under), so every slice for that institution — and its
+  // legend entry — always shows the same color instead of a per-type shade.
+  const institutionAbsTotals = new Map();
+  accounts.forEach((a) => {
+    const institution = a.institution || 'Other';
+    institutionAbsTotals.set(institution, (institutionAbsTotals.get(institution) || 0) + Math.abs(a.balance));
+  });
+  const institutionNames = [...institutionAbsTotals.keys()]
+    .filter((name) => institutionAbsTotals.get(name) > 0)
+    .sort((a, b) => institutionAbsTotals.get(b) - institutionAbsTotals.get(a));
+  const institutionColorMap = {};
+  distinctColors(institutionNames.length).forEach((color, i) => { institutionColorMap[institutionNames[i]] = color; });
 
   const accountLabels = [];
   const accountValues = [];
@@ -367,19 +377,20 @@ function renderAccountCompositionChart(accounts) {
 
     const institutions = [...byInstitution.entries()]
       .map(([name, accts]) => ({ name, accts, abs: accts.reduce((sum, a) => sum + Math.abs(a.balance), 0) }))
+      .filter((institution) => institution.abs > 0)
       .sort((a, b) => b.abs - a.abs);
 
-    institutions.forEach((institution, i) => {
+    institutions.forEach((institution) => {
       institutionLabels.push(institution.name);
       institutionValues.push(institution.abs);
-      institutionColors.push(hexToRgba(typeColors[type], Math.max(0.4, 0.75 - i * 0.15)));
+      institutionColors.push(institutionColorMap[institution.name]);
 
       [...institution.accts]
         .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))
         .forEach((a, j) => {
           accountLabels.push(a.name);
           accountValues.push(Math.abs(a.balance));
-          accountColors.push(hexToRgba(typeColors[type], Math.max(0.2, 0.5 - j * 0.1)));
+          accountColors.push(hslWithAlpha(institutionColorMap[institution.name], Math.max(0.4, 0.85 - j * 0.15)));
         });
     });
   });
@@ -387,6 +398,11 @@ function renderAccountCompositionChart(accounts) {
   const total = typeValues.reduce((sum, v) => sum + v, 0);
 
   renderCategoryLegend('account-composition-legend', types.map((t) => ({ name: t, color: typeColors[t] })));
+
+  // Second legend line for the middle ring: one entry per institution, using
+  // its single fixed color (same color for that institution everywhere in
+  // the chart, even if its accounts span multiple types), largest first.
+  renderCategoryLegend('account-composition-institution-legend', institutionNames.map((name) => ({ name, color: institutionColorMap[name] })));
 
   // Indexed by datasetIndex (outer to inner: account, institution, type) so
   // the tooltip can look up the right name for whichever ring is hovered,

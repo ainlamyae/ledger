@@ -46,9 +46,10 @@ function actualProteinEatenBySource(from, to) {
 // a target scaled live off the current protein target —
 //   targetProteinG = (proteinPercent / 100) × weeklyProteinTarget × (lookbackDays / 7)
 // — so every ingredient's target rises or falls automatically as the real
-// target does, with no separate ratio/scale-factor bookkeeping. Sorted
-// highest target first, so the ingredients the plan leans on most heavily
-// lead the chart rather than being scattered by how close each is to plan.
+// target does, with no separate ratio/scale-factor bookkeeping. Sorted by
+// remaining gap (target minus actual) descending — the source with the most
+// left to eat leads the chart (a to-do-list read: eat this one next), while
+// anything already at or past its target sinks toward the bottom.
 function computeProteinRotationRows(from, to) {
   const lookbackDays = datesInRange(from, to).length;
   const sources = trackedProteinSources();
@@ -72,7 +73,7 @@ function computeProteinRotationRows(from, to) {
         actualPercentOfTotalTarget: totalTargetForWindow > 0 ? Math.round((actualProteinG / totalTargetForWindow) * 1000) / 10 : 0,
       };
     })
-    .sort((a, b) => b.targetProteinG - a.targetProteinG);
+    .sort((a, b) => (b.targetProteinG - b.actualProteinG) - (a.targetProteinG - a.actualProteinG));
 }
 
 // Enough px per row that every tracked ingredient's label fits on screen at

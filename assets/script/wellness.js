@@ -23,10 +23,10 @@ function isCompositeCategory(category) {
   return category.includes(';');
 }
 
-// Accepted separators between a Sleep entry's bed and wake time. '/' is the
-// canonical, always-written form; ';' is also accepted on read/input since a
-// few rows ended up saved that way (edited directly in the Sheet) — saving
-// one of those again through the app normalizes it back to '/'.
+// Accepted separators between a Sleep entry's bed and wake time. ';' is the
+// canonical, always-written form; '/' is also accepted on read/input since
+// older rows were saved that way — saving one of those again through the
+// app normalizes it back to ';'.
 const SLEEP_PAIR_SEPARATOR = /[/;]/;
 
 // Parses "HH:MM" (1 or 2-digit hour) into minutes since midnight, or null if
@@ -55,7 +55,7 @@ function sleepDurationHours(bedMin, wakeMin) {
 // overwrites it, so an undo can restore the exact original cell text.
 function rawAmountString(e) {
   if (e.sleepBedMin !== null && e.sleepBedMin !== undefined && e.sleepWakeMin !== null && e.sleepWakeMin !== undefined) {
-    return `${formatClockTime24(e.sleepBedMin)}/${formatClockTime24(e.sleepWakeMin)}`;
+    return `${formatClockTime24(e.sleepBedMin)}; ${formatClockTime24(e.sleepWakeMin)}`;
   }
   if (e.amount === null) return '';
   return e.amount2 !== null ? `${e.amount}; ${e.amount2}` : String(e.amount);
@@ -231,9 +231,9 @@ async function refreshWellness(forceRefresh = false) {
         unit = u1 || '';
         unit2 = u2 || null;
       } else if (category === 'Sleep' && typeof rawAmount === 'string' && SLEEP_PAIR_SEPARATOR.test(rawAmount)) {
-        // Bed/wake pair typed as "HH:MM/HH:MM" (or, for a few rows edited
-        // directly in the Sheet, "HH:MM; HH:MM") instead of a plain duration
-        // — a legacy plain-number Sleep cell comes back from
+        // Bed/wake pair typed as "HH:MM; HH:MM" (or, for older rows saved
+        // before the canonical separator changed, "HH:MM/HH:MM") instead of
+        // a plain duration — a legacy plain-number Sleep cell comes back from
         // UNFORMATTED_VALUE as a JS number, not a string, so the typeof
         // check above already keeps this branch from ever misfiring on an
         // old entry.
@@ -358,7 +358,7 @@ function renderWellnessList() {
 
     const notesShort = e.notes.length > 20 ? `${e.notes.slice(0, 20)}…` : e.notes;
     const amountText = e.category === 'Sleep' && e.sleepBedMin !== null
-      ? `${formatClockTime24(e.sleepBedMin)} / ${formatClockTime24(e.sleepWakeMin)}`
+      ? `${formatClockTime24(e.sleepBedMin)}; ${formatClockTime24(e.sleepWakeMin)}`
       : e.amount !== null
         ? (e.amount2 !== null ? `${e.amount} / ${e.amount2}` : String(e.amount))
         : '—';
@@ -507,7 +507,7 @@ function onCategoryChange() {
 
   document.getElementById('wellness-unit').value = defaults.unit;
   document.getElementById('wellness-amount').placeholder =
-    cat === 'Sleep' ? 'e.g. 7.5, or 23:30/07:00 for bed/wake' : '';
+    cat === 'Sleep' ? 'e.g. 7.5, or 23:30; 07:00 for bed/wake' : '';
 
   // Historical descriptions for this category, sorted by frequency (most used first).
   // 'Calories' and 'Calories; Protein' share one history — they're the same kind
@@ -566,14 +566,14 @@ async function submitWellnessForm(event) {
     const parts = amountRaw.split(SLEEP_PAIR_SEPARATOR).map((s) => s.trim());
     const [bedMin, wakeMin] = parts.map((s) => parseClockTime(s));
     if (parts.length !== 2 || bedMin === null || wakeMin === null) {
-      showFieldError('wellness-form-error', 'Bed/wake time must be HH:MM/HH:MM (e.g. 23:30/07:00 — "HH:MM; HH:MM" also works).');
+      showFieldError('wellness-form-error', 'Bed/wake time must be HH:MM; HH:MM (e.g. 23:30; 07:00 — "HH:MM/HH:MM" also works).');
       return;
     }
     if (bedMin === wakeMin) {
       showFieldError('wellness-form-error', 'Bed and wake time cannot be the same.');
       return;
     }
-    amount = `${formatClockTime24(bedMin)}/${formatClockTime24(wakeMin)}`;
+    amount = `${formatClockTime24(bedMin)}; ${formatClockTime24(wakeMin)}`;
   } else {
     const evaluated = evaluateNumberExpression(amountRaw);
     if (amountRaw && evaluated === null) {

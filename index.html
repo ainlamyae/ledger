@@ -401,13 +401,14 @@
             <h2>Wellness Insight</h2>
             <p class="hint">An AI-generated read on your recent trends vs. the previous period — grounded in your weight trajectory, targets, and logging.</p>
 
-            <label class="insight-lookback-label">Look back
-                <select id="insight-lookback">
-                    <option value="7">7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30">30 days</option>
-                </select>
-            </label>
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="insight-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="insight-date-to">
+                </label>
+            </div>
 
             <div id="insight-data-preview" class="insight-data-preview"></div>
 
@@ -428,13 +429,14 @@
             <h2>Protein Source Rotation</h2>
             <p class="hint">Actual protein eaten vs. your live target for each source — a low or empty bar means it's time for that one. Set an ingredient's Protein % on its Nutrition Facts row to track it here.</p>
 
-            <label class="insight-lookback-label">Look back
-                <select id="protein-rotation-lookback">
-                    <option value="7">7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30">30 days</option>
-                </select>
-            </label>
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="protein-rotation-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="protein-rotation-date-to">
+                </label>
+            </div>
 
             <div class="chart-box">
                 <canvas id="protein-rotation-chart"></canvas>

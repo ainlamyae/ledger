@@ -11,7 +11,9 @@
 // independent of whatever Nutrition Facts' Amount/Calories happen to say
 // today. Wired up by initProteinRotationPanel(), called from app.js.
 
-const PROTEIN_ROTATION_LOOKBACK_DEFAULT = 7;
+// Default span of the From/To date pickers on first load — otherwise
+// identical in meaning to the old fixed 7-day lookback.
+const PROTEIN_ROTATION_LOOKBACK_DEFAULT_DAYS = 7;
 
 // Every Nutrition Facts row with a Protein % set — that field is the sole
 // "is this tracked" switch (nutrition.js's refreshNutrition/openNutritionForm).
@@ -26,11 +28,7 @@ function trackedProteinSources() {
 // same source and date filter food-insight.js's aggregateFoodIntake uses,
 // but simpler here: no serving size or ingredient-weight conversion is
 // needed, only the protein grams each breakdown item already carries.
-function actualProteinEatenBySource(lookbackDays) {
-  const dates = lastNDates(lookbackDays);
-  const from = dates[0];
-  const to = dates[dates.length - 1];
-
+function actualProteinEatenBySource(from, to) {
   const proteinByName = new Map();
   getDatedWellnessEntries()
     .filter((e) => e.category === 'Calories; Protein' && e.date >= from && e.date <= to)
@@ -51,9 +49,10 @@ function actualProteinEatenBySource(lookbackDays) {
 // target does, with no separate ratio/scale-factor bookkeeping. Sorted
 // highest target first, so the ingredients the plan leans on most heavily
 // lead the chart rather than being scattered by how close each is to plan.
-function computeProteinRotationRows(lookbackDays) {
+function computeProteinRotationRows(from, to) {
+  const lookbackDays = datesInRange(from, to).length;
   const sources = trackedProteinSources();
-  const proteinByName = actualProteinEatenBySource(lookbackDays);
+  const proteinByName = actualProteinEatenBySource(from, to);
   const dailyProteinTarget = getProteinTargetG(getDatedWellnessEntries());
   const weeklyProteinTarget = dailyProteinTarget * 7;
   // Total protein target across the whole lookback window (not per
@@ -76,10 +75,6 @@ function computeProteinRotationRows(lookbackDays) {
     .sort((a, b) => b.targetProteinG - a.targetProteinG);
 }
 
-function currentProteinRotationLookbackDays() {
-  return Number(document.getElementById('protein-rotation-lookback').value) || PROTEIN_ROTATION_LOOKBACK_DEFAULT;
-}
-
 // Enough px per row that every tracked ingredient's label fits on screen at
 // once (no autoSkip-dropped labels) rather than being squeezed into a fixed
 // box sized for a handful of rows.
@@ -88,9 +83,9 @@ const PROTEIN_ROTATION_MIN_HEIGHT = 200;
 
 let proteinRotationChart = null;
 
-function renderProteinRotationChart(lookbackDays) {
+function renderProteinRotationChart({ from, to }) {
   const ctx = document.getElementById('protein-rotation-chart');
-  const rows = computeProteinRotationRows(lookbackDays);
+  const rows = computeProteinRotationRows(from, to);
 
   const labels = rows.map((r) => r.name);
   const actualData = rows.map((r) => r.actualProteinG);
@@ -158,10 +153,16 @@ function renderProteinRotationChart(lookbackDays) {
   });
 }
 
-function initProteinRotationPanel() {
-  renderProteinRotationChart(currentProteinRotationLookbackDays());
+// Set by initProteinRotationPanel() to the getter initDateRangeControl()
+// (charts.js) returns — read by app.js to re-render once wellness/nutrition
+// data finishes loading after the panel's own initial (data-less) render.
+let getProteinRotationDateRange = () => ({ from: null, to: null });
 
-  document.getElementById('protein-rotation-lookback').addEventListener('change', () => {
-    renderProteinRotationChart(currentProteinRotationLookbackDays());
+function initProteinRotationPanel() {
+  // Shared From/To wiring (charts.js) — same one insight.js uses for the
+  // Wellness Insight panel.
+  getProteinRotationDateRange = initDateRangeControl('protein-rotation-date-from', 'protein-rotation-date-to', PROTEIN_ROTATION_LOOKBACK_DEFAULT_DAYS, () => {
+    renderProteinRotationChart(getProteinRotationDateRange());
   });
+  renderProteinRotationChart(getProteinRotationDateRange());
 }

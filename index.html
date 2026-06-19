@@ -106,7 +106,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📉 Weight Forecast</span>
-                        <span class="node-graph-tooltip">A Weight Forecast chart projects your goal arrival date from a multi-factor model of caloric balance, activity, and sleep. Click ⚙️ Calibrate to fit that model to your own logged weight, calorie, activity, and sleep history — instead of generic population constants — previewing the fit and a confidence score before you commit. A plateau alert flags when your trend has held flat for about 10 days, so a stall doesn't go unnoticed.</span>
+                        <span class="node-graph-tooltip">A Weight Forecast chart projects your goal arrival date from a multi-factor model of caloric balance, activity, and sleep, with a progress meter showing both the percent of the way there and the kg still left to go. Click ⚙️ Calibrate to fit that model to your own logged weight, calorie, activity, and sleep history — instead of generic population constants — previewing the fit and a confidence score before you commit. A plateau alert flags when your trend has held flat for about 10 days, so a stall doesn't go unnoticed.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🍽️ AI Calorie &amp; Protein Estimator</span>
@@ -122,15 +122,19 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🥗 AI Food Insight</span>
-                        <span class="node-graph-tooltip">See every ingredient you've actually eaten over the last 7/14/30 days, totaled up by amount, calories, and protein — then ask AI a free-text question about it, like which vitamins or minerals your diet might be missing. The report is saved and waiting for you next visit, not lost the moment you navigate away.</span>
+                        <span class="node-graph-tooltip">See every ingredient you've actually eaten over a custom date range, totaled up by amount, calories, and protein — then ask AI a free-text question about it, like which vitamins or minerals your diet might be missing. The report is saved and waiting for you next visit, not lost the moment you navigate away.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">💡 AI Wellness Insight</span>
-                        <span class="node-graph-tooltip">Get a plain-language read on your recent habits: a 7/14/30-day snapshot compared against your own targets and trend, reviewed by AI — saved automatically, so it's still there next time instead of a one-off report you have to re-run.</span>
+                        <span class="node-graph-tooltip">Get a plain-language read on your recent habits: a custom date-range snapshot compared against your own targets and the immediately preceding period, reviewed by AI — saved automatically, so it's still there next time instead of a one-off report you have to re-run.</span>
+                    </button>
+                    <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">📈 AI Activity Insight</span>
+                        <span class="node-graph-tooltip">Get an AI read on your workout performance over a custom date range — consistency, total volume trend, and which muscle groups have gone neglected — then ask a free-text question about it. The report is saved and waiting for you next visit.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🔄 Protein Source Rotation</span>
-                        <span class="node-graph-tooltip">Flag your go-to protein sources with a target share of your protein goal, and a chart shows what you've actually eaten from each recently vs. that live target — a low or empty bar means it's time to eat that one.</span>
+                        <span class="node-graph-tooltip">Flag your go-to protein sources with a target share of your protein goal, and a chart over a custom date range shows what you've actually eaten from each vs. that live target, sorted so whichever source has the most left to eat leads the list — a low or empty bar means it's time to eat that one.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🏋️ Strength Training Plan</span>
@@ -311,9 +315,16 @@
                         <div class="weight-progress-meter-fill" id="weight-progress-meter-fill"></div>
                     </div>
                     <div class="weight-progress-meter-stats">
-                        <span id="weight-progress-meter-pct" class="weight-progress-meter-pct"></span>
-                        <span id="weight-projection-eta" class="weight-eta"></span>
+                        <span class="weight-progress-meter-stat">
+                            <span id="weight-progress-meter-pct" class="weight-progress-meter-pct"></span>
+                            <span class="weight-progress-meter-stat-label">there</span>
+                        </span>
+                        <span class="weight-progress-meter-stat">
+                            <span id="weight-progress-meter-remaining" class="weight-progress-meter-pct"></span>
+                            <span class="weight-progress-meter-stat-label">to go</span>
+                        </span>
                     </div>
+                    <p id="weight-projection-eta" class="weight-eta"></p>
                 </div>
                 <p id="weight-plateau-note" class="weight-plateau-note"></p>
             </div>
@@ -358,45 +369,6 @@
             </div>
         </div>
 
-        <div class="panel" id="food-insight-panel">
-            <h2>Food Insight</h2>
-            <p class="hint">An AI-generated read on possible nutrient gaps in your recent food.</p>
-
-            <label class="insight-lookback-label">Look back
-                <select id="food-insight-lookback">
-                    <option value="7">7 days</option>
-                    <option value="14">14 days</option>
-                    <option value="30">30 days</option>
-                </select>
-            </label>
-
-            <div class="table-responsive">
-                <table id="food-insight-table">
-                    <thead>
-                    <tr>
-                        <th>Ingredient</th>
-                        <th>Amount</th>
-                        <th>Calories</th>
-                        <th>Protein (g)</th>
-                    </tr>
-                    </thead>
-                    <tbody id="food-insight-ingredients-body"></tbody>
-                </table>
-            </div>
-
-            <label class="insight-question-label" for="food-insight-question">Ask a question (optional)
-                <textarea id="food-insight-question" rows="2" placeholder="e.g. Which vitamins or minerals might be missing?"></textarea>
-            </label>
-
-            <div class="panel-actions">
-                <button type="button" id="food-insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
-            </div>
-
-            <p id="food-insight-generated-at" class="hint" hidden></p>
-            <div id="food-insight-body"></div>
-            <p id="food-insight-status" class="status" hidden></p>
-        </div>
-
         <div class="panel" id="wellness-insight-panel">
             <h2>Wellness Insight</h2>
             <p class="hint">An AI-generated read on your recent trends vs. the previous period — grounded in your weight trajectory, targets, and logging.</p>
@@ -425,6 +397,74 @@
             <p id="insight-status" class="status" hidden></p>
         </div>
 
+        <div class="panel" id="food-insight-panel">
+            <h2>Food Insight</h2>
+            <p class="hint">An AI-generated read on possible nutrient gaps in your recent food.</p>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="food-insight-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="food-insight-date-to">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="food-insight-table">
+                    <thead>
+                    <tr>
+                        <th>Ingredient</th>
+                        <th>Amount</th>
+                        <th>Calories</th>
+                        <th>Protein (g)</th>
+                    </tr>
+                    </thead>
+                    <tbody id="food-insight-ingredients-body"></tbody>
+                </table>
+            </div>
+
+            <label class="insight-question-label" for="food-insight-question">Ask a question (optional)
+                <textarea id="food-insight-question" rows="2" placeholder="e.g. Which vitamins or minerals might be missing?"></textarea>
+            </label>
+
+            <div class="panel-actions">
+                <button type="button" id="food-insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
+            </div>
+
+            <p id="food-insight-generated-at" class="hint" hidden></p>
+            <div id="food-insight-body"></div>
+            <p id="food-insight-status" class="status" hidden></p>
+        </div>
+
+        <div class="panel" id="activity-insight-panel">
+            <h2>Activity Insight</h2>
+            <p class="hint">An AI-generated read on your workout performance — consistency, volume trend, and which muscle groups need attention.</p>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="activity-insight-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="activity-insight-date-to">
+                </label>
+            </div>
+
+            <div id="activity-insight-data-preview" class="insight-data-preview"></div>
+
+            <label class="insight-question-label" for="activity-insight-question">Ask a question (optional)
+                <textarea id="activity-insight-question" rows="2" placeholder="e.g. Which muscle group should I prioritize next?"></textarea>
+            </label>
+
+            <div class="panel-actions">
+                <button type="button" id="activity-insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
+            </div>
+
+            <p id="activity-insight-generated-at" class="hint" hidden></p>
+            <div id="activity-insight-body"></div>
+            <p id="activity-insight-status" class="status" hidden></p>
+        </div>
+
         <div class="panel" id="protein-rotation-panel">
             <h2>Protein Source Rotation</h2>
             <p class="hint">Actual protein eaten vs. your live target for each source — a low or empty bar means it's time for that one. Set an ingredient's Protein % on its Nutrition Facts row to track it here.</p>
@@ -450,7 +490,7 @@
             <div class="workout-day">
                 <h4>Day 1 — Legs</h4>
                 <div class="table-responsive">
-                    <table id="workout-table-legs" data-day="Leg Day">
+                    <table id="workout-table-legs" class="workout-table-strength" data-day="Leg Day">
                         <thead>
                         <tr>
                             <th>Exercise (machine)</th>
@@ -504,7 +544,7 @@
             <div class="workout-day">
                 <h4>Day 2 — Push (chest, shoulders, triceps)</h4>
                 <div class="table-responsive">
-                    <table id="workout-table-push" data-day="Push Day">
+                    <table id="workout-table-push" class="workout-table-strength" data-day="Push Day">
                         <thead>
                         <tr>
                             <th>Exercise (machine)</th>
@@ -533,7 +573,13 @@
                             <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
                         </tr>
                         <tr>
-                            <td>Lateral Raise machine (or cable)</td>
+                            <td>Left Lateral Raise machine (or cable)</td>
+                            <td>2 × 12</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Right Lateral Raise machine (or cable)</td>
                             <td>2 × 12</td>
                             <td>60 sec</td>
                             <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
@@ -552,7 +598,7 @@
             <div class="workout-day">
                 <h4>Day 3 — Pull (back, biceps)</h4>
                 <div class="table-responsive">
-                    <table id="workout-table-pull" data-day="Pull Day">
+                    <table id="workout-table-pull" class="workout-table-strength" data-day="Pull Day">
                         <thead>
                         <tr>
                             <th>Exercise (machine)</th>
@@ -594,7 +640,7 @@
             <div class="workout-day">
                 <h4>Day 4 — Full Body (dumbbell)</h4>
                 <div class="table-responsive">
-                    <table id="workout-table-dumbbell" data-day="Dumbbell Day">
+                    <table id="workout-table-dumbbell" class="workout-table-strength" data-day="Dumbbell Day">
                         <thead>
                         <tr>
                             <th>Exercise (machine)</th>
@@ -660,7 +706,7 @@
             <h3>NEAT</h3>
             <div class="workout-day">
                 <div class="table-responsive">
-                    <table id="neat-table" data-day="NEAT">
+                    <table id="neat-table" class="workout-table-neat" data-day="NEAT">
                         <thead>
                         <tr>
                             <th>Activity</th>
@@ -682,7 +728,7 @@
             <h3>Cardio</h3>
             <div class="workout-day">
                 <div class="table-responsive">
-                    <table id="cardio-table" data-day="Cardio">
+                    <table id="cardio-table" class="workout-table-neat" data-day="Cardio">
                         <thead>
                         <tr>
                             <th>Activity</th>
@@ -693,6 +739,11 @@
                         <tbody>
                         <tr>
                             <td>Swim</td>
+                            <td>30 min</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-minutes="30"></td>
+                        </tr>
+                        <tr>
+                            <td>Running</td>
                             <td>30 min</td>
                             <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-minutes="30"></td>
                         </tr>
@@ -1824,6 +1875,7 @@
 <script src="assets/script/calibration.js"></script>
 <script src="assets/script/insight.js"></script>
 <script src="assets/script/food-insight.js"></script>
+<script src="assets/script/activity-insight.js"></script>
 <script src="assets/script/protein-rotation.js"></script>
 <script src="assets/script/landing-graph.js"></script>
 <script src="assets/script/gate.js"></script>

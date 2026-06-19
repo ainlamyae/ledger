@@ -552,12 +552,14 @@ async function loadDashboard(forceRefresh = false) {
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
     wellnessPromise.then(() => {
-      // The two AI-read panels' local (free) previews depend on wellness
+      // The three AI-read panels' local (free) previews depend on wellness
       // entries that just finished loading above — refresh them now rather
-      // than leaving whatever initFoodInsightPanel/initInsightPanel rendered
-      // at window 'load' time, before any data existed.
-      renderFoodInsightPreview(currentFoodInsightLookbackDays());
+      // than leaving whatever initFoodInsightPanel/initInsightPanel/
+      // initActivityInsightPanel rendered at window 'load' time, before any
+      // data existed.
+      renderFoodInsightPreview(getFoodInsightDateRange());
       renderInsightDataPreview(getInsightDateRange());
+      renderActivityInsightDataPreview(getActivityInsightDateRange());
     }),
     nutritionPromise,
     // Protein Source Rotation needs wellness (actual servings eaten),
@@ -776,6 +778,7 @@ window.addEventListener('load', () => {
   initCalibrationPanel();
   initInsightPanel();
   initFoodInsightPanel();
+  initActivityInsightPanel();
   initProteinRotationPanel();
   initWorkoutPlan();
   setupScrollSpy();

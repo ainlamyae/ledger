@@ -11,7 +11,9 @@
 // still shows something on a fresh page load instead of going blank.
 // Wired up by initFoodInsightPanel(), called from app.js.
 
-const FOOD_INSIGHT_LOOKBACK_DEFAULT = 7;
+// Default span of the From/To date pickers on first load — otherwise
+// identical in meaning to the old fixed 7-day lookback.
+const FOOD_INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
 const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missing from this diet?';
 
 // Sums each Calculate-derived breakdown item across every Calories; Protein
@@ -21,11 +23,7 @@ const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missin
 // showing as two summary lines is a harmless cosmetic difference, not a
 // data-quality problem, so the simpler/more predictable exact match wins.
 // Entries with no breakdown (entry.breakdown === []) are silently skipped.
-function aggregateFoodIntake(lookbackDays) {
-  const dates = lastNDates(lookbackDays);
-  const from = dates[0];
-  const to = dates[dates.length - 1];
-
+function aggregateFoodIntake(from, to) {
   const byName = new Map();
 
   getDatedWellnessEntries()
@@ -115,18 +113,14 @@ function formatAggregatedAmount(grams, count) {
   return parts.length ? parts.join(', ') : '—';
 }
 
-function currentFoodInsightLookbackDays() {
-  return Number(document.getElementById('food-insight-lookback').value) || FOOD_INSIGHT_LOOKBACK_DEFAULT;
-}
-
 // Renders the (locally computed, not AI) ingredient table.
-function renderFoodInsightPreview(lookbackDays) {
+function renderFoodInsightPreview({ from, to }) {
   const tbody = document.getElementById('food-insight-ingredients-body');
   tbody.innerHTML = '';
-  const rows = aggregateFoodIntake(lookbackDays);
+  const rows = aggregateFoodIntake(from, to);
 
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(4, `No Calculate-derived ingredients logged in the last ${lookbackDays} days.`));
+    tbody.appendChild(renderEmptyRow(4, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
     return;
   }
 
@@ -145,8 +139,8 @@ function renderFoodInsightPreview(lookbackDays) {
 // Plain-text ingredient list + the user's question (or the default). Kept
 // intentionally simple — ingredient totals only, no day-by-day breakdown
 // (that's what Insight is for).
-function formatFoodInsightPrompt(rows, lookbackDays, question) {
-  const header = `Aggregated ingredients logged over the last ${lookbackDays} days (name: total amount, total calories, total protein):`;
+function formatFoodInsightPrompt(rows, from, to, question) {
+  const header = `Aggregated ingredients logged from ${from} to ${to} (name: total amount, total calories, total protein):`;
   const body = rows.length
     ? rows.map((r) => `- ${r.name} (${r.amountLabel}): ${r.calories} kcal, ${r.protein} g protein`).join('\n')
     : '(no Calculate-derived ingredient breakdown logged in this window)';
@@ -158,14 +152,22 @@ const FOOD_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewin
 
 Be explicit that this is an inference from typical food composition, not a lab-measured nutrient analysis, and that specific products/brands/preparation can vary. You are not a doctor — do not diagnose a deficiency or recommend supplement dosages; suggest food-based ways to close likely gaps instead.
 
-Write a short plain-text answer. Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Keep it under 250 words.`;
+Write a short plain-text report with exactly these five sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 
-async function generateFoodInsight(lookbackDays, question) {
+Overview: one or two sentences on the overall inferred nutrient picture this pattern of eating suggests.
+Going well: vitamins/minerals this pattern likely covers well.
+Needs attention: vitamins/minerals this pattern likely falls short on.
+Suggestions: 2-4 concrete, specific food-based ways to close the likely gaps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — do not run them together in one line.
+Answer: directly answers the question included below.
+
+Keep the whole report under 250 words.`;
+
+async function generateFoodInsight(from, to, question) {
   const apiKey = getSettingString('GROQ_API_KEY', null);
   if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
 
-  const rows = aggregateFoodIntake(lookbackDays);
-  const userMessage = formatFoodInsightPrompt(rows, lookbackDays, question);
+  const rows = aggregateFoodIntake(from, to);
+  const userMessage = formatFoodInsightPrompt(rows, from, to, question);
 
   const res = await fetch(GROQ_API, {
     method: 'POST',
@@ -192,27 +194,11 @@ async function generateFoodInsight(lookbackDays, question) {
   return data.choices[0].message.content;
 }
 
-// Same untrusted-model-output safety rule as insight.js's renderInsightText
-// — one <p> per non-blank line via textContent, never innerHTML. Not
-// shared with renderInsightText: that function's job is bolding insight.js's
-// 4 fixed section labels, which don't apply to this feature's freeform Q&A
-// response — duplicating this ~10-line helper matches how the app already
-// keeps small per-feature render helpers local rather than growing a shared
-// grab-bag module.
-function renderFoodInsightText(container, text) {
-  text.split('\n').forEach((rawLine) => {
-    const line = rawLine.trim();
-    if (!line) return;
-    const p = document.createElement('p');
-    p.textContent = line;
-    container.appendChild(p);
-  });
-}
-
-async function runFoodInsightGeneration(lookbackDays, question) {
+async function runFoodInsightGeneration(from, to, question) {
   const body = document.getElementById('food-insight-body');
   const btn = document.getElementById('food-insight-generate-btn');
-  const select = document.getElementById('food-insight-lookback');
+  const fromEl = document.getElementById('food-insight-date-from');
+  const toEl = document.getElementById('food-insight-date-to');
   const textarea = document.getElementById('food-insight-question');
 
   body.innerHTML = '';
@@ -220,19 +206,20 @@ async function runFoodInsightGeneration(lookbackDays, question) {
 
   const loading = document.createElement('p');
   loading.className = 'hint';
-  loading.textContent = `Analyzing your last ${lookbackDays} days of food…`;
+  loading.textContent = `Analyzing ${from} to ${to}…`;
   body.appendChild(loading);
 
   btn.disabled = true;
-  select.disabled = true;
+  fromEl.disabled = true;
+  toEl.disabled = true;
   textarea.disabled = true;
   const originalLabel = btn.textContent;
   btn.textContent = 'Generating…';
 
   try {
-    const text = await generateFoodInsight(lookbackDays, question);
+    const text = await generateFoodInsight(from, to, question);
     body.innerHTML = '';
-    renderFoodInsightText(body, text);
+    renderInsightText(body, text);
 
     // Persisted so a fresh page load still shows the last read instead of
     // going blank — unlike insight.js's Wellness Insight, this is the one
@@ -253,7 +240,8 @@ async function runFoodInsightGeneration(lookbackDays, question) {
     showFieldError('food-insight-status', err.message);
   } finally {
     btn.disabled = false;
-    select.disabled = false;
+    fromEl.disabled = false;
+    toEl.disabled = false;
     textarea.disabled = false;
     btn.textContent = originalLabel;
   }
@@ -285,19 +273,25 @@ function renderSavedFoodInsight() {
     return;
   }
 
-  renderFoodInsightText(body, text);
+  renderInsightText(body, text);
   renderFoodInsightGeneratedAt(getSettingString('FOOD_INSIGHT_LAST_GENERATED_AT', null));
 }
 
+// Set by initFoodInsightPanel() to the getter initDateRangeControl()
+// (charts.js) returns — same shared From/To wiring insight.js and
+// protein-rotation.js use.
+let getFoodInsightDateRange = () => ({ from: null, to: null });
+
 function initFoodInsightPanel() {
   clearFieldError('food-insight-status');
-  renderFoodInsightPreview(currentFoodInsightLookbackDays());
+  getFoodInsightDateRange = initDateRangeControl('food-insight-date-from', 'food-insight-date-to', FOOD_INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
+    renderFoodInsightPreview(getFoodInsightDateRange());
+  });
+  renderFoodInsightPreview(getFoodInsightDateRange());
   renderSavedFoodInsight();
 
   document.getElementById('food-insight-generate-btn').addEventListener('click', () => {
-    runFoodInsightGeneration(currentFoodInsightLookbackDays(), document.getElementById('food-insight-question').value);
-  });
-  document.getElementById('food-insight-lookback').addEventListener('change', () => {
-    renderFoodInsightPreview(currentFoodInsightLookbackDays());
+    const { from, to } = getFoodInsightDateRange();
+    runFoodInsightGeneration(from, to, document.getElementById('food-insight-question').value);
   });
 }

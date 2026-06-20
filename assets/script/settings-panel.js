@@ -115,12 +115,24 @@ async function submitSettingForm(event) {
   ]];
 
   try {
+    // RAW here for the same reason saveSettingValues uses it (see there): this
+    // tab is a key/value store, and nothing in it benefits from Sheets
+    // reinterpreting the typed text. A BIRTH_DATE of "1990-05-12" is meant to
+    // be read back as exactly that string, and a HEIGHT_CM of 178 must never
+    // end up in a date-formatted cell — where it would read back as a date and
+    // register as "not set" everywhere.
     if (editingSettingRow) {
-      await updateValues(`${CONFIG.SHEETS.SETTINGS}!A${editingSettingRow}:C${editingSettingRow}`, values);
+      await updateValues(`${CONFIG.SHEETS.SETTINGS}!A${editingSettingRow}:C${editingSettingRow}`, values, 'RAW');
     } else {
-      await appendValues(SETTINGS_PANEL_RANGE, values);
+      await appendValues(SETTINGS_PANEL_RANGE, values, 'RAW');
     }
     closeSettingForm();
+    await refreshSettingsList(true);
+    // Repairs this row's format if a previous USER_ENTERED write date-stamped
+    // it, so editing a broken setting is enough to fix it.
+    const saved = allSettingRows.find((r) => r.key === key);
+    if (saved) await clearSettingValueFormats([saved.row]);
+
     await refreshSettingsList(true);
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
@@ -129,11 +141,48 @@ async function submitSettingForm(event) {
   }
 }
 
+// A cell's number format is a separate property from its value, so writing the
+// right number into a cell that some earlier write turned into a date-formatted
+// one leaves it still reading back as a date string. Clearing the format on
+// every row written repairs those in place — an already-broken setting is fixed
+// by re-saving it, rather than needing its row deleted by hand.
+async function clearSettingValueFormats(rowNumbers) {
+  if (rowNumbers.length === 0 || settingsSheetId === null) return;
+
+  await batchUpdate(rowNumbers.map((row) => ({
+    repeatCell: {
+      range: {
+        sheetId: settingsSheetId,
+        startRowIndex: row - 1,
+        endRowIndex: row,
+        startColumnIndex: 1, // column B, the Value cell
+        endColumnIndex: 2,
+      },
+      // Field named in `fields` but omitted from `cell` — the API's documented
+      // way to DELETE a field, resetting the cell to Automatic formatting.
+      cell: { userEnteredFormat: {} },
+      fields: 'userEnteredFormat.numberFormat',
+    },
+  })));
+}
+
 // Writes key/value pairs to the Settings tab — updating rows that already
 // exist in place, appending new ones for keys seen for the first time — then
 // refreshes both the settings-panel list and currentSettings so callers see
 // their own write immediately. Shared by every feature that persists an
 // AI/computed result there (calibration.js, insight.js, food-insight.js).
+//
+// RAW, not USER_ENTERED: every value routed through here is already a finished
+// computed value that has to survive the round trip byte-for-byte, and
+// USER_ENTERED reinterprets it the way typing into the cell would. That caused
+// a genuinely destructive bug — PROJ_CALIBRATED_AT's "2026-07-30" was parsed
+// into a real date, which turned its cell into a DATE-formatted one, and rows
+// appended beside it inherited that format. A coefficient like 0.00031534 is a
+// perfectly valid date serial, so it then displayed as "1899-12-30 0:00" and
+// (via VALUE_PARAMS' FORMATTED_STRING dateTimeRenderOption) read back as that
+// STRING rather than a number. getSetting() saw NaN and reported the setting as
+// absent, so a correctly-written calibration silently vanished — as did any
+// other numeric setting whose cell caught the same format.
 async function saveSettingValues(values) {
   await initSettingsPanel(true);
   if (settingsSheetMissing) {
@@ -147,14 +196,21 @@ async function saveSettingValues(values) {
   Object.entries(values).forEach(([key, value]) => {
     const existing = existingByKey.get(key);
     if (existing) {
-      updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes]]));
+      updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes ?? '']], 'RAW'));
     } else {
       newRows.push([key, value, '']);
     }
   });
 
   await Promise.all(updates);
-  if (newRows.length > 0) await appendValues(SETTINGS_PANEL_RANGE, newRows);
+  if (newRows.length > 0) await appendValues(SETTINGS_PANEL_RANGE, newRows, 'RAW');
+
+  // Formats are cleared BEFORE the read-back below, so currentSettings gets the
+  // repaired numeric values rather than the date strings the old format would
+  // still have produced this one last time.
+  await refreshSettingsList(true);
+  const writtenKeys = new Set(Object.keys(values));
+  await clearSettingValueFormats(allSettingRows.filter((r) => writtenKeys.has(r.key)).map((r) => r.row));
 
   await refreshSettingsList(true);
   currentSettings = await loadSettings(true);

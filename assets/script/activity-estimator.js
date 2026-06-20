@@ -2,9 +2,9 @@
 // when the current category is Activity — the Activity counterpart to
 // calorie-estimator.js. Understands the Activity Plan's standardized workout
 // note (see strength-plan.js's logWorkout): one line per ticked row —
-// "sets×reps  Exercise Name" for a strength row, "Nmin  Activity Name" for a
-// fixed-duration row (Swim), or "Nstep  Activity Name" for a step-count row
-// (Walk). Wired up by wellness.js — see its calc-btn click dispatcher in
+// "sets×reps  Exercise Name" for a strength row, "Nsec  Exercise Name" for an
+// isometric hold (Plank), "Nmin  Activity Name" for a fixed-duration row
+// (Swim), or "Nstep  Activity Name" for a step-count row (Walk). Wired up by wellness.js — see its calc-btn click dispatcher in
 // initWellness() — and called directly by strength-plan.js's logWorkout()
 // right after it fills the note in.
 
@@ -61,6 +61,24 @@ const EXERCISE_MET = {
   'Dumbbell Lateral Raise': 3.5,
   'Dumbbell Bicep Curl': 3.5,
   'Dumbbell Tricep Extension': 3.5,
+  // Day 5, bodyweight/no-equipment. Deliberately reusing the same two sourced
+  // values as the machine/dumbbell rows above rather than introducing new
+  // per-exercise numbers: multi-joint, large-muscle-group movements get the
+  // 5.0 compound value, and core/isolation work plus the isometric holds get
+  // the 3.5 general resistance-training value. A plank has no distinct
+  // Compendium entry of its own, and 3.5 (its general resistance-training
+  // value, also this table's default) is the closest sourced figure — better
+  // than inventing a plank-specific MET.
+  'Push-up': 5.0,
+  'Bodyweight Squat': 5.0,
+  'Mountain Climber': 5.0,
+  Crunch: 3.5,
+  Plank: 3.5,
+  'Side Plank (both sides)': 3.5,
+  'Leg Raise': 3.5,
+  'Glute Bridge': 3.5,
+  'Bird Dog (both sides)': 3.5,
+  Superman: 3.5,
   Swim: 6.0,
   Walk: 3.0,
   Running: 7.0,
@@ -71,12 +89,17 @@ const EXERCISE_MET = {
 const EXERCISE_MET_DEFAULT = 3.5;
 
 // Matches one standardized workout note line — a strength row ("3×10  Leg
-// Press"), a fixed-duration NEAT row ("30min  Swim"), or a step-count row
-// ("6000step  Walk"). Any line matching none of these (e.g. a blank line,
+// Press"), an isometric hold ("135sec  Plank"), a fixed-duration NEAT row
+// ("30min  Swim"), or a step-count row ("6000step  Walk"). Any line matching none of these (e.g. a blank line,
 // or a leftover day-header line from an older-format saved entry) is skipped.
 const STRENGTH_NOTE_LINE_PATTERN = /^(\d+)×(\d+)\s+(.+)$/;
 const DURATION_NOTE_LINE_PATTERN = /^(\d+)min\s+(.+)$/;
 const STEPS_NOTE_LINE_PATTERN = /^(\d+)step\s+(.+)$/;
+// An isometric hold row's total held seconds ("135sec  Plank") — seconds
+// rather than minutes because a hold is typically well under a minute per set,
+// and rounding 3 × 45 sec to whole minutes would lose most of the precision.
+// Distinct prefix from "step"/"min" so the three can't be confused.
+const HOLD_NOTE_LINE_PATTERN = /^(\d+)sec\s+(.+)$/;
 
 function parseWorkoutNoteLines(notes) {
   return notes
@@ -95,6 +118,10 @@ function parseWorkoutNoteLines(notes) {
       if (stepsMatch) {
         return { type: 'steps', steps: Number(stepsMatch[1]), name: stepsMatch[2].trim() };
       }
+      const holdMatch = HOLD_NOTE_LINE_PATTERN.exec(line);
+      if (holdMatch) {
+        return { type: 'hold', seconds: Number(holdMatch[1]), name: holdMatch[2].trim() };
+      }
       return null;
     })
     .filter(Boolean);
@@ -108,7 +135,7 @@ function parseWorkoutNoteLines(notes) {
 function estimateWorkoutActivity(notes, weightKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
-    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log Workout button, or write one \"sets×reps  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
+    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log Workout button, or write one \"sets×reps  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
   }
 
   let totalSeconds = 0;
@@ -121,6 +148,10 @@ function estimateWorkoutActivity(notes, weightKg) {
     let activeSeconds;
     if (line.type === 'sets') activeSeconds = line.sets * line.reps * WORKOUT_REP_SEC;
     else if (line.type === 'steps') activeSeconds = toActivityMinutes(line.steps, 'steps') * 60;
+    // Already the total active time for a hold row — the note carries seconds
+    // directly (see strength-plan.js's activeSecondsForBox), no tempo or pace
+    // conversion to apply.
+    else if (line.type === 'hold') activeSeconds = line.seconds;
     else activeSeconds = line.minutes * 60;
 
     totalSeconds += activeSeconds;

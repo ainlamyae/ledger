@@ -115,6 +115,8 @@ async function refreshTransactions(forceRefresh = false) {
   }));
   renderTransactions();
   populateAutocompleteOptions();
+  syncExportAccountOptions();
+  renderExportPreview();
 }
 
 // Fills the Payee/Description datalists with previously used values so the
@@ -158,6 +160,7 @@ async function refreshAccountOptions() {
 
   setCached('lists', { transactionsSheetId, accountOptions, categoryOptions });
   populateCategoryFilter();
+  syncExportAccountOptions();
 }
 
 function populateCategoryFilter() {
@@ -335,12 +338,20 @@ async function submitTransactionForm(event) {
 
   const keepOpen = event.submitter?.id === 'tx-save-add-btn';
 
+  const amount = evaluateNumberExpression(document.getElementById('tx-amount').value);
+  if (amount === null) {
+    const errorEl = document.getElementById('tx-form-error');
+    errorEl.textContent = 'Amount must be a number or a simple expression, e.g. =-9.97-1.30';
+    errorEl.hidden = false;
+    return;
+  }
+
   const values = [[
     document.getElementById('tx-date').value,
     document.getElementById('tx-account').value,
     document.getElementById('tx-payee').value,
     document.getElementById('tx-description').value,
-    Number(document.getElementById('tx-amount').value),
+    amount,
     document.getElementById('tx-category').value,
   ]];
 

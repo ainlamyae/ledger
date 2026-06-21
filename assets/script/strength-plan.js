@@ -88,6 +88,14 @@ function logWorkout() {
       // bare numbers, so a trailing " sec" would silently make the line
       // unparseable and drop the exercise from the recalculated total.
       else if (box.dataset.hold !== undefined) quantity = `${activeSecondsForBox(box)}sec`;
+      // Read off the DISPLAYED "Sets × Reps" cell, which makes the visible plan
+      // the authority — so every strength row's data-sets/data-reps must match
+      // what its own cell shows. They didn't for 22 of the original 24 rows
+      // (e.g. a row displaying "3 × 10" carried data-reps="11"), and since
+      // estimateWorkoutMinutes above reads the ATTRIBUTES while this note reads
+      // the TEXT, Log Workout and a later Recalculate disagreed by ~6% on the
+      // same ticked exercises despite the two paths claiming to mirror each
+      // other exactly. Keep any new row's attributes and display in step.
       else quantity = cells[1].textContent.trim().replace(/\s*×\s*/, '×');
       return `${quantity}  ${name}`;
     })

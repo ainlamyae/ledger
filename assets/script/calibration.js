@@ -1,6 +1,7 @@
 // Weight Trend & Forecast's "Calibrate" flow: fits calcProjection()'s
 // generic energy-balance formula (charts.js) to the user's OWN weigh-in/
-// calorie/activity/sleep history via weighted least squares, then saves the
+// calorie/activity/sleep history via weighted ridge regression (penalty chosen
+// from that history by leave-one-out cross-validation), then saves the
 // resulting gains to the Settings tab so calcProjection() picks them up via
 // getCalibratedGains(). Never runs automatically — a user who doesn't click
 // Calibrate keeps the generic formula exactly as-is.
@@ -33,6 +34,7 @@ const PROJ_SETTING_KEYS = [
   'PROJ_CALIBRATED_AT',
   'PROJ_CALIBRATION_R2',
   'PROJ_CALIBRATION_SAMPLES',
+  'PROJ_CALIBRATION_ALPHA',
   // Superseded by PROJ_ACTIVITY_KG_PER_KCAL_DAY (see charts.js's
   // getCalibratedGains) — kept here only so Reset still cleans up a
   // leftover row from before this rename, on anyone who calibrated earlier.
@@ -40,7 +42,7 @@ const PROJ_SETTING_KEYS = [
 ];
 
 let calibrationListenersAttached = false;
-let lastCalibrationFit = null; // { beta0, betaCal, betaAct, betaSleep, r2, n } once a passing fit exists, else null
+let lastCalibrationFit = null; // { beta0, betaCal, betaAct, betaSleep, betaProtein, r2, r2Cv, alpha, n } once a passing fit exists, else null
 
 function initCalibrationPanel() {
   if (calibrationListenersAttached) return;
@@ -253,8 +255,20 @@ function solveLinearSystem(A, b) {
   return M.map((row, i) => row[n] / row[i]);
 }
 
-// Weighted least squares (weight = days, capped, so one abnormally long gap
-// can't dominate the fit) of:
+// Ridge penalties tried by the leave-one-out search in fitWeightedRidge, as a
+// fraction of the data's own information (see solveRidge for why that's a pure
+// ratio here). 0 is included so a genuinely strong fit isn't shrunk at all.
+const PROJ_RIDGE_ALPHAS = [0, 0.01, 0.03, 0.1, 0.3, 1, 3, 10];
+
+// Among penalties whose held-out error is within this fraction of the best,
+// the strongest one wins — see fitWeightedRidge.
+const PROJ_RIDGE_TIE_TOLERANCE = 0.01;
+
+// Predictor order for every coefficient array below: calories, activity,
+// sleep, protein. The intercept is handled separately (it isn't penalized).
+const PROJ_PREDICTOR_COUNT = 4;
+
+// The model being fitted, in the units each coefficient is reported in:
 //   ratePerDay ≈ β0 + β1·(avgCalories−calorieTarget) + β2·avgActivityKcal + β3·(avgSleepHours−sleepTarget) + β4·(avgProteinG−proteinTarget)
 // avgActivityKcal (not raw activity minutes) so this term is in the same
 // energy units as avgCalories — β2 then means the same thing β1 does, just
@@ -264,37 +278,181 @@ function solveLinearSystem(A, b) {
 // makes β0 a clean "baseline kg/day drift my logged habits don't explain"
 // term (adaptive thermogenesis / intake under-reporting / noise) —
 // something the generic formula has no provision for at all.
-function fitWeightedOLS(samples, calorieTarget, sleepTarget, proteinTarget) {
-  const X = samples.map((s) => [1, s.avgCalories - calorieTarget, s.avgActivityKcal, s.avgSleepHours - sleepTarget, s.avgProteinG - proteinTarget]);
-  const y = samples.map((s) => s.ratePerDay);
-  const w = samples.map((s) => Math.min(s.days, PROJ_CALIBRATION_MAX_INTERVAL_WEIGHT_DAYS));
+function buildDesign(samples, calorieTarget, sleepTarget, proteinTarget) {
+  return {
+    x: samples.map((s) => [
+      s.avgCalories - calorieTarget,
+      s.avgActivityKcal,
+      s.avgSleepHours - sleepTarget,
+      s.avgProteinG - proteinTarget,
+    ]),
+    y: samples.map((s) => s.ratePerDay),
+    // Weight = interval length in days, capped, so one abnormally long gap
+    // can't dominate the fit.
+    w: samples.map((s) => Math.min(s.days, PROJ_CALIBRATION_MAX_INTERVAL_WEIGHT_DAYS)),
+  };
+}
 
-  const k = 5;
-  const ATA = Array.from({ length: k }, () => new Array(k).fill(0));
-  const ATy = new Array(k).fill(0);
+// Weighted ridge regression over `rows` of `design`, returned in the model's
+// ORIGINAL units so every caller and every stored coefficient keeps the meaning
+// documented above.
+//
+// Ridge is not scale-invariant, which matters enormously here: these four
+// predictors are hundreds of kcal, hundreds of kcal, about one hour, and tens of
+// grams. Adding one raw penalty to an unstandardized normal-matrix diagonal
+// would have penalized the sleep coefficient on the order of 10,000x harder than
+// the calorie one, purely because of the units they happen to be measured in. So
+// each predictor is standardized by its own WEIGHTED standard deviation first,
+// which also makes every diagonal entry of Z'WZ exactly the total weight — so
+// `alpha` is a pure ratio of penalty to information, comparable across
+// predictors and across users, rather than a magic number in mixed units.
+//
+// Returns null if the penalized system still can't be solved.
+function solveRidge(design, rows, alpha) {
+  const { x, y, w } = design;
+  const wSum = rows.reduce((sum, i) => sum + w[i], 0);
+  if (wSum <= 0) return null;
 
-  samples.forEach((_, i) => {
-    for (let a = 0; a < k; a++) {
-      ATy[a] += w[i] * X[i][a] * y[i];
-      for (let b = 0; b < k; b++) ATA[a][b] += w[i] * X[i][a] * X[i][b];
-    }
-  });
+  const yMean = rows.reduce((sum, i) => sum + w[i] * y[i], 0) / wSum;
 
-  const beta = solveLinearSystem(ATA, ATy);
-  if (!beta) return { status: 'singular' };
+  // A predictor with no variance across these rows (e.g. protein never logged,
+  // so every deviation from target is the same number) carries no information
+  // and can't be standardized. It's dropped with a zero coefficient rather than
+  // making the whole system singular — which is what the un-regularized fit did,
+  // refusing to calibrate the other three terms at all over one unused input.
+  const mean = [];
+  const sd = [];
+  const active = [];
+  for (let j = 0; j < PROJ_PREDICTOR_COUNT; j++) {
+    const m = rows.reduce((sum, i) => sum + w[i] * x[i][j], 0) / wSum;
+    const variance = rows.reduce((sum, i) => sum + w[i] * (x[i][j] - m) ** 2, 0) / wSum;
+    mean.push(m);
+    sd.push(Math.sqrt(variance));
+    if (sd[j] > 0) active.push(j);
+  }
 
-  const wSum = w.reduce((a, b) => a + b, 0);
-  const yMeanW = w.reduce((s, wi, i) => s + wi * y[i], 0) / wSum;
+  const beta = new Array(PROJ_PREDICTOR_COUNT).fill(0);
+
+  if (active.length > 0) {
+    const k = active.length;
+    const A = Array.from({ length: k }, () => new Array(k).fill(0));
+    const b = new Array(k).fill(0);
+
+    rows.forEach((i) => {
+      const z = active.map((j) => (x[i][j] - mean[j]) / sd[j]);
+      const dy = y[i] - yMean;
+      for (let a = 0; a < k; a++) {
+        b[a] += w[i] * z[a] * dy;
+        for (let c = 0; c < k; c++) A[a][c] += w[i] * z[a] * z[c];
+      }
+    });
+
+    for (let a = 0; a < k; a++) A[a][a] += alpha * wSum;
+
+    const solved = solveLinearSystem(A, b);
+    if (!solved) return null;
+
+    // A standardized coefficient is "per standard deviation", so dividing by
+    // that predictor's own sd puts it back into per-kcal / per-hour / per-gram.
+    active.forEach((j, a) => { beta[j] = solved[a] / sd[j]; });
+  }
+
+  // The intercept is deliberately NOT penalized — standard practice, since it
+  // isn't a slope and shrinking it would bias the model's overall level rather
+  // than its sensitivities. Because the predictors were centered above, it falls
+  // out as the fitted value at x = 0, which in these already-target-centered
+  // coordinates is exactly the semantics charts.js depends on: the rate at
+  // target intake, zero logged activity, target sleep, and target protein.
+  const beta0 = yMean - beta.reduce((sum, bj, j) => sum + bj * mean[j], 0);
+
+  return { beta0, beta, droppedCount: PROJ_PREDICTOR_COUNT - active.length };
+}
+
+function predictRate(coefficients, xi) {
+  return coefficients.beta0 + coefficients.beta.reduce((sum, bj, j) => sum + bj * xi[j], 0);
+}
+
+// Total weighted squared error of predicting each interval from a model refitted
+// WITHOUT it — standardization included, so nothing about the held-out interval
+// leaks into the model that predicts it. This is what selects alpha: any
+// in-sample criterion would always pick zero shrinkage, because ridge can only
+// ever increase in-sample error. Null if any fold fails to solve.
+function looSquaredError(design, alpha) {
+  const n = design.y.length;
+  let sse = 0;
+
+  for (let held = 0; held < n; held++) {
+    const rows = [];
+    for (let i = 0; i < n; i++) if (i !== held) rows.push(i);
+
+    const trained = solveRidge(design, rows, alpha);
+    if (!trained) return null;
+    sse += design.w[held] * (design.y[held] - predictRate(trained, design.x[held])) ** 2;
+  }
+
+  return sse;
+}
+
+// Fits the model above with the penalty chosen from the user's own data.
+//
+// Why regularize at all: four predictors over a few dozen weigh-in intervals,
+// all correlated (eat more on days you train more, sleep less when you eat
+// late), is exactly the setup where least squares hands back large offsetting
+// coefficients that fit the noise. In practice that produced physiologically
+// impossible signs — a fit claiming that burning calories, sleeping more, and
+// eating more protein each ADD weight — and, because β0 has to absorb whatever
+// those wrong-signed terms contribute at the user's average habits, a baseline
+// drift so large the projection came out pinned to its own safety clamp. Ridge
+// pulls the sensitivities toward zero, and β0 follows them back toward the
+// weighted mean rate actually observed, which is the honest answer when the
+// habit data explains little.
+function fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget) {
+  const design = buildDesign(samples, calorieTarget, sleepTarget, proteinTarget);
+  const allRows = design.y.map((_, i) => i);
+
+  const scored = PROJ_RIDGE_ALPHAS
+    .map((alpha) => ({ alpha, sse: looSquaredError(design, alpha) }))
+    .filter((s) => s.sse !== null);
+  if (scored.length === 0) return { status: 'singular' };
+
+  // Among penalties that predict a held-out interval about equally well, take
+  // the strongest: it's the one least likely to be reading noise as signal.
+  // (Same idea as glmnet's one-standard-error rule, with a fixed tolerance in
+  // place of an SE estimate.)
+  const bestSse = Math.min(...scored.map((s) => s.sse));
+  const chosen = scored
+    .filter((s) => s.sse <= bestSse * (1 + PROJ_RIDGE_TIE_TOLERANCE))
+    .reduce((best, s) => (s.alpha > best.alpha ? s : best));
+
+  const fit = solveRidge(design, allRows, chosen.alpha);
+  if (!fit) return { status: 'singular' };
+
+  const wSum = design.w.reduce((a, b) => a + b, 0);
+  const yMeanW = design.w.reduce((s, wi, i) => s + wi * design.y[i], 0) / wSum;
   let ssRes = 0;
   let ssTot = 0;
-  samples.forEach((_, i) => {
-    const yHat = beta[0] * X[i][0] + beta[1] * X[i][1] + beta[2] * X[i][2] + beta[3] * X[i][3] + beta[4] * X[i][4];
-    ssRes += w[i] * (y[i] - yHat) ** 2;
-    ssTot += w[i] * (y[i] - yMeanW) ** 2;
+  design.y.forEach((yi, i) => {
+    ssRes += design.w[i] * (yi - predictRate(fit, design.x[i])) ** 2;
+    ssTot += design.w[i] * (yi - yMeanW) ** 2;
   });
-  const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
 
-  return { status: 'ok', beta0: beta[0], betaCal: beta[1], betaAct: beta[2], betaSleep: beta[3], betaProtein: beta[4], r2, n: samples.length };
+  return {
+    status: 'ok',
+    beta0: fit.beta0,
+    betaCal: fit.beta[0],
+    betaAct: fit.beta[1],
+    betaSleep: fit.beta[2],
+    betaProtein: fit.beta[3],
+    r2: ssTot > 0 ? 1 - ssRes / ssTot : 0,
+    // How well the model predicts an interval it never saw. Unlike R² this can
+    // go NEGATIVE, which is the useful part: below zero means the fitted habit
+    // terms predict a new weigh-in interval worse than simply assuming the
+    // average rate, i.e. there's no usable signal yet however good R² looks.
+    r2Cv: ssTot > 0 ? 1 - chosen.sse / ssTot : 0,
+    alpha: chosen.alpha,
+    droppedCount: fit.droppedCount,
+    n: samples.length,
+  };
 }
 
 // Guardrails independent of the fit-time solver succeeding — a technically
@@ -326,8 +484,22 @@ function validateCalibration(fit, samples) {
   // A soft warning rather than blocking (unlike betaCal above) — activity is
   // the secondary predictor here, so one noisy fit shouldn't throw away an
   // otherwise-usable calibration the way a backwards calorie coefficient does.
+  if (fit.droppedCount > 0) {
+    warnings.push(`${fit.droppedCount} of the four habit inputs never varied across your weigh-ins, so ${fit.droppedCount === 1 ? 'it was' : 'they were'} left out of the fit rather than guessed at — log ${fit.droppedCount === 1 ? 'it' : 'them'} alongside your weight to include ${fit.droppedCount === 1 ? 'it' : 'them'} next time.`);
+  }
+
   if (fit.betaAct > 0) {
     warnings.push("The fit implies burning more calories through activity slows weight loss, which is not physiologically plausible — the activity term is likely just noise; the rest of the calibration is still usable.");
+  }
+
+  // The honest headline when regularization couldn't rescue the fit: R2 measures
+  // how well the model describes the intervals it was fitted on, which a flexible
+  // model can always do to some degree. r2Cv measures whether it predicts a
+  // weigh-in it never saw, and at or below zero it does worse than simply
+  // assuming the average rate — so the calibrated forecast is not yet an
+  // improvement on the generic one, whatever R2 says.
+  if (fit.r2Cv <= 0) {
+    warnings.push(`This fit has no predictive power yet (predictive R² ${fit.r2Cv.toFixed(2)}) — on weigh-ins it hadn't seen it does no better than assuming your average rate, so the calibrated forecast isn't an improvement on the generic one. The energy density is still worth keeping; the habit sensitivities aren't reliable yet.`);
   }
 
   if (fit.r2 < PROJ_CALIBRATION_MIN_R2) {
@@ -355,7 +527,7 @@ function runCalibration() {
     return;
   }
 
-  const fit = fitWeightedOLS(samples, calorieTarget, sleepTarget, proteinTarget);
+  const fit = fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget);
   if (fit.status !== 'ok') {
     summary.innerHTML = '<p>Could not fit a stable model from this history — try logging more varied calorie intake alongside your weigh-ins.</p>';
     return;
@@ -372,7 +544,9 @@ function runCalibration() {
 
   summary.innerHTML = `<table class="calibration-summary-table">
     <tr><td>Intervals used</td><td>${fit.n}${excludedCount ? ` (${excludedCount} excluded — insufficient calorie logs)` : ''}</td></tr>
-    <tr><td>Fit quality (R²)</td><td>${fit.r2.toFixed(2)}</td></tr>
+    <tr><td>Fit quality (R²)</td><td>${fit.r2.toFixed(2)} <span class="hint">in-sample</span></td></tr>
+    <tr><td>Predictive (R²)</td><td>${fit.r2Cv.toFixed(2)} <span class="hint">on weigh-ins the fit never saw — at or below 0 means your habit data doesn't predict a new interval better than assuming your average rate</span></td></tr>
+    <tr><td>Shrinkage</td><td>${fit.alpha === 0 ? 'none needed' : `α ${fit.alpha}`} <span class="hint">${fit.alpha === 0 ? 'the fit held up on its own' : 'chosen from your own data by leave-one-out; pulls noisy sensitivities toward zero'}</span></td></tr>
     <tr><td>Energy density</td><td>${effectiveKcalPerKg !== null ? `~${effectiveKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(generic: 7,700)</span>` : 'n/a'}</td></tr>
     <tr><td>Activity</td><td>${activityKcalPerKg !== null ? `~${activityKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(compare to Energy density above — similar values mean the model is internally consistent)</span>` : `${(fit.betaAct * 1000).toFixed(2)} g/day per kcal burned`}</td></tr>
     <tr><td>Sleep</td><td>${(fit.betaSleep * 1000).toFixed(0)} g/day per hour above/below your ${sleepTarget} hr target</td></tr>
@@ -451,6 +625,9 @@ async function saveCalibratedGains() {
     PROJ_CALIBRATED_AT: new Date().toISOString().slice(0, 10),
     PROJ_CALIBRATION_R2: Math.round(fit.r2 * 1000) / 1000,
     PROJ_CALIBRATION_SAMPLES: fit.n,
+    // Recorded so a saved calibration says how much it had to be shrunk to
+    // hold up — the coefficients alone can't tell you that afterwards.
+    PROJ_CALIBRATION_ALPHA: fit.alpha,
   };
 
   try {

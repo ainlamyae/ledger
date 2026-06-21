@@ -5,7 +5,10 @@ async function sheetsRequest(path, options = {}) {
   const token = getAccessToken();
   if (!token) throw new Error('Not signed in');
 
-  const res = await fetch(`${SHEETS_API}/${CONFIG.SPREADSHEET_ID}${path}`, {
+  const spreadsheetId = getActiveSpreadsheetId();
+  if (!spreadsheetId) throw new Error('No spreadsheet selected');
+
+  const res = await fetch(`${SHEETS_API}/${spreadsheetId}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,

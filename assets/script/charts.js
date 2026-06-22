@@ -53,6 +53,23 @@ function niceAxisMax(value) {
   return niceResidual * magnitude;
 }
 
+// Same idea as niceAxisMax but with a much finer ladder, for axes where a
+// coarse round-up wastes visible chart area. niceAxisMax steps 1 → 2 → 5 → 10,
+// so anything just past 2,000 lands on 5,000 and leaves over half the plot
+// empty: a 2,100 kcal deficit — an ordinary day of eating light — got an axis
+// twice the height of the tallest bar. These steps keep the round-up to at most
+// 25% instead of 150%, while still landing on values a reader parses at a
+// glance. Kept separate rather than widening niceAxisMax itself so the other
+// chart using that helper keeps the bounds it was tuned with.
+const NICE_AXIS_STEPS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+
+function niceAxisBound(value) {
+  if (value <= 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const residual = value / magnitude;
+  return (NICE_AXIS_STEPS.find((step) => residual <= step) ?? 10) * magnitude;
+}
+
 // Destroys `existingChart` if present, then constructs and returns a new
 // Chart.js instance from `config` — only used where destroy and construct are
 // unconditionally adjacent; render functions that skip construction on empty
@@ -1959,8 +1976,14 @@ function renderWellnessEnergyBalanceChart(entries) {
   // switches both constants and both labels below.
   const gains = getCalibratedGains();
   const kcalPerKg = gains ? kcalPerKgFat() : GENERIC_KCAL_PER_KG_FAT;
-  const axisUnit = gains ? 'g weight' : 'g fat';
   const massLabel = gains ? 'Expected scale weight' : 'Expected fat';
+  // Which quantity the right axis measures belongs on the axis ONCE, as its
+  // title — repeating "g weight" on all eight tick labels said the same thing
+  // eight times and crowded out the numbers. The ticks now carry the bare unit,
+  // matching the left axis's "kcal", and the calibrated-vs-generic distinction
+  // this label exists to make (see the comment above: a fitted density is a
+  // scale-weight response, not fat) is stated in the title and the tooltip.
+  const massAxisTitle = `${massLabel} (g)`;
 
   // Levels the whole Mifflin curve onto the fit's own resting-equivalent
   // expenditure, measured at the latest weigh-in — the one day where the
@@ -1991,8 +2014,8 @@ function renderWellnessEnergyBalanceChart(entries) {
 
   const maxDeficit = Math.max(0, ...values.map((v) => -v));
   const maxSurplus = Math.max(0, ...values);
-  const yMin = -niceAxisMax(Math.max(maxDeficit * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL));
-  const yMax = niceAxisMax(Math.max(maxSurplus * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL));
+  const yMin = -niceAxisBound(Math.max(maxDeficit * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL));
+  const yMax = niceAxisBound(Math.max(maxSurplus * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL));
 
   wellnessEnergyBalanceChart = upsertChart(wellnessEnergyBalanceChart, ctx, {
     data: {
@@ -2067,7 +2090,8 @@ function renderWellnessEnergyBalanceChart(entries) {
           position: 'right',
           afterFit: fixTrendYAxisWidth,
           grid: { drawOnChartArea: false },
-          ticks: { includeBounds: false, callback: maskedUnitTick(axisUnit) },
+          title: { display: true, text: massAxisTitle, color: Chart.defaults.color, font: { size: 11 } },
+          ticks: { includeBounds: false, callback: maskedUnitTick('g') },
         },
       },
     },

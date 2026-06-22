@@ -95,6 +95,7 @@ function setupTransactionSorting() {
 
     th.textContent = '';
     th.append(label, indicator);
+    th.setAttribute('tabindex', '0');
 
     th.addEventListener('click', () => {
       const key = th.dataset.sort;
@@ -108,6 +109,12 @@ function setupTransactionSorting() {
       currentPage = 1;
       selectedRows.clear();
       renderTransactions();
+    });
+    th.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        th.click();
+      }
     });
   });
 }
@@ -243,6 +250,13 @@ function renderTransactions() {
 
   const tbody = document.getElementById('transactions-body');
   tbody.innerHTML = '';
+
+  if (pageItems.length === 0) {
+    const message = allTransactions.length === 0
+      ? 'No transactions yet — add your first one above.'
+      : 'No transactions match your search/filter.';
+    tbody.appendChild(renderEmptyRow(8, message));
+  }
 
   pageItems.forEach((t) => {
     const tr = document.createElement('tr');

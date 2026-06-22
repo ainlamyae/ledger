@@ -113,6 +113,7 @@ function setupTimesheetSorting() {
   indicator.className = 'sort-indicator';
   th.textContent = '';
   th.append(label, indicator);
+  th.setAttribute('tabindex', '0');
 
   const updateIndicator = () => { indicator.textContent = tsSort.dir === 1 ? ' ▲' : ' ▼'; };
   updateIndicator();
@@ -121,6 +122,12 @@ function setupTimesheetSorting() {
     tsSort.dir *= -1;
     updateIndicator();
     renderTimesheetList();
+  });
+  th.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      th.click();
+    }
   });
 }
 
@@ -214,7 +221,15 @@ function renderTimesheetList() {
   const tbody = document.getElementById('timesheet-body');
   tbody.innerHTML = '';
 
-  getFilteredTimeEntries().forEach((e) => {
+  const entries = getFilteredTimeEntries();
+  if (entries.length === 0) {
+    const message = allTimeEntries.length === 0
+      ? 'No time logged yet — click "Log a Day" above.'
+      : 'No entries in this date range.';
+    tbody.appendChild(renderEmptyRow(8, message));
+  }
+
+  entries.forEach((e) => {
     const tr = document.createElement('tr');
     const weekend = isWeekend(e.date);
 

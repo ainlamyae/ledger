@@ -427,11 +427,6 @@ function renderReconciliationStatus(missingAmount) {
     ? '✅ Reconciled'
     : `⚠️ Reconciliation off by ${formatCurrency(missingAmount)} — check account balances or look for a missing transaction`;
   el.classList.toggle('warning', !isReconciled);
-
-  const card = document.getElementById('reconciliation-value');
-  card.textContent = isReconciled ? '✅' : formatCurrency(missingAmount);
-  card.classList.toggle('income', isReconciled);
-  card.classList.toggle('expense', !isReconciled);
 }
 
 async function refreshNetWorth() {
@@ -495,7 +490,11 @@ async function loadDashboard(forceRefresh = false) {
       renderReconciliationStatus(report.missingAmount);
       setLastUpdated();
     }),
-    initTransactions(forceRefresh),
+    initTransactions(forceRefresh).then(() => {
+      renderCommonPayeeChart(allTransactions);
+      renderCommonDescriptionChart(allTransactions);
+      renderPayeeSpendChart(allTransactions);
+    }),
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
   ]);

@@ -59,7 +59,7 @@ function renderIncomeExpenseChart(months) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, afterFit: fixTrendYAxisWidth } },
+      scales: { y: { beginAtZero: true, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } } },
     },
   });
 }
@@ -97,7 +97,7 @@ function renderExpenseBreakdownTrendChart(months) {
       plugins: { legend: { display: false } },
       scales: {
         x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, max: yMax, afterFit: fixTrendYAxisWidth },
+        y: { stacked: true, beginAtZero: true, max: yMax, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } },
       },
     },
   });
@@ -173,7 +173,7 @@ function renderSpendingTrendChart(categories, totalMonths) {
       },
       scales: {
         x: { ticks: { display: false }, border: { width: 3 } },
-        y: { beginAtZero: true },
+        y: { beginAtZero: true, ticks: { callback: (value) => formatCurrency(value) } },
       },
     },
   });
@@ -674,7 +674,7 @@ function renderSavingsTrendChart(months) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: false, afterFit: fixTrendYAxisWidth } },
+      scales: { y: { beginAtZero: false, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } } },
     },
   });
 }
@@ -769,7 +769,7 @@ function renderTopSumsChart(chart, canvasId, entries) {
       },
       scales: {
         x: { ticks: { autoSkip: false, maxRotation: 60, minRotation: 60 } },
-        y: { beginAtZero: true },
+        y: { beginAtZero: true, ticks: { callback: (value) => formatCurrency(value) } },
       },
     },
   });

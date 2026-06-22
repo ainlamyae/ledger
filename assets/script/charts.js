@@ -494,12 +494,16 @@ function buildDistribution(values, binCount, formatLabel) {
 
   const labels = counts.map((_, i) => formatLabel(min + binWidth * (i + 0.5)));
 
-  const peakCount = Math.max(...counts);
+  // Bars are shown as a % of all days rather than raw counts, so the curve
+  // overlay is scaled to the same peak percentage to keep its shape lined up.
+  const percentages = counts.map((c) => (c / values.length) * 100);
+
+  const peakPercentage = Math.max(...percentages);
   const normalPdf = (x) => (sd ? (1 / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-((x - avg) ** 2) / (2 * sd ** 2)) : 0);
   const peakPdf = normalPdf(avg) || 1;
-  const curve = counts.map((_, i) => (normalPdf(min + binWidth * (i + 0.5)) / peakPdf) * peakCount);
+  const curve = counts.map((_, i) => (normalPdf(min + binWidth * (i + 0.5)) / peakPdf) * peakPercentage);
 
-  return { labels, counts, curve };
+  return { labels, counts, percentages, curve };
 }
 
 // Shared across all 4 Work Pattern Analysis bar charts so bars look the same
@@ -528,7 +532,7 @@ function renderDistributionChart(canvasId, dist) {
     data: {
       labels: dist.labels,
       datasets: [
-        { type: 'bar', label: 'Days', data: dist.counts, backgroundColor: 'rgba(59, 130, 246, .5)', order: 2, maxBarThickness: WORK_PATTERN_BAR_THICKNESS },
+        { type: 'bar', label: 'Days', data: dist.percentages, counts: dist.counts, backgroundColor: 'rgba(59, 130, 246, .5)', order: 2, maxBarThickness: WORK_PATTERN_BAR_THICKNESS },
         { type: 'line', label: 'Normal Distribution', data: dist.curve, borderColor: '#dc2626', pointRadius: 0, tension: .4, order: 1 },
       ],
     },
@@ -537,11 +541,14 @@ function renderDistributionChart(canvasId, dist) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { filter: (item) => item.dataset.label === 'Days', callbacks: { label: (item) => `${item.raw} day(s)` } },
+        tooltip: {
+          filter: (item) => item.dataset.label === 'Days',
+          callbacks: { label: (item) => `${item.dataset.counts[item.dataIndex]} day(s) (${item.raw.toFixed(1)}%)` },
+        },
       },
       scales: {
         x: { afterFit: fixWorkPatternXAxisHeight },
-        y: { beginAtZero: true, ticks: { precision: 0 } },
+        y: { beginAtZero: true, ticks: { callback: (value) => `${value}%` } },
       },
     },
   });
@@ -670,5 +677,128 @@ function renderSavingsTrendChart(months) {
       scales: { y: { beginAtZero: false, afterFit: fixTrendYAxisWidth } },
     },
   });
+}
+
+const COMMON_CHART_LIMIT = 25;
+
+// Counts how many transactions share each value of `field`, ignoring blanks,
+// and returns the top N as {label, count} sorted highest first.
+function topValueCounts(transactions, field, limit) {
+  const counts = new Map();
+  transactions.forEach((t) => {
+    const value = t[field];
+    if (!value) return;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  });
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([label, count]) => ({ label, count }));
+}
+
+// Vertical bar chart shared by the Common Payees / Common Expense
+// Descriptions panels — both just show record counts per value, sized to
+// match the other trend charts' chart-box (labels rotate to fit up to 50
+// bars in that same width).
+function renderTopCountsChart(chart, canvasId, entries) {
+  const ctx = document.getElementById(canvasId);
+  if (chart) chart.destroy();
+  if (entries.length === 0) return null;
+
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: entries.map((e) => e.label),
+      datasets: [{ label: 'Records', data: entries.map((e) => e.count), backgroundColor: '#3b82f6' }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { autoSkip: false, maxRotation: 60, minRotation: 60 } },
+        y: { beginAtZero: true, ticks: { precision: 0 } },
+      },
+    },
+  });
+}
+
+// Sums each transaction's amount per value of `field`, ignoring blanks, and
+// returns the top N as {label, total} ranked by spend magnitude (largest
+// absolute total first).
+function topValueSums(transactions, field, limit) {
+  const sums = new Map();
+  transactions.forEach((t) => {
+    const value = t[field];
+    if (!value) return;
+    sums.set(value, (sums.get(value) || 0) + t.amount);
+  });
+
+  return [...sums.entries()]
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .slice(0, limit)
+    .map(([label, total]) => ({ label, total }));
+}
+
+// Vertical bar chart of total spend per value, sized to match the other
+// trend charts' chart-box like renderTopCountsChart. Bars use the absolute
+// total so expense totals (negative sums) still stand upright instead of
+// hanging below the axis.
+function renderTopSumsChart(chart, canvasId, entries) {
+  const ctx = document.getElementById(canvasId);
+  if (chart) chart.destroy();
+  if (entries.length === 0) return null;
+
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: entries.map((e) => e.label),
+      datasets: [{
+        label: 'Total',
+        data: entries.map((e) => Math.abs(e.total)),
+        backgroundColor: entries.map((e) => (e.total >= 0 ? '#16a34a' : '#dc2626')),
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (item) => formatCurrency(item.raw) } },
+      },
+      scales: {
+        x: { ticks: { autoSkip: false, maxRotation: 60, minRotation: 60 } },
+        y: { beginAtZero: true },
+      },
+    },
+  });
+}
+
+function isNotIncome(t) {
+  return t.category !== 'Income';
+}
+
+let commonPayeeChart = null;
+
+function renderCommonPayeeChart(transactions) {
+  commonPayeeChart = renderTopCountsChart(commonPayeeChart, 'common-payee-chart',
+    topValueCounts(transactions.filter(isNotIncome), 'payee', COMMON_CHART_LIMIT));
+}
+
+let commonDescriptionChart = null;
+
+function renderCommonDescriptionChart(transactions) {
+  const expenses = transactions.filter((t) => t.amount < 0 && isNotIncome(t));
+  commonDescriptionChart = renderTopCountsChart(commonDescriptionChart, 'common-description-chart',
+    topValueCounts(expenses, 'description', COMMON_CHART_LIMIT));
+}
+
+let payeeSpendChart = null;
+
+function renderPayeeSpendChart(transactions) {
+  const expenses = transactions.filter((t) => t.amount < 0 && isNotIncome(t));
+  payeeSpendChart = renderTopSumsChart(payeeSpendChart, 'payee-spend-chart',
+    topValueSums(expenses, 'payee', COMMON_CHART_LIMIT));
 }
 

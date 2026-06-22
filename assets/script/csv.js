@@ -1,4 +1,4 @@
-const CSV_HEADER = ['Date', 'Account', 'Payee', 'Description', 'Amount', 'Category'];
+const CSV_HEADER = ['Date', 'Account', 'Payee', 'Category', 'Amount', 'Description'];
 
 let csvListenersAttached = false;
 let exportFilterCount = 0;
@@ -238,7 +238,7 @@ function renderExportPreview() {
 
   matches.forEach((t) => {
     const tr = document.createElement('tr');
-    [t.date, t.account, t.payee, t.description, t.category].forEach((value) => {
+    [t.date, t.account, t.payee, t.category, t.description].forEach((value) => {
       const td = document.createElement('td');
       td.textContent = value;
       tr.appendChild(td);
@@ -260,7 +260,7 @@ function renderExportPreview() {
 
 function exportTransactionsCSV() {
   const rows = getMatchingExportTransactions()
-    .map((t) => [t.date, t.account, t.payee, t.description, t.amount, t.category]);
+    .map((t) => [t.date, t.account, t.payee, t.category, t.amount, t.description]);
 
   if (rows.length === 0) {
     alert('No transactions match the selected filters.');
@@ -337,7 +337,7 @@ async function importTransactionsCSV(file) {
 
   const values = dataRows
     .filter((r) => r.length >= 6 && r[0])
-    .map((r) => [r[0], r[1], r[2], r[3], Number(r[4]) || 0, r[5]]);
+    .map((r) => [r[0], r[1], r[2], r[3], r[5], Number(r[4]) || 0]);
 
   if (!values.length) {
     alert('No valid transaction rows found in the CSV.');

@@ -46,6 +46,17 @@ body,
     transition: background-color .2s ease, color .2s ease, border-color .2s ease;
 }
 
+:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.panel h2:focus-visible,
+th.sortable:focus-visible {
+    outline-offset: -1px;
+    border-radius: 4px;
+}
+
 html {
     font-size: 15px;
     scroll-behavior: smooth;
@@ -506,7 +517,7 @@ kbd {
 }
 
 .panel-group {
-    border: 1px solid #000;
+    border: 1px solid var(--color-border);
     border-radius: 12px;
     padding: .6rem;
     display: flex;
@@ -701,6 +712,13 @@ td {
 
 th {
     color: var(--color-text-muted);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 1.5rem .5rem;
+    color: var(--color-text-muted);
+    font-style: italic;
 }
 
 th.sortable {

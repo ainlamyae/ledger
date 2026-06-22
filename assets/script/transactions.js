@@ -70,6 +70,9 @@ function setupBulkActions() {
   });
 
   document.getElementById('tx-bulk-delete-btn').addEventListener('click', bulkDeleteTransactions);
+  document.getElementById('tx-bulk-edit-btn').addEventListener('click', openBulkEditForm);
+  document.getElementById('tx-bulk-edit-cancel-btn').addEventListener('click', closeBulkEditForm);
+  document.getElementById('tx-bulk-edit-form').addEventListener('submit', submitBulkEditForm);
 }
 
 function updateBulkActionsUI() {
@@ -77,10 +80,9 @@ function updateBulkActionsUI() {
   const selected = allTransactions.filter((t) => selectedRows.has(t.row));
 
   bar.hidden = selected.length === 0;
-  if (selected.length > 0) {
-    const total = selected.reduce((sum, t) => sum + t.amount, 0);
-    document.getElementById('tx-bulk-summary').textContent = `${selected.length} selected — total ${formatCurrency(total)}`;
-  }
+  const total = selected.reduce((sum, t) => sum + t.amount, 0);
+  document.getElementById('tx-bulk-summary').textContent =
+    selected.length > 0 ? `${selected.length} selected — total ${formatCurrency(total)}` : '';
 }
 
 function setupTransactionSorting() {
@@ -425,6 +427,108 @@ async function submitTransactionForm(event) {
     const errorEl = document.getElementById('tx-form-error');
     errorEl.textContent = err.message;
     errorEl.hidden = false;
+  }
+}
+
+// A field is prefilled when every selected transaction shares the same
+// value for it; otherwise it's left blank, meaning "leave unchanged" when
+// submitBulkEditForm reads it back.
+function sharedFieldValue(selected, field) {
+  const first = selected[0][field];
+  return selected.every((t) => t[field] === first) ? first : '';
+}
+
+function openBulkEditForm() {
+  const selected = allTransactions.filter((t) => selectedRows.has(t.row));
+  if (selected.length === 0) return;
+
+  document.getElementById('tx-bulk-date').value = sharedFieldValue(selected, 'date');
+  document.getElementById('tx-bulk-payee').value = sharedFieldValue(selected, 'payee');
+  document.getElementById('tx-bulk-description').value = sharedFieldValue(selected, 'description');
+  document.getElementById('tx-bulk-category').value = sharedFieldValue(selected, 'category');
+
+  const sharedAmount = selected.every((t) => t.amount === selected[0].amount) ? selected[0].amount : '';
+  document.getElementById('tx-bulk-amount').value = sharedAmount;
+
+  const accountSelect = document.getElementById('tx-bulk-account');
+  const sharedAccount = sharedFieldValue(selected, 'account');
+  populateSelect(accountSelect, accountOptions, sharedAccount || undefined);
+  accountSelect.insertAdjacentHTML('afterbegin', '<option value="">— Leave unchanged —</option>');
+  if (!sharedAccount) accountSelect.value = '';
+
+  document.getElementById('tx-bulk-edit-form-error').hidden = true;
+  document.getElementById('tx-bulk-edit-modal').hidden = false;
+}
+
+function closeBulkEditForm() {
+  document.getElementById('tx-bulk-edit-modal').hidden = true;
+}
+
+async function submitBulkEditForm(event) {
+  event.preventDefault();
+
+  const errorEl = document.getElementById('tx-bulk-edit-form-error');
+  const patch = {};
+
+  const date = document.getElementById('tx-bulk-date').value;
+  if (date) patch.date = date;
+  const account = document.getElementById('tx-bulk-account').value;
+  if (account) patch.account = account;
+  const payee = document.getElementById('tx-bulk-payee').value;
+  if (payee) patch.payee = payee;
+  const description = document.getElementById('tx-bulk-description').value;
+  if (description) patch.description = description;
+  const category = document.getElementById('tx-bulk-category').value;
+  if (category) patch.category = category;
+
+  const amountInput = document.getElementById('tx-bulk-amount').value;
+  if (amountInput) {
+    const amount = evaluateNumberExpression(amountInput);
+    if (amount === null) {
+      errorEl.textContent = 'Amount must be a number or a simple expression, e.g. =-9.97-1.30';
+      errorEl.hidden = false;
+      return;
+    }
+    patch.amount = amount;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    errorEl.textContent = 'Change at least one field.';
+    errorEl.hidden = false;
+    return;
+  }
+
+  const selected = allTransactions.filter((t) => selectedRows.has(t.row));
+  const snapshots = selected.map((t) => ({ ...t }));
+
+  try {
+    await Promise.all(selected.map((t) => {
+      const merged = { ...t, ...patch };
+      return updateValues(`${CONFIG.SHEETS.TRANSACTIONS}!A${t.row}:F${t.row}`,
+        [[merged.date, merged.account, merged.payee, merged.description, merged.amount, merged.category]]);
+    }));
+
+    selectedRows.clear();
+    await refreshTransactions(true);
+    closeBulkEditForm();
+    showUndoToast(`${selected.length} transaction(s) updated.`, () => restoreBulkEdit(snapshots));
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.hidden = false;
+  }
+}
+
+// Unlike restoreTransactions (which re-appends deleted rows at the end since
+// their original rows are gone), a bulk edit's rows still exist — restoring
+// just means writing each snapshot's values back in place.
+async function restoreBulkEdit(snapshots) {
+  try {
+    await Promise.all(snapshots.map((t) =>
+      updateValues(`${CONFIG.SHEETS.TRANSACTIONS}!A${t.row}:F${t.row}`,
+        [[t.date, t.account, t.payee, t.description, t.amount, t.category]])));
+    await refreshTransactions(true);
+  } catch (err) {
+    alert(`Failed to restore: ${err.message}`);
   }
 }
 

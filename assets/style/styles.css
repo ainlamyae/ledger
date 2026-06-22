@@ -622,6 +622,10 @@ kbd {
     margin-bottom: 1rem;
 }
 
+.panel-actions[hidden] {
+    display: none;
+}
+
 .filters {
     display: flex;
     gap: .5rem;
@@ -853,6 +857,7 @@ td .btn {
 }
 
 #tx-form label,
+#tx-bulk-edit-form label,
 #account-form label,
 #timesheet-form label {
     display: block;
@@ -863,6 +868,8 @@ td .btn {
 
 #tx-form input,
 #tx-form select,
+#tx-bulk-edit-form input,
+#tx-bulk-edit-form select,
 #account-form input,
 #account-form select,
 #timesheet-form input,
@@ -880,6 +887,7 @@ td .btn {
 }
 
 #tx-form select,
+#tx-bulk-edit-form select,
 #account-form select,
 #timesheet-form select {
     width: auto;

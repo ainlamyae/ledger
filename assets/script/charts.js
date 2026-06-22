@@ -24,6 +24,17 @@ function fixTrendYAxisWidth(scale) {
   scale.width = TREND_Y_AXIS_WIDTH;
 }
 
+// Rounds a computed axis max up to the nearest "nice" number (1/2/5 times a
+// power of ten, e.g. 4327 -> 5000) so explicit y-axis caps don't show an
+// arbitrary value with no clean gridlines.
+function niceAxisMax(value) {
+  if (value <= 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const residual = value / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude;
+}
+
 let incomeExpenseChart = null;
 
 function renderIncomeExpenseChart(months) {
@@ -68,7 +79,7 @@ function renderExpenseBreakdownTrendChart(months) {
   // outlier month doesn't squash every other month's bars into a sliver.
   const totals = months.map((m) => m.categories.reduce((sum, c) => sum + c.value, 0));
   const sortedTotals = [...totals].sort((a, b) => b - a);
-  const yMax = (sortedTotals[1] ?? sortedTotals[0]) * 1.2;
+  const yMax = niceAxisMax((sortedTotals[1] ?? sortedTotals[0]) * 1.2);
 
   expenseBreakdownTrendChart = new Chart(ctx, {
     type: 'bar',

@@ -200,8 +200,6 @@
         </div>
     </div>
 
-    <div style="height:.5rem"></div>
-
     <div class="panel">
         <h2>Spending Breakdown by Type</h2>
 
@@ -361,8 +359,6 @@
         </div>
     </div>
 
-    <div style="height:.5rem"></div>
-
     <div class="panel">
         <h2>Lifelong Trend</h2>
 
@@ -400,14 +396,9 @@
             <h2>Transactions</h2>
 
             <div class="panel-actions">
-                <button id="import-csv-btn" class="btn">Import CSV</button>
+                <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
                 <input type="file" id="import-csv-input" accept=".csv" hidden>
                 <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
-            </div>
-
-            <div class="panel-actions" id="tx-bulk-actions" hidden>
-                <span id="tx-bulk-summary"></span>
-                <button id="tx-bulk-delete-btn" class="btn">🗑️ Delete Selected</button>
             </div>
 
             <div class="filters">
@@ -432,6 +423,12 @@
 
                     <tbody id="transactions-body"></tbody>
                 </table>
+            </div>
+
+            <div class="panel-actions" id="tx-bulk-actions" hidden>
+                <span id="tx-bulk-summary"></span>
+                <button id="tx-bulk-edit-btn" class="btn" title="Edit Selected" aria-label="Edit Selected">✏️</button>
+                <button id="tx-bulk-delete-btn" class="btn" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
             </div>
 
             <div class="pagination" id="tx-pagination"></div>
@@ -660,6 +657,43 @@
             <div class="modal-actions">
                 <button type="button" id="tx-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" id="tx-save-add-btn" class="btn">Save &amp; Add Another</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="tx-bulk-edit-modal" class="modal" hidden>
+    <div class="modal-card">
+        <h2>Edit Selected Transactions</h2>
+
+        <form id="tx-bulk-edit-form">
+            <label>Date
+                <input type="date" id="tx-bulk-date">
+            </label>
+            <label>Account
+                <select id="tx-bulk-account">
+                    <option value="">— Leave unchanged —</option>
+                </select>
+            </label>
+            <label>Payee
+                <input type="text" id="tx-bulk-payee" list="tx-payee-options">
+            </label>
+            <label>Description
+                <input type="text" id="tx-bulk-description" list="tx-description-options">
+            </label>
+            <label>Amount
+                <input type="text" inputmode="decimal" id="tx-bulk-amount" placeholder="e.g. -45.50 or =-9.97-1.30">
+            </label>
+            <label>Category
+                <input type="text" id="tx-bulk-category" list="tx-category-options">
+            </label>
+
+            <p class="hint">Leave a field blank to keep each transaction's existing value.</p>
+            <p id="tx-bulk-edit-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="tx-bulk-edit-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>

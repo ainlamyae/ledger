@@ -20,6 +20,30 @@ function formatCurrency(value) {
   return privacyMode ? maskDigits(formatted) : formatted;
 }
 
+let undoToastTimer = null;
+
+// Shared by single and bulk transaction delete. Re-showing the toast before
+// the previous one's timer fires (e.g. deleting twice in quick succession)
+// clears the old timer so it can't dismiss the new toast early.
+function showUndoToast(message, onUndo) {
+  clearTimeout(undoToastTimer);
+
+  const toast = document.getElementById('undo-toast');
+  document.getElementById('undo-toast-message').textContent = message;
+
+  const btn = document.getElementById('undo-toast-btn');
+  const newBtn = btn.cloneNode(true);
+  btn.replaceWith(newBtn);
+  newBtn.addEventListener('click', () => {
+    clearTimeout(undoToastTimer);
+    toast.hidden = true;
+    onUndo();
+  });
+
+  toast.hidden = false;
+  undoToastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
+}
+
 let currentReport = null;
 
 // 'Account Balance'!D1 holds the pre-computed net worth total.
@@ -122,6 +146,43 @@ async function populateAccountMenu() {
 
   document.getElementById('account-menu-name').textContent = info.name || '';
   document.getElementById('account-menu-email').textContent = info.email || '';
+}
+
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'account-modal', 'timesheet-modal', 'shortcuts-modal'];
+
+function toggleShortcutsHelp() {
+  const modal = document.getElementById('shortcuts-modal');
+  modal.hidden = !modal.hidden;
+}
+
+// Global shortcuts. Escape always works (even while focus is inside a
+// modal's own input, e.g. typing an amount then hitting Escape to cancel);
+// the single-letter shortcuts are skipped whenever focus is in a field that
+// actually consumes typed characters, so they can't fire while searching or
+// filling out a form.
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const openModal = SHORTCUT_MODAL_IDS.map((id) => document.getElementById(id)).find((m) => !m.hidden);
+      if (openModal) openModal.hidden = true;
+      return;
+    }
+
+    const target = document.activeElement;
+    const isTyping = target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
+    if (isTyping) return;
+
+    if (e.key === '/') {
+      e.preventDefault();
+      document.getElementById('tx-search').focus();
+    } else if (e.key === 'n') {
+      openTransactionForm();
+    } else if (e.key === '?') {
+      toggleShortcutsHelp();
+    }
+  });
+
+  document.getElementById('shortcuts-close-btn').addEventListener('click', toggleShortcutsHelp);
 }
 
 function setupAccountMenu() {
@@ -606,6 +667,7 @@ window.addEventListener('load', () => {
   setupPanelToggles();
   setupThemeToggle();
   setupPrivacyToggle();
+  setupKeyboardShortcuts();
   applyChartTheme();
 
   document.getElementById('footer-year').textContent = new Date().getFullYear();

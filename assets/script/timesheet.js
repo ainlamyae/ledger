@@ -81,6 +81,13 @@ async function initTimeSheet(forceRefresh = false) {
     document.getElementById('log-today-btn').addEventListener('click', () => {
       openTimesheetForm(isoFromDate(new Date()));
     });
+    document.getElementById('timesheet-reminder-log-btn').addEventListener('click', () => {
+      openTimesheetForm(isoFromDate(new Date()));
+    });
+    document.getElementById('timesheet-reminder-enable-btn').addEventListener('click', async () => {
+      await Notification.requestPermission();
+      checkTimesheetReminder();
+    });
     document.getElementById('timesheet-cancel-btn').addEventListener('click', closeTimesheetForm);
     document.getElementById('timesheet-form').addEventListener('submit', submitTimesheetForm);
     document.getElementById('timesheet-holiday').addEventListener('change', toggleTimesheetHolidayFields);
@@ -153,6 +160,39 @@ async function refreshTimeSheet(forceRefresh = false) {
 
   setDefaultTimesheetDateRange();
   renderTimesheetList();
+  renderTimesheetDistributionCharts(allTimeEntries);
+  renderTimesheetDailyAverageChart(allTimeEntries);
+  checkTimesheetReminder();
+}
+
+// A weekday with neither a logged entry nor a holiday/day-off note for
+// today means today hasn't been logged yet — surface a banner, and (once
+// the user has opted in) a real OS notification. Browsers block requesting
+// Notification permission outside a direct user gesture, so it can only be
+// offered via the banner's own button, never automatically on load.
+function checkTimesheetReminder() {
+  const banner = document.getElementById('timesheet-reminder-banner');
+  const today = isoFromDate(new Date());
+
+  if (isWeekend(today) || allTimeEntries.some((e) => e.date === today)) {
+    banner.hidden = true;
+    return;
+  }
+
+  banner.hidden = false;
+
+  const enableBtn = document.getElementById('timesheet-reminder-enable-btn');
+  if (!('Notification' in window)) {
+    enableBtn.hidden = true;
+  } else if (Notification.permission === 'granted') {
+    enableBtn.hidden = true;
+    if (localStorage.getItem('ledger_last_reminder_notified') !== today) {
+      new Notification('Ledger', { body: "You haven't logged today's hours yet." });
+      localStorage.setItem('ledger_last_reminder_notified', today);
+    }
+  } else {
+    enableBtn.hidden = false;
+  }
 }
 
 function getFilteredTimeEntries() {

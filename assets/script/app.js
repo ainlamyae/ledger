@@ -381,7 +381,6 @@ async function loadReport(forceRefresh) {
   const missingAmount = Number(reconciliationRows[0]?.[0]) || 0;
 
   const report = {
-    month: current[0],
     income: current[1] || 0,
     expenses: current[2] || 0,
     saved: current[savedIndex] || 0,
@@ -404,12 +403,12 @@ async function loadReport(forceRefresh) {
 
 function renderSummaryCards(data) {
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
-  document.getElementById('income-label').textContent = `Income (${data.month})`;
+  document.getElementById('income-label').textContent = 'Income';
   document.getElementById('income-value').textContent = formatCurrency(data.income);
-  document.getElementById('expenses-label').textContent = `Expenses (${data.month})`;
+  document.getElementById('expenses-label').textContent = 'Expenses';
   document.getElementById('expenses-value').textContent = formatCurrency(data.expenses);
 
-  document.getElementById('cashflow-label').textContent = `Net Cash Flow (${data.month})`;
+  document.getElementById('cashflow-label').textContent = 'Net Cash Flow';
 
   const savingsEl = document.getElementById('savings-value');
   savingsEl.textContent = formatCurrency(data.saved);

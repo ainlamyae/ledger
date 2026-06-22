@@ -17,6 +17,14 @@ let authChangeHandler = () => {};
 // silent refresh (vs. an explicit signIn() click), so a failure from it can
 // be treated as "still signed out" instead of a user-facing error.
 let pendingSilent = false;
+// Access tokens expire after ~1hr with no refresh token (the implicit GIS
+// flow never issues one), so a tab left open needs its own timer to renew
+// silently before that happens — otherwise Sheets API calls start failing
+// with 401 mid-session, or the next reload has to fall back to the gate.
+let refreshTimer = null;
+// Refresh this long before actual expiry, so the new token is in place with
+// margin to spare even if the silent request itself takes a few seconds.
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 function loadStoredToken() {
   const raw = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -27,17 +35,28 @@ function loadStoredToken() {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     return null;
   }
-  return token;
+  return { token, expiresAt };
 }
 
 function storeToken(token, expiresInSeconds) {
   const expiresAt = Date.now() + expiresInSeconds * 1000;
   localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
+  scheduleTokenRefresh(expiresAt);
+}
+
+function scheduleTokenRefresh(expiresAt) {
+  clearTimeout(refreshTimer);
+  const delay = Math.max(expiresAt - Date.now() - REFRESH_BUFFER_MS, 0);
+  refreshTimer = setTimeout(() => {
+    pendingSilent = true;
+    tokenClient.requestAccessToken({ prompt: 'none' });
+  }, delay);
 }
 
 function initAuth(onAuthChange) {
   authChangeHandler = onAuthChange;
-  accessToken = loadStoredToken();
+  const stored = loadStoredToken();
+  accessToken = stored?.token || null;
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,
@@ -65,6 +84,7 @@ function initAuth(onAuthChange) {
   });
 
   if (accessToken) {
+    scheduleTokenRefresh(stored.expiresAt);
     authChangeHandler(accessToken);
     return;
   }
@@ -86,6 +106,7 @@ function signIn() {
 }
 
 function signOut() {
+  clearTimeout(refreshTimer);
   if (accessToken) {
     google.accounts.oauth2.revoke(accessToken, () => {});
   }

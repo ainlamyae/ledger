@@ -1880,7 +1880,7 @@ const ENERGY_BALANCE_AXIS_MIN_KCAL = 200;
 // Bounds on the resting expenditure implied by a calibrated fit, as a multiple of
 // the same person's Mifflin BMR. A real TDEE never sits far outside this.
 const CALIBRATED_RESTING_MIN_BMR_RATIO = 0.75;
-const CALIBRATED_RESTING_MAX_BMR_RATIO = 1.75;
+const CALIBRATED_RESTING_MAX_BMR_RATIO = 2.5;
 
 // "+320" / "-450" — the sign carries the entire meaning on this chart (a
 // deficit vs a surplus), so a positive figure is shown with an explicit + in

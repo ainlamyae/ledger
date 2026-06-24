@@ -53,14 +53,8 @@ function niceAxisMax(value) {
   return niceResidual * magnitude;
 }
 
-// Same idea as niceAxisMax but with a much finer ladder, for axes where a
-// coarse round-up wastes visible chart area. niceAxisMax steps 1 → 2 → 5 → 10,
-// so anything just past 2,000 lands on 5,000 and leaves over half the plot
-// empty: a 2,100 kcal deficit — an ordinary day of eating light — got an axis
-// twice the height of the tallest bar. These steps keep the round-up to at most
-// 25% instead of 150%, while still landing on values a reader parses at a
-// glance. Kept separate rather than widening niceAxisMax itself so the other
-// chart using that helper keeps the bounds it was tuned with.
+// Finer-grained niceAxisMax, for axes where its 1/2/5/10 ladder rounds up far
+// enough to waste most of the plot area.
 const NICE_AXIS_STEPS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 
 function niceAxisBound(value) {
@@ -577,17 +571,84 @@ function latestWeightKg(entries) {
   return weightEntries.length ? weightEntries[weightEntries.length - 1].amount : null;
 }
 
-// Protein's target can be a flat gram amount (PROTEIN_TARGET_G) or, if set,
-// a per-kg multiplier (PROTEIN_TARGET_G_PER_KG) applied to the most
-// recently logged Weight entry — e.g. 1.6 g/kg scales automatically as body
-// weight changes instead of needing to be updated by hand whenever it does.
-// The per-kg setting wins whenever it's present and a weight has been
-// logged; otherwise this falls back to the flat gram target.
+// Accepted ways of writing the g/kg band in one Settings cell: `1.6-2`,
+// `1.6~2`, `1.6 – 2`, `1.6 to 2`. A bare `1.6` is still valid and simply
+// means a band with the same figure at both ends.
+const G_PER_KG_BAND_SEPARATOR = /\s*(?:~|-|–|—|to)\s*/i;
+
+// The `1.6-2`-style single cell, parsed to {low, high} — null if it's absent
+// or holds nothing numeric. A bare `1.6` yields low === high.
+function parseGPerKgRangeCell() {
+  const raw = getSettingString('PROTEIN_TARGET_G_PER_KG', null);
+  if (raw === null) return null;
+
+  const parts = String(raw).trim().split(G_PER_KG_BAND_SEPARATOR)
+    .map(Number)
+    .filter((n) => !Number.isNaN(n) && n > 0);
+  if (parts.length === 0) return null;
+
+  return { low: parts[0], high: parts[parts.length - 1] };
+}
+
+// The protein target's g-per-kg band as {low, high} — null if none of the
+// three keys yields a usable figure, which sends getProteinTargetBandG() to
+// the flat PROTEIN_TARGET_G fallback. Either style of entry works, whichever
+// reads better in the Settings tab: the band in one cell
+// (PROTEIN_TARGET_G_PER_KG = `1.6-2`), or one end per row
+// (PROTEIN_TARGET_G_PER_KG_MIN = `1.6`, PROTEIN_TARGET_G_PER_KG_MAX = `2`).
+// The explicit _MIN/_MAX rows win per-end over the range cell, so either can
+// be overridden on its own. Whatever survives is sorted, so a band entered
+// backwards is still read as a band rather than an empty one.
+function getProteinGPerKgBand() {
+  const cell = parseGPerKgRangeCell();
+  const ends = [
+    getSetting('PROTEIN_TARGET_G_PER_KG_MIN', null) ?? cell?.low ?? null,
+    getSetting('PROTEIN_TARGET_G_PER_KG_MAX', null) ?? cell?.high ?? null,
+  ].filter((n) => n !== null);
+
+  if (ends.length === 0) return null;
+  return { low: Math.min(...ends), high: Math.max(...ends) };
+}
+
+// Protein's target is a BAND of grams per day rather than a single number,
+// because the evidence behind it is a range (e.g. 1.6–2.0 g/kg), not a point.
+// The band is that g/kg range applied to your GOAL weight (WEIGHT_GOAL_KG) —
+// not today's weight — since the point of the protein floor is to support the
+// body you're heading for; scaling it off current weight would quietly shrink
+// the target with every kg lost, exactly when protein matters most. Falls back
+// to the most recently logged weight if no goal is set, and finally to the flat
+// PROTEIN_TARGET_G (as a zero-width band) if no per-kg band is set at all, so
+// an existing flat-gram setup keeps behaving exactly as before.
+function getProteinTargetBandG(entries) {
+  const band = getProteinGPerKgBand();
+  const basisWeightKg = band !== null
+    ? (getSetting('WEIGHT_GOAL_KG', null) ?? latestWeightKg(entries))
+    : null;
+
+  if (basisWeightKg !== null) {
+    return { min: Math.round(basisWeightKg * band.low), max: Math.round(basisWeightKg * band.high) };
+  }
+
+  const flat = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  return { min: flat, max: flat };
+}
+
+// Midpoint of the band, for the places that structurally need ONE number
+// rather than a range: the calibration regression's protein centering (and
+// the projection formula fitted against it), and Protein Source Rotation's
+// per-ingredient share of the daily target.
 function getProteinTargetG(entries) {
-  const perKg = getSetting('PROTEIN_TARGET_G_PER_KG', null);
-  const weightKg = perKg !== null ? latestWeightKg(entries) : null;
-  if (weightKg !== null) return Math.round(weightKg * perKg);
-  return getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  const { min, max } = getProteinTargetBandG(entries);
+  return Math.round((min + max) / 2);
+}
+
+// "131" for a zero-width band, "131~164" otherwise — the one place the band's
+// display form is decided, so the glance tile and the Insight prompt can't
+// drift apart. The separator is a parameter because the two callers want
+// different ones: '~' reads as "to" on the tile, while the Insight prompt
+// passes a plain '-' rather than sending an unusual character to the AI.
+function formatProteinTargetBand(band, separator = '~') {
+  return band.max > band.min ? `${band.min}${separator}${band.max}` : `${band.min}`;
 }
 
 // Mifflin-St Jeor resting/basal metabolic rate (kcal/day) — the energy cost
@@ -765,19 +826,29 @@ function renderTodayGlanceCards(entries) {
   if (sleepHours !== null) sleepHours = Math.round(sleepHours * 10) / 10;
 
   const calorieTarget = getCalorieTargetKcal(entries);
-  const proteinTarget = getProteinTargetG(entries);
+  const proteinBand = getProteinTargetBandG(entries);
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
   // Which direction is "good" differs per metric: at/under target is the
   // win for Calories (a deficit target), at/over target is the win for
-  // Protein/Activity/Sleep.
+  // Activity/Sleep. Protein is the one metric judged against a RANGE — green
+  // only while it's inside the band, red both under it and over it, since the
+  // band's top end is a real ceiling and not just headroom. A zero-width band
+  // (flat PROTEIN_TARGET_G, no per-kg range set) has no inside to land in, so
+  // it keeps the at-or-over-target rule it's always had.
+  const proteinInBand = protein !== null && protein >= proteinBand.min
+    && (proteinBand.max === proteinBand.min || protein <= proteinBand.max);
+
   setTodayGlanceTile('today-calories', calories, calorieTarget, 'kcal', calories !== null && calories <= calorieTarget);
-  setTodayGlanceTile('today-protein', protein, proteinTarget, 'g', protein !== null && protein >= proteinTarget);
+  setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand);
   setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
   setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
 }
 
+// `target` is a number for the single-figure metrics and a preformatted
+// string ("131~164") for Protein's band — both interpolate identically, and
+// maskDigits masks either the same way.
 function setTodayGlanceTile(idPrefix, value, target, unit, isGood) {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'expense');
@@ -1195,12 +1266,42 @@ function renderWellnessActivityChart(entries) {
 function renderWellnessProteinChart(entries) {
   const ctx = document.getElementById('wellness-protein-chart');
 
-  const proteinTarget = getProteinTargetG(entries);
+  const band = getProteinTargetBandG(entries);
 
   const proteinEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.amount2 !== null);
   const dates = trailingDatesForCategory(proteinEntries, WELLNESS_METRICS_DAYS);
   const byDate = new Map();
   proteinEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
+
+  // One dashed line per end of the target band, with the space between them
+  // shaded — so "in range" is a region you can see a bar land inside, not a
+  // single line to be over or under. `fill: '+1'` shades from the upper line
+  // down to the NEXT dataset (the lower line), so the pair must stay adjacent
+  // and in this order. A zero-width band (flat PROTEIN_TARGET_G, no per-kg
+  // range set) collapses back to the single dashed line this chart had before.
+  const targetLine = (value, label, extra = {}) => ({
+    type: 'line',
+    label,
+    data: new Array(dates.length).fill(value),
+    borderColor: '#dc2626',
+    borderDash: [4, 4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    tension: 0,
+    isTargetLine: true,
+    order: 1,
+    ...extra,
+  });
+
+  const targetDatasets = band.max > band.min
+    ? [
+      targetLine(band.max, `${band.max} g upper target`, {
+        fill: '+1',
+        backgroundColor: 'rgba(220, 38, 38, 0.10)',
+      }),
+      targetLine(band.min, `${band.min} g target floor`),
+    ]
+    : [targetLine(band.min, `${band.min} g target`)];
 
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
     data: {
@@ -1213,16 +1314,7 @@ function renderWellnessProteinChart(entries) {
           backgroundColor: '#0ea5e9',
           order: 2,
         },
-        {
-          type: 'line',
-          label: `${proteinTarget} g target`,
-          data: new Array(dates.length).fill(proteinTarget),
-          borderColor: '#dc2626',
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0,
-          order: 1,
-        },
+        ...targetDatasets,
       ],
     },
     options: {
@@ -1230,7 +1322,14 @@ function renderWellnessProteinChart(entries) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
+        tooltip: {
+          // The band's two lines are the same constant on every day — hovering
+          // a bar should report that day's protein, not repeat the target
+          // twice alongside it (the Physical Activity chart filters its own
+          // fixed target line out of the tooltip for the same reason).
+          filter: (item) => !item.dataset.isTargetLine,
+          callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel },
+        },
       },
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
@@ -1883,6 +1982,11 @@ function carryForwardWeightByDate(weightByDate, dates) {
 // the plot area.
 const ENERGY_BALANCE_AXIS_MIN_KCAL = 200;
 
+// Bounds on the resting expenditure implied by a calibrated fit, as a multiple of
+// the same person's Mifflin BMR. A real TDEE never sits far outside this.
+const CALIBRATED_RESTING_MIN_BMR_RATIO = 0.75;
+const CALIBRATED_RESTING_MAX_BMR_RATIO = 2.5;
+
 // "+320" / "-450" — the sign carries the entire meaning on this chart (a
 // deficit vs a surplus), so a positive figure is shown with an explicit + in
 // the tooltip rather than bare.
@@ -1977,21 +2081,24 @@ function renderWellnessEnergyBalanceChart(entries) {
   const gains = getCalibratedGains();
   const kcalPerKg = gains ? kcalPerKgFat() : GENERIC_KCAL_PER_KG_FAT;
   const massLabel = gains ? 'Expected scale weight' : 'Expected fat';
-  // Which quantity the right axis measures belongs on the axis ONCE, as its
-  // title — repeating "g weight" on all eight tick labels said the same thing
-  // eight times and crowded out the numbers. The ticks now carry the bare unit,
-  // matching the left axis's "kcal", and the calibrated-vs-generic distinction
-  // this label exists to make (see the comment above: a fitted density is a
-  // scale-weight response, not fat) is stated in the title and the tooltip.
-  const massAxisTitle = `${massLabel} (g)`;
 
   // Levels the whole Mifflin curve onto the fit's own resting-equivalent
   // expenditure, measured at the latest weigh-in — the one day where the
   // calibrated maintenance is exactly target − β₀·K.
+  // beta0 * kcalPerKg converts the fit's whole unexplained drift into kcal/day, so
+  // a noisy fit can imply a resting expenditure no body can have — a -195 g/day
+  // drift at 34,986 kcal/kg adds 6,822 kcal and put maintenance near 8,600,
+  // rendering every day as a 5,000+ kcal deficit. Outside a plausible multiple of
+  // Mifflin the offset is dropped and the plain curve is used.
   const latestWeight = latestWeightKg(entries);
-  const maintenanceOffset = (gains && latestWeight !== null)
-    ? (getCalorieTargetKcal(entries) - gains.beta0 * kcalPerKg) - mifflinStJeorBmr(latestWeight, heightCm, age, sex)
-    : 0;
+  const bmrAtLatest = latestWeight !== null ? mifflinStJeorBmr(latestWeight, heightCm, age, sex) : null;
+  const calibratedResting = (gains && bmrAtLatest !== null)
+    ? getCalorieTargetKcal(entries) - gains.beta0 * kcalPerKg
+    : null;
+  const restingIsPlausible = calibratedResting !== null
+    && calibratedResting >= bmrAtLatest * CALIBRATED_RESTING_MIN_BMR_RATIO
+    && calibratedResting <= bmrAtLatest * CALIBRATED_RESTING_MAX_BMR_RATIO;
+  const maintenanceOffset = restingIsPlausible ? calibratedResting - bmrAtLatest : 0;
 
   const detailByDate = new Map();
 
@@ -2090,7 +2197,6 @@ function renderWellnessEnergyBalanceChart(entries) {
           position: 'right',
           afterFit: fixTrendYAxisWidth,
           grid: { drawOnChartArea: false },
-          title: { display: true, text: massAxisTitle, color: Chart.defaults.color, font: { size: 11 } },
           ticks: { includeBounds: false, callback: maskedUnitTick('g') },
         },
       },

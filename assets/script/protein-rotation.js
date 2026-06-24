@@ -54,6 +54,10 @@ function computeProteinRotationRows(from, to) {
   const lookbackDays = datesInRange(from, to).length;
   const sources = trackedProteinSources();
   const proteinByName = actualProteinEatenBySource(from, to);
+  // Midpoint of the target band: a share-of-target split needs one
+  // denominator, and the middle of the band is the fairest one to divide up
+  // (a floor-based split would under-target every source, a top-end one would
+  // over-target every source).
   const dailyProteinTarget = getProteinTargetG(getDatedWellnessEntries());
   const weeklyProteinTarget = dailyProteinTarget * 7;
   // Total protein target across the whole lookback window (not per

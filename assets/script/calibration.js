@@ -1,9 +1,6 @@
-// Weight Trend & Forecast's "Calibrate" flow: fits calcProjection()'s
-// generic energy-balance formula (charts.js) to the user's OWN weigh-in/
-// calorie/activity/sleep history via weighted least squares, then saves the
-// resulting gains to the Settings tab so calcProjection() picks them up via
-// getCalibratedGains(). Never runs automatically — a user who doesn't click
-// Calibrate keeps the generic formula exactly as-is.
+// Calibrate flow: fits calcProjection()'s energy-balance formula (charts.js) to
+// the user's own Weight/Calories/Activity/Sleep history by weighted least
+// squares and saves the gains to the Settings tab. User-triggered only.
 
 const PROJ_CALIBRATION_MIN_SAMPLES = 6;
 const PROJ_CALIBRATION_MIN_CALORIE_COVERAGE = 0.5;
@@ -14,12 +11,8 @@ const PROJ_CALIBRATION_MIN_CALORIE_STD_DEV = 100;
 // real physiological signal.
 const PROJ_CALIBRATION_MIN_KCAL_PER_KG = 1500;
 const PROJ_CALIBRATION_MAX_KCAL_PER_KG = 20000;
-// Warn-only band: 7,700 kcal/kg (pure fat) is a ceiling, not a norm — real
-// short-window weigh-in data is often dominated by water/glycogen shifts
-// (glycogen depletion drags several kg of water with it at near-zero kcal
-// cost), which can drag the fitted energy density well below 7,700 without
-// the fit itself being unreliable. Outside this band is unusual enough to
-// flag, not implausible enough to block.
+// Warn-only band. Short weigh-in windows are dominated by water/glycogen, which
+// can pull the fitted density well below 7,700 without the fit being wrong.
 const PROJ_CALIBRATION_TYPICAL_MIN_KCAL_PER_KG = 5000;
 const PROJ_CALIBRATION_TYPICAL_MAX_KCAL_PER_KG = 9500;
 const PROJ_CALIBRATION_MIN_R2 = 0.15;
@@ -54,23 +47,8 @@ function initCalibrationPanel() {
   document.getElementById('calibration-reset-btn').addEventListener('click', resetCalibration);
 }
 
-// Health Metrics' "which formula am I looking at" toggle. Everything
-// calibration-dependent funnels through charts.js's getCalibratedGains(), so
-// flipping one flag switches the whole section between the calibrated view and
-// the generic one — the Weight Trend & Forecast slope/ETA, the calculated
-// calorie target (and with it the Caloric Intake target line and the Calories
-// Today tile), and Wellness Insight's trajectory/energy-density lines. It
-// writes nothing to the Settings tab: this is a display switch for comparing
-// the two, not an edit to the saved fit, so it can't damage a calibration and
-// resets to calibrated on reload.
-//
-// Calorie Deficit & Fat Loss follows it too, and relabels its right axis when
-// it does — the fitted density measures scale weight rather than fat, so that
-// axis means a different thing in each view (see
-// renderWellnessEnergyBalanceChart). Body Composition Change is the one chart
-// that stays put in both: the fit has no composition parameter to substitute
-// (it's an energy model; Forbes/Deurenberg are anthropometric), and it's the
-// measured-magnitude reference the predictive charts get compared against.
+// Calibrated/generic view switch. Display-only: flips the flag
+// getCalibratedGains() reads, writes nothing, and resets on reload.
 function initFormulaToggle() {
   const btn = document.getElementById('formula-toggle-btn');
 
@@ -78,11 +56,7 @@ function initFormulaToggle() {
     useCalibratedFormula = !useCalibratedFormula;
     refreshFormulaToggle();
 
-    // Re-render straight from the already-loaded entries rather than going
-    // through loadDashboard — the toggle changes only how these numbers are
-    // computed, not what data they're computed from, so there's nothing to
-    // re-fetch. renderWellnessCharts covers the projection chart, the target
-    // lines, and the Today at a glance tiles in one call.
+    // Same data, different formula — re-render without re-fetching.
     renderWellnessCharts(getDatedWellnessEntries());
     renderInsightDataPreview(getInsightDateRange());
   });
@@ -90,14 +64,8 @@ function initFormulaToggle() {
   refreshFormulaToggle();
 }
 
-// Label reports the ACTIVE view, so the button doubles as a status readout;
-// the title says what clicking will do.
-//
-// The no-saved-fit state gets its OWN label rather than reusing the plain
-// "Generic formula" one: with nothing on file the button is disabled, and a
-// disabled button reading exactly what the enabled generic view reads is
-// indistinguishable from "you toggled to generic and it won't toggle back."
-// Naming the reason inline is what makes a dead button legible.
+// Label reports the active view; the no-saved-fit state gets its own label so a
+// disabled button doesn't read identically to the enabled generic one.
 function refreshFormulaToggle() {
   const btn = document.getElementById('formula-toggle-btn');
   const hasSavedFit = readSavedCalibratedGains() !== null;
@@ -144,13 +112,9 @@ function closeCalibrationModal() {
   document.getElementById('calibration-modal').hidden = true;
 }
 
-// Collapses same-day Weight entries (averaged), pairs up consecutive
-// weigh-ins into intervals, and computes each interval's average
-// calories/activity/sleep using the exact same day-with-a-log averaging
-// convention calcProjection() uses (charts.js's avg()) — training and
-// projection must agree on what "average calories" means, or the fitted
-// coefficients end up calibrated against a quantity calcProjection() never
-// actually feeds them.
+// Averages same-day Weight entries, pairs consecutive weigh-ins into intervals,
+// and averages each interval's habits with charts.js's avg() — training and
+// projection must agree on what "average calories" means.
 function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
   const weightSums = new Map();
   const caloriesByDate = new Map();
@@ -253,17 +217,10 @@ function solveLinearSystem(A, b) {
   return M.map((row, i) => row[n] / row[i]);
 }
 
-// Weighted least squares (weight = days, capped, so one abnormally long gap
-// can't dominate the fit) of:
+// Weighted least squares (weight = interval days, capped) of:
 //   ratePerDay ≈ β0 + β1·(avgCalories−calorieTarget) + β2·avgActivityKcal + β3·(avgSleepHours−sleepTarget) + β4·(avgProteinG−proteinTarget)
-// avgActivityKcal (not raw activity minutes) so this term is in the same
-// energy units as avgCalories — β2 then means the same thing β1 does, just
-// for calories burned instead of eaten, rather than requiring a separate
-// minutes-to-kcal conversion bolted on afterward for display purposes only.
-// Centering calories/sleep/protein on the user's existing target settings
-// makes β0 a clean "baseline kg/day drift my logged habits don't explain"
-// term (adaptive thermogenesis / intake under-reporting / noise) —
-// something the generic formula has no provision for at all.
+// Activity is in kcal, not minutes, so β2 shares β1's units. Centering on the
+// user's targets makes β0 the baseline drift the logged habits don't explain.
 function fitWeightedOLS(samples, calorieTarget, sleepTarget, proteinTarget) {
   const X = samples.map((s) => [1, s.avgCalories - calorieTarget, s.avgActivityKcal, s.avgSleepHours - sleepTarget, s.avgProteinG - proteinTarget]);
   const y = samples.map((s) => s.ratePerDay);
@@ -362,12 +319,8 @@ function runCalibration() {
   }
 
   const effectiveKcalPerKg = fit.betaCal > 0 ? Math.round(1 / fit.betaCal) : null;
-  // betaAct is now in the same units as betaCal (kg/day per kcal, just for
-  // burning instead of eating), so its own implied energy density is
-  // directly comparable to the intake-derived one above — similar values
-  // are a sanity check that the model is internally consistent; wildly
-  // different ones (or a positive betaAct, flagged separately below) mean
-  // the activity term is mostly noise.
+  // Same units as betaCal, so its implied density is directly comparable —
+  // similar values mean the model is internally consistent.
   const activityKcalPerKg = fit.betaAct < 0 ? Math.round(-1 / fit.betaAct) : null;
 
   summary.innerHTML = `<table class="calibration-summary-table">
@@ -386,11 +339,8 @@ function runCalibration() {
     return;
   }
   if (validation.warnings.length > 0) {
-    // Both cases render through the same red .status element (no separate
-    // warning color in this app's CSS) — spelling out "calibration
-    // succeeded" and "still enabled" in the text itself, rather than relying
-    // on color, is what actually tells a blocking failure apart from a
-    // heads-up here.
+    // Shares the red .status element with real failures, so the text itself has
+    // to say the calibration succeeded rather than relying on colour.
     showFieldError('calibration-status', `⚠️ Calibrated successfully — Save below is still enabled. Heads up: ${validation.warnings.join(' ')}`);
   }
 
@@ -398,12 +348,8 @@ function runCalibration() {
   saveBtn.disabled = false;
 }
 
-// Which of the just-written keys can't be found (or came back changed) on the
-// sheet. PROJ_CALIBRATED_AT is excluded from the value comparison on purpose:
-// it's cosmetic, and a date-formatted cell can legitimately read back in the
-// sheet's own display format rather than the ISO string that was written,
-// which would fail a strict comparison for no real reason. Every other key is
-// numeric and functional.
+// Which just-written keys are missing or changed on the sheet.
+// PROJ_CALIBRATED_AT is skipped: a date cell can read back reformatted.
 function unverifiedCalibrationKeys(written) {
   return Object.entries(written)
     .filter(([key]) => key !== 'PROJ_CALIBRATED_AT')
@@ -461,23 +407,17 @@ async function saveCalibratedGains() {
     return;
   }
 
-  // saveSettingValues re-reads the whole Settings tab back into
-  // currentSettings, so this checks what the sheet NOW HOLDS rather than
-  // re-inspecting what we just tried to write. A partial write is the one
-  // failure that would otherwise pass silently: the formula needs all four
-  // core gains present, so a single missing row means every consumer quietly
-  // falls back to the generic formula while the modal reports success.
+  // Checks what the sheet now holds, not what we tried to write. A partial
+  // write is the one failure that would otherwise pass silently — all four core
+  // gains must be present or every consumer falls back to the generic formula.
   const unverified = unverifiedCalibrationKeys(written);
   const engaged = readSavedCalibratedGains() !== null;
   if (unverified.length > 0 || !engaged) {
     refreshFormulaToggle();
 
-    // EVERY key coming back missing means the read-back itself returned
-    // nothing, not that eight separate writes each silently no-op'd — the
-    // writes are awaited above and throw on any API error, so they reached the
-    // sheet. Saying "couldn't confirm" without that distinction previously led
-    // to a Reset to Default that deleted a calibration which was safely
-    // written, so this case explicitly warns against exactly that.
+    // Every key missing means the read-back returned nothing, not that the
+    // writes failed — they're awaited and throw. Warn against Reset here, which
+    // would delete a calibration that is probably saved.
     const readBackEmpty = unverified.length === Object.keys(written).length - 1;
     setCalibrationStatus(readBackEmpty
       ? 'The calibration was written to the sheet, but reading the Settings tab back returned nothing, so it can\'t be confirmed here. Do NOT use "Reset to Default" — that would delete a fit that is probably saved. Reload the page and reopen this dialog to check, and see the browser console for the underlying Sheets error.'
@@ -486,11 +426,8 @@ async function saveCalibratedGains() {
     return;
   }
 
-  // Saved AND verified. Everything below is display refresh only, so it's
-  // wrapped separately: a rendering failure must never be reported as a failed
-  // save. Conflating the two is what previously told a user their calibration
-  // hadn't saved when it had — and sent them to "Reset to Default", deleting a
-  // fit that was already safely on the sheet.
+  // Saved and verified; below is display refresh only. Wrapped separately so a
+  // rendering failure is never reported as a failed save.
   useCalibratedFormula = true;
   try {
     refreshFormulaToggle();

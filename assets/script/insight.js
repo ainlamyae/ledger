@@ -1,6 +1,8 @@
 // "💡 Wellness Insight" panel (formerly "Insight"): sends a plain-language
 // snapshot of the user's recent data (current window + the immediately
-// preceding period of equal length, plus age/height/BMI, their own targets,
+// preceding period of equal length, plus the shared age/sex/height/weight/BMI
+// profile block Food and Activity Insight also send, their own targets and
+// calorie bound,
 // and the same weight-trajectory/calibration numbers the Weight Trend &
 // Forecast chart already computes) to Groq and shows the free-text response
 // inline. Never runs automatically, and unlike calorie-estimator.js's calls
@@ -26,6 +28,43 @@ function ageFromBirthDate(birthDateStr) {
     || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
   if (beforeBirthdayThisYear) age--;
   return age;
+}
+
+// Age, sex, height, latest logged weight and the BMI those two imply — the
+// body every one of this app's health numbers is actually about. Read straight
+// from Settings and the latest weigh-in (latestWeightKg/computeBmi, charts.js),
+// so all three AI panels describe the same person.
+function gatherProfileSnapshot() {
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const weightKg = latestWeightKg(getDatedWellnessEntries());
+
+  return {
+    age: ageFromBirthDate(getSettingString('BIRTH_DATE', null)),
+    sex: getSettingString('SEX', null),
+    heightCm,
+    weightKg,
+    bmi: (heightCm !== null && weightKg !== null) ? computeBmi(weightKg, heightCm) : null,
+  };
+}
+
+// The snapshot as prompt lines, shared by Wellness, Food and Activity Insight:
+// none of these three questions has a body-independent answer. 1,400 kcal/day
+// is a floor for one person and a ceiling for another, "enough iron" depends on
+// sex, and whether a training volume is heavy depends on the body lifting it —
+// so the profile goes to all three rather than only to the panel that happens
+// to compute calorie figures. Missing fields are reported as "not set" instead
+// of being dropped, so the model can see what it doesn't know rather than
+// quietly assuming a default. weightGoalKg is passed only by Wellness Insight,
+// the one panel whose subject is the journey rather than today's body.
+function formatProfileLines(p, weightGoalKg = null) {
+  const goalSuffix = weightGoalKg !== null ? ` (goal: ${weightGoalKg} kg)` : '';
+  return [
+    `Age: ${p.age !== null ? p.age : 'not set'}`,
+    `Sex: ${p.sex !== null ? p.sex : 'not set'}`,
+    `Height: ${p.heightCm !== null ? `${p.heightCm} cm` : 'not set'}`,
+    `Current weight: ${p.weightKg !== null ? `${p.weightKg} kg${goalSuffix}` : 'not logged'}`,
+    `BMI: ${p.bmi !== null ? p.bmi : 'not available (needs height and a logged weight)'}`,
+  ];
 }
 
 // The days immediately before [fromIso, toIso], same length as that range —
@@ -133,14 +172,6 @@ function gatherInsightMetrics(fromIso, toIso) {
   const current = aggregateWindow(dates);
   const previous = aggregateWindow(previousDateRange(fromIso, toIso));
 
-  const weightEntries = getDatedWellnessEntries()
-    .filter((e) => e.category === 'Weight' && e.amount !== null)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  const heightCm = getSetting('HEIGHT_CM', null);
-  const currentWeightKg = weightEntries.length ? weightEntries[weightEntries.length - 1].amount : null;
-  const bmi = (heightCm !== null && currentWeightKg !== null) ? computeBmi(currentWeightKg, heightCm) : null;
-
   // Reuses the exact same trajectory/calibration logic the Weight Trend &
   // Forecast chart is built from (charts.js) — Insight doesn't compute its
   // own trend, it just reports this one.
@@ -151,17 +182,21 @@ function gatherInsightMetrics(fromIso, toIso) {
   return {
     lookbackDays,
     rangeLabel,
-    age: ageFromBirthDate(getSettingString('BIRTH_DATE', null)),
-    heightCm,
-    currentWeightKg,
+    // The shared age/sex/height/weight/BMI block (formatProfileLines above) —
+    // sex included because the BMR behind every calorie figure here is built
+    // from it, and calorie/protein norms genuinely differ by it.
+    profile: gatherProfileSnapshot(),
     weightGoalKg: getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT),
-    bmi,
     projection,
     energyDensityKcalPerKg,
 
     avgCalories: current.avgCalories,
     prevAvgCalories: previous.avgCalories,
-    calorieTarget: getCalorieTargetKcal(getDatedWellnessEntries()),
+    // The whole bound, not a bare number — {kcal, kind} — so the prompt can
+    // name it "max" or "min". Handing over "target: 1388" let the AI praise a
+    // 900-kcal day on a bulk and scold a 1,300-kcal one on a cut, both of which
+    // are the opposite of the truth.
+    calorieBound: getCalorieBound(getDatedWellnessEntries()),
     caloriesDaysLogged: current.caloriesDaysLogged,
 
     avgProtein: current.avgProtein,
@@ -227,11 +262,14 @@ function formatActivityBreakdownLines(m) {
 }
 
 function formatInsightPrompt(m) {
-  const line = (label, value, unit, target, daysLogged, prevValue) => {
+  // `word` is what the figure in brackets is called: 'target' for the metrics
+  // that really have one, but 'max'/'min' for calories, whose figure is a bound
+  // to stay on one side of rather than a number to land on.
+  const line = (label, value, unit, target, daysLogged, prevValue, word = 'target') => {
     if (value === null) return `${label} (${m.rangeLabel}): not logged this period`;
     const coverage = daysLogged < m.lookbackDays ? ` [only ${daysLogged}/${m.lookbackDays} days logged]` : '';
     const trend = prevValue !== null ? ` — previous period: ${prevValue}${unit}` : '';
-    return `${label} (${m.rangeLabel}): ${value}${unit} (target: ${target}${unit})${trend}${coverage}`;
+    return `${label} (${m.rangeLabel}): ${value}${unit} (${word}: ${target}${unit})${trend}${coverage}`;
   };
 
   // Bespoke rather than built from the generic line() helper above, since
@@ -248,11 +286,8 @@ function formatInsightPrompt(m) {
   })();
 
   const lines = [
-    `Age: ${m.age !== null ? m.age : 'not set'}`,
-    `Height: ${m.heightCm !== null ? `${m.heightCm} cm` : 'not set'}`,
-    `Current weight: ${m.currentWeightKg !== null ? `${m.currentWeightKg} kg (goal: ${m.weightGoalKg} kg)` : 'not logged'}`,
-    m.bmi !== null ? `BMI: ${m.bmi}` : null,
-    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget, m.caloriesDaysLogged, m.prevAvgCalories),
+    ...formatProfileLines(m.profile, m.weightGoalKg),
+    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieBound.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieBound.kind),
     line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
     activityTotalLine,
     ...formatActivityBreakdownLines(m),
@@ -268,7 +303,9 @@ function formatInsightPrompt(m) {
 
 const INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing someone's own self-tracked data. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given their age, height, BMI, current weight vs. goal, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal target and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a weight-trajectory line (their actual estimated rate of progress toward their goal, personalized if they've calibrated it, generic otherwise). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
+You'll be given their age, sex, height, BMI, current weight vs. goal, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal figure and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a weight-trajectory line (their actual estimated rate of progress toward their goal, personalized if they've calibrated it, generic otherwise). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
+
+Calorie intake has no target — its figure is a BOUND, and the label says which one. "(max: 1388 kcal/day)" is a ceiling: they are aiming to lose weight, so at or under it is on track and over it is off track. "(min: 2600 kcal/day)" is a floor: they are aiming to gain weight, so at or over it is on track and under it is off track. Never treat a day under a "min" as a win or read it as a deficit worth praising, and never describe being under a "max" as falling short. If the average sits far on the good side of a max, that is a deeper deficit than planned, not a failure — comment on whether the pace looks sustainable (especially alongside protein and sleep) rather than scoring it as a miss.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 

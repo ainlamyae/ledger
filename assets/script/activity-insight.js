@@ -134,6 +134,11 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
   return {
     lookbackDays,
     rangeLabel,
+    // Same age/sex/height/weight/BMI block Wellness and Food Insight send
+    // (insight.js) — set volume, rest needs and what counts as a heavy session
+    // all depend on the body doing the lifting, so the coach shouldn't be
+    // reasoning about this log without knowing whose it is.
+    profile: gatherProfileSnapshot(),
     activityDaysLogged: current.activityDaysLogged,
     prevActivityDaysLogged: previous.activityDaysLogged,
     avgActivityMins: current.avgActivityMins,
@@ -162,6 +167,8 @@ function formatActivityInsightPrompt(m) {
   const volumeLine = `Total resistance-training sets, all muscle groups (${m.rangeLabel}): ${m.totalSetsInRange} — previous period: ${m.prevTotalSetsInRange}`;
 
   const lines = [
+    ...formatProfileLines(m.profile),
+    '',
     consistencyLine,
     volumeLine,
     ...formatActivityBreakdownLines(m),
@@ -175,7 +182,7 @@ function formatActivityInsightPrompt(m) {
 
 const ACTIVITY_INSIGHT_SYSTEM_PROMPT = `You are a supportive strength-training coach reviewing someone's own self-tracked workout log. You are not a doctor — do not diagnose injuries or prescribe rehab; if something sounds like pain or an injury, tell them to see a professional instead of advising around it.
 
-You'll be given: how many days they logged any activity this period vs. the immediately preceding period of the same length; their total resistance-training set volume this period vs. that previous period; the same activity-type breakdown (minutes/day and kcal/day burned by type, e.g. NEAT/Cardio/Strength Training) the app's Wellness Insight also reports; and a muscle-group breakdown (sets performed and sessions this period, plus days since it was actually last trained) covering Legs, Chest, Back, Shoulders, Biceps, and Triceps, sorted most-neglected-first. A muscle marked "never logged" has no training history in the data at all — treat that as a real gap to flag, not a rounding artifact.
+You'll be given: their age, sex, height, current weight and BMI (any of which may read "not set" — treat that as missing, never guess a value, and note it if it matters to your answer); how many days they logged any activity this period vs. the immediately preceding period of the same length; their total resistance-training set volume this period vs. that previous period; the same activity-type breakdown (minutes/day and kcal/day burned by type, e.g. NEAT/Cardio/Strength Training) the app's Wellness Insight also reports; and a muscle-group breakdown (sets performed and sessions this period, plus days since it was actually last trained) covering Legs, Chest, Back, Shoulders, Biceps, and Triceps, sorted most-neglected-first. A muscle marked "never logged" has no training history in the data at all — treat that as a real gap to flag, not a rounding artifact.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 

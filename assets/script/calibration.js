@@ -295,7 +295,9 @@ function validateCalibration(fit, samples) {
 }
 
 function runCalibration() {
-  const calorieTarget = getCalorieTargetKcal(getDatedWellnessEntries());
+  // The bound's kcal figure is the intake level the fit centers on — its
+  // max/min direction is a labelling matter and has no place in the regression.
+  const calorieTarget = getCalorieBoundKcal(getDatedWellnessEntries());
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
   // The regression centers protein on one figure, so it uses the target
   // band's midpoint (getProteinTargetG) — a band has no single center to
@@ -437,8 +439,8 @@ async function saveCalibratedGains() {
     refreshFormulaToggle();
     applySettingsToWidgets();
     // Whole section, not just the projection chart: a new energy density also
-    // moves the calculated calorie target, and with it the Caloric Intake
-    // target line and the Calories Today tile.
+    // moves the calculated calorie bound, and with it the Caloric Intake
+    // bound line and the Calories tile.
     renderWellnessCharts(getDatedWellnessEntries());
   } catch (err) {
     console.error('Calibration saved and verified, but refreshing the display failed:', err);

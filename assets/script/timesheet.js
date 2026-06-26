@@ -1,8 +1,10 @@
 const TIMESHEET_RANGE = `${CONFIG.SHEETS.TIMESHEET}!A2:G`;
+const TS_PAGE_SIZE = 14;
 
 let allTimeEntries = [];
 let timesheetListenersAttached = false;
 let tsSort = { dir: -1 };
+let tsCurrentPage = 1;
 
 function timeToMinutes(hhmm) {
   if (!hhmm) return null;
@@ -97,8 +99,14 @@ async function initTimeSheet(forceRefresh = false) {
     ['timesheet-start', 'timesheet-end', 'timesheet-break'].forEach((id) => {
       document.getElementById(id).addEventListener('input', updateTimesheetLiveDuration);
     });
-    document.getElementById('timesheet-date-from').addEventListener('input', renderTimesheetList);
-    document.getElementById('timesheet-date-to').addEventListener('input', renderTimesheetList);
+    document.getElementById('timesheet-date-from').addEventListener('input', () => {
+      tsCurrentPage = 1;
+      renderTimesheetList();
+    });
+    document.getElementById('timesheet-date-to').addEventListener('input', () => {
+      tsCurrentPage = 1;
+      renderTimesheetList();
+    });
     setupTimesheetSorting();
   }
 
@@ -121,6 +129,7 @@ function setupTimesheetSorting() {
   th.addEventListener('click', () => {
     tsSort.dir *= -1;
     updateIndicator();
+    tsCurrentPage = 1;
     renderTimesheetList();
   });
   th.addEventListener('keydown', (e) => {
@@ -129,20 +138,6 @@ function setupTimesheetSorting() {
       th.click();
     }
   });
-}
-
-// Defaults the filter to the trailing 2 weeks, but only the first time —
-// never stomps a date range the user already set themselves.
-function setDefaultTimesheetDateRange() {
-  const fromInput = document.getElementById('timesheet-date-from');
-  const toInput = document.getElementById('timesheet-date-to');
-  if (fromInput.value || toInput.value) return;
-
-  const today = new Date();
-  const twoWeeksAgo = new Date();
-  twoWeeksAgo.setDate(today.getDate() - 13);
-  fromInput.value = isoFromDate(twoWeeksAgo);
-  toInput.value = isoFromDate(today);
 }
 
 // Start/End/Break/Date are read and written as plain text/numbers the app
@@ -171,7 +166,6 @@ async function refreshTimeSheet(forceRefresh = false) {
     }))
     .filter((e) => e.date);
 
-  setDefaultTimesheetDateRange();
   renderTimesheetList();
   renderTimesheetDistributionCharts(allTimeEntries);
   renderTimesheetDailyAverageChart(allTimeEntries);
@@ -222,14 +216,20 @@ function renderTimesheetList() {
   tbody.innerHTML = '';
 
   const entries = getFilteredTimeEntries();
-  if (entries.length === 0) {
+  const totalPages = Math.max(1, Math.ceil(entries.length / TS_PAGE_SIZE));
+  tsCurrentPage = Math.min(tsCurrentPage, totalPages);
+
+  const start = (tsCurrentPage - 1) * TS_PAGE_SIZE;
+  const pageEntries = entries.slice(start, start + TS_PAGE_SIZE);
+
+  if (pageEntries.length === 0) {
     const message = allTimeEntries.length === 0
       ? 'No time logged yet — click "Log a Day" above.'
-      : 'No entries in this date range.';
+      : 'No entries match this date range.';
     tbody.appendChild(renderEmptyRow(8, message));
   }
 
-  entries.forEach((e) => {
+  pageEntries.forEach((e) => {
     const tr = document.createElement('tr');
     const weekend = isWeekend(e.date);
 
@@ -282,6 +282,41 @@ function renderTimesheetList() {
     if (weekend || isNoEntry) tr.classList.add('timesheet-no-entry');
     tbody.appendChild(tr);
   });
+
+  renderTsPagination(totalPages);
+}
+
+function renderTsPagination(totalPages) {
+  const container = document.getElementById('ts-pagination');
+  container.innerHTML = '';
+  if (totalPages <= 1) return;
+
+  const prev = document.createElement('button');
+  prev.className = 'btn';
+  prev.textContent = '⬅️';
+  prev.title = 'Previous page';
+  prev.setAttribute('aria-label', 'Previous page');
+  prev.disabled = tsCurrentPage === 1;
+  prev.addEventListener('click', () => {
+    tsCurrentPage--;
+    renderTimesheetList();
+  });
+
+  const info = document.createElement('span');
+  info.textContent = `${tsCurrentPage} of ${totalPages}`;
+
+  const next = document.createElement('button');
+  next.className = 'btn';
+  next.textContent = '➡️';
+  next.title = 'Next page';
+  next.setAttribute('aria-label', 'Next page');
+  next.disabled = tsCurrentPage === totalPages;
+  next.addEventListener('click', () => {
+    tsCurrentPage++;
+    renderTimesheetList();
+  });
+
+  container.append(prev, info, next);
 }
 
 function toggleTimesheetHolidayFields() {

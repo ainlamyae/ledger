@@ -508,6 +508,15 @@ function onCategoryChange() {
   document.getElementById('wellness-unit').value = defaults.unit;
   document.getElementById('wellness-amount').placeholder =
     cat === 'Sleep' ? 'e.g. 7.5, or 23:30; 07:00 for bed/wake' : '';
+  // Notes is what 🧮 Calculate reads ingredients from, so on the food
+  // categories its placeholder doubles as the hint that a quantity can be
+  // written as a calorie figure instead ("300kcal cookie" — Calculate works
+  // back to the weight and protein from the density it has for that food).
+  // Blank elsewhere, where Notes is just free text.
+  document.getElementById('wellness-notes').placeholder =
+    (cat === 'Calories' || cat === 'Calories; Protein')
+      ? 'e.g. 2 eggs, 100g rice, 300kcal cookie'
+      : '';
 
   // Historical descriptions for this category, sorted by frequency (most used first).
   // 'Calories' and 'Calories; Protein' share one history — they're the same kind

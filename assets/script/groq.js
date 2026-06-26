@@ -23,6 +23,10 @@ Split it into individual food items. For each item, provide:
 - "kcalPer100gFallback": your best estimate of calories per 100g for this food
 - "proteinPer100gFallback": your best estimate of grams of protein per 100g for this food
 
+An amount may be given as an energy figure instead of a quantity (e.g. "300kcal cookie", "1200kj rice") — that is how many
+calories were eaten, NOT a weight or a count. For those, work "grams" back out from your own kcal-per-100g estimate for the
+food, and use null for "count".
+
 Do not calculate the total calories or protein yourself — that happens outside this response.
 
 Respond with ONLY a JSON object, no other text, in exactly this shape:

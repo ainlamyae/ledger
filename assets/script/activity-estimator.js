@@ -2,7 +2,7 @@
 // when the current category is Activity — the Activity counterpart to
 // calorie-estimator.js. Understands the Activity Plan's standardized workout
 // note (see strength-plan.js's logWorkout): one line per ticked row —
-// "sets×reps  Exercise Name" for a strength row, "Nsec  Exercise Name" for an
+// "N×  Exercise Name" (total reps) for a strength row, "Nsec  Exercise Name" for an
 // isometric hold (Plank), "Nmin  Activity Name" for a fixed-duration row
 // (Swim), or "Nstep  Activity Name" for a step-count row (Walk). Wired up by wellness.js — see its calc-btn click dispatcher in
 // initWellness() — and called directly by strength-plan.js's logWorkout()
@@ -88,13 +88,22 @@ const EXERCISE_MET = {
 // estimate instead of blocking Calculate entirely.
 const EXERCISE_MET_DEFAULT = 3.5;
 
-// Matches one standardized workout note line — a strength row ("3×10 Leg
+// Matches one standardized workout note line — a strength row ("30× Leg
 // Press"), an isometric hold ("135sec Plank"), a fixed-duration NEAT row
 // ("30min Swim"), or a step-count row ("6000step Walk"). Any line matching none of these (e.g. a blank line,
 // or a leftover day-header line from an older-format saved entry) is skipped.
 // The gap is `\s+`, so entries saved back when Log Workout emitted two spaces
 // still parse identically to the single-spaced ones it writes now.
-const STRENGTH_NOTE_LINE_PATTERN = /^(\d+)×(\d+)\s+(.+)$/;
+//
+// Strength rows carry TOTAL REPS with × as the unit ("30×"), in the same
+// <number><unit> shape as the other three. The two-number "3×10" form Log Workout
+// used to write is still matched below, so entries already saved to the sheet keep
+// parsing — it's normalized to the same total-rep figure (3 × 10 = 30) rather than
+// kept as a separate shape, so nothing downstream has to handle two strength
+// forms. The two can't be confused: the total-rep form has whitespace after the ×,
+// the legacy one has a digit.
+const REPS_NOTE_LINE_PATTERN = /^(\d+)×\s+(.+)$/;
+const LEGACY_SETS_REPS_NOTE_LINE_PATTERN = /^(\d+)×(\d+)\s+(.+)$/;
 const DURATION_NOTE_LINE_PATTERN = /^(\d+)min\s+(.+)$/;
 const STEPS_NOTE_LINE_PATTERN = /^(\d+)step\s+(.+)$/;
 // An isometric hold row's total held seconds ("135sec Plank") — seconds
@@ -108,9 +117,13 @@ function parseWorkoutNoteLines(notes) {
     .split('\n')
     .map((raw) => {
       const line = raw.trim();
-      const strengthMatch = STRENGTH_NOTE_LINE_PATTERN.exec(line);
-      if (strengthMatch) {
-        return { type: 'sets', sets: Number(strengthMatch[1]), reps: Number(strengthMatch[2]), name: strengthMatch[3].trim() };
+      const repsMatch = REPS_NOTE_LINE_PATTERN.exec(line);
+      if (repsMatch) {
+        return { type: 'reps', reps: Number(repsMatch[1]), name: repsMatch[2].trim() };
+      }
+      const legacyMatch = LEGACY_SETS_REPS_NOTE_LINE_PATTERN.exec(line);
+      if (legacyMatch) {
+        return { type: 'reps', reps: Number(legacyMatch[1]) * Number(legacyMatch[2]), name: legacyMatch[3].trim() };
       }
       const durationMatch = DURATION_NOTE_LINE_PATTERN.exec(line);
       if (durationMatch) {
@@ -137,7 +150,7 @@ function parseWorkoutNoteLines(notes) {
 function estimateWorkoutActivity(notes, weightKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
-    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log Workout button, or write one \"sets×reps  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
+    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log Workout button, or write one \"N×  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
   }
 
   let totalSeconds = 0;
@@ -148,7 +161,7 @@ function estimateWorkoutActivity(notes, weightKg) {
     if (!(line.name in EXERCISE_MET)) unmatchedNames.push(line.name);
     const met = EXERCISE_MET[line.name] ?? EXERCISE_MET_DEFAULT;
     let activeSeconds;
-    if (line.type === 'sets') activeSeconds = line.sets * line.reps * WORKOUT_REP_SEC;
+    if (line.type === 'reps') activeSeconds = line.reps * WORKOUT_REP_SEC;
     else if (line.type === 'steps') activeSeconds = toActivityMinutes(line.steps, 'steps') * 60;
     // Already the total active time for a hold row — the note carries seconds
     // directly (see strength-plan.js's activeSecondsForBox), no tempo or pace

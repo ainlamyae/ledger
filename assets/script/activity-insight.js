@@ -1,21 +1,11 @@
-// "📈 Activity Insight" panel: sends a plain-language workout-performance
-// snapshot (consistency, activity-type breakdown, total resistance-training
-// volume, and a per-muscle-group last-trained/volume breakdown) to Groq and
-// shows the free-text response inline. Third AI-insight panel alongside
-// insight.js's Wellness Insight and food-insight.js's Food Insight — reuses
-// their shared building blocks directly (aggregateWindow/previousDateRange/
-// formatDateRangeLabel/formatActivityBreakdownLines from insight.js,
-// INSIGHT_SECTION_LABELS/renderInsightText for the untrusted-output-safe
-// render, initDateRangeControl from charts.js) rather than re-deriving them
-// — this panel's own new part is purely the muscle-group volume/recency
-// breakdown, which neither existing panel computes (Wellness Insight's own
-// activity section only reports totals by description — NEAT/Cardio/
-// Strength Training — not per-muscle detail). Like Food/Wellness Insight,
-// the last result IS persisted, to the Settings tab as
-// ACTIVITY_INSIGHT_LAST_RESULT/ACTIVITY_INSIGHT_LAST_GENERATED_AT. Wired up
-// by initActivityInsightPanel(), called from app.js.
-
-const ACTIVITY_INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
+// The Health Insight panel's Activity mode: a plain-language workout-performance
+// snapshot (consistency, activity-type breakdown, total resistance volume, and a
+// per-muscle-group last-trained/volume breakdown). The muscle-group detail is
+// this mode's own contribution — the Wellness mode's activity section only
+// reports totals by description (NEAT/Cardio/Strength Training). Everything else
+// is borrowed: aggregateWindow/previousDateRange/formatDateRangeLabel/
+// formatActivityBreakdownLines/formatProfileLines from insight.js,
+// parseWorkoutNoteLines from activity-estimator.js. insight-panel.js drives it.
 
 // Stable display order — also the iteration order for the muscle-group
 // breakdown before it's re-sorted most-neglected-first.
@@ -130,7 +120,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
 
 // Reuses insight.js's own aggregateWindow/previousDateRange/
 // formatDateRangeLabel — the exact same current-vs-previous-period
-// computation Wellness Insight already runs, just for this panel's own
+// computation the Wellness mode already runs, just for this mode's own
 // selected range — plus the new muscle-group/volume metrics above.
 function gatherActivityInsightMetrics(fromIso, toIso) {
   const dates = datesInRange(fromIso, toIso);
@@ -143,7 +133,7 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
   return {
     lookbackDays,
     rangeLabel,
-    // Same age/sex/height/weight/BMI block Wellness and Food Insight send
+    // Same age/sex/height/weight/BMI block the Wellness and Food modes send
     // (insight.js) — training volume, rest needs and what counts as a heavy session
     // all depend on the body doing the lifting, so the coach shouldn't be
     // reasoning about this log without knowing whose it is.
@@ -193,162 +183,15 @@ const ACTIVITY_INSIGHT_SYSTEM_PROMPT = `You are a supportive strength-training c
 
 You'll be given: their age, sex, height, current weight and BMI (any of which may read "not set" — treat that as missing, never guess a value, and note it if it matters to your answer); how many days they logged any activity this period vs. the immediately preceding period of the same length; their total resistance-training rep volume this period vs. that previous period; the same activity-type breakdown (minutes/day and kcal/day burned by type, e.g. NEAT/Cardio/Strength Training) the app's Wellness Insight also reports; and a muscle-group breakdown (reps performed and sessions this period, plus days since it was actually last trained) covering Legs, Chest, Back, Shoulders, Biceps, and Triceps, sorted most-neglected-first. A muscle marked "never logged" has no training history in the data at all — treat that as a real gap to flag, not a rounding artifact.
 
+Every volume figure is a TOTAL rep count: each exercise's reps summed across all of its sets for the period. The log stores only that total (a workout note reads "30x Leg Press"), so the number of sets and the reps per set cannot be recovered from it. Do not infer, restate or ask for a sets-by-reps figure, do not assume a default set count, and express any volume you recommend as a total rep count as well.
+
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 
 Overview: one or two sentences on the overall picture — consistency and volume trend vs. the previous period.
 Going well: what's on track — muscle groups being trained regularly, volume holding or increasing.
 Needs attention: which muscle group(s) are most neglected (longest gap or lowest volume) and any consistency or volume decline vs. the previous period.
-Suggestions: 2-4 concrete, specific next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — prioritize the most neglected muscle group(s) for the next session.
+Suggestions: 2-4 concrete, specific next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — prioritize the most neglected muscle group(s) for the next session, and give any target as total reps rather than sets by reps.
 
 If an additional question from the user is included after the data, also answer it directly in a fifth section, "Answer: text".
 
 Keep the whole report under 250 words.`;
-
-async function generateActivityInsight(fromIso, toIso, question) {
-  const apiKey = getSettingString('GROQ_API_KEY', null);
-  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
-
-  let userMessage = formatActivityInsightPrompt(gatherActivityInsightMetrics(fromIso, toIso));
-  if (question && question.trim()) userMessage += `\n\nAdditional question: ${question.trim()}`;
-
-  const res = await fetch(GROQ_API, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0.4,
-      messages: [
-        { role: 'system', content: ACTIVITY_INSIGHT_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `Groq API error ${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.choices[0].message.content;
-}
-
-// Set by initActivityInsightPanel() to the getter initDateRangeControl()
-// (charts.js) returns — the same shared From/To wiring insight.js and
-// protein-rotation.js use.
-let getActivityInsightDateRange = () => ({ from: null, to: null });
-
-function initActivityInsightPanel() {
-  clearFieldError('activity-insight-status');
-  getActivityInsightDateRange = initDateRangeControl('activity-insight-date-from', 'activity-insight-date-to', ACTIVITY_INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
-    renderActivityInsightDataPreview(getActivityInsightDateRange());
-  });
-  renderActivityInsightDataPreview(getActivityInsightDateRange());
-  renderSavedActivityInsight();
-
-  document.getElementById('activity-insight-generate-btn').addEventListener('click', () => {
-    const { from, to } = getActivityInsightDateRange();
-    runActivityInsightGeneration(from, to, document.getElementById('activity-insight-question').value);
-  });
-}
-
-// Shows exactly what formatActivityInsightPrompt() would send to Groq, in
-// plain language, so nothing about the request is a black box — same rule
-// insight.js's renderInsightDataPreview follows. Our own computed text (not
-// model output), rendered before Send to AI is ever clicked and refreshed
-// live as the date range changes.
-function renderActivityInsightDataPreview({ from, to }) {
-  const preview = document.getElementById('activity-insight-data-preview');
-  preview.innerHTML = '';
-  formatActivityInsightPrompt(gatherActivityInsightMetrics(from, to)).split('\n').forEach((line) => {
-    const p = document.createElement('p');
-    p.textContent = line;
-    preview.appendChild(p);
-  });
-}
-
-// Only runs on an explicit Send to AI click — changing the date range only
-// updates the (free, local) data preview above.
-async function runActivityInsightGeneration(fromIso, toIso, question) {
-  const body = document.getElementById('activity-insight-body');
-  const btn = document.getElementById('activity-insight-generate-btn');
-  const fromEl = document.getElementById('activity-insight-date-from');
-  const toEl = document.getElementById('activity-insight-date-to');
-  const textarea = document.getElementById('activity-insight-question');
-
-  body.innerHTML = '';
-  clearFieldError('activity-insight-status');
-
-  const loading = document.createElement('p');
-  loading.className = 'hint';
-  loading.textContent = `Analyzing ${fromIso} to ${toIso}…`;
-  body.appendChild(loading);
-
-  btn.disabled = true;
-  fromEl.disabled = true;
-  toEl.disabled = true;
-  textarea.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Generating…';
-
-  try {
-    const text = await generateActivityInsight(fromIso, toIso, question);
-    body.innerHTML = '';
-    renderInsightText(body, text);
-
-    // Persisted so a fresh page load still shows the last read instead of
-    // going blank — same pattern as Food/Wellness Insight.
-    const generatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
-    try {
-      await saveSettingValues({
-        ACTIVITY_INSIGHT_LAST_RESULT: text,
-        ACTIVITY_INSIGHT_LAST_GENERATED_AT: generatedAt,
-      });
-      renderActivityInsightGeneratedAt(generatedAt);
-    } catch (saveErr) {
-      showFieldError('activity-insight-status', `Generated, but couldn't save it: ${saveErr.message}`);
-    }
-  } catch (err) {
-    body.innerHTML = '';
-    showFieldError('activity-insight-status', err.message);
-  } finally {
-    btn.disabled = false;
-    fromEl.disabled = false;
-    toEl.disabled = false;
-    textarea.disabled = false;
-    btn.textContent = originalLabel;
-  }
-}
-
-function renderActivityInsightGeneratedAt(timestamp) {
-  const el = document.getElementById('activity-insight-generated-at');
-  if (!timestamp) {
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  el.textContent = `Last generated ${timestamp}`;
-}
-
-// Restores the last AI result (if any) from the Settings tab on page load,
-// so the panel shows the previous read instead of an empty placeholder.
-function renderSavedActivityInsight() {
-  const body = document.getElementById('activity-insight-body');
-  const text = getSettingString('ACTIVITY_INSIGHT_LAST_RESULT', null);
-
-  body.innerHTML = '';
-  if (!text) {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'hint';
-    placeholder.textContent = 'Review the data above, then click "Send to AI" to get a read on it.';
-    body.appendChild(placeholder);
-    renderActivityInsightGeneratedAt(null);
-    return;
-  }
-
-  renderInsightText(body, text);
-  renderActivityInsightGeneratedAt(getSettingString('ACTIVITY_INSIGHT_LAST_GENERATED_AT', null));
-}

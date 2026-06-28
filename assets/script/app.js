@@ -557,11 +557,7 @@ async function loadDashboard(forceRefresh = false) {
       renderReconciliationStatus(report.missingAmount);
       setLastUpdated();
     }),
-    initTransactions(forceRefresh).then(() => {
-      renderCommonPayeeChart(allTransactions);
-      renderCommonDescriptionChart(allTransactions);
-      renderPayeeSpendChart(allTransactions);
-    }),
+    initTransactions(forceRefresh),
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
     wellnessPromise.then(() => {

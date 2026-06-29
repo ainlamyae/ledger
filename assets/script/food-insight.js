@@ -66,7 +66,7 @@ function aggregateFoodIntake(from, to) {
 // Nutrition Facts row does. Returns null (leaving the count as-is for
 // display) if there's no matching row or its Amount has no gram figure —
 // e.g. an ingredient banked via a fresh USDA/AI miss that hasn't been
-// reviewed/saved yet (see the Calculate breakdown's "＋ Save" button).
+// reviewed/saved yet (see the Calculate breakdown's 💾 button).
 function convertCountToGrams(name, count) {
   const tableEntry = findNutritionEntry(name);
   if (!tableEntry) return null;
@@ -159,7 +159,7 @@ function formatFoodInsightPrompt(rows, from, to, question) {
 
 const FOOD_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewing a plain list of foods someone logged over a recent period — each ingredient's total amount eaten and the total calories/protein it contributed. No vitamin or mineral data is provided; none was measured. Use your general knowledge of typical food composition to infer which vitamins/minerals this pattern of eating is likely rich in or short on, and answer the user's specific question.
 
-The list is preceded by their age, sex, height, current weight and BMI. Use it: reference intakes for iron, calcium, folate, B12 and protein differ by sex and age, and whether a day's total food is a lot or a little depends on the body eating it. Any of those fields may read "not set" or "not logged" — that means the app doesn't have it, so say what you'd need rather than assuming a figure.
+The list is preceded by their age, sex, height, current body mass and BMI. Use it: reference intakes for iron, calcium, folate, B12 and protein differ by sex and age, and whether a day's total food is a lot or a little depends on the body eating it. Any of those fields may read "not set" or "not logged" — that means the app doesn't have it, so say what you'd need rather than assuming a figure.
 
 Be explicit that this is an inference from typical food composition, not a lab-measured nutrient analysis, and that specific products/brands/preparation can vary. You are not a doctor — do not diagnose a deficiency or recommend supplement dosages; suggest food-based ways to close likely gaps instead.
 

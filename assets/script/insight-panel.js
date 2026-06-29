@@ -17,7 +17,7 @@
 const INSIGHT_MODES = {
   wellness: {
     label: 'Wellness',
-    hint: 'A read on your recent trends vs. the previous period — grounded in your weight trajectory, targets, and logging.',
+    hint: 'A read on your recent trends vs. the previous period — grounded in your body mass trajectory, targets, and logging.',
     questionPlaceholder: 'e.g. Should I prioritize sleep or protein right now?',
     previewId: 'insight-preview-text',
     gather: (from, to) => gatherInsightMetrics(from, to),

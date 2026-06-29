@@ -51,13 +51,13 @@ description of food ingredients and amounts (e.g. "2 eggs, 1 slice toast, 1 tbsp
 
 Split it into individual food items. For each item, provide:
 - "query": a plain, generic food name suitable for searching a nutrition database (not a brand name)
-- "grams": your best real-world estimate of the total gram weight for the stated amount
+- "grams": your best real-world estimate of the total gram mass for the stated amount
 - "count": how many discrete whole units of this food are described (e.g. 2 for "2 rice cakes", 1 for "a banana", 3 for "3 eggs") — use null if it isn't naturally counted in whole pieces (e.g. a measured/weighed ingredient like "125g ground beef" or "1 cup rice")
 - "kcalPer100gFallback": your best estimate of calories per 100g for this food
 - "proteinPer100gFallback": your best estimate of grams of protein per 100g for this food
 
 An amount may be given as an energy figure instead of a quantity (e.g. "300kcal cookie", "1200kj rice") — that is how many
-calories were eaten, NOT a weight or a count. For those, work "grams" back out from your own kcal-per-100g estimate for the
+calories were eaten, NOT a mass or a count. For those, work "grams" back out from your own kcal-per-100g estimate for the
 food, and use null for "count".
 
 Do not calculate the total calories or protein yourself — that happens outside this response.

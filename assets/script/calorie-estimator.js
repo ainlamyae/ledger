@@ -465,7 +465,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 // A row.newRow means this item missed the Nutrition Facts table and was
 // estimated fresh (USDA/AI) rather than looked up — nothing is banked
 // automatically (see estimateCaloriesAndProtein's autoBank param), so the
-// user reviews it here: either click "＋ Save" to bank it as-is, or leave it
+// user reviews it here: either click 💾 to bank it as-is, or leave it
 // and fix/retype the ingredient in Notes then Calculate again if the name
 // was wrong (e.g. a typo not matching an existing row).
 function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
@@ -475,11 +475,12 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn';
-  btn.textContent = '＋ Save';
+  btn.textContent = '💾';
   btn.title = `Not in your Nutrition Facts table yet — save "${row.name}" (${row.newRow.amount}, ${row.newRow.calories} kcal, ${row.newRow.protein}g protein) so it's a trusted lookup next time instead of a fresh guess`;
+  btn.setAttribute('aria-label', `Save ${row.name} to Nutrition Facts`);
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    btn.textContent = 'Saving…';
+    btn.textContent = '⏳';
     try {
       await addNutritionEntry(row.newRow);
       await refreshNutrition(true);
@@ -490,7 +491,7 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
       renderCalcBreakdown(breakdown, totalCalories, totalProtein);
     } catch (err) {
       btn.disabled = false;
-      btn.textContent = '＋ Save';
+      btn.textContent = '💾';
       showFieldError('wellness-form-error', err.message);
     }
   });

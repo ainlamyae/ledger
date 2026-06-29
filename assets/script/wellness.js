@@ -3,7 +3,7 @@ const W_PAGE_SIZE = 28;
 
 const CATEGORY_DEFAULTS = {
   Sleep:    { unit: 'hr',   descriptions: ['Sleep Duration'] },
-  Weight:   { unit: 'kg',   descriptions: ['Morning Weight', 'Evening Weight'] },
+  Weight:   { unit: 'kg',   descriptions: ['Morning Body Mass', 'Evening Body Mass'] },
   Calories: { unit: 'kcal', descriptions: ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage', 'Other'] },
   Activity: { unit: 'steps', descriptions: ['Walk', 'Run', 'Workout', 'Cycling', 'Swimming', 'HIIT', 'Yoga', 'Strength Training', 'Basketball', 'Stretching'] },
   // Composite category written by the Calculate button (calorie-estimator.js):
@@ -15,6 +15,12 @@ const CATEGORY_DEFAULTS = {
   // calorie burn (currently just Strength Training, from the workout note).
   'Activity; Calories': { unit: 'min; kcal', descriptions: ['Walk', 'Run', 'Workout', 'Cycling', 'Swimming', 'HIIT', 'Yoga', 'Strength Training', 'Basketball', 'Stretching'] },
 };
+
+// 'Weight' stays the stored category — renaming it would orphan every logged
+// row — so it's translated to "Body Mass" only on the way to the screen.
+function categoryLabel(category) {
+  return category === 'Weight' ? 'Body Mass' : category;
+}
 
 // True for the composite "Calories; Protein" category (or any future
 // ';'-joined category) — these rows carry paired Amount/Unit values instead
@@ -314,7 +320,9 @@ function getFilteredWellnessEntries() {
         e.description.toLowerCase().includes(search) ||
         e.notes.toLowerCase().includes(search) ||
         e.unit.toLowerCase().includes(search) ||
-        e.category.toLowerCase().includes(search)
+        // Both spellings, so searching "body mass" finds rows stored as 'Weight'.
+        e.category.toLowerCase().includes(search) ||
+        categoryLabel(e.category).toLowerCase().includes(search)
       );
     })
     .sort((a, b) => {
@@ -339,7 +347,7 @@ function renderWellnessList() {
 
   if (pageEntries.length === 0) {
     const message = allWellnessEntries.length === 0
-      ? 'No wellness entries yet — click "+ Add Entry" to get started.'
+      ? 'No wellness entries yet — click "Log an Entry" to get started.'
       : 'No entries match this filter.';
     tbody.appendChild(renderEmptyRow(9, message));
   }
@@ -380,7 +388,7 @@ function renderWellnessList() {
       checkboxCell,
       makeCell(e.date || '🔁 Pattern'),
       makeCell(e.time || '—'),
-      makeCell(e.category),
+      makeCell(categoryLabel(e.category)),
       makeCell(e.description),
       makeCell(privacyMode ? maskDigits(amountText) : amountText),
       makeCell(unitText),
@@ -462,7 +470,7 @@ function openWellnessForm(entry, duplicate = false) {
 
   editingWellnessRow = (entry && !duplicate) ? entry.row : null;
 
-  const title = duplicate ? 'Duplicate Entry' : (entry ? 'Edit Entry' : 'Log Entry');
+  const title = duplicate ? 'Duplicate Entry' : (entry ? 'Edit Entry' : 'Log an Entry');
   document.getElementById('wellness-modal-title').textContent = title;
   document.getElementById('wellness-entry-date').value = entry ? entry.date : today;
   document.getElementById('wellness-entry-time').value = entry ? entry.time : currentTime;
@@ -652,8 +660,12 @@ async function bulkRecalculateWellness() {
   }
 
   const btn = document.getElementById('wellness-bulk-recalc-btn');
+  const summaryEl = document.getElementById('wellness-bulk-summary');
   const originalLabel = btn.textContent;
   btn.disabled = true;
+  // Progress goes to the summary span, not the button — the button is one glyph
+  // wide and a counter inside it would resize the whole bar on every row.
+  btn.textContent = '⏳';
 
   const snapshots = eligible.map((e) => ({
     row: e.row, date: e.date, time: e.time, category: e.category,
@@ -671,7 +683,7 @@ async function bulkRecalculateWellness() {
   const results = await Promise.allSettled(eligible.map(async (e, i) => {
     try {
       if (isActivityCategory(e.category)) {
-        if (weightKg === null) throw new Error('Log your weight first — the calorie formula needs it.');
+        if (weightKg === null) throw new Error('Log your body mass first — the calorie formula needs it.');
         const { minutes, calories } = estimateWorkoutActivity(e.notes, weightKg);
         await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:H${e.row}`,
           [[e.date, e.time, 'Activity; Calories', e.description, `${minutes}; ${calories}`, 'min; kcal', e.notes, '']]);
@@ -683,7 +695,7 @@ async function bulkRecalculateWellness() {
       succeededSnapshots.push(snapshots[i]);
     } finally {
       done++;
-      btn.textContent = `Recalculating ${done}/${eligible.length}…`;
+      summaryEl.textContent = `Recalculating ${done}/${eligible.length}…`;
     }
   }));
 

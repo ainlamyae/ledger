@@ -162,7 +162,7 @@ function renderNutritionList() {
 
   if (pageItems.length === 0) {
     const message = allNutritionEntries.length === 0
-      ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "+ Add Ingredient" to add one yourself.'
+      ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add Ingredient" to add one yourself.'
       : 'No ingredients match your search.';
     tbody.appendChild(renderEmptyRow(9, message));
   }
@@ -186,7 +186,7 @@ function renderNutritionList() {
     const isUsable = parseGramsFromAmount(n.amount) !== null || parseCountFromAmount(n.amount) !== null;
     const amountCell = makeCell(
       (n.amount && !isUsable) ? `${n.amount} ⚠️` : (n.amount || '—'),
-      (n.amount && !isUsable) ? 'No gram weight or leading count found — Calculate will skip this row and re-estimate instead' : undefined
+      (n.amount && !isUsable) ? 'No gram mass or leading count found — Calculate will skip this row and re-estimate instead' : undefined
     );
 
     const density = proteinDensity(n);

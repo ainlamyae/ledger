@@ -1,4 +1,4 @@
-// "🧪 Formula" in the Health Trends & Forecast heading: shows the daily calorie
+// "Formula" in the Health Indicators heading: shows the daily calorie
 // bound as a formula with its three tunable inputs editable, recomputes the
 // figure as you type, and can write the values back to the Settings tab.
 //
@@ -27,27 +27,27 @@ const FORMULA_FIELDS = [
 // separate published formula with its own source, and the substituted figures
 // below are labelled with the same symbols so the two read together.
 const FORMULA_EXPRESSION = `Resting metabolic rate — Mifflin-St Jeor (1990)
-    BMR  =  10·m  +  6.25·h  −  5·a  +  σ
+    BMR  =  10×m  +  6.25×h  −  5×a  +  σ
 
 Activity burn at the daily target — ACSM metabolic equation
-    Eₐ   =  MET · m · τ · κ / 200
+    Eₐ   =  MET × m × τ × κ / ε
 
 Daily energy deficit implied by the weekly fat-loss goal
-    D    =  (Δm · ρ) / 7
+    D    =  (Δm × ρ) / 7
 
 Proposed daily intake
     Eᵢₙ  =  BMR  +  Eₐ  −  D
 
-Maintenance is affine in body mass — M(m) = A + B·m
-    A    =  6.25·h  −  5·a  +  σ
-    B    =  10  +  MET · τ · κ / 200
+Maintenance is affine in body mass — M(m) = A + B×m
+    A    =  6.25×h  −  5×a  +  σ
+    B    =  10  +  MET × τ × κ / ε
 
 Body mass at which Eᵢₙ becomes maintenance
     m∞   =  (Eᵢₙ  −  A) / B
 
 Exponential decay toward m∞, not linear loss
-    m(t) =  m∞  +  (m − m∞) · e^(−B·t/ρ)
-    t    =  (ρ / B) · ln[ (m − m∞) / (m_g − m∞) ]`;
+    m(t) =  m∞  +  (m − m∞) × e^(−B×t/ρ)
+    t    =  (ρ / B) × ln[ (m − m∞) / (m_g − m∞) ]`;
 
 function formulaFieldValue(field) {
   return getSetting(field.key, null) ?? field.fallback();
@@ -105,7 +105,7 @@ function readFormulaInputs() {
   const heightCm = formulaNumber('formula-height');
   const age = formulaNumber('formula-age');
   const sex = document.getElementById('formula-sex').value;
-  if (weightKg === null) invalid.push('current weight');
+  if (weightKg === null) invalid.push('current body mass');
   if (heightCm === null) invalid.push('HEIGHT_CM');
   if (age === null) invalid.push('BIRTH_DATE (age)');
 
@@ -123,36 +123,12 @@ function readFormulaInputs() {
   return { overrides, preview, weightKg, heightCm, age, sex, invalid };
 }
 
+// The projection itself lives in charts.js as projectPlanDays, shared with the Body
+// Mass Trend forecast so the date shown here and the one on that chart are the same
+// arithmetic. This module only supplies the live inputs.
+
 // The formula with every symbol replaced by the figure actually used, so a
 // surprising total can be traced to whichever input produced it.
-// Closed-form solution of dm/dt = (Eᵢₙ − A − B·m)/ρ at fixed intake, rather than a
-// day-by-day loop: it's an ordinary linear ODE, so the exact answer is one log.
-// Verified against numeric integration (agrees to the discrete step's rounding).
-//
-// Works in both directions — a surplus makes m∞ heavier than m and the same log
-// gives the days to gain — but it can only reach targets that lie between m and
-// m∞. A target past the asymptote is genuinely unreachable at that intake, which
-// is reported rather than extrapolated.
-function projectFormulaDays({ intakeKcal, weightKg, heightCm, age, sex, met, tau, kappa, goalKg }) {
-  const a = 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
-  const b = 10 + (met * tau * kappa) / ML_O2_PER_KCAL;
-  const equilibriumKg = (intakeKcal - a) / b;
-
-  if (Math.abs(weightKg - goalKg) < WEIGHT_AT_GOAL_TOLERANCE_KG) {
-    return { a, b, equilibriumKg, status: 'reached' };
-  }
-
-  const ratio = (weightKg - equilibriumKg) / (goalKg - equilibriumKg);
-  if (!Number.isFinite(ratio) || ratio <= 1) {
-    return { a, b, equilibriumKg, status: 'unreachable' };
-  }
-
-  const days = (GENERIC_KCAL_PER_KG_FAT / b) * Math.log(ratio);
-  const eta = new Date();
-  eta.setDate(eta.getDate() + Math.round(days));
-  return { a, b, equilibriumKg, days, etaIso: isoFromDate(eta), status: 'ok' };
-}
-
 function renderFormulaSubstituted(detail, proj, { preview, weightKg, heightCm, age, sex }) {
   const el = document.getElementById('formula-substituted');
   el.innerHTML = '';
@@ -164,20 +140,20 @@ function renderFormulaSubstituted(detail, proj, { preview, weightKg, heightCm, a
   // sign rather than being joined with a fixed '+'.
   const sigma = sex === 'male' ? '+ 5' : '− 161';
   const rows = [
-    ['BMR', `10 · ${weightKg} + 6.25 · ${heightCm} − 5 · ${age} ${sigma}  =  ${Math.round(detail.bmr)} kcal/day`],
-    ['Eₐ', `${met} · ${weightKg} · ${preview.ACTIVITY_TARGET_MIN} · ${preview.KCAL_PER_MET_KG_MIN} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
-    ['D', `${preview.WEEKLY_FAT_LOSS_KG} · 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
+    ['BMR', `10 × ${weightKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(detail.bmr)} kcal/day`],
+    ['Eₐ', `${met} × ${weightKg} × ${preview.ACTIVITY_TARGET_MIN} × ${preview.KCAL_PER_MET_KG_MIN} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
+    ['D', `${preview.WEEKLY_FAT_LOSS_KG} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
     ['Eᵢₙ', `${Math.round(detail.bmr)} + ${Math.round(detail.activityKcal)} − ${Math.round(deficit)}  =  ${detail.kcal} kcal/day`],
   ];
 
   const goalKg = preview.WEIGHT_GOAL_KG;
   rows.push(
-    ['A', `6.25 · ${heightCm} − 5 · ${age} ${sigma}  =  ${Math.round(proj.a)} kcal/day`],
-    ['B', `10 + ${met} · ${preview.ACTIVITY_TARGET_MIN} · ${preview.KCAL_PER_MET_KG_MIN} / 200  =  ${Math.round(proj.b * 100) / 100} kcal/day per kg`],
+    ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(proj.a)} kcal/day`],
+    ['B', `10 + ${met} × ${preview.ACTIVITY_TARGET_MIN} × ${preview.KCAL_PER_MET_KG_MIN} / 200  =  ${Math.round(proj.b * 100) / 100} kcal/day per kg`],
     ['m∞', `(${detail.kcal} − ${Math.round(proj.a)}) / ${Math.round(proj.b * 100) / 100}  =  ${Math.round(proj.equilibriumKg * 10) / 10} kg`],
   );
   if (proj.status === 'ok') {
-    rows.push(['t', `(7700 / ${Math.round(proj.b * 100) / 100}) · ln[(${weightKg} − ${Math.round(proj.equilibriumKg * 10) / 10}) / (${goalKg} − ${Math.round(proj.equilibriumKg * 10) / 10})]  =  ${Math.round(proj.days)} days`]);
+    rows.push(['t', `(7700 / ${Math.round(proj.b * 100) / 100}) × ln[(${weightKg} − ${Math.round(proj.equilibriumKg * 10) / 10}) / (${goalKg} − ${Math.round(proj.equilibriumKg * 10) / 10})]  =  ${Math.round(proj.days)} days`]);
   }
 
   rows.forEach(([label, value]) => {
@@ -237,13 +213,10 @@ function renderFormulaPreview() {
   const text = `${detail.kcal} kcal`;
   resultEl.textContent = privacyMode ? maskDigits(text) : text;
 
-  // Why this t won't match the Weight Trend panel's. Same equation — verified
-  // identical on identical inputs — but this one is the plan (eat exactly Eᵢₙ, hit
-  // the activity target, sleep not modelled) while the chart forecasts from what
-  // you actually logged. The gap between them is the plan-vs-reality gap.
-  noteEl.textContent = 'Assumes you eat exactly Eᵢₙ and hit ACTIVITY_TARGET_MIN every day. Weight Trend & Forecast runs the same equation on your logged intake, activity and sleep instead, so the two dates differ whenever your habits differ from this plan.';
+  // Clear any earlier invalid-input message.
+  noteEl.textContent = '';
 
-  const proj = projectFormulaDays({
+  const proj = projectPlanDays({
     intakeKcal: detail.kcal,
     weightKg,
     heightCm,

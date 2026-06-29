@@ -336,7 +336,7 @@ function populateSelect(select, options, selected) {
 function openTransactionForm(transaction, duplicate = false) {
   editingRow = (transaction && !duplicate) ? transaction.row : null;
 
-  const title = duplicate ? 'Duplicate Transaction' : (transaction ? 'Edit Transaction' : 'Add Transaction');
+  const title = duplicate ? 'Duplicate Transaction' : (transaction ? 'Edit Transaction' : 'Log a Transaction');
   document.getElementById('tx-modal-title').textContent = title;
   document.getElementById('tx-date').value = transaction ? transaction.date : new Date().toISOString().slice(0, 10);
   document.getElementById('tx-payee').value = transaction ? transaction.payee : '';

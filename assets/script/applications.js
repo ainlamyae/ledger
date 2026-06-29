@@ -127,7 +127,7 @@ function renderApplicationsList() {
 
   if (filtered.length === 0) {
     const message = allApplications.length === 0
-      ? 'No applications yet — click "+ Add Application" to get started.'
+      ? 'No applications yet — click "Log an Application" to get started.'
       : 'No applications match your search.';
     const empty = document.createElement('div');
     empty.className = 'empty-state';
@@ -240,7 +240,7 @@ const APPLICATION_FIELD_IDS = ['type', 'number', 'date', 'action'];
 function openApplicationForm(app) {
   editingApplicationRow = app ? app.headerRow : null;
 
-  document.getElementById('application-modal-title').textContent = app ? 'Edit Application' : 'Add Application';
+  document.getElementById('application-modal-title').textContent = app ? 'Edit Application' : 'Log an Application';
 
   const values = app ? [app.type, app.appNumber, app.date, app.action] : ['', '', '', 'Submited'];
   APPLICATION_FIELD_IDS.forEach((id, i) => {

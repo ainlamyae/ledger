@@ -17,7 +17,7 @@
 const INSIGHT_MODES = {
   wellness: {
     label: 'Wellness',
-    hint: 'A read on your recent trends vs. the previous period — grounded in your weight trajectory, targets, and logging.',
+    hint: 'A read on your recent trends vs. the previous period — grounded in your body mass trajectory, targets, and logging.',
     questionPlaceholder: 'e.g. Should I prioritize sleep or protein right now?',
     previewId: 'insight-preview-text',
     gather: (from, to) => gatherInsightMetrics(from, to),
@@ -63,7 +63,6 @@ const INSIGHT_MODES = {
 
 const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
 const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food'];
-const INSIGHT_IDLE_HINT = 'Pick Wellness, Food, or Activity to load its data — nothing is computed until you do.';
 
 // What's on screen right now: which mode, the range it was gathered for, and
 // the gathered data itself. Send to AI reuses this data rather than re-running
@@ -74,7 +73,9 @@ let getInsightDateRange = () => ({ from: null, to: null });
 
 function initInsightPanel() {
   clearFieldError('insight-status');
-  document.getElementById('insight-mode-status').textContent = INSIGHT_IDLE_HINT;
+  // Starts blank — the element still carries the real status messages below
+  // ("Still loading your Health Log…"), it just no longer opens with a prompt.
+  document.getElementById('insight-mode-status').textContent = '';
 
   // Wires the From/To pair and defaults it to the last 7 days, but renders
   // nothing — a date edit only recomputes once a mode has been loaded.

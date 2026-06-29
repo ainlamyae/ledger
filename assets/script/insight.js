@@ -1,20 +1,12 @@
-// "💡 Wellness Insight" panel (formerly "Insight"): sends a plain-language
-// snapshot of the user's recent data (current window + the immediately
-// preceding period of equal length, plus the shared age/sex/height/weight/BMI
-// profile block Food and Activity Insight also send, their own targets and
-// calorie bound,
-// and the same weight-trajectory numbers the Weight Trend &
-// Forecast chart already computes) to Groq and shows the free-text response
-// inline. Never runs automatically, and unlike calorie-estimator.js's calls
-// this one is neither cached nor deterministic (it's advice text, not a
-// number to reproduce) — but the last result IS persisted, to the Settings
-// tab as WELLNESS_INSIGHT_LAST_RESULT/WELLNESS_INSIGHT_LAST_GENERATED_AT, so
-// the panel still shows something on a fresh page load. Wired up by
-// initInsightPanel(), called from app.js.
-
-// Default span of the From/To date pickers on first load — otherwise
-// identical in meaning to the old fixed 7-day lookback.
-const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
+// Shared building blocks for the Health Insight panel, plus everything specific
+// to its Wellness mode. The profile snapshot, the window aggregator and the
+// model-output renderer here are used by all three modes (food-insight.js,
+// activity-insight.js); the metrics/prompt pair below is Wellness's own.
+// insight-panel.js owns the panel itself — the buttons, the Groq call, and
+// persisting each mode's last report.
+//
+// ageFromBirthDate is also called from charts.js (BMR/BMI paths), so it lives
+// here rather than moving into the panel file.
 
 // Whole-years-old as of today; null if BIRTH_DATE isn't set or unparseable.
 function ageFromBirthDate(birthDateStr) {
@@ -54,7 +46,7 @@ function gatherProfileSnapshot() {
 // so the profile goes to all three rather than only to the panel that happens
 // to compute calorie figures. Missing fields are reported as "not set" instead
 // of being dropped, so the model can see what it doesn't know rather than
-// quietly assuming a default. weightGoalKg is passed only by Wellness Insight,
+// quietly assuming a default. weightGoalKg is passed only by the Wellness mode,
 // the one panel whose subject is the journey rather than today's body.
 function formatProfileLines(p, weightGoalKg = null) {
   const goalSuffix = weightGoalKg !== null ? ` (goal: ${weightGoalKg} kg)` : '';
@@ -97,7 +89,12 @@ function aggregateWindow(dates) {
   const activityKcalByDescriptionByDate = new Map();
   const sleepByDate = new Map();
 
-  getDatedWellnessEntries()
+  // Hoisted out of the loop below: it doesn't vary per entry, and inside the
+  // forEach it cost a full filter plus a filter-and-sort for every activity row.
+  const datedEntries = getDatedWellnessEntries();
+  const weightKg = latestWeightKg(datedEntries);
+
+  datedEntries
     .filter((e) => e.date >= from && e.date <= to)
     .forEach((e) => {
       if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
@@ -122,7 +119,7 @@ function aggregateWindow(dates) {
         // Every entry gets a burn figure via charts.js's activityEntryKcal — its
         // own amount2, else its minutes at ACTIVITY_MET. A plain Activity row used
         // to contribute nothing, understating what the AI was told was burned.
-        const kcal = activityEntryKcal(e, latestWeightKg(getDatedWellnessEntries()));
+        const kcal = activityEntryKcal(e, weightKg);
         activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
         if (!activityKcalByDescriptionByDate.has(description)) activityKcalByDescriptionByDate.set(description, new Map());
         const kcalByDate = activityKcalByDescriptionByDate.get(description);
@@ -228,11 +225,19 @@ function formatTrajectoryLine(projection) {
   if (projection.status === 'reached') return 'Weight trajectory: already at goal weight.';
   if (projection.status === 'no-change') return 'Weight trajectory: current habits project no meaningful weight change.';
   if (projection.status === 'wrong-direction') return 'Weight trajectory: current trend is moving away from the goal, not toward it.';
+  // Moving the right way but toward a plateau short of the goal — the intake these
+  // habits average is maintenance at that weight, so it never arrives.
+  if (projection.status === 'asymptote') {
+    return `Weight trajectory: current habits move toward the goal but level off around ${Math.round(projection.equilibriumKg * 10) / 10} kg, short of it — reaching the goal needs a change in intake or activity.`;
+  }
   if (projection.status !== 'ok') return 'Weight trajectory: not enough data to estimate a trend.';
 
   const kgPerWeek = Math.abs(projection.slope * 7).toFixed(1);
   const direction = projection.slope < 0 ? 'losing' : 'gaining';
-  return `Weight trajectory: ${direction} ~${kgPerWeek} kg/week, estimated to reach the ${projection.weightGoal} kg goal around ${isoFromDate(projection.etaDate)} (~${projection.daysToGoal} days) — generic population-average estimate.`;
+  // "currently" because the rate isn't constant: the arrival date comes from an
+  // exponential model in which the rate decays as BMR falls with body mass, so
+  // quoting the present rate as if it held to the goal would overstate progress.
+  return `Weight trajectory: currently ${direction} ~${kgPerWeek} kg/week (slowing as weight drops), estimated to reach the ${projection.weightGoal} kg goal around ${isoFromDate(projection.etaDate)} (~${projection.daysToGoal} days) — generic population-average estimate.`;
 }
 
 // One line per activity description (e.g. NEAT / Resistance / Cardio),
@@ -310,70 +315,6 @@ If an additional question from the user is included after the data, also answer 
 
 Keep the whole report under 250 words.`;
 
-async function generateWellnessInsight(fromIso, toIso, question) {
-  const apiKey = getSettingString('GROQ_API_KEY', null);
-  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
-
-  let userMessage = formatInsightPrompt(gatherInsightMetrics(fromIso, toIso));
-  if (question && question.trim()) userMessage += `\n\nAdditional question: ${question.trim()}`;
-
-  const res = await fetch(GROQ_API, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0.4,
-      messages: [
-        { role: 'system', content: INSIGHT_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `Groq API error ${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.choices[0].message.content;
-}
-
-// Set by initInsightPanel() to the getter initDateRangeControl() (charts.js)
-// returns — the one shared From/To wiring also used by protein-rotation.js.
-let getInsightDateRange = () => ({ from: null, to: null });
-
-function initInsightPanel() {
-  clearFieldError('insight-status');
-  getInsightDateRange = initDateRangeControl('insight-date-from', 'insight-date-to', INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
-    renderInsightDataPreview(getInsightDateRange());
-  });
-  renderInsightDataPreview(getInsightDateRange());
-  renderSavedWellnessInsight();
-
-  document.getElementById('insight-generate-btn').addEventListener('click', () => {
-    const { from, to } = getInsightDateRange();
-    runInsightGeneration(from, to, document.getElementById('insight-question').value);
-  });
-}
-
-// Shows exactly what formatInsightPrompt() would send to Groq, in plain
-// language, so nothing about the request is a black box — this is our own
-// computed text (not model output), rendered before Send to AI is ever
-// clicked and refreshed live as the date range changes.
-function renderInsightDataPreview({ from, to }) {
-  const preview = document.getElementById('insight-data-preview');
-  preview.innerHTML = '';
-  formatInsightPrompt(gatherInsightMetrics(from, to)).split('\n').forEach((line) => {
-    const p = document.createElement('p');
-    p.textContent = line;
-    preview.appendChild(p);
-  });
-}
-
 const INSIGHT_SECTION_LABELS = ['Overview', 'Going well', 'Needs attention', 'Suggestions', 'Answer'];
 
 // One <p> per line (blank lines dropped) rather than per blank-line-separated
@@ -400,87 +341,4 @@ function renderInsightText(container, text) {
     }
     container.appendChild(p);
   });
-}
-
-// Only runs on an explicit Send to AI click — changing the date range only
-// updates the (free, local) data preview above.
-async function runInsightGeneration(fromIso, toIso, question) {
-  const body = document.getElementById('insight-body');
-  const btn = document.getElementById('insight-generate-btn');
-  const fromEl = document.getElementById('insight-date-from');
-  const toEl = document.getElementById('insight-date-to');
-  const textarea = document.getElementById('insight-question');
-
-  body.innerHTML = '';
-  clearFieldError('insight-status');
-
-  const loading = document.createElement('p');
-  loading.className = 'hint';
-  loading.textContent = `Analyzing ${fromIso} to ${toIso}…`;
-  body.appendChild(loading);
-
-  btn.disabled = true;
-  fromEl.disabled = true;
-  toEl.disabled = true;
-  textarea.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Generating…';
-
-  try {
-    const text = await generateWellnessInsight(fromIso, toIso, question);
-    body.innerHTML = '';
-    renderInsightText(body, text);
-
-    // Persisted so a fresh page load still shows the last read instead of
-    // going blank — same pattern as food-insight.js's Food Insight panel.
-    const generatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
-    try {
-      await saveSettingValues({
-        WELLNESS_INSIGHT_LAST_RESULT: text,
-        WELLNESS_INSIGHT_LAST_GENERATED_AT: generatedAt,
-      });
-      renderInsightGeneratedAt(generatedAt);
-    } catch (saveErr) {
-      showFieldError('insight-status', `Generated, but couldn't save it: ${saveErr.message}`);
-    }
-  } catch (err) {
-    body.innerHTML = '';
-    showFieldError('insight-status', err.message);
-  } finally {
-    btn.disabled = false;
-    fromEl.disabled = false;
-    toEl.disabled = false;
-    textarea.disabled = false;
-    btn.textContent = originalLabel;
-  }
-}
-
-function renderInsightGeneratedAt(timestamp) {
-  const el = document.getElementById('insight-generated-at');
-  if (!timestamp) {
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  el.textContent = `Last generated ${timestamp}`;
-}
-
-// Restores the last AI result (if any) from the Settings tab on page load,
-// so the panel shows the previous read instead of an empty placeholder.
-function renderSavedWellnessInsight() {
-  const body = document.getElementById('insight-body');
-  const text = getSettingString('WELLNESS_INSIGHT_LAST_RESULT', null);
-
-  body.innerHTML = '';
-  if (!text) {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'hint';
-    placeholder.textContent = 'Review the data above, then click "Send to AI" to get a read on it.';
-    body.appendChild(placeholder);
-    renderInsightGeneratedAt(null);
-    return;
-  }
-
-  renderInsightText(body, text);
-  renderInsightGeneratedAt(getSettingString('WELLNESS_INSIGHT_LAST_GENERATED_AT', null));
 }

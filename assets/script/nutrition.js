@@ -42,6 +42,10 @@ function parseCountFromAmount(amount) {
 }
 
 let allNutritionEntries = [];
+// Same purpose as wellness.js's wellnessDataLoaded: lets a click that races the
+// initial fetch say "still loading" instead of treating the empty array as the
+// real answer (an untracked ingredient and an unloaded table look identical).
+let nutritionDataLoaded = false;
 let nutritionListenersAttached = false;
 let nSort = { key: 'name', dir: 1 };
 let nCurrentPage = 1;
@@ -120,6 +124,7 @@ async function refreshNutrition(forceRefresh = false) {
     }))
     .filter((n) => n.name);
 
+  nutritionDataLoaded = true;
   renderNutritionList();
 }
 

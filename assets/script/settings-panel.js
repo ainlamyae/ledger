@@ -56,6 +56,18 @@ async function refreshSettingsList(forceRefresh = false) {
   renderSettingsList();
 }
 
+// A Value cell holds anything from `82` to a whole saved AI report, and a
+// multi-hundred-character cell stretched the row far past every other one.
+// Truncated for display only — the full text is in the title attribute and in
+// the edit form, and nothing here is ever written back from the table.
+const SETTING_VALUE_DISPLAY_MAX = 32;
+
+function truncateSettingValue(value) {
+  return value.length > SETTING_VALUE_DISPLAY_MAX
+    ? `${value.slice(0, SETTING_VALUE_DISPLAY_MAX)}…`
+    : value;
+}
+
 function renderSettingsList() {
   const tbody = document.getElementById('settings-body');
   tbody.innerHTML = '';
@@ -77,7 +89,11 @@ function renderSettingsList() {
     // names — letters carry just as much sensitive content as digits do
     // here, unlike a plain number. The Key column (e.g. WEIGHT_GOAL_KG)
     // isn't sensitive on its own and stays visible.
-    tr.append(makeCell(setting.key), makeCell(privacyMode ? maskText(setting.value) : setting.value), actionsCell);
+    // No hover-reveal of a masked value — that would defeat the privacy toggle.
+    const shown = truncateSettingValue(privacyMode ? maskText(setting.value) : setting.value);
+    const fullTitle = (!privacyMode && shown !== setting.value) ? setting.value : undefined;
+
+    tr.append(makeCell(setting.key), makeCell(shown, fullTitle), actionsCell);
     tbody.appendChild(tr);
   });
 }

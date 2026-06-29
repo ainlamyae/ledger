@@ -29,7 +29,7 @@ function fixTrendYAxisWidth(scale) {
 // Activity's calories-burned dots) — so a chart with no real right axis
 // still gets the same plot-area width and x-axis tick spacing as the two
 // that do, instead of stretching further right and misaligning the date
-// labels across the Health Metrics section. A fresh object per call since
+// labels across the Health Trends & Forecast section. A fresh object per call since
 // Chart.js's afterFit mutates the live scale instance it's handed, not this
 // config object, but a factory avoids relying on that being safe forever.
 function ghostRightAxis() {
@@ -578,15 +578,23 @@ const GENERIC_KCAL_PER_KG_FAT = 7700;
 // and the MET formula therefore can't be evaluated.
 const GENERIC_KCAL_PER_ACTIVE_MIN = 5;
 
-// ACSM form: 1 MET = 3.5 mL O₂/kg/min and a litre of O₂ releases ~5 kcal, so
-// 3.5/200 kcal per MET per kg per minute. Not the `MET × kg × hours` shorthand,
-// which assumes 1 MET = 1 kcal/kg/hour and lands a flat 5% low.
-const KCAL_PER_MET_KG_MIN = 3.5 / 200;
+// ACSM form: 1 MET = 3.5 mL O₂/kg/min and a litre of O₂ releases ~5 kcal (200 mL
+// per kcal), so 3.5/200 kcal per MET per kg per minute. Not the `MET × kg × hours`
+// shorthand, which assumes 1 MET = 1 kcal/kg/hour and lands a flat 5% low.
+const MET_ML_O2_PER_KG_MIN_DEFAULT = 3.5;
+const ML_O2_PER_KCAL = 200;
+
+// Only the mL-O₂ numerator is overridable (KCAL_PER_MET_KG_MIN in Settings, so
+// the Formula Playground can save a different one); the /200 is fixed, since it's
+// oxygen's energy yield rather than anything personal.
+function kcalPerMetKgMin() {
+  return getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT) / ML_O2_PER_KCAL;
+}
 
 // The app's only MET→kcal conversion, so the bound's assumed activity burn and
 // Calculate's measured one (activity-estimator.js) can't disagree.
 function metKcal(met, weightKg, minutes) {
-  return met * weightKg * minutes * KCAL_PER_MET_KG_MIN;
+  return met * weightKg * minutes * kcalPerMetKgMin();
 }
 
 function latestWeightKg(entries) {
@@ -871,7 +879,7 @@ function calorieBoundVariance(kcal, boundKcal) {
   return Math.round(kcal - boundKcal);
 }
 
-// Number of trailing days shown in each Health Metrics chart (Body Weight,
+// Number of trailing days shown in each Health Trends & Forecast chart (Body Weight,
 // Caloric Intake, Protein Intake, Physical Activity, Rest & Recovery). Body
 // Weight appears here as well as in the Weight Trend & Forecast chart above
 // without duplicating it: that one is the trajectory (trend, goal, forecast),
@@ -918,7 +926,7 @@ function datesInRange(fromIso, toIso) {
 
 // Wires up a From/To date-range picker (two <input type="date">) shared by
 // any panel that lets the user pick an arbitrary custom range instead of a
-// fixed N-day lookback (Wellness Insight, Protein Source Rotation, ...) —
+// fixed N-day lookback (Health Insight, Protein Source Rotation, ...) —
 // one implementation instead of each panel re-deriving its own defaulting
 // and listener wiring. Defaults both inputs to the last defaultDays days
 // (today inclusive) the first time they're empty, fires onChange on every
@@ -1980,6 +1988,9 @@ function calcProjection(entries) {
 
   let slope;
   let method;
+  // Set only by the habit branch below, and only with a profile on file: the
+  // exponential model's three coefficients. Null means project as a straight line.
+  let decay = null;
 
   if (caloriesByDate.size > 0 || activityKcalByDate.size > 0) {
     const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
@@ -2014,6 +2025,27 @@ function calcProjection(entries) {
     const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
     slope = baseSlope * sleepRatio;
 
+    // Maintenance isn't a constant as weight changes — it's affine in body mass,
+    // so holding intake fixed makes the trajectory an exponential decay toward
+    // the weight where that intake IS maintenance, not a straight line. Both
+    // terms scale with mass: BMR by its 10·m coefficient, and the logged activity
+    // burn because metKcal is proportional to weight (the same kg of walking
+    // costs less at a lighter body). Only available with a profile — without a
+    // BMR there's no A/B to split maintenance into, so `decay` stays null and the
+    // straight-line projection below is used unchanged.
+    if (resting !== null && lastWeight > 0) {
+      const perKg = 10 + avgActivityKcal / lastWeight;
+      const weightIndependent = maintenance - perKg * lastWeight;
+      decay = {
+        perKg,
+        // Sleep scales the whole rate, so it divides the energy density rather
+        // than entering the equilibrium — the destination is the same either way,
+        // only the speed of arrival changes.
+        kcalPerKg: GENERIC_KCAL_PER_KG_FAT / sleepRatio,
+        equilibriumKg: (avgCalories - weightIndependent) / perKg,
+      };
+    }
+
     // The formula scales by sleep, so a missing sleep log genuinely leaves it
     // working with partial habit data.
     const allPresent = caloriesByDate.size > 0 && activityKcalByDate.size > 0 && sleepByDate.size > 0;
@@ -2032,22 +2064,54 @@ function calcProjection(entries) {
   const goingDown = weightGoal < lastWeight;
   if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method, slope };
 
-  const daysToGoal = Math.round((weightGoal - lastWeight) / slope);
+  // A fixed intake can only ever carry you to its own equilibrium weight, so a
+  // goal on the far side of it is never reached however long you hold the habit.
+  // The straight line couldn't express that — it always produced an arrival date
+  // — which is exactly the case this status exists to report.
+  if (decay !== null) {
+    const gapNow = lastWeight - decay.equilibriumKg;
+    const gapGoal = weightGoal - decay.equilibriumKg;
+    if (gapGoal / gapNow <= 0) {
+      return { status: 'asymptote', method, slope, equilibriumKg: decay.equilibriumKg };
+    }
+  }
+
+  // Time to the goal: the straight line's own division, or the exponential
+  // model's closed form — t = (ρ/B)·ln[(m − m∞)/(m_g − m∞)], the exact solution
+  // of dm/dt = (E − A − B·m)/ρ rather than a day-by-day simulation of it.
+  const daysToGoal = decay !== null
+    ? Math.round((decay.kcalPerKg / decay.perKg)
+      * Math.log((lastWeight - decay.equilibriumKg) / (weightGoal - decay.equilibriumKg)))
+    : Math.round((weightGoal - lastWeight) / slope);
   const etaDate = new Date(today);
   etaDate.setDate(today.getDate() + daysToGoal);
+
+  // m(t) = m∞ + (m − m∞)·e^(−B·t/ρ) for the curve, m + slope·t for the line.
+  const weightAtDay = (d) => (decay !== null
+    ? decay.equilibriumKg + (lastWeight - decay.equilibriumKg) * Math.exp(-(decay.perKg * d) / decay.kcalPerKg)
+    : lastWeight + slope * d);
 
   const cappedDays = Math.min(daysToGoal, 365);
   const projectedPoints = [];
   for (let d = 0; d <= cappedDays; d += 7) {
     const pd = new Date(today);
     pd.setDate(today.getDate() + d);
-    projectedPoints.push({ date: isoFromDate(pd), weight: Math.round((lastWeight + slope * d) * 10) / 10 });
+    projectedPoints.push({ date: isoFromDate(pd), weight: Math.round(weightAtDay(d) * 10) / 10 });
   }
   if (daysToGoal <= 365) {
     projectedPoints.push({ date: isoFromDate(etaDate), weight: weightGoal });
   }
 
-  return { status: 'ok', slope, daysToGoal, etaDate, projectedPoints, method, weightGoal };
+  return {
+    status: 'ok',
+    slope,
+    daysToGoal,
+    etaDate,
+    projectedPoints,
+    method,
+    weightGoal,
+    equilibriumKg: decay !== null ? decay.equilibriumKg : null,
+  };
 }
 
 function renderWellnessProjectionChart(entries) {
@@ -2056,7 +2120,7 @@ function renderWellnessProjectionChart(entries) {
 
   const meterWrap = document.getElementById('weight-progress-meter');
   const meterFill = document.getElementById('weight-progress-meter-fill');
-  const meterPct = document.getElementById('weight-progress-meter-pct');
+  const meterDone = document.getElementById('weight-progress-meter-done');
   const meterRemaining = document.getElementById('weight-progress-meter-remaining');
   const timeWrap = document.getElementById('time-progress-meter');
   const timeFill = document.getElementById('time-progress-meter-fill');
@@ -2065,7 +2129,7 @@ function renderWellnessProjectionChart(entries) {
   const etaEl = document.getElementById('weight-projection-eta');
   const plateauNote = document.getElementById('weight-plateau-note');
   meterWrap.hidden = true;
-  meterPct.textContent = '';
+  meterDone.textContent = '';
   meterRemaining.textContent = '';
   meterRemaining.classList.remove('danger');
   timeWrap.hidden = true;
@@ -2091,13 +2155,14 @@ function renderWellnessProjectionChart(entries) {
   // shown whenever there's a real start point and a distinct goal,
   // regardless of trajectory status (even "wrong direction" is worth
   // seeing visually, just in the danger color instead of the accent).
-  // Shows both the concrete kg remaining (the motivating, actionable number
-  // a bare percentage doesn't convey) and the percentage already covered,
-  // rather than just the one abstract figure.
+  // Both readouts are kg — how far you've come and how far is left, in the same
+  // unit, so the pair can be compared directly. The percentage still drives the
+  // bar's width; it just isn't spelled out beside a kg figure any more.
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
   const totalDelta = startWeight - weightGoal;
   if (Math.abs(totalDelta) >= 0.1) {
     const pct = Math.max(0, Math.min(100, ((startWeight - lastWeight) / totalDelta) * 100));
+    const doneKg = Math.round(Math.abs(startWeight - lastWeight) * 10) / 10;
     const remainingKg = Math.round(Math.abs(lastWeight - weightGoal) * 10) / 10;
     const isWrongDirection = proj.status === 'wrong-direction';
 
@@ -2105,8 +2170,8 @@ function renderWellnessProjectionChart(entries) {
     meterFill.style.width = `${pct}%`;
     meterFill.classList.toggle('danger', isWrongDirection);
 
-    const pctText = `${Math.round(pct)}%`;
-    meterPct.textContent = privacyMode ? maskDigits(pctText) : pctText;
+    const doneText = `${doneKg} kg`;
+    meterDone.textContent = privacyMode ? maskDigits(doneText) : doneText;
 
     const remainingText = `${remainingKg} kg`;
     meterRemaining.textContent = privacyMode ? maskDigits(remainingText) : remainingText;
@@ -2131,6 +2196,9 @@ function renderWellnessProjectionChart(entries) {
     reached: () => 'Goal reached! 🎉',
     'no-change': () => 'No net change at current habits',
     'wrong-direction': () => `Current habits trend away from goal — ${rateNote()}, so no arrival date can be projected`,
+    // The rate is real and pointed the right way, but it decays to zero before
+    // the goal: the intake these habits average IS maintenance at that weight.
+    asymptote: () => `Currently ${rateNote()}, but these habits level off around ${Math.round(proj.equilibriumKg * 10) / 10} kg — the goal isn't reachable without changing them`,
   }[proj.status];
   if (statusNote) {
     const note = statusNote();
@@ -2338,7 +2406,7 @@ function renderWellnessProjectionChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        // Off, like every other Health Metrics chart. Chart.js draws the legend
+        // Off, like every other Health Trends & Forecast chart. Chart.js draws the legend
         // inside the canvas, so a legend here left this chart's plot area ~30px
         // shorter than the rest of the section. Series are named in the tooltip.
         legend: { display: false },

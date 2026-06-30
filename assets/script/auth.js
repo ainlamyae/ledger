@@ -107,14 +107,18 @@ function initAuth(onAuthChange) {
     return;
   }
 
-  // No stored token: try a silent refresh off the browser's existing Google
-  // session before falling back to the sign-in gate. prompt: 'none' only
-  // succeeds quietly when that session is already active (e.g. Chrome on
-  // Android sharing the device's signed-in Google account); otherwise GIS
-  // reports an error here instead of opening a popup, so this never blocks
-  // or flashes anything — it just degrades to the gate.
-  pendingSilent = true;
-  tokenClient.requestAccessToken({ prompt: 'none' });
+  // No stored token: on desktop, try a silent refresh — GIS resolves the
+  // existing Google session via a hidden iframe, no visible UI. On mobile,
+  // skip this entirely: mobile browsers (especially iOS) restrict cross-origin
+  // iframes, so GIS falls back to opening a popup/tab even for prompt:'none',
+  // causing an unexpected window to appear before the user taps anything.
+  // Just show the sign-in gate immediately instead.
+  if (/Mobi|Android|iPhone|iPad|IEMobile/i.test(navigator.userAgent)) {
+    authChangeHandler(null);
+  } else {
+    pendingSilent = true;
+    tokenClient.requestAccessToken({ prompt: 'none' });
+  }
 }
 
 function signIn() {
@@ -124,6 +128,26 @@ function signIn() {
   // this without any visible UI or with a single account-picker click.
   const hasConsented = localStorage.getItem(CONSENTED_STORAGE_KEY);
   tokenClient.requestAccessToken({ prompt: hasConsented ? '' : 'consent' });
+
+  // On mobile, GIS opens the OAuth flow as a new browser tab rather than a
+  // true popup. window.opener is often null in that context, so the token
+  // can't be posted back — the app tab stays at the sign-in gate even after
+  // the user authenticates. When the user switches back here, a silent
+  // requestAccessToken succeeds because the browser now has a Google session
+  // cookie from the completed sign-in.
+  if (/Mobi|Android|iPhone|iPad|IEMobile/i.test(navigator.userAgent)) {
+    let attempts = 0;
+    const retryOnReturn = () => {
+      if (document.hidden || isSignedIn()) return;
+      if (++attempts > 3) {
+        document.removeEventListener('visibilitychange', retryOnReturn);
+        return;
+      }
+      pendingSilent = true;
+      tokenClient.requestAccessToken({ prompt: 'none' });
+    };
+    document.addEventListener('visibilitychange', retryOnReturn);
+  }
 }
 
 function signOut() {

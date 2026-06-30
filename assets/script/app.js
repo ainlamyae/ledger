@@ -161,7 +161,7 @@ async function populateAccountMenu() {
   document.getElementById('account-menu-email').textContent = info.email || '';
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -563,6 +563,7 @@ async function loadDashboard(forceRefresh = false) {
     }),
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
+    initWellness(forceRefresh),
   ]);
 
   const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);

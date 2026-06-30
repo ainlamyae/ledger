@@ -15,5 +15,6 @@ const CONFIG = {
     INSIGHT: 'Insight',
     RECONCILIATION: 'Reconciliation',
     TIMESHEET: 'eTimeSheet',
+    WELLNESS: 'Wellness Log',
   },
 };

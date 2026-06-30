@@ -46,6 +46,7 @@
         <a href="#transactions">Transactions</a>
         <a href="#accounts">Accounts</a>
         <a href="#timesheet">Time Sheet</a>
+        <a href="#wellness">Wellness Log</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -468,6 +469,91 @@
         </div>
     </section>
 
+    <div style="height:.5rem"></div>
+
+    <section id="wellness" class="panel-group">
+        <h2 class="panel-group-title">Wellness Log</h2>
+
+        <div class="panel">
+            <h2>Wellness Charts</h2>
+
+            <div class="panel-section">
+                <h3>Weight Trend</h3>
+                <div class="chart-box">
+                    <canvas id="wellness-weight-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Daily Calories — Last 7 Days</h3>
+                <div class="chart-box">
+                    <canvas id="wellness-calories-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Sleep Duration — Last 7 Days</h3>
+                <div class="chart-box">
+                    <canvas id="wellness-sleep-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Activity — Last 7 Days</h3>
+                <div class="chart-box">
+                    <canvas id="wellness-activity-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Wellness Log</h2>
+
+            <div class="panel-actions">
+                <button id="add-wellness-btn" class="btn btn-primary">+ Add Entry</button>
+            </div>
+
+            <div class="filters">
+                <select id="wellness-category-filter">
+                    <option value="">All Categories</option>
+                    <option>Sleep</option>
+                    <option>Weight</option>
+                    <option>Calories</option>
+                    <option>Activity</option>
+                </select>
+            </div>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="wellness-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="wellness-date-to">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="wellness-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th>Time</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Unit</th>
+                        <th>Notes</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="wellness-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="wellness-pagination"></div>
+        </div>
+    </section>
+
 </div>
 
 <div class="fab-stack">
@@ -516,7 +602,7 @@
                 <datalist id="tx-description-options"></datalist>
             </label>
             <label>Amount
-                <input type="text" inputmode="decimal" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2" required>
+                <input type="text" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2" required>
             </label>
 
             <p class="hint">Use a positive amount for income, negative for expenses. You can also enter an expression, e.g. =-9.97-1.30 or -32/2.</p>
@@ -554,7 +640,7 @@
                 <input type="text" id="tx-bulk-description" list="tx-description-options">
             </label>
             <label>Amount
-                <input type="text" inputmode="decimal" id="tx-bulk-amount" placeholder="e.g. -45.50 or =-9.97-1.30">
+                <input type="text" id="tx-bulk-amount" placeholder="e.g. -45.50 or =-9.97-1.30">
             </label>
 
             <p class="hint">Leave a field blank to keep each transaction's existing value.</p>
@@ -596,7 +682,7 @@
                 </datalist>
             </label>
             <label>Balance
-                <input type="text" inputmode="decimal" id="account-balance" placeholder="e.g. 1234.56 or =5000-1234.56" required>
+                <input type="text" id="account-balance" placeholder="e.g. 1234.56 or =5000-1234.56" required>
             </label>
 
             <p id="account-form-error" class="status" hidden></p>
@@ -645,6 +731,50 @@
     </div>
 </div>
 
+<div id="wellness-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="wellness-modal-title">Add Entry</h2>
+
+        <form id="wellness-form">
+            <label>Date
+                <input type="date" id="wellness-entry-date" required>
+            </label>
+            <label>Time
+                <input type="time" id="wellness-entry-time">
+            </label>
+            <label>Category
+                <select id="wellness-category" required>
+                    <option value="">— Select —</option>
+                    <option>Sleep</option>
+                    <option>Weight</option>
+                    <option>Calories</option>
+                    <option>Activity</option>
+                </select>
+            </label>
+            <label>Description
+                <input type="text" id="wellness-description" list="wellness-description-options" required>
+                <datalist id="wellness-description-options"></datalist>
+            </label>
+            <label>Amount
+                <input type="text" id="wellness-amount" required>
+            </label>
+            <label>Unit
+                <input type="text" id="wellness-unit">
+            </label>
+            <label>Notes
+                <textarea id="wellness-notes" rows="2"></textarea>
+            </label>
+
+            <p id="wellness-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="wellness-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="shortcuts-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" hidden>
     <div class="modal-card">
         <h2 id="shortcuts-modal-title">Keyboard Shortcuts</h2>
@@ -673,6 +803,7 @@
 <script src="assets/script/accounts.js"></script>
 <script src="assets/script/timesheet.js"></script>
 <script src="assets/script/csv.js"></script>
+<script src="assets/script/wellness.js"></script>
 <script src="assets/script/app.js"></script>
 </body>
 </html>

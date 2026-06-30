@@ -5,7 +5,7 @@ const CATEGORY_DEFAULTS = {
   Sleep:    { unit: 'hr',   descriptions: ['Sleep Duration'] },
   Weight:   { unit: 'kg',   descriptions: ['Morning Weight', 'Evening Weight'] },
   Calories: { unit: 'kcal', descriptions: ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage', 'Other'] },
-  Activity: { unit: 'min',  descriptions: ['Walk', 'Run', 'Workout', 'Cycling', 'Swimming', 'HIIT', 'Yoga', 'Strength Training', 'Basketball', 'Stretching'] },
+  Activity: { unit: 'steps', descriptions: ['Walk', 'Run', 'Workout', 'Cycling', 'Swimming', 'HIIT', 'Yoga', 'Strength Training', 'Basketball', 'Stretching'] },
 };
 
 let allWellnessEntries = [];
@@ -501,7 +501,7 @@ function renderWellnessActivityChart() {
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: (v) => `${v} min` },
+          ticks: { callback: (v) => v.toLocaleString() },
         },
       },
     },

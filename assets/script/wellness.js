@@ -297,6 +297,9 @@ async function refreshWellness(forceRefresh = false) {
   wellnessDataLoaded = true;
   renderWellnessList();
   renderWellnessCharts(getDatedWellnessEntries());
+  // Ticks the Activity Plan rows already logged today (strength-plan.js) — here
+  // rather than in the plan's own init so a save re-marks the rows it wrote.
+  renderWorkoutPlanProgress();
 }
 
 function getDatedWellnessEntries() {

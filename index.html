@@ -270,16 +270,16 @@
 
         <div class="cards today-glance-cards">
             <div class="card">
-                <h3 id="today-calories-label">Calories</h3>
+                <h3 id="today-calories-label">Calory Intake</h3>
                 <div class="value" id="today-calories-value">—</div>
-            </div>
-            <div class="card">
-                <h3>Protein</h3>
-                <div class="value" id="today-protein-value">—</div>
             </div>
             <div class="card">
                 <h3>Activity</h3>
                 <div class="value" id="today-activity-value">—</div>
+            </div>
+            <div class="card">
+                <h3>Protein</h3>
+                <div class="value" id="today-protein-value">—</div>
             </div>
             <div class="card">
                 <h3>Sleep</h3>
@@ -340,7 +340,7 @@
                 <div class="weight-projection-header">
                     <h4>Body Mass</h4>
                 </div>
-                <div class="chart-box chart-box-donut">
+                <div class="chart-box chart-box-flush">
                     <canvas id="wellness-weight-chart"></canvas>
                 </div>
             </div>
@@ -357,28 +357,28 @@
             <div class="donut-grid wellness-metrics-grid">
                 <div class="donut-item">
                     <h4 id="wellness-calories-label">Caloric Intake</h4>
-                    <div class="chart-box chart-box-donut">
+                    <div class="chart-box chart-box-flush">
                         <canvas id="wellness-calories-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
                     <h4>Physical Activity</h4>
-                    <div class="chart-box chart-box-donut">
+                    <div class="chart-box chart-box-flush">
                         <canvas id="wellness-activity-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
                     <h4>Protein Intake</h4>
-                    <div class="chart-box chart-box-donut">
+                    <div class="chart-box chart-box-flush">
                         <canvas id="wellness-protein-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
                     <h4>Rest &amp; Recovery</h4>
-                    <div class="chart-box chart-box-donut">
+                    <div class="chart-box chart-box-flush">
                         <canvas id="wellness-sleep-chart"></canvas>
                     </div>
                 </div>
@@ -387,7 +387,7 @@
 
         <div class="panel" id="insight-panel">
             <h2>Health Insight</h2>
-            <p class="hint" id="insight-hint">Three AI reads on your own logged data, one panel. Pick Wellness, Food, or Activity below to load exactly what would be sent, then send it.</p>
+            <p class="hint" id="insight-hint"></p>
 
             <div class="export-date-range">
                 <label>From
@@ -440,7 +440,6 @@
 
         <div class="panel" id="protein-rotation-panel">
             <h2>Protein Source Rotation</h2>
-            <p class="hint">Actual protein eaten vs. your live target for each source — a low or empty bar means it's time for that one. Set an ingredient's Protein % on its Nutrition Facts row to track it here. The donut splits the same sources by share of protein eaten: outer ring the 4 weeks ending on the To date, inner ring the last week of it.</p>
 
             <div class="export-date-range">
                 <label>From
@@ -459,6 +458,8 @@
                     <canvas id="protein-rotation-donut"></canvas>
                 </div>
             </div>
+
+            <div class="donut-legend" id="protein-rotation-legend"></div>
         </div>
 
         <div class="panel" id="workout-plan-panel">
@@ -877,7 +878,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="nutrition-search" placeholder="Search ingredient name...">
+                <input type="text" id="nutrition-search" placeholder="Search classification or ingredient name...">
             </div>
 
             <div class="table-responsive">
@@ -885,6 +886,7 @@
                     <thead>
                     <tr>
                         <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
+                        <th class="sortable" data-sort="classification">Classification</th>
                         <th class="sortable" data-sort="name">Name</th>
                         <th>Amount</th>
                         <th class="sortable" data-sort="calories">Calories</th>
@@ -1351,7 +1353,7 @@
 
 <div id="tx-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="tx-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="tx-modal-title">Log a Transaction</h2>
 
         <form id="tx-form" class="app-form">
@@ -1390,7 +1392,7 @@
 
 <div id="tx-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-bulk-edit-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="tx-bulk-edit-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="tx-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="tx-bulk-edit-modal-title">Edit Selected Transactions</h2>
 
         <form id="tx-bulk-edit-form" class="app-form">
@@ -1427,7 +1429,7 @@
 
 <div id="account-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="account-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="account-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="account-modal-title">Add Account</h2>
 
         <form id="account-form" class="app-form">
@@ -1468,7 +1470,7 @@
 
 <div id="setting-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="setting-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="setting-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="setting-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="setting-modal-title">Add Setting</h2>
 
         <form id="setting-form" class="app-form">
@@ -1512,7 +1514,7 @@
 
 <div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="timesheet-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="timesheet-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="timesheet-modal-title">Log Time</h2>
 
         <form id="timesheet-form" class="app-form">
@@ -1552,7 +1554,7 @@
 
 <div id="wellness-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="wellness-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="wellness-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="wellness-modal-title">Log an Entry</h2>
 
         <form id="wellness-form" class="app-form">
@@ -1618,7 +1620,7 @@
 
 <div id="wellness-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-bulk-edit-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="wellness-bulk-edit-modal-title">Edit Selected Entries</h2>
 
         <form id="wellness-bulk-edit-form" class="app-form">
@@ -1650,7 +1652,7 @@
 
 <div id="formula-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formula-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="formula-close-btn" class="btn modal-close">Close</button>
+        <button type="button" id="formula-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="formula-modal-title">Health Formula Playground</h2>
 
         <pre id="formula-expression" class="formula-expression"></pre>
@@ -1753,10 +1755,14 @@
 
 <div id="nutrition-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="nutrition-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="nutrition-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="nutrition-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="nutrition-modal-title">Add Ingredient</h2>
 
         <form id="nutrition-form" class="app-form">
+            <label>Classification
+                <input type="text" id="nutrition-classification" list="nutrition-classification-options" placeholder="optional — e.g. Dairy, Poultry, Grain">
+            </label>
+            <datalist id="nutrition-classification-options"></datalist>
             <label>Name
                 <input type="text" id="nutrition-name" required>
             </label>
@@ -1779,9 +1785,12 @@
 
             <p class="hint">Amount needs either a mass in grams somewhere in it (e.g. "100g" or "1 scoop (32g)") or, for a food that's naturally counted in whole pieces, a leading count (e.g. "1 rice cake", "2 eggs") — either way Calculate can scale it to whatever quantity you actually logged.</p>
             <p class="hint">Protein % sets what share of your protein target should come from this ingredient (e.g. 10 for "10% of my protein target") — since that target already updates live with your body mass/activity, this ingredient's actual gram target moves with it automatically.</p>
+            <div id="nutrition-usda-results" class="usda-results" hidden></div>
+
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
+                <button type="button" id="nutrition-usda-btn" class="btn" title="Look the typed name up in USDA FoodData Central and fill Amount, Calories and Protein from it">🔍 Look up in USDA</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1790,7 +1799,7 @@
 
 <div id="contact-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="contact-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="contact-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="contact-modal-title">Add Contact</h2>
 
         <form id="contact-form" class="app-form">
@@ -1869,7 +1878,7 @@
 
 <div id="travel-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="travel-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="travel-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="travel-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="travel-modal-title">Log a Travel</h2>
 
         <form id="travel-form" class="app-form">
@@ -1913,7 +1922,7 @@
 
 <div id="application-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="application-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="application-cancel-btn" class="btn modal-close">Close</button>
+        <button type="button" id="application-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="application-modal-title">Log an Application</h2>
 
         <form id="application-form" class="app-form">
@@ -1942,7 +1951,7 @@
 
 <div id="shortcuts-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="shortcuts-close-btn" class="btn modal-close">Close</button>
+        <button type="button" id="shortcuts-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="shortcuts-modal-title">Keyboard Shortcuts</h2>
         <ul class="shortcuts-list">
             <li><kbd>/</kbd> Focus transaction search</li>

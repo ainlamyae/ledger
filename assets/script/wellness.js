@@ -366,6 +366,7 @@ function renderWellnessWeightChart() {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
+        x: { ticks: { maxTicksLimit: 7, maxRotation: 0 } },
         y: {
           beginAtZero: false,
           afterFit: fixTrendYAxisWidth,

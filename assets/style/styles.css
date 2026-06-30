@@ -161,7 +161,8 @@ header h1 {
 #accounts,
 #charts,
 #transactions,
-#timesheet {
+#timesheet,
+#wellness {
     scroll-margin-top: 65px;
 }
 
@@ -1094,7 +1095,8 @@ td .btn {
     #accounts,
     #charts,
     #transactions,
-    #timesheet {
+    #timesheet,
+    #wellness {
         scroll-margin-top: 50px;
     }
 

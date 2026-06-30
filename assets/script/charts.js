@@ -21,7 +21,7 @@ function applyChartTheme() {
 const TREND_Y_AXIS_WIDTH = 64;
 
 function fixTrendYAxisWidth(scale) {
-  scale.width = TREND_Y_AXIS_WIDTH;
+  if (scale.width < TREND_Y_AXIS_WIDTH) scale.width = TREND_Y_AXIS_WIDTH;
 }
 
 // Rounds a computed axis max up to the nearest "nice" number (1/2/5 times a

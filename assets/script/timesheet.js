@@ -1,5 +1,5 @@
 const TIMESHEET_RANGE = `${CONFIG.SHEETS.TIMESHEET}!A2:G`;
-const TS_PAGE_SIZE = 14;
+const TS_PAGE_SIZE = 28;
 
 let allTimeEntries = [];
 let timesheetListenersAttached = false;

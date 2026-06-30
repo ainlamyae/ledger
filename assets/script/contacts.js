@@ -20,7 +20,7 @@ async function initContacts(forceRefresh = false) {
 
     document.getElementById('add-contact-btn').addEventListener('click', () => openContactForm(null));
     document.getElementById('contact-cancel-btn').addEventListener('click', closeContactForm);
-    document.getElementById('contact-form').addEventListener('submit', submitContactForm);
+    onFormSubmit('contact-form', submitContactForm);
     document.getElementById('export-contacts-google-btn').addEventListener('click', () => exportContactsGoogleCSV(allContacts));
     document.getElementById('export-contacts-outlook-btn').addEventListener('click', () => exportContactsOutlookCSV(allContacts));
 
@@ -50,8 +50,8 @@ function setupContactsBulkActions() {
   document.getElementById('contacts-bulk-export-outlook-btn').addEventListener('click', () => {
     exportContactsOutlookCSV(allContacts.filter((c) => selectedContactRows.has(c.row)), '-selected');
   });
-  document.getElementById('contacts-bulk-merge-btn').addEventListener('click', mergeSelectedContacts);
-  document.getElementById('contacts-bulk-delete-btn').addEventListener('click', bulkDeleteContacts);
+  onAsyncClick('contacts-bulk-merge-btn', mergeSelectedContacts);
+  onAsyncClick('contacts-bulk-delete-btn', bulkDeleteContacts);
 }
 
 function setupContactsSorting() {
@@ -175,7 +175,7 @@ function renderContactsList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openContactForm(c) }),
-      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteContact(c) }),
+      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteContact(c) }),
     );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);

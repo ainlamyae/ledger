@@ -33,7 +33,7 @@ async function initSettingsPanel(forceRefresh = false) {
     settingPanelListenersAttached = true;
     document.getElementById('add-setting-btn').addEventListener('click', () => openSettingForm());
     document.getElementById('setting-cancel-btn').addEventListener('click', closeSettingForm);
-    document.getElementById('setting-form').addEventListener('submit', submitSettingForm);
+    onFormSubmit('setting-form', submitSettingForm);
   }
 }
 
@@ -82,7 +82,7 @@ function renderSettingsList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openSettingForm(setting) }),
-      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteSetting(setting.row) }),
+      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteSetting(setting.row) }),
     );
 
     // Full-masked (not just digits) since values include API keys and city

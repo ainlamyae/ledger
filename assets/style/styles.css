@@ -17,6 +17,10 @@ textarea {
     --color-nav-hover: #4279ad;
     --color-primary: #3b82f6;
     --color-primary-hover: #2563eb;
+    --color-ai: #f59e0b;
+    --color-ai-hover: #d97706;
+    --color-danger: #dc2626;
+    --color-danger-hover: #b91c1c;
     --color-income: #16a34a;
     --color-expense: #dc2626;
     --color-other: #7c3aed;
@@ -317,6 +321,18 @@ header .btn:hover {
     cursor: not-allowed;
 }
 
+/* Mid-action (withButtonBusy, assets/script/ui-helpers.js) — the label already
+   carries an ellipsis, this takes the clicks away so a slow save can't be
+   fired twice. */
+.btn[aria-busy="true"] {
+    opacity: .6;
+    cursor: progress;
+    pointer-events: none;
+}
+
+/* Three roles, one colour each, applied everywhere that role appears:
+   blue adds or saves, amber spends an AI call, red closes or destroys.
+   Anything else stays the default surface button. */
 .btn-primary {
     background: var(--color-primary);
     border-color: var(--color-primary);
@@ -325,6 +341,28 @@ header .btn:hover {
 
 .btn-primary:hover {
     background: var(--color-primary-hover);
+}
+
+/* Dark text rather than white — a yellow light enough to read as yellow
+   can't carry white text at an accessible contrast. */
+.btn-ai {
+    background: var(--color-ai);
+    border-color: var(--color-ai);
+    color: #1f2937;
+}
+
+.btn-ai:hover {
+    background: var(--color-ai-hover);
+}
+
+.btn-danger {
+    background: var(--color-danger);
+    border-color: var(--color-danger);
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: var(--color-danger-hover);
 }
 
 .gate {

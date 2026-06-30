@@ -97,7 +97,7 @@ async function initTimeSheet(forceRefresh = false) {
       checkTimesheetReminder();
     });
     document.getElementById('timesheet-cancel-btn').addEventListener('click', closeTimesheetForm);
-    document.getElementById('timesheet-form').addEventListener('submit', submitTimesheetForm);
+    onFormSubmit('timesheet-form', submitTimesheetForm);
     document.getElementById('timesheet-holiday').addEventListener('change', () => {
       toggleTimesheetHolidayFields();
       updateTimesheetLiveDuration();

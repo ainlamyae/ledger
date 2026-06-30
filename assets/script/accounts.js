@@ -23,7 +23,7 @@ async function initAccountManager(forceRefresh = false) {
     accountListenersAttached = true;
     document.getElementById('add-account-btn').addEventListener('click', () => openAccountForm());
     document.getElementById('account-cancel-btn').addEventListener('click', closeAccountForm);
-    document.getElementById('account-form').addEventListener('submit', submitAccountForm);
+    onFormSubmit('account-form', submitAccountForm);
     setupAccountSorting();
   }
 }
@@ -85,7 +85,7 @@ function renderAccountsList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openAccountForm(account) }),
-      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteAccount(account.row) }),
+      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteAccount(account.row) }),
     );
 
     tr.append(nameCell, institutionCell, typeCell, balanceCell, actionsCell);

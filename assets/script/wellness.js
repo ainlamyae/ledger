@@ -166,7 +166,7 @@ function renderWellnessList() {
       return td;
     };
 
-    const notesShort = e.notes.length > 40 ? `${e.notes.slice(0, 40)}…` : e.notes;
+    const notesShort = e.notes.length > 20 ? `${e.notes.slice(0, 20)}…` : e.notes;
 
     tr.append(
       makeCell(e.date),

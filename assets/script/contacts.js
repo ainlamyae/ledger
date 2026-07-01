@@ -175,7 +175,7 @@ function renderContactsList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openContactForm(c) }),
-      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteContact(c) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteContact(c) }),
     );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);

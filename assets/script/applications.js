@@ -186,7 +186,7 @@ function buildApplicationCard(app) {
 
   actions.append(
     makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (e) => { e.stopPropagation(); openApplicationForm(app); } }),
-    makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: (e) => { e.stopPropagation(); return deleteApplication(app); } }),
+    makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: (e) => { e.stopPropagation(); return deleteApplication(app); } }),
   );
   header.append(icon, title, actions);
 

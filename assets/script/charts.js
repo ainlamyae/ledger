@@ -15,6 +15,19 @@ function applyChartTheme() {
   };
 }
 
+// The colour every reference mark in Health Indicators is drawn in — the
+// per-column caps and the State Trend goal line.
+//
+// Deliberately NOT red. Red is this app's "missed" score on bars and dots, so a
+// limit drawn in the same red read as a failure rather than as the thing being
+// measured against. Near-black on light, near-white on dark (matching
+// --color-text), so it stays the strongest line on the chart either way.
+// Called at render time, and every chart is destroyed and rebuilt on a theme
+// switch (loadDashboard), so it always picks up the current theme.
+function boundMarkColor() {
+  return document.documentElement.dataset.theme === 'dark' ? '#e2e8f0' : '#1f2937';
+}
+
 // Fixed width for the y-axis label column on the three Trend charts, so
 // their plot areas (and thus their y-axes) line up vertically even though
 // each chart's values have a different number of digits.
@@ -25,8 +38,8 @@ function fixTrendYAxisWidth(scale) {
 }
 
 // An invisible right-hand axis reserving the exact same TREND_Y_AXIS_WIDTH
-// as a real right axis (State Trend & Forecast's BMI line, Physical Activity's
-// minutes scale) — so a chart with no real right axis
+// as a real right axis (State Trend & Forecast's BMI line, Body Mass's fat
+// energy, Physical Activity's kcal) — so a chart with no real right axis
 // still gets the same plot-area width and x-axis tick spacing as the two
 // that do, instead of stretching further right and misaligning the date
 // labels across the Health Indicators section. A fresh object per call since
@@ -42,11 +55,38 @@ function ghostRightAxis() {
   };
 }
 
-// Mirror of the above for a chart whose real axis sits on the RIGHT (Body Mass,
-// once its kg scale moved there) — without a left spacer that chart's plot area
-// would start further left than its neighbours' and misalign the date labels.
+// Mirror of the above, for a chart whose real axis sits on the RIGHT (Body Mass's
+// kg scale). Without a left spacer its plot area would start further left than
+// its neighbours' and misalign the date labels down the section.
 function ghostLeftAxis() {
   return { ...ghostRightAxis(), position: 'left' };
+}
+
+// The Health Indicators section's one mark for "the figure that applies here" —
+// a solid red hairline drawn as a floating bar (`[from, to]`) with
+// `grouped: false`, so it overlays its own column rather than being placed
+// beside it. Every chart in the section that has such a figure uses this, so the
+// mark means the same thing and looks the same wherever it appears.
+// `values` is one entry per column; null leaves that column unmarked.
+function boundCapDataset(label, values, capHalf, extra = {}) {
+  return {
+    type: 'bar',
+    label,
+    data: values.map((v) => (v === null || v === undefined ? null : [v - capHalf, v + capHalf])),
+    backgroundColor: boundMarkColor(),
+    grouped: false,
+    // Chart.js draws highest order first, so the lowest paints last and sits on
+    // top — a cap is only useful if it's still visible on a column that overshot it.
+    order: 0,
+    ...extra,
+  };
+}
+
+// Half-thickness for those caps: a fraction of the axis span rather than a fixed
+// amount in the data's own units, so the mark stays a hairline whatever range the
+// chart ends up covering.
+function boundCapHalf(axisSpan) {
+  return Math.abs(axisSpan) * 0.006;
 }
 
 // Rounds a computed axis max up to the nearest "nice" number (1/2/5 times a
@@ -1398,9 +1438,11 @@ function renderWellnessWeightChart(entries) {
       },
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
-        // kg on the RIGHT, fat energy on the left. The bars stay on `y` (their
-        // default axis), so only the sides move. Gridlines follow the left axis as
-        // everywhere else, which puts them on the kcal scale here.
+        // Fat energy on the LEFT, kg on the RIGHT. kg still owns the gridlines
+        // though — it's the scale the bars are actually read against, and the only
+        // one that can put every line on a round number, since fat energy is a
+        // non-linear restatement of it. The bars stay on `y` (their default axis),
+        // so only the sides move.
         y: {
           // The one metric chart here that must NOT begin at zero: a 0 kg
           // baseline puts every bar within a pixel or two of the same height and
@@ -1412,9 +1454,7 @@ function renderWellnessWeightChart(entries) {
           min: yMin,
           max: yMax,
           afterFit: fixTrendYAxisWidth,
-          // The exception to "the left axis owns the gridlines": kg is the scale the
-          // bars are actually read against, and only it can put every line on a round
-          // number. autoSkip off so the step is honoured exactly.
+          // autoSkip off so the step is honoured exactly.
           ticks: { stepSize: kgStep, autoSkip: false, callback: maskedUnitTick('kg', kgStep < 1 ? 1 : 0) },
         },
         y1: canShowFatEnergy
@@ -1560,7 +1600,7 @@ function renderWellnessCaloriesChart(entries) {
           type: 'bar',
           label: `${bound.word} for the day`,
           data: capData,
-          backgroundColor: '#dc2626',
+          backgroundColor: boundMarkColor(),
           grouped: false,
           isBoundMarker: true,
           // Chart.js draws datasets from the HIGHEST order to the lowest, so the
@@ -1867,8 +1907,6 @@ function unreservedActivityHues(count) {
 function renderWellnessActivityChart(entries) {
   const ctx = document.getElementById('wellness-activity-chart');
 
-  const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
-
   const activityEntries = entries.filter((e) => (e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null);
   const dates = trailingDatesForCategory(activityEntries, WELLNESS_METRICS_DAYS);
 
@@ -1953,20 +1991,46 @@ function renderWellnessActivityChart(entries) {
     order: 0,
   };
 
-  // Excluded from the tooltip via the filter callback below — it's a fixed
-  // reference line, not a per-day value, so repeating "90 min target" on
-  // every hover added noise without telling you anything new each time.
+  // The reference line is the PLANNED BURN, on the kcal axis — not the flat
+  // minutes target it used to be. That line sat on the other axis from the dots
+  // it appeared to judge, so a day could clear it on a walk while burning far
+  // less than a day that lifted; the dots were already scored against this
+  // figure instead, and the visible line now matches what scores them.
+  //
+  // It moves day to day because activityTargetKcal is MET x that day's own
+  // carried-forward body mass x ACTIVITY_TARGET_MIN — so it falls as body mass
+  // does. Stepped, since the weight is carried forward between weigh-ins and the
+  // figure genuinely holds flat until the next one; a sloped line would imply an
+  // interpolation that isn't happening. A day with no body mass on file has no
+  // figure, so the line breaks there rather than inventing one.
+  const plannedBurnKcal = dates.map((date) => {
+    const weightKg = activityWeightForDate.get(date) ?? null;
+    return weightKg === null ? null : activityTargetKcal(weightKg);
+  });
+
+  // Marked as a cap across each day's own column — a floating bar (`[from, to]`)
+  // with `grouped: false` so it overlays rather than sits beside, exactly as the
+  // Caloric Intake and Calorie Balance charts mark their own per-day figures.
+  // It used to be a dashed line, which was right while the target was a flat
+  // number of minutes; now that it moves with each day's body mass, a line
+  // spanning the window would read as one shared limit no matter how it's dashed,
+  // while a mark per column says the figure belongs to that day and no other.
+  // Thickness is a fraction of the kcal range so it stays a hairline at any scale.
+  const burnMagnitudes = [
+    ...caloriesData.filter((v) => v !== null),
+    ...plannedBurnKcal.filter((v) => v !== null),
+  ];
+  const capHalf = (burnMagnitudes.length ? Math.max(...burnMagnitudes) : 1) * 0.006;
   const targetLineDataset = {
-    type: 'line',
-    label: `${activityTarget} min target`,
-    data: new Array(dates.length).fill(-activityTarget),
-    borderColor: '#dc2626',
-    borderDash: [4, 4],
-    // Matches the Protein band's lines. Without it Chart.js defaults to 3, which
-    // drew this target visibly heavier than every other one in the section.
-    borderWidth: 1.5,
-    pointRadius: 0,
-    tension: 0,
+    type: 'bar',
+    label: 'Planned Burn',
+    data: plannedBurnKcal.map((v) => (v === null ? null : [-v - capHalf, -v + capHalf])),
+    yAxisID: 'y1',
+    backgroundColor: boundMarkColor(),
+    grouped: false,
+    // Chart.js draws highest order first, so the lowest paints last and sits on
+    // top. Three layers here: bars (2), then this cap (1) so it stays visible on a
+    // day that overshot it, then the dots (0) on top of both.
     order: 1,
     isTargetLine: true,
   };
@@ -1990,42 +2054,29 @@ function renderWellnessActivityChart(entries) {
           padding: { top: 40 },
         },
         tooltip: {
-          // The target line IS reported now — it's the red dash on the chart, and the
-          // hover is where its figure belongs. Only empty slots are dropped.
-          filter: (item) => item.raw !== null,
+          // Empty slots, and the cap — a floating bar would report itself as a
+          // `[from, to]` pair, so its figure is stated properly in afterBody
+          // instead, the same way Caloric Intake handles its own cap.
+          filter: (item) => item.raw !== null && !item.dataset.isTargetLine,
           // Rows in dataset order. Without this Chart.js hands them over sorted by
           // the `order` property that controls DRAW order, which put the dots
-          // (order: 0) at the top — above the bars and far from the Planned burn line
-          // they should be read against.
+          // (order: 0) above the bars, away from the Planned Burn figure below
+          // that they should be read against.
           itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
-            // Chart.js's default swatch takes its dash from the POINT options, so a
-            // dashed line still shows as a solid block. Spelled out here so the
-            // target's swatch is the red dash you see on the chart, and so each dot
-            // gets the scored colour it was actually drawn in.
+            // Each dot's swatch is the scored colour it was actually drawn in,
+            // rather than the dataset's single default.
             labelColors: (item) => {
               const ds = item.dataset;
-              if (ds.isTargetLine) {
-                return {
-                  borderColor: '#dc2626', backgroundColor: 'transparent',
-                  borderWidth: 2, borderDash: [2, 2],
-                };
-              }
               const fill = Array.isArray(ds.pointBackgroundColor)
                 ? ds.pointBackgroundColor[item.dataIndex]
                 : (ds.pointBackgroundColor ?? ds.backgroundColor);
               return { borderColor: fill, backgroundColor: fill };
             },
             // Signed the same way the two axes are: calories keep the minus (energy
-            // spent), minutes report the magnitude they actually were. The target
-            // line's own dataset label already ends in "min target", so it states its
-            // figure once rather than repeating it either side of a colon.
+            // spent), minutes report the magnitude they actually were.
             label: (item) => {
-              if (item.dataset.isTargetLine) {
-                const text = `Target: ${activityTarget} min`;
-                return privacyMode ? maskDigits(text) : text;
-              }
               // y1 is the kcal scale, everything else on this chart is minutes — so
               // the unit follows the axis the row belongs to.
               const isKcal = item.dataset.yAxisID === 'y1';
@@ -2033,15 +2084,12 @@ function renderWellnessActivityChart(entries) {
               const text = `${item.dataset.label}: ${isKcal ? v : Math.abs(v)} ${isKcal ? 'kcal' : 'min'}`;
               return privacyMode ? maskDigits(text) : text;
             },
-            // The kcal the activity target implies at that day's own body mass —
-            // exactly what the dot's colour is scored against, so the hover explains
-            // the colour instead of leaving it to be inferred. Added once per hover
-            // rather than per row, and carries its unit because this tooltip also
-            // lists minutes. Omitted when that day has no body mass to compute from.
+            // The cap's own figure, last and flush-left via afterBody — the same
+            // placement Caloric Intake gives its bound, so the two read alike.
             afterBody: (items) => {
-              const weightKg = activityWeightForDate.get(items[0]?.label) ?? null;
-              if (weightKg === null) return '';
-              const text = `Planned Burn: ${-Math.round(activityTargetKcal(weightKg))} kcal`;
+              const i = items[0]?.dataIndex;
+              if (i === undefined || plannedBurnKcal[i] === null) return '';
+              const text = `Planned Burn: ${-Math.round(plannedBurnKcal[i])} kcal`;
               return privacyMode ? maskDigits(text) : text;
             },
           },
@@ -2049,11 +2097,13 @@ function renderWellnessActivityChart(entries) {
       },
       scales: {
         x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
-        // Minutes on the RIGHT, calories on the left — the reverse of this chart's
-        // other dual-axis siblings. The axis ids stay as they are (the bars and the
-        // target line default to `y`, the dots name `y1`), so only the sides move.
-        // Gridlines follow the left axis, as everywhere else in the app, which puts
-        // them on the kcal scale here.
+        // kcal on the LEFT owning the gridlines, minutes on the right drawing none.
+        // The exception to this panel's left-axis-is-the-primary rule, and it earns
+        // it: the comparison this chart exists to make — Actual Burn against Planned
+        // Burn — happens entirely on the kcal scale, so the horizontal lines have to
+        // be spaced in kcal for that pair to be readable against them. The axis ids
+        // are untouched (bars default to `y`, the dots and the planned line name
+        // `y1`); only the sides move.
         // Both scales run from 0 at the top down into the negative, since every
         // series is plotted negated — but they label differently on purpose. Calories
         // keep the minus sign: that energy left the body. Minutes drop it, because
@@ -2087,39 +2137,30 @@ function renderWellnessProteinChart(entries) {
   const byDate = new Map();
   proteinEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
 
-  // One dashed line per end of the target band, with the space between them
-  // shaded — so "in range" is a region you can see a bar land inside, not a
-  // single line to be over or under. `fill: '+1'` shades from the upper line
-  // down to the NEXT dataset (the lower line), so the pair must stay adjacent
-  // and in this order. A zero-width band (flat PROTEIN_TARGET_G, no per-kg
-  // range set) collapses back to the single dashed line this chart had before.
-  const targetLine = (value, label, extra = {}) => ({
+  // Each end of the band is marked with the section's own per-column cap rather
+  // than a dashed line spanning the window, so this chart's red mark reads as the
+  // same thing as every other chart's. The band is still a shaded region: the two
+  // line datasets survive purely to carry `fill: '+1'` (which shades from the
+  // upper line down to the NEXT dataset, so the pair must stay adjacent and in
+  // this order) with their own stroke turned off, and the caps are drawn over the
+  // top. A zero-width band (flat PROTEIN_TARGET_G, no per-kg range) collapses to
+  // a single row of caps with nothing to shade between.
+  //
+  // Shaded green, not red: unlike the Caloric Intake chart — where the shading
+  // marks the half you must stay OUT of — the region between these two lines is
+  // the one you're aiming to land in, and it sits behind bars scored in the same
+  // green.
+  const bandFill = (value, extra = {}) => ({
     type: 'line',
-    label,
+    label: `${value} g band edge`,
     data: new Array(dates.length).fill(value),
-    borderColor: '#dc2626',
-    borderDash: [4, 4],
-    borderWidth: 1.5,
+    borderWidth: 0,
     pointRadius: 0,
     tension: 0,
     isTargetLine: true,
-    order: 1,
+    order: 3,
     ...extra,
   });
-
-  // Shaded green, not red: unlike the Caloric Intake chart — where the shading
-  // marks the half you must stay OUT of — the region between these two lines is
-  // the one you're aiming to land in, and it now sits behind bars scored in the
-  // same green.
-  const targetDatasets = band.max > band.min
-    ? [
-      targetLine(band.max, `${band.max} g upper target`, {
-        fill: '+1',
-        backgroundColor: 'rgba(22, 163, 74, 0.10)',
-      }),
-      targetLine(band.min, `${band.min} g target floor`),
-    ]
-    : [targetLine(band.min, `${band.min} g target`)];
 
   // Green inside the band; the two ways of leaving it are NOT equivalent. Falling
   // short of the floor is the miss that costs you muscle on a deficit, so it stays
@@ -2133,6 +2174,20 @@ function renderWellnessProteinChart(entries) {
     if (!byDate.has(d) || withinProteinBand(values[i], band)) return '#16a34a';
     return values[i] > band.max ? PROTEIN_OVER_BAND_COLOR : '#dc2626';
   });
+
+  // This axis is zero-based and auto-topped, so its span is whatever the tallest
+  // thing on it is — a bar or the band's own top end.
+  const capHalf = boundCapHalf(Math.max(band.max, ...values, 1));
+  const capFor = (value, label) => boundCapDataset(label, new Array(dates.length).fill(value), capHalf, { isTargetLine: true });
+
+  const targetDatasets = band.max > band.min
+    ? [
+      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.min),
+      capFor(band.max, `${band.max} g upper target`),
+      capFor(band.min, `${band.min} g target floor`),
+    ]
+    : [capFor(band.min, `${band.min} g target`)];
 
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
     data: {
@@ -2604,6 +2659,19 @@ function renderWellnessProjectionChart(entries) {
     etaEl.textContent = privacyMode ? maskDigits(note) : note;
   }
 
+  // Which model drew the forecast, said out loud. It decides the SHAPE of the
+  // projected line, and until now nothing on screen revealed it: the plan and
+  // habit paths both integrate maintenance as it falls with body mass, so their
+  // line is an exponential that visibly eases off; the body-mass-only fallback
+  // is a least-squares slope and is dead straight by construction. A line that
+  // looks straighter than expected is answered here rather than left a mystery.
+  const PROJECTION_METHOD_NOTE = {
+    plan: 'from your plan — the curve eases as body mass falls',
+    full: 'from recent habits — the curve eases as body mass falls',
+    partial: 'from recent habits (partial data) — the curve eases as body mass falls',
+    'weight-only': 'from the body-mass trend alone — a straight line, with no profile to model the slowdown',
+  };
+
   const hasProjection = proj.status === 'ok';
   const projPoints = hasProjection ? proj.projectedPoints : [];
 
@@ -2633,6 +2701,12 @@ function renderWellnessProjectionChart(entries) {
       const toGoText = `${daysToGo} ${daysToGo === 1 ? 'day' : 'days'}`;
       timeRemaining.textContent = privacyMode ? maskDigits(toGoText) : toGoText;
     }
+
+    // The 'ok' status left this line blank, so a forecast that WAS drawn said
+    // nothing about itself. It now states its current rate and which model
+    // produced it, the same line the can't-forecast statuses already use.
+    const okNote = `Currently ${rateNote()} — projected ${PROJECTION_METHOD_NOTE[proj.method] ?? ''}`;
+    etaEl.textContent = privacyMode ? maskDigits(okNote) : okNote;
   }
 
   const histLabels = weightEntries.map((e) => e.date);
@@ -2696,7 +2770,13 @@ function renderWellnessProjectionChart(entries) {
         return { x: dayOffset(d), y };
       }),
       borderColor: '#6366f1',
-      borderDash: [6, 4],
+      // The one dash pattern used everywhere in the app, and the same width as
+      // the trend line this continues — it was [6, 4] at Chart.js's default
+      // width 3, which made the forecast the heaviest, longest-dashed line on a
+      // chart where it's the least certain thing shown, and left the red goal
+      // line beside it looking like a different kind of dash.
+      borderDash: [4, 4],
+      borderWidth: 2,
       // Line only — the shaded area under it read as a quantity, when all the
       // forecast actually asserts is where the trend line goes.
       fill: false,
@@ -2710,8 +2790,13 @@ function renderWellnessProjectionChart(entries) {
       // projection, but the goal line is drawn either way.
       label: `${weightGoal} kg Goal`,
       data: allLabels.map((d) => ({ x: dayOffset(d), y: weightGoal })),
-      borderColor: '#dc2626',
-      borderDash: [4, 4],
+      // Solid, matching the hairline caps the rest of the section marks its
+      // figures with — this used to be dashed, which made it the odd one out.
+      // It stays a continuous line rather than becoming caps like the others
+      // because this chart has no columns to cap: its x-axis is a true linear
+      // time scale carrying irregularly spaced history and a distant projected
+      // point, so there is nothing per-column for a mark to belong to.
+      borderColor: boundMarkColor(),
       borderWidth: 1.5,
       pointRadius: 0,
       tension: 0,
@@ -2752,8 +2837,22 @@ function renderWellnessProjectionChart(entries) {
   const weightMin = Math.min(...weightValues);
   const weightMax = Math.max(...weightValues);
   const weightPad = Math.max(0.5, (weightMax - weightMin) * 0.08);
-  const yMin = Math.floor(weightMin - weightPad);
-  const yMax = Math.ceil(weightMax + weightPad);
+
+  // The goal end gets no padding: the projection stops there and nothing is ever
+  // plotted past it, so padding reserved a band of chart with nothing in it — a
+  // 70 kg goal was floored to 68, two empty kg below the lowest thing drawn. The
+  // axis now ends on the goal itself, which is the line everything is read
+  // against. Still floor/ceil'd to whole kg: the ticks below step by exactly 1
+  // from these bounds, so a fractional goal would otherwise put every gridline
+  // on a fractional number.
+  // Only when the goal really is the extreme — a reading that overshoots it pads
+  // normally, since then there IS something drawn beyond the goal to make room for.
+  const yMin = weightMin < weightGoal
+    ? Math.floor(weightMin - weightPad)
+    : Math.floor(weightGoal);
+  const yMax = weightMax > weightGoal
+    ? Math.ceil(weightMax + weightPad)
+    : Math.ceil(weightGoal);
 
   const scales = {
     x: {
@@ -3015,9 +3114,8 @@ function renderWellnessEnergyBalanceChart(entries) {
           type: 'bar',
           label: 'Planned for the day',
           data: labels.map(() => [planned - plannedHalf, planned + plannedHalf]),
-          // Same red every other target mark in the section uses — the Caloric
-          // Intake caps, the Protein band lines, the activity target line.
-          backgroundColor: '#dc2626',
+          // boundMarkColor, like every other reference mark in the section.
+          backgroundColor: boundMarkColor(),
           grouped: false,
           isBoundMarker: true,
           // Lowest order paints last, so the dash stays visible on a day whose bar

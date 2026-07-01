@@ -330,9 +330,12 @@ header .btn:hover {
     pointer-events: none;
 }
 
-/* Three roles, one colour each, applied everywhere that role appears:
-   blue adds or saves, amber spends an AI call, red closes or destroys.
-   Anything else stays the default surface button. */
+/* Three roles, one colour each: blue adds or saves, amber spends an AI call,
+   red destroys. Anything else stays the default surface button.
+   Red is reserved for text labels — its fill is dark enough that an emoji sat
+   on it is hard to make out, so the ❌ closes and 🗑️ deletes stay default and
+   say what they are by glyph instead. Amber is light enough not to have the
+   problem, which is why the 🧮 recalculate keeps it. */
 .btn-primary {
     background: var(--color-primary);
     border-color: var(--color-primary);
@@ -1039,8 +1042,8 @@ kbd {
 
 .filters {
     display: flex;
-    gap: .5rem;
-    margin-bottom: 1rem;
+    gap: .4rem;
+    margin-bottom: .6rem;
 }
 
 .filters input[type="text"] {
@@ -1051,7 +1054,7 @@ kbd {
 .filters select {
     font: inherit;
     font-size: var(--input-font-size);
-    padding: .5rem;
+    padding: .35rem .5rem;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
     background: var(--color-surface);
@@ -1342,6 +1345,23 @@ th.sortable:hover {
     margin-bottom: .25rem;
 }
 
+/* Same reason as .today-glance-cards below: three of these four now carry two
+   figures ("-$1,675.26 / -$1,700.00"), which the dashboard's 1.6rem .value
+   can't hold in a ~188px card. One size across all four keeps the row even. */
+#finances > .cards .value {
+    font-size: 1.1rem;
+}
+
+/* Four across only works while .container is at its full 950px; between there
+   and the 820px general breakpoint the tiles narrow past what two figures fit,
+   so these go two-up early instead of shrinking further. Scoped by id so the
+   Health glance tiles, whose values are shorter, keep their own breakpoint. */
+@media (max-width: 949px) {
+    #finances > .cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 .today-glance-cards {
     grid-template-columns: repeat(4, 1fr);
 }
@@ -1517,7 +1537,17 @@ td .btn {
 }
 
 .modal-card h2 {
-    margin-bottom: 1rem;
+    margin-bottom: .6rem;
+}
+
+/* A form's own hints sit between the last field and the actions row, where the
+   .hint default 1rem reads as a gap rather than as spacing. */
+.app-form .hint {
+    margin-bottom: .5rem;
+}
+
+.app-form .modal-actions {
+    margin-top: .6rem;
 }
 
 /* Floated rather than absolutely positioned: .modal-card scrolls, so an
@@ -1533,10 +1563,15 @@ td .btn {
     line-height: 1;
 }
 
+/* Tight by design. The gaps between a label, its box and the next field are cut
+   hardest — they cost height without buying anything — while the box's own
+   vertical padding is only trimmed, since it sets the tap target. Horizontal
+   padding is left alone: that's the gap between the border and the text you're
+   reading, and it's the one that looks cramped when shaved. */
 .app-form label {
     display: block;
-    margin-bottom: .6rem;
-    font-size: .9rem;
+    margin-bottom: .35rem;
+    font-size: .85rem;
     color: var(--color-text-muted);
 }
 
@@ -1545,10 +1580,10 @@ td .btn {
 .app-form textarea {
     display: block;
     width: 100%;
-    margin-top: .25rem;
+    margin-top: .1rem;
     font: inherit;
     font-size: var(--input-font-size);
-    padding: .5rem;
+    padding: .35rem .5rem;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
     background: var(--color-surface);
@@ -1999,24 +2034,24 @@ td .btn {
 
 .export-date-range {
     display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: .6rem;
+    margin-bottom: .6rem;
 }
 
 .export-date-range label {
     flex: 1;
     display: block;
-    font-size: .9rem;
+    font-size: .85rem;
     color: var(--color-text-muted);
 }
 
 .export-date-range input {
     display: block;
     width: 100%;
-    margin-top: .25rem;
+    margin-top: .1rem;
     font: inherit;
     font-size: var(--input-font-size);
-    padding: .5rem;
+    padding: .35rem .5rem;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
     background: var(--color-surface);
@@ -2285,14 +2320,16 @@ td .btn {
     }
 
     .app-form label {
-        margin-bottom: .35rem;
-        font-size: .82rem;
+        margin-bottom: .3rem;
+        font-size: .8rem;
     }
 
+    /* Horizontal only — the vertical padding is already at the floor where the
+       box still reads as a tap target. */
     .app-form input,
     .app-form select,
     .app-form textarea {
-        padding: .4rem;
+        padding: .35rem .4rem;
     }
 
     .modal-actions {
@@ -2380,13 +2417,11 @@ td .btn {
     grid-template-columns: 2.5rem minmax(0, 1fr) 6.5rem minmax(0, 1fr);
     align-items: center;
     gap: .6rem;
-    padding: .25rem 0;
-    border-bottom: 1px solid var(--color-border);
+    /* No divider between rows: the boxed inputs already mark where one variable
+       ends and the next begins, so the rules were 14 lines of ink doing nothing
+       but adding height. */
+    padding: .15rem 0;
     font-size: .8rem;
-}
-
-.formula-row:last-child {
-    border-bottom: none;
 }
 
 .formula-sym {
@@ -2423,9 +2458,18 @@ td .btn {
 
 /* A population constant, not an input — shown so the formula reads completely,
    styled as text so it can't be mistaken for something editable. */
+/* Same figure size and padding as the input beside it, so ρ's 7700 sits on the
+   same line and scale as the editable values above it. Only the border and
+   background are withheld — those are what mark a field as editable, and they
+   do that job without the figure also having to be a different size. */
 .formula-fixed {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    text-align: center;
+    font-size: var(--input-font-size);
+    padding: .3rem .4rem;
+    /* Left, like the text inside every input above it — it used to be centred,
+       which left 7700 and 200 visibly offset from the column of editable
+       figures they sit under. */
+    text-align: left;
     color: var(--color-text-muted);
 }
 
@@ -2458,18 +2502,24 @@ td .btn {
     }
 
     .formula-row input,
-    .formula-row select {
+    .formula-row select,
+    .formula-fixed {
         padding: .3rem .25rem;
     }
 
     /* Right-aligned so each value sits against its own unit rather than
        stranded at the far side of the box. */
-    .formula-row input {
+    .formula-row input,
+    .formula-fixed {
         text-align: right;
     }
 
-    .formula-fixed {
-        font-size: .7rem;
+    .formula-result-label {
+        font-size: .75rem;
+    }
+
+    .formula-result-value {
+        font-size: .95rem;
     }
 }
 
@@ -2486,10 +2536,13 @@ td .btn {
     color: var(--color-text-muted);
 }
 
+/* Sized against the longer of the two ("165 days → 2027-01-17"), which at the
+   old 1.4rem crowded its own label on a narrow card. */
 .formula-result-value {
-    font-size: 1.4rem;
+    font-size: 1.05rem;
     font-weight: 600;
     color: var(--color-primary);
+    text-align: right;
 }
 
 .formula-substituted p {

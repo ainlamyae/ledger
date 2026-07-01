@@ -1,6 +1,11 @@
 # Ledger
 
-A private, serverless personal life dashboard — health, finances, time tracking, travel, applications, and contacts in one place. Ledger reads and writes directly to a Google Sheet you own — there is no backend, no database, and no third-party data store. The site is public on GitHub Pages and usable by anyone with a Google account: each user clones their own copy of the Ledger template and the app talks only to that copy, scoped via Google Drive's per-file `drive.file` permission — the data behind it is only ever accessible to the Google account that owns that particular spreadsheet.
+A private, serverless personal life dashboard — health, finances, time tracking, travel, applications, and contacts in one place.
+
+- Reads and writes **directly to a Google Sheet you own**. No backend, no database, no third-party data store.
+- Public on GitHub Pages, usable by anyone with a Google account.
+- Each user clones their own copy of the template; the app only ever touches that copy.
+- Scoped via Google Drive's per-file `drive.file` permission — data is visible only to the account owning that sheet.
 
 ## Table of Contents
 
@@ -26,83 +31,163 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ## Overview
 
-Ledger is a single-page application that authenticates the user with their own Google account, then reads and writes a private "Ledger" Google Sheet via the Sheets API v4. All aggregation, charting, filtering, sorting, and CRUD logic runs client-side in vanilla JavaScript — there is no build step and no server component to deploy or maintain.
+- Single-page app; authenticates with the user's own Google account.
+- Reads/writes a private "Ledger" spreadsheet via Sheets API v4.
+- All aggregation, charting, filtering, sorting and CRUD runs client-side in vanilla JS.
+- No build step, no server component to deploy or maintain.
 
 ![Ledger dashboard screenshot](assets/images/dashboard-screenshot.png)
 
+---
+
 ## Features
 
-- **Dashboard widgets** — a row of 4 self-contained "bulb" cards above every panel group, independent of the Google Sheet and working as soon as the page loads: **Time** (local `HH:mm:ss` next to a resolved location name, and a second, independently configurable reference clock defaulting to Isfahan, shown in a smaller muted style), **Date** (today's date in Gregorian ✝️, Shamsi 🌞, and Ghamari 🌜 calendars, laid out as a shared day/month/year grid so the three calendars line up column by column via the browser's own `Intl` calendar support — no vendored date-conversion library), **Azan** (Sobh/Zohr/Maghreb/Midnight prayer times computed client-side from sun-angle astronomical formulas using the Shia "Tehran"/University of Tehran method — Midnight is the standard midpoint between Maghrib and the next day's Fajr — for the resolved location), and **Weather** (current conditions plus a 3-day forecast for the resolved location). Location resolution tries, in order: a manual override (click the location name to auto-detect via `navigator.geolocation` + reverse-geocode, or type a city to search), then browser geolocation, then a `WIDGET_DEFAULT_CITY` `Settings` key, then a hardcoded Waterloo/Isfahan fallback — so the widgets never show a dead end even with location access denied. All of it runs on free, key-less public APIs called directly from the browser (Open-Meteo for weather + city search, BigDataCloud for reverse geocoding), cached in `localStorage` with their own TTLs separate from the Sheets data cache.
-- **Responsive, mobile-friendly layout** — a breakpoint ladder (800px/640px/420px) tightens padding, grid columns, and the type scale for phones and half-width windows without a separate mobile view; every form field is pinned to a 16px floor so tapping into a date/text/select field never triggers a mobile browser's auto-zoom-and-pan. Dashboard summary/widget cards cap at a fixed column width instead of stretching edge-to-edge on wide screens.
-- **Summary cards** — at-a-glance Net Worth, Monthly Income, Monthly Expenditure, and Monthly Cash Flow, at the top of the **Finances** panel group, above Spending by Category.
-- **Spending by Category** — a grouped bar chart comparing each category's average monthly spend over four periods (Last Month as-is, Last Quarter Average ÷ 3, Last Year Average ÷ 12, and Lifelong Average ÷ total months of data; each category's 4 bars are shaded from its own color, most recent = most opaque), plus four donut charts breaking down each period's spending by category share. Both share one legend, and categories are ordered by Lifelong Average spend, highest first.
-- **Spending Breakdown by Type** — for each spending category that has at least one `Type` recorded in `Insight`, four donut charts (Last Month, Last Quarter, Last Year, Lifelong) breaking that category's spend down by `Type`, a free-text prefix convention in the `Transactions` `Description` field (e.g. "Bread - milk and eggs"), pre-aggregated by formulas in the `Insight` sheet. Panels are built dynamically from whatever categories/Types `Insight` defines (no hardcoded list), ordered by lifelong spend (highest first), and each donut includes an "Untyped" slice for spending without a recognized prefix.
-- **Historical Trends** — three charts in one panel: **Category Expenditure Trend** (stacked bar chart of spending by category, month over month, with categories stacked in the same highest-to-lowest Lifelong Average order as Spending by Category), **Revenue vs. Expenditure** (stepped area chart of the full transaction history), and **Cumulative Net Worth** (running total of savings as a line chart).
-- **Transaction Log** — searchable, filterable, sortable, paginated (⬅️/➡️) table with add/edit/delete/duplicate (Duplicate opens the edit form pre-filled from that row, so a similar new entry can be filled in and saved without retyping everything). CSV import also exists (`csv.js`) but its button is hidden from the UI by default. The Payee, Description, and Category fields all autocomplete from your transaction history and the `Insight` category list (most-used values first) instead of a fixed dropdown, helping correct typos or voice-dictation mistakes and letting you type a brand-new category (e.g. "Income") on the fly. Long Payee/Description values are truncated with an ellipsis (hover to see the full text). The Amount field accepts a simple arithmetic expression (optionally prefixed with `=`, e.g. `=-9.97-1.30` to add tax, or `-32/2` to split a charge); results are rounded to the nearest cent. An "Advanced Filters" toggle (collapsed by default) reveals a From/To date range plus a filter builder — each row picks a field (Account, Payee, Description, Category, Amount), an operator (Contains/Equals/etc. for text fields, =, ≠, >, >=, <, <= for Amount), and a value, with rows after the first getting an AND/OR selector evaluated left to right (e.g. Category contains "Grocery" OR Category contains "Household", AND Amount < 0) — these narrow the same table (so sorting, pagination, and bulk edit/delete all keep working against the filtered set) and an Export CSV button writes exactly what's currently filtered, not just the visible page.
-- **Bulk transaction operations** — a checkbox per row (plus a header "select all") shows a running count and total (privacy-mode aware) of the selected transactions below the table, alongside ✏️ Edit Selected and 🗑️ Delete Selected buttons. Edit Selected opens a form pre-filled with whichever fields are identical across every selected transaction (a field that differs is left blank); only fields you actually fill in are applied to all selected rows, so e.g. recategorizing a batch doesn't touch their dates or amounts. Bulk delete issues one `batchUpdate` with a `deleteDimension` request per row, ordered highest-row-first so earlier deletes in the same call can't invalidate later ones. Selection clears whenever the underlying view changes (search/filter/sort/page) but survives an unrelated re-render.
-- **Undo for bulk edit and deletes** — editing or deleting a transaction (single or bulk) shows a toast with an Undo button for a few seconds. Undoing a delete re-appends the deleted row(s) — they land back at the end of the sheet rather than their original position, since Sheets addresses rows by position and the delete has already shifted everything below them. Undoing a bulk edit writes each transaction's original values back in place instead, since those rows were never removed.
-- **Keyboard shortcuts** — `/` focuses the transaction search box, `n` opens Add Transaction, `Esc` closes whichever modal (or the account menu) is open, and `?` toggles a shortcuts-help overlay. All except `Esc` are ignored while focus is in any text field, so they never fire while typing.
-- **Accessibility** — every modal exposes `role="dialog"`/`aria-modal`/`aria-labelledby`, auto-focuses its first field on open, traps `Tab`/`Shift+Tab` inside itself while open, and restores focus to whatever triggered it on close (including via `Esc`). Collapsible panel headings and sortable table headers are reachable and operable by keyboard (`Tab` + `Enter`/`Space`), and all interactive elements get a visible focus outline. An empty Transaction Log/Account Summary/Work Log table shows a friendly message instead of rendering blank.
-- **Portfolio** — the Portfolio Allocation donut chart (a 3-ring nested donut: the inner ring shows each account type's share of total balance shaded by type, the middle ring breaks that down by institution — each institution has one fixed color, even if its accounts span multiple types — and the outer ring by individual account, shaded by its institution's color; both rings use colors spread evenly around the color wheel so no two entries share a color, however many there are. Account types and institutions are both ordered by absolute balance highest first, so a type or institution with a large negative net — e.g. Credit/debt — still ranks by its size rather than sorting last; types and institutions with a zero balance total are omitted), followed by the Account Summary panel: a sortable table of balances by institution/type, with add/edit/delete, inline Net Worth recalculation, and a reconciliation status (✅ Reconciled, or ⚠️ with the gap amount if recorded balances don't match transaction history). The Balance field accepts the same arithmetic-expression syntax as the transaction Amount field.
-- **Time Tracker** — a "Log a Day" button opens a modal to record a day's Company, Start/End time, Break, and an optional Task note (a weekday with no times but a Task note is treated as a holiday/day off; one with neither is flagged as a missed entry). Company is free text with an autocomplete datalist of previously used values, and defaults to whichever company was used on the most recently logged day. The modal shows a live "Log Time" duration preview that recomputes as Start/End/Break change (or shows "🏖 Holiday" once that checkbox is ticked), so you see the computed hours before saving. A reminder banner appears whenever today is a weekday with nothing logged yet **for your current company** (whichever company appears on the most recently dated entry — a day logged only under a company you've since left doesn't count), with its own "Log a Day" shortcut and an opt-in "Enable reminders" button — browsers require a direct user gesture to grant `Notification` permission, so it's never requested automatically; once granted, an OS-level notification fires once per day (guarded via `localStorage`) instead of only the in-page banner. The **Work Analytics** panel renders four charts above the log: histograms — each with a fitted normal-distribution curve overlay, bars shown as a % of all logged days (so the curve's height tracks the bars regardless of sample size; the tooltip still shows the underlying day count) — of Arrival Distribution, Departure Distribution, and Hours Worked Distribution across weekday work shifts (weekends, holidays/days off, and mis-keyed negative durations are excluded), plus a bar chart of Daily Hours Average over Last Week/Last Month/Last Quarter/Last Year/Lifelong, averaged only over working days so weekends and holidays don't pull the average down. All four charts share the same bar thickness and x-axis label-row height regardless of how many bars/bins each has, so they line up evenly side by side; Daily Hours Average's longer period labels are rotated vertical to fit that shared height without overlapping or clipping. Below the charts, a one-line **overtime summary** tallies time worked beyond an assumed 8h/day, scoped to that same current company — net/signed (a short day offsets a long one) across weekday shifts only, excluding weekends, un-logged days, and today's possibly-still-in-progress entry — broken out as Total/Last Year/Last Month/Last Week; it reads "⏱️ ... beyond an 8h/day pace overall" in bold red once the lifelong total is net-positive, or a muted "✅ At or under an 8h/day pace overall" otherwise, and stays blank until there's at least one full logged weekday to tally. Below that, the Work Log table lists entries (Company, Date, Day, Start, End, Break, Duration, Task) within a From/To date range, sortable by Date, with computed Duration and inline edit, paginated at 14 entries per page (⬅️/➡️); changing the date range or sort order resets to page 1.
-- **Panel groups** — **Health**, **Finances**, and **Other** (in that order, top to bottom) each wrap their related panels in a bordered group with one heading, linked from the top nav in the same order; clicking that link expands every panel in its group at once. **Finances** combines what were previously two separate groups (Journal's spending/transaction panels and Portfolio's account panels) under one heading, with the summary cards as its first block. **Other** leads with Work Analytics + Work Log (the Time Tracker, folded in here rather than kept as its own top-level group now that it's the only feature under it), followed by Travel Insights + Travel Log, Application Log, and Contact List.
-- **Collapsible panels** — every chart/table panel is collapsed by default; click its title to expand or collapse it (dragging to select the title's text does not toggle it). A floating "expand/collapse all" button toggles every panel at once. Collapsed content gets the `inert` attribute (not just a CSS animation to zero height), so it's pulled out of the accessibility tree, tab order, and text selection/find-in-page too — a collapsed table's rows genuinely aren't there for any consumer, not just visually hidden for mouse users.
-- **Privacy mode** — a floating 🙈/👁️ button masks every dollar amount across the summary cards, tables, and charts by replacing each digit with `*` (e.g. `$1,234.56` → `$*,***.**`). It also covers: the Health Log table's Amount and Notes columns and the Health Tracker/State Trend & Forecast charts (axis ticks, tooltips, legend, and the ETA line); the Contact List's First/Last name and Email (fully masked, since letters carry the sensitive content there) and Phone (digit-masked, so the "(***) ***-****" shape stays recognizable); and the Settings panel's Value column (fully masked — API keys and city names all live there — while the Key column stays visible since a setting's name alone isn't sensitive). Numeric fields (Amount, axis/tooltip values, phone numbers) are digit-masked like currency; free-text fields (Notes, names, email, Settings values) are fully masked character-by-character so no words leak through either way. Amounts are shown by default each time you sign in; click the button to hide them for the rest of the session (for reading the dashboard somewhere it can be seen over your shoulder).
-- **Dark mode** — a floating 🌙/☀️ button switches the whole app — including charts and the landing page — between light and dark themes, persisted in `localStorage`.
-- **Resilient sign-in** — silent token refresh on return visits (including PWA/home-screen launches). A `ledger_consented` flag in `localStorage` tracks whether this browser has previously completed the OAuth consent flow — returning users get `prompt: ''` (Google can satisfy this silently or with a single account-picker click) while first-time users always go through the full consent prompt. Cleared on sign-out so a different person signing in on the same browser always gets their own consent flow. A tab left open also renews its own access token silently a few minutes before the ~1-hour expiry; if a silent refresh fails mid-session (e.g. a brief network blip), the app retries after a 2-minute backoff rather than signing the user out.
-- **Account menu** — once signed in, the header shows the Google account's avatar (or initials, if it has none); clicking it opens a dropdown with the account's name/email and a Sign out button.
-- **Health Tracker** — a dedicated section (accessible from the nav) for tracking health metrics across five categories, each a full-width chart (one per row) with x-axis date labels angled 45° and thinned to ~7 evenly-spaced ticks for readability, showing up to the last 84 days but starting at whichever date that category was actually first logged rather than always padding out to a fixed 84-day window with empty leading days (mirroring how the State Trend & Forecast chart below already starts at its own first body mass reading) — with one deliberate exception: **Body Mass** borrows Caloric Intake's own x-axis instead of deriving one from the body mass log, since the two are read as a stacked pair and a body mass log starting on a different day than the calorie log would slide one chart's dates out of line with the other's. All eight Health Metrics charts — these 5 plus State Trend & Forecast, Calorie Balance, and Body Composition Change below — share an identical plot-area width and left-axis width, so their x-axis date labels always line up vertically down the section: the three with a real right-hand axis (Physical Activity's calories-burned dots, State Trend & Forecast's BMI line, Calorie Balance's grams-of-fat twin) fix that axis to a set width via the same mechanism the left axis already uses, and the other five reserve an equal-width invisible axis on the right purely so their plot area matches, even though they have nothing to show there: **Body Mass** (bar chart, one bar per body mass reading — same-day duplicates averaged — scored by *direction* rather than against a line: green when that day's body mass moved toward your goal from the previous body mass reading, red when it moved away, and gray only for the one bar that genuinely can't be scored — the leftmost, with no earlier body mass reading behind it. A day the scale held exactly still is *not* neutral: it's judged by **where** it held, green while you're at your goal body mass (within the same 0.1 kg tolerance the rest of the app treats as "there", since holding is exactly what success looks like once you've arrived) and red while you're still short of it, because that's a stall — the thing the goal exists to move away from. With no `WEIGHT_GOAL_KG` set there's no way to be at one, so a stall stays red. Which direction counts as progress comes from `getCalorieBoundKind` — the same read of `WEIGHT_GOAL_KG` (and its `WEEKLY_FAT_LOSS_KG` fallback) that makes the Caloric Intake bound below it a max or a min — so the two charts can never disagree about which way you're heading; the heading stays a plain "Body Mass" and the hover, not the title, is what names the direction. The comparison is against the previous *body mass reading*, not the previous calendar day, so weighing in every third day still scores every bar, and the leftmost bar is seeded from the most recent body mass reading *before* the window rather than left unscored because its predecessor is off the left edge. A day with no body mass reading is an empty slot, not a zero — unlike Caloric Intake, where a missing log is a harmless zero-height bar, 0 kg is an impossible body mass that would drag the whole y-axis down to it — and this is the one metric chart whose y-axis deliberately does *not* begin at zero, since a 0 kg baseline puts every bar within a pixel of the same height and hides the day-to-day movement the chart exists to show; it pads the real data range instead. It draws no goal line of its own: State Trend & Forecast above already owns the goal, the smoothed trend, and the forecast, and a goal several kg away would flatten this axis into exactly the flat line that chart exists to smooth. Hovering reports the body mass alone (`Weight: 82.4 kg`) — the direction is already carried by the bar colour, so the tooltip does not restate it, **Caloric Intake** (bar chart, total per day, with a **bound** *staircase* rather than a single target line — `CALORIE_TARGET_KCAL` by default, or a personalized Mifflin-St Jeor/TDEE-based calculation if `HEIGHT_CM`, `BIRTH_DATE`, `SEX`, and `WEEKLY_FAT_LOSS_KG` are all set in `Settings` and a body mass has been logged — see [Data Model](#data-model). There is no "target" daily intake in this app: the figure is a **maximum** when your goal body mass is below your latest body mass reading and a **minimum** when it's above it (with the sign of `WEEKLY_FAT_LOSS_KG` deciding if you're already at goal, and a maximum if neither is set), because eating 400 kcal under a lean bulk's figure isn't a good day any more than eating 400 over a cut's is. The calculated figure is **re-evaluated for every day on the chart from the body mass in effect that day** (most recent body mass reading on or before it, carried forward — the same read Calorie Balance uses for its per-day BMR), not from today's body mass applied backwards across the whole window: the bound is a function of body mass, so a 6 kg loss moves a calculated maximum by roughly 80 kcal, and one flat line judged the first day of a 12-week window against the body you have *now* — marking days red that were comfortably inside the maximum that actually applied when you ate them. There is therefore **no single line to draw, and no shaded out-of-bounds zone at all**: each day's figure is marked as a hairline red **cap across that day's own bar** (a floating bar, `grouped: false` so it overlays the bar rather than sitting beside it, at the lowest `order` so it paints last and stays visible on a day whose bar overshoots it). A continuous line — however dashed or stepped — reads as one shared limit spanning the window, and a filled zone reads as an even more fixed one, which is exactly the misreading a per-day bound has to avoid; a mark per bar says the limit belongs to that day and to no other. The last cap is the same number the Calories glance tile shows, since that's this same formula at the latest body mass reading. The deficit is always taken from the **generic 7,700 kcal/kg**: `WEEKLY_FAT_LOSS_KG` is a *fat* goal, and converting it into a daily deficit needs adipose tissue's energy density, which is not a personal parameter. There is no plausibility guard on the result — a bound that looks aggressive means `WEEKLY_FAT_LOSS_KG` itself is aggressive, which is the user's own setting to make. The flat `CALORIE_TARGET_KCAL` fallback has no body mass basis at all and stays a genuinely flat line. Because that movement is small in absolute terms — tens of kcal across a 12-week window — **this chart's y-axis is deliberately not zero-based**, the only intake chart here that isn't: on a 0–2,500 axis a 70 kcal drift is a handful of pixels end to end and a fraction of one between adjacent days, which is exactly why a genuinely per-day staircase still read as one fixed line. The axis instead spans the region the comparison actually happens in, framed on **what was logged** — every *logged* day's intake, padded by 15% or 120 kcal (whichever is larger), rounded to 50 kcal and clamped at zero; the zeros standing in for unlogged days are excluded, since they'd drag the floor back to zero and undo the zoom. The bound is deliberately *not* part of that frame, and that isn't a detail: padding the axis around the bound made the ruler move with the thing it measures, so a bound that shifts as your body mass changes put the caps back within 2 px of where they started while the intake bars changed height instead. Framing on logged intake holds the frame still — what you ate doesn't depend on where the bound sits — while the bound moves the caps across it. The caps still can't be allowed off-plot, so the frame is *widened* (never re-padded) to reach a cap that falls outside it — the only remaining case where the bound can move the axis, quantized to a coarse 250 kcal so the frame holds still across several hundred kcal of bound movement even then. Bars are therefore read as a position against the line rather than as a quantity of food. On top of that, **each bar carries its own cap** — a hairline floating bar at that day's figure, the same width as the bar it sits on (`grouped: false` overlays rather than juxtaposes, and it takes the lowest `order` so it paints last and stays visible on a day whose bar overshoots it) — so the limit visibly belongs to that day rather than to the chart. The chart's own heading says which bound it is ("Max Caloric Intake" / "Min Caloric Intake"), and with no shaded zone left, **bar color carries the entire pass/fail read**: each bar is scored against its own day's cap in the app's own green/red rather than a flat amber — green on the right side of that day's bound (at-or-under a max, at-or-over a min), red on the wrong one. Hovering anywhere in a day's column (`interaction: {mode: 'index', intersect: false}`, so the cap sitting on top of a bar can't intercept the pointer and produce an empty tooltip) reports that day as labelled fields, in the same form the Calorie Balance tooltip uses: `Intake: 1850 kcal` / `Maximum: 1877 kcal` / `Variance: -27 kcal` / `Reference weight: 79.6 kg` — the last field naming the body mass that day's figure was calculated from, which is the reason it differs from the next day's, and omitted entirely on the flat-setting fallback, which has no reference body mass to name. A day with nothing logged is scored as neither: it plots as 0, which is a missing log rather than a day of fasting, so it takes the green (invisible at zero height anyway) instead of counting as the worst day on the chart under a *minimum*), **Physical Activity** (stacked bar chart normalized to minutes — steps entries are converted at 100 steps/min, hour entries are multiplied by 60 — with one stacked segment per Description (e.g. NEAT, Cardio, Strength Training) so a day's mix of activity types is visible at a glance rather than one summed bar, plus a 100 min target line excluded from the hover tooltip since it's a fixed constant rather than a per-day value, and, for any day with a Calculate-derived calorie figure, its own dot plotted against a dedicated right-hand kcal axis so calories burned has a visible shape day to day, not just a tooltip number), **Rest & Recovery** (floating bars spanning each night's bed→wake time on a clock-time axis anchored at noon — so a night crossing midnight still renders as one unbroken bar — and tightly bounded to the actual earliest bedtime/latest waketime in the window (rounded out to the nearest 3-hour tick) rather than always reserving a fixed 18-hour span regardless of how tightly clustered the real data is, colored on a red→amber→green gradient by how close that night's duration came to `SLEEP_TARGET_HOURS` — see [Data Model](#data-model) for how a Sleep entry's bed/wake times are logged), and **Protein Intake** (bar chart, total grams per day, with a target *band* rather than a single line: two dashed lines with the space between them shaded, drawn from the `PROTEIN_TARGET_G_PER_KG` grams-per-kg range × your `WEIGHT_GOAL_KG` target body mass — falling back to a single line at the flat `PROTEIN_TARGET_G` when no range is set. Bars are scored the same way the Protein tile is (`withinProteinBand`, shared by both so they can't disagree): green inside the band, red both under the floor and over the top end, since the band's upper end is a real ceiling rather than extra credit — and the band itself is shaded green, not red, because unlike Caloric Intake's shading (the half to stay out of) this is the region you're aiming to land in. A day with nothing logged takes the green, since 0 g is a missing log rather than a day without protein. Both target lines are filtered out of the hover tooltip, since they're the same constant on every day). Body Mass appearing here as well as in the State Trend & Forecast chart isn't a duplicate: that one is the trajectory (trend line, goal, projection), this one scores each individual day's move as toward or away from the goal. All 5 go full-width, one per row, rather than sharing one. Above all of this, a **Today at a glance** row of 4 stat tiles (styled like the dashboard's summary cards) shows today's actual vs. your own figure for Calories, Protein, Activity, and Sleep in one glance — colored green when you're on the right side of it (at/over for Activity and Sleep; for Calories, whichever side your goal points to) and red when you're not, gray when nothing's logged yet for that metric today. The four headings are bare metric names (Calories, Protein, Activity, Sleep) — the row already says these are today's figures (last night's, for Sleep), so they don't repeat it. The Calories tile's *heading* carries which bound its figure is — "Max Calories" while your goal body mass is below today's, "Min Calories" while it's above — since the number alone can't say it and the value line has no room; it's digit-free, so privacy mode has nothing to hide there. Protein is the exception: its target is a *band* rather than one number, so its tile reads as a range (e.g. `142 / 131~164 g`) and is green only while the day's protein lands inside that band — red both under the floor and over the top end. A band set as a single figure keeps the plain at/over-target rule, since there's no inside to land in. A **State Trend & Forecast** chart — the first thing shown inside the Health Metrics panel, above those 4 charts — plots historical body mass (shaded) alongside a projected trajectory toward your body mass goal (shaded in a distinct tint) using a multi-factor model (caloric balance and activity, scaled by sleep quality). It measures your intake against **maintenance** (Mifflin-St Jeor from your profile and latest body mass reading, plus that window's logged activity burn) — the same baseline the Calorie Balance chart uses, so the two can't contradict each other. Measuring against the calorie *bound* instead was a real bug: the calculated figure is already maintenance minus your planned deficit, so eating exactly that figure produced a balance of ~zero and the forecast announced "no net change at current habits" — precisely when you were hitting the deficit that should deliver your full `WEEKLY_FAT_LOSS_KG`. It also added logged activity on top of a target that was then derived from BMR × an `ACTIVITY_MULTIPLIER`, double-counting movement the multiplier already assumed; the two errors pointed opposite ways, which is what kept the result looking plausible while flatly disagreeing with the deficit chart. The multiplier is gone now — the bound is BMR + activity too, so all three share one baseline by construction. A third line, **State Trend & Forecast**, overlays a centered moving average of nearby logged body mass readings (a small window of points, not a calendar-day window, so it smooths the same way whether you log daily or sporadically) to filter out day-to-day water/food-body mass noise without chasing a single high or low reading. Its x-axis is a true linear time scale (day-offset from the first plotted date, not equally-spaced categories), so daily historical entries followed by weekly (then a single distant ETA) projected points are spaced proportionally to how far apart they actually are, rather than implying every gap is the same length. When a `HEIGHT_CM` `Settings` key is set, a second **BMI** y-axis appears on the right — no separate BMI line is plotted, since BMI is just body mass rescaled by a fixed constant and would exactly retrace the existing body mass line; instead the axis's own bounds are derived directly from the body mass axis's bounds (not auto-ranged independently), so BMI can be read straight off the body mass line and the two axes stay true parallel twins instead of drifting out of correspondence. Between the heading and the chart — read before the plot rather than as a footnote under it — a **progress meter** (a fill bar plus two bold stats — percent of the total distance already covered, and kg still remaining to the goal) shows how far you've come from your first logged body mass toward your goal — the kg-remaining stat turning red if the current trend is heading the wrong way — with a second, lighter **time meter** directly beneath it measuring the same journey along the other axis: days elapsed since your first body mass reading versus the forecast's own remaining days. Together the two answer "how far along am I" in distance and in time at once, and a long time bar beside a short body mass bar is itself the signal that progress is costing more calendar than the effort suggests. The time meter needs a real arrival date, so it hides for any status that can't produce one — with the projected arrival date and days remaining on their own centered line underneath. When no arrival date can be projected at all — already at goal, a flat trend, or habits trending away from the goal — only the dashed forecast segment is dropped: the measured body mass history, the smoothed trend line, and the goal line all still render (they don't depend on a forecast existing), and that line explains why while still reporting the current rate in kg/week, and, separately, a **plateau alert**: if the smoothed State Trend & Forecast line has net-changed less than 0.3 kg over the last ~10 days of actual logged history (not the model's projected slope), a warning line flags how many days it's held flat, so a real-world stall doesn't hide behind an otherwise-fine projection.
+### Dashboard widgets
 
-Between State Trend & Forecast and Calorie Balance sits the **Body Mass** chart: one bar per logged reading,
-scored green or red by whether the scale moved toward your goal, gray when it can't be scored — the
-first bar shown, or a plateau that has held under `WEIGHT_STALL_RED_AFTER_DAYS`. Holding *at* the goal
-stays green however long it lasts. Its **left** axis restates the same bars as the energy stored in the
-fat mass each implies (see *Fat energy* below), and its gridlines are driven by the kg scale so every
-line lands on a round kg. Hovering reports the reading, the change since the previous reading, BMI, and
-the estimated body fat %, fat mass, fat energy and fat-energy change.
+- Four self-contained "bulb" cards above each panel group; work before sign-in.
+- **Time** — local `HH:mm:ss` plus a second, independently configurable reference clock.
+- **Date** — Gregorian ✝️, Shamsi 🌞 and Ghamari 🌜 in one aligned day/month/year grid, via `Intl`.
+- **Azan** — Sobh/Zohr/Maghreb/Midnight, computed client-side (Shia "Tehran" method).
+- **Weather** — current conditions plus a 3-day forecast.
+- Location resolution order: manual override → browser geolocation → `WIDGET_DEFAULT_CITY` → Waterloo/Isfahan fallback.
+- Powered by free key-less APIs (Open-Meteo, BigDataCloud), cached with their own TTLs.
 
-Then a **Calorie Balance** chart plots each day's energy balance — what you ate minus what you spent —
-as a bar, with the body-fat change that balance implies readable off a right-hand grams axis. Bars keep
-the sign convention (below zero is a deficit, above is a surplus) and are scored against the **planned**
-deficit that `WEEKLY_FAT_LOSS_KG` implies, drawn as a red dash on every bar: at or beyond it is green,
-short of it but still on the goal's side of zero is gray, and the wrong side of zero is red. Which side
-is "toward the goal" comes from `getCalorieBoundKind`, the same read the Caloric Intake bound uses, so
-the app's green/red never congratulates someone trying to gain for undereating. That's also why it's no
-longer called "Calorie Deficit & Fat Loss": a deficit is only progress for half the people using it.
+### Layout and interaction
 
-Intake is your logged `Calories`/`Calories; Protein` entries; spend is Mifflin-St Jeor BMR — the cost of
-just being alive, from `HEIGHT_CM`, `BIRTH_DATE`, `SEX`, and the most recent body mass reading on or
-before that day (carried forward, since a BMR is needed for every day in the window, not just the days
-you happened to step on the scale) — plus that day's own logged activity burn (`Activity; Calories`'
-Calculate-derived kcal where present, else the same flat 5 kcal/active-minute estimate the forecast
-falls back to). No lifestyle multiplier is applied on top of the BMR, unlike the way the Caloric Intake
-bound computes it: activity is already logged here as real kcal (NEAT included), so scaling BMR by a
-lifestyle multiplier as well would count the same movement twice and overstate every deficit.
+- Responsive breakpoint ladder (950/820/800/640/420px); no separate mobile view.
+- Every form field has a 16px floor so mobile browsers never auto-zoom on focus.
+- Modals are full-width on phones; cards cap at a fixed column width on wide screens.
+- **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
+- **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
+- **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
+- **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
+- **Dark mode** — floating 🌙/☀️ toggle, persisted.
+- **Privacy mode** — floating 🙈/👁️ masks amounts, health figures, contact details and Settings values.
 
-Grams of fat is that balance ÷ 7,700 kcal/kg — adipose tissue's energy density, a population constant
-rather than a personal parameter. Because it is a single fixed divisor, the right-hand axis is derived
-from the left one's own bounds as a true twin — zero lines up with zero and every bar reads off either
-side. The kcal axis is pinned to 250-kcal gridlines with both bounds rounded out to a multiple of it, so
-no label sits off-grid. A day with no food logged is left as an empty slot rather than counted as a day
-of eating nothing (which would show a phantom full-BMR deficit). Hovering breaks out every term of the
-subtraction — eaten, maintenance, activity, expected fat, actual deficit — with the planned deficit last.
-Requires `HEIGHT_CM`, `BIRTH_DATE`, and `SEX` in `Settings` plus at least one logged body mass;
-otherwise it renders an explanatory empty state.
+### Button roles
 
-A single **Health Insight** panel sits after Health Indicators, before Health Log, holding all three AI reads — **Wellness**, **Food** and **Activity** — behind three mode buttons plus one shared From/To date-range picker. It was three separate panels; they ran an identical flow (pick a range, compute a local preview, optionally ask a question, send to Groq, render, persist) and differed only in what they gathered, how they phrased it, and which system prompt they sent, so all three now share one `INSIGHT_MODES` descriptor table and one copy of the flow (`insight-panel.js`). **Nothing is computed until you click a mode button.** That's the point of the split: the old panels each rendered their full data preview on page load *and* again once Health Log data arrived — whether or not you ever opened them, and every panel starts collapsed — which cost dozens of passes over the whole log, including a re-parse of every workout note ever written, before you'd touched anything. A load that never opens this panel now does none of that work. Clicking a mode loads its data for the picked range, shows a preview of exactly what would be sent, and restores that mode's own last saved report (each mode persists its own, so switching modes swaps the report too); changing the dates recomputes the loaded mode, and 🚀 **Send to AI** sends the data already on screen rather than re-aggregating it, so the preview is provably the request. All three modes prepend the same age/sex/height/body mass/BMI profile block, rendered identically in each — reference intakes for iron, calcium, folate, B12 and protein depend on sex and age; what counts as a heavy training volume depends on the body lifting it; and "is this enough food" can't be read off an ingredient list without knowing whose it is — and it's shown on screen rather than attached invisibly. **Wellness** compares the selected range against the equal-length preceding period (calories, protein, activity minutes and kcal broken out per Description, sleep) with the same body mass-trajectory numbers the State Trend & Forecast chart computes. **Food** lists every distinct ingredient logged via 🧮 Calculate in the range, summed into one total amount/calories/protein each (highest-calorie first), converting a unit-count total (e.g. 23 eggs) to grams from that ingredient's own per-unit body mass in Nutrition Facts so the summary reads in one consistent unit. **Activity** reports consistency and total resistance-training rep volume vs. the previous period plus a per-muscle-group breakdown (Legs/Chest/Back/Shoulders/Biceps/Triceps) sorted most-neglected-first, with each muscle's last-trained date searched across the *full* history so a long gap still reads correctly when it falls outside the picked window. Volume is always a total rep count, never sets × reps: a workout note records only the total (`30x Leg Press`), so a set count isn't recoverable, and the system prompt says so outright rather than leaving the model to invent one. Each mode's report is plain text in fixed sections (Overview / Going well / Needs attention / Suggestions, plus Answer when you asked something), rendered without `innerHTML` since it's untrusted model output, and saved to `Settings` under that mode's `INSIGHT_*` keys.
+- **Blue** — add or save (Add/Log buttons, Save, Save & Add Another, 💾 bank).
+- **Amber** — spends an AI call (Send to AI, 🧮 Calculate, 🧮 Recalculate Selected).
+- **Red** — destructive, text labels only (the export filter's remove).
+- **Default** — everything else, including all emoji buttons (❌ close, 🗑️ delete) — an emoji on a dark fill is hard to read.
+- Slow actions append `…` to the label and block re-clicks until they settle: all form saves, bulk merge/delete, every row delete, and the AI/USDA calls.
 
-Also between Health Indicators and Health Log, a **Protein Source Rotation** panel shows a horizontal bar per ingredient flagged with a Protein % on its Nutrition Facts row (see below): the bar is actual protein eaten from that ingredient in the selected custom From/To date range, and a red tick marks its live target — that ingredient's Protein % of the midpoint of your current protein target band, scaled to the selected range — sorted by remaining gap (target minus actual) descending, so the ingredient with the most left to eat leads the chart and anything already at or past its target sinks toward the bottom. A low or empty bar flags an ingredient you haven't relied on recently. Hovering either shows the underlying grams, plus, for the Eaten bar, what % of your *total* protein target that ingredient's actual consumption covered this window (not just its own configured share). Since the underlying protein target is itself live (`getProteinTargetG`, the same Mifflin-St Jeor-style calculation the Caloric Intake target and State Trend & Forecast projection already use), every ingredient's gram target moves with it automatically as body mass/activity change — there's no separate serving-size concept and nothing to rescale by hand. Beside the bars, a two-ring donut splits the same sources by share of protein actually eaten, ignoring targets: the outer ring covers the 4 weeks ending on the To date, the inner ring the last week of it — so a source that's carried the last week but barely registers over the month (or the reverse) shows up as a mismatch between the two rings. Both rings are fixed windows anchored to the To date, not the From/To span itself, so the donut always compares the same two horizons no matter how wide the bars' range is set. Each source keeps one color across the whole panel — its bar and both of its slices — so the rings are told apart by position alone, never by shade, and the donut needs no legend of its own; hovering a slice names the source, its grams, and its share of that ring's window. Both charts share one fixed height so they line up as a single row (the bar chart no longer grows taller with each tracked ingredient, so a long list of sources packs its labels tighter rather than pushing the donut down the page).
+### Finances
 
-Also between Protein Source Rotation and Health Log, an **Activity Plan** panel gives a Push/Pull/Legs/Dumbbell/Bodybody mass strength plan plus two flat-activity tables below it, each row a "Done" checkbox on the right: the **Strength Training** tables are one per day, each row a machine (or, on Day 5, a no-equipment exercise) with its sets x reps and rest. Day 5 — **Core & Bodybody mass** — needs no body mass or device at all (Crunch, Plank, Leg Raise, Glute Bridge, Bird Dog, Superman, Push-up, Bodybody mass Squat, Mountain Climber), and introduces the plan's first *isometric hold* rows: a Plank is held for a set number of seconds rather than repped, so its checkbox carries `data-hold` (seconds per set) instead of `data-reps` and contributes `sets x hold` seconds directly, with no per-rep tempo applied. Bilateral exercises state their TOTAL set count rather than per-side (e.g. "Bird Dog (both sides) — 6 x 12"), so the displayed figure and the logged duration can't drift apart. On a phone the three right-hand columns tighten up (smaller type, trimmed padding, narrower width hints) so a long exercise name stays on one line instead of wrapping; **NEAT** (currently just Walk, 6000 step) and **Cardio** (currently Swim, 30 min, and Running, 30 min) hold everything else, one table per activity "kind" so more can be added the same way over time — a NEAT row's Amount is a step count, a Cardio row's is a plain duration. A single **Log Workout** button below every table (rather than one per table) reads every ticked checkbox across all of them at once, so a session that mixes strength exercises with a NEAT/Cardio activity — or exercises from different strength days — still logs as one entry. Duration and calories only ever count active time, never rest: a strength row contributes sets x reps at an assumed 3 sec/rep, a hold row its own `sets x hold` seconds (its Rest column is display-only, not counted in either case), a Cardio row contributes its own fixed duration, and a NEAT (step-count) row is converted to minutes the same way the Activity chart already does (`toActivityMinutes`, ~100 steps/min) — no warm-up/transition allowance is added on top of any of them. Log Workout opens the Health Log's Log Entry modal pre-filled with Category "Activity", Description "Strength Training" if any strength exercise was ticked (otherwise the ticked table's own name(s), e.g. "NEAT" or "NEAT + Cardio" — not the specific activity, since a table may hold more than one activity later), Unit `min`, the estimated duration as Amount, and Notes as one flat line per ticked row, no day/table label — `Nx Exercise Name` (TOTAL reps, read off the row's own `Sets x Reps` cell) for a strength row, `Nsec Exercise Name` for an isometric hold, `Nmin Activity Name` for a Cardio row, `Nstep Activity Name` for a NEAT row (e.g. `30x Leg Press\n135sec Plank\n30min Swim`) — one space between the quantity and the name (the Recalculate parsers match the gap as `\s+`, so notes saved back when this wrote two spaces still parse identically) — a hold row writes its TOTAL held seconds rather than the "3 x 45 sec" its cell displays, since the `<number><unit>` pattern needs its unit flush against the number and a trailing " sec" would make the line unparseable on Recalculate, silently dropping that exercise. That separator is a plain ASCII `x`, the same character the plan tables show in their `Sets x Reps` column — but the Recalculate parsers accept `×` as well, since Log Workout wrote that form before the switch and notes already saved to the sheet have to keep parsing — then immediately runs the same estimate 🧮 **Calculate** does (see below) so the modal opens already showing the real duration/calorie pair; nothing is written until the user reviews/edits and clicks Save, same as any other manual entry. From there, clicking 🧮 **Calculate** (same button as the food flow below, dispatched by the entry's current Category) re-derives the duration from that Notes text and estimates calories burned as `MET × bodyweight(kg) × hours`, summed per row using its own MET over its own active seconds only — a Compendium-of-Physical-Activities-sourced 5.0 for compound multi-joint strength exercises (Leg Press, Chest/Shoulder Press, Lat Pulldown, Seated Row, and their Day 4 dumbbell equivalents — Goblet Squat, DB Bench Press, DB Row, DB Shoulder Press, DB Romanian Deadlift, plus Day 5's Push-up, Bodybody mass Squat, and Mountain Climber), 3.5 for single-joint isolation exercises, Day 5's core work and isometric holds, and Walk, 6.0 for Swim, or 7.0 for Running — using the most recently logged Body Mass entry as bodybody mass. Category becomes `Activity; Calories`, Amount `"<minutes>; <kcal>"`, Unit `min; kcal`. Requires a logged Body Mass entry first (a click that races the page's initial data load instead shows a "still loading" message rather than wrongly claiming no body mass was ever logged); only understands the Activity Plan's own note format for now (a hand-typed or otherwise-shaped Notes text shows an inline error rather than a guess). Below that, a filterable/sortable **Health Log** table (search across description/notes/unit/category, plus a date range and category filter, sortable by date, paginated at 28 entries per page ⬅️/➡️) with add/edit/delete/duplicate — a thicker top border marks each row where the date changes from the row above, so day boundaries are visible at a glance regardless of sort direction. The Log Entry form is category-aware: selecting a category pre-fills the unit field and populates a datalist of Description suggestions sourced from your past entries for that category (most-used first), falling back to built-in defaults. Category's own dropdown only ever offers `Weight`, `Sleep`, `Calories; Protein`, and `Activity; Calories` — plain `Activity` isn't a choosable option (Log Workout still uses it as a one-tick transient value before its auto-Calculate flips it to `Activity; Calories`), same as plain `Calories` never was. The Amount field accepts arithmetic expressions (same syntax as Journal). A 🧮 **Calculate** button lets you type a freeform ingredient list into Notes (e.g. "125g ground beef, 1 cup crushed tomatoes, 30g rice") instead of a calorie number: an LLM (Groq) splits it into per-item gram-mass/calorie-density/protein-density estimates, then each item is matched against your own **Nutrition Facts** table first (see below and [Data Model](#data-model)) by the ingredient name *you actually typed* — never the AI's own rephrasing of it, so it can't silently rename or fork what you already have — a trusted match there (e.g. the exact brand/product you buy) is used as-is, scaled to the logged quantity, with no further lookup. Only a miss falls back to cross-checking against real values from the USDA FoodData Central database — falling back further to the model's own estimate only if the database has no plausible match either, so a mismatched database entry can't silently produce a wildly wrong number. That fallback result is shown in the breakdown table with a **＋ Save** button rather than banked automatically — reviewing before it joins your trusted table catches a typo'd or misphrased name (e.g. "oilve oil" not matching an existing "olive oil" row) before it becomes a same-food duplicate under the wrong name; leaving it unsaved and fixing/retyping the ingredient in Notes, then recalculating, is the intended fix instead. (**Recalculate Selected**, below, has no per-row review UI and so still banks a miss automatically, same as before.) The final totals are always summed client-side rather than trusted from the model. The Category/Unit/Amount/Notes fields are then filled in automatically — Category set to `Calories; Protein`, Amount to `"<kcal>; <protein g>"`, Unit to `kcal; g` — keeping one meal's calorie and protein estimate on a single entry, ready to review and Save. Results are cached per exact input text, so recalculating the same entry is instant and gives the same answer every time. Requires `GROQ_API_KEY` and `USDA_FDC_API_KEY` in `Settings` (see below) — the button is always present, but shows an inline error/warning if a key is missing or a result looks implausible. A checkbox column and select-all let you act on several Health Log rows at once: **✏️ Edit Selected** opens a form pre-filled with whichever of Category/Description/Notes is identical across every selected entry (a field that differs is left blank); only fields you actually fill in are patched onto all selected rows — Amount/Unit are always left untouched — with an undo toast once it finishes; **Recalculate Selected** re-derives each selected entry from its own Notes text independently — the Nutrition Facts/Groq/USDA estimate for a Calories/Calories; Protein entry, or the duration+MET estimate (using the latest logged Body Mass) for an Activity/Activity; Calories entry — skipping and reporting entries with no Notes or of another category rather than erroring, with an undo toast once it finishes; **Merge Selected** requires 2+ entries sharing one exact category, sums their calorie (and protein, if composite) amounts, combines differing Descriptions and Notes rather than dropping either, writes the result onto the earliest-selected row, and deletes the rest — this one can't be undone. Backed by a `Wellness Log` sheet tab in the same Google Sheet as all other data. Below the Health Log, a **Nutrition Facts** panel lists every known ingredient (Name/Amount/Calories/Protein) in a searchable, sortable table, backed by its own `Nutrition Facts` sheet tab (see [Data Model](#data-model)): "+ Add Ingredient" lets you pin down the exact numbers for a specific brand/product — Amount needs either a gram mass in it (e.g. "1 scoop (32g)") so Calculate can scale it by body mass, or, for a food naturally counted in whole pieces, a leading count (e.g. "1 rice cake", "2 eggs") so it scales by how many units you logged instead — ✏️/🗑️ edit and delete each row, and a checkbox column with **🔗 Merge Selected** consolidates 2+ rows you ended up phrasing slightly differently across entries — merge matching is always exact-text against what you typed, never a fuzzy or AI-driven match, so search + manual merge is the intended way to keep it clean (blanks on the earliest-selected row are filled in from the others; nothing is summed, unlike the Health Log's own merge). Calculate's own table lookup is a little more forgiving than that on one specific point: after an exact match fails, it also tries folding a trailing "s" off both sides (so a Notes line typed as "2 eggs" still hits an existing "egg" row, and vice versa) before falling back to USDA/AI — everything else about a name still has to match exactly.
-- **Travel** — a searchable, sortable Travel Log table (Country/City, Port, Type, Via, Date, Time, Reason, Detail) with add/edit/delete, backed by a `Travel` sheet tab. Above the table, a **Travel Insights** panel derives two views from that same log: a **Time Spent by Country** grid of flag-emoji tiles (hover for country name + duration) computed by pairing each Arrival with its closing Departure (an open-ended final Arrival counts as an ongoing stay, credited up to today), and a **Countries Visited** choropleth world map (Chart.js + `chartjs-chart-geo`, world borders from `world-atlas`) highlighting every visited country. If a `BIRTH_DATE` key is set in `Settings` and the very first Travel row is a Departure, the years lived in the home country before that first trip are credited too, rather than being silently dropped just because the log itself only starts at the first trip ever taken.
-- **Applications** — an Applications panel tracking immigration/visa applications as expandable cards, one per application (Type, App Number, Submitted date, latest status), each expanding to its full status-update history. Cards are grouped under "Ongoing" and "Closed" headings: an application counts as ongoing as long as its submission date or any status update is dated today (a still-active application's last recorded date keeps moving forward with each new update; once closed, that date stops advancing and stops matching "today" the next day). Add creates a new application header row only — status updates and the Delay figure are managed directly in the Sheet, since the Delay formula's cell references are hand-maintained per application. New applications are inserted at the top of the sheet's data (not appended after it) so the sheet's whole-column footer formulas (`Total Waiting time`, `Total Time in Canada`) shift down intact instead of a new row landing after them. Backed by an `Applications` sheet tab.
-- **Contacts** — a searchable, sortable, paginated Contact List table (name, phone, email, tags) with add/edit/delete; the full record (prefix, birthday, up to 3 phones/2 emails, address with Province/Region for tax purposes, Website/LinkedIn/2 Telegram links, Tags, and a free-text Note) is edited in the Add/Edit Contact modal. Backed by a `Contacts` sheet tab. A checkbox column plus a bulk-actions bar let you select multiple rows to **export just the selection** (CSV formatted for Google/Phone Contacts or Outlook), **bulk-delete**, or **merge 2+ contacts into one** (fields already filled on the target row are kept, blanks are filled in from the others, and phone/email/Telegram lists are combined and deduplicated) — handy for cleaning up near-duplicates. `scripts/merge_contacts.py` is a one-time local tool that merges a Google Contacts export, an old manual spreadsheet, and a JSON contacts list into one deduplicated starting point for this tab — see its module docstring and the `Contacts` entry under [Data Model](#data-model) for the merge/dedup logic.
-- **Settings** — a compact panel just below Contact List for managing the `Settings` tab's key/value pairs (see [Data Model](#data-model)) without leaving the app or opening the spreadsheet directly: a Key/Value table with ✏️ edit and 🗑️ delete per row, and a "+ Add" button. The Add/Edit modal's Key field autocompletes from the app's known setting keys (`WEIGHT_GOAL_KG`, `CALORIE_TARGET_KCAL`, `SLEEP_TARGET_HOURS`, `ACTIVITY_TARGET_MIN`, `PROTEIN_TARGET_G`, `PROTEIN_TARGET_G_PER_KG`, `PROTEIN_TARGET_G_PER_KG_MIN`, `PROTEIN_TARGET_G_PER_KG_MAX`, `HEIGHT_CM`, `BIRTH_DATE`, `SEX`, `ACTIVITY_MET_DEFAULT`, `WEEKLY_FAT_LOSS_KG`, `WIDGET_DEFAULT_CITY`, and `WIDGET_SECOND_CLOCK_CITY`) while still accepting a free-text custom key, and also has an optional Notes field (column C — still never read by the app itself, just a place to jot what a setting is for). Saving or deleting a row immediately re-applies the change to any live widget that reads it (e.g. a changed `WEIGHT_GOAL_KG` updates the Body Mass target line *and* the protein target band — which is derived from it — right away), without a page reload. If the `Settings` tab doesn't exist yet, the panel shows an explanatory message and disables "+ Add" instead of erroring.
-- **Local caching** — a 5-minute `localStorage` cache avoids redundant Sheets API calls; manual refresh and clear-cache controls are available as floating buttons.
+- **Summary cards** — Net Worth, Monthly Cash Flow, Monthly Income, Monthly Expenditure.
+  - Income and Expenditure also show the average of the **previous 3 months**, separated by `/`.
+  - The current month is excluded from its own benchmark; a tooltip names the months averaged.
+- **Spending by Category** — grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months), plus four donuts.
+- **Spending Breakdown by Type** — per-category donuts driven by a free-text `Description` prefix convention, built dynamically from `Insight`.
+- **Historical Trends** — Category Expenditure Trend (stacked), Revenue vs. Expenditure (stepped area), Cumulative Net Worth (line).
+- **Transaction Log** — searchable, filterable, sortable, paginated; add/edit/delete/duplicate.
+  - Payee/Description/Category autocomplete from history; new categories can be typed inline.
+  - Amount accepts arithmetic (`=-9.97-1.30`, `-32/2`), rounded to the cent.
+  - Advanced Filters: date range plus an AND/OR field-filter builder; Export CSV writes exactly what's filtered.
+- **Bulk transaction ops** — select rows for ✏️ Edit Selected (only filled fields applied) or 🗑️ Delete Selected (one `batchUpdate`, highest row first).
+- **Undo** — toast after bulk edit/delete; deletes re-append, edits write original values back in place.
+- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the Account Summary table with reconciliation status.
 
-Category-based charts (Spending by Category, Category Expenditure Trend, Spending Breakdown by Type) all assign each category/type a color spread evenly around the color wheel, ordered by highest-to-lowest absolute spend.
+### Time Tracker
 
-Every dollar-denominated chart axis (Average Monthly Spending by Category, Category Expenditure Trend, Revenue vs. Expenditure, Cumulative Net Worth) formats its y-axis ticks as currency rather than raw numbers; the Time Tracker's hours- and percentage-based charts are left as plain numbers since they aren't money.
+- **Log a Day** modal — Company, Start/End, Break, optional Task; live duration preview.
+- Company autocompletes and defaults to the most recently logged one.
+- Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
+- **Work Analytics** — Arrival, Departure and Hours Worked histograms with normal-curve overlays, plus Daily Hours Average by period.
+- **Overtime summary** — net time beyond an 8h/day pace, broken out Total/Year/Month/Week.
+- **Work Log** table — date range, sortable, computed Duration, inline edit, paginated.
+
+### Health — Today at a glance
+
+- Four tiles: **Max/Min Calory Intake**, **Activity**, **Protein**, **Sleep**.
+- Each reads `actual / target unit`, green on the right side of the figure, red otherwise, grey when nothing's logged.
+- Activity also restates its target in kcal — `— / 100 min = 394 kcal` — from the same `activityTargetKcal` the calorie bound uses.
+- The Calories heading carries which bound it is, since the number alone can't say it.
+- Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
+
+### Health — Health Indicators
+
+- All charts share one height and one plot-area width, so their date labels line up down the page.
+- **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward goal; optional BMI twin axis.
+  - Progress meters above the chart: distance covered and time elapsed, side by side.
+  - Plateau alert when the smoothed trend has held flat.
+- **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
+- **Calorie Balance** — intake minus BMR minus activity, scored against the *planned* deficit; grams-of-fat twin axis.
+- **Caloric Intake** — per-day bars with a per-day bound drawn as a cap on each bar, not one shared line.
+- **Physical Activity** — stacked minutes per Description, plus a calories-burned dot series.
+- **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
+- **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
+
+### Health — Health Insight (AI)
+
+- One panel, three modes: **Wellness**, **Food**, **Activity**.
+- **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
+- Clicking a mode shows a preview of exactly what would be sent; 🚀 Send to AI sends that same data.
+- All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
+- **Wellness** — selected range vs. the equal-length preceding period.
+- **Food** — ingredients **grouped by Classification**, each group carrying its own ingredient count and calorie/protein totals.
+  - Groups are ordered by calories; `Unclassified` always sinks to the bottom and is flagged to the model as not a food group.
+  - The preview table groups identically.
+- **Activity** — consistency, rep volume, and a per-muscle-group breakdown sorted most-neglected-first.
+- Reports render as plain text without `innerHTML` (untrusted model output) and persist per mode.
+
+### Health — Protein Source Rotation
+
+- One horizontal bar per ingredient carrying a Protein % on its Nutrition Facts row.
+- Bar is actual protein eaten in range; a red tick marks its live target.
+- **Grouped by Classification** — one hue per group, lightness stepped within it, so a group reads as a block and its members stay distinct.
+- Groups ordered by combined remaining gap; within a group, most-left-to-eat first. `Unclassified` last.
+- A legend below shows one swatch per classification.
+- Beside the bars, a two-ring donut splits the same sources by share eaten: outer 4 weeks, inner last week.
+
+### Health — Activity Plan
+
+- Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row a "Done" checkbox.
+- **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover.
+- **Log a Workout sends only what's newly ticked**, and extends today's entry instead of opening a second row.
+  - The button reads "Add to Today's Workout" once something is already logged.
+  - Free text already in the note is preserved; the description re-derives from everything in the session.
+- Duration counts active time only — rest, warm-up and transitions are excluded.
+- Opens the Health Log modal pre-filled, then runs 🧮 Calculate; nothing is written until you Save.
+
+### Health — Health Log
+
+- Filterable/sortable table (search, date range, category filter), paginated; add/edit/delete/duplicate.
+- A thicker top border marks each date change, so day boundaries read at a glance.
+- Category-aware form: pre-fills the unit and offers Description suggestions from your own history.
+- **🧮 Calculate** — type a freeform ingredient list into Notes instead of a number.
+  - Each item is matched against **your own Nutrition Facts first**, by the name *you typed* — never the AI's rephrasing.
+  - A miss falls back to USDA FoodData Central, then to the model's own estimate.
+  - A fallback result gets a **＋ Save** button rather than being banked silently.
+  - Totals are always summed client-side.
+- Bulk actions: ✏️ Edit Selected, 🧮 Recalculate Selected, 🔗 Merge Selected.
+
+### Health — Nutrition Facts
+
+- Searchable, sortable ingredient table backed by its own sheet tab.
+- **Classification** is the first column — a free-text grouping (Dairy, Poultry, Grain).
+  - The Add/Edit form offers a datalist of classifications already in use, so the column doesn't fragment.
+  - Search matches classification **and** name, so typing `dairy` pulls up the whole group.
+  - Left blank by Calculate's auto-bank — the app has no basis for guessing one.
+- **🔍 Look up in USDA** button beside Save fills Amount/Calories/Protein from FoodData Central.
+  - Lists **every candidate** rather than taking the top one — Calculate can sanity-check a result against an AI estimate and this can't, and USDA ranks "Oil, soybean" above the bean.
+  - Applies the top match so the common case is one click; click another to switch.
+  - Leaves Name as typed and never sets Verified — a database figure isn't a checked label.
+- 🔗 Merge Selected consolidates near-duplicates; matching is exact-text, never fuzzy.
+
+### Other
+
+- **Travel** — sortable Travel Log plus Time Spent by Country flag tiles and a Countries Visited choropleth.
+- **Applications** — immigration/visa applications as expandable cards, grouped Ongoing/Closed.
+- **Contacts** — searchable, paginated list; bulk export (Google/Outlook CSV), delete and merge.
+- **Settings** — Key/Value/Notes table for the `Settings` tab, applied to live widgets without a reload.
+- **Local caching** — 5-minute `localStorage` cache; manual refresh and clear-cache controls.
+
+### Chart conventions
+
+- Category colours are spread evenly around the wheel, ordered by absolute spend.
+- Every dollar axis formats ticks as currency; hours/percentage axes stay plain numbers.
+- Green means met, red missed, **grey means not scored either way**.
 
 ---
 
@@ -110,10 +195,11 @@ Every dollar-denominated chart axis (Average Monthly Spending by Category, Categ
 
 ### System Diagram
 
-Ledger is a static site that talks directly to Google's APIs — and a handful of other free/opt-in APIs — from the browser. There is no application server in the request path, ever.
+- Static site talking directly to Google's APIs from the browser.
+- No application server in the request path, ever.
 
 ![Ledger system architecture diagram](assets/images/architecture-diagram.png)
-<sub>Simplified high-level view of the core OAuth + Sheets flow — see the detailed diagram below for the full set of integrations, including the ones added since this image was captured.</sub>
+<sub>Simplified high-level view of the core OAuth + Sheets flow — see the detailed diagram below for the full set of integrations.</sub>
 
 ```mermaid
 flowchart TD
@@ -138,7 +224,7 @@ flowchart TD
     Picker -. "picked file ID" .-> App
 
     Groq["Groq chat-completions API<br/>api.groq.com<br/>🧮 Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Activity)"]
-    USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check"]
+    USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup"]
     Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
 
@@ -148,13 +234,14 @@ flowchart TD
     App -. "no key, unauthenticated" .-> BDC
 ```
 
-Because every Sheets API call carries the signed-in user's own OAuth token, scoped via `drive.file` to only the specific spreadsheet they created or picked, each user can only ever read or write their own copy — even though the static site and `config.js` (Client ID, template spreadsheet ID, and Picker API key) are visible to everyone; none of those three are secrets (see [Security & Privacy](#security--privacy)).
-
-The other four integrations are all opt-in or key-less, and none of them ever see spreadsheet data: Groq and USDA FoodData Central are only called from the Health Log's 🧮 Calculate button (and Health Insight, Groq only) — and only once `GROQ_API_KEY`/`USDA_FDC_API_KEY` are set in the user's own `Settings` tab, sending nothing but the typed ingredient text (or, for Insight/Food Insight, the aggregated summary described in [Security & Privacy](#security--privacy)) — while Open-Meteo and BigDataCloud power the Time/Date/Azan/Weather dashboard widgets with no API key, login, or financial data involved at all, sending only coordinates (from `navigator.geolocation` or a typed city name).
+- Every Sheets call carries the user's own OAuth token, scoped by `drive.file` to the one spreadsheet they picked.
+- `config.js` values (Client ID, template ID, Picker key) are visible to everyone and are **not** secrets.
+- Groq/USDA are opt-in and see only typed ingredient text or the aggregated Insight summary.
+- Open-Meteo/BigDataCloud are key-less and see only coordinates or a typed city name.
 
 ### System Flowchart
 
-Where the diagram above shows *who the browser talks to*, this shows *what happens, in order* — the same control flow documented in prose in [Data Flow](#data-flow) below, laid out as a diagram. Every branch here is a real code path, not an illustrative simplification.
+Where the diagram above shows *who the browser talks to*, this shows *what happens, in order*. Every branch is a real code path.
 
 ```mermaid
 flowchart TD
@@ -226,7 +313,7 @@ flowchart TD
     Idle --> InsightPanel["Health Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
     InsightMode -- no --> Idle
-    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Calculate breakdown rollup /<br/>per-muscle-group reps — no API call"]
+    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Classification-grouped ingredient rollup /<br/>per-muscle-group reps — no API call"]
     InsightPreview --> InsightSend{"🚀 Send to AI<br/>clicked?"}
     InsightSend -- yes --> InsightReport["Groq chat-completions API<br/>renders free-text report,<br/>saved to that mode's INSIGHT_* keys"] --> Idle
     InsightSend -- no --> Idle
@@ -237,77 +324,89 @@ flowchart TD
 
 ### Frontend Module Map
 
-Loaded as classic `<script>` tags (no bundler), in this order, sharing one global scope:
+Classic `<script>` tags, no bundler, loaded in this order, one shared global scope.
 
-| Order | Module | Responsibility | Key exports used elsewhere |
-|---|---|---|---|
-| 1 | `config.js` | `CONFIG`: Client ID, template spreadsheet ID, Picker API key, sheet tab names | `CONFIG` |
-| 2 | `auth.js` | Google sign-in/out, token persistence (`localStorage`), silent refresh, account profile lookup for the header avatar menu | `initAuth`, `signIn`, `signOut`, `getAccessToken`, `fetchUserInfo` |
-| 3 | `drive.js` | Per-user spreadsheet selection: opens Sheets' "make a copy" link for the template, Google Picker for selecting/confirming a file, `localStorage`-backed active spreadsheet ID | `openTemplateCopyLink`, `pickSpreadsheet`, `getActiveSpreadsheetId`, `setActiveSpreadsheetId`, `clearActiveSpreadsheetId` |
-| 4 | `sheets.js` | Thin Sheets API v4 wrapper (get / batchGet / append / update / clear / batchUpdate) against the active spreadsheet ID. `appendValues`/`updateValues` take an optional `valueInputOption`, defaulting to `USER_ENTERED` (what the entity forms want, so a typed date or formula is parsed as if typed) — the `Settings` writers pass `RAW` instead so a computed value round-trips byte-for-byte, see row 20 | `getValues`, `batchGetValues`, `appendValues`, `updateValues`, `batchUpdate`, `getSpreadsheetMetadata` |
-| 5 | `cache.js` | `localStorage`-backed cache with a configurable per-call TTL (5 minutes by default), hard-refresh (cache + Cache Storage + service workers), and the shared numeric-expression evaluator used by the Balance and Amount fields | `getCached`, `setCached`, `clearCache`, `hardRefresh`, `evaluateNumberExpression` |
-| 6 | `ui-helpers.js` | Shared DOM/CRUD helpers used by every entity module (Transactions, Accounts, Time Tracker, Health Log, Contacts, Travel, Applications, Settings panel): sheet-ID-by-tab-title lookup, a confirm-then-delete wrapper, form field error display, row-action-button/table-cell builders, sortable-column-header wiring, and pagination rendering — the mechanical bits of the "table + modal form" pattern shared across those modules, kept out of each one's own file | `findSheetId`, `confirmAndDelete`, `showFieldError`, `clearFieldError`, `makeRowActionButton`, `makeCell`, `makeSortableHeaders`, `renderPager` |
-| 7 | `groq.js` | Groq chat-completions client for the Health Log's Calculate button: sends a freeform ingredient description, tolerantly parses the model's JSON reply (extracts the outermost `{...}` rather than trusting `response_format: json_object`, and evaluates any inline arithmetic expression left in a numeric field instead of rejecting it), and returns per-item search phrasing/gram-mass/whole-unit-count/calorie-density estimates — deliberately does *not* rewrite or standardize the user's own Notes text; the model's `query` field is used only as an internal USDA search term, never as an ingredient's identity or shown/saved back to the user (`calorie-estimator.js` resolves identity from the user's own typed text instead) | `groqExtractIngredients` |
-| 8 | `usda.js` | USDA FoodData Central client: looks up real per-100g calorie data for a food name, returning several search candidates (not just the top hit) so the caller can cross-check against the model's own estimate rather than trusting an unranked first result | `usdaLookupKcalCandidates` |
-| 9 | `nutrition.js` | Nutrition Facts: a personal, editable ingredient table (Name/Amount/Calories/Protein) that `calorie-estimator.js` checks before ever calling Groq/USDA for a given ingredient — searchable/sortable table below the Health Log, add/edit/delete, multi-select bulk Merge to consolidate duplicate/near-duplicate names. `findNutritionEntry`'s lookup tries an exact case-insensitive match first, then falls back to folding a trailing "s" off both sides ("egg"/"eggs") before reporting a miss | `initNutrition`, `refreshNutrition`, `findNutritionEntry`, `addNutritionEntry`, `parseGramsFromAmount`, `parseCountFromAmount` |
-| 10 | `calorie-estimator.js` | The Health Log's 🧮 Calculate button's full logic: reads the Notes field, deterministically splits it into segments itself (`splitNotesIntoSegments`/`extractIngredientName`/`extractIngredientQuantity` — no AI, also stripping generic size adjectives like "small"/"large" and gluing/canonicalizing units), and calls `groq.js` to extract gram/count/fallback estimates for those same items; each item's identity for the Nutrition Facts lookup/banking is resolved from the user's *own* typed segment (paired 1:1 with Groq's items whenever the split lines up, which is the common case) rather than Groq's own `query` phrasing, so the AI can never rename an ingredient or cause a near-duplicate table row. Per item, checks `nutrition.js`'s table first by that resolved name (a trusted hit skips `usda.js` entirely) and falls back to `usda.js` cross-checked against the model's own estimate on a miss. That fallback result is surfaced with a **＋ Save** button in the breakdown table rather than banked automatically (an `autoBank` option on the shared `estimateCaloriesAndProtein` function — the interactive Calculate button passes `false`; `wellness.js`'s Recalculate Selected, which has no per-row review UI, leaves it `true` and still banks automatically), so a typo'd or misphrased name can be caught and fixed in Notes before it becomes a same-food duplicate under the wrong name. Sums client-side, fills in Category/Description/Amount, and deterministically rewrites Notes into a standardized one-ingredient-per-line form (`50g Greek yogurt`, `2x apple`, quantity+unit glued with no space, a bare count replaced by the real determined body mass once Calculate has one), highest-calorie ingredient first — no AI involved in that rewrite or ordering, only in the density estimates that feed it. Renders a per-item breakdown table (Name/Amount/Calories/Protein/**Density used**/Source/Save), in that same calorie-descending order, so the exact kcal-per-100g-or-per-unit figure behind each total is visible without DevTools, and that same breakdown (including any still-unsaved `newRow`) is JSON-encoded into the `Wellness Log`'s `Breakdown` column (see [Data Model](#data-model)) so reopening an entry for edit restores it instantly instead of recalculating — including a not-yet-saved row's Save button, if it was never clicked. Caches only the Groq split by exact input text (the Nutrition Facts lookup itself is never cached, so an edited table row takes effect immediately), and surfaces warnings/errors — `wellness.js` only wires the button's click to this module's `calculateWellnessCalories`, and restores a saved breakdown on Edit/Duplicate via `renderCalcBreakdown` | `calculateWellnessCalories` |
-| 11 | `widgets.js` | The 4 dashboard "bulb" widgets (Time, Date, Azan, Weather): geolocation + reverse/forward geocoding and the manual location pickers, the Tehran-method prayer-time calculation (including Midnight, the standard Maghrib/next-Fajr midpoint), the Gregorian/Shamsi/Ghamari date formatting rendered as a shared day/month/year grid, and the Open-Meteo weather fetch/render — entirely independent of the Google Sheet | `initWidgets`, `applySettingsToWidgets` |
-| 12 | `charts.js` | Chart.js renderers for the dashboard charts, including the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, the nested Portfolio Allocation donut, the Health Tracker's 4 metric charts (Caloric Intake/Protein Intake/Rest & Recovery/Physical Activity — the latter a stacked bar chart broken down per activity Description, and Rest & Recovery a floating-bar chart colored by target-adherence rather than a plain bottom-anchored bar — each starting its x-axis at that category's own earliest logged entry rather than a fixed trailing window) plus its State Trend & Forecast projection chart (which plots Body Mass itself, alongside a smoothed trend line and the projection), its Calorie Balance chart (per-day intake minus Mifflin-St Jeor BMR and logged activity burn, with the implied grams of fat on a twin right-hand axis), its Body Composition Change chart, the Work Analytics charts (Arrival/Departure/Hours Worked Distribution histograms with a normal-curve overlay, plus the Daily Hours Average bar chart), the Time Spent by Country flag-tile computation, and the Countries Visited choropleth world map | `renderSpendingTrendChart`, `renderSpendingBreakdownCharts`, `renderTypeBreakdownCharts`, `renderIncomeExpenseChart`, `renderExpenseBreakdownTrendChart`, `renderSavingsTrendChart`, `renderAccountCompositionChart`, `renderWellnessCharts`, `renderTimesheetDistributionCharts`, `renderTimesheetDailyAverageChart`, `renderTimesheetOvertimeSummary`, `computeCountryDays`, `getVisitedCountries`, `renderCountryDaysList`, `renderWorldMapChart`, `getProteinTargetG`, `withinProteinBand`, `getCalorieBoundKcal`, `getCalorieBound`, `getCalorieBoundKind`, `withinCalorieBound`, `mifflinStJeorBmr`, `restingMaintenanceKcal` |
-| 13 | `transactions.js` | Transaction Log table: list, search/filter/date-range/advanced field filters, sortable columns, pagination, add/edit/delete, Payee/Description/Category autocomplete, multi-select bulk edit/delete with selected-row sum | `initTransactions`, `refreshTransactions`, `refreshAccountOptions`, `bulkDeleteTransactions`, `restoreTransactions`, `openBulkEditForm`, `submitBulkEditForm`, `getFilteredTransactions` |
-| 14 | `accounts.js` | Account Summary table: balances + validation list, sortable, add/edit/delete | `initAccountManager` |
-| 15 | `timesheet.js` | Time Tracker: Work Log table (date-range filter, sortable, add/edit), holiday/missed-entry detection, client-side Duration computation, the data feeding the Work Analytics charts, the today-not-logged reminder banner/notification, and scoping the overtime summary/reminder to whichever company was most recently logged, on or before today | `initTimeSheet`, `refreshTimeSheet`, `getFilteredTimeEntries`, `checkTimesheetReminder`, `getLastCompany`, `entriesForLastCompany`, `populateTimesheetCompanyOptions` |
-| 16 | `csv.js` | CSV import for transactions, the advanced filter-builder engine (date range + AND/OR field filters) shared by Transaction Log's "Advanced Filters" toggle and CSV export, and a shared text-file download helper (`downloadTextFile`) used by both transaction and contact CSV exports | `initCsvControls`, `getExportFilters`, `transactionMatchesExportFilters`, `downloadTextFile`, `todayStamp` |
-| 17 | `wellness.js` | Health Tracker: filterable/sortable Health Log table, category-aware Log Entry form with history-based autocomplete, CRUD against the `Wellness Log` tab (including its `Breakdown` column — restoring a saved breakdown on Edit/Duplicate, dropping it on Merge or a Notes-changing bulk edit since it'd no longer match), multi-select bulk Edit/Recalculate/Merge, and wiring the Calculate button to `calorie-estimator.js` — chart rendering itself lives in `charts.js` | `initWellness`, `refreshWellness` |
-| 18 | `strength-plan.js` | Strength Training Plan panel: three Leg/Push/Pull gym tables (machine, sets x reps, rest), each exercise with a "Done" checkbox. The single Log Workout button below all three reads every ticked box across all of them (so a session mixing exercises from different tables still logs as one entry), estimates its duration from each ticked row's sets/reps/rest plus a per-exercise transition and a fixed warm-up allowance, and pre-fills `wellness.js`'s Log Entry modal (Category, Description, Amount, Unit, and a per-day breakdown in Notes) for the user to review and save — it never writes to the sheet itself | `initWorkoutPlan` |
-| 19 | `contacts.js` | Contacts: searchable/sortable Contact List table, add/edit/delete, multi-select bulk export/delete/merge, CSV export for Google/Phone import and Outlook import | `initContacts`, `refreshContacts` |
-| 20 | `settings-panel.js` | Settings panel: Key/Value/Notes table below Contact List, add/edit/delete against the `Settings` tab, re-applying `app.js`'s `loadSettings`/`applySettingsToWidgets` after every change so live widgets/targets pick up the new value immediately. Also home to `saveSettingValues`, the shared writer every feature that persists a computed result uses (the three AI insight panels). Both write paths use `RAW` and reset the Value cell's number format — see [Data Model](#data-model) for the date-format bug that made necessary | `initSettingsPanel`, `refreshSettingsList`, `saveSettingValues`, `clearSettingValueFormats` |
-| 21 | `travel.js` | Travel: sortable/searchable Travel Log table, add/edit/delete, and pairing Arrival/Departure rows into the Time Spent by Country and Countries Visited data `charts.js` renders | `initTravel`, `refreshTravel` |
-| 22 | `applications.js` | Applications: parses `Applications`' header-row-plus-status-updates grouping into Ongoing/Closed cards, searchable, add (inserts at the top of the sheet)/edit/delete (removes a whole application's row range) | `initApplications`, `refreshApplications`, `parseApplications` |
-| 23 | `insight.js` | Health Insight's shared building blocks plus its **Wellness** mode: the age/sex/height/body mass/BMI profile block every mode sends (`gatherProfileSnapshot`/`formatProfileLines`), the window aggregator (`aggregateWindow`/`previousDateRange`/`formatDateRangeLabel`) Wellness and Activity both use, and the XSS-safe model-output renderer (`renderInsightText`/`INSIGHT_SECTION_LABELS`) all three use. Its Wellness-specific half aggregates the selected From/To range plus the equal-length preceding period from `allWellnessEntries` — including activity broken down per Description (e.g. NEAT/Cardio/Strength Training), each with its own avg minutes/day, avg kcal/day burned and trend, alongside the combined total — reuses `charts.js`'s `calcProjection` for the trajectory line, and passes the protein target through as a range rather than one number. Also home to `ageFromBirthDate`, which `charts.js` calls on its BMR/BMI paths | `gatherProfileSnapshot`, `formatProfileLines`, `aggregateWindow`, `previousDateRange`, `renderInsightText`, `gatherInsightMetrics`, `formatInsightPrompt` |
-| 24 | `food-insight.js` | Health Insight's **Food** mode: aggregates every 🧮 Calculate-derived breakdown item across `allWellnessEntries` in the selected From/To range into one per-ingredient total (name, amount, calories, protein), converting a unit-count total to grams via that ingredient's own per-unit body mass in the Nutrition Facts table (`nutrition.js`'s `findNutritionEntry`/`parseGramsFromAmount`/`parseCountFromAmount`) so the summary reads in one consistent unit, and phrases that list for a nutrient-gap read. The only mode that inlines the user's question (with a built-in default) in its own prompt rather than having it appended | `aggregateFoodIntake`, `renderFoodInsightPreview`, `formatFoodInsightPrompt` |
-| 25 | `activity-insight.js` | Health Insight's **Activity** mode: reuses `insight.js`'s profile block and its `aggregateWindow`/`previousDateRange` for the activity-type breakdown and current-vs-previous-period consistency, then adds its own per-muscle-group breakdown (Legs/Chest/Back/Shoulders/Biceps/Triceps) by walking every logged workout note through `activity-estimator.js`'s `parseWorkoutNoteLines` and a fixed exercise-name → muscle-group lookup, computing reps and sessions in range plus a last-trained date searched across the *full* history (so a long-neglected muscle still reads correctly when it falls outside the picked window), sorted most-neglected-first. Volume is total reps, never sets × reps — the log only stores the total (`30x Leg Press`), and the system prompt says so explicitly so the model can't invent a set count | `gatherActivityInsightMetrics`, `computeMuscleGroupRows`, `formatActivityInsightPrompt` |
-| 26 | `insight-panel.js` | The Health Insight panel itself, shared by all three modes: the `INSIGHT_MODES` descriptor table (what to gather, how to phrase it, which system prompt, which two `INSIGHT_*` Settings keys), the three mode/load buttons, the preview renderer, the Groq call via `groq.js`'s `groqChatText`, and per-mode save/restore of the last report. Computes **nothing** until a mode button is clicked — replaces three separate panels that each aggregated the whole Health Log on every page load | `initInsightPanel`, `loadInsightMode`, `renderSavedInsight` |
-| 27 | `protein-rotation.js` | Protein Source Rotation panel: for every ingredient flagged with a Protein % on its Nutrition Facts row, sums actual protein eaten from it in the selected custom From/To date range against a live target (that ingredient's share of the current protein target, via `charts.js`'s `getProteinTargetG` — the midpoint of the goal-body mass-derived target band, since a share-of-target split needs one denominator to divide up), rendered as a horizontal bar chart sorted by remaining gap descending — the source with the most left to eat leads, anything at or past its target sinks to the bottom — plus, beside it, a two-ring donut of each source's share of protein eaten over the 4 weeks (outer) and the last week (inner) ending on the To date, reusing the bars' own per-source colors so one source is one color panel-wide | `initProteinRotationPanel`, `renderProteinRotationChart`, `renderProteinRotationDonut` |
-| 28 | `landing-graph.js` | Pre-login landing page's Health/Finances/Other feature mind-maps: lays out each group's nodes in a ring around its hub (radius sized to the group's node count), draws the SVG hub-to-node lines, and positions each node's tooltip (flips above the node, clamps to the viewport) on hover/focus/tap — purely presentational, runs on every load regardless of sign-in state and touches nothing else on the page | None — self-initializes on `DOMContentLoaded` |
-| 29 | `gate.js` | The pre-login flow: which of the sign-in gate / file-selection gate / dashboard is visible (`setUIState`), reacting to auth state changes (`handleAuthChange`) by populating the header account menu and either loading the dashboard or showing the file gate, plus the file gate's own "Get the Template"/"Select my Ledger" buttons — kept separate from `app.js` (the dashboard itself) so the pre-login flow can be read and changed on its own | `initGate`, `setUIState`, `handleAuthChange` |
-| 30 | `app.js` | Orchestration: report aggregation, dashboard rendering, scroll-spy nav, collapsible panels (toggling `inert` on collapsed content, not just a CSS animation, so it's excluded from the accessibility tree/tab order/text selection too), dark mode toggle, privacy mode (`maskDigits`/`maskText`, used by every module that renders currency, Health Log Amount/Notes, Health Tracker chart ticks/tooltips/legend, Contact List name/phone/email, and Settings values — shown by default, hidden on demand), the `Settings` tab reader (which keeps the last known-good copy when a read fails rather than reporting "no settings"), app-level keyboard shortcuts, modal focus management (focus-on-open/restore-on-close, Tab trapping, skipping date/time fields as an auto-focus target so opening a modal never pops a mobile date picker), the shared empty-state table row helper, the shared undo toast, wiring everything together on `window.load` (including `gate.js`'s `initGate()`) | `loadDashboard`, `setupKeyboardShortcuts`, `setupModalFocusManagement`, `renderEmptyRow`, `showUndoToast`, `formatCurrency`, `maskDigits`, `maskText`, `setPanelCollapsed` |
+| # | Module | Responsibility |
+|---|---|---|
+| 1 | `config.js` | `CONFIG`: Client ID, template spreadsheet ID, Picker API key, sheet tab names |
+| 2 | `auth.js` | Google sign-in/out, token persistence, silent refresh, profile lookup |
+| 3 | `drive.js` | Template copy link, Google Picker, active spreadsheet ID storage |
+| 4 | `sheets.js` | Sheets API v4 wrapper; `USER_ENTERED` by default, `RAW` for Settings writes |
+| 5 | `cache.js` | `localStorage` cache with per-call TTL, hard refresh, numeric-expression evaluator |
+| 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
+| 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes |
+| 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit |
+| 9 | `nutrition.js` | Nutrition Facts table, Classification column + datalist, USDA lookup button, merge, `findNutritionEntry` |
+| 10 | `calorie-estimator.js` | 🧮 Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
+| 11 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
+| 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
+| 13 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
+| 14 | `accounts.js` | Account Summary: balances, CRUD |
+| 15 | `timesheet.js` | Work Log, holiday/missed detection, analytics data, reminder banner |
+| 16 | `csv.js` | CSV import, advanced filter engine, download helper |
+| 17 | `wellness.js` | Health Log table and form, `Breakdown` column, bulk Edit/Recalculate/Merge |
+| 18 | `strength-plan.js` | Activity Plan tables, logged-today ticks, incremental Log a Workout |
+| 19 | `activity-estimator.js` | Workout note parsing, active-seconds and MET-based burn |
+| 20 | `contacts.js` | Contact List, CRUD, bulk export/delete/merge |
+| 21 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
+| 22 | `travel.js` | Travel Log CRUD; feeds country-days and the choropleth |
+| 23 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
+| 24 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
+| 25 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
+| 26 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
+| 27 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 28 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 29 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution |
+| 30 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
+| 31 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
+| 32 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
 ### Data Flow
 
-**Dashboard widgets** (independent of sign-in)
-0. `app.js`'s `window.load` handler calls `initWidgets()` unconditionally — the widget row only needs the (possibly still-hidden) `#dashboard` markup to exist, not an authenticated session, so the clock/date/Azan/weather bulbs start immediately regardless of sign-in state. Once `loadDashboard()` does run (see below), it also calls `applySettingsToWidgets()` so a `WIDGET_DEFAULT_CITY`/`WIDGET_SECOND_CLOCK_CITY` `Settings` value can override the hardcoded defaults, without overriding a location the user already picked manually in-browser.
+**Widgets** (independent of sign-in)
+
+1. `initWidgets()` runs unconditionally on `window.load`.
+2. `applySettingsToWidgets()` later lets Settings override defaults, without overriding a manual pick.
 
 **Sign-in**
-1. `app.js` calls `initAuth(handleAuthChange)`.
-2. `auth.js` checks `localStorage` for a non-expired token. If found, it's used immediately. If not, a *silent* `requestAccessToken({ prompt: 'none' })` is tried against the existing Google session — only if that fails does the landing page's "Sign in with Google" button trigger a full consent prompt.
-3. On success, `handleAuthChange(token)` checks `getActiveSpreadsheetId()` (`drive.js`). If a spreadsheet is already selected for this browser, it swaps the landing page for the dashboard and calls `loadDashboard()`. Otherwise it shows the file-selection gate.
 
-**File selection** (first run on a browser, or after sign-out/clearing storage)
-3a. "Get the Template" opens Google Sheets' own `/copy` URL for `CONFIG.TEMPLATE_SPREADSHEET_ID` in a new tab — Sheets clones it directly into the user's Drive via Google's UI, with no extra OAuth scope needed.
-3b. "Select my Ledger" calls `pickSpreadsheet()`, which opens a Google Picker scoped to Sheets files. Picking a file (the new copy, or an existing one from a prior session) is what grants the `drive.file`-scoped token access to that specific file; its ID is stored as `ledger_spreadsheet_id` and the dashboard loads.
+1. `initAuth(handleAuthChange)`.
+2. Non-expired token in `localStorage` is used; else a silent `prompt: 'none'` attempt; else the consent button.
+3. On success, an already-selected spreadsheet loads the dashboard; otherwise the file gate shows.
+
+**File selection** (first run, or after sign-out)
+
+1. "Get the Template" opens Sheets' own `/copy` URL — no extra scope.
+2. "Select my Ledger" opens the Picker; picking the file is what grants `drive.file` access to it.
 
 **Dashboard load**
-4. `loadReport()` returns cached data (`ledger_cache_report`, 5-minute TTL) or issues a single `batchGetValues` for the `Monthly Summary`, `Account Balance`, `Insight`, and `Reconciliation` ranges, then derives the summary cards, the Revenue vs. Expenditure and Cumulative Net Worth trends, the Category Expenditure Trend over time, the Spending by Category comparisons, the per-category `Type` breakdown for the Spending Breakdown by Type donuts, and the reconciliation status shown above the Account Summary table.
-5. `initTransactions()`, `initAccountManager()`, `initTimeSheet()`, `initWellness()`, `initContacts()`, `initSettingsPanel()`, `initTravel()`, and `initApplications()` run concurrently (`Promise.allSettled`), each checking their own cache before calling the Sheets API. Once `initTravel()` resolves, it derives and renders the Time Spent by Country and Countries Visited data from the loaded Travel rows.
-6. `charts.js` renders all Chart.js canvases — the 4 line/bar charts, the 4-donut Spending by Category breakdown grid, the per-category Spending Breakdown by Type donut grids, and the Work Analytics charts; `app.js` renders the summary cards; `accounts.js`, `transactions.js`, and `timesheet.js` render their tables.
 
-**Writes** (add/edit/delete transaction or account, edit balance, CSV import)
-7. UI actions call `appendValues` / `updateValues` / `batchUpdate` directly against the spreadsheet.
-8. On success, the relevant cache key is refreshed (`refreshTransactions(true)`, `refreshAccountsList(true)`, `refreshNetWorth()`, etc.) so the UI reflects the change immediately without a full page reload.
+1. `loadReport()` — cache or one `batchGetValues` for Monthly Summary, Account Balance, Insight, Reconciliation.
+2. Entity modules init concurrently via `Promise.allSettled`, each checking its own cache.
+3. `charts.js` renders canvases; `app.js` renders summary cards; each module renders its table.
 
-**Health Insight** (user-triggered, `insight-panel.js`)
-9. The Health Insight panel computes **nothing** on page load. It renders three mode buttons — Wellness, Food, Activity — and until one is clicked no aggregation over `allWellnessEntries` happens at all. This is deliberate: the three separate panels this replaced each computed their full data preview on load and again once wellness data arrived, whether or not anyone opened them (all panels start collapsed), which cost dozens of passes over the Health Log — including a re-parse of every workout note ever logged — before the user had done anything.
-10. Clicking a mode button gathers that mode's data for the current From/To range, renders the preview of exactly what would be sent, and restores that mode's last saved report from `currentSettings` (a string read, no sheet call). Everything that differs per mode — what to gather, how to phrase it, which system prompt, which two `INSIGHT_*` keys — lives in one `INSIGHT_MODES` descriptor table; the flow around it exists once. Wellness aggregates the selected range plus the equal-length preceding period (`aggregateWindow`/`previousDateRange`) with `charts.js`'s `calcProjection` for the trajectory line; Food aggregates every 🧮 Calculate breakdown item into per-ingredient totals, converting unit counts to grams via Nutrition Facts; Activity adds the per-muscle-group volume/last-trained breakdown. All three prepend the shared age/sex/height/body mass/BMI profile block (`gatherProfileSnapshot`/`formatProfileLines`), shown on screen so nothing is attached to the request invisibly. Changing From/To recomputes the loaded mode; clicking a different mode swaps to it.
-11. Only clicking "🚀 Send to AI" calls Groq, via `groq.js`'s shared `groqChatText`. It sends the data **already on screen** rather than re-aggregating, so the preview is provably the request. Wellness and Activity append your question as "Additional question:" only when the box is non-blank; Food inlines it (with a built-in default) in its own prompt. The free-text response is rendered by `renderInsightText`, which never uses `innerHTML` — this is untrusted model output. The result and a timestamp are saved to that mode's `INSIGHT_<MODE>_LAST_RESULT`/`_LAST_GENERATED_AT` rows in `Settings`; nothing else about this step touches the spreadsheet or any cache.
+**Writes**
+
+1. UI calls `appendValues` / `updateValues` / `batchUpdate` directly.
+2. Only the affected cache entry is refreshed — no page reload.
+3. The clicked button shows `…` and blocks re-clicks until the write settles.
+
+**Health Insight**
+
+1. Nothing is computed on load.
+2. A mode click gathers that mode's data, renders the preview, restores that mode's saved report.
+3. 🚀 Send to AI sends the data already on screen, then saves the report to `Settings`.
 
 **Manual refresh**
-15. The 🔄 Refresh and 🧹 Clear Cache buttons — part of the floating action button stack in the bottom-right corner — clear the cache and re-fetch everything; Clear Cache additionally clears Cache Storage and unregisters any service workers, then reloads — for recovering from a stale deployed version. The same stack also holds the 🌙/☀️ dark mode toggle and the expand/collapse-all panels button.
+
+- 🔄 Refresh clears the cache and re-fetches.
+- 🧹 Clear Cache also purges Cache Storage and service workers, then reloads.
 
 ---
 
 ## Data Model
 
-A single Google Sheet (cloned per-user from the template) with the following tabs, accessible only to the Google account that owns that copy.
+One Google Sheet per user, cloned from the template, with these tabs.
 
 ### `Transactions`
 
@@ -316,334 +415,197 @@ A single Google Sheet (cloned per-user from the template) with the following tab
 | A — Date | Date | ISO format |
 | B — Account | Text | Must match a name in `Account Balance` column A |
 | C — Payee | Text | Merchant / person / institution |
-| D — Category | Text | Must match a category name in `Insight` column A |
-| E — Description | Text | Optional detail |
-| F — Amount | Number | Positive = income, negative = expense. The sign alone defines the type — there is no separate Income/Expense column. |
+| D — Category | Text | Must match a category in `Insight` column A |
+| E — Description | Text | Optional detail; its `Type - ` prefix drives the Type donuts |
+| F — Amount | Number | Positive = income, negative = expense — the sign alone defines the type |
 
 ### `Account Balance`
-
-Net worth snapshot and the account list, combined in one tab.
 
 | Cell/Column | Type | Notes |
 |---|---|---|
 | D1 | Number (formula) | Net Worth, e.g. `=ROUND(SUM(D3:D100),2)` |
 | Row 2 | Header | `Account \| Institute \| Type \| Balance` |
-| A3:A | Text | Account name — also the dropdown source for `Transactions` and the Account Summary table |
-| B3:B | Text | Institution, e.g. a bank or brokerage name |
-| C3:C | Text | Type — one of `Cash`, `Chequing`, `Checking`, `Saving`, `Credit`, `Investment`, `Investment (Managed)`, `Investment (Member)`, `Investment (Employer)`, `Person`, `Other` |
-| D3:D | Number | Account balance |
+| A3:A | Text | Account name — also the dropdown source for `Transactions` |
+| B3:B | Text | Institution |
+| C3:C | Text | `Cash`, `Chequing`, `Saving`, `Credit`, `Investment`, `Person`, `Other`, … |
+| D3:D | Number | Balance |
 
 ### `Monthly Summary` (formula-driven)
 
-`SUMIFS` against `Transactions`, recomputed automatically whenever transaction data changes — no client-side aggregation. Row 1 is the header; data rows start at row 2.
+`SUMIFS` against `Transactions`; row 1 is the header.
 
 | Column | Contents |
 |---|---|
 | A | Month label |
 | B | Income |
 | C | Expenses |
-| D onward | Per-category expense totals — one column per category in `Insight` column A, matched by header name (see below) |
+| D onward | One column per category in `Insight` column A, matched by header name |
 | Second-to-last | Saved (income − expenses) |
 | Last | Cumulative savings |
 
-`app.js` reads row 1 as headers and matches each category name from `Insight` column A against the `Monthly Summary` headers to find its column — except "Income"/"Expenses" (columns B/C), which are excluded even if `Insight` also has a row with that name, since they aren't spending categories. `Saved` and `Cumulative` aren't matched by name; they're always taken as the last two columns of the data rows, so inserting a new category column anywhere before them doesn't break either chart. Adding or renaming a category only requires updating `Insight` and adding a matching column/header to `Monthly Summary` — no code changes needed.
+- Category columns are matched by name; `Income`/`Expenses` are excluded even if `Insight` lists them.
+- `Saved`/`Cumulative` are always the last two columns, so inserting a category doesn't break them.
+- The summary cards' quarter average is the mean of the **3 rows before** the active month.
 
 ### `Insight` (formula-driven)
 
-Per-category, per-`Type` spending breakdown used by the Spending Breakdown by Type donuts. `Type` is not a separate column on `Transactions` — it's a free-text prefix convention on the `Description` field (e.g. a transaction with Description "Bread - milk and eggs" has Type "Bread"). Data rows start at row 2.
-
-| Column | Contents |
-|---|---|
-| A — Category | Category name. Column A is also the source of the category list used throughout the dashboard and the transaction form's Category autocomplete suggestions — each unique value across all rows becomes one category. The form isn't limited to this list — typing a new value (e.g. "Income") works too. |
-| B — Type | A `Description` prefix, or **blank** for a row holding that category's overall total |
-| C — Last Month | `-SUMIFS(...)` over `Transactions`, matching Category, `Description` starting with `Type` (via `Type&"*"`, or no Description filter if `Type` is blank), `Amount < 0`, and the date window for "last month" |
-| D — Last Quarter | Same, for the trailing 3-month window |
-| E — Last Year | Same, for the trailing 12-month window |
-| F — Lifelong | Same, with no date filter |
-
-Cell `H1` holds `=TODAY()`, the single anchor date that every period's `EOMONTH(...)`-based date window is computed relative to.
-
-For each category, the blank-`Type` row's totals are used as that category's overall spend; the gap between that total and the sum of its named `Type` rows becomes the "Untyped" donut slice. `Type` rows with a Lifelong value of `0` (a retired Type with no historical spend) are excluded entirely, so removing a Type from active use doesn't leave an empty entry in the legend. The 5 categories shown (Grocery, Household, Personal, Transportation, Housing) are a fixed list in `charts.js` (`TYPE_BREAKDOWN_CATEGORIES`) — adding a new category requires adding its rows to `Insight`, the category name to that constant, and a matching donut-grid block in `index.html`.
+- Per-category, per-`Type` spend for the Type donuts. Data starts at row 2.
+- Columns: Category, Type, Last Month, Last Quarter, Last Year, Lifelong.
+- `Type` is a free-text prefix on `Transactions.Description`, not a column.
+- Column A is the source of the app-wide category list; the form isn't limited to it.
+- A blank `Type` row holds the category's overall total (the "Untyped" remainder).
 
 ### `eTimeSheet`
 
-One row per logged calendar day, oldest first. Data rows start at row 2.
-
-| Column | Type | Notes |
-|---|---|---|
-| A — Company | Text | Free-text employer name |
-| B — Date | Date | ISO format |
-| C — Day | Text | Weekday name; only written when a brand-new row is appended, never read back |
-| D — Start | Text | `HH:MM`, blank for a holiday/day off |
-| E — End | Text | `HH:MM`, blank for a holiday/day off |
-| F — Break | Number (minutes) | Break length; pre-existing Excel-style `H:MM`/`H:MM:SS` duration cells are also parsed |
-| G — Duration | — | Never read or written by the app — `timesheet.js` always computes worked time client-side from Start/End/Break |
-| H — Task | Text | Free-text note. On a weekday with no Start/End, a non-blank Task marks the day as a holiday/day off; blank instead flags a missed entry |
-
-A weekend day (Saturday/Sunday) with no Start/End is neither a holiday nor a missed entry — it's just not logged. Logging a new date that leaves a gap since the last logged date backfills every missing day in between with a blank row first, keeping one row per calendar day.
-
-The 8h/day overtime pace summary and the "log today" reminder only consider entries whose Company matches the most recently dated entry that has one — entries from a company you've since left don't skew either.
+- One row per logged day: Company, Date, Day, Start, End, Break, Duration, Task.
+- A weekday with a Task note but no times is a holiday; one with neither is a missed entry.
 
 ### `Wellness Log`
 
-One row per wellness measurement, newest appended last. Data rows start at row 2.
-
 | Column | Type | Notes |
 |---|---|---|
-| A — Date | Date | ISO format. Blank marks the row a reusable **pattern** — a template you can 📋 Duplicate and assign a real date to later, e.g. logging the same meal-prep across several days. Pattern rows always sort to the top of the Health Log table regardless of the Date column's sort direction, are excluded from every chart and target calculation, and aren't hidden by an active date-range filter |
+| A — Date | Date | ISO. **Blank marks a reusable pattern row** — excluded from charts, always sorted to the top |
 | B — Time | Text | `HH:MM`, optional |
-| C — Category | Text | One of `Sleep`, `Weight`, `Calories`, `Activity`, or the composite `Calories; Protein` / `Activity; Calories` written by the 🧮 Calculate button |
-| D — Description | Text | E.g. "Morning Body Mass", "Lunch", "Run" |
-| E — Amount | Number, a `;`-joined pair, or a `/`-joined bed/wake pair | The measured value; units defined by column F. For `Calories; Protein` rows, two values joined as `"<kcal>; <protein g>"` (e.g. `"320; 10"`); for `Activity; Calories` rows, `"<minutes>; <kcal burned>"` (e.g. `"20; 10"`) — either way, two values instead of a single number. For `Sleep` rows, either a plain number of hours, or bed/wake clock times joined as `"<bed HH:MM>/<wake HH:MM>"` (e.g. `"23:30/07:00"`; a `;`-joined pair like `"23:30; 07:00"` is also read the same way, for rows edited directly in the Sheet — the app itself always writes `/`) — duration is then computed automatically (wrapping past midnight when wake ≤ bed) and stored as the entry's hours for every existing consumer (today-glance tile, projection), while the bed/wake pair itself only feeds the Rest & Recovery chart's floating bars |
-| F — Unit | Text | Auto-filled by category: `kg` for Body Mass, `kcal` for Calories, `hr` for Sleep, `steps` (or `min`/`hr`) for Activity, `kcal; g` for `Calories; Protein`, `min; kcal` for `Activity; Calories` |
-| G — Notes | Text | Optional free-text note |
-| H — Breakdown | Text (JSON) | Not present in the template by default — add it manually (see below). The 🧮 Calculate button's per-item breakdown (name/amount/calories/protein/density/source, plus a not-yet-banked USDA/AI-miss row's pending Nutrition Facts values if its **＋ Save** button was never clicked), JSON-encoded, so opening an existing `Calories; Protein` entry for edit shows it again instantly — no re-run of Groq/USDA needed, and an unclicked Save button reappears too. Blank for entries never Calculated (or manually merged/edited since), and blank/invalid JSON is just treated as "none" rather than an error |
+| C — Category | Text | `Sleep`, `Weight`, `Calories`, `Activity`, or composite `Calories; Protein` / `Activity; Calories` |
+| D — Description | Text | e.g. "Lunch", "Run" |
+| E — Amount | Number or pair | `"320; 10"` for kcal;protein, `"20; 10"` for min;kcal, `"23:30/07:00"` for bed/wake |
+| F — Unit | Text | Auto-filled per category |
+| G — Notes | Text | Free text; the standardized ingredient/workout lines live here |
+| H — Breakdown | Text (JSON) | Optional. Calculate's per-item breakdown, so Edit restores it without re-running Groq/USDA |
 
-Not present in the template by default — add a column H header named exactly `Breakdown` to enable it; the app works fine without it (Calculate simply won't have anything to restore on a later Edit).
-
-The `Weight` category is stored under that name but shown everywhere as **Body Mass** (`wellness.js`'s `categoryLabel`). Renaming the stored value would orphan every already-logged row, since nine filters match `e.category === 'Weight'` exactly, so the rename is a display-layer translation only: the category `<option>`s keep `value="Weight"`, and the Health Log's search box matches either spelling.
-
-The Physical Activity chart normalizes all entries to minutes before plotting (steps ÷ 100, hours × 60), so step-count and duration entries are comparable on the same axis, and stacks one bar segment per distinct Description value (e.g. NEAT, Cardio, Strength Training) rather than summing them into a single bar. Any day with an `Activity; Calories` entry also gets its own dot plotted against a dedicated **left-hand** kcal axis (minutes moved to the right) — a real second series, not just a hover tooltip — so calories burned has its own visible shape day to day rather than only showing up on hover; the dashed activity-target reference line is excluded from the hover tooltip itself (it's a fixed constant, not a per-day value, so repeating it on every hover added noise rather than information). Every other Health Metrics chart (Body Mass, Caloric Intake, Rest & Recovery, Protein Intake, Rest & Recovery) reserves that exact same right-margin width via an invisible axis even though it has nothing to show there, purely so all eight charts' plot areas — and thus their x-axis date labels — line up with the three (this one, State Trend & Forecast's BMI line, and Calorie Balance's grams-of-fat axis) that have a real right axis.
-
-Typing a Sleep entry's Amount as `<bed HH:MM>/<wake HH:MM>` (or `<bed HH:MM>; <wake HH:MM>` — both separators are read the same way, though the app itself always writes `/`) instead of a plain number unlocks the Rest & Recovery chart's floating bars: each day's bar spans bedtime to wake time on a fixed 18:00→12:00 (next day) axis rather than a bar anchored to zero, so its vertical position shows *when* you slept and its length shows the duration. Bars are colored on a red → amber → green gradient by how close that night's duration came to `SLEEP_TARGET_HOURS` (red at half the target or below, green at target or above) — the exact bed/wake times and duration are always in the hover tooltip too, so the color is never the only signal. A date with only a plain-number Sleep entry (no bed/wake pair) simply has no bar that day, rather than falling back to the old bottom-anchored style.
-
-The `Calories; Protein` category keeps one meal's calorie and protein estimate on a single row rather than two: the 🧮 Calculate button writes it directly, and it's picked up everywhere a plain `Calories` row would be (Caloric Intake chart, State Trend & Forecast projection) while its protein half feeds the separate Protein Intake chart and target.
-
-The `Activity; Calories` category is the Activity-side equivalent: for a workout logged via the Activity Plan's Log Workout button (see below), 🧮 Calculate re-derives the duration (active time only, net of rest) from the standardized workout note and estimates calories burned (`MET × bodyweight(kg) × hours`, using per-row MET values and the latest logged Body Mass) and writes both into one row. It's picked up everywhere a plain `Activity` row would be via its minutes half (today-glance tile, Activity chart's stacked bars, the projection's activity-minutes bookkeeping) — its calories-burned half additionally feeds its own dot series on the Physical Activity chart's right-hand axis, the Wellness Insight preview's per-activity kcal figures — it is never netted against Calories intake or the Calories tile, though, since those track eaten vs. a fixed target, not eaten-minus-burned.
+- `Weight` is stored under that name but displayed everywhere as **Body Mass** — a display-layer rename only, so no logged row is orphaned.
+- Columns G and H are not in the template by default; add the headers to enable them.
 
 ### `Nutrition Facts`
 
-One row per known ingredient, no fixed order. Data rows start at row 2. Not present in the template by default — add it manually (tab name and header row exactly as below) before the app can use it.
+One row per ingredient. Data starts at row 2. Not in the template by default — add the tab and header row.
 
 | Column | Type | Notes |
 |---|---|---|
-| A — Name | Text | Generic ingredient name (e.g. "chicken breast", "whey protein powder", "rice cake"); matched case-insensitively, exact-text, against the ingredient text *you actually typed* in a Health Log entry's Notes (recovered by `calorie-estimator.js`'s own deterministic split) — never against Groq's own rephrasing of it, so the AI can't silently match (or bank a new row under) a name it invented instead of what was typed |
-| B — Amount | Text | Freeform serving-size text, scaled by `calorie-estimator.js` one of two ways: **by body mass** if a bare number immediately followed by `g` appears anywhere in it (e.g. `100g`, `1 scoop (32g)`, `1 cup (240g)`) — scaled against the AI's estimated gram mass of however much was eaten; or, if no gram figure is found, **by count** for a food naturally counted in whole pieces (e.g. `1 rice cake`, `2 eggs`) — scaled against the AI's estimated count of whole units eaten, using Amount's own leading number as the unit count Calories/Protein correspond to (default 1 if there isn't one). A row with neither is still visible/editable but is treated as a miss by Calculate |
-| C — Calories | Number | kcal for the stated Amount |
-| D — Protein | Number | grams of protein for the stated Amount |
-| E — Verified | Text | Not present in the template by default — add a column E header named exactly `Verified` to enable it; the app works fine without it (every row just shows unverified). `1` means you've personally checked Calories/Protein against the label on your own purchased ingredient; blank means it's still whatever the USDA/AI fallback computed. Only ever set by hand via the ✓ checkbox on Add/Edit Ingredient — never written by Calculate's own auto-bank (📋/🧮) or the Recalculate Selected bulk action, since neither involves a human checking a real label. Shown as a ✅ in the Nutrition Facts table, blank otherwise. Merging keeps a row verified if *any* of the merged rows was, never the other way around |
-| F — Protein % | Number | Not present in the template by default — add a column F header named exactly `Protein %` to enable it; the app works fine without it (every ingredient is simply untracked). The sole "is this tracked by Protein Source Rotation" switch: blank excludes the ingredient from that panel entirely; a number is the % of your current protein target (`getProteinTargetG`) this ingredient should cover, e.g. `10` for "turkey = 10% of my protein" — see [Features](#features). Merging fills a blank Protein % from the other merged rows, same fill-blanks-only rule as Calories/Protein/Amount |
+| A — Classification | Text | Free-text grouping (`Dairy`, `Poultry`, `Grain`). Drives the Food insight grouping and Protein Source Rotation colours. Left blank by Calculate's auto-bank |
+| B — Name | Text | Matched case-insensitively against the text *you typed*, never the AI's rephrasing |
+| C — Amount | Text | Needs a gram figure (`100g`, `1 scoop (32g)`) to scale by weight, or a leading count (`1 rice cake`) to scale by count |
+| D — Calories | Number | kcal for the stated Amount |
+| E — Protein | Number | grams for the stated Amount |
+| F — Verified | Text | `1` = you checked it against a real label. Only ever set by hand — never by Calculate or the USDA lookup |
+| G — Protein % | Number | Blank excludes the ingredient from Protein Source Rotation; a number is its % share of your protein target |
 
-The Nutrition Facts table also shows a **Protein/100kcal** column — grams of protein per 100 kcal, computed client-side from Calories/Protein for display and sorting only; it is never read from or written to the sheet. Sorting by it surfaces the leanest protein sources (highest first) or the least efficient ones (lowest first).
-
-Rows are added three ways: manually via "+ Add Ingredient" to pin down the real numbers for a specific brand/product — either by body mass or, for a discrete food, by count (e.g. `1 rice cake`); reviewed via the Calculate breakdown table's **＋ Save** button the first time an ingredient falls back to USDA/AI (always written as `Amount: "100g"`, matching whatever per-100g figure it computed, regardless of whether that particular mention was phrased by body mass or count, and always banked under the name *you typed* — never the AI's own search phrasing); or, for `wellness.js`'s Recalculate Selected bulk action (no per-row review UI), the same USDA/AI fallback is banked automatically, same as Calculate always used to. Once a row exists, Calculate always trusts it over a fresh guess; a count-based row only matches when the AI can extract a whole-unit count from that mention (a vague/fractional phrasing falls back to USDA/AI instead, same as no row at all). Lookup tries an exact case-insensitive name match first, then falls back to folding a trailing "s" off both sides ("egg"/"eggs") before treating it as a miss. The "🔗 Merge Selected" bulk action consolidates duplicate/near-duplicate names *you* typed differently across entries (e.g. a name the plural fold above doesn't cover) — merge matching itself is exact-text only, no automatic fuzzy matching, so search + manual merge is the intended way to keep the table clean.
+- **Protein/100kcal** is computed client-side for display and sorting only; never stored.
+- Rows are added three ways: manually, via the breakdown's ＋ Save button, or auto-banked by Recalculate Selected.
+- Lookup tries exact match, then folds a trailing "s" off both sides, before reporting a miss.
 
 ### `Contacts`
 
-One row per contact. Data rows start at row 2. Not present in the template by default — see `scripts/merge_contacts.py` for a one-time tool that merges a Google Contacts export, an old manual sheet, and a JSON contacts list into a deduplicated starting point for this tab.
-
-| Column | Type | Notes |
-|---|---|---|
-| A — First Name | Text | |
-| B — Middle Name | Text | |
-| C — Last Name | Text | |
-| D — Prefix | Text | e.g. `Dr.`, `Prof.`, `Mr.` |
-| E — Tags | Text | Comma-separated, e.g. `UW, Family` |
-| F — Birthday | Date | ISO format; used for birthday reminders |
-| G/H/I — Phone 1/2/3 | Text | No label column — first slot is the primary number |
-| J/K — Email 1/2 | Text | |
-| L — Street Address | Text | |
-| M — City | Text | |
-| N — Province/Region | Text | Drives applicable tax rate on receipts/quotes |
-| O — Postal Code | Text | |
-| P — Country | Text | |
-| Q — Website | URL | Personal/company site |
-| R — LinkedIn | URL | |
-| S/T — Telegram / Telegram 2 | URL | |
-| U — Note | Text | Free-text; also where the merge script folds in anything that overflowed a slot (4th+ phone, 3rd+ email, etc.) |
+- One row per contact, columns A–U: names, prefix, tags, birthday, 3 phones, 2 emails, address, links, note.
+- Not in the template by default; `scripts/merge_contacts.py` builds a deduplicated starting point.
 
 ### `Travel`
 
-One row per border-crossing event (an Arrival or a Departure), oldest first. Data rows start at row 2.
-
-| Column | Type | Notes |
-|---|---|---|
-| A — Country, City | Text | e.g. `Canada, Toronto` — only the part before the comma is used as the country name (flag lookup, world map, Time Spent by Country totals) |
-| B — Port | Text | Airport/border checkpoint/terminal name |
-| C — Type | Text | `Departure` or `Arival` (sic — matched case-insensitively; anything not "Departure" is treated as an Arrival) |
-| D — Via | Text | e.g. `Flight`, `Bus`; blank on Arrival rows |
-| E — Date | Date | ISO format |
-| F — Time | Text | `HH:MM`, optional — combined with Date so a same-day round trip still nets a real sub-day duration instead of rounding to 0 |
-| G — Reason | Text | e.g. `Tourism`, `Student`, `Work`; blank on Departure rows |
-| H — Detail | Text | Free-text, e.g. an itinerary note or employer/school name |
-
-`charts.js`'s `computeCountryDays()` walks the rows in order: an Arrival opens a stay in that country, and the next Departure (regardless of its own Country/City, since it's wherever that stay was) closes it and credits the elapsed time to the country the stay opened in; a trailing Arrival with no following Departure is an ongoing stay credited up to today. Since the log only starts at the first trip ever taken, a `BIRTH_DATE` key in `Settings` lets the years lived at home before that first trip count too (see below).
+- One row per movement: Country/City, Port, Type (Arrival/Departure), Via, Date, Time, Reason, Detail.
+- Arrivals are paired with their closing Departure; an open-ended final Arrival counts up to today.
 
 ### `Applications`
 
-Not a flat table — each application is a header row (Delay, Date, Action, Type, App Number all set) optionally followed by status-update rows that only carry Date + Action, until the next application's header row starts. Data rows start at row 2.
-
-| Column | Type | Notes |
-|---|---|---|
-| A — Delay (in Days) | Number (formula) | Header rows only — a hand-maintained formula referencing that specific application's own first and last logged row, e.g. `=DATEVALUE(B17)-DATEVALUE(B2)`. Left blank by the app when adding a new application, since there's no "last row" yet to reference. |
-| B — Date | Date | ISO format |
-| C — Action | Text | e.g. `Submited` (header row), or a status update like `IRCC Application Received` |
-| D — Type | Text | Header rows only, e.g. `Visa 5`, `Post-graduation Work Permit` |
-| E — App Number | Text | Header rows only |
-
-The sheet's last two rows are whole-column footer formulas (`Total Waiting time` = `SUM` of every Delay, `Total Time in Canada` = a running `DATEDIF`), not data — `applications.js`'s `parseApplications()` skips any row whose Action contains "Total" so they're never mistaken for a status update. Adding a new application via the UI inserts a fresh row 2 (rather than appending after the existing data) so those footer formulas' ranges shift down and stay correct instead of a new row landing after them.
+- Columns A–E: Delay, Date, Action, Type, App Number.
+- A row with both Type and App Number starts an application; following rows are its status updates.
+- New applications are inserted at row 2 so the sheet's footer formulas shift down intact.
 
 ### `Settings` (optional, user-managed)
 
-A plain key-value tab for personal parameters that would otherwise be hardcoded — currently the 5 Health Tracker targets, `BIRTH_DATE`, the two `WIDGET_*` city keys, two third-party API keys (`GROQ_API_KEY`, `USDA_FDC_API_KEY`) used by the Health Log's calorie calculator. Not present in the template by default; the app works with today's defaults until a user adds it (or adds their first row via the in-app **Settings** panel — see [Features](#features) — which creates the tab's data going forward but won't create the tab itself). Data rows start at row 2.
-
-| Column | Type | Notes |
-|---|---|---|
-| A — Key | Text | `UPPER_SNAKE_CASE`, matched by code (e.g. `WEIGHT_GOAL_KG`); the Settings panel's Add/Edit modal autocompletes from the known keys below but also accepts a free-text custom one |
-| B — Value | Number or Text | Numeric for the Health Tracker targets; `BIRTH_DATE`, `SEX`, and the two `WIDGET_*` city keys are text-valued (read via `getSettingString()` rather than `getSetting()`) |
-| C — Notes | Text | Free-text, human-only — never read by `getSetting`/`getSettingString`; editable via the Settings panel as a place to note what a setting is for |
-
-Recognized keys today, with their fallback if the tab or a row is missing:
-
-| Key | Default | Used for |
-|---|---|---|
-| `WEIGHT_GOAL_KG` | `82` | State Trend & Forecast chart goal line and ETA projection |
-| `CALORIE_TARGET_KCAL` | `2000` | Caloric Intake chart bound staircase — read as a daily **maximum** while your goal body mass is below your latest body mass reading and a **minimum** while it's above (the key keeps its historical name for backwards compatibility with existing sheets; the app never presents it as a target); caloric-balance input for the State Trend & Forecast projection. Ignored if `HEIGHT_CM`, `BIRTH_DATE`, `SEX`, and `WEEKLY_FAT_LOSS_KG` are all set and a Body Mass entry has been logged — see below |
-| `SEX` | *(none — falls back to `CALORIE_TARGET_KCAL`)* | `male` or `female` — the Mifflin-St Jeor BMR constant (`+5`/`−161`) used both when calculating a personalized calorie bound (see `WEEKLY_FAT_LOSS_KG` below) and for the Calorie Balance chart's per-day maintenance figure, plus the sex term in Body Composition Change's body-fat estimate; also sent in the profile block all three AI panels use, since calorie, protein and micronutrient reference intakes all differ by sex |
-| `ACTIVITY_MET_DEFAULT` | `3.5` | Intensity used to turn activity minutes into calories, everywhere the app estimates them: `MET × 3.5 × (weight / 200) × minutes` (the ACSM oxygen-based form — 1 MET is 3.5 mL O₂/kg/min and a litre of O₂ releases ~5 kcal). Drives the calorie bound's activity term, the Physical Activity chart's kcal dots, the Calorie Balance chart, the State Trend & Forecast projection and Wellness Insight — one figure, via `charts.js`'s `metKcal`/`activityEntryKcal`, so none of them can disagree. `3.0` leisurely walking, `3.5` general resistance work (default), `5.0` compound/explosive lifting, `6.0` swimming, `7.0` jogging. An entry with its own 🧮 Calculate-derived kcal keeps that figure instead, since it was costed against the real per-exercise MET. `ACTIVITY_MET` is accepted as an alias. This **replaced** `ACTIVITY_MULTIPLIER` (a 1.2–1.9 TDEE factor): a MET is a concrete figure you can look up for the thing you actually do, and it scales only the activity term rather than inflating BMR. Optional — absent, 3.5 applies, so unlike the multiplier its absence can never drop you to the flat `CALORIE_TARGET_KCAL` |
-| `WEEKLY_FAT_LOSS_KG` | *(none — falls back to `CALORIE_TARGET_KCAL`)* | Desired rate of fat loss in kg/week, e.g. `0.5` — `getCalorieBoundKcal()` converts this to a daily deficit (at `GENERIC_KCAL_PER_KG_FAT` — 7,700 — fat’s own energy density) and subtracts it from maintenance — which is the Mifflin-St Jeor BMR **plus** the burn `ACTIVITY_TARGET_MIN` implies at `ACTIVITY_MET`, with no lifestyle multiplier anywhere — to get the actual daily figure used everywhere. It is the last required input: with `HEIGHT_CM`, `BIRTH_DATE`, `SEX` and a logged body mass, setting this is what switches you from the flat `CALORIE_TARGET_KCAL` to a calculated bound. Set to a negative value for a lean bulk instead of a cut — which raises the figure above maintenance, and (if you're already at your goal body mass, so there's no `WEIGHT_GOAL_KG`-vs-body mass reading direction to read) is also what flips it from a maximum to a minimum |
-| `SLEEP_TARGET_HOURS` | `8` | Rest & Recovery chart's bar color gradient (red→amber→green) and today-glance tile target. Also the sleep-quality factor in the forecast's **habit-based fallback** — the plan-based path used whenever the full profile is on file does not model sleep |
-| `ACTIVITY_TARGET_MIN` | `100` | Physical Activity chart target line, the Activity glance tile, and Health Insight's Wellness prompt — **and, since it replaced `ACTIVITY_MULTIPLIER`, an input to your calculated calorie bound**: those minutes at `ACTIVITY_MET` and your current body mass are the activity term added to your BMR. Worth knowing that this couples a goal to an allowance — raise the target and your calorie ceiling rises whether or not you actually hit it (at 100 min, 3.5 MET and 89 kg that term is ~519 kcal), so it is a figure to set honestly rather than aspirationally |
-| `PROTEIN_TARGET_G` | `100` | Flat fallback protein target in grams: the Protein Intake chart's single target line and today-glance tile figure when no `PROTEIN_TARGET_G_PER_KG` band is set. Ignored once that band is set (and either `WEIGHT_GOAL_KG` is set or a Body Mass entry has been logged) |
-| `PROTEIN_TARGET_G_PER_KG` | *(none — falls back to `PROTEIN_TARGET_G`)* | Grams of protein per kg, as a **band** rather than one figure — `1.6-2` (also accepted: `1.6~2`, `1.6 – 2`, `1.6 to 2`, or a bare `1.6` for a single figure). `getProteinTargetBandG()` multiplies both ends by **`WEIGHT_GOAL_KG` — your target body mass, not your current one** — so the target reflects the body you're heading for instead of shrinking with every kg lost (it falls back to the most recently logged body mass if no goal body mass is set). The Protein Intake chart draws the band as two dashed lines with the space between them shaded, and the Protein tile reads e.g. `142 / 131~164 g` and turns green only while the day's protein is inside the band — red both under it and over it |
-| `PROTEIN_TARGET_G_PER_KG_MIN` | *(none — the low end comes from `PROTEIN_TARGET_G_PER_KG` itself)* | Optional low end of the band as its own row (e.g. `1.6`), for keeping the two ends in two rows instead of one range cell. Overrides whatever low end `PROTEIN_TARGET_G_PER_KG` carried |
-| `PROTEIN_TARGET_G_PER_KG_MAX` | *(none — the high end comes from `PROTEIN_TARGET_G_PER_KG` itself)* | Optional high end of the band as its own row (e.g. `2`), the counterpart to `..._MIN` above. Overrides whatever high end `PROTEIN_TARGET_G_PER_KG` carried. Setting just one of `..._MIN`/`..._MAX` and nothing else gives a single-figure (zero-width) band |
-| `HEIGHT_CM` | *(none — BMI line/axis and Insight's BMI figure are both omitted)* | Height in cm — enables the State Trend & Forecast chart's BMI line/axis and is part of the age/sex/height/body mass/BMI profile block all three AI panels (Wellness, Food, Activity Insight) send for context. On its own it also gives the Body Mass tooltip its BMI row. With `BIRTH_DATE` and `SEX` alongside it, the three unlock the plan-based forecast, the Calorie Balance chart, and the Body Mass chart's fat-energy axis and body-fat rows |
-| `BIRTH_DATE` | *(none — feature skipped)* | ISO date, e.g. `1991-02-12`. Supplies the age term in the Mifflin-St Jeor BMR (the calculated calorie bound, the plan-based forecast, and the Calorie Balance chart's maintenance figure) and in Deurenberg's body-fat estimate (the Body Mass chart's fat-energy axis). Separately, if set and the first `Travel` row is a Departure, credits the home country with the time from this date to that first Departure in the Time Spent by Country breakdown |
-| `WIDGET_DEFAULT_CITY` | `Waterloo, ON` (hardcoded) | A city name, e.g. `Waterloo, ON, Canada` — geocoded via Open-Meteo and used as the Azan/Weather widgets' fallback location whenever the browser doesn't share (or hasn't yet resolved) a location and no manual override is set for that browser |
-| `WIDGET_SECOND_CLOCK_CITY` | `Isfahan` (hardcoded) | A city name — geocoded to a timezone and used for the Time widget's second clock row, unless overridden per-browser by clicking that city's name |
-| `GROQ_API_KEY` | *(none — Calculate shows an inline error)* | Bearer token for [Groq](https://groq.com/)'s chat-completions API, used by the Health Log's 🧮 Calculate button to parse a freeform ingredient description into per-item food name/gram-mass/calorie-density estimates |
-| `USDA_FDC_API_KEY` | *(none — falls back to the model's own estimate)* | Bearer token for [USDA FoodData Central](https://fdc.nal.usda.gov/), used to cross-check each ingredient's calorie density against real nutrition data before accepting the model's guess; get a free key at fdc.nal.usda.gov |
-| `INSIGHT_FOOD_LAST_RESULT` | *(none — the mode shows a placeholder)* | Written by Health Insight's **🚀 Send to AI** in Food mode: the last Groq-generated nutrient-gap report, restored whenever that mode is loaded so it isn't blank until you regenerate it |
-| `INSIGHT_FOOD_LAST_GENERATED_AT` | *(none)* | Timestamp the Food report above was generated — shown as "Last generated ..." under it |
-| `INSIGHT_WELLNESS_LAST_RESULT` | *(none — the mode shows a placeholder)* | Same as `INSIGHT_FOOD_LAST_RESULT`, for Health Insight's Wellness mode |
-| `INSIGHT_WELLNESS_LAST_GENERATED_AT` | *(none)* | Timestamp the Wellness report above was generated |
-| `INSIGHT_ACTIVITY_LAST_RESULT` | *(none — the mode shows a placeholder)* | Same as `INSIGHT_FOOD_LAST_RESULT`, for Health Insight's Activity mode |
-| `INSIGHT_ACTIVITY_LAST_GENERATED_AT` | *(none)* | Timestamp the Activity report above was generated |
-
-All six share the `INSIGHT_` prefix so the three modes' saved reports sort together in the Settings tab rather than scattering under W/F/A. They were formerly named `WELLNESS_INSIGHT_*`/`FOOD_INSIGHT_*`/`ACTIVITY_INSIGHT_*`; those older names are still *read* as a fallback (`getSettingStringAny`, newest name first), so a report saved before the rename keeps showing and is rewritten under the new name on the next **🚀 Send to AI** — the stale row is then safe to delete from the Settings panel.
-
-Every write to this tab uses `valueInputOption=RAW` and clears the Value cell's number format, rather than the `USER_ENTERED` the entity forms use. This tab is a key/value store where each value is meant to round-trip byte-for-byte, and `USER_ENTERED` reinterprets it the way typing into the cell would — which caused a silently destructive bug worth recording: a written `2026-07-30` was parsed into a real date, turning its cell into a DATE-formatted one, and rows appended beside it inherited that format. A value like `0.00031534` is a valid date serial, so it then displayed as `1899-12-30 0:00` and — because the tab is read with `dateTimeRenderOption: 'FORMATTED_STRING'` — read back as that *string* instead of a number. `getSetting()` saw `NaN` and reported the setting as absent, so a correctly-written value vanished from the app while sitting intact in the sheet, as would any numeric setting whose cell caught the same format (a `HEIGHT_CM` of 178 reading back as a date is indistinguishable from "height not set"). Because a cell's number format is a separate property from its value, writing RAW alone wouldn't repair an already-affected cell — so each written row's Value format is reset to Automatic in the same operation, which means re-saving a broken setting fixes it in place. A read failure on this tab is also no longer treated as "there are no settings": `loadSettings` keeps the last known-good copy and logs the cause instead of returning `{}` and caching that for the full TTL, which used to wipe every setting in memory on one transient error.
-
-Each key falls back independently — a missing tab, a missing row, or a non-numeric Value only affects that one parameter, never the rest of the dashboard. This tab is meant to grow (e.g. a future API key or SMTP setting is just another row) but is read over the same OAuth-authenticated Sheets API as every other tab — as private as the rest of the workbook, not extra-protected secret storage. **`GROQ_API_KEY` and `USDA_FDC_API_KEY` are the first genuine secrets stored this way** — unlike `config.js`'s values (see [Security & Privacy](#security--privacy)), these two are real bearer tokens sent directly from the browser to Groq/USDA on every Calculate click; they're only ever as protected as this Settings tab itself.
+- Columns A/B/C — Key, Value, Notes. Notes is never read by the app.
+- Missing tab or row falls back to hardcoded defaults.
+- Written with `RAW` so a computed value round-trips byte-for-byte.
 
 ### `Reconciliation` (formula-driven)
 
-A single reconciliation check comparing recorded account balances against transaction history.
-
-| Cell | Contents |
-|---|---|
-| A5 | Label — "Missing Amount" |
-| B5 | The discrepancy: non-zero means an `Account Balance` entry is wrong or a `Transactions` row is missing |
-
-`app.js` reads `B5` and shows a reconciliation status above the Accounts table — ✅ Reconciled if it's `0` (within half a cent), or ⚠️ with the discrepancy amount otherwise.
+- `B5` holds the gap between recorded balances and transaction history.
+- Non-zero means a balance is wrong or a transaction is missing.
 
 ---
 
 ## Health Formula Reference
 
-Every formula the Health section computes, with the file and line it lives on. Population constants
-(fat's energy density, the MET conversion, Deurenberg's body-fat estimate) are marked as such — they are literature
-values, not personal parameters, and none of them is read from `Settings`.
+- Every formula the Health section computes, with the file it lives in.
+- Population constants are literature values, not personal parameters.
+- None of them is read from `Settings` unless noted.
 
 ### Population constants
 
 | Constant | Value | Where |
 |---|---|---|
-| `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `charts.js:582` |
-| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM: 1 MET = 3.5 mL O₂/kg/min, 1 L O₂ ≈ 5 kcal). The numerator is overridable via a `KCAL_PER_MET_KG_MIN` Settings row — the only one of these constants that is. Shown as **ε** in the Formula Playground | `charts.js:591` |
-| `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort when no body mass is on file | `charts.js:586` |
-| `WORKOUT_REP_SEC` | `3` s per rep | `strength-plan.js:15` |
-| steps → minutes | `100` steps/min | `charts.js:1792` |
-| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `charts.js:565`, `activity-estimator.js:88` |
-| `WEIGHT_TREND_WINDOW_SIZE` | `5` logged points | `charts.js:2211` |
-| `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `charts.js:2239` |
+| `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `charts.js` |
+| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `charts.js` |
+| `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort with no body mass on file | `charts.js` |
+| `WORKOUT_REP_SEC` | `3` s per rep | `strength-plan.js` |
+| steps → minutes | `100` steps/min | `charts.js` |
+| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `charts.js`, `activity-estimator.js` |
+| `WEIGHT_TREND_WINDOW_SIZE` | `5` logged points | `charts.js` |
+| `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `charts.js` |
 
 ### Scoring thresholds
 
-Each chart's bars/dots are colored by how far a day sits from its own figure. Green means met, red
-missed, and **gray means "not scored either way"** — the same `#9ca3af` in all four cases.
-
-| Threshold | Value | Effect | Where |
-|---|---|---|---|
-| `CALORIE_BOUND_NEAR_FRACTION` | `5 %` | Caloric Intake: past the bound by ≤5 % is gray, beyond is red | `charts.js:891` |
-| `ACTIVITY_NEAR_TARGET_FRACTION` | `5 %` | Physical Activity dots: short of the implied burn by ≤5 % is gray | `charts.js:733` |
-| `WEIGHT_STALL_RED_AFTER_DAYS` | `2` days | Body Mass: a flat reading is gray until the plateau has held this long, then red. Holding *at* the goal stays green however long | `charts.js:1136` |
-| Protein over-band | — | Above the band's top end is gray, not red: past the point more protein buys anything, but not a failure. Below the floor stays red | `charts.js:2114` |
-| Calorie Balance vs. plan | — | At or beyond the planned deficit is green, short of it but still on the goal's side of zero is gray, wrong side of zero is red | `energyBalanceColor`, `charts.js:2869` |
+| Threshold | Value | Effect |
+|---|---|---|
+| `CALORIE_BOUND_NEAR_FRACTION` | `5 %` | Past the bound by ≤5 % is grey, beyond is red |
+| `ACTIVITY_NEAR_TARGET_FRACTION` | `5 %` | Short of the implied burn by ≤5 % is grey |
+| `WEIGHT_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* goal stays green |
+| Protein over-band | — | Above the top end is grey, not red. Below the floor stays red |
+| Calorie Balance vs. plan | — | At/beyond plan green, short but right side of zero grey, wrong side red |
 
 ### Body
 
 ```
-BMI                = weightKg / (heightCm/100)²                               charts.js:1802
-age                = years since BIRTH_DATE (−1 before this year's birthday)   insight.js:12
-bodyFat%           = 1.20·BMI + 0.23·age − 10.8·(sex==male ? 1 : 0) − 5.4      charts.js:1180
-                     clamped to [3, 60]                                       (Deurenberg 1991)
-```
+BMI                = weightKg / (heightCm/100)²
+age                = years since BIRTH_DATE (−1 before this year's birthday)
+bodyFat%           = 1.20·BMI + 0.23·age − 10.8·(sex==male ? 1 : 0) − 5.4
+                     clamped to [3, 60]                       (Deurenberg 1991)
 
-**State Trend & Forecast line** — centered simple moving average over *logged points*, not calendar days
-(`charts.js:2221`), so it smooths the same way whether body mass readings are daily or sporadic:
-
+trend[i]           = mean(values[i−2 … i+2])   centered SMA over logged points
+plateau            = |trend[last] − trend[start]| < 0.3 kg over ≥10 days, ≥3 points
 ```
-trend[i] = mean(values[i−2 … i+2])          window truncated at both ends
-```
-
-**Plateau detection** (`charts.js:2246`): flag when `|trend[last] − trend[windowStart]| < 0.3 kg`
-over a ≥10-day span; needs ≥3 points actually spanning the window, so a couple of sparse entries
-can't confirm flatness.
 
 ### Energy
 
 ```
-metKcal(met, kg, min)     = met × kg × min × KCAL_PER_MET_KG_MIN/200          charts.js:596
-activityMinutes(amt,unit) = steps/100 | hours×60 | min as-is                   charts.js:1582
+metKcal(met, kg, min)     = met × kg × min × KCAL_PER_MET_KG_MIN/200
+activityMinutes(amt,unit) = steps/100 | hours×60 | min as-is
 
-activityEntryKcal(entry)  = entry.amount2                    if logged (real per-exercise MET)
+activityEntryKcal(entry)  = entry.amount2                    if logged
                           = metKcal(ACTIVITY_MET, kg, mins)  else, with a weight on file
-                          = mins × 5                         else              charts.js:733
+                          = mins × 5                         else
 
-BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)       charts.js:702
-activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)     charts.js:725
+BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)
+activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)
 ```
 
-**Calorie bound** (`charts.js:776`) — one number per day, deliberately not called a "target":
+**Calorie bound** — one number per day, deliberately not called a "target":
 
 ```
 bound = round( BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7 )
 ```
 
-Falls back to the flat `CALORIE_TARGET_KCAL` if any of height / age / sex / `WEEKLY_FAT_LOSS_KG` is
-missing. On the Caloric Intake chart it is re-evaluated **per day** from that day's carried-forward
-body mass (`charts.js:817`), so the line moves ≈ 10 kcal/kg (BMR) + ≈ 5.8 kcal/kg (activity, at default
-MET and target) as body mass changes — a 6 kg loss shifts it by roughly 95 kcal.
-
-Which bound it is (`charts.js:842`): `goal < current → max` (a ceiling), `goal > current → min` (a
-floor); if the goal is absent, unreached, or within 0.1 kg, the sign of `WEEKLY_FAT_LOSS_KG` decides
-instead (negative = a lean bulk = a floor).
-
-```
-met?      = intake ≤ bound (max) | intake ≥ bound (min)                       charts.js:871
-variance  = round(intake − bound)                                             charts.js:878
-```
+- Falls back to flat `CALORIE_TARGET_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing.
+- Re-evaluated **per day** from that day's carried-forward body mass.
+- Moves ≈ 15.8 kcal per kg, so a 6 kg loss shifts it by roughly 95 kcal.
+- Max when goal < current, min when goal > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
+- `activityTargetKcal` is also what the Activity glance tile shows after its `=`.
 
 ### Calorie Balance (per day)
 
 ```
 maintenance = BMR(that day's carried-forward weight, height, age, sex)
-balance     = intake − maintenance − activityKcal(that day)                   charts.js:2540
-expected g  = (balance / 7700) × 1000                                         charts.js:2542
+balance     = intake − maintenance − activityKcal(that day)
+expected g  = (balance / 7700) × 1000
 ```
 
-A day with no food logged is a gap, not a day of eating nothing.
+- A day with no food logged is a gap, not a day of eating nothing.
 
 ### State Trend & Forecast
 
-**Plan-based** — the primary path, used whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are all on file
-(`planProjectionFromSettings`, `charts.js:2298`). It projects the plan being *followed*: eating exactly
-the calculated bound Eᵢₙ and hitting `ACTIVITY_TARGET_MIN` every day.
+**Plan-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the plan being *followed*.
 
 ```
-Eᵢₙ    = calculated calorie bound at the latest reading      = BMR + Eₐ(target) − D
+Eᵢₙ    = BMR + Eₐ(target) − D                    calculated bound at the latest reading
 A      = 6.25·cm − 5·age + (male ? +5 : −161)    mass-independent part of maintenance
 B      = 10 + MET·τ·κ/ε                          per-kg part, kcal/day/kg
 m∞     = (Eᵢₙ − A) / B                           where that intake IS maintenance
@@ -651,54 +613,38 @@ m(t)   = m∞ + (m − m∞)·e^(−B·t/ρ)                every 7 days, capped
 t      = (ρ / B) · ln[ (m − m∞) / (goal − m∞) ]
 ```
 
-`t` is the exact closed-form solution of `dm/dt = (Eᵢₙ − A − B·m) / ρ`, not a day-by-day simulation of
-it (verified against numeric integration — they agree to the discrete step's rounding). Maintenance is
-affine in body mass, so holding intake fixed makes the trajectory an exponential decay rather than a
-straight line: every kg lost lowers BMR, which shrinks the deficit, so progress decelerates.
+- `t` is the exact closed-form solution of `dm/dt = (Eᵢₙ − A − B·m) / ρ`, verified against numeric integration.
+- Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
+- `projectPlanDays` is shared with the Formula Playground, so the chart and the playground can't disagree.
+- Worked example (87.5 → 72 kg, 170 cm, 35 y, male, κ=3, τ=100, 0.84 kg/wk): `BMR 1768`, `Eₐ 459`, `D 924`, `Eᵢₙ 1303`, `A 893`, `B 15.25`, `m∞ 26.9 kg`, `t 149 days`.
 
-**This is the same arithmetic the Health Formula Playground prints**, and deliberately the same
-*function* — `projectPlanDays` (`charts.js:2275`) is shared by both, so the chart's arrival date, the
-progress meters and the playground's `t` cannot quote different numbers. Feed it 87.5 kg → 72 kg at
-170 cm / 35 y / male with `κ=3`, `τ=100`, `WEEKLY_FAT_LOSS_KG=0.84` and every term matches:
-`BMR 1768`, `Eₐ 459`, `D 924`, `Eᵢₙ 1303`, `A 893`, `B 15.25`, `m∞ 26.9 kg`, `t 149 days`.
+> **What this forecast is not:**
+> - It states the plan, not recent behaviour.
+> - Eating over the bound does **not** slip the date — only body mass, the goal, or the plan's own settings move it.
+> - Sleep doesn't enter it at all.
+> - Actual-vs-plan lives on the Calorie Balance chart instead.
 
-> **What this forecast is not.** It states the plan, not recent behaviour. Eating over the bound for a
-> fortnight does **not** slip the date — it moves only when body mass, the goal, or the plan's own
-> settings change. Sleep does not enter it at all. Actual-vs-plan lives on the **Calorie Balance**
-> chart, whose bars are scored green / gray / red against the planned deficit day by day.
-
-**Habit-based fallback** — used only when the profile is incomplete, and any calories or activity are
-logged in the last 14 days:
+**Habit-based fallback** — only when the profile is incomplete and something is logged in the last 14 days:
 
 ```
 maintenance = flatBound + avgActivityKcal
-balance     = avgCalories − maintenance                      avgCalories → bound if none logged
-baseSlope   = balance / 7700                                 kg/day
+balance     = avgCalories − maintenance
+baseSlope   = balance / 7700
 sleepRatio  = clamp(avgSleep / SLEEP_TARGET_HOURS, 0.7, 1.0)
-slope       = baseSlope × sleepRatio                         kg/day
+slope       = baseSlope × sleepRatio
 ```
 
-Every average is taken over **days that actually have a log**, not the calendar length of the window
-(`avg()`, `charts.js:2196`). Without a BMR there is no `A`/`B` to split maintenance into, so this path
-projects the straight line below rather than the decay curve.
+**Body-mass-only fallback** — nothing logged at all; ordinary least-squares slope.
 
-**Body-mass-only fallback** — nothing logged at all; ordinary least-squares slope
-(`linearRegressionSlope`, `charts.js:2183`):
+- Statuses: `reached`, `no-change`, `wrong-direction`, and `asymptote` (goal lies past `m∞`).
+- The slope is reported for all four, so the status line quotes a rate rather than "unavailable".
 
-```
-slope        = (n·Σxy − Σx·Σy) / (n·Σx² − (Σx)²)   x = index of the reading, y = kg
-daysToGoal   = round((goal − lastWeight) / slope)
-projected(d) = lastWeight + slope·d
-```
+> **Known inconsistency**, confined to this fallback:
+> - The regression is fitted against the *index* of each reading, so its units are kg per logged entry.
+> - Its consumers treat it as kg per day. They agree only if you log daily.
+> - Unreachable on the plan-based path, which never uses it.
 
-Statuses: `reached` if `|last − goal| < 0.1`, `no-change` if the slope is 0, `wrong-direction` if its
-sign opposes the goal, and `asymptote` when the goal lies past `m∞` — the plan is pointed the right way,
-but it levels off before arriving, so no date is projected and the status line names the plateau body
-mass instead. That last case is one a straight line could not express: it always produced an arrival
-date. The slope is still reported for all four so the status line can quote a rate rather than a bare
-"projection unavailable".
-
-**Progress meters** (`charts.js:2506` onward), rendered *above* the chart's heading:
+**Progress meters** (rendered above the chart heading):
 
 ```
 bar %       = clamp( (startWeight − lastWeight) / (startWeight − goal) × 100, 0, 100 )
@@ -707,89 +653,63 @@ to-go kg    = |lastWeight − goal|
 time bar %  = daysElapsed / (daysElapsed + daysToGoal) × 100
 ```
 
-Both readouts are kg so the pair can be compared directly; the percentage survives only as the bar's
-own width.
-
-> **Known inconsistency**, confined to the body-mass-only fallback. The regression is fitted against the
-> *index* of each reading, so its units are kg **per logged entry** — but `daysToGoal`, `projected(d)`
-> and the `~x kg/week` note all consume it as kg **per day**. They agree only if you log daily; logging
-> weekly makes that forecast about 7× too fast. Unreachable on the plan-based path, which never uses it.
-
 ### Fat energy — the Body Mass chart's second axis
 
-The Body Mass chart carries a twin **left** axis restating each reading as the energy stored in the fat
-mass it implies, and its tooltip reports the same figures per day:
-
 ```
-bodyFat%   = clamp(Deurenberg(BMI, age, sex), 3, 60)      charts.js:1189
-fatMass    = kg × bodyFat%/100                            charts.js:1194
-fatEnergy  = fatMass × 7700                               charts.js:1199
+bodyFat%   = clamp(Deurenberg(BMI, age, sex), 3, 60)
+fatMass    = kg × bodyFat%/100
+fatEnergy  = fatMass × 7700
 ```
 
-One clamp, one chain — the percentage in the tooltip, the fat mass, the energy row and the axis are all
-derived from the same three functions, so they cannot disagree.
-
-A population-average estimate, not a measurement: nothing in this app observes body composition
-directly (no smart scale, calipers or DEXA), so the split is inferred from BMI alone. Because body fat %
-itself moves with BMI, fat energy is *quadratic* in body mass while a Chart.js twin axis can only be
-linear — the axis is anchored at the two ends of the kg range, which costs under 0.5 % of the axis span
-(~9 g of fat) on a typical window and about 2.8 % across an unusually wide 13 kg one.
-
-The same non-linearity is why a 1 kg change is not worth 7,700 kcal: at ~90 kg and 175 cm only about
-61 % of a kg is fat, so the tooltip's `Fat Energy Change` reads ≈ 4,685 kcal per kg. Each end of a change
-is converted at its own body mass rather than at a flat rate.
-
-> A **Body Composition Change** chart used to sit here, splitting each day's change into fat / muscle /
-> water via Forbes' partition and a fixed 73 : 27 fat-free split. It was removed along with
-> `FORBES_C_KG` and `FFM_WATER_FRACTION`; Deurenberg's estimate survives for the axis above.
+- One clamp, one chain — tooltip, fat mass, energy row and axis can't disagree.
+- A population-average estimate, not a measurement; nothing here observes body composition directly.
+- Fat energy is quadratic in body mass while a twin axis can only be linear, so the axis is anchored at both ends of the kg range (<0.5 % error on a typical window).
+- This is why 1 kg isn't worth 7,700 kcal: at ~90 kg / 175 cm only ~61 % of a kg is fat, so the tooltip reads ≈ 4,685 kcal/kg.
 
 ### Protein
 
 ```
-band (g/day) = { round(basisKg × gPerKg.low), round(basisKg × gPerKg.high) }  charts.js:655
-   basisKg    = WEIGHT_GOAL_KG, else the latest logged weight — the goal, so the
-                target doesn't quietly shrink with every kg lost
+band (g/day) = { round(basisKg × gPerKg.low), round(basisKg × gPerKg.high) }
+   basisKg    = WEIGHT_GOAL_KG, else the latest logged weight
    fallback   = flat PROTEIN_TARGET_G as a zero-width band
-midpoint     = round((min + max) / 2)                                         charts.js:672
-in band?     = g ≥ min AND (max == min OR g ≤ max)                            charts.js:692
-               the top end is a real ceiling, not headroom
-protein/100kcal = protein / calories × 100                                    nutrition.js:134
+midpoint     = round((min + max) / 2)
+in band?     = g ≥ min AND (max == min OR g ≤ max)
+protein/100kcal = protein / calories × 100
 ```
 
-**Protein Source Rotation** (`protein-rotation.js:57`), per tracked ingredient:
+**Protein Source Rotation**, per tracked ingredient:
 
 ```
-targetG   = (Protein% / 100) × (dailyMidpoint × 7) × (lookbackDays / 7)
-          ≡ Protein%/100 × dailyMidpoint × lookbackDays
+targetG   = (Protein% / 100) × dailyMidpoint × lookbackDays
 actualG   = Σ protein of every Calculate breakdown item with that name in range
 % of total target = actualG / (dailyMidpoint × lookbackDays) × 100
-sort key  = targetG − actualG, descending
+sort key  = classification group gap, then targetG − actualG within it, both descending
 ```
 
-Donut rings: each source's share of `Σ actualG` over the 28 days and the 7 days ending on the To date.
+- Group colour: one hue per classification, lightness stepped `62 − (n mod 4)×9` within it.
+- Donut rings: each source's share of `Σ actualG` over the 28 and 7 days ending on the To date.
 
-### Today at a Glance (`charts.js:967`)
+### Today at a Glance
 
-Sums today's entries per category. Green/red by: calories → `withinCalorieBound`, protein →
-`withinProteinBand`, activity → `mins ≥ ACTIVITY_TARGET_MIN`, sleep → `hrs ≥ SLEEP_TARGET_HOURS`.
+- Sums today's entries per category.
+- Green/red by `withinCalorieBound`, `withinProteinBand`, `mins ≥ ACTIVITY_TARGET_MIN`, `hrs ≥ SLEEP_TARGET_HOURS`.
+- The Activity tile appends `= activityTargetKcal(latest weight)` rounded to whole kcal.
 
 ### Sleep
 
 ```
-axis position (hours) = ((clockMin − 12·60) + 1440) mod 1440 / 60             charts.js:1440
+axis position (hours) = ((clockMin − 12·60) + 1440) mod 1440 / 60
 colour ratio          = clamp( (durationHr − target/2) / (target − target/2), 0, 1 )
-                        red → amber below 0.5, amber → green above            charts.js:1480
+                        red → amber below 0.5, amber → green above
 ```
 
 ### Workout logging (Activity Plan → 🧮 Calculate)
 
-Active time only: rest between sets, warm-up and moving between machines are real gym time but
-aren't activity, so they're excluded rather than inflating the logged figure
-(`strength-plan.js:26`, `activity-estimator.js:151`).
+Active time only — rest, warm-up and moving between machines are real gym time but aren't activity.
 
 ```
 strength row  activeSec = sets × reps × 3
-hold row      activeSec = sets × holdSec        (already seconds; no per-rep tempo applies)
+hold row      activeSec = sets × holdSec        (already seconds; no per-rep tempo)
 NEAT steps    activeSec = (steps / 100) × 60
 cardio min    activeSec = minutes × 60
 
@@ -797,34 +717,29 @@ minutes  = max(1, round(Σ activeSec / 60))
 calories = Σ metKcal( MET(exercise) ?? 3.5, weightKg, activeSecᵢ / 60 )
 ```
 
-Each line's own MET applies only to its own active seconds. Note parsing
-(`activity-estimator.js:116`): `30x Name` → 30 total reps; the legacy `3x10 Name` → 30 reps;
-`135sec`, `30min`, `6000step`.
+- `activeSecondsForNoteLine` (`activity-estimator.js`) is the single place this is decided — Log a Workout's prefill and Calculate both read it.
+- Note parsing: `30x Name` → 30 total reps; legacy `3x10 Name` → 30; `135sec`, `30min`, `6000step`.
+- A second Log a Workout the same day appends its new lines to today's entry rather than opening a new row.
 
-### Food logging (🧮 Calculate, `calorie-estimator.js:323-357`)
+### Food logging (🧮 Calculate)
 
-Precedence: your own `Nutrition Facts` row (by **count** first, then by **body mass**) → USDA
-FoodData Central → the model's own estimate.
+Precedence: your own `Nutrition Facts` row (by **count** first, then by **weight**) → USDA → the model's estimate.
 
 ```
 by count   kcalPerUnit = row.calories / row.count
            itemKcal    = kcalPerUnit × count
-           itemProtein = (row.protein / row.count) × count
 
 by weight  kcalPer100g = row.calories / row.grams × 100
            itemKcal    = kcalPer100g × grams / 100
-           itemProtein = protPer100g × grams / 100
 
 energy-anchored ("300kcal cookie") — the same sources read backwards:
            grams = energyKcal / kcalPer100g × 100        (weight wins here)
            count = energyKcal / kcalPerUnit              (only if the row has no gram figure)
 ```
 
-Count wins over body mass on the normal path because multiplying by an exact count beats trusting an
-estimated total gram mass; body mass wins on the energy-anchored path because "300kcal cookie" is most
-useful rewritten as a number to put on the scale. A new row is always banked per 100 g, whatever unit
-this particular mention used. Food Insight's own count→gram conversion is
-`(row.grams / row.count) × count` (`food-insight.js:70`).
+- Count wins normally: an exact count beats an estimated gram mass.
+- Weight wins on the energy-anchored path: "300kcal cookie" is most useful as a number to put on the scale.
+- A new row is always banked per 100 g, whatever unit that mention used.
 
 ---
 
@@ -833,12 +748,12 @@ this particular mention used. Food Insight's own count→gram conversion is
 | Layer | Choice |
 |---|---|
 | Frontend | HTML5, CSS3, vanilla JavaScript (ES6+) — no framework, no build step |
-| Charts | [Chart.js](https://www.chartjs.org/), plus [chartjs-chart-geo](https://github.com/sgratzl/chartjs-chart-geo) + a [world-atlas](https://github.com/topojson/world-atlas) topojson dataset (both CDN-loaded) for the Countries Visited choropleth map |
-| Authentication | [Google Identity Services](https://developers.google.com/identity) (GIS), OAuth 2.0 token flow, `drive.file` + `userinfo.email`/`userinfo.profile` scopes |
+| Charts | [Chart.js](https://www.chartjs.org/), plus [chartjs-chart-geo](https://github.com/sgratzl/chartjs-chart-geo) + [world-atlas](https://github.com/topojson/world-atlas) for the choropleth |
+| Authentication | [Google Identity Services](https://developers.google.com/identity), OAuth 2.0, `drive.file` + `userinfo.*` scopes |
 | File selection | [Google Picker API](https://developers.google.com/drive/picker) |
 | Data store | Google Sheets API v4 |
-| Location/weather widgets | Browser `navigator.geolocation` + `Intl` (calendars, timezones); [Open-Meteo](https://open-meteo.com/) forecast + geocoding APIs and [BigDataCloud](https://www.bigdatacloud.com/) reverse geocoding — both free, key-less, called directly from the browser |
-| Health Log calorie/protein calculator, AI Insight | [Groq](https://groq.com/) chat-completions API — ingredient parsing/estimation (calorie-estimator.js) cross-checked against [USDA FoodData Central](https://fdc.nal.usda.gov/) (real per-100g nutrition data), and free-text health coaching reports (insight.js) — both called directly from the browser with a per-user `GROQ_API_KEY` (and `USDA_FDC_API_KEY` for the calculator) stored in `Settings` |
+| Widgets | `navigator.geolocation` + `Intl`; [Open-Meteo](https://open-meteo.com/) and [BigDataCloud](https://www.bigdatacloud.com/) — free, key-less |
+| AI / nutrition | [Groq](https://groq.com/) chat-completions and [USDA FoodData Central](https://fdc.nal.usda.gov/) — per-user keys in `Settings` |
 | Hosting | GitHub Pages |
 
 ---
@@ -847,48 +762,44 @@ this particular mention used. Food Insight's own count→gram conversion is
 
 ```text
 ledger/
-├── index.html              # Page shell: sign-in gate, dashboard, modals, footer
-├── favicon.svg              # Browser tab icon
-├── manifest.json            # Web app manifest (PWA/home-screen install)
-├── robots.txt               # Search engine crawling rules
-├── sitemap.xml              # Sitemap for search engines
+├── index.html                    # Page shell: gates, dashboard, modals, footer
+├── favicon.svg · manifest.json · robots.txt · sitemap.xml
 ├── assets/
-│   ├── images/
-│   │   ├── social-preview.png   # Open Graph / Twitter card image
-│   │   └── apple-touch-icon.png # iOS home-screen icon
-│   ├── style/
-│   │   └── styles.css       # All styling
+│   ├── images/                   # Social preview, touch icon, diagrams
+│   ├── style/styles.css          # All styling
 │   └── script/
-│       ├── config.js        # Client ID + template Spreadsheet ID + Picker API key + sheet/range names
-│       ├── auth.js           # Google Identity Services sign-in/out, token storage
-│       ├── drive.js          # Per-user spreadsheet selection: template copy link, Picker, active-file storage
-│       ├── sheets.js         # Sheets API wrapper (get, batchGet, append, update, batchUpdate)
-│       ├── cache.js          # localStorage cache + hard refresh
-│       ├── ui-helpers.js     # Shared DOM/CRUD helpers (sheet-id lookup, confirm-delete, sortable headers, pager, etc.)
-│       ├── groq.js           # Groq chat-completions client for the Health Log calorie calculator
-│       ├── usda.js           # USDA FoodData Central client for the Health Log calorie calculator
-│       ├── calorie-estimator.js # Health Log Calculate button: Groq+USDA calorie estimation logic
-│       ├── widgets.js        # Dashboard bulbs: Time/Date/Azan/Weather, location pickers
-│       ├── charts.js         # Chart.js renderers
-│       ├── transactions.js   # Transactions table: filters, sorting, CRUD
-│       ├── accounts.js       # Accounts table: balances + CRUD
-│       ├── timesheet.js      # Time Sheet: Time Log table + Work Pattern Analysis chart data
-│       ├── csv.js            # CSV export/import for transactions
-│       ├── wellness.js       # Wellness Log: charts, log table, CRUD
-│       ├── strength-plan.js  # Strength Training Plan: Leg/Push/Pull tables, ticked-set duration estimate, pre-fills Health Log
-│       ├── activity-estimator.js # Health Log Calculate button (Activity): re-derives duration + MET-based calorie burn from a workout note
-│       ├── contacts.js       # Contacts: Contact List table, CRUD, bulk export/delete/merge
-│       ├── settings-panel.js # Settings panel: Key/Value/Notes table + CRUD against the Settings tab
-│       ├── travel.js         # Travel Log table + CRUD; feeds Time Spent by Country / Countries Visited
-│       ├── applications.js   # Applications: parses header+status-update rows into cards, CRUD
-│       ├── insight.js        # Health Insight: shared profile/aggregation/render helpers + its Wellness mode
-│       ├── food-insight.js   # Health Insight's Food mode: per-ingredient rollup + nutrient-gap prompt
-│       ├── activity-insight.js # Health Insight's Activity mode: consistency, rep volume, per-muscle-group breakdown
-│       ├── insight-panel.js  # The Health Insight panel: mode table, load buttons, Groq call, per-mode save/restore
-│       ├── protein-rotation.js # Protein Source Rotation panel: actual vs. target protein eaten per flagged ingredient
-│       ├── landing-graph.js  # Pre-login landing page's feature mind-map layout/tooltips (presentational only)
-│       ├── gate.js           # Pre-login flow: sign-in gate, file-selection gate, auth-state UI transitions
-│       └── app.js            # Orchestration, report aggregation, scroll-spy nav
+│       ├── config.js             # Client ID, template ID, Picker key, sheet names
+│       ├── auth.js               # Sign-in/out, token storage, silent refresh
+│       ├── drive.js              # Template copy link, Picker, active-file storage
+│       ├── sheets.js             # Sheets API wrapper
+│       ├── cache.js              # localStorage cache + hard refresh
+│       ├── ui-helpers.js         # Shared table/modal/busy-button helpers
+│       ├── groq.js               # Groq chat client
+│       ├── usda.js               # USDA FoodData Central client
+│       ├── nutrition.js          # Nutrition Facts table, Classification, USDA lookup
+│       ├── calorie-estimator.js  # 🧮 Calculate for food
+│       ├── activity-estimator.js # 🧮 Calculate for workouts
+│       ├── widgets.js            # Time / Date / Azan / Weather bulbs
+│       ├── charts.js             # Chart.js renderers + health formulas
+│       ├── transactions.js       # Transaction Log
+│       ├── accounts.js           # Account Summary
+│       ├── timesheet.js          # Work Log + analytics data
+│       ├── csv.js                # CSV import/export + filter engine
+│       ├── wellness.js           # Health Log
+│       ├── strength-plan.js      # Activity Plan
+│       ├── contacts.js           # Contact List
+│       ├── settings-panel.js     # Settings table
+│       ├── travel.js             # Travel Log
+│       ├── applications.js       # Applications cards
+│       ├── insight.js            # Insight shared helpers + Wellness mode
+│       ├── food-insight.js       # Insight Food mode
+│       ├── activity-insight.js   # Insight Activity mode
+│       ├── insight-panel.js      # Insight panel shell
+│       ├── protein-rotation.js   # Protein Source Rotation
+│       ├── formula-playground.js # Health Formula Playground
+│       ├── landing-graph.js      # Pre-login mind-maps
+│       ├── gate.js               # Pre-login flow
+│       └── app.js                # Orchestration
 ├── LICENSE
 └── README.md
 ```
@@ -897,17 +808,19 @@ ledger/
 
 ## Getting Started
 
-These steps are for the app's developer/deployer, done once. Individual users don't configure anything — they just sign in and pick or create their own spreadsheet from the running app (see [Data Flow](#data-flow)).
+For the app's developer/deployer, done once. End users configure nothing — they sign in and pick or create their own spreadsheet.
 
 ### 1. Create the template Google Sheet
 
-Create a spreadsheet with the tabs described in [Data Model](#data-model), pre-populated with a small amount of sample data so charts aren't empty on a new user's first run. Share it as **Anyone with the link can view** — this is the file every user's personal copy gets cloned from via Sheets' own "make a copy" flow, so it must be link-viewable but should contain no real personal data.
+- Create a spreadsheet with the tabs in [Data Model](#data-model).
+- Pre-populate a little sample data so charts aren't empty on a first run.
+- Share it as **Anyone with the link can view** — it must be link-viewable and contain no real personal data.
 
 ### 2. Create a Google Cloud project and credentials
 
-1. Create a Google Cloud project and enable the **Google Sheets API**, the **Google Drive API**, and the **Google Picker API**.
-2. Create an **OAuth 2.0 Client ID** (Web application). Add the origin(s) the app will be served from (e.g. `https://<your-username>.github.io`) as authorized JavaScript origins. For local development, also add `http://localhost:8000`.
-3. Create an **API key** (Cloud Console → Credentials → Create Credentials → API key) and restrict it to the Picker API and the same origins. This is separate from the OAuth Client ID — the Picker widget needs it to initialize.
+1. Enable the **Sheets API**, **Drive API** and **Picker API**.
+2. Create an **OAuth 2.0 Client ID** (Web application); add your origins (e.g. `https://<user>.github.io`, `http://localhost:8000`).
+3. Create an **API key**, restricted to the Picker API and the same origins.
 
 ### 3. Configure the app
 
@@ -927,6 +840,7 @@ const CONFIG = {
     RECONCILIATION: 'Reconciliation',
     TIMESHEET: 'eTimeSheet',
     WELLNESS: 'Wellness Log',
+    NUTRITION: 'Nutrition Facts',
     CONTACTS: 'Contacts',
     SETTINGS: 'Settings',
     TRAVEL: 'Travel',
@@ -935,30 +849,26 @@ const CONFIG = {
 };
 ```
 
-None of these values are secrets — see [Security & Privacy](#security--privacy). Note that the `drive.file` scope (see [Tech Stack](#tech-stack)) is an unverified-app-friendly scope, so this doesn't require Google's sensitive-scope OAuth verification review the way a broader Sheets/Drive scope would.
+- None of these are secrets — see [Security & Privacy](#security--privacy).
+- `drive.file` is an unverified-app-friendly scope, so no sensitive-scope OAuth review is needed.
 
 ### 4. Run locally
-
-No build step is required. Serve the directory with any static file server, e.g.:
 
 ```sh
 python -m http.server 8000
 ```
 
-Then open `http://localhost:8000`.
+Then open `http://localhost:8000`. No build step.
 
 ---
 
 ## Deployment
 
-The app is a static site — any static host works, but GitHub Pages requires zero configuration:
-
 1. Push the repository to GitHub.
-2. Open **Settings → Pages**.
-3. Under **Source**, select **Deploy from a branch**, branch `main`, folder `/ (root)`.
-4. Save. The site will be published at `https://<your-username>.github.io/<repo-name>`.
-
-Make sure that URL is added as an authorized JavaScript origin for the OAuth client (see [Getting Started](#getting-started)).
+2. **Settings → Pages**.
+3. Source: **Deploy from a branch**, branch `main`, folder `/ (root)`.
+4. Save — published at `https://<user>.github.io/<repo>`.
+5. Add that URL as an authorized JavaScript origin on the OAuth client.
 
 ---
 
@@ -968,73 +878,85 @@ Make sure that URL is added as an authorized JavaScript origin for the OAuth cli
 
 | Range | Used in | Purpose |
 |---|---|---|
-| `'Monthly Summary'!A1:Z149` | `app.js` | Header row (for dynamic category column matching) plus monthly income/expense/category data and cumulative net worth |
-| `'Account Balance'!A1:D1` | `app.js` | Net Worth figure (`D1`) for the summary card |
-| `Insight!A2:F200` | `app.js` | Per-category, per-Type spend breakdown for the Spending by Category bar chart and donuts, and the Spending Breakdown by Type donuts, and the source of the category list (column A) for chart category matching |
-| `'Reconciliation'!B5` | `app.js` | Missing Amount — non-zero means recorded account balances don't reconcile with transaction history (a transaction may be missing or a balance may be wrong) |
+| `'Monthly Summary'!A1:Z149` | `app.js` | Header row plus monthly income/expense/category data and cumulative net worth |
+| `'Account Balance'!A1:D1` | `app.js` | Net Worth figure (`D1`) |
+| `Insight!A2:F200` | `app.js` | Per-category/per-Type spend, and the category list (column A) |
+| `'Reconciliation'!B5` | `app.js` | Missing Amount — non-zero means balances don't reconcile |
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
 | `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
-| `'Account Balance'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete suggestions for the transaction form |
-| `eTimeSheet!A2:H` | `timesheet.js` | Work Log rows; read for the table, Work Analytics charts, and gap backfill, appended/updated on add or edit |
-| `'Wellness Log'!A2:G` | `wellness.js` | Health Log entries; read for all charts and the Health Log table, appended on add, updated on edit, deleted via `batchUpdate` |
-| `'Nutrition Facts'!A2:F` | `nutrition.js`, `calorie-estimator.js`, `protein-rotation.js` | Ingredient Name/Amount/Calories/Protein/Verified/Protein % rows; read for the Nutrition Facts table, 🧮 Calculate's trusted-lookup pass, and the Protein Source Rotation chart's tracked-ingredient list, appended on add (manual or Calculate's own USDA/AI fallback), updated on edit or merge, deleted via `batchUpdate` |
-| `'Contacts'!A2:U` | `contacts.js` | Contact rows; read for the Contact List table, appended on add, updated on edit, deleted via `batchUpdate` |
-| `'Travel'!A2:H` | `travel.js` | Travel rows; read for the Travel Log table and the Time Spent by Country / Countries Visited data, appended on add, updated on edit, deleted via `batchUpdate` |
-| `'Applications'!A2:E` | `applications.js` | Application header + status-update rows, grouped client-side into cards; new applications inserted at row 2 via `batchUpdate`, edited in place, deleted (whole row range) via `batchUpdate` |
-| `Settings!A2:C` | `app.js`, `settings-panel.js` | Optional personal-parameter overrides (e.g. Health Tracker targets, `BIRTH_DATE` and the two `WIDGET_*` city keys); missing tab/row falls back to hardcoded/generic defaults. `app.js` only reads it (columns A/B); `settings-panel.js` reads all 3 columns and appends/updates/deletes rows via the Settings panel UI |
+| `'Account Balance'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete |
+| `eTimeSheet!A2:H` | `timesheet.js` | Work Log rows |
+| `'Wellness Log'!A2:H` | `wellness.js` | Health Log entries, including the `Breakdown` column |
+| `'Nutrition Facts'!A2:G` | `nutrition.js`, `calorie-estimator.js`, `food-insight.js`, `protein-rotation.js` | Classification / Name / Amount / Calories / Protein / Verified / Protein % |
+| `'Contacts'!A2:U` | `contacts.js` | Contact rows |
+| `'Travel'!A2:H` | `travel.js` | Travel rows |
+| `'Applications'!A2:E` | `applications.js` | Application header + status-update rows |
+| `Settings!A2:C` | `app.js`, `settings-panel.js` | Personal overrides; `app.js` reads A/B, the panel reads and writes all three |
 
-**Client-side cache (`localStorage` via `cache.js`, 5-minute TTL by default unless noted):**
+**Client-side cache (`localStorage` via `cache.js`, 5-minute TTL unless noted):**
 
 | Cache key | Set by | Contents |
 |---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report (summary cards, chart data, Spending by Category comparison, Spending Breakdown by Type) |
-| `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + account/category dropdown options |
+| `ledger_cache_report` | `app.js` | Aggregated report for the summary cards and finance charts |
+| `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
-| `ledger_cache_accounts-meta` | `accounts.js` | `Account Balance` sheet ID |
-| `ledger_cache_account-list` | `accounts.js` | Raw `'Account Balance'!A3:D100` rows |
+| `ledger_cache_accounts-meta` / `account-list` | `accounts.js` | `Account Balance` sheet ID / rows |
 | `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:H` rows |
-| `ledger_cache_wellness` | `wellness.js` | Raw `'Wellness Log'!A2:G` rows |
-| `ledger_cache_nutrition` | `nutrition.js` | Raw `'Nutrition Facts'!A2:F` rows |
+| `ledger_cache_wellness` | `wellness.js` | Raw `'Wellness Log'!A2:H` rows |
+| `ledger_cache_nutrition` | `nutrition.js` | Raw `'Nutrition Facts'!A2:G` rows |
 | `ledger_cache_contacts` | `contacts.js` | Raw `'Contacts'!A2:U` rows |
 | `ledger_cache_travel` | `travel.js` | Raw `'Travel'!A2:H` rows |
 | `ledger_cache_applications` | `applications.js` | Raw `'Applications'!A2:E` rows |
-| `ledger_cache_settings` | `app.js` | Parsed `Settings` key-value map (`{}` if the tab is absent) |
-| `ledger_cache_settings-panel-meta` | `settings-panel.js` | `Settings` sheet ID for the Settings panel's row-delete calls (`null` if the tab is absent) |
-| `ledger_cache_setting-list` | `settings-panel.js` | Raw `Settings!A2:C` rows (Key/Value/Notes) backing the Settings panel's table |
-| `ledger_cache_widget_location` | `widgets.js` | Auto-detected `{ lat, lon, label }` from `navigator.geolocation` + BigDataCloud reverse geocoding — 6-hour TTL |
-| `ledger_cache_widget_weather_<lat>_<lon>` | `widgets.js` | Open-Meteo current + 3-day forecast response for a given coordinate pair — 30-minute TTL |
+| `ledger_cache_settings` | `app.js` | Parsed `Settings` key-value map |
+| `ledger_cache_settings-panel-meta` / `setting-list` | `settings-panel.js` | `Settings` sheet ID / raw rows |
+| `ledger_cache_widget_location` | `widgets.js` | Auto-detected `{lat, lon, label}` — 6-hour TTL |
+| `ledger_cache_widget_weather_<lat>_<lon>` | `widgets.js` | Open-Meteo response — 30-minute TTL |
 
-**Auth, file selection, and widget preferences (`localStorage`, separate from the cache above):**
+**Auth, file selection and widget preferences (`localStorage`, separate from the cache):**
 
 | Key | Set by | Contents |
 |---|---|---|
-| `ledger_token` | `auth.js` | `{ token, expiresAt }` — OAuth access token + expiry, enables silent refresh |
-| `ledger_consented` | `auth.js` | Set to `'1'` once the user completes the OAuth consent flow; controls whether `signIn()` uses `prompt: ''` (returning user) or `prompt: 'consent'` (first-time user); cleared on sign-out |
-| `ledger_spreadsheet_id` | `drive.js` | The signed-in user's chosen spreadsheet's Drive file ID — every Sheets API call in `sheets.js` targets this ID, not a fixed constant |
-| `ledger_last_reminder_notified` | `timesheet.js` | Today's date once the Time Sheet OS notification has fired, so it only fires once per day rather than on every reload |
-| `ledger_widget_manual_location` | `widgets.js` | `{ lat, lon, label }` set via the Time widget's location picker ("Enter a city…"); overrides both auto-detected geolocation and any `WIDGET_DEFAULT_CITY` Settings value until cleared |
-| `ledger_widget_second_clock_location` | `widgets.js` | `{ label, timezone }` set via the second clock row's own picker; overrides both the hardcoded Isfahan default and any `WIDGET_SECOND_CLOCK_CITY` Settings value |
+| `ledger_token` | `auth.js` | `{ token, expiresAt }` — enables silent refresh |
+| `ledger_consented` | `auth.js` | `'1'` once consent completes; controls `prompt` on next sign-in; cleared on sign-out |
+| `ledger_spreadsheet_id` | `drive.js` | The chosen spreadsheet's Drive file ID — every Sheets call targets it |
+| `ledger_last_reminder_notified` | `timesheet.js` | Today's date once the OS notification fired |
+| `ledger_widget_manual_location` | `widgets.js` | `{lat, lon, label}` from the location picker; overrides auto-detect and Settings |
+| `ledger_widget_second_clock_location` | `widgets.js` | `{label, timezone}` for the second clock |
 
 ---
 
 ## Caching Strategy
 
-- `index.html` is served with `Cache-Control: no-cache, no-store, must-revalidate`, so the app shell is never stale.
-- All Sheets API responses are cached in `localStorage` for 5 minutes (`cache.js`), keyed per data set (see [Configuration Reference](#configuration-reference)).
-- Every write operation (add/edit/delete) immediately refreshes only the affected cache entries, so the UI updates without a full reload.
-- The 🔄 **Refresh** button (floating, bottom-right) clears the cache and re-fetches all data.
-- The 🧹 **Clear Cache** button (floating, bottom-right) additionally purges Cache Storage and unregisters any service workers before reloading — useful if a browser has pinned an old deployed version.
+- `index.html` is served `no-cache, no-store, must-revalidate`, so the shell is never stale.
+- Sheets responses are cached in `localStorage` for 5 minutes, keyed per data set.
+- Every write refreshes only the affected cache entry, so the UI updates without a reload.
+- 🔄 **Refresh** clears the cache and re-fetches everything.
+- 🧹 **Clear Cache** also purges Cache Storage and unregisters service workers, then reloads.
+
+> After changing a sheet's column layout, expect up to 5 minutes of stale reads until the cache expires — or use Clear Cache. Writes always bypass the cache.
 
 ---
 
 ## Security & Privacy
 
-- Each user's financial data lives in their own private Google Sheet (a personal clone of the public template), accessible only to them.
-- The frontend authenticates with per-user Google OAuth using the `drive.file` scope — the narrowest Drive scope available, granting access only to files the app created or the user explicitly selected via Picker. It cannot see or list the rest of a user's Drive. It also requests the non-sensitive `userinfo.email`/`userinfo.profile` scopes, used only to show the account's name/avatar in the header menu — no separate API or data store is involved.
-- `CLIENT_ID`, `TEMPLATE_SPREADSHEET_ID`, and `PICKER_API_KEY` in `config.js` are not secrets — access is enforced by Google's OAuth consent and each spreadsheet's own ownership/sharing, not by hiding these values. The template itself is intentionally link-viewable and contains no real personal data — see the template-build process in `scripts/build_template.py`.
-- There is no backend, no password storage, and no third-party data store for financial data. The dashboard widgets are the one exception to "Google only": if location access is granted, the browser sends coordinates (or a typed city name) directly to Open-Meteo and BigDataCloud to resolve weather/prayer-time/place-name data — no account, no financial data, and no server-side component of this app is involved, and it can be avoided entirely by leaving location access denied and/or not setting a custom city.
-- The Health Log's calorie/protein calculator and the Health Insight reports are opt-in exceptions: if `GROQ_API_KEY`/`USDA_FDC_API_KEY` are set, clicking 🧮 Calculate sends the typed ingredient text (not any other Sheet data) directly from the browser to Groq and USDA FoodData Central. Insight sends more — age, height, BMI, current body mass/goal, and aggregated calorie/protein/activity/sleep averages. Food Insight sends your aggregated ingredient list (name, total amount, total calories/protein) for the selected date range plus whatever question you typed (or the built-in default) — no vitamin/mineral data is ever fetched or sent, since none exists anywhere in this app. Activity Insight sends the same kind of activity-type breakdown Insight does, plus a per-muscle-group sets/sessions/last-trained breakdown derived from your logged workout notes — no data beyond what's already visible in the Activity Plan/Health Log. Each report sends only from the moment its own "🚀 Send to AI" is clicked (opening any of the three panels, and adjusting its From/To date range, only computes the preview locally, sending nothing). Unlike `CLIENT_ID`/`TEMPLATE_SPREADSHEET_ID`/`PICKER_API_KEY`, these two Settings values **are** real bearer-token secrets, not just non-sensitive config — they grant API access billed to whoever's key it is. They're stored in the user's own private `Settings` tab (same access model as the rest of the workbook, not extra-protected secret storage) and never committed to this repository; both features are entirely unused, and no key is required, unless a user explicitly adds one.
-- **Privacy mode** masks on-screen amounts on demand (see [Features](#features)) for safer screen-sharing or use in public — this is a display-only toggle and doesn't affect what's stored in the spreadsheet.
+- Each user's data lives in their own private Google Sheet, accessible only to them.
+- Auth uses the `drive.file` scope — the narrowest Drive scope, covering only files the app created or the user picked. It cannot list the rest of a Drive.
+- `userinfo.email`/`userinfo.profile` are used only for the header avatar.
+- `CLIENT_ID`, `TEMPLATE_SPREADSHEET_ID` and `PICKER_API_KEY` are **not secrets** — access is enforced by OAuth consent and per-file ownership.
+- No backend, no password storage, no third-party store for financial data.
+- **Widgets** are the one always-on exception:
+  - With location granted, coordinates or a typed city go to Open-Meteo and BigDataCloud.
+  - No account, no financial data, no server of ours involved.
+  - Avoidable entirely by denying location and not setting a custom city.
+- **Groq / USDA are opt-in** and only run once you set the keys:
+  - 🧮 Calculate sends the typed ingredient text only.
+  - The USDA lookup sends the ingredient name only.
+  - Wellness Insight sends age, height, BMI, body mass/goal and aggregated averages.
+  - Food Insight sends the classification-grouped ingredient list plus your question. No vitamin/mineral data exists in this app, so none is ever sent.
+  - Activity Insight sends the activity-type and per-muscle-group breakdown.
+  - Nothing is sent until that panel's 🚀 Send to AI is clicked.
+- `GROQ_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Settings` tab and are never committed.
+- **Privacy mode** is display-only and doesn't change what's stored.
 
 ---
 

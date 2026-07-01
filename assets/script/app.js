@@ -2,6 +2,7 @@ const REPORT_RANGE = `'${CONFIG.SHEETS.REPORT}'!A1:Z149`;
 const BALANCE_RANGE = `'${CONFIG.SHEETS.BALANCE}'!A1:D1`;
 const INSIGHT_RANGE = `${CONFIG.SHEETS.INSIGHT}!A2:F200`;
 const RECONCILIATION_RANGE = `'${CONFIG.SHEETS.RECONCILIATION}'!B5`;
+const SETTINGS_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -467,6 +468,48 @@ async function loadReport(forceRefresh) {
   return report;
 }
 
+let currentSettings = {};
+
+// 'Settings'!A2:C is optional and user-managed — unlike every other tab,
+// most users won't have added it. Any failure here (most commonly: the tab
+// doesn't exist yet) is swallowed and treated as "no settings", never as a
+// dashboard-load failure; every reader falls back to its own default via
+// getSetting() below.
+async function loadSettings(forceRefresh) {
+  if (!forceRefresh) {
+    const cached = getCached('settings');
+    if (cached) return cached;
+  }
+
+  let settings = {};
+  try {
+    const resp = await getValues(SETTINGS_RANGE, VALUE_PARAMS);
+    settings = parseSettings(resp.values || []);
+  } catch {
+    settings = {};
+  }
+
+  setCached('settings', settings);
+  return settings;
+}
+
+// Row-reduce idiom mirroring parseTypeBreakdown — column A is the key,
+// column B its value; column C (Notes) is intentionally never read.
+function parseSettings(settingsRows) {
+  const settings = {};
+  settingsRows.forEach((row) => { if (row[0]) settings[row[0]] = row[1]; });
+  return settings;
+}
+
+// Looks up a numeric parameter from the Settings tab, falling back to
+// `fallback` if the tab/row is missing, the cell is blank, or the value
+// isn't a usable number.
+function getSetting(key, fallback) {
+  const raw = currentSettings[key];
+  const num = Number(raw);
+  return raw !== undefined && raw !== '' && !Number.isNaN(num) ? num : fallback;
+}
+
 function renderSummaryCards(data) {
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
   document.getElementById('income-label').textContent = 'Monthly Income';
@@ -540,6 +583,10 @@ async function loadDashboard(forceRefresh = false) {
   loading.hidden = false;
   clearDashboardError();
 
+  // Never throws (see loadSettings) — must resolve before initWellness
+  // renders so its target-line charts see the user's values, if any.
+  currentSettings = await loadSettings(forceRefresh);
+
   // Report, transactions, and accounts are independent API calls — fetch
   // them concurrently so the dashboard doesn't wait on three round trips
   // in sequence.
@@ -564,6 +611,7 @@ async function loadDashboard(forceRefresh = false) {
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
     initWellness(forceRefresh),
+    initContacts(forceRefresh),
   ]);
 
   const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
@@ -638,9 +686,8 @@ function setupPanelToggles() {
   });
 
   // Jumping to a section via the nav also expands its panel(s), since
-  // everything starts collapsed. "Charts" and "Accounts" are panel-groups
-  // wrapping multiple .panel children, so expand all of them; other nav
-  // targets are a single .panel and expand directly.
+  // everything starts collapsed. Panel-group targets expand every child
+  // panel; a lone .panel target expands directly.
   document.querySelectorAll('#main-nav a').forEach((link) => {
     link.addEventListener('click', () => {
       const target = document.querySelector(link.getAttribute('href'));
@@ -723,9 +770,9 @@ function setupScrollSpy() {
 
   sections.forEach((section) => observer.observe(section));
 
-  // The cards row above #charts can push its midpoint past the viewport's
-  // center line, so the observer never fires for it near the top of the
-  // page. Force the first nav link active once the user scrolls back up.
+  // The cards row above the first section can push its midpoint past the
+  // viewport's center line, so the observer never fires for it near the top
+  // of the page. Force the first nav link active once the user scrolls back up.
   window.addEventListener('scroll', () => {
     if (window.scrollY < sections[0].offsetTop) {
       navLinks.forEach((link) => link.classList.remove('active'));

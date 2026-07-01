@@ -118,9 +118,9 @@ function hslWithAlpha(hsl, alpha) {
 // live.
 const SPENDING_TREND_PERIODS = [
   { key: 'lastMonth', label: 'Last Month', alpha: 1, months: 1 },
-  { key: 'quarterAvg', label: 'Last Quarter Average', alpha: 0.7, months: 3 },
-  { key: 'yearAvg', label: 'Last Year Average', alpha: 0.45, months: 12 },
-  { key: 'lifelongAvg', label: 'Lifelong Average', alpha: 0.25, months: null },
+  { key: 'quarterAvg', label: 'Last Quarter', alpha: 0.7, months: 3 },
+  { key: 'yearAvg', label: 'Last Year', alpha: 0.45, months: 12 },
+  { key: 'lifelongAvg', label: 'Lifelong', alpha: 0.25, months: null },
 ];
 
 // Renders a category-color swatch legend, shared by several panels (e.g. the

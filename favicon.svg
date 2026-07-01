@@ -1,3 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <text x="16" y="24" font-size="24" text-anchor="middle">📊</text>
+  <rect width="32" height="32" rx="7" fill="#3b82f6"/>
+  <rect x="7" y="18" width="5" height="9" rx="1.5" fill="#fff"/>
+  <rect x="14" y="12" width="5" height="15" rx="1.5" fill="#fff"/>
+  <rect x="21" y="6" width="5" height="21" rx="1.5" fill="#fff"/>
 </svg>

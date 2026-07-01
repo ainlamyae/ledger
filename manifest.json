@@ -1,10 +1,12 @@
 {
   "name": "Ledger",
   "short_name": "Ledger",
-  "description": "Private, serverless personal finance dashboard.",
+  "description": "Private, serverless personal dashboard for finance, time, and wellness.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
+  "lang": "en",
+  "categories": ["finance", "productivity", "health"],
   "background_color": "#f5f7fb",
   "theme_color": "#0d2e4f",
   "icons": [

@@ -23,7 +23,7 @@ async function initAccountManager(forceRefresh = false) {
     accountListenersAttached = true;
     document.getElementById('add-account-btn').addEventListener('click', () => openAccountForm());
     document.getElementById('account-cancel-btn').addEventListener('click', closeAccountForm);
-    document.getElementById('account-form').addEventListener('submit', submitAccountForm);
+    onFormSubmit('account-form', submitAccountForm);
     setupAccountSorting();
   }
 }

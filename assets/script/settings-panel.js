@@ -33,7 +33,7 @@ async function initSettingsPanel(forceRefresh = false) {
     settingPanelListenersAttached = true;
     document.getElementById('add-setting-btn').addEventListener('click', () => openSettingForm());
     document.getElementById('setting-cancel-btn').addEventListener('click', closeSettingForm);
-    document.getElementById('setting-form').addEventListener('submit', submitSettingForm);
+    onFormSubmit('setting-form', submitSettingForm);
   }
 }
 

@@ -65,7 +65,7 @@ async function initNutrition(forceRefresh = false) {
 
     document.getElementById('add-nutrition-btn').addEventListener('click', () => openNutritionForm(null));
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
-    document.getElementById('nutrition-form').addEventListener('submit', submitNutritionForm);
+    onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-usda-btn').addEventListener('click', lookupNutritionFromUsda);
 
     document.getElementById('nutrition-search').addEventListener('input', () => {
@@ -88,7 +88,7 @@ function setupNutritionBulkActions() {
     renderNutritionList();
   });
 
-  document.getElementById('nutrition-bulk-merge-btn').addEventListener('click', mergeSelectedNutritionEntries);
+  onAsyncClick('nutrition-bulk-merge-btn', mergeSelectedNutritionEntries);
 }
 
 function setupNutritionSorting() {

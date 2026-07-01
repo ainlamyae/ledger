@@ -217,7 +217,7 @@
 
                         <div class="location-picker-manual">
                             <input type="text" id="location-manual-input" placeholder="Enter a city…">
-                            <button type="button" id="location-manual-btn" class="btn">Set</button>
+                            <button type="button" id="location-manual-btn" class="btn btn-primary">Set</button>
                         </div>
 
                         <p id="location-picker-status" class="status status-info" hidden></p>
@@ -232,7 +232,7 @@
                     <div class="location-picker-dropdown" id="second-clock-dropdown" hidden>
                         <div class="location-picker-manual">
                             <input type="text" id="second-clock-manual-input" placeholder="Enter a city…">
-                            <button type="button" id="second-clock-manual-btn" class="btn">Set</button>
+                            <button type="button" id="second-clock-manual-btn" class="btn btn-primary">Set</button>
                         </div>
 
                         <p id="second-clock-status" class="status status-info" hidden></p>
@@ -430,7 +430,7 @@
             </label>
 
             <div class="panel-actions">
-                <button type="button" id="insight-generate-btn" class="btn btn-primary" disabled title="Load a data set first">Send to AI</button>
+                <button type="button" id="insight-generate-btn" class="btn btn-ai" disabled title="Load a data set first">Send to AI</button>
             </div>
 
             <p id="insight-generated-at" class="hint" hidden></p>
@@ -863,7 +863,7 @@
             <div class="panel-actions" id="wellness-bulk-actions" hidden>
                 <span id="wellness-bulk-summary"></span>
                 <button id="wellness-bulk-edit-btn" class="btn" title="Edit Selected" aria-label="Edit Selected">✏️</button>
-                <button id="wellness-bulk-recalc-btn" class="btn" title="Recalculate Selected" aria-label="Recalculate Selected">🧮</button>
+                <button id="wellness-bulk-recalc-btn" class="btn btn-ai" title="Recalculate Selected" aria-label="Recalculate Selected">🧮</button>
                 <button id="wellness-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
             </div>
 
@@ -922,6 +922,11 @@
             </div>
 
             <div class="card">
+                <h3 id="cashflow-label">Monthly Cash Flow</h3>
+                <div class="value" id="savings-value">—</div>
+            </div>
+
+            <div class="card">
                 <h3 id="income-label">Monthly Income</h3>
                 <div class="value income" id="income-value">—</div>
             </div>
@@ -929,11 +934,6 @@
             <div class="card">
                 <h3 id="expenses-label">Monthly Expenditure</h3>
                 <div class="value expense" id="expenses-value">—</div>
-            </div>
-
-            <div class="card">
-                <h3 id="cashflow-label">Monthly Cash Flow</h3>
-                <div class="value" id="savings-value">—</div>
             </div>
         </div>
 
@@ -1045,7 +1045,7 @@
                     <div id="export-filters"></div>
                     <datalist id="export-account-options"></datalist>
 
-                    <button type="button" id="export-add-filter-btn" class="btn">Add Filter</button>
+                    <button type="button" id="export-add-filter-btn" class="btn btn-primary">Add Filter</button>
                 </form>
             </div>
 
@@ -1383,7 +1383,7 @@
             <p id="tx-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" id="tx-save-add-btn" class="btn">Save &amp; Add Another</button>
+                <button type="submit" id="tx-save-add-btn" class="btn btn-primary">Save &amp; Add Another</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1611,7 +1611,7 @@
             <p id="wellness-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="wellness-calc-btn" class="btn">Calculate</button>
+                <button type="button" id="wellness-calc-btn" class="btn btn-ai">Calculate</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>

@@ -300,7 +300,9 @@ function renderTimesheetList() {
     actionsCell.appendChild(editBtn);
 
     tr.append(dateCell, dayCell, startCell, endCell, breakCell, durationCell, taskCell, actionsCell);
-    if (weekend || isNoEntry) tr.classList.add('timesheet-no-entry');
+    if (weekend) tr.classList.add('timesheet-weekend');
+    else if (isHoliday) tr.classList.add('timesheet-holiday');
+    else if (isNoEntry) tr.classList.add('timesheet-no-entry');
     tbody.appendChild(tr);
   });
 

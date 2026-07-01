@@ -16,5 +16,7 @@ const CONFIG = {
     RECONCILIATION: 'Reconciliation',
     TIMESHEET: 'eTimeSheet',
     WELLNESS: 'Wellness Log',
+    CONTACTS: 'Contacts',
+    SETTINGS: 'Settings',
   },
 };

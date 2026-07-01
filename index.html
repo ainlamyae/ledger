@@ -40,13 +40,13 @@
 <body>
 
 <header>
-    <h1><span class="logo-icon" aria-hidden="true">📊</span><span class="logo-text">Ledger</span></h1>
+    <h1><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></h1>
     <nav id="main-nav" class="nav" hidden>
-        <a href="#charts">Analytics</a>
         <a href="#transactions">Journal</a>
         <a href="#accounts">Portfolio</a>
         <a href="#timesheet">Time Tracker</a>
         <a href="#wellness">Health Tracker</a>
+        <a href="#contacts">Contacts</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -112,6 +112,11 @@
             </div>
 
             <div class="landing-feature">
+                <h3>Contacts</h3>
+                <p>Keep names, phones, emails, addresses, birthdays, and social links (LinkedIn, Telegram) in one searchable Contact List. Bulk-select rows to export CSVs for Google/Phone or Outlook, or merge duplicate entries into one.</p>
+            </div>
+
+            <div class="landing-feature">
                 <h3>Private by Design</h3>
                 <p>Your data lives in your own private Google Sheet — never on a third-party server. Privacy mode masks all amounts on screen at a keystroke.</p>
             </div>
@@ -157,8 +162,8 @@
         </div>
     </div>
 
-    <section id="charts" class="panel-group">
-        <h2 class="panel-group-title">Analytics</h2>
+    <section id="transactions" class="panel-group">
+        <h2 class="panel-group-title">Journal</h2>
 
         <div class="panel">
         <h2>Spending by Category</h2>
@@ -181,21 +186,21 @@
                 </div>
 
                 <div class="donut-item">
-                    <h4>Last Quarter Average</h4>
+                    <h4>Last Quarter</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="spending-breakdown-quarter-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Last Year Average</h4>
+                    <h4>Last Year</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="spending-breakdown-year-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Lifelong Average</h4>
+                    <h4>Lifelong</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="spending-breakdown-lifelong-chart"></canvas>
                     </div>
@@ -262,12 +267,6 @@
             </div>
         </div>
     </div>
-    </section>
-
-    <div style="height:.5rem"></div>
-
-    <section id="transactions" class="panel-group">
-        <h2 class="panel-group-title">Journal</h2>
 
         <div class="panel">
             <h2>Transaction History</h2>
@@ -574,6 +573,53 @@
         </div>
     </section>
 
+    <div style="height:.5rem"></div>
+
+    <section id="contacts" class="panel-group">
+        <h2 class="panel-group-title">Contacts</h2>
+
+        <div class="panel">
+            <h2>Contact List</h2>
+
+            <div class="panel-actions">
+                <button id="add-contact-btn" class="btn btn-primary">+ Add Contact</button>
+                <button id="export-contacts-google-btn" class="btn">Export for Google/Phone</button>
+                <button id="export-contacts-outlook-btn" class="btn">Export for Outlook</button>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="contacts-search" placeholder="Search name, tags, phone, email...">
+            </div>
+
+            <div class="table-responsive">
+                <table id="contacts-table">
+                    <thead>
+                    <tr>
+                        <th><input type="checkbox" id="contacts-select-all" aria-label="Select all contacts on this page"></th>
+                        <th class="sortable" data-sort="first">First Name</th>
+                        <th class="sortable" data-sort="last">Last Name</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Tags</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="contacts-body"></tbody>
+                </table>
+            </div>
+
+            <div class="panel-actions" id="contacts-bulk-actions" hidden>
+                <span id="contacts-bulk-summary"></span>
+                <button id="contacts-bulk-export-google-btn" class="btn" title="Export Selected for Google/Phone">Export Selected (Google)</button>
+                <button id="contacts-bulk-export-outlook-btn" class="btn" title="Export Selected for Outlook">Export Selected (Outlook)</button>
+                <button id="contacts-bulk-merge-btn" class="btn" title="Merge Selected">🔗 Merge Selected</button>
+                <button id="contacts-bulk-delete-btn" class="btn" title="Delete Selected">🗑️ Delete Selected</button>
+            </div>
+
+            <div class="pagination" id="contacts-pagination"></div>
+        </div>
+    </section>
+
 </div>
 
 <div class="fab-stack">
@@ -795,6 +841,85 @@
     </div>
 </div>
 
+<div id="contact-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="contact-modal-title">Add Contact</h2>
+
+        <form id="contact-form">
+            <label>First Name
+                <input type="text" id="contact-first">
+            </label>
+            <label>Middle Name
+                <input type="text" id="contact-middle">
+            </label>
+            <label>Last Name
+                <input type="text" id="contact-last">
+            </label>
+            <label>Prefix
+                <input type="text" id="contact-prefix" placeholder="Dr., Prof., Mr., ...">
+            </label>
+            <label>Tags
+                <input type="text" id="contact-tags" placeholder="Comma-separated, e.g. Family, UW">
+            </label>
+            <label>Birthday
+                <input type="date" id="contact-birthday">
+            </label>
+            <label>Phone 1
+                <input type="tel" id="contact-phone1">
+            </label>
+            <label>Phone 2
+                <input type="tel" id="contact-phone2">
+            </label>
+            <label>Phone 3
+                <input type="tel" id="contact-phone3">
+            </label>
+            <label>Email 1
+                <input type="email" id="contact-email1">
+            </label>
+            <label>Email 2
+                <input type="email" id="contact-email2">
+            </label>
+            <label>Street Address
+                <input type="text" id="contact-street">
+            </label>
+            <label>City
+                <input type="text" id="contact-city">
+            </label>
+            <label>Province / Region
+                <input type="text" id="contact-region">
+            </label>
+            <label>Postal Code
+                <input type="text" id="contact-postal">
+            </label>
+            <label>Country
+                <input type="text" id="contact-country">
+            </label>
+            <label>Website
+                <input type="url" id="contact-website">
+            </label>
+            <label>LinkedIn
+                <input type="url" id="contact-linkedin">
+            </label>
+            <label>Telegram
+                <input type="url" id="contact-telegram">
+            </label>
+            <label>Telegram 2
+                <input type="url" id="contact-telegram2">
+            </label>
+            <label>Note
+                <textarea id="contact-note" rows="2"></textarea>
+            </label>
+
+            <p id="contact-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" id="contact-cancel-btn" class="btn">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="shortcuts-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" hidden>
     <div class="modal-card">
         <h2 id="shortcuts-modal-title">Keyboard Shortcuts</h2>
@@ -824,6 +949,7 @@
 <script src="assets/script/timesheet.js"></script>
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/wellness.js"></script>
+<script src="assets/script/contacts.js"></script>
 <script src="assets/script/app.js"></script>
 </body>
 </html>

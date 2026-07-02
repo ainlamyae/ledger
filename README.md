@@ -111,6 +111,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward goal; optional BMI twin axis.
   - Progress meters above the chart: distance covered and time elapsed, side by side.
   - Plateau alert when the smoothed trend has held flat.
+  - The status line under the chart speaks only when there is **no** forecast to draw — goal reached, no net change, trending away, or levelling off short of goal. A forecast that renders says nothing, since the meters and the curve already do.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
 - **Calorie Balance** — intake minus BMR minus activity, scored against the *planned* deficit; grams-of-fat twin axis.
 - **Caloric Intake** — per-day bars with a per-day bound drawn as a cap on each bar, not one shared line.
@@ -131,11 +132,16 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
 - Clicking a mode shows a preview of exactly what would be sent; 🚀 Send to AI sends that same data.
 - All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
+- **No line repeats the date range.** Every figure in a mode covers the same window, so it's stated once by the panel's own status line rather than eight times inside the prompt. The `[only N/M days logged]` marker carries the window length wherever coverage is partial.
 - **Wellness** — selected range vs. the equal-length preceding period.
 - **Food** — ingredients **grouped by Classification**, each group carrying its own ingredient count and calorie/protein totals.
   - Groups are ordered by calories; `Unclassified` always sinks to the bottom and is flagged to the model as not a food group.
   - The preview table groups identically.
-- **Activity** — consistency, rep volume, and a per-muscle-group breakdown sorted most-neglected-first.
+- **Activity** — rep volume vs. the previous period, a routine-activity summary, and a per-muscle-group breakdown sorted most-neglected-first.
+  - Each muscle group carries **the exercises that built it** — every movement logged against it in range and its total reps, heaviest first. The model is told these are the movements the user actually has access to, so recommendations name them instead of inventing lifts.
+  - Non-resistance types (a walk, a swim) are **summarised, not listed per day** — one row each with days logged and the range/average of minutes, kcal and steps. Repeating a daily walk for every date buried the sessions that differ.
+  - The split is by content, not by name: a type is routine when nothing logged under it carries reps.
+  - Minutes are **net active time**, not session wall-clock. The system prompt says so explicitly and tells the model to judge training by rep volume and muscle coverage — an 8-minute resistance session is a real one, and "spend more minutes" is never the advice.
 - Reports render as plain text without `innerHTML` (untrusted model output) and persist per mode.
 
 ### Health — Protein Source Rotation

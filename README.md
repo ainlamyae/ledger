@@ -111,12 +111,20 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward goal; optional BMI twin axis.
   - Progress meters above the chart: distance covered and time elapsed, side by side.
   - Plateau alert when the smoothed trend has held flat.
+  - The status line under the chart speaks only when there is **no** forecast to draw — goal reached, no net change, trending away, or levelling off short of goal. A forecast that renders says nothing, since the meters and the curve already do.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
 - **Calorie Balance** — intake minus BMR minus activity, scored against the *planned* deficit; grams-of-fat twin axis.
 - **Caloric Intake** — per-day bars with a per-day bound drawn as a cap on each bar, not one shared line.
 - **Physical Activity** — stacked minutes per Description, plus a calories-burned dot series.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
+- All six carry a **violet dashed segment per week**, so a week that quietly drifted past its bound is visible next to the per-day mark.
+  - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a goal cap.
+  - Buckets are counted **back from today**, so the most recent seven days are always one whole week and only the oldest bucket can come up short.
+  - Built from days that were actually **logged**; a week with nothing logged draws nothing.
+  - **Flat** on five of them — the week's average. Rest & Recovery carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Planned Burn lives on.
+  - **Sloped** on Body Mass alone: a bar there is an absolute level, not a per-day quantity, so a flat mean says nothing. Each week is a least-squares fit through its own readings, extended to both week edges so slopes compare directly. A week with one weigh-in shows a dot — no slope is measurable from it.
+  - Every one of these charts adds the figure to its tooltip as well; Body Mass quotes the slope as `kg/week`.
 
 ### Health — Health Insight (AI)
 
@@ -124,11 +132,16 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
 - Clicking a mode shows a preview of exactly what would be sent; 🚀 Send to AI sends that same data.
 - All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
+- **No line repeats the date range.** Every figure in a mode covers the same window, so it's stated once by the panel's own status line rather than eight times inside the prompt. The `[only N/M days logged]` marker carries the window length wherever coverage is partial.
 - **Wellness** — selected range vs. the equal-length preceding period.
 - **Food** — ingredients **grouped by Classification**, each group carrying its own ingredient count and calorie/protein totals.
   - Groups are ordered by calories; `Unclassified` always sinks to the bottom and is flagged to the model as not a food group.
   - The preview table groups identically.
-- **Activity** — consistency, rep volume, and a per-muscle-group breakdown sorted most-neglected-first.
+- **Activity** — rep volume vs. the previous period, a routine-activity summary, and a per-muscle-group breakdown sorted most-neglected-first.
+  - Each muscle group carries **the exercises that built it** — every movement logged against it in range and its total reps, heaviest first. The model is told these are the movements the user actually has access to, so recommendations name them instead of inventing lifts.
+  - Non-resistance types (a walk, a swim) are **summarised, not listed per day** — one row each with days logged and the range/average of minutes, kcal and steps. Repeating a daily walk for every date buried the sessions that differ.
+  - The split is by content, not by name: a type is routine when nothing logged under it carries reps.
+  - Minutes are **net active time**, not session wall-clock. The system prompt says so explicitly and tells the model to judge training by rep volume and muscle coverage — an 8-minute resistance session is a real one, and "spend more minutes" is never the advice.
 - Reports render as plain text without `innerHTML` (untrusted model output) and persist per mode.
 
 ### Health — Protein Source Rotation
@@ -599,6 +612,20 @@ expected g  = (balance / 7700) × 1000
 ```
 
 - A day with no food logged is a gap, not a day of eating nothing.
+
+### 7-day dash (all six Health Indicators charts)
+
+```
+bucket(i)  = floor((columnCount − 1 − i) / 7)      counted back from today
+
+flat       = mean of that bucket's LOGGED days     unlogged days sit out
+sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
+             evaluated at all 7 columns            Body Mass only, ≥2 readings
+```
+
+- Drawn as a line whose bucket-crossing segments are transparent, so each week is one dash rather than a stepped line with risers.
+- Body Mass folds the fitted endpoints into its kg bounds before padding — a fit extended to the week edges can reach past every reading in it, and the fat-energy twin axis is derived from those same bounds.
+- Rest & Recovery averages bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 average to midnight rather than midday.
 
 ### State Trend & Forecast
 

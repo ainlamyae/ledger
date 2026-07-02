@@ -154,17 +154,9 @@ function aggregateWindow(dates) {
   };
 }
 
-// Human-readable stand-in for the old "last N days" phrasing — since the
-// range is now an arbitrary user-picked From/To rather than always ending
-// today, the label needs the actual dates to stay accurate.
-function formatDateRangeLabel(fromIso, toIso, dayCount) {
-  return `${fromIso} to ${toIso}, ${dayCount} day${dayCount === 1 ? '' : 's'}`;
-}
-
 function gatherInsightMetrics(fromIso, toIso) {
   const dates = datesInRange(fromIso, toIso);
   const lookbackDays = dates.length;
-  const rangeLabel = formatDateRangeLabel(fromIso, toIso, lookbackDays);
   const current = aggregateWindow(dates);
   const previous = aggregateWindow(previousDateRange(fromIso, toIso));
 
@@ -175,7 +167,6 @@ function gatherInsightMetrics(fromIso, toIso) {
 
   return {
     lookbackDays,
-    rangeLabel,
     // The shared age/sex/height/weight/BMI block (formatProfileLines above) —
     // sex included because the BMR behind every calorie figure here is built
     // from it, and calorie/protein norms genuinely differ by it.
@@ -257,7 +248,7 @@ function formatActivityBreakdownLines(m) {
       const kcalNow = cur.avgKcal !== null ? `, ${cur.avgKcal} kcal/day burned` : '';
       const kcalPrev = prev && prev.avgKcal !== null ? `, ${prev.avgKcal} kcal/day burned` : '';
       const trend = prev ? ` — previous period: ${prev.avgMins} min/day${kcalPrev}` : ' — previous period: not logged';
-      return `Avg activity — ${description} (${m.rangeLabel}): ${cur.avgMins} min/day${kcalNow}${trend}${coverage}`;
+      return `Avg activity — ${description}: ${cur.avgMins} min/day${kcalNow}${trend}${coverage}`;
     });
 }
 
@@ -265,11 +256,14 @@ function formatInsightPrompt(m) {
   // `word` is what the figure in brackets is called: 'target' for the metrics
   // that really have one, but 'max'/'min' for calories, whose figure is a bound
   // to stay on one side of rather than a number to land on.
+  // No range on the line: every figure here covers the same one, so repeating it
+  // eight times cost more than the data did. The [N/M days logged] marker carries
+  // the window length where coverage is partial.
   const line = (label, value, unit, target, daysLogged, prevValue, word = 'target') => {
-    if (value === null) return `${label} (${m.rangeLabel}): not logged this period`;
+    if (value === null) return `${label}: not logged this period`;
     const coverage = daysLogged < m.lookbackDays ? ` [only ${daysLogged}/${m.lookbackDays} days logged]` : '';
     const trend = prevValue !== null ? ` — previous period: ${prevValue}${unit}` : '';
-    return `${label} (${m.rangeLabel}): ${value}${unit} (${word}: ${target}${unit})${trend}${coverage}`;
+    return `${label}: ${value}${unit} (${word}: ${target}${unit})${trend}${coverage}`;
   };
 
   // Bespoke rather than built from the generic line() helper above, since
@@ -277,12 +271,12 @@ function formatInsightPrompt(m) {
   // riding alongside its primary one (minutes) — line() only has room for
   // one value + one target.
   const activityTotalLine = (() => {
-    if (m.avgActivityMins === null) return `Avg activity total (${m.rangeLabel}): not logged this period`;
+    if (m.avgActivityMins === null) return 'Avg activity total: not logged this period';
     const coverage = m.activityDaysLogged < m.lookbackDays ? ` [only ${m.activityDaysLogged}/${m.lookbackDays} days logged]` : '';
     const kcalNow = m.avgActivityKcal !== null ? `, ${m.avgActivityKcal} kcal/day burned` : '';
     const kcalPrev = m.prevAvgActivityKcal !== null ? `, ${m.prevAvgActivityKcal} kcal/day burned` : '';
     const trend = m.prevAvgActivityMins !== null ? ` — previous period: ${m.prevAvgActivityMins} min/day${kcalPrev}` : '';
-    return `Avg activity total (${m.rangeLabel}): ${m.avgActivityMins} min/day${kcalNow} (target: ${m.activityTarget} min/day)${trend}${coverage}`;
+    return `Avg activity total: ${m.avgActivityMins} min/day${kcalNow} (target: ${m.activityTarget} min/day)${trend}${coverage}`;
   })();
 
   const lines = [

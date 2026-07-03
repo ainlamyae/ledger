@@ -510,6 +510,12 @@ function getSetting(key, fallback) {
   return raw !== undefined && raw !== '' && !Number.isNaN(num) ? num : fallback;
 }
 
+// Same as getSetting(), but for non-numeric values (e.g. BIRTH_DATE).
+function getSettingString(key, fallback) {
+  const raw = currentSettings[key];
+  return raw !== undefined && raw !== '' ? raw : fallback;
+}
+
 function renderSummaryCards(data) {
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
   document.getElementById('income-label').textContent = 'Monthly Income';
@@ -612,6 +618,8 @@ async function loadDashboard(forceRefresh = false) {
     initTimeSheet(forceRefresh),
     initWellness(forceRefresh),
     initContacts(forceRefresh),
+    initTravel(forceRefresh),
+    initApplications(forceRefresh),
   ]);
 
   const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);

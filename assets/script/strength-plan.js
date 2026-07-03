@@ -200,6 +200,74 @@ function renderWorkoutPlanProgress() {
     logged.size ? "Add to Today's Workout" : 'Log a Workout';
 }
 
+// The Instruction modal's figures are committed under assets/images/activities,
+// one per exercise. Both fetch scripts derive their filenames the same way, so
+// this slug has to match theirs — it's the only thing tying a plan row to its
+// picture, and a row whose name is edited here loses its figure until the file
+// is renamed to suit.
+function activitySlug(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+// Deferred to the first open of the modal: the figures are nothing the dashboard
+// needs until it's asked for, and lazy loading keeps the ones below the fold off
+// the wire entirely.
+let activityFiguresDrawn = false;
+
+// Movements that have an animated loop rather than a still guide. Kept as an
+// explicit list so the page never probes for a file that isn't there: guessing
+// would cost a 404 on every still. scripts/fetch_activity_animations.mjs prints
+// this list when it runs, and the two have to agree.
+const ACTIVITY_ANIMATIONS = new Set([
+  'leg-press', 'leg-extension-quads', 'leg-curl-hamstrings', 'hip-abduction-machine',
+  'chest-press-machine', 'shoulder-press-machine', 'pec-deck-chest-fly-machine',
+  'cable-tricep-pushdown', 'lat-pulldown', 'seated-row-machine',
+  'left-lateral-raise-machine-or-cable', 'dumbbell-goblet-squat', 'dumbbell-bench-press', 'dumbbell-lateral-raise', 'leg-raise',
+  'rear-delt-fly-machine-or-cable', 'cable-bicep-curl',
+  'dumbbell-bicep-curl', 'bird-dog-both-sides', 'push-up',
+  'hip-adduction-machine', 'calf-raise-machine', 'dumbbell-row',
+]);
+
+function renderActivityFigures() {
+  if (activityFiguresDrawn) return;
+  activityFiguresDrawn = true;
+
+  document.querySelectorAll('.instruction-activities li').forEach((li) => {
+    const name = li.textContent.trim();
+    const slug = activitySlug(name);
+    // An animated movement is a .gif and a still one a .jpg — nothing else about
+    // them differs, since a browser loops a GIF in a plain <img> on its own.
+    const animated = ACTIVITY_ANIMATIONS.has(slug);
+
+    const figure = document.createElement('img');
+    figure.className = 'instruction-figure';
+    figure.src = `assets/images/activities/${slug}.${animated ? 'gif' : 'jpg'}`;
+    figure.alt = animated ? `${name}, animated` : `${name}, start and finish positions`;
+    figure.loading = 'lazy';
+    // A name in the plan with no figure filed under its slug leaves the label
+    // standing on its own, rather than a broken-image icon.
+    figure.addEventListener('error', () => figure.remove(), { once: true });
+
+    const label = document.createElement('span');
+    label.className = 'instruction-activity-name';
+    label.textContent = name;
+
+    li.textContent = '';
+    li.append(figure, label);
+  });
+}
+
 function initWorkoutPlan() {
   document.getElementById('log-workout-btn').addEventListener('click', logWorkout);
+
+  // A sibling of the <h2>, not a child of it — the h2 is the collapse toggle, so
+  // a button inside it would close the panel on the way to opening the modal.
+  const instructionModal = document.getElementById('activity-instruction-modal');
+  document.getElementById('activity-instruction-btn').addEventListener('click', () => {
+    renderActivityFigures();
+    instructionModal.hidden = false;
+  });
+  document.getElementById('activity-instruction-close-btn').addEventListener('click', () => {
+    instructionModal.hidden = true;
+  });
 }

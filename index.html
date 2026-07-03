@@ -469,7 +469,10 @@
         </div>
 
         <div class="panel" id="workout-plan-panel">
-            <h2>Activity Plan</h2>
+            <div class="panel-header">
+                <h2>Activity Plan</h2>
+                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Instruction</button>
+            </div>
 
             <h3>Strength Training</h3>
             <div class="workout-day">
@@ -1820,6 +1823,67 @@
         <div class="modal-actions">
             <button type="button" id="formula-reset-btn" class="btn">Reset</button>
             <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="activity-instruction-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="activity-instruction-title" hidden>
+    <div class="modal-card">
+        <button type="button" id="activity-instruction-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        <h2 id="activity-instruction-title">Instructions on the Activities</h2>
+
+        <p class="hint instruction-key">Each guide shows the start and the finish, with the muscle worked picked out in red.</p>
+
+        <div class="instruction-body">
+            <h3>Legs</h3>
+            <ul class="instruction-activities">
+                <li>Leg Press</li>
+                <li>Leg Extension (quads)</li>
+                <li>Leg Curl (hamstrings)</li>
+                <li>Hip Abduction machine</li>
+                <li>Hip Adduction machine</li>
+                <li>Calf Raise machine</li>
+            </ul>
+            <h3>Push (chest, shoulders, triceps)</h3>
+            <ul class="instruction-activities">
+                <li>Chest Press machine</li>
+                <li>Shoulder Press machine</li>
+                <li>Pec Deck / Chest Fly machine</li>
+                <li>Left Lateral Raise machine (or cable)</li>
+                <li>Right Lateral Raise machine (or cable)</li>
+                <li>Cable Tricep Pushdown</li>
+            </ul>
+            <h3>Pull (back, biceps)</h3>
+            <ul class="instruction-activities">
+                <li>Lat Pulldown</li>
+                <li>Seated Row machine</li>
+                <li>Rear Delt Fly machine (or cable)</li>
+                <li>Cable Bicep Curl</li>
+            </ul>
+            <h3>Full Body (dumbbell)</h3>
+            <ul class="instruction-activities">
+                <li>Dumbbell Goblet Squat</li>
+                <li>Dumbbell Bench Press</li>
+                <li>Dumbbell Row</li>
+                <li>Dumbbell Shoulder Press</li>
+                <li>Dumbbell Romanian Deadlift</li>
+                <li>Dumbbell Lateral Raise</li>
+                <li>Dumbbell Bicep Curl</li>
+                <li>Dumbbell Tricep Extension</li>
+            </ul>
+            <h3>Core &amp; Bodyweight (no equipment)</h3>
+            <ul class="instruction-activities">
+                <li>Crunch</li>
+                <li>Plank</li>
+                <li>Side Plank (both sides)</li>
+                <li>Leg Raise</li>
+                <li>Glute Bridge</li>
+                <li>Bird Dog (both sides)</li>
+                <li>Superman</li>
+                <li>Push-up</li>
+                <li>Bodyweight Squat</li>
+                <li>Mountain Climber</li>
+            </ul>
         </div>
     </div>
 </div>

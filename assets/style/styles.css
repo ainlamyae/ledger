@@ -1577,6 +1577,63 @@ td .btn {
     line-height: 1;
 }
 
+.instruction-key {
+    margin-bottom: 1rem;
+}
+
+/* The global `* { margin: 0 }` strips the gap a run-in heading needs. Grouped
+   by the plan's own categories, minus the day numbers — which day you train
+   them on isn't what you came to this modal to look up. */
+.instruction-body h3 {
+    margin: 1.2rem 0 .5rem;
+    font-size: .95rem;
+}
+
+.instruction-body h3:first-child {
+    margin-top: 0;
+}
+
+/* Each guide is one wide picture carrying both ends of the movement, so the
+   cells are sized for a landscape image rather than a square one. */
+.instruction-activities {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    align-items: start;
+    gap: .5rem;
+}
+
+.instruction-activities li {
+    padding: .5rem .65rem;
+    font-size: .9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+/* A fixed height with object-fit: contain, not a fixed aspect ratio. The figures
+   are nowhere near one shape — square animated loops next to guides three times
+   as wide — so pinning a ratio would squash them and letting them run free makes
+   every row a different height. Contain gives one tidy band and leaves every
+   figure at its own proportions.
+
+   White regardless of theme: these are drawn on white, so a dark card behind
+   them would just frame a white rectangle. */
+.instruction-figure {
+    display: block;
+    width: 100%;
+    height: 170px;
+    object-fit: contain;
+    margin-bottom: .4rem;
+    background: #fff;
+    border-radius: var(--radius-md);
+}
+
+.instruction-activity-name {
+    display: block;
+    font-weight: 600;
+}
+
+
 /* Tight by design. The gaps between a label, its box and the next field are cut
    hardest — they cost height without buying anything — while the box's own
    vertical padding is only trimmed, since it sets the tap target. Horizontal

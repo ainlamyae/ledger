@@ -160,6 +160,12 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - Free text already in the note is preserved; the description re-derives from everything in the session.
 - Duration counts active time only — rest, warm-up and transitions are excluded.
 - Opens the Health Log modal pre-filled, then runs Calculate; nothing is written until you Save.
+- **Instruction** in the panel heading opens "Instructions on the Activities" — all 34 strength exercises, grouped by category (Legs / Push / Pull / Full Body / Core & Bodyweight) rather than by the day they fall on.
+  - Every figure shows the **muscle worked picked out in red**. 23 are **animated loops**; the remaining 11 are stills carrying **the start and the finish side by side**.
+  - Animated and still differ by nothing but file extension — a browser loops a GIF in a plain `<img>`, so there is no `<video>` element and no fallback path. `ACTIVITY_ANIMATIONS` in `strength-plan.js` is the one list that decides which is which.
+  - Sizes are all over the place at source (square loops next to guides three times as wide), so a figure is given a **fixed height with `object-fit: contain`** rather than a fixed aspect ratio — one tidy band per row, nothing squashed. They sit on white in either theme, since that's what they're drawn on.
+  - Committed under `assets/images/activities/<slug>.gif` or `.jpg`, 23.3 MB in total (22.8 MB animation, 0.4 MB stills). Lazy-loaded on first open of the modal, so nothing is fetched until it's asked for; a plan row with no file under its slug leaves the label standing rather than a broken-image icon.
+  - Two fetchers keep it current, both skipping what's already on disk: `scripts/fetch_activity_images.mjs` for the stills and `scripts/fetch_activity_animations.mjs` for the loops. The animation one also drops a still once its replacement is on disk — and checks the download actually succeeded first, having once deleted a still for a fetch that had 403'd.
 
 ### Health — Health Log
 
@@ -363,7 +369,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 15 | `timesheet.js` | Work Log, holiday/missed detection, analytics data, reminder banner |
 | 16 | `csv.js` | CSV import, advanced filter engine, download helper |
 | 17 | `wellness.js` | Health Log table and form, `Breakdown` column, bulk Edit/Recalculate/Merge |
-| 18 | `strength-plan.js` | Activity Plan tables, logged-today ticks, incremental Log a Workout |
+| 18 | `strength-plan.js` | Activity Plan tables, logged-today ticks, incremental Log a Workout, Instruction modal |
 | 19 | `activity-estimator.js` | Workout note parsing, active-seconds and MET-based burn |
 | 20 | `contacts.js` | Contact List, CRUD, bulk export/delete/merge |
 | 21 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
@@ -796,7 +802,8 @@ ledger/
 ├── index.html                    # Page shell: gates, dashboard, modals, footer
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
 ├── assets/
-│   ├── images/                   # Social preview, touch icon, diagrams
+│   ├── images/                   # Social preview, touch icon
+│   │   └── activities/            # One figure per movement — animated .gif or two-position .jpg
 │   ├── style/styles.css          # All styling
 │   └── script/
 │       ├── config.js             # Client ID, template ID, Picker key, sheet names
@@ -832,6 +839,10 @@ ledger/
 │       ├── landing-graph.js      # Pre-login mind-maps
 │       ├── gate.js               # Pre-login flow
 │       └── app.js                # Orchestration
+├── scripts/
+│   ├── build_template.py              # Scrubbed demo workbook for the Sheets template
+│   ├── fetch_activity_images.mjs      # Still exercise guides → assets/images/activities
+│   └── fetch_activity_animations.mjs  # Animated exercise loops → assets/images/activities
 ├── LICENSE
 └── README.md
 ```

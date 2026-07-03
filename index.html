@@ -938,7 +938,34 @@
         </div>
 
         <div class="panel">
-        <h2>Spending by Category</h2>
+            <h2>Historical Trends</h2>
+
+            <div class="panel-section">
+                <h3>Category Expenditure Trend</h3>
+                <div class="chart-box">
+                    <canvas id="expense-breakdown-trend-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="expense-breakdown-trend-legend"></div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Revenue vs. Expenditure</h3>
+                <div class="chart-box">
+                    <canvas id="income-expense-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="income-expense-legend"></div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Cumulative Net Worth</h3>
+                <div class="chart-box">
+                    <canvas id="savings-trend-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+        <h2>Spending Breakdown</h2>
 
         <div class="panel-section">
             <h3>Average Monthly Spending by Category</h3>
@@ -981,37 +1008,10 @@
 
             <div class="donut-legend" id="spending-trend-legend"></div>
         </div>
-    </div>
-
-    <div class="panel" id="type-breakdown-panel">
-        <h2>Spending Breakdown by Type</h2>
-        <div id="type-breakdown-container"></div>
-    </div>
-
-    <div class="panel">
-        <h2>Historical Trends</h2>
 
         <div class="panel-section">
-            <h3>Category Expenditure Trend</h3>
-            <div class="chart-box">
-                <canvas id="expense-breakdown-trend-chart"></canvas>
-            </div>
-            <div class="donut-legend" id="expense-breakdown-trend-legend"></div>
-        </div>
-
-        <div class="panel-section">
-            <h3>Revenue vs. Expenditure</h3>
-            <div class="chart-box">
-                <canvas id="income-expense-chart"></canvas>
-            </div>
-            <div class="donut-legend" id="income-expense-legend"></div>
-        </div>
-
-        <div class="panel-section">
-            <h3>Cumulative Net Worth</h3>
-            <div class="chart-box">
-                <canvas id="savings-trend-chart"></canvas>
-            </div>
+            <h3>Spending Breakdown by Type</h3>
+            <div id="type-breakdown-container"></div>
         </div>
     </div>
 

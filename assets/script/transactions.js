@@ -11,6 +11,10 @@ let listenersAttached = false;
 let txSort = { key: null, dir: 1 };
 let selectedRows = new Set();
 let transactionsDirtyFromAdd = false;
+// Same purpose as wellness.js's wellnessDataLoaded — lets a click that races
+// the initial fetch (e.g. Financial Insight) tell "not loaded yet" apart
+// from "loaded, zero transactions".
+let transactionsDataLoaded = false;
 
 async function initTransactions(forceRefresh = false) {
   let lists = forceRefresh ? null : getCached('lists');
@@ -117,6 +121,7 @@ async function refreshTransactions(forceRefresh = false) {
     description: row[4] || '',
     amount: Number(row[5]) || 0,
   }));
+  transactionsDataLoaded = true;
   renderTransactions();
   populateAutocompleteOptions();
   syncExportAccountOptions();

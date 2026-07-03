@@ -2378,19 +2378,23 @@ function renderWellnessProjectionChart(entries) {
   const meterFill = document.getElementById('weight-progress-meter-fill');
   const meterDone = document.getElementById('weight-progress-meter-done');
   const meterRemaining = document.getElementById('weight-progress-meter-remaining');
+  const meterGoal = document.getElementById('weight-progress-meter-goal');
   const timeWrap = document.getElementById('time-progress-meter');
   const timeFill = document.getElementById('time-progress-meter-fill');
   const timeElapsed = document.getElementById('time-progress-meter-elapsed');
   const timeRemaining = document.getElementById('time-progress-meter-remaining');
+  const timeEta = document.getElementById('time-progress-meter-eta');
   const etaEl = document.getElementById('weight-projection-eta');
   const plateauNote = document.getElementById('weight-plateau-note');
   meterWrap.hidden = true;
   meterDone.textContent = '';
   meterRemaining.textContent = '';
+  meterGoal.textContent = '';
   meterRemaining.classList.remove('danger');
   timeWrap.hidden = true;
   timeElapsed.textContent = '';
   timeRemaining.textContent = '';
+  timeEta.textContent = '';
   etaEl.textContent = '';
   plateauNote.textContent = '';
   plateauNote.classList.remove('warning');
@@ -2428,6 +2432,9 @@ function renderWellnessProjectionChart(entries) {
     const remainingText = `${remainingKg} kg`;
     meterRemaining.textContent = privacyMode ? maskDigits(remainingText) : remainingText;
     meterRemaining.classList.toggle('danger', isWrongDirection);
+
+    const goalText = `→ ${weightGoal} kg`;
+    meterGoal.textContent = privacyMode ? maskDigits(goalText) : goalText;
   }
 
   // An undrawable projection drops only the projected SEGMENT. It used to `return`
@@ -2475,6 +2482,9 @@ function renderWellnessProjectionChart(entries) {
 
       const toGoText = `${daysToGo} ${daysToGo === 1 ? 'day' : 'days'}`;
       timeRemaining.textContent = privacyMode ? maskDigits(toGoText) : toGoText;
+
+      const etaText = `→ ${isoFromDate(proj.etaDate)}`;
+      timeEta.textContent = privacyMode ? maskDigits(etaText) : etaText;
     }
   }
 

@@ -1,7 +1,6 @@
 const REPORT_RANGE = `'${CONFIG.SHEETS.REPORT}'!A1:Z149`;
 const BALANCE_RANGE = `'${CONFIG.SHEETS.BALANCE}'!A1:D1`;
 const INSIGHT_RANGE = `${CONFIG.SHEETS.INSIGHT}!A2:F200`;
-const RECONCILIATION_RANGE = `'${CONFIG.SHEETS.RECONCILIATION}'!B5`;
 const SETTINGS_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -69,7 +68,7 @@ function showUndoToast(message, onUndo) {
 
 let currentReport = null;
 
-// 'Account Balance'!D1 holds the pre-computed net worth total.
+// 'Accounts'!D1 holds the pre-computed net worth total.
 function parseBalance(balanceRows) {
   return (balanceRows[0] && balanceRows[0][3]) || 0;
 }
@@ -271,13 +270,12 @@ async function loadReport(forceRefresh) {
   }
 
   const { valueRanges } = await batchGetValues(
-    [REPORT_RANGE, BALANCE_RANGE, INSIGHT_RANGE, RECONCILIATION_RANGE],
+    [REPORT_RANGE, BALANCE_RANGE, INSIGHT_RANGE],
     VALUE_PARAMS
   );
   const reportRows = valueRanges[0].values || [];
   const balanceRows = valueRanges[1].values || [];
   const insightRows = valueRanges[2].values || [];
-  const reconciliationRows = valueRanges[3].values || [];
 
   // Insight!A2:F200 lists each category once per Type plus one blank-Type
   // total row, so collapse column A to a unique, order-preserving list.
@@ -370,7 +368,13 @@ async function loadReport(forceRefresh) {
     });
 
   const netWorth = parseBalance(balanceRows);
-  const missingAmount = Number(reconciliationRows[0]?.[0]) || 0;
+
+  // Reconciliation gap: recorded account balances vs. what the transaction
+  // history alone adds up to. Non-zero means a balance is wrong or a
+  // transaction is missing — computed client-side from figures the app
+  // already reads, no dedicated sheet tab required.
+  const cumulativeSaved = Number(monthlyRows[monthlyRows.length - 1]?.[cumulativeIndex]) || 0;
+  const missingAmount = netWorth - cumulativeSaved;
 
   const report = {
     income: current[1] || 0,
@@ -516,9 +520,6 @@ function renderSummaryCards(data) {
   savingsEl.classList.toggle('expense', data.saved < 0);
 }
 
-// 'Reconciliation'!B5 is the Sheet's pre-computed gap between recorded
-// account balances and transaction history. Non-zero means an account
-// balance is wrong or a transaction is missing.
 function renderReconciliationStatus(missingAmount) {
   const isReconciled = Math.abs(missingAmount) < 0.005;
 
@@ -589,26 +590,32 @@ async function loadDashboard(forceRefresh = false) {
   // Every module below is an independent API call — fetch them all
   // concurrently so the dashboard doesn't wait on nine round trips in
   // sequence.
+  const reportPromise = loadReport(forceRefresh).then((report) => {
+    currentReport = report;
+    renderSummaryCards(report);
+    renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
+    renderSpendingBreakdownCharts(report.categoryComparison);
+    renderTypeBreakdownCharts(report.typeBreakdown);
+    renderIncomeExpenseChart(report.incomeExpenseTrend);
+    renderExpenseBreakdownTrendChart(report.categoryTrend);
+    renderSavingsTrendChart(report.savingsTrend);
+    renderReconciliationStatus(report.missingAmount);
+    setLastUpdated();
+  });
+  const transactionsPromise = initTransactions(forceRefresh);
+  const accountsPromise = initAccountManager(forceRefresh);
+
   const results = await Promise.allSettled([
     settingsPromise,
-    loadReport(forceRefresh).then((report) => {
-      currentReport = report;
-      renderSummaryCards(report);
-      renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
-      renderSpendingBreakdownCharts(report.categoryComparison);
-      renderTypeBreakdownCharts(report.typeBreakdown);
-      renderIncomeExpenseChart(report.incomeExpenseTrend);
-      renderExpenseBreakdownTrendChart(report.categoryTrend);
-      renderSavingsTrendChart(report.savingsTrend);
-      renderReconciliationStatus(report.missingAmount);
-      setLastUpdated();
-    }),
-    initTransactions(forceRefresh),
-    initAccountManager(forceRefresh),
+    reportPromise,
+    transactionsPromise,
+    accountsPromise,
     initTimeSheet(forceRefresh),
-    // Health Insight deliberately isn't refreshed here: it computes nothing
-    // until one of its mode buttons is clicked, which is what keeps this load
-    // free of the aggregation those three panels used to run on every visit.
+    // Health Insight and Financial Insight deliberately aren't refreshed
+    // here: neither computes anything until its own "load" action (a mode
+    // button, or Financial Snapshot) is clicked, which is what keeps
+    // this load free of the aggregation those panels used to run on every
+    // visit.
     wellnessPromise,
     nutritionPromise,
     // Protein Source Rotation needs wellness (actual servings eaten),
@@ -827,6 +834,7 @@ window.addEventListener('load', () => {
   initInsightPanel();
   initFormulaPlayground();
   initProteinRotationPanel();
+  initFinancialInsight();
   initWorkoutPlan();
   setupScrollSpy();
   setupPanelToggles();

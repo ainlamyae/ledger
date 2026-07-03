@@ -36,8 +36,6 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - All aggregation, charting, filtering, sorting and CRUD runs client-side in vanilla JS.
 - No build step, no server component to deploy or maintain.
 
-![Ledger dashboard screenshot](assets/images/dashboard-screenshot.png)
-
 ---
 
 ## Features
@@ -46,7 +44,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 - Four self-contained "bulb" cards above each panel group; work before sign-in.
 - **Time** — local `HH:mm:ss` plus a second, independently configurable reference clock.
-- **Date** — Gregorian ✝️, Shamsi 🌞 and Ghamari 🌜 in one aligned day/month/year grid, via `Intl`.
+- **Date** — Gregorian, Shamsi and Ghamari in one aligned day/month/year grid, via `Intl`.
 - **Azan** — Sobh/Zohr/Maghreb/Midnight, computed client-side (Shia "Tehran" method).
 - **Weather** — current conditions plus a 3-day forecast.
 - Location resolution order: manual override → browser geolocation → `WIDGET_DEFAULT_CITY` → Waterloo/Isfahan fallback.
@@ -61,15 +59,15 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
-- **Dark mode** — floating 🌙/☀️ toggle, persisted.
-- **Privacy mode** — floating 🙈/👁️ masks amounts, health figures, contact details and Settings values.
+- **Dark mode** — floating toggle, persisted.
+- **Privacy mode** — floating toggle masks amounts, health figures, contact details and Settings values.
 
 ### Button roles
 
-- **Blue** — add or save (Add/Log buttons, Save, Save & Add Another, 💾 bank).
-- **Amber** — spends an AI call (Send to AI, 🧮 Calculate, 🧮 Recalculate Selected).
+- **Blue** — add or save (Add/Log buttons, Save, Save & Add Another, bank).
+- **Amber** — spends an AI call (Send to AI, Calculate, Recalculate Selected).
 - **Red** — destructive, text labels only (the export filter's remove).
-- **Default** — everything else, including all emoji buttons (❌ close, 🗑️ delete) — an emoji on a dark fill is hard to read.
+- **Default** — everything else, including all emoji buttons (close, delete) — an emoji on a dark fill is hard to read.
 - Slow actions append `…` to the label and block re-clicks until they settle: all form saves, bulk merge/delete, every row delete, and the AI/USDA calls.
 
 ### Finances
@@ -77,16 +75,16 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Summary cards** — Net Worth, Monthly Cash Flow, Monthly Income, Monthly Expenditure.
   - Income and Expenditure also show the average of the **previous 3 months**, separated by `/`.
   - The current month is excluded from its own benchmark; a tooltip names the months averaged.
-- **Spending by Category** — grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months), plus four donuts.
-- **Spending Breakdown by Type** — per-category donuts driven by a free-text `Description` prefix convention, built dynamically from `Insight`.
-- **Historical Trends** — Category Expenditure Trend (stacked), Revenue vs. Expenditure (stepped area), Cumulative Net Worth (line).
+- **Financial Indicators** — Cumulative Net Worth (line), Revenue vs. Expenditure (stepped area), Category Expenditure Trend (stacked), grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months) plus four category donuts, then per-category Type donuts driven by a free-text `Description` prefix convention, built dynamically from `Insight`.
+- **Financial Insight (AI)** — click "Financial Snapshot" to preview net worth, total Market Value, monthly cash flow/income/expenditure, spending by category over four complete periods (Previous Month/Quarter/Year/Lifelong), and every open account's Balance vs. Market Value; optionally ask a question, then **Send to AI** for a plain-text read — Overview, Going well, Needs attention, Investment Outlook (short-term liquidity, long-term growth), Suggestions. Nothing is computed until that click — same as Health Insight below.
+  - A same-day figure (Cash Flow/Income/Expenditure) is flagged "partial month in progress" so the AI doesn't mistake an early-month total for a decline; closed/empty accounts and Institution are left out of what's sent.
 - **Transaction Log** — searchable, filterable, sortable, paginated; add/edit/delete/duplicate.
   - Payee/Description/Category autocomplete from history; new categories can be typed inline.
   - Amount accepts arithmetic (`=-9.97-1.30`, `-32/2`), rounded to the cent.
   - Advanced Filters: date range plus an AND/OR field-filter builder; Export CSV writes exactly what's filtered.
-- **Bulk transaction ops** — select rows for ✏️ Edit Selected (only filled fields applied) or 🗑️ Delete Selected (one `batchUpdate`, highest row first).
+- **Bulk transaction ops** — select rows for Edit Selected (only filled fields applied) or Delete Selected (one `batchUpdate`, highest row first).
 - **Undo** — toast after bulk edit/delete; deletes re-append, edits write original values back in place.
-- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the Account Summary table with reconciliation status.
+- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the Account Summary table (with a Total row summing Balance and Market Value) and reconciliation status.
 
 ### Time Tracker
 
@@ -109,7 +107,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward goal; optional BMI twin axis.
-  - Progress meters above the chart: distance covered and time elapsed, side by side.
+  - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (goal body mass, or the projected arrival date).
   - Plateau alert when the smoothed trend has held flat.
   - The status line under the chart speaks only when there is **no** forecast to draw — goal reached, no net change, trending away, or levelling off short of goal. A forecast that renders says nothing, since the meters and the curve already do.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
@@ -130,7 +128,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 - One panel, three modes: **Wellness**, **Food**, **Activity**.
 - **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
-- Clicking a mode shows a preview of exactly what would be sent; 🚀 Send to AI sends that same data.
+- Clicking a mode shows a preview of exactly what would be sent; Send to AI sends that same data.
 - All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
 - **No line repeats the date range.** Every figure in a mode covers the same window, so it's stated once by the panel's own status line rather than eight times inside the prompt. The `[only N/M days logged]` marker carries the window length wherever coverage is partial.
 - **Wellness** — selected range vs. the equal-length preceding period.
@@ -161,19 +159,19 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - The button reads "Add to Today's Workout" once something is already logged.
   - Free text already in the note is preserved; the description re-derives from everything in the session.
 - Duration counts active time only — rest, warm-up and transitions are excluded.
-- Opens the Health Log modal pre-filled, then runs 🧮 Calculate; nothing is written until you Save.
+- Opens the Health Log modal pre-filled, then runs Calculate; nothing is written until you Save.
 
 ### Health — Health Log
 
 - Filterable/sortable table (search, date range, category filter), paginated; add/edit/delete/duplicate.
 - A thicker top border marks each date change, so day boundaries read at a glance.
 - Category-aware form: pre-fills the unit and offers Description suggestions from your own history.
-- **🧮 Calculate** — type a freeform ingredient list into Notes instead of a number.
+- **Calculate** — type a freeform ingredient list into Notes instead of a number.
   - Each item is matched against **your own Nutrition Facts first**, by the name *you typed* — never the AI's rephrasing.
   - A miss falls back to USDA FoodData Central, then to the model's own estimate.
   - A fallback result gets a **＋ Save** button rather than being banked silently.
   - Totals are always summed client-side.
-- Bulk actions: ✏️ Edit Selected, 🧮 Recalculate Selected, 🔗 Merge Selected.
+- Bulk actions: Edit Selected, Recalculate Selected, Merge Selected.
 
 ### Health — Nutrition Facts
 
@@ -182,11 +180,11 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - The Add/Edit form offers a datalist of classifications already in use, so the column doesn't fragment.
   - Search matches classification **and** name, so typing `dairy` pulls up the whole group.
   - Left blank by Calculate's auto-bank — the app has no basis for guessing one.
-- **🔍 Look up in USDA** button beside Save fills Amount/Calories/Protein from FoodData Central.
+- **Look up in USDA** button beside Save fills Amount/Calories/Protein from FoodData Central.
   - Lists **every candidate** rather than taking the top one — Calculate can sanity-check a result against an AI estimate and this can't, and USDA ranks "Oil, soybean" above the bean.
   - Applies the top match so the common case is one click; click another to switch.
   - Leaves Name as typed and never sets Verified — a database figure isn't a checked label.
-- 🔗 Merge Selected consolidates near-duplicates; matching is exact-text, never fuzzy.
+- Merge Selected consolidates near-duplicates; matching is exact-text, never fuzzy.
 
 ### Other
 
@@ -211,9 +209,6 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Static site talking directly to Google's APIs from the browser.
 - No application server in the request path, ever.
 
-![Ledger system architecture diagram](assets/images/architecture-diagram.png)
-<sub>Simplified high-level view of the core OAuth + Sheets flow — see the detailed diagram below for the full set of integrations.</sub>
-
 ```mermaid
 flowchart TD
     subgraph Client["Browser (Client) — GitHub Pages static site, no build step"]
@@ -226,7 +221,7 @@ flowchart TD
     Sheets["Google Sheets API v4<br/>sheets.googleapis.com<br/>get / batchGet / append / update / clear / batchUpdate"]
     Drive["Google Drive API v3<br/>googleapis.com/drive/v3/files<br/>active spreadsheet's filename — get / rename"]
     Picker["Google Picker API<br/>gapi 'picker' module + PICKER_API_KEY<br/>spreadsheet selection UI"]
-    Sheet[("The signed-in user's own Ledger spreadsheet<br/>(cloned from TEMPLATE_SPREADSHEET_ID via<br/>Sheets' 'make a copy', selected via Picker)<br/><br/>Transactions · Account Balance · Monthly Summary*<br/>Insight* · Reconciliation* · eTimeSheet<br/>Wellness Log · Nutrition Facts · Contacts<br/>Settings · Travel · Applications<br/><br/>* formula-driven, app only reads these")]
+    Sheet[("The signed-in user's own Ledger spreadsheet<br/>(cloned from TEMPLATE_SPREADSHEET_ID via<br/>Sheets' 'make a copy', selected via Picker)<br/><br/>Transactions · Accounts · Monthly Summary*<br/>Insight* · eTimeSheet<br/>Wellness Log · Nutrition Facts · Contacts<br/>Settings · Travel · Applications<br/><br/>* formula-driven, app only reads these")]
 
     App -- "1 . request OAuth token" --> GIS
     GIS -- "2 . access token" --> App
@@ -236,7 +231,7 @@ flowchart TD
     App -- "pick / confirm spreadsheet file" --> Picker
     Picker -. "picked file ID" .-> App
 
-    Groq["Groq chat-completions API<br/>api.groq.com<br/>🧮 Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Activity)"]
+    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Activity)<br/>Financial Insight reports"]
     USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup"]
     Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
@@ -259,7 +254,8 @@ Where the diagram above shows *who the browser talks to*, this shows *what happe
 ```mermaid
 flowchart TD
     Start(["Page load"]) --> Widgets["initWidgets()<br/>Time / Date / Azan / Weather bulbs<br/>(independent of sign-in)"]
-    Start --> Auth["initAuth(handleAuthChange)"]
+    Start --> Gate["initGate()<br/>wires sign-in / file-gate buttons"]
+    Gate --> Auth["initAuth(handleAuthChange)"]
 
     Auth --> TokenCheck{"Non-expired token<br/>in localStorage?"}
     TokenCheck -- yes --> HandleAuth["handleAuthChange(token)"]
@@ -279,11 +275,12 @@ flowchart TD
 
     subgraph LoadDashboard["Dashboard load — loadDashboard()"]
         direction TB
-        Report["loadReport()<br/>cached or batchGetValues:<br/>Monthly Summary, Account Balance,<br/>Insight, Reconciliation"]
+        Report["loadReport()<br/>cached or batchGetValues:<br/>Monthly Summary, Accounts,<br/>Insight — missingAmount computed<br/>client-side from the first two"]
         Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications<br/>(each checks its own cache first)"]
+        ProteinRot["Once Wellness + Nutrition settle:<br/>renderProteinRotationChart()<br/>(protein-rotation.js)"]
         Render["charts.js renders every canvas<br/>app.js renders summary cards<br/>each module renders its own table"]
         Report --> Render
-        Modules --> Render
+        Modules --> ProteinRot --> Render
     end
 
     LoadDashboard --> Idle(["Dashboard interactive"])
@@ -309,8 +306,10 @@ flowchart TD
     Idle --> TravelFlow["Travel Insights<br/>(derived, no extra API call)"]
     TravelFlow --> TravelDerive["Pair each Arrival with its<br/>closing Departure (open-ended<br/>final Arrival = ongoing, to today)<br/>→ Time Spent by Country tiles +<br/>Countries Visited choropleth"] --> Idle
 
-    Idle --> Calc["🧮 Calculate<br/>Health Log Log Entry form"]
-    Calc --> Split["splitNotesIntoSegments()<br/>deterministic, no AI — recovers<br/>each item's OWN typed name"]
+    Idle --> Calc["Calculate<br/>Health Log Log Entry form"]
+    Calc --> CalcCategory{"handleCalculateClick():<br/>entry category?"}
+
+    CalcCategory -- Food --> Split["splitNotesIntoSegments()<br/>deterministic, no AI — recovers<br/>each item's OWN typed name"]
     Split --> ExtractCheck{"Notes text cached?<br/>(calc-extract-v2)"}
     ExtractCheck -- hit --> Items["items[]: query (Groq's own<br/>search phrasing, never shown/<br/>stored), grams, count,<br/>kcal/protein fallback"]
     ExtractCheck -- miss --> Groq["groqExtractIngredients()<br/>→ cache the split"] --> Items
@@ -323,15 +322,21 @@ flowchart TD
     Bank --> Sum
     Sum --> Idle
 
+    CalcCategory -- Activity --> ActWeight{"getLatestWeightKg():<br/>a Weight entry logged?"}
+    ActWeight -- no --> ActBlocked["Blocked — Calculate<br/>needs a weight to size the burn"] --> Idle
+    ActWeight -- yes --> ActParse["parseWorkoutNoteLines()<br/>Nx / Nsec / Nmin / Nstep forms"]
+    ActParse --> ActMET["Per line: EXERCISE_MET table<br/>(fallback EXERCISE_MET_DEFAULT)<br/>+ activeSecondsForNoteLine()"]
+    ActMET --> ActSum["metKcal() per line, summed →<br/>breakdown table + Amount field.<br/>No AI, no cache — pure parse+lookup."] --> Idle
+
     Idle --> InsightPanel["Health Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
     InsightMode -- no --> Idle
     InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Classification-grouped ingredient rollup /<br/>per-muscle-group reps — no API call"]
-    InsightPreview --> InsightSend{"🚀 Send to AI<br/>clicked?"}
+    InsightPreview --> InsightSend{"Send to AI<br/>clicked?"}
     InsightSend -- yes --> InsightReport["Groq chat-completions API<br/>renders free-text report,<br/>saved to that mode's INSIGHT_* keys"] --> Idle
     InsightSend -- no --> Idle
 
-    Idle --> Manual["🔄 Refresh /<br/>🧹 Clear Cache"]
+    Idle --> Manual["Refresh /<br/>Clear Cache"]
     Manual --> ClearCache["Clear localStorage cache<br/>— Clear Cache also clears<br/>Cache Storage/service workers,<br/>then reloads"] --> LoadDashboard
 ```
 
@@ -350,7 +355,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes |
 | 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit |
 | 9 | `nutrition.js` | Nutrition Facts table, Classification column + datalist, USDA lookup button, merge, `findNutritionEntry` |
-| 10 | `calorie-estimator.js` | 🧮 Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
+| 10 | `calorie-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
 | 11 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
 | 13 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
@@ -370,9 +375,10 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 27 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
 | 28 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
 | 29 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution |
-| 30 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
-| 31 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
-| 32 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 30 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 31 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
+| 32 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
+| 33 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
 ### Data Flow
 
@@ -394,7 +400,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 **Dashboard load**
 
-1. `loadReport()` — cache or one `batchGetValues` for Monthly Summary, Account Balance, Insight, Reconciliation.
+1. `loadReport()` — cache or one `batchGetValues` for Monthly Summary, Accounts, Insight.
 2. Entity modules init concurrently via `Promise.allSettled`, each checking its own cache.
 3. `charts.js` renders canvases; `app.js` renders summary cards; each module renders its table.
 
@@ -408,12 +414,12 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 1. Nothing is computed on load.
 2. A mode click gathers that mode's data, renders the preview, restores that mode's saved report.
-3. 🚀 Send to AI sends the data already on screen, then saves the report to `Settings`.
+3. Send to AI sends the data already on screen, then saves the report to `Settings`.
 
 **Manual refresh**
 
-- 🔄 Refresh clears the cache and re-fetches.
-- 🧹 Clear Cache also purges Cache Storage and service workers, then reloads.
+- Refresh clears the cache and re-fetches.
+- Clear Cache also purges Cache Storage and service workers, then reloads.
 
 ---
 
@@ -426,22 +432,25 @@ One Google Sheet per user, cloned from the template, with these tabs.
 | Column | Type | Notes |
 |---|---|---|
 | A — Date | Date | ISO format |
-| B — Account | Text | Must match a name in `Account Balance` column A |
+| B — Account | Text | Must match a name in `Accounts` column A |
 | C — Payee | Text | Merchant / person / institution |
 | D — Category | Text | Must match a category in `Insight` column A |
 | E — Description | Text | Optional detail; its `Type - ` prefix drives the Type donuts |
 | F — Amount | Number | Positive = income, negative = expense — the sign alone defines the type |
 
-### `Account Balance`
+### `Accounts`
 
 | Cell/Column | Type | Notes |
 |---|---|---|
 | D1 | Number (formula) | Net Worth, e.g. `=ROUND(SUM(D3:D100),2)` |
-| Row 2 | Header | `Account \| Institute \| Type \| Balance` |
+| Row 2 | Header | `Account \| Institute \| Type \| Balance \| Market Value` |
 | A3:A | Text | Account name — also the dropdown source for `Transactions` |
 | B3:B | Text | Institution |
 | C3:C | Text | `Cash`, `Chequing`, `Saving`, `Credit`, `Investment`, `Person`, `Other`, … |
-| D3:D | Number | Balance |
+| D3:D | Number | Balance — the deposited/book figure that ties out to transaction history |
+| E3:E | Number, optional | Market Value — today's redemption/cash-out value, where it differs from Balance (interest-bearing or investment accounts). Blank means "not tracked" and renders as `—`; not included in any sheet formula |
+
+- **Reconciliation** — computed client-side, not a sheet formula: `D1` (recorded balances) minus `Monthly Summary`'s last row, Cumulative column (transaction history). Non-zero means a balance is wrong or a transaction is missing. Uses Balance, not Market Value — Market Value is informational only.
 
 ### `Monthly Summary` (formula-driven)
 
@@ -528,11 +537,6 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 - Columns A/B/C — Key, Value, Notes. Notes is never read by the app.
 - Missing tab or row falls back to hardcoded defaults.
 - Written with `RAW` so a computed value round-trips byte-for-byte.
-
-### `Reconciliation` (formula-driven)
-
-- `B5` holds the gap between recorded balances and transaction history.
-- Non-zero means a balance is wrong or a transaction is missing.
 
 ---
 
@@ -730,7 +734,7 @@ colour ratio          = clamp( (durationHr − target/2) / (target − target/2)
                         red → amber below 0.5, amber → green above
 ```
 
-### Workout logging (Activity Plan → 🧮 Calculate)
+### Workout logging (Activity Plan → Calculate)
 
 Active time only — rest, warm-up and moving between machines are real gym time but aren't activity.
 
@@ -748,7 +752,7 @@ calories = Σ metKcal( MET(exercise) ?? 3.5, weightKg, activeSecᵢ / 60 )
 - Note parsing: `30x Name` → 30 total reps; legacy `3x10 Name` → 30; `135sec`, `30min`, `6000step`.
 - A second Log a Workout the same day appends its new lines to today's entry rather than opening a new row.
 
-### Food logging (🧮 Calculate)
+### Food logging (Calculate)
 
 Precedence: your own `Nutrition Facts` row (by **count** first, then by **weight**) → USDA → the model's estimate.
 
@@ -804,8 +808,8 @@ ledger/
 │       ├── groq.js               # Groq chat client
 │       ├── usda.js               # USDA FoodData Central client
 │       ├── nutrition.js          # Nutrition Facts table, Classification, USDA lookup
-│       ├── calorie-estimator.js  # 🧮 Calculate for food
-│       ├── activity-estimator.js # 🧮 Calculate for workouts
+│       ├── calorie-estimator.js  # Calculate for food
+│       ├── activity-estimator.js # Calculate for workouts
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts.js             # Chart.js renderers + health formulas
 │       ├── transactions.js       # Transaction Log
@@ -824,6 +828,7 @@ ledger/
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
 │       ├── formula-playground.js # Health Formula Playground
+│       ├── financial-insight.js  # Financial Insight panel
 │       ├── landing-graph.js      # Pre-login mind-maps
 │       ├── gate.js               # Pre-login flow
 │       └── app.js                # Orchestration
@@ -861,10 +866,9 @@ const CONFIG = {
   SHEETS: {
     TRANSACTIONS: 'Transactions',
     REPORT: 'Monthly Summary',
-    BALANCE: 'Account Balance',
-    ACCOUNTS: 'Account Balance',
+    BALANCE: 'Accounts',
+    ACCOUNTS: 'Accounts',
     INSIGHT: 'Insight',
-    RECONCILIATION: 'Reconciliation',
     TIMESHEET: 'eTimeSheet',
     WELLNESS: 'Wellness Log',
     NUTRITION: 'Nutrition Facts',
@@ -905,13 +909,12 @@ Then open `http://localhost:8000`. No build step.
 
 | Range | Used in | Purpose |
 |---|---|---|
-| `'Monthly Summary'!A1:Z149` | `app.js` | Header row plus monthly income/expense/category data and cumulative net worth |
-| `'Account Balance'!A1:D1` | `app.js` | Net Worth figure (`D1`) |
+| `'Monthly Summary'!A1:Z149` | `app.js` | Header row plus monthly income/expense/category data and cumulative net worth (last row's last column feeds the reconciliation check) |
+| `'Accounts'!A1:D1` | `app.js` | Net Worth figure (`D1`), also the other side of the reconciliation check |
 | `Insight!A2:F200` | `app.js` | Per-category/per-Type spend, and the category list (column A) |
-| `'Reconciliation'!B5` | `app.js` | Missing Amount — non-zero means balances don't reconcile |
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
-| `'Account Balance'!A3:D100` | `accounts.js` | Account name, institution, type, balance |
-| `'Account Balance'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete |
+| `'Accounts'!A3:E100` | `accounts.js` | Account name, institution, type, balance, market value |
+| `'Accounts'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete |
 | `eTimeSheet!A2:H` | `timesheet.js` | Work Log rows |
 | `'Wellness Log'!A2:H` | `wellness.js` | Health Log entries, including the `Breakdown` column |
 | `'Nutrition Facts'!A2:G` | `nutrition.js`, `calorie-estimator.js`, `food-insight.js`, `protein-rotation.js` | Classification / Name / Amount / Calories / Protein / Verified / Protein % |
@@ -927,7 +930,7 @@ Then open `http://localhost:8000`. No build step.
 | `ledger_cache_report` | `app.js` | Aggregated report for the summary cards and finance charts |
 | `ledger_cache_lists` | `transactions.js` | Transactions sheet ID + dropdown options |
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
-| `ledger_cache_accounts-meta` / `account-list` | `accounts.js` | `Account Balance` sheet ID / rows |
+| `ledger_cache_accounts-meta` / `account-list` | `accounts.js` | `Accounts` sheet ID / rows |
 | `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:H` rows |
 | `ledger_cache_wellness` | `wellness.js` | Raw `'Wellness Log'!A2:H` rows |
 | `ledger_cache_nutrition` | `nutrition.js` | Raw `'Nutrition Facts'!A2:G` rows |
@@ -957,8 +960,8 @@ Then open `http://localhost:8000`. No build step.
 - `index.html` is served `no-cache, no-store, must-revalidate`, so the shell is never stale.
 - Sheets responses are cached in `localStorage` for 5 minutes, keyed per data set.
 - Every write refreshes only the affected cache entry, so the UI updates without a reload.
-- 🔄 **Refresh** clears the cache and re-fetches everything.
-- 🧹 **Clear Cache** also purges Cache Storage and unregisters service workers, then reloads.
+- **Refresh** clears the cache and re-fetches everything.
+- **Clear Cache** also purges Cache Storage and unregisters service workers, then reloads.
 
 > After changing a sheet's column layout, expect up to 5 minutes of stale reads until the cache expires — or use Clear Cache. Writes always bypass the cache.
 
@@ -976,12 +979,12 @@ Then open `http://localhost:8000`. No build step.
   - No account, no financial data, no server of ours involved.
   - Avoidable entirely by denying location and not setting a custom city.
 - **Groq / USDA are opt-in** and only run once you set the keys:
-  - 🧮 Calculate sends the typed ingredient text only.
+  - Calculate sends the typed ingredient text only.
   - The USDA lookup sends the ingredient name only.
   - Wellness Insight sends age, height, BMI, body mass/goal and aggregated averages.
   - Food Insight sends the classification-grouped ingredient list plus your question. No vitamin/mineral data exists in this app, so none is ever sent.
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
-  - Nothing is sent until that panel's 🚀 Send to AI is clicked.
+  - Nothing is sent until that panel's Send to AI is clicked.
 - `GROQ_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Settings` tab and are never committed.
 - **Privacy mode** is display-only and doesn't change what's stored.
 

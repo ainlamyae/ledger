@@ -15,7 +15,7 @@ OUTPUT_PATH = r"C:\Users\AlanKay\Downloads\Ledger Template.xlsx"
 # Categories chosen to match every category column in 'Monthly Summary' (D1:L1):
 # Housing, Transportation, Grocery, Personal, Household, Fee, Medical,
 # Application, Donation -- plus one Income row and one RRSP contribution pair
-# so the 'Account Balance' RRSP formulas have something to sum.
+# so the 'Accounts' RRSP formulas have something to sum.
 DEMO_TRANSACTIONS = [
     (datetime.datetime(2025, 4, 1), "Checking", "Employer Inc",        "Payroll Deposit",            3200.00, "Income"),
     (datetime.datetime(2025, 4, 2), "Checking", "Generic Landlord",    "Home Rent",                  -1200.00, "Housing"),
@@ -51,7 +51,7 @@ def rebuild_transactions(wb):
 
 
 def rebuild_account_balance(wb):
-    ws = wb["Account Balance"]
+    ws = wb["Accounts"]
 
     # Row 18 = "Hossein" / Person / IMPORTRANGE from a private external sheet.
     # No template user can access that sheet -- remove the row entirely.

@@ -1102,6 +1102,13 @@ td {
     border-top: 2px solid var(--color-text-muted);
 }
 
+/* Account Summary's Total row (assets/script/accounts.js) — same bold/top-border
+   treatment as the other summed-last-row tables above. */
+#accounts-table tr.accounts-total-row td {
+    font-weight: 600;
+    border-top: 2px solid var(--color-text-muted);
+}
+
 /* Classification header above each group of ingredients in the Food insight
    preview (assets/script/food-insight.js) — spans the table, so the tint and
    weight are what separate it from the ingredient rows it heads. */
@@ -1140,6 +1147,8 @@ td {
 
 #transactions-table th:nth-child(7),
 #accounts-table th:nth-child(4),
+#accounts-table th:nth-child(5),
+#accounts-table td:nth-child(5),
 #wellness-table th:nth-child(5) {
     text-align: right;
 }
@@ -1263,6 +1272,11 @@ th.sortable:hover {
 
 .expense {
     color: var(--color-expense);
+    text-align: right;
+}
+
+.account-closed {
+    color: var(--color-text-muted);
     text-align: right;
 }
 
@@ -1708,6 +1722,7 @@ td .btn {
 
 .weight-progress-meter-stats {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
     gap: .75rem;
@@ -1719,6 +1734,7 @@ td .btn {
    abstract percentage standing alone. */
 .weight-progress-meter-stat {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: .3rem;
 }
@@ -1726,6 +1742,13 @@ td .btn {
 .weight-progress-meter-stat-label {
     font-size: 1.1rem;
     color: var(--color-text-muted);
+}
+
+/* The "→ 70 kg" / "→ 2027-01-27" target trailing "to go". */
+.weight-progress-meter-goal {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-text);
 }
 
 .weight-progress-meter-pct {

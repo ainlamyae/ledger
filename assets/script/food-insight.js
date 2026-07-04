@@ -1,5 +1,5 @@
 // The Health Insight panel's Food mode: aggregates every ingredient logged (via
-// the Health Log's 🧮 Calculate breakdown) over the picked range into one
+// Physique's 🧮 Calculate breakdown) over the picked range into one
 // per-ingredient total, and phrases it for a nutrient-gap read. No vitamin or
 // mineral data exists anywhere in this app (usda.js only extracts kcal/protein),
 // so this leans entirely on the model's own food-composition knowledge — the
@@ -17,7 +17,7 @@
 function aggregateFoodIntake(from, to) {
   const byName = new Map();
 
-  getDatedWellnessEntries()
+  physiqueAsWellnessEntries()
     .filter((e) => e.category === 'Calories; Protein' && e.date >= from && e.date <= to)
     .forEach((e) => {
       (e.breakdown || []).forEach((item) => {

@@ -1,4 +1,4 @@
-// The Health Insight panel's Activity mode: a plain-language workout-performance
+﻿// The Health Insight panel's Activity mode: a plain-language workout-performance
 // snapshot (consistency, activity-type breakdown, total resistance volume, and a
 // per-muscle-group last-trained/volume breakdown). The muscle-group detail is
 // this mode's own contribution — the Wellness mode's activity section only
@@ -7,42 +7,10 @@
 // formatProfileLines from insight.js,
 // parseWorkoutNoteLines from activity-estimator.js. insight-panel.js drives it.
 
-// Stable display order — also the iteration order for the muscle-group
-// breakdown before it's re-sorted most-neglected-first.
-const MUSCLE_GROUPS = ['Legs', 'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'];
-
-// Keyed by the exact exercise name text as it appears in the Activity Plan
-// tables (index.html) — same convention activity-estimator.js's EXERCISE_MET
-// uses. NEAT/Cardio activities (Walk, Swim, Running) aren't muscle-specific
-// resistance work, so they're deliberately not mapped here — they still
-// count toward the overall consistency/activity-type totals below via
-// aggregateWindow, just not toward any muscle group's volume.
-const EXERCISE_MUSCLE_GROUP = {
-  'Leg Press': 'Legs',
-  'Leg Extension (quads)': 'Legs',
-  'Leg Curl (hamstrings)': 'Legs',
-  'Hip Abduction machine': 'Legs',
-  'Hip Adduction machine': 'Legs',
-  'Calf Raise machine': 'Legs',
-  'Chest Press machine': 'Chest',
-  'Pec Deck / Chest Fly machine': 'Chest',
-  'Shoulder Press machine': 'Shoulders',
-  'Left Lateral Raise machine (or cable)': 'Shoulders',
-  'Right Lateral Raise machine (or cable)': 'Shoulders',
-  'Cable Tricep Pushdown': 'Triceps',
-  'Lat Pulldown': 'Back',
-  'Seated Row machine': 'Back',
-  'Rear Delt Fly machine (or cable)': 'Shoulders',
-  'Cable Bicep Curl': 'Biceps',
-  'Dumbbell Goblet Squat': 'Legs',
-  'Dumbbell Bench Press': 'Chest',
-  'Dumbbell Row': 'Back',
-  'Dumbbell Shoulder Press': 'Shoulders',
-  'Dumbbell Romanian Deadlift': 'Legs',
-  'Dumbbell Lateral Raise': 'Shoulders',
-  'Dumbbell Bicep Curl': 'Biceps',
-  'Dumbbell Tricep Extension': 'Triceps',
-};
+// Muscle groups and the exercise -> group mapping now come from the Activities
+// sheet tab (activities.js). The reported groups are whatever that sheet
+// actually names, in the order it names them, so filling in a blank cell with a
+// group that didn't exist before starts reporting without a code change.
 
 // Total resistance-training REPS logged in [fromIso, toIso], across every
 // exercise (mapped or not) — the simple whole-body volume-trend figure,
@@ -57,7 +25,7 @@ const EXERCISE_MUSCLE_GROUP = {
 // is a current-vs-previous-period comparison.
 function sumStrengthRepsInWindow(fromIso, toIso) {
   let total = 0;
-  getDatedWellnessEntries()
+  physiqueAsWellnessEntries()
     .filter((e) => isActivityCategory(e.category) && e.date >= fromIso && e.date <= toIso && e.notes.trim())
     .forEach((e) => {
       parseWorkoutNoteLines(e.notes).forEach((line) => {
@@ -76,17 +44,17 @@ function sumStrengthRepsInWindow(fromIso, toIso) {
 // most-neglected-first (never logged, then longest gap, then lowest volume)
 // so the muscle needing attention next always leads the list.
 function computeMuscleGroupRows(fromIso, toIso) {
-  const stats = new Map(MUSCLE_GROUPS.map((m) => [m, {
+  const stats = new Map(activityMuscleGroups().map((m) => [m, {
     repsInRange: 0, sessionDatesInRange: new Set(), lastTrainedDate: null, exerciseReps: new Map(),
   }]));
 
-  getDatedWellnessEntries()
+  physiqueAsWellnessEntries()
     .filter((e) => isActivityCategory(e.category) && e.notes.trim())
     .forEach((e) => {
       parseWorkoutNoteLines(e.notes)
         .filter((line) => line.type === 'reps')
         .forEach((line) => {
-          const muscle = EXERCISE_MUSCLE_GROUP[line.name];
+          const muscle = activityMuscleGroup(line.name);
           if (!muscle) return;
           const s = stats.get(muscle);
           if (!s.lastTrainedDate || e.date > s.lastTrainedDate) s.lastTrainedDate = e.date;
@@ -101,7 +69,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
     });
 
   const todayIso = isoFromDate(new Date());
-  return MUSCLE_GROUPS.map((muscle) => {
+  return [...stats.keys()].map((muscle) => {
     const s = stats.get(muscle);
     const daysSinceLastTrained = s.lastTrainedDate
       ? Math.round((dateFromIso(todayIso) - dateFromIso(s.lastTrainedDate)) / 86400000)
@@ -132,15 +100,15 @@ function computeMuscleGroupRows(fromIso, toIso) {
 // so that filter can tell them apart by content.
 function computeActivitySessionDays(fromIso, toIso) {
   const byDate = new Map();
-  const weightKg = latestWeightKg(getDatedWellnessEntries());
+  const bodyMassKg = latestBodyMassKg(physiqueAsWellnessEntries());
 
-  getDatedWellnessEntries()
+  physiqueAsWellnessEntries()
     .filter((e) => isActivityCategory(e.category) && e.amount !== null && e.date >= fromIso && e.date <= toIso)
     .forEach((e) => {
       if (!byDate.has(e.date)) byDate.set(e.date, { date: e.date, sessions: [], mins: 0, kcal: 0 });
       const day = byDate.get(e.date);
       const mins = toActivityMinutes(e.amount, e.unit);
-      const kcal = Math.round(activityEntryKcal(e, weightKg));
+      const kcal = Math.round(activityEntryKcal(e, bodyMassKg));
       day.sessions.push({
         description: e.description || 'Other',
         mins,
@@ -168,7 +136,7 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
 
   return {
     lookbackDays,
-    // Same age/sex/height/weight/BMI block the Wellness and Food modes send
+    // Same age/sex/height/body-mass/BMI block the Wellness and Food modes send
     // (insight.js) — training volume, rest needs and what counts as a heavy session
     // all depend on the body doing the lifting, so the coach shouldn't be
     // reasoning about this log without knowing whose it is.

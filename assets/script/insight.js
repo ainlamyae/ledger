@@ -28,7 +28,7 @@ function ageFromBirthDate(birthDateStr) {
 // so all three AI panels describe the same person.
 function gatherProfileSnapshot() {
   const heightCm = getSetting('HEIGHT_CM', null);
-  const weightKg = latestWeightKg(getDatedWellnessEntries());
+  const weightKg = latestWeightKg(physiqueAsWellnessEntries());
 
   return {
     age: ageFromBirthDate(getSettingString('BIRTH_DATE', null)),
@@ -73,7 +73,7 @@ function previousDateRange(fromIso, toIso) {
   return datesInRange(isoFromDate(prevFrom), isoFromDate(prevTo));
 }
 
-// Aggregates getDatedWellnessEntries() over an arbitrary set of dates (a
+// Aggregates physiqueAsWellnessEntries() over an arbitrary set of dates (a
 // datesInRange or previousDateRange result) the same way calcProjection() does
 // (charts.js) — shared so the current and previous period get identical
 // aggregation logic.
@@ -91,7 +91,7 @@ function aggregateWindow(dates) {
 
   // Hoisted out of the loop below: it doesn't vary per entry, and inside the
   // forEach it cost a full filter plus a filter-and-sort for every activity row.
-  const datedEntries = getDatedWellnessEntries();
+  const datedEntries = physiqueAsWellnessEntries();
   const weightKg = latestWeightKg(datedEntries);
 
   datedEntries
@@ -163,7 +163,7 @@ function gatherInsightMetrics(fromIso, toIso) {
   // Reuses the exact same trajectory logic the Weight Trend & Forecast chart
   // is built from (charts.js) — Insight doesn't compute its own trend, it just
   // reports this one.
-  const projection = calcProjection(getDatedWellnessEntries());
+  const projection = calcProjection(physiqueAsWellnessEntries());
 
   return {
     lookbackDays,
@@ -180,7 +180,7 @@ function gatherInsightMetrics(fromIso, toIso) {
     // name it "max" or "min". Handing over "target: 1388" let the AI praise a
     // 900-kcal day on a bulk and scold a 1,300-kcal one on a cut, both of which
     // are the opposite of the truth.
-    calorieBound: getCalorieBound(getDatedWellnessEntries()),
+    calorieBound: getCalorieBound(physiqueAsWellnessEntries()),
     caloriesDaysLogged: current.caloriesDaysLogged,
 
     avgProtein: current.avgProtein,
@@ -189,7 +189,7 @@ function gatherInsightMetrics(fromIso, toIso) {
     // genuinely is a range, and collapsing it to a midpoint here would have
     // the AI calling an in-range day short of target. ASCII hyphen rather than
     // the UI's en dash, since this string is headed for the prompt.
-    proteinTarget: formatProteinTargetBand(getProteinTargetBandG(getDatedWellnessEntries()), '-'),
+    proteinTarget: formatProteinTargetBand(getProteinTargetBandG(physiqueAsWellnessEntries()), '-'),
     proteinDaysLogged: current.proteinDaysLogged,
 
     avgActivityMins: current.avgActivityMins,

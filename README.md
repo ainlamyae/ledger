@@ -105,6 +105,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Health — Health Indicators
 
+Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
+
 - All charts share one height and one plot-area width, so their date labels line up down the page.
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward goal; optional BMI twin axis.
   - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (goal body mass, or the projected arrival date).
@@ -113,7 +115,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
 - **Calorie Balance** — intake minus BMR minus activity, scored against the *planned* deficit; grams-of-fat twin axis.
 - **Caloric Intake** — per-day bars with a per-day bound drawn as a cap on each bar, not one shared line.
-- **Physical Activity** — stacked minutes per Description, plus a calories-burned dot series.
+- **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout the Activity Plan can't parse groups under "Other".
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
 - All six carry a **violet dashed segment per week**, so a week that quietly drifted past its bound is visible next to the per-day mark.
@@ -159,25 +161,23 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - The button reads "Add to Today's Workout" once something is already logged.
   - Free text already in the note is preserved; the description re-derives from everything in the session.
 - Duration counts active time only — rest, warm-up and transitions are excluded.
-- Opens the Health Log modal pre-filled, then runs Calculate; nothing is written until you Save.
+- Opens the Physique day form pre-filled on today's row, then runs the workout half of Calculate; nothing is written until you Save.
 - **Instruction** in the panel heading opens "Instructions on the Activities" — all 34 strength exercises, grouped by category (Legs / Push / Pull / Full Body / Core & Bodyweight) rather than by the day they fall on.
   - Every figure shows the **muscle worked picked out in red**. 23 are **animated loops**; the remaining 11 are stills carrying **the start and the finish side by side**.
-  - Animated and still differ by nothing but file extension — a browser loops a GIF in a plain `<img>`, so there is no `<video>` element and no fallback path. `ACTIVITY_ANIMATIONS` in `strength-plan.js` is the one list that decides which is which.
+  - Animated and still differ by nothing but file extension — a browser loops a GIF in a plain `<img>`, so there is no `<video>` element and no fallback path. Which file a row gets is simply what its `Image` cell on the `Activities` tab points at.
   - Sizes are all over the place at source (square loops next to guides three times as wide), so a figure is given a **fixed height with `object-fit: contain`** rather than a fixed aspect ratio — one tidy band per row, nothing squashed. They sit on white in either theme, since that's what they're drawn on.
   - Committed under `assets/images/activities/<slug>.gif` or `.jpg`, 23.3 MB in total (22.8 MB animation, 0.4 MB stills). Lazy-loaded on first open of the modal, so nothing is fetched until it's asked for; a plan row with no file under its slug leaves the label standing rather than a broken-image icon.
   - Two fetchers keep it current, both skipping what's already on disk: `scripts/fetch_activity_images.mjs` for the stills and `scripts/fetch_activity_animations.mjs` for the loops. The animation one also drops a still once its replacement is on disk — and checks the download actually succeeded first, having once deleted a still for a fetch that had 403'd.
 
-### Health — Health Log
+### Health — Physique
 
-- Filterable/sortable table (search, date range, category filter), paginated; add/edit/delete/duplicate.
-- A thicker top border marks each date change, so day boundaries read at a glance.
-- Category-aware form: pre-fills the unit and offers Description suggestions from your own history.
-- **Calculate** — type a freeform ingredient list into Notes instead of a number.
-  - Each item is matched against **your own Nutrition Facts first**, by the name *you typed* — never the AI's rephrasing.
-  - A miss falls back to USDA FoodData Central, then to the model's own estimate.
-  - A fallback result gets a **＋ Save** button rather than being banked silently.
-  - Totals are always summed client-side.
-- Bulk actions: Edit Selected, Recalculate Selected, Merge Selected.
+- One row per day. Filterable/sortable table (search, date range), paginated; add/edit/delete/duplicate.
+- **Log a Day** opens the form; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
+- **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout.
+- **Select rows, then Calculate in the bulk bar** to recalculate whole days at once. Same two estimators, same incremental reuse — a line whose `noteLine` still matches that day's saved breakdown keeps its numbers, so re-running a stretch of days only pays for what changed.
+  - Each day's burn uses **its own** Body Mass where it has one, falling back to the most recent day that recorded one — so a historical row is priced with the weight it was actually logged at.
+  - Days with neither a Consumption nor a Workout are skipped and counted; per-day failures don't stop the rest.
+  - Progress shows in the selection summary, and the whole run is one undo.
 
 ### Health — Nutrition Facts
 
@@ -227,7 +227,7 @@ flowchart TD
     Sheets["Google Sheets API v4<br/>sheets.googleapis.com<br/>get / batchGet / append / update / clear / batchUpdate"]
     Drive["Google Drive API v3<br/>googleapis.com/drive/v3/files<br/>active spreadsheet's filename — get / rename"]
     Picker["Google Picker API<br/>gapi 'picker' module + PICKER_API_KEY<br/>spreadsheet selection UI"]
-    Sheet[("The signed-in user's own Ledger spreadsheet<br/>(cloned from TEMPLATE_SPREADSHEET_ID via<br/>Sheets' 'make a copy', selected via Picker)<br/><br/>Transactions · Accounts · Monthly Summary*<br/>Insight* · eTimeSheet<br/>Wellness Log · Nutrition Facts · Contacts<br/>Settings · Travel · Applications<br/><br/>* formula-driven, app only reads these")]
+    Sheet[("The signed-in user's own Ledger spreadsheet<br/>(cloned from TEMPLATE_SPREADSHEET_ID via<br/>Sheets' 'make a copy', selected via Picker)<br/><br/>Transactions · Accounts · Monthly Summary*<br/>Insight* · eTimeSheet<br/>Physique · Activities · Nutrition Facts<br/>Contacts<br/>Settings · Travel · Applications<br/><br/>* formula-driven, app only reads these")]
 
     App -- "1 . request OAuth token" --> GIS
     GIS -- "2 . access token" --> App
@@ -282,8 +282,8 @@ flowchart TD
     subgraph LoadDashboard["Dashboard load — loadDashboard()"]
         direction TB
         Report["loadReport()<br/>cached or batchGetValues:<br/>Monthly Summary, Accounts,<br/>Insight — missingAmount computed<br/>client-side from the first two"]
-        Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications<br/>(each checks its own cache first)"]
-        ProteinRot["Once Wellness + Nutrition settle:<br/>renderProteinRotationChart()<br/>(protein-rotation.js)"]
+        Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initActivities · initPhysique<br/>initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications<br/>(each checks its own cache first)"]
+        ProteinRot["Once Physique + Nutrition settle:<br/>renderProteinRotationChart()<br/>(protein-rotation.js)"]
         Render["charts.js renders every canvas<br/>app.js renders summary cards<br/>each module renders its own table"]
         Report --> Render
         Modules --> ProteinRot --> Render
@@ -291,7 +291,7 @@ flowchart TD
 
     LoadDashboard --> Idle(["Dashboard interactive"])
 
-    Idle --> Writes["Add / edit / delete / duplicate<br/>— any single row, any module:<br/>Transactions · Accounts · Timesheet · Wellness<br/>Nutrition Facts · Contacts · Settings · Travel · Applications"]
+    Idle --> Writes["Add / edit / delete / duplicate<br/>— any single row, any module:<br/>Transactions · Accounts · Timesheet · Wellness · Physique<br/>Nutrition Facts · Contacts · Settings · Travel · Applications"]
     Writes --> WriteCall["appendValues / updateValues / batchUpdate"]
     WriteCall --> Refresh["Refresh that module's cache<br/>+ re-render — no page reload"]
     Refresh --> Idle
@@ -312,7 +312,7 @@ flowchart TD
     Idle --> TravelFlow["Travel Insights<br/>(derived, no extra API call)"]
     TravelFlow --> TravelDerive["Pair each Arrival with its<br/>closing Departure (open-ended<br/>final Arrival = ongoing, to today)<br/>→ Time Spent by Country tiles +<br/>Countries Visited choropleth"] --> Idle
 
-    Idle --> Calc["Calculate<br/>Health Log Log Entry form"]
+    Idle --> Calc["Calculate<br/>Physique day form, or bulk over selected days"]
     Calc --> CalcCategory{"handleCalculateClick():<br/>entry category?"}
 
     CalcCategory -- Food --> Split["splitNotesIntoSegments()<br/>deterministic, no AI — recovers<br/>each item's OWN typed name"]
@@ -368,23 +368,24 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 14 | `accounts.js` | Account Summary: balances, CRUD |
 | 15 | `timesheet.js` | Work Log, holiday/missed detection, analytics data, reminder banner |
 | 16 | `csv.js` | CSV import, advanced filter engine, download helper |
-| 17 | `wellness.js` | Health Log table and form, `Breakdown` column, bulk Edit/Recalculate/Merge |
-| 18 | `strength-plan.js` | Activity Plan tables, logged-today ticks, incremental Log a Workout, Instruction modal |
-| 19 | `activity-estimator.js` | Workout note parsing, active-seconds and MET-based burn |
-| 20 | `contacts.js` | Contact List, CRUD, bulk export/delete/merge |
-| 21 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
-| 22 | `travel.js` | Travel Log CRUD; feeds country-days and the choropleth |
-| 23 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
-| 24 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
-| 25 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
-| 26 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 27 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
-| 28 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 29 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution |
-| 30 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 31 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
-| 32 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
-| 33 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 17 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, serves category/MET/muscle-group/image lookups |
+| 18 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
+| 19 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
+| 20 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
+| 21 | `contacts.js` | Contact List, CRUD, bulk export/delete/merge |
+| 22 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
+| 23 | `travel.js` | Travel Log CRUD; feeds country-days and the choropleth |
+| 24 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
+| 25 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
+| 26 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
+| 27 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
+| 28 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 29 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 30 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution |
+| 31 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 32 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
+| 33 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
+| 34 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
 ### Data Flow
 
@@ -488,21 +489,46 @@ One Google Sheet per user, cloned from the template, with these tabs.
 - One row per logged day: Company, Date, Day, Start, End, Break, Duration, Task.
 - A weekday with a Task note but no times is a holiday; one with neither is a missed entry.
 
-### `Wellness Log`
+### `Activities`
+
+The exercise catalogue — one row per movement, and the single source for what used to be spread across five places (the Activity Plan's static tables, the Instruction modal's list, the MET table, the muscle-group map, and the gif/jpg animation list). Not in the template by default; add the tab and header row.
 
 | Column | Type | Notes |
 |---|---|---|
-| A — Date | Date | ISO. **Blank marks a reusable pattern row** — excluded from charts, always sorted to the top |
-| B — Time | Text | `HH:MM`, optional |
-| C — Category | Text | `Sleep`, `Weight`, `Calories`, `Activity`, or composite `Calories; Protein` / `Activity; Calories` |
-| D — Description | Text | e.g. "Lunch", "Run" |
-| E — Amount | Number or pair | `"320; 10"` for kcal;protein, `"20; 10"` for min;kcal, `"23:30/07:00"` for bed/wake |
-| F — Unit | Text | Auto-filled per category |
-| G — Notes | Text | Free text; the standardized ingredient/workout lines live here |
-| H — Breakdown | Text (JSON) | Optional. Calculate's per-item breakdown, so Edit restores it without re-running Groq/USDA |
+| A — Category | Text | `Strength`, `Cardio`, `NEAT`, … **What the Physical Activity chart stacks by** |
+| B — Group | Text | Free text; the Activity Plan sub-table this row renders into, and its heading |
+| C — Name | Text | The join key — must match the workout note lines exactly. A name not listed here is priced at the fallback MET, gets no muscle group, and stacks under `Other` |
+| D — Unit | Text | `x` (reps), `sec` (hold), `step`, `min`. Tells `3 x 45 sec` (a hold) from `3 x 15` (reps) |
+| E — Sets x Reps, Rest | Text | `3 x 10, 90 sec` · `3 x 45 sec, 45 sec` · `6000 step` · `30 min`. Split on the **last** comma; the rest half is optional |
+| F — Image | Text | URL or repo-relative path to the Instruction modal's figure. Blank means label-only |
+| G — MET | Number | Metabolic equivalent for the burn formula |
+| H — Muscle Group | Text | Drives the neglected-muscle Insight. The reported groups are whatever this column names, so a new one needs no code change |
 
-- `Weight` is stored under that name but displayed everywhere as **Body Mass** — a display-layer rename only, so no logged row is orphaned.
-- Columns G and H are not in the template by default; add the headers to enable them.
+- Both the displayed cell and the checkbox's quantity attributes are built from column E, so they can no longer disagree — they had, on 24 of 34 rows, which made Log a Workout and a later Recalculate differ by up to ~15% on the same exercise.
+- A missing or unreadable tab costs the plan tables and the category split (everything lands under `Other`); the charts still render.
+
+### `Physique`
+
+One row per **day**, rather than one row per logged event. **This is the tab every chart, today-tile, Insight mode, Protein Source Rotation and Activity Plan tick reads.** Not in the template by default; add the tab and header row.
+
+| Column | Type | Notes |
+|---|---|---|
+| A — Date | Date | ISO. One row per date; the form refuses a second row for a date already logged. **Blank marks a reusable pattern row** — excluded from every chart and Insight mode, always sorted to the top, and exempt from the one-row-per-date rule |
+| B — Bedtime | Time | `HH:MM` |
+| C — Wake-up Time | Time | `HH:MM`. Hovering either time cell shows the sleep length, wrapping past midnight |
+| D — Body Mass | Number | kg |
+| E — Consumption | Text | Free text, one food per line |
+| F — Breakdown | Text (JSON) | Calculate's per-item breakdown. Rendered as a table under the form; the table lists it as an item count with the names on hover |
+| G — Calories In | Number | kcal |
+| H — Protein In | Number | grams |
+| I — Workout | Text | Free text, one activity per line |
+| J — Activity Duration | Number | minutes |
+| K — Calories Out | Number | kcal |
+
+- Every numeric field accepts an arithmetic expression (`30+15`).
+- **Pattern** on the form saves a dateless template — a meal or session you repeat — that 📋 Duplicate turns into a real day, dated today with its contents intact. Patterns never reach a chart, tile or Insight mode.
+- **Calculate** runs both estimators at once: Consumption fills Breakdown, Calories In and Protein In (`calorie-estimator.js`), Workout fills Activity Duration and Calories Out (`activity-estimator.js`). The breakdown table is `renderCalcBreakdown` (`calorie-estimator.js`), drawn into this form via its `target` argument — 💾 banks a new ingredient to `Nutrition Facts` from here too. Editing Consumption never touches the breakdown; it goes stale until you press Calculate again.
+- **Calculate is incremental.** Each breakdown item records the standardized line it produced (`noteLine`), and Calculate writes those lines back into Consumption — so on a re-run, any line still matching one of them reuses its numbers verbatim and only the leftovers reach Groq/USDA. Editing one ingredient in a ten-line day costs one lookup, not ten; re-running an unchanged day costs none. A breakdown saved before `noteLine` existed matches nothing and re-estimates in full, exactly as it used to. The same ingredient typed twice reuses one saved item and re-estimates the other, rather than double-counting one result. When nothing is reused the estimator's own totals pass straight through, so a first Calculate is exact; a mixed run re-sums the (already rounded) per-item figures and can differ by a fraction. Either field can be left empty — only the filled side runs, and neither side's failure stops the other. The burn formula takes body mass from this day's own field, falling back to the most recent day that recorded one.
 
 ### `Nutrition Facts`
 
@@ -823,7 +849,7 @@ ledger/
 │       ├── accounts.js           # Account Summary
 │       ├── timesheet.js          # Work Log + analytics data
 │       ├── csv.js                # CSV import/export + filter engine
-│       ├── wellness.js           # Health Log
+│       ├── physique.js           # Physique (one row per day)
 │       ├── strength-plan.js      # Activity Plan
 │       ├── contacts.js           # Contact List
 │       ├── settings-panel.js     # Settings table
@@ -881,7 +907,6 @@ const CONFIG = {
     ACCOUNTS: 'Accounts',
     INSIGHT: 'Insight',
     TIMESHEET: 'eTimeSheet',
-    WELLNESS: 'Wellness Log',
     NUTRITION: 'Nutrition Facts',
     CONTACTS: 'Contacts',
     SETTINGS: 'Settings',
@@ -927,7 +952,6 @@ Then open `http://localhost:8000`. No build step.
 | `'Accounts'!A3:E100` | `accounts.js` | Account name, institution, type, balance, market value |
 | `'Accounts'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete |
 | `eTimeSheet!A2:H` | `timesheet.js` | Work Log rows |
-| `'Wellness Log'!A2:H` | `wellness.js` | Health Log entries, including the `Breakdown` column |
 | `'Nutrition Facts'!A2:G` | `nutrition.js`, `calorie-estimator.js`, `food-insight.js`, `protein-rotation.js` | Classification / Name / Amount / Calories / Protein / Verified / Protein % |
 | `'Contacts'!A2:U` | `contacts.js` | Contact rows |
 | `'Travel'!A2:H` | `travel.js` | Travel rows |
@@ -943,7 +967,6 @@ Then open `http://localhost:8000`. No build step.
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transactions!A2:F` rows |
 | `ledger_cache_accounts-meta` / `account-list` | `accounts.js` | `Accounts` sheet ID / rows |
 | `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:H` rows |
-| `ledger_cache_wellness` | `wellness.js` | Raw `'Wellness Log'!A2:H` rows |
 | `ledger_cache_nutrition` | `nutrition.js` | Raw `'Nutrition Facts'!A2:G` rows |
 | `ledger_cache_contacts` | `contacts.js` | Raw `'Contacts'!A2:U` rows |
 | `ledger_cache_travel` | `travel.js` | Raw `'Travel'!A2:H` rows |

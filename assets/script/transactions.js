@@ -11,7 +11,7 @@ let listenersAttached = false;
 let txSort = { key: null, dir: 1 };
 let selectedRows = new Set();
 let transactionsDirtyFromAdd = false;
-// Same purpose as wellness.js's wellnessDataLoaded — lets a click that races
+// Same purpose as physique.js's physiqueDataLoaded — lets a click that races
 // the initial fetch (e.g. Financial Insight) tell "not loaded yet" apart
 // from "loaded, zero transactions".
 let transactionsDataLoaded = false;

@@ -5,7 +5,7 @@ let accountsSheetId = null;
 let editingAccountRow = null;
 let accountListenersAttached = false;
 let accountSort = { key: null, dir: 1 };
-// Same purpose as wellness.js's wellnessDataLoaded: lets a click that races
+// Same purpose as physique.js's physiqueDataLoaded: lets a click that races
 // the initial fetch (e.g. Financial Insight, loaded before this resolves)
 // tell "not loaded yet" apart from "loaded, zero accounts".
 let accountsDataLoaded = false;

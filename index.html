@@ -524,6 +524,7 @@
 
             <div class="panel-actions" id="physique-bulk-actions" hidden>
                 <span id="physique-bulk-summary"></span>
+                <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit) and sort by calories — local only, no AI">Combine &amp; Sort</button>
                 <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
             </div>
 
@@ -669,6 +670,15 @@
             <h3>Spending Breakdown by Type</h3>
             <div id="type-breakdown-container"></div>
         </div>
+
+        <div class="panel-section">
+            <h3>Portfolio Allocation</h3>
+            <div class="chart-box">
+                <canvas id="account-composition-chart"></canvas>
+            </div>
+            <div class="donut-legend" id="account-composition-legend"></div>
+            <div class="donut-legend" id="account-composition-institution-legend"></div>
+        </div>
     </div>
 
         <div class="panel" id="financial-insight-panel">
@@ -729,7 +739,7 @@
         </div>
 
         <div class="panel">
-            <h2>Transaction Log</h2>
+            <h2>Transaction</h2>
 
             <div class="panel-actions">
                 <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
@@ -790,15 +800,6 @@
             </div>
 
             <div class="pagination" id="tx-pagination"></div>
-        </div>
-
-        <div class="panel">
-            <h2>Portfolio Allocation</h2>
-            <div class="chart-box">
-                <canvas id="account-composition-chart"></canvas>
-            </div>
-            <div class="donut-legend" id="account-composition-legend"></div>
-            <div class="donut-legend" id="account-composition-institution-legend"></div>
         </div>
 
         <div class="panel">
@@ -1341,6 +1342,7 @@
             <p id="physique-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
+                <button type="button" id="physique-combine-btn" class="btn" title="Combine duplicate ingredient lines (same name and unit) and sort by calories — local only, no AI">Combine &amp; Sort</button>
                 <button type="button" id="physique-calc-btn" class="btn btn-ai">Calculate</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
@@ -1356,6 +1358,14 @@
         <pre id="formula-expression" class="formula-expression"></pre>
 
         <p class="formula-where">where,</p>
+
+        <fieldset class="formula-solve-for">
+            <legend>Solve for</legend>
+            <label><input type="radio" name="formula-solve-for" value="EIN" checked> Calories</label>
+            <label><input type="radio" name="formula-solve-for" value="TARGET_MASS"> Target body mass</label>
+            <label><input type="radio" name="formula-solve-for" value="TAU"> Activity target</label>
+            <label><input type="radio" name="formula-solve-for" value="DELTA_M"> Weekly fat loss</label>
+        </fieldset>
 
         <div class="formula-inputs">
             <label class="formula-row">
@@ -1427,16 +1437,24 @@
                 <span class="formula-fixed">200</span>
                 <span class="formula-unit">mL O₂/kcal</span>
             </div>
-        </div>
-
-        <div class="formula-result">
-            <span class="formula-result-label">Eᵢₙ — target daily intake</span>
-            <span id="formula-result-value" class="formula-result-value"></span>
-        </div>
-
-        <div class="formula-result">
-            <span class="formula-result-label">t — days to m_g, holding Eᵢₙ daily</span>
-            <span id="formula-days-value" class="formula-result-value"></span>
+            <label class="formula-row">
+                <span class="formula-sym">Eᵢₙ</span>
+                <span class="formula-name">target daily intake</span>
+                <input type="text" id="formula-ein" inputmode="decimal">
+                <span class="formula-unit">kcal</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">t</span>
+                <span class="formula-name">days to m_g, holding Eᵢₙ daily</span>
+                <input type="text" id="formula-days" inputmode="decimal">
+                <span class="formula-unit">days</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym"></span>
+                <span class="formula-name">estimated arrival date</span>
+                <input type="date" id="formula-eta">
+                <span class="formula-unit" id="formula-eta-note"></span>
+            </label>
         </div>
 
         <div id="formula-substituted" class="formula-substituted"></div>

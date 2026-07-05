@@ -581,6 +581,10 @@ async function loadDashboard(forceRefresh = false) {
   // actually read currentSettings, so just those two wait on it.
   const settingsPromise = loadSettings(forceRefresh).then((settings) => {
     currentSettings = settings;
+    // 0 hides amounts, 1 (or unset) shows them — kept in the Settings tab so
+    // the FAB's state survives a refresh instead of always starting shown.
+    privacyMode = getSetting('SHOW_AMOUNTS', 1) === 0;
+    updatePrivacyButtonUI();
     applySettingsToWidgets();
   });
 
@@ -783,24 +787,31 @@ function setupThemeToggle() {
   });
 }
 
+// Reflects the current privacyMode on the FAB's icon/tooltip. Standalone (not
+// nested in setupPrivacyToggle) so loadDashboard can call it too, once the
+// Settings tab's SHOW_AMOUNTS tells it what privacyMode actually is.
+function updatePrivacyButtonUI() {
+  const btn = document.getElementById('privacy-toggle-fab');
+  btn.textContent = privacyMode ? '🙈' : '👁️';
+  btn.title = privacyMode ? 'Show amounts' : 'Hide amounts';
+  btn.setAttribute('aria-label', btn.title);
+}
+
 // Masks every formatted amount on the page (cards, tables, chart ticks,
 // and chart tooltips) by re-rendering from cached data with formatCurrency
 // in masked mode.
 function setupPrivacyToggle() {
-  const btn = document.getElementById('privacy-toggle-fab');
+  updatePrivacyButtonUI();
 
-  const updateButton = () => {
-    btn.textContent = privacyMode ? '🙈' : '👁️';
-    btn.title = privacyMode ? 'Show amounts' : 'Hide amounts';
-    btn.setAttribute('aria-label', btn.title);
-  };
-
-  updateButton();
-
-  btn.addEventListener('click', () => {
+  document.getElementById('privacy-toggle-fab').addEventListener('click', () => {
     privacyMode = !privacyMode;
-    updateButton();
+    updatePrivacyButtonUI();
     if (!document.getElementById('dashboard').hidden) loadDashboard(false);
+    // Persisted to the Settings tab (not localStorage) so it survives a
+    // refresh; best-effort since a missing Settings tab shouldn't block toggling.
+    saveSettingValues({ SHOW_AMOUNTS: privacyMode ? 0 : 1 }).catch((err) => {
+      console.error('Failed to save SHOW_AMOUNTS setting:', err);
+    });
   });
 }
 

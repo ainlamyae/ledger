@@ -13,6 +13,47 @@ function breakdownToJson(breakdown) {
   return (breakdown && breakdown.length) ? JSON.stringify(breakdown) : '';
 }
 
+// For renderCalcBreakdown's table ONLY — never applied to the saved breakdown
+// itself (see the caution there). Two Consumption lines for the same
+// ingredient (e.g. "38g onion" and "28g onion", typed separately) merge into
+// one displayed row rather than showing twice — the Total already treats
+// them as one, so the split served no purpose. Grouped by name AND amount
+// type (grams vs count, "×N"), since those aren't the same quantity and
+// summing them would be meaningless. Density is recomputed off the merged
+// calories/grams rather than kept from either original row, so it stays the
+// true rate for the combined amount.
+function mergeDuplicateBreakdownRows(rows) {
+  const merged = new Map();
+
+  rows.forEach((row) => {
+    const isCount = row.amount.startsWith('×');
+    const key = `${row.name.toLowerCase()}|${isCount ? 'count' : 'grams'}`;
+    const quantity = parseFloat(row.amount.replace('×', ''));
+    const existing = merged.get(key);
+
+    if (!existing) {
+      merged.set(key, { ...row, quantity });
+      return;
+    }
+
+    existing.quantity += quantity;
+    existing.calories += row.calories;
+    existing.protein = Math.round((existing.protein + row.protein) * 10) / 10;
+    existing.amount = isCount ? `×${existing.quantity}` : `${Math.round(existing.quantity * 10) / 10}g`;
+    // Count-based density is per-unit, not per-gram, so a merged unit count
+    // still charges the same per-unit rate rather than a recomputed one.
+    if (!isCount) existing.density = `${Math.round((existing.calories / existing.quantity) * 1000) / 10} kcal/100g`;
+    if (existing.source !== row.source) existing.source = `${existing.source} + ${row.source}`;
+    existing.noteLine = `${existing.noteLine}\n${row.noteLine}`;
+    if (!existing.newRow && row.newRow) existing.newRow = row.newRow;
+  });
+
+  // Re-sorted since merging can change which row has the most calories.
+  return [...merged.values()]
+    .sort((a, b) => b.calories - a.calories)
+    .map(({ quantity, ...row }) => row);
+}
+
 // USDA search can rank a token-overlap false match above the actual food (e.g.
 // "soybeans" → "Oil, soybean" at 884 kcal/100g instead of the bean at ~140).
 // Trust a database candidate only if it's in the same ballpark as the model's
@@ -503,7 +544,13 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
   const tbody = document.getElementById(`${target}-calc-breakdown-body`);
   tbody.innerHTML = '';
 
-  breakdown.forEach((row) => {
+  // Merged for DISPLAY only — two Notes lines for the same ingredient (e.g.
+  // two "onion" lines) show as one summed row. The saved `breakdown` itself
+  // stays one entry per line: physique.js's incremental re-estimate matches
+  // saved items back to Notes lines by exact noteLine, and merging that
+  // field would make a duplicated ingredient re-estimate from scratch (an
+  // extra Groq/USDA lookup) on every future Calculate instead of reusing it.
+  mergeDuplicateBreakdownRows(breakdown).forEach((row) => {
     const tr = document.createElement('tr');
     tr.append(
       makeCell(row.name),

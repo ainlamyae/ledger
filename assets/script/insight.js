@@ -1,4 +1,4 @@
-// Shared building blocks for the Health Insight panel, plus everything specific
+﻿// Shared building blocks for the Health Insight panel, plus everything specific
 // to its Wellness mode. The profile snapshot, the window aggregator and the
 // model-output renderer here are used by all three modes (food-insight.js,
 // activity-insight.js); the metrics/prompt pair below is Wellness's own.
@@ -22,20 +22,20 @@ function ageFromBirthDate(birthDateStr) {
   return age;
 }
 
-// Age, sex, height, latest logged weight and the BMI those two imply — the
+// Age, sex, height, latest logged body mass and the BMI those two imply — the
 // body every one of this app's health numbers is actually about. Read straight
-// from Settings and the latest weigh-in (latestWeightKg/computeBmi, charts.js),
+// from Settings and the latest weigh-in (latestBodyMassKg/computeBmi, charts.js),
 // so all three AI panels describe the same person.
 function gatherProfileSnapshot() {
   const heightCm = getSetting('HEIGHT_CM', null);
-  const weightKg = latestWeightKg(physiqueAsWellnessEntries());
+  const bodyMassKg = latestBodyMassKg(physiqueAsWellnessEntries());
 
   return {
     age: ageFromBirthDate(getSettingString('BIRTH_DATE', null)),
     sex: getSettingString('SEX', null),
     heightCm,
-    weightKg,
-    bmi: (heightCm !== null && weightKg !== null) ? computeBmi(weightKg, heightCm) : null,
+    bodyMassKg,
+    bmi: (heightCm !== null && bodyMassKg !== null) ? computeBmi(bodyMassKg, heightCm) : null,
   };
 }
 
@@ -46,15 +46,15 @@ function gatherProfileSnapshot() {
 // so the profile goes to all three rather than only to the panel that happens
 // to compute calorie figures. Missing fields are reported as "not set" instead
 // of being dropped, so the model can see what it doesn't know rather than
-// quietly assuming a default. weightGoalKg is passed only by the Wellness mode,
+// quietly assuming a default. bodyMassTargetKg is passed only by the Wellness mode,
 // the one panel whose subject is the journey rather than today's body.
-function formatProfileLines(p, weightGoalKg = null) {
-  const goalSuffix = weightGoalKg !== null ? ` (goal: ${weightGoalKg} kg)` : '';
+function formatProfileLines(p, bodyMassTargetKg = null) {
+  const targetSuffix = bodyMassTargetKg !== null ? ` (target: ${bodyMassTargetKg} kg)` : '';
   return [
     `Age: ${p.age !== null ? p.age : 'not set'}`,
     `Sex: ${p.sex !== null ? p.sex : 'not set'}`,
     `Height: ${p.heightCm !== null ? `${p.heightCm} cm` : 'not set'}`,
-    `Current body mass: ${p.weightKg !== null ? `${p.weightKg} kg${goalSuffix}` : 'not logged'}`,
+    `Current body mass: ${p.bodyMassKg !== null ? `${p.bodyMassKg} kg${targetSuffix}` : 'not logged'}`,
     `BMI: ${p.bmi !== null ? p.bmi : 'not available (needs height and a logged body mass)'}`,
   ];
 }
@@ -92,7 +92,7 @@ function aggregateWindow(dates) {
   // Hoisted out of the loop below: it doesn't vary per entry, and inside the
   // forEach it cost a full filter plus a filter-and-sort for every activity row.
   const datedEntries = physiqueAsWellnessEntries();
-  const weightKg = latestWeightKg(datedEntries);
+  const bodyMassKg = latestBodyMassKg(datedEntries);
 
   datedEntries
     .filter((e) => e.date >= from && e.date <= to)
@@ -119,7 +119,7 @@ function aggregateWindow(dates) {
         // Every entry gets a burn figure via charts.js's activityEntryKcal — its
         // own amount2, else its minutes at ACTIVITY_MET. A plain Activity row used
         // to contribute nothing, understating what the AI was told was burned.
-        const kcal = activityEntryKcal(e, weightKg);
+        const kcal = activityEntryKcal(e, bodyMassKg);
         activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
         if (!activityKcalByDescriptionByDate.has(description)) activityKcalByDescriptionByDate.set(description, new Map());
         const kcalByDate = activityKcalByDescriptionByDate.get(description);
@@ -160,27 +160,27 @@ function gatherInsightMetrics(fromIso, toIso) {
   const current = aggregateWindow(dates);
   const previous = aggregateWindow(previousDateRange(fromIso, toIso));
 
-  // Reuses the exact same trajectory logic the Weight Trend & Forecast chart
+  // Reuses the exact same trajectory logic the State Trend & Forecast chart
   // is built from (charts.js) — Insight doesn't compute its own trend, it just
   // reports this one.
   const projection = calcProjection(physiqueAsWellnessEntries());
 
   return {
     lookbackDays,
-    // The shared age/sex/height/weight/BMI block (formatProfileLines above) —
+    // The shared age/sex/height/body-mass/BMI block (formatProfileLines above) —
     // sex included because the BMR behind every calorie figure here is built
     // from it, and calorie/protein norms genuinely differ by it.
     profile: gatherProfileSnapshot(),
-    weightGoalKg: getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT),
+    bodyMassTargetKg: getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT),
     projection,
 
     avgCalories: current.avgCalories,
     prevAvgCalories: previous.avgCalories,
-    // The whole bound, not a bare number — {kcal, kind} — so the prompt can
-    // name it "max" or "min". Handing over "target: 1388" let the AI praise a
-    // 900-kcal day on a bulk and scold a 1,300-kcal one on a cut, both of which
-    // are the opposite of the truth.
-    calorieBound: getCalorieBound(physiqueAsWellnessEntries()),
+    // The whole figure, not a bare number — {kcal, kind} — so the prompt can
+    // name it "max" or "min" rather than the direction-blind "target: 1388",
+    // which let the AI praise a 900-kcal day on a bulk and scold a 1,300-kcal
+    // one on a cut — both of which are the opposite of the truth.
+    calorieTarget: getCalorieTarget(physiqueAsWellnessEntries()),
     caloriesDaysLogged: current.caloriesDaysLogged,
 
     avgProtein: current.avgProtein,
@@ -213,13 +213,13 @@ function gatherInsightMetrics(fromIso, toIso) {
 // into the prompt.
 function formatTrajectoryLine(projection) {
   if (!projection) return 'Body mass trajectory: not enough reading history yet to estimate a trend.';
-  if (projection.status === 'reached') return 'Body mass trajectory: already at goal body mass.';
+  if (projection.status === 'reached') return 'Body mass trajectory: already at target body mass.';
   if (projection.status === 'no-change') return 'Body mass trajectory: current habits project no meaningful body mass change.';
-  if (projection.status === 'wrong-direction') return 'Body mass trajectory: current trend is moving away from the goal, not toward it.';
-  // Moving the right way but toward a plateau short of the goal — the intake these
+  if (projection.status === 'wrong-direction') return 'Body mass trajectory: current trend is moving away from the target, not toward it.';
+  // Moving the right way but toward a plateau short of the target — the intake these
   // habits average is maintenance at that body mass, so it never arrives.
   if (projection.status === 'asymptote') {
-    return `Body mass trajectory: current habits move toward the goal but level off around ${Math.round(projection.equilibriumKg * 10) / 10} kg, short of it — reaching the goal needs a change in intake or activity.`;
+    return `Body mass trajectory: current habits move toward the target but level off around ${Math.round(projection.equilibriumKg * 10) / 10} kg, short of it — reaching the target needs a change in intake or activity.`;
   }
   if (projection.status !== 'ok') return 'Body mass trajectory: not enough data to estimate a trend.';
 
@@ -227,8 +227,8 @@ function formatTrajectoryLine(projection) {
   const direction = projection.slope < 0 ? 'losing' : 'gaining';
   // "currently" because the rate isn't constant: the arrival date comes from an
   // exponential model in which the rate decays as BMR falls with body mass, so
-  // quoting the present rate as if it held to the goal would overstate progress.
-  return `Body mass trajectory: currently ${direction} ~${kgPerWeek} kg/week (slowing as body mass drops), estimated to reach the ${projection.weightGoal} kg goal around ${isoFromDate(projection.etaDate)} (~${projection.daysToGoal} days) — generic population-average estimate.`;
+  // quoting the present rate as if it held to the target would overstate progress.
+  return `Body mass trajectory: currently ${direction} ~${kgPerWeek} kg/week (slowing as body mass drops), estimated to reach the ${projection.bodyMassTarget} kg target around ${isoFromDate(projection.etaDate)} (~${projection.daysToTarget} days) — generic population-average estimate.`;
 }
 
 // One line per activity description (e.g. NEAT / Resistance / Cardio),
@@ -254,8 +254,8 @@ function formatActivityBreakdownLines(m) {
 
 function formatInsightPrompt(m) {
   // `word` is what the figure in brackets is called: 'target' for the metrics
-  // that really have one, but 'max'/'min' for calories, whose figure is a bound
-  // to stay on one side of rather than a number to land on.
+  // that are a point to land on, but 'max'/'min' for calories, whose target is
+  // directional — a side to stay on rather than a number to land on.
   // No range on the line: every figure here covers the same one, so repeating it
   // eight times cost more than the data did. The [N/M days logged] marker carries
   // the window length where coverage is partial.
@@ -280,8 +280,8 @@ function formatInsightPrompt(m) {
   })();
 
   const lines = [
-    ...formatProfileLines(m.profile, m.weightGoalKg),
-    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieBound.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieBound.kind),
+    ...formatProfileLines(m.profile, m.bodyMassTargetKg),
+    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieTarget.kind),
     line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
     activityTotalLine,
     ...formatActivityBreakdownLines(m),
@@ -294,9 +294,9 @@ function formatInsightPrompt(m) {
 
 const INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing someone's own self-tracked data. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given their age, sex, height, BMI, current body mass vs. goal, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal figure and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a body-mass-trajectory line (their actual estimated rate of progress toward their goal). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
+You'll be given their age, sex, height, BMI, current body mass vs. target, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal figure and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a body-mass-trajectory line (their actual estimated rate of progress toward their target). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
 
-Calorie intake has no target — its figure is a BOUND, and the label says which one. "(max: 1388 kcal/day)" is a ceiling: they are aiming to lose body mass, so at or under it is on track and over it is off track. "(min: 2600 kcal/day)" is a floor: they are aiming to gain body mass, so at or over it is on track and under it is off track. Never treat a day under a "min" as a win or read it as a deficit worth praising, and never describe being under a "max" as falling short. If the average sits far on the good side of a max, that is a deeper deficit than planned, not a failure — comment on whether the pace looks sustainable (especially alongside protein and sleep) rather than scoring it as a miss.
+Calorie intake's target is DIRECTIONAL, not a point to land on, and the label says which side: "(max: 1388 kcal/day)" is a ceiling: they are aiming to lose body mass, so at or under it is on track and over it is off track. "(min: 2600 kcal/day)" is a floor: they are aiming to gain body mass, so at or over it is on track and under it is off track. Never treat a day under a "min" as a win or read it as a deficit worth praising, and never describe being under a "max" as falling short. If the average sits far on the good side of a max, that is a deeper deficit than the target called for, not a failure — comment on whether the pace looks sustainable (especially alongside protein and sleep) rather than scoring it as a miss.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 

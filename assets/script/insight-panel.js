@@ -146,7 +146,7 @@ function setInsightModeButtons(modeKey) {
 }
 
 // One <p> per line. Every mode's preview uses this, which is what keeps the
-// shared profile block (age/sex/height/weight/BMI) looking identical across all
+// shared profile block (age/sex/height/body mass/BMI) looking identical across all
 // three instead of each mode inventing its own layout for the same five facts.
 function renderInsightLines(el, lines) {
   el.innerHTML = '';

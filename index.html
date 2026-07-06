@@ -92,7 +92,7 @@
                 <div class="node-graph-spokes">
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🩺 Health Tracker</span>
-                        <span class="node-graph-tooltip">Track Body Mass, Caloric Intake, Protein Intake, Physical Activity, and Rest &amp; Recovery, one row per day in a searchable Physique log. Charts show your last 84 days versus your daily figures — calories against a shaded excess zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's reading colored green or red by whether the scale moved toward your target or away from it. A day is logged as you live it rather than in one sitting: log breakfast now and dinner later onto the same date and the two are merged into that one day — food and exercise lines added together, totals re-added — with the combined day shown for you to check before anything is written.</span>
+                        <span class="node-graph-tooltip">Track Body Mass, Caloric Intake, Protein Intake, Physical Activity, and Rest &amp; Recovery, one row per day in a searchable Physique log. Charts show any date range you pick — one From/To for the whole panel, the last 4 weeks by default — versus your daily figures — calories against a shaded excess zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's reading colored green or red by whether the scale moved toward your target or away from it. A day is logged as you live it rather than in one sitting: log breakfast now and dinner later onto the same date and the two are merged into that one day — food and exercise lines added together, totals re-added — with the combined day shown for you to check before anything is written.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🎯 Personalized Daily Targets</span>
@@ -176,7 +176,7 @@
                 <div class="node-graph-spokes">
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">⏱️ Time Tracker</span>
-                        <span class="node-graph-tooltip">Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts. A reminder banner (with optional browser notifications) catches a day you forgot to log, and an overtime alert flags when your pace runs past an 8h/day average.</span>
+                        <span class="node-graph-tooltip">Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns as histogram charts above the log itself. A reminder banner (with optional browser notifications) catches a day you forgot to log, and an overtime alert flags when your pace runs past an 8h/day average.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">✈️ Travel &amp; Applications</span>
@@ -342,6 +342,21 @@
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
             </div>
 
+            <!-- Above the Body Mass heading, not inside its block: it governs every
+                 chart from here down — Body Mass, Calorie Balance, Caloric Intake,
+                 Physical Activity, Protein Intake, Rest & Recovery and Protein Source
+                 Rotation — so sitting under one chart's label would read as belonging
+                 to that chart alone. State Trend & Forecast above is deliberately
+                 outside it: that one reads the whole history. -->
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="wellness-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="wellness-date-to">
+                </label>
+            </div>
+
             <div class="body-mass-projection-wrap">
                 <div class="body-mass-projection-header">
                     <h4>Body Mass</h4>
@@ -388,6 +403,24 @@
                         <canvas id="wellness-sleep-chart"></canvas>
                     </div>
                 </div>
+            </div>
+
+            <!-- Was its own "Protein Source Rotation" panel, moved in last so every
+                 Health chart is in one place and they collapse together. The wrap is
+                 what makes its heading one of the set, not a style of its own. -->
+            <div class="body-mass-projection-wrap">
+                <h4>Protein Source Rotation</h4>
+
+                <div class="protein-rotation-charts">
+                    <div class="chart-box">
+                        <canvas id="protein-rotation-chart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="protein-rotation-donut"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-legend" id="protein-rotation-legend"></div>
             </div>
         </div>
 
@@ -444,42 +477,16 @@
             <p id="insight-status" class="status" hidden></p>
         </div>
 
-        <div class="panel" id="protein-rotation-panel">
-            <h2>Protein Source Rotation</h2>
-
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="protein-rotation-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="protein-rotation-date-to">
-                </label>
-            </div>
-
-            <div class="protein-rotation-charts">
-                <div class="chart-box">
-                    <canvas id="protein-rotation-chart"></canvas>
-                </div>
-                <div class="chart-box">
-                    <canvas id="protein-rotation-donut"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-legend" id="protein-rotation-legend"></div>
-        </div>
-
         <div class="panel" id="workout-plan-panel">
             <div class="panel-header">
                 <h2>Activity Plan</h2>
+                <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add Activity</button>
                 <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Instruction</button>
+                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn">Log a Workout</button>
             </div>
 
             <!-- Rebuilt from the Activities sheet tab by activities.js -->
             <div id="activity-plan-tables"></div>
-
-            <div class="panel-actions">
-                <button type="button" id="log-workout-btn" class="btn btn-primary">Log a Workout</button>
-            </div>
         </div>
 
         <div class="panel">
@@ -531,10 +538,9 @@
         </div>
 
         <div class="panel">
-            <h2>Nutrition Facts</h2>
-
-            <div class="panel-actions">
-                <button id="add-nutrition-btn" class="btn btn-primary">Add Ingredient</button>
+            <div class="panel-header">
+                <h2>Nutrition Facts</h2>
+                <button id="add-nutrition-btn" class="btn btn-primary panel-header-btn">Add Ingredient</button>
             </div>
 
             <div class="filters">
@@ -738,14 +744,16 @@
         </div>
 
         <div class="panel">
-            <h2>Transaction</h2>
+            <div class="panel-header">
+                <h2>Transaction</h2>
+                <button id="add-transaction-btn" class="btn btn-primary panel-header-btn">Log a Transaction</button>
+            </div>
 
             <div class="panel-actions">
                 <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
                 <input type="file" id="import-csv-input" accept=".csv" hidden>
                 <button id="tx-advanced-filters-toggle" class="btn">Advanced Filters</button>
                 <button id="export-csv-btn" class="btn">Export CSV</button>
-                <button id="add-transaction-btn" class="btn btn-primary">Log a Transaction</button>
             </div>
 
             <div class="filters">
@@ -802,11 +810,15 @@
         </div>
 
         <div class="panel">
-            <h2>Account Summary</h2>
+            <div class="panel-header">
+                <h2>Account Summary</h2>
+                <button id="add-account-btn" class="btn btn-primary panel-header-btn">Add Account</button>
+            </div>
 
+            <!-- The reconciliation readout stays put: it's a status line about the
+                 table below, not an action, so it doesn't belong on the heading. -->
             <div class="panel-actions">
                 <span id="reconciliation-status" class="reconciliation-status"></span>
-                <button id="add-account-btn" class="btn btn-primary">Add Account</button>
             </div>
 
             <div class="table-responsive">
@@ -843,13 +855,21 @@
 
         <div id="timesheet-reminder-banner" class="info-banner" hidden>
             <span>You haven't logged today's hours yet.</span>
-            <button id="timesheet-reminder-log-btn" class="btn btn-primary">Log a Day</button>
+            <button id="timesheet-reminder-log-btn" class="btn btn-primary">Log Time</button>
             <button id="timesheet-reminder-enable-btn" class="btn" hidden>Enable reminders</button>
         </div>
 
         <div class="panel">
-            <h2>Work Analytics</h2>
+            <div class="panel-header">
+                <h2>Work Log</h2>
+                <!-- "Log Time", matching the modal it opens — "Log a Day" collided
+                     with Physique's button of the same name in the Health tab. -->
+                <button id="log-today-btn" class="btn btn-primary panel-header-btn">Log Time</button>
+            </div>
 
+            <!-- What used to be a separate "Work Analytics" panel: the charts read
+                 the same logged hours as the table below them, so they live in the
+                 same panel and collapse with it. -->
             <div class="donut-grid">
                 <div class="donut-item">
                     <h4>Arrival Distribution</h4>
@@ -881,14 +901,6 @@
             </div>
 
             <p id="timesheet-overtime-summary" class="timesheet-overtime-summary"></p>
-        </div>
-
-        <div class="panel">
-            <h2>Work Log</h2>
-
-            <div class="panel-actions">
-                <button id="log-today-btn" class="btn btn-primary">Log a Day</button>
-            </div>
 
             <div class="export-date-range">
                 <label>From
@@ -923,8 +935,13 @@
         </div>
 
         <div class="panel">
-            <h2>Travel Insights</h2>
+            <div class="panel-header">
+                <h2>Travel Log</h2>
+                <button id="add-travel-btn" class="btn btn-primary panel-header-btn">Log a Travel</button>
+            </div>
 
+            <!-- What used to be a separate "Travel Insights" panel, same as Work
+                 Analytics above: both views read the same rows as the table below. -->
             <div class="donut-grid travel-insights-grid">
                 <div class="donut-item">
                     <h4>Time Spent by Country</h4>
@@ -937,14 +954,6 @@
                         <canvas id="travel-world-map-chart"></canvas>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>Travel Log</h2>
-
-            <div class="panel-actions">
-                <button id="add-travel-btn" class="btn btn-primary">Log a Travel</button>
             </div>
 
             <div class="filters">
@@ -973,10 +982,9 @@
         </div>
 
         <div class="panel">
-            <h2>Application Log</h2>
-
-            <div class="panel-actions">
-                <button id="add-application-btn" class="btn btn-primary">Log an Application</button>
+            <div class="panel-header">
+                <h2>Application Log</h2>
+                <button id="add-application-btn" class="btn btn-primary panel-header-btn">Log an Application</button>
             </div>
 
             <div class="filters">
@@ -987,10 +995,12 @@
         </div>
 
         <div class="panel">
-            <h2>Contact List</h2>
+            <div class="panel-header">
+                <h2>Contact List</h2>
+                <button id="add-contact-btn" class="btn btn-primary panel-header-btn">Add Contact</button>
+            </div>
 
             <div class="panel-actions">
-                <button id="add-contact-btn" class="btn btn-primary">Add Contact</button>
                 <button id="export-contacts-google-btn" class="btn">Export for Google/Phone</button>
                 <button id="export-contacts-outlook-btn" class="btn">Export for Outlook</button>
             </div>
@@ -1028,10 +1038,9 @@
         </div>
 
         <div class="panel">
-            <h2>Settings</h2>
-
-            <div class="panel-actions">
-                <button id="add-setting-btn" class="btn btn-primary">Add Setting</button>
+            <div class="panel-header">
+                <h2>Settings</h2>
+                <button id="add-setting-btn" class="btn btn-primary panel-header-btn">Add Setting</button>
             </div>
 
             <div class="table-responsive">
@@ -1481,6 +1490,18 @@
 
         <div id="formula-substituted" class="formula-substituted"></div>
 
+        <fieldset class="formula-solve-for formula-pin-mode">
+            <legend>Which stays fixed as you lose weight</legend>
+            <label title="Holds your target fat loss. Every new weigh-in recalculates the daily intake that delivers it, so the calorie number falls as you get lighter and the pace stays on plan.">
+                <input type="radio" name="formula-pin-mode" value="deficit" checked>
+                Pin target deficit/fat loss
+            </label>
+            <label title="Holds this daily intake. Maintenance falls as you get lighter, so the deficit shrinks and fat loss decelerates — the constant-intake journey the forecast above solves for.">
+                <input type="radio" name="formula-pin-mode" value="intake">
+                Pin target daily intake
+            </label>
+        </fieldset>
+
         <p class="hint" id="formula-profile-note"></p>
         <p id="formula-status" class="status" hidden></p>
 
@@ -1499,6 +1520,68 @@
         <p class="hint instruction-key">Each guide shows the start and the finish, with the muscle worked picked out in red.</p>
 
         <div class="instruction-body" id="instruction-body"></div>
+    </div>
+</div>
+
+<div id="activity-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="activity-modal-title" hidden>
+    <div class="modal-card">
+        <button type="button" id="activity-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        <h2 id="activity-modal-title">Add Activity</h2>
+
+        <form id="activity-form" class="app-form">
+            <div class="form-row">
+                <label>Category
+                    <input type="text" id="activity-category" list="activity-category-options" required placeholder="e.g. Strength, Cardio, NEAT">
+                </label>
+                <label>Group
+                    <input type="text" id="activity-group" list="activity-group-options" required placeholder="e.g. Push, Pull, Legs">
+                </label>
+            </div>
+            <datalist id="activity-category-options"></datalist>
+            <datalist id="activity-group-options"></datalist>
+            <label>Name
+                <input type="text" id="activity-name" required placeholder="e.g. Seated Row machine">
+            </label>
+            <div class="form-row">
+                <label>Unit
+                    <select id="activity-unit">
+                        <option value="x">x — reps</option>
+                        <option value="sec">sec — timed hold</option>
+                        <option value="step">step — step count</option>
+                        <option value="min">min — fixed duration</option>
+                    </select>
+                </label>
+                <label>Muscle Group
+                    <input type="text" id="activity-muscle-group" list="activity-muscle-group-options" placeholder="e.g. Back, Chest, Core">
+                </label>
+            </div>
+            <datalist id="activity-muscle-group-options"></datalist>
+            <div class="form-row">
+                <label>Sets x Reps
+                    <input type="text" id="activity-amount" placeholder="e.g. 3 x 10, or 6000 step">
+                </label>
+                <label>Rest
+                    <input type="text" id="activity-rest" placeholder="e.g. 90 sec">
+                </label>
+            </div>
+            <div class="form-row">
+                <label>MET
+                    <input type="text" id="activity-met" placeholder="e.g. 5 — blank uses the default">
+                </label>
+                <label>Image
+                    <input type="text" id="activity-image" placeholder="e.g. assets/images/activities/seated-row.gif">
+                </label>
+            </div>
+
+            <p class="hint">Name is the join key: it has to match the workout note lines exactly, so renaming an activity here stops older logged lines being recognised as this movement. Unit is what tells a hold (<code>3 x 45 sec</code>) from reps (<code>3 x 15</code>), a step count from a minute count.</p>
+            <p class="hint">MET is the intensity the calorie burn is priced at. Leave it blank and the general fallback is used — the burn still works, just less specifically.</p>
+
+            <p id="activity-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
     </div>
 </div>
 

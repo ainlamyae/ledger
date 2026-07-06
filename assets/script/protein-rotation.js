@@ -15,10 +15,6 @@
 // against its medium-term one. Wired up by initProteinRotationPanel(), called
 // from app.js.
 
-// Default span of the From/To date pickers on first load — otherwise
-// identical in meaning to the old fixed 7-day lookback.
-const PROTEIN_ROTATION_LOOKBACK_DEFAULT_DAYS = 7;
-
 // Every Nutrition Facts row with a Protein % set — that field is the sole
 // "is this tracked" switch (nutrition.js's refreshNutrition/openNutritionForm).
 const PROTEIN_UNCLASSIFIED_LABEL = 'Unclassified';
@@ -303,16 +299,10 @@ function renderProteinRotationChart({ from, to }) {
   renderProteinRotationDonut(rows, barColors, to);
 }
 
-// Set by initProteinRotationPanel() to the getter initDateRangeControl()
-// (charts.js) returns — read by app.js to re-render once wellness/nutrition
-// data finishes loading after the panel's own initial (data-less) render.
-let getProteinRotationDateRange = () => ({ from: null, to: null });
-
+// No From/To pair of its own any more: this chart is the last block of the Health
+// Indicators panel, and wellnessDateRange() (charts.js) is that panel's one window.
+// initWellnessRangeControl() owns the wiring and redraws this chart on a change, so all
+// that's left here is the first, usually data-less render.
 function initProteinRotationPanel() {
-  // Shared From/To wiring (charts.js) — same one insight.js uses for the
-  // Health Insight panel.
-  getProteinRotationDateRange = initDateRangeControl('protein-rotation-date-from', 'protein-rotation-date-to', PROTEIN_ROTATION_LOOKBACK_DEFAULT_DAYS, () => {
-    renderProteinRotationChart(getProteinRotationDateRange());
-  });
-  renderProteinRotationChart(getProteinRotationDateRange());
+  renderProteinRotationChart(wellnessDateRange());
 }

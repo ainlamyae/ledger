@@ -229,6 +229,15 @@ function renderActivityPlanTables() {
   });
 }
 
+// "3 x 10 · 90 sec rest", or the amount alone for a row with no rest to take
+// (steps, minutes). Both halves come from the single cell splitAmountAndRest
+// already divides, so the modal shows exactly what the plan table's Sets x Reps
+// and Rest columns do.
+function instructionPrescription(activity) {
+  if (!activity.amount) return '';
+  return activity.rest ? `${activity.amount} · ${activity.rest} rest` : activity.amount;
+}
+
 // The Instruction modal's list, grouped the same way. Figures come from the
 // sheet's Image column — the slug guessing and the hand-maintained list of
 // which movements were animated are both gone.
@@ -260,6 +269,20 @@ function renderInstructionList() {
       label.textContent = activity.name;
 
       li.append(figure, label);
+
+      // The name is what you scan for, so the rest of the row sits under it at
+      // plain weight: what the movement trains, then how much of it to do. A
+      // line whose cell is blank on the sheet is skipped rather than printed
+      // empty.
+      [activity.muscleGroup, instructionPrescription(activity)]
+        .filter(Boolean)
+        .forEach((text) => {
+          const meta = document.createElement('span');
+          meta.className = 'instruction-activity-meta';
+          meta.textContent = text;
+          li.appendChild(meta);
+        });
+
       list.appendChild(li);
     });
 

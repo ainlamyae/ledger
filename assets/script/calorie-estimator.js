@@ -332,7 +332,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     let amount;
     let kcal;
     let protein;
-    // Shown as its own "Density used" column in the Calculate breakdown
+    // Shown as its own "Density" column in the Calculate breakdown
     // table so the actual figure applied (not just the final total) is
     // visible without needing DevTools — this is what distinguishes "the
     // math is right but the stored density is wrong" from "the wrong branch
@@ -540,6 +540,41 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, tar
 // `target` names the form whose table to draw into — currently only Physique's
 // (physique.js), which keeps the same JSON in a field of its own and so gets it
 // rewritten here too.
+// A tick for the case that needs no words: the item was found in your own
+// Nutrition Facts table. It was the widest label in the column and by far the
+// most common, so it cost the most space to say the least. An estimate keeps its
+// wording — which estimator ran, and whether USDA was reachable, is the part
+// actually worth reading. The full label stays on hover.
+//
+// Matched on the rendered label rather than the raw source key so a breakdown
+// already saved on the sheet collapses too, and translated at render time only —
+// the stored JSON keeps the descriptive string.
+const NUTRITION_TABLE_SOURCE_LABEL = 'Nutrition Facts';
+
+function sourceCell(source) {
+  return source === NUTRITION_TABLE_SOURCE_LABEL
+    ? makeCell('✅', source)
+    : makeCell(source);
+}
+
+// "213.4 kcal/100g" -> "213.4", and "52 kcal/unit" -> "52". The unit was the
+// same eight characters on nearly every row, so it moves to the column header's
+// tooltip and the cell keeps only the figure.
+//
+// The two bases aren't marked apart in this column because the Amount column
+// beside it already does: a count-priced row reads "×2" and a weight-priced one
+// "120g", so which figure this is follows from the row itself. The full string
+// is on hover, and the stored JSON carries it verbatim.
+const DENSITY_SUFFIXES = [' kcal/100g', ' kcal/unit'];
+
+function densityCell(density) {
+  const text = String(density || '');
+  const suffix = DENSITY_SUFFIXES.find((s) => text.endsWith(s));
+  return suffix
+    ? makeCell(text.slice(0, -suffix.length), text)
+    : makeCell(text);
+}
+
 function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'physique') {
   const tbody = document.getElementById(`${target}-calc-breakdown-body`);
   tbody.innerHTML = '';
@@ -557,8 +592,8 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(row.amount),
       makeCell(String(row.calories)),
       makeCell(String(row.protein)),
-      makeCell(row.density),
-      makeCell(row.source),
+      densityCell(row.density),
+      sourceCell(row.source),
       makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, target),
     );
     tbody.appendChild(tr);

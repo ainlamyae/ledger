@@ -1,13 +1,13 @@
 const CACHE_PREFIX = 'ledger_cache_';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-function getCached(key) {
+function getCached(key, ttlMs = CACHE_TTL_MS) {
   const raw = localStorage.getItem(CACHE_PREFIX + key);
   if (!raw) return null;
 
   try {
     const { data, timestamp } = JSON.parse(raw);
-    if (Date.now() - timestamp > CACHE_TTL_MS) return null;
+    if (Date.now() - timestamp > ttlMs) return null;
     return data;
   } catch {
     return null;

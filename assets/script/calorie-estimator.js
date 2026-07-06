@@ -502,10 +502,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 // user reviews it here: either click 💾 to bank it as-is, or leave it
 // and fix/retype the ingredient in Notes then Calculate again if the name
 // was wrong (e.g. a typo not matching an existing row).
-function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, target) {
-  const cell = document.createElement('td');
-  if (!row.newRow) return cell;
-
+function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, target) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn btn-primary';
@@ -529,8 +526,7 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, tar
       showFieldError(`${target}-form-error`, err.message);
     }
   });
-  cell.appendChild(btn);
-  return cell;
+  return btn;
 }
 
 // Renders the per-item breakdown table under Notes so the combined Amount
@@ -540,21 +536,36 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, tar
 // `target` names the form whose table to draw into — currently only Physique's
 // (physique.js), which keeps the same JSON in a field of its own and so gets it
 // rewritten here too.
-// A tick for the case that needs no words: the item was found in your own
-// Nutrition Facts table. It was the widest label in the column and by far the
-// most common, so it cost the most space to say the least. An estimate keeps its
-// wording — which estimator ran, and whether USDA was reachable, is the part
-// actually worth reading. The full label stays on hover.
+// Source and Save are one column, because they're two halves of the same fact
+// and can never both carry content: a Nutrition Facts hit is already banked by
+// definition (it's where the numbers came from) and so never gets a newRow,
+// while every estimate carries one until it's banked. Merging them drops a whole
+// column, and on a day that came entirely from your own table the column is one
+// tick wide.
+//
+// A tick for the case that needs no words. It was the widest label here and by
+// far the most common, so it cost the most space to say the least. An estimate
+// keeps its wording — which estimator ran, and whether USDA was reachable, is
+// the part actually worth reading — followed by 💾 while it's still bankable.
 //
 // Matched on the rendered label rather than the raw source key so a breakdown
 // already saved on the sheet collapses too, and translated at render time only —
 // the stored JSON keeps the descriptive string.
 const NUTRITION_TABLE_SOURCE_LABEL = 'Nutrition Facts';
 
-function sourceCell(source) {
-  return source === NUTRITION_TABLE_SOURCE_LABEL
-    ? makeCell('✅', source)
-    : makeCell(source);
+function sourceCell(row, breakdown, totalCalories, totalProtein, target) {
+  const cell = document.createElement('td');
+  const fromTable = row.source === NUTRITION_TABLE_SOURCE_LABEL;
+
+  const label = document.createElement('span');
+  label.textContent = fromTable ? '✅' : row.source;
+  label.title = row.source;
+  cell.appendChild(label);
+
+  if (row.newRow) {
+    cell.append(' ', makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, target));
+  }
+  return cell;
 }
 
 // "213.4 kcal/100g" -> "213.4", and "52 kcal/unit" -> "52". The unit was the
@@ -593,8 +604,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(String(row.calories)),
       makeCell(String(row.protein)),
       densityCell(row.density),
-      sourceCell(row.source),
-      makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, target),
+      sourceCell(row, breakdown, totalCalories, totalProtein, target),
     );
     tbody.appendChild(tr);
   });
@@ -606,7 +616,6 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
     makeCell(''),
     makeCell(String(totalCalories)),
     makeCell(String(totalProtein)),
-    makeCell(''),
     makeCell(''),
     makeCell(''),
   );

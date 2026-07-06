@@ -12,6 +12,25 @@
 // sheet tab (activities.js) — activityMet() reads them, so adding an exercise
 // there prices it without a code change.
 
+// How long each note-line unit actually takes. Only the two units that need
+// converting are tunable — seconds per rep here, steps per minute via
+// WORKOUT_STEPS_PER_MIN (toActivityMinutes, charts.js). A "135sec" hold and a
+// "30min" swim already carry their own time, so there's nothing to set on those.
+//
+// Seconds per rep is a lifting tempo, and 3 s is a brisk one — a machine rep
+// taken under control is closer to 4-5 s, which on a 200-rep session is the
+// difference between 10 and 17 minutes. Set WORKOUT_REP_SEC on the Settings tab
+// to your own tempo.
+//
+// Only time actually under tension counts, at whatever tempo is set: rest
+// between sets, warm-up and moving between machines are real gym-visit time but
+// aren't activity, so they stay out rather than inflating the logged number.
+const WORKOUT_REP_SEC_DEFAULT = 3;
+
+function workoutRepSec() {
+  return getSetting('WORKOUT_REP_SEC', WORKOUT_REP_SEC_DEFAULT);
+}
+
 // Matches one standardized workout note line — a strength row ("30x Leg
 // Press"), an isometric hold ("135sec Plank"), a fixed-duration NEAT row
 // ("30min Swim"), or a step-count row ("6000step Walk"). Any line matching none of these (e.g. a blank line,
@@ -71,9 +90,10 @@ function parseWorkoutNoteLines(notes) {
 // A parsed line's active seconds, net of rest — the one place the plan's
 // duration math lives, read by both Log Workout's prefill and Calculate so the
 // two can't drift apart on the same exercises. Steps convert via the same
-// steps↔minutes ratio the Activity chart uses (toActivityMinutes, charts.js).
+// steps↔minutes ratio the Activity chart uses (toActivityMinutes, charts.js),
+// which reads WORKOUT_STEPS_PER_MIN.
 function activeSecondsForNoteLine(line) {
-  if (line.type === 'reps') return line.reps * WORKOUT_REP_SEC;
+  if (line.type === 'reps') return line.reps * workoutRepSec();
   if (line.type === 'steps') return toActivityMinutes(line.steps, 'steps') * 60;
   // Already the total active time — the note carries seconds directly.
   if (line.type === 'hold') return line.seconds;
@@ -96,9 +116,10 @@ function estimateWorkoutActivity(notes, bodyMassKg) {
   let totalSeconds = 0;
   let calories = 0;
   const unmatchedNames = [];
-  // Per line as well as the totals, so a day mixing categories can be
-  // apportioned across them (physique.js's activity split) rather than being
-  // labelled with whichever one happened to win.
+  // Per line as well as the totals: this is what the Physique form's activity
+  // table shows (physique.js's renderPhysiqueActivityBreakdown), and it's the
+  // grain a day mixing categories has to be read at — a mixed day apportioned
+  // across its categories rather than labelled with whichever one won.
   const perLine = [];
 
   lines.forEach((line) => {
@@ -112,6 +133,10 @@ function estimateWorkoutActivity(notes, bodyMassKg) {
     perLine.push({
       name: line.name,
       category: activityCategory(line.name),
+      // The note's own quantity token ("30x", "135sec"), so a table row can be
+      // matched back to the Workout line it was priced from at a glance.
+      quantity: workoutNoteQuantityForLine(line),
+      met,
       seconds: activeSeconds,
       calories: lineKcal,
     });

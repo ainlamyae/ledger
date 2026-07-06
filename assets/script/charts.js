@@ -1694,10 +1694,20 @@ function renderWellnessSleepChart(entries) {
   });
 }
 
-// Steps and timed entries onto one comparable scale. ~100 steps/min is walking pace.
+// Steps and timed entries onto one comparable scale. ~100 steps/min is walking
+// pace; WORKOUT_STEPS_PER_MIN overrides it for a longer or shorter stride, and
+// applies everywhere at once — this chart, the Activity target, and the workout
+// estimator's own duration (activeSecondsForNoteLine, activity-estimator.js).
+// The default lives here rather than beside WORKOUT_REP_SEC_DEFAULT because
+// charts.js loads first: a const in the later file would still be in its dead
+// zone. Nothing there needs it anyway — the estimator calls this function.
+const WORKOUT_STEPS_PER_MIN_DEFAULT = 100;
+
 function toActivityMinutes(amount, unit) {
   const u = (unit || '').toLowerCase().trim();
-  if (u === 'steps' || u === 'step') return Math.round(amount / 100);
+  if (u === 'steps' || u === 'step') {
+    return Math.round(amount / getSetting('WORKOUT_STEPS_PER_MIN', WORKOUT_STEPS_PER_MIN_DEFAULT));
+  }
   if (u === 'hr' || u === 'hour' || u === 'hours') return Math.round(amount * 60);
   return amount; // 'min' or unknown — use as-is
 }
@@ -1985,9 +1995,11 @@ function renderWellnessProteinChart(entries) {
   });
 
   // The two ways of leaving the band are NOT equivalent. Under the floor is the miss
-  // that costs muscle on a deficit, so red. Over the top isn't a failure, just past the
-  // point where more protein buys anything, so gray. An unlogged day takes the green.
-  const PROTEIN_OVER_BAND_COLOR = '#9ca3af';
+  // that costs muscle on a deficit, so red. Over the top is a darker green than the
+  // band itself — still a day you hit your protein, just past the point where more
+  // buys anything, and read as a success rather than the neutral gray the other charts
+  // give their near-miss. An unlogged day takes the plain green.
+  const PROTEIN_OVER_BAND_COLOR = '#166534';
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
     if (!byDate.has(d) || withinProteinBand(values[i], band)) return '#16a34a';

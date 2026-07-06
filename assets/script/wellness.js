@@ -371,7 +371,7 @@ function renderWellnessWeightChart() {
 
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
 
-  const dates = lastNDates(7);
+  const dates = lastNDates(10);
   const byDate = new Map();
   allWellnessEntries
     .filter((e) => e.category === 'Weight' && e.amount !== null)
@@ -387,7 +387,7 @@ function renderWellnessWeightChart() {
           data: dates.map((d) => byDate.get(d) ?? null),
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59, 130, 246, .1)',
-          fill: true,
+          fill: false,
           tension: 0.3,
           pointRadius: 3,
           spanGaps: true,
@@ -396,7 +396,7 @@ function renderWellnessWeightChart() {
         {
           type: 'line',
           label: `${weightGoal} kg goal`,
-          data: new Array(7).fill(weightGoal),
+          data: new Array(10).fill(weightGoal),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -410,7 +410,7 @@ function renderWellnessWeightChart() {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { maxRotation: 0 } },
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
         y: {
           beginAtZero: false,
           afterFit: fixTrendYAxisWidth,
@@ -427,7 +427,7 @@ function renderWellnessCaloriesChart() {
 
   const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
 
-  const dates = lastNDates(7);
+  const dates = lastNDates(10);
   const byDate = new Map();
   allWellnessEntries
     .filter((e) => e.category === 'Calories' && e.amount !== null)
@@ -447,7 +447,7 @@ function renderWellnessCaloriesChart() {
         {
           type: 'line',
           label: `${calorieTarget} kcal target`,
-          data: new Array(7).fill(calorieTarget),
+          data: new Array(10).fill(calorieTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -461,6 +461,7 @@ function renderWellnessCaloriesChart() {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -477,7 +478,7 @@ function renderWellnessSleepChart() {
 
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
-  const dates = lastNDates(7);
+  const dates = lastNDates(10);
   const byDate = new Map();
   allWellnessEntries
     .filter((e) => e.category === 'Sleep' && e.amount !== null)
@@ -499,7 +500,7 @@ function renderWellnessSleepChart() {
         {
           type: 'line',
           label: `${sleepTarget} hr target`,
-          data: new Array(7).fill(sleepTarget),
+          data: new Array(10).fill(sleepTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -513,6 +514,7 @@ function renderWellnessSleepChart() {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -538,7 +540,7 @@ function renderWellnessActivityChart() {
 
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
 
-  const dates = lastNDates(7);
+  const dates = lastNDates(10);
   const byDate = new Map();
   allWellnessEntries
     .filter((e) => e.category === 'Activity' && e.amount !== null)
@@ -564,7 +566,7 @@ function renderWellnessActivityChart() {
         {
           type: 'line',
           label: `${activityTarget} min target`,
-          data: new Array(7).fill(activityTarget),
+          data: new Array(10).fill(activityTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -587,6 +589,7 @@ function renderWellnessActivityChart() {
         },
       },
       scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -750,7 +753,7 @@ function renderWellnessProjectionChart() {
           data: allLabels.map((d) => ({ x: dayOffset(d), y: histMap.get(d) ?? null })),
           borderColor: '#3b82f6',
           backgroundColor: 'rgba(59,130,246,0.08)',
-          fill: false,
+          fill: true,
           tension: 0.3,
           pointRadius: 2,
           spanGaps: false,
@@ -765,8 +768,9 @@ function renderWellnessProjectionChart() {
             return { x: dayOffset(d), y };
           }),
           borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,0.08)',
           borderDash: [6, 4],
-          fill: false,
+          fill: true,
           tension: 0,
           pointRadius: 0,
           spanGaps: false,

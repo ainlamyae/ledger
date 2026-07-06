@@ -619,6 +619,7 @@ async function loadDashboard(forceRefresh = false) {
     initTimeSheet(forceRefresh),
     initWellness(forceRefresh),
     initContacts(forceRefresh),
+    initSettingsPanel(forceRefresh),
     initTravel(forceRefresh),
     initApplications(forceRefresh),
   ]);

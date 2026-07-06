@@ -1687,8 +1687,22 @@ td .btn {
    stacked field would have left. */
 .form-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* minmax(0, 1fr), not a bare 1fr. A bare fr is minmax(auto, 1fr), and that
+       auto floors each track at its content's min-content width — which for a
+       date input is far wider than for a text box, since it has to fit
+       "yyyy-mm-dd" plus a picker icon. A wide modal has slack to absorb the
+       difference and the two tracks still look equal, but on a phone the Date
+       track claimed what it needed and Body Mass beside it came out visibly
+       narrower. A 0 floor lets both tracks stay exactly half at every width;
+       each control is width: 100% of its own track, so they end up identical. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0 .6rem;
+}
+
+/* Same reason: a grid item's own auto minimum would re-introduce the floor
+   minmax(0, …) just removed. */
+.form-row > label {
+    min-width: 0;
 }
 
 .app-form input,

@@ -1706,6 +1706,21 @@ td .btn {
     color: var(--color-text);
 }
 
+/* One height for every single-line control, because they don't agree on their
+   own: a date or time input carries a picker indicator in its shadow DOM and a
+   select carries an arrow, so each computes an intrinsic height a pixel or two
+   off a plain text box. Stacked fields hid that; pairing Date with Body Mass on
+   one row put two different types side by side and made it obvious.
+   Derived from the same tokens as the padding rather than pinned to a magic
+   number — 1.2em of text (at the control's own font-size), the .35rem padding
+   top and bottom, and the two 1px borders, which box-sizing: border-box counts
+   in. Checkboxes and radios are excluded: they'd stretch into 32px squares. */
+.app-form input:not([type="checkbox"]):not([type="radio"]),
+.app-form select {
+    height: calc(1.2em + .7rem + 2px);
+    line-height: 1.2;
+}
+
 .app-form select {
     width: auto;
     min-width: 45%;

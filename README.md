@@ -56,6 +56,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Every form field has a 16px floor so mobile browsers never auto-zoom on focus.
 - Modals are full-width on phones; cards cap at a fixed column width on wide screens.
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
+- **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it — Log a Day, Add Ingredient, Log a Transaction, Add Account, Log Time, Add Setting and the rest. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
+- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work Log, Travel Insights into Travel Log, Protein Source Rotation into Health Indicators.
 - **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
@@ -88,12 +90,13 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Time Tracker
 
-- **Log a Day** modal — Company, Start/End, Break, optional Task; live duration preview.
+- **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. (Named for its modal rather than "Log a Day", which collided with Physique's button of the same name.)
 - Company autocompletes and defaults to the most recently logged one.
 - Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
-- **Work Analytics** — Arrival, Departure and Hours Worked histograms with normal-curve overlays, plus Daily Hours Average by period.
-- **Overtime summary** — net time beyond an 8h/day pace, broken out Total/Year/Month/Week.
-- **Work Log** table — date range, sortable, computed Duration, inline edit, paginated.
+- One **Work Log** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
+  - Arrival, Departure and Hours Worked histograms with normal-curve overlays, plus Daily Hours Average by period.
+  - **Overtime summary** — net time beyond an 8h/day pace, broken out Total/Year/Month/Week.
+  - The table itself — date range, sortable, computed Duration, inline edit, paginated.
 
 ### Health — Today at a glance
 
@@ -108,6 +111,9 @@ A private, serverless personal life dashboard — health, finances, time trackin
 Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
+- **One From/To pair, above Body Mass, is the panel's window** — Body Mass, Calorie Balance, Caloric Intake, Physical Activity, Protein Intake, Rest & Recovery and Protein Source Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
+  - **State Trend & Forecast is deliberately outside it**: that chart is the whole journey plus a projection, and clipping it to a month would be clipping the trend it exists to show.
+  - `wellnessDateRange()` reads the two inputs straight from the DOM, falling back to the default when either is blank — so it can't matter whether a chart renders before or after the control is wired. `wellnessWindowDates()` turns that into the date list, clipped forward to the first day the metric in question has anything logged, so no chart opens on a run of empty days. An inverted range yields no days, which every caller already reads as "nothing to draw".
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward target; optional BMI twin axis.
   - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (target body mass, or the projected arrival date).
   - Plateau alert when the smoothed trend has held flat.
@@ -118,13 +124,26 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
-- All six carry a **violet dashed segment per week**, so a week that quietly drifted past its target is visible next to the per-day mark.
+- **Protein Source Rotation** last — see its section below.
+- All six of the scored charts carry a **violet dashed segment per week**, so a week that quietly drifted past its target is visible next to the per-day mark.
   - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a target cap.
   - Buckets are counted **back from today**, so the most recent seven days are always one whole week and only the oldest bucket can come up short.
   - Built from days that were actually **logged**; a week with nothing logged draws nothing.
   - **Flat** on five of them — the week's average. Rest & Recovery carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Target Burn lives on.
   - **Sloped** on Body Mass alone: a bar there is an absolute level, not a per-day quantity, so a flat mean says nothing. Each week is a least-squares fit through its own readings, extended to both week edges so slopes compare directly. A week with one weigh-in shows a dot — no slope is measurable from it.
   - Every one of these charts adds the figure to its tooltip as well; Body Mass quotes the slope as `kg/week`.
+
+### Health — Formula Playground
+
+**Formula** in the Health Indicators heading opens it.
+
+- Every term of the calorie-target and forecast algebra, with your own numbers substituted in — not a black box you have to trust.
+- **Solve for** any one of Calories, Target body mass, Activity target or Weekly fat loss; the rest are inputs and the picked one is computed. Activity target and Weekly fat loss also let you type either Eᵢₙ or `t` and compute whichever you didn't touch.
+- Edits are live and local until **Save** writes them back to `Settings`; `projectTargetDays` is shared with the Body Mass chart, so the two can never disagree about a date.
+- **Which stays fixed as you lose weight** — the one decision the algebra can't make for you:
+  - **Pin target deficit/fat loss** (default) — holds your pace. Every weigh-in recalculates the intake that delivers it, so calories fall as you lighten. A straight line to the goal.
+  - **Pin target daily intake** — holds the calorie number. Maintenance falls as you lighten, so the deficit shrinks and loss decelerates. This is the constant-Eᵢₙ journey `projectTargetDays` actually solves, so pinning it is what makes the number you eat and the date you're shown the same plan.
+  - They write one setting from opposite ends: intake saves Eᵢₙ to `CALORIE_TARGET_FIXED_KCAL`, deficit saves a blank (read as unset), so switching back needs no row deleted. The key is only written when the mode changes. On a 94 → 82 kg example at 0.5 kg/week the two arrive ~168 vs ~207 days apart — same goal, different journey.
 
 ### Health — Health Insight (AI)
 
@@ -146,6 +165,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Protein Source Rotation
 
+- Last block of the **Health Indicators** panel — every Health chart sits in that one panel, so they collapse together and share its one From/To window.
+- The donut's two rings are fixed spans anchored to the window's **To** date (4 weeks and 1 week), not fractions of the window — so they keep meaning the same thing whatever range is picked.
 - One horizontal bar per ingredient carrying a Protein % on its Nutrition Facts row.
 - Bar is actual protein eaten in range; a red tick marks its live target.
 - **Grouped by Classification** — one hue per group, lightness stepped within it, so a group reads as a block and its members stay distinct.
@@ -156,6 +177,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 ### Health — Activity Plan
 
 - Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row a "Done" checkbox.
+- **All seven tables are one grid.** Five columns each — a NEAT row carries an empty Rest cell — with the four right-hand columns pinned to the same widths, so Sets x Reps, Rest, Done and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~526px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
 - **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover.
 - **Log a Workout sends only what's newly ticked**, and extends today's entry instead of opening a second row.
   - The button reads "Add to Today's Workout" once something is already logged.
@@ -163,6 +185,11 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - Duration counts active time only — rest, warm-up and transitions are excluded. The per-rep tempo is yours to set (`WORKOUT_REP_SEC`, default 3 s — a controlled machine rep is nearer 4-5), as is the steps-per-minute ratio (`WORKOUT_STEPS_PER_MIN`, default 100).
 - After Calculate, an **activity table** under the Workout field shows the working per exercise — its quantity, the MET it was priced at, its minutes and its kcal — summed to a Total row. Nothing about it is stored; it's local arithmetic over the Workout text, recomputed whenever the day is opened.
 - Opens the Physique day form pre-filled on today's row, then runs the workout half of Calculate; nothing is written until you Save.
+- **The catalogue is editable in the app.** ✏️ / 📋 / 🗑️ on every plan row, and **Add Activity** beside Instruction in the panel heading — same shape as Nutrition Facts' ingredient form, the app's other user-owned catalogue. One modal covers all eight columns, with datalists of the Categories, Groups and Muscle Groups already in use so a free-text column doesn't fragment into `Push`/`push`/`Pusg`.
+  - **Name is guarded as the join key.** A second row under an existing name wouldn't be a duplicate, it would be invisible — `activitiesByName` keeps one entry per name, so the newer row would shadow the older everywhere (MET, muscle group, the plan's ticks). Saving one is refused with the clash named; 📋 Duplicate pre-fills `… (copy)` so it saves cleanly and can be renamed.
+  - Sets x Reps and Rest are two inputs but one cell (column E), rejoined on the comma `splitAmountAndRest` splits on — verified to round-trip byte-for-byte, including a hold's own `3 x 45 sec, 45 sec`.
+  - Deleting a row leaves days already logged against it untouched: those lines are free text on a Physique day. They just lose their own MET and stack under `Other` if recalculated, which the confirmation says out loud.
+  - The row actions sit **last**, after Done: `strength-plan.js` reads a ticked row's name from `children[0]` and its quantity from `children[1]`, so anything new has to go on the end. Rebuilding the tables also re-applies today's ticks, so an edit doesn't make the plan look unlogged.
 - **Instruction** in the panel heading opens "Instructions on the Activities" — all 34 strength exercises, grouped by category (Legs / Push / Pull / Full Body / Core & Bodyweight) rather than by the day they fall on.
   - Every figure shows the **muscle worked picked out in red**. 23 are **animated loops**; the remaining 11 are stills carrying **the start and the finish side by side**.
   - Under each name, at plain weight: the **muscle group** it trains and its **sets × reps · rest** — both straight from the `Activities` sheet, so the modal can't disagree with the plan table.
@@ -174,8 +201,9 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 ### Health — Physique
 
 - One row per day. Filterable/sortable table (search, date range), paginated; add/edit/delete/duplicate.
-- **Log a Day** sits in the panel heading (like **Instruction** on Activity Plan), so it stays reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
+- **Log a Day** sits in the panel heading — every panel's primary action does now (`.panel-header`), which also keeps it reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
 - **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout — all four of which are hidden fields, read instead off the Total row of the table under each of the two text areas.
+- Form layout: Date + Body Mass share a row, Bedtime + Wake-up Time the next. The pairs use `minmax(0, 1fr)` columns and the date/time inputs drop their native appearance — a bare `1fr` floors a track at its content's min-content width, and iOS Safari otherwise sizes a picker to its own content and ignores a smaller `width: 100%`, either of which leaves the plain text box beside it looking narrower.
 - **Saving onto a day already logged merges into it** rather than being refused: the first Save folds that row into the form, the second commits. Details under `Physique` below.
 - **Select rows, then Calculate in the bulk bar** to recalculate whole days at once. Same two estimators, same incremental reuse — a line whose `noteLine` still matches that day's saved breakdown keeps its numbers, so re-running a stretch of days only pays for what changed.
   - Each day's burn uses **its own** Body Mass where it has one, falling back to the most recent day that recorded one — so a historical row is priced with the body mass it was actually logged at.
@@ -197,7 +225,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Other
 
-- **Travel** — sortable Travel Log plus Time Spent by Country flag tiles and a Countries Visited choropleth.
+- **Travel** — one Travel Log panel: Time Spent by Country flag tiles and a Countries Visited choropleth above the sortable table they're derived from.
 - **Applications** — immigration/visa applications as expandable cards, grouped Ongoing/Closed.
 - **Contacts** — searchable, paginated list; bulk export (Google/Outlook CSV), delete and merge.
 - **Settings** — Key/Value/Notes table for the `Settings` tab, applied to live widgets without a reload.
@@ -312,7 +340,7 @@ flowchart TD
     TSWrite --> TSReminder["checkTimesheetReminder() re-evaluates<br/>the banner, scoped to whichever<br/>company was last logged on/before today"]
     TSReminder --> Idle
 
-    Idle --> TravelFlow["Travel Insights<br/>(derived, no extra API call)"]
+    Idle --> TravelFlow["Travel Log views<br/>(derived, no extra API call)"]
     TravelFlow --> TravelDerive["Pair each Arrival with its<br/>closing Departure (open-ended<br/>final Arrival = ongoing, to today)<br/>→ Time Spent by Country tiles +<br/>Countries Visited choropleth"] --> Idle
 
     Idle --> Calc["Calculate<br/>Physique day form, or bulk over selected days"]
@@ -371,7 +399,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 14 | `accounts.js` | Account Summary: balances, CRUD |
 | 15 | `timesheet.js` | Work Log, holiday/missed detection, analytics data, reminder banner |
 | 16 | `csv.js` | CSV import, advanced filter engine, download helper |
-| 17 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, serves category/MET/muscle-group/image lookups |
+| 17 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
 | 18 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
 | 19 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
 | 20 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
@@ -384,7 +412,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 27 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
 | 28 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
 | 29 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 30 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution |
+| 30 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, save back to `Settings`, and the deficit/intake pin |
 | 31 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
 | 32 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
 | 33 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
@@ -494,7 +522,7 @@ One Google Sheet per user, cloned from the template, with these tabs.
 
 ### `Activities`
 
-The exercise catalogue — one row per movement, and the single source for what used to be spread across five places (the Activity Plan's static tables, the Instruction modal's list, the MET table, the muscle-group map, and the gif/jpg animation list). Not in the template by default; add the tab and header row.
+The exercise catalogue — one row per movement, and the single source for what used to be spread across five places (the Activity Plan's static tables, the Instruction modal's list, the MET table, the muscle-group map, and the gif/jpg animation list). Not in the template by default; add the tab and header row. Editable from the Activity Plan panel (Add Activity, and ✏️ / 📋 / 🗑️ per row) as well as directly on the sheet.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -644,6 +672,8 @@ target = round( BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7 )
 - Falls back to flat `CALORIE_TARGET_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing.
 - Re-evaluated **per day** from that day's carried-forward body mass.
 - Moves ≈ 15.8 kcal per kg, so a 6 kg loss shifts it by roughly 95 kcal.
+- **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Formula Playground's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's Eᵢₙ — instead of being recalculated from each weigh-in. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
+- The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant Eᵢₙ — so pinning is also what makes the target you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
 - Max when target < current, min when target > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
 - `activityTargetKcal` is also what the Activity glance tile shows after its `=`.
 
@@ -772,7 +802,14 @@ sort key  = classification group gap, then targetG − actualG within it, both d
 axis position (hours) = ((clockMin − 12·60) + 1440) mod 1440 / 60
 colour ratio          = clamp( (durationHr − target/2) / (target − target/2), 0, 1 )
                         red → amber below 0.5, amber → green above
+
+axis min = floor(earliest / 3) × 3      the 3h tick at or below the earliest bedtime
+axis max = ceil(latest / 3) × 3         the 3h tick at or above the latest wake
+           ±3 only when an extreme lands exactly ON a tick
 ```
+
+- Noon-anchored, not 18:00-anchored: an assumed bedtime broke on a night shift, while noon falls mid-waking-period for virtually any schedule.
+- The `±3` used to be unconditional, which cost up to 6 hours of empty axis — a 23:00 bedtime floors to 21:00 and was then padded down to 18:00. It's now applied only where a bar would otherwise sit flush against the axis edge.
 
 ### Workout logging (Activity Plan → Calculate)
 

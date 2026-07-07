@@ -18,6 +18,14 @@ const EXERCISE_MET_FALLBACK = 3.5;
 let allActivities = [];
 let activitiesByName = new Map();
 let activitiesDataLoaded = false;
+let activityListenersAttached = false;
+let activitiesSheetId = null;
+let editingActivityRow = null;
+
+async function fetchActivitiesSheetId() {
+  const metadata = await getSpreadsheetMetadata();
+  return findSheetId(metadata, CONFIG.SHEETS.ACTIVITIES);
+}
 
 // "3 x 10, 90 sec" -> { amount: "3 x 10", rest: "90 sec", restSec: 90 }. Split
 // on the LAST comma, so a hold row's own "3 x 45 sec, 45 sec" still divides
@@ -48,6 +56,13 @@ function parseActivityAmount(amount, unit) {
 }
 
 async function initActivities(forceRefresh = false) {
+  if (!activityListenersAttached) {
+    activityListenersAttached = true;
+    document.getElementById('add-activity-btn').addEventListener('click', () => openActivityForm(null));
+    document.getElementById('activity-cancel-btn').addEventListener('click', closeActivityForm);
+    onFormSubmit('activity-form', submitActivityForm);
+  }
+
   let values = forceRefresh ? null : getCached('activities');
   if (!values) {
     const resp = await getValues(ACTIVITIES_RANGE, VALUE_PARAMS);
@@ -56,11 +71,14 @@ async function initActivities(forceRefresh = false) {
   }
 
   allActivities = values
-    .map((row) => {
+    .map((row, i) => {
       const name = String(row[2] || '').trim();
       const unit = String(row[3] || '').trim().toLowerCase();
       const { amount, rest, restSec } = splitAmountAndRest(row[4]);
       return {
+        // The sheet row this came from — what an edit or delete addresses. The
+        // range starts at A2, so the first parsed entry is row 2.
+        row: i + 2,
         category: String(row[0] || '').trim(),
         group: String(row[1] || '').trim(),
         name,
@@ -158,16 +176,26 @@ function makeActivityTable(group, rows) {
   table.className = isStrength ? 'workout-table-strength' : 'workout-table-neat';
   table.dataset.day = group;
 
+  // Five columns in every table, whatever its type — a NEAT/Cardio row has no
+  // rest to take, but it still gets the (empty) Rest cell so all seven tables
+  // are one grid and their columns line up when stacked down the panel. Only the
+  // two labels differ, since a step count isn't a set count.
+  //
+  // The row actions column is last and unlabelled, the same shape every other
+  // table in the app uses. Order matters beyond looks: strength-plan.js reads a
+  // ticked row's name from children[0] and its quantity from children[1], so
+  // anything new has to go on the END, and the Done column is now marked by its
+  // label rather than by being last.
   const headers = isStrength
-    ? ['Exercise/Machine', 'Sets x Reps', 'Rest', 'Done']
-    : ['Activity', 'Amount', 'Done'];
+    ? ['Exercise/Machine', 'Sets x Reps', 'Rest', 'Done', '']
+    : ['Activity', 'Amount', 'Rest', 'Done', ''];
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  headers.forEach((label, i) => {
+  headers.forEach((label) => {
     const th = document.createElement('th');
     th.textContent = label;
-    if (i === headers.length - 1) th.className = 'workout-check-col';
+    if (label === 'Done') th.className = 'workout-check-col';
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -175,13 +203,21 @@ function makeActivityTable(group, rows) {
   const tbody = document.createElement('tbody');
   rows.forEach((activity) => {
     const tr = document.createElement('tr');
-    tr.append(makeCell(activity.name), makeCell(activity.amount));
-    if (isStrength) tr.appendChild(makeCell(activity.rest));
+    tr.append(makeCell(activity.name), makeCell(activity.amount), makeCell(activity.rest));
 
     const checkCell = document.createElement('td');
     checkCell.className = 'workout-check-cell';
     checkCell.appendChild(makeActivityCheckbox(activity));
     tr.appendChild(checkCell);
+
+    const actionsCell = document.createElement('td');
+    actionsCell.className = 'workout-actions-cell';
+    actionsCell.append(
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openActivityForm(activity) }),
+      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openActivityForm(activity, true) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteActivity(activity) }),
+    );
+    tr.appendChild(actionsCell);
 
     tbody.appendChild(tr);
   });
@@ -197,7 +233,7 @@ function renderActivityPlanTables() {
   if (!allActivities.length) {
     const empty = document.createElement('p');
     empty.className = 'hint';
-    empty.textContent = `No activities yet — add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group).`;
+    empty.textContent = `No activities yet — click "Add Activity" above, or add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab directly (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group).`;
     container.appendChild(empty);
     return;
   }
@@ -227,6 +263,158 @@ function renderActivityPlanTables() {
       container.appendChild(day);
     });
   });
+
+  // The tables were just rebuilt from scratch, so today's ticks and tints went
+  // with them — put them back. Matters most after an edit here: the plan
+  // shouldn't look like nothing was logged just because a row was renamed.
+  renderWorkoutPlanProgress();
+}
+
+// --- Add / Edit / Duplicate / Delete --------------------------------------
+//
+// The catalogue was read-only in the UI until now: changing an exercise meant
+// opening the sheet. Same shape as Nutrition Facts' ingredient form
+// (nutrition.js), which is the other user-owned catalogue the app reads.
+
+function openActivityForm(activity, duplicate = false) {
+  editingActivityRow = (activity && !duplicate) ? activity.row : null;
+  document.getElementById('activity-modal-title').textContent =
+    duplicate ? 'Duplicate Activity' : (activity ? 'Edit Activity' : 'Add Activity');
+
+  // Category and Group are prefilled on a plain Add too — a new exercise is
+  // nearly always another one in the group you were just looking at, and the
+  // datalists carry the rest.
+  setActivityField('category', activity?.category);
+  setActivityField('group', activity?.group);
+  // A duplicate has to land on a different Name: it's the join key, so two rows
+  // sharing one would make the second shadow the first everywhere.
+  setActivityField('name', activity ? (duplicate ? `${activity.name} (copy)` : activity.name) : '');
+  setActivityField('unit', activity?.unit || 'x');
+  setActivityField('amount', activity?.amount);
+  setActivityField('rest', activity?.rest);
+  setActivityField('met', activity?.met);
+  setActivityField('image', activity?.image);
+  setActivityField('muscle-group', activity?.muscleGroup);
+
+  renderActivityDatalist('activity-category-options', 'category');
+  renderActivityDatalist('activity-group-options', 'group');
+  renderActivityDatalist('activity-muscle-group-options', 'muscleGroup');
+
+  clearFieldError('activity-form-error');
+  document.getElementById('activity-modal').hidden = false;
+}
+
+function setActivityField(id, value) {
+  document.getElementById(`activity-${id}`).value =
+    (value === null || value === undefined) ? '' : String(value);
+}
+
+function activityFieldValue(id) {
+  return document.getElementById(`activity-${id}`).value.trim();
+}
+
+// Values already in use for a free-text column, most-used first — the same
+// guard against fragmenting into "Push"/"push"/"Pusg" that Nutrition Facts'
+// Classification datalist provides.
+function renderActivityDatalist(datalistId, key) {
+  const counts = new Map();
+  allActivities.forEach((a) => {
+    if (a[key]) counts.set(a[key], (counts.get(a[key]) || 0) + 1);
+  });
+
+  const dl = document.getElementById(datalistId);
+  dl.innerHTML = '';
+  [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([value]) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      dl.appendChild(opt);
+    });
+}
+
+function closeActivityForm() {
+  document.getElementById('activity-modal').hidden = true;
+  editingActivityRow = null;
+}
+
+async function submitActivityForm(event) {
+  event.preventDefault();
+
+  const name = activityFieldValue('name');
+  const category = activityFieldValue('category');
+  const group = activityFieldValue('group');
+  const metRaw = activityFieldValue('met');
+
+  if (!name || !category || !group) {
+    showFieldError('activity-form-error', 'Category, Group and Name are all required — Group is the sub-table this row renders into.');
+    return;
+  }
+
+  // Name is the join key for the note lines, the MET lookup, the muscle-group
+  // map and the plan's own ticks, so a second row under an existing name
+  // wouldn't be a duplicate — it would be invisible.
+  const clash = allActivities.find((a) => a.row !== editingActivityRow
+    && a.name.toLowerCase() === name.toLowerCase());
+  if (clash) {
+    showFieldError('activity-form-error', `"${clash.name}" is already in the plan — Name is what every logged line matches on, so it has to be unique. Edit that row, or give this one a different name.`);
+    return;
+  }
+
+  const met = metRaw ? evaluateNumberExpression(metRaw) : null;
+  if (metRaw && met === null) {
+    showFieldError('activity-form-error', 'MET must be a number (e.g. 5 or 3.8), or blank to use the default.');
+    return;
+  }
+
+  // Column E is one cell holding both halves, split on its LAST comma — so the
+  // rest half is joined back on the same way, and a hold's own "3 x 45 sec"
+  // amount keeps its internal spacing intact.
+  const rest = activityFieldValue('rest');
+  const amount = activityFieldValue('amount');
+  const amountAndRest = [amount, rest].filter(Boolean).join(', ');
+
+  const values = [[
+    category,
+    group,
+    name,
+    activityFieldValue('unit'),
+    amountAndRest,
+    activityFieldValue('image'),
+    met !== null ? met : '',
+    activityFieldValue('muscle-group'),
+  ]];
+
+  try {
+    if (editingActivityRow !== null) {
+      await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:H${editingActivityRow}`, values);
+    } else {
+      await appendValues(ACTIVITIES_RANGE, values);
+    }
+    closeActivityForm();
+    await initActivities(true);
+  } catch (err) {
+    showFieldError('activity-form-error', err.message);
+  }
+}
+
+// Deleting the catalogue row doesn't touch a workout already logged against
+// it — that's free text on a Physique day. It just stops being priced by its
+// own MET and stacks under 'Other', which the confirmation says out loud.
+async function deleteActivity(activity) {
+  await confirmAndDelete(
+    `Delete "${activity.name}" from the Activity Plan? Days already logged against it keep their lines, but will be priced at the default MET if recalculated.`,
+    async () => {
+      if (!activitiesSheetId) activitiesSheetId = await fetchActivitiesSheetId();
+      await batchUpdate([{
+        deleteDimension: {
+          range: { sheetId: activitiesSheetId, dimension: 'ROWS', startIndex: activity.row - 1, endIndex: activity.row },
+        },
+      }]);
+      await initActivities(true);
+    },
+    "Couldn't delete activity",
+  );
 }
 
 // "3 x 10 · 90 sec rest", or the amount alone for a row with no rest to take

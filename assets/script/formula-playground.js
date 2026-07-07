@@ -615,6 +615,10 @@ function openFormulaPlayground() {
   // one was last typed into in a previous session.
   dualKnownField.TAU = 'ein';
   dualKnownField.DELTA_M = 'days';
+  // Set from what's actually on the sheet, so the pair always shows the live
+  // state rather than defaulting to one and inviting an accidental switch.
+  const pinMode = pinnedCalorieTargetKcal() !== null ? 'intake' : 'deficit';
+  document.querySelector(`input[name="formula-pin-mode"][value="${pinMode}"]`).checked = true;
   loadFormulaInputsFromSettings();
   applySolveForMode('EIN');
   renderFormulaPreview();
@@ -622,9 +626,33 @@ function openFormulaPlayground() {
   document.getElementById('formula-modal').hidden = false;
 }
 
+// Eᵢₙ as the playground currently shows it — computed in most modes, typed in the
+// ones that solve for something else. Read off the box either way, so what gets
+// pinned is exactly the number on screen.
+function formulaEinKcal() {
+  const shown = evaluateNumberExpression(document.getElementById('formula-ein').value.trim());
+  return (shown !== null && shown > 0) ? Math.round(shown) : null;
+}
+
 async function saveFormulaSettings() {
   const { overrides, invalid } = readFormulaInputs();
   if (invalid.length) return;
+
+  // Two ways to hold a plan steady, and they're mutually exclusive: pinning the
+  // intake writes the shown Eᵢₙ, pinning the deficit writes a blank — which is
+  // how the setting gets cleared, since getSetting reads an empty cell as unset
+  // and WEEKLY_FAT_LOSS_KG (saved with the rest of these inputs) is what the
+  // deficit is then held at. Only written when it's changing, so a save from the
+  // default mode doesn't add a blank row to a sheet that never had one.
+  const pinned = document.querySelector('input[name="formula-pin-mode"]:checked').value === 'intake';
+  const einKcal = formulaEinKcal();
+  if (pinned && einKcal === null) {
+    showFieldError('formula-status', "Can't pin a daily intake while Eᵢₙ has no value — fill the other inputs in first, or pin the deficit instead.");
+    return;
+  }
+  if (pinned || pinnedCalorieTargetKcal() !== null) {
+    overrides[CALORIE_TARGET_PIN_KEY] = pinned ? einKcal : '';
+  }
 
   const saveBtn = document.getElementById('formula-save-btn');
   const statusEl = document.getElementById('formula-status');
@@ -644,7 +672,9 @@ async function saveFormulaSettings() {
     applySolveForMode(currentSolveFor());
     renderFormulaPreview();
     statusEl.classList.add('status-ok');
-    showFieldError('formula-status', 'Saved — the Caloric Intake chart and the forecast now use these.');
+    showFieldError('formula-status', pinned
+      ? `Saved — daily intake is pinned at ${einKcal} kcal and no longer moves with your body mass.`
+      : 'Saved — the deficit is what stays fixed; the Caloric Intake chart and the forecast now use these.');
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {

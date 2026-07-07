@@ -59,6 +59,23 @@ const INSIGHT_MODES = {
     resultKeys: ['INSIGHT_ACTIVITY_LAST_RESULT', 'ACTIVITY_INSIGHT_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_ACTIVITY_LAST_GENERATED_AT', 'ACTIVITY_INSIGHT_LAST_GENERATED_AT'],
   },
+  protein: {
+    label: 'Protein Sources',
+    hint: 'A read on how well your actual eating matched your protein-source rotation targets.',
+    questionPlaceholder: 'e.g. Which source should I prioritize next?',
+    previewId: 'insight-preview-text',
+    // computeProteinRotationRows is protein-rotation.js's — same rows the
+    // Protein Source Rotation chart plots, so this mode can't quote a
+    // different figure for the same ingredient.
+    gather: (from, to) => computeProteinRotationRows(from, to),
+    formatPrompt: (rows) => formatProteinRotationInsightPrompt(rows),
+    renderPreview: (rows) => renderInsightPreviewLines(formatProteinRotationInsightPrompt(rows)),
+    appendQuestion: true,
+    needsNutrition: true,
+    systemPrompt: PROTEIN_ROTATION_INSIGHT_SYSTEM_PROMPT,
+    resultKeys: ['INSIGHT_PROTEIN_LAST_RESULT'],
+    generatedAtKeys: ['INSIGHT_PROTEIN_LAST_GENERATED_AT'],
+  },
 };
 
 const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;

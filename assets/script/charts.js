@@ -779,6 +779,40 @@ function activityTargetKcal(bodyMassKg) {
   return metKcal(activityMet(), bodyMassKg, getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT));
 }
 
+// A PINNED activity target: the same idea as CALORIE_TARGET_PIN_KEY below, but for the
+// workout goal itself. Unset, the goal is ACTIVITY_TARGET_MIN minutes and whatever that
+// burns falls as body mass falls, since metKcal scales with mass — pin this instead and
+// the BURN stays put, so the minutes needed rise instead as you get lighter.
+//
+// Deliberately doesn't touch activityTargetKcal above (or calorieTargetDetail, which calls
+// it): those stay the raw, pin-blind calculation the Formula Playground previews live and
+// the calorie-intake target is built from — the same way CALORIE_TARGET_PIN_KEY leaves
+// calorieTargetDetail alone. Only the activity tile and chart, which show the workout goal
+// itself rather than daily intake, read this.
+const ACTIVITY_TARGET_PIN_KEY = 'ACTIVITY_TARGET_FIXED_KCAL';
+
+function pinnedActivityTargetKcal() {
+  return getSetting(ACTIVITY_TARGET_PIN_KEY, null);
+}
+
+// TODAY's activity kcal target: the pinned figure if one is set, else whatever
+// ACTIVITY_TARGET_MIN implies at bodyMassKg.
+function getActivityTargetKcal(bodyMassKg) {
+  return pinnedActivityTargetKcal() ?? activityTargetKcal(bodyMassKg);
+}
+
+// The mirror for minutes: unset, it's just the flat ACTIVITY_TARGET_MIN; pinned, it's
+// however many minutes at bodyMassKg it now takes to burn the pinned figure — rising as
+// body mass falls, since the same MET moves less mass per minute. No body mass, no figure
+// to divide by, so it falls back to the flat minutes setting either way.
+function getActivityTargetMin(bodyMassKg) {
+  const pinnedKcal = pinnedActivityTargetKcal();
+  if (pinnedKcal === null || bodyMassKg === null) {
+    return getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
+  }
+  return pinnedKcal / (activityMet() * bodyMassKg * kcalPerMetKgMin());
+}
+
 // The single rule every activity kcal figure goes through. A Calculate-derived amount2
 // wins (it used the real per-exercise MET); otherwise minutes at ACTIVITY_MET.
 function activityEntryKcal(entry, bodyMassKg) {
@@ -1024,7 +1058,10 @@ function renderTodayGlanceCards(entries) {
 
   const calorieTarget = getCalorieTarget(entries);
   const proteinBand = getProteinTargetBandG(entries);
-  const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
+  const bodyMassKg = latestBodyMassKg(entries);
+  // Minutes when time is what's pinned; rises with a lighter body mass when calorie burn
+  // is pinned instead — see getActivityTargetMin.
+  const activityTarget = Math.round(getActivityTargetMin(bodyMassKg));
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
   // The heading carries which target it is, since the number can't and the value line
@@ -1034,10 +1071,10 @@ function renderTodayGlanceCards(entries) {
   // Protein is the one metric judged against a RANGE — inside the band only.
   const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
 
-  // What hitting the minutes target would burn, via the same activityTargetKcal the
-  // calorie target is built from, so the two can't quote different numbers for one day.
-  const bodyMassKg = latestBodyMassKg(entries);
-  const targetBurn = bodyMassKg !== null ? `${Math.round(activityTargetKcal(bodyMassKg))} kcal` : null;
+  // What hitting the minutes target would burn — pinned flat if calorie burn is what's
+  // pinned, else via the same activityTargetKcal the calorie target is built from, so the
+  // two can't quote different numbers for one day.
+  const targetBurn = bodyMassKg !== null ? `${Math.round(getActivityTargetKcal(bodyMassKg))} kcal` : null;
 
   setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand);
@@ -1046,13 +1083,13 @@ function renderTodayGlanceCards(entries) {
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
-// and mask alike. `note` restates it in a second unit ("= 394 kcal"), inside the same
+// and mask alike. `note` restates it in a second unit ("→ 394 kcal"), inside the same
 // string rather than its own element, so the line reads at one size and masks as one.
 function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null) {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'expense');
 
-  const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` = ${note}` : ''}`;
+  const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` → ${note}` : ''}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
   if (value !== null) el.classList.add(isGood ? 'income' : 'expense');
 }
@@ -1881,14 +1918,15 @@ function renderWellnessActivityChart(entries) {
 
   const hasData = activityDatasets.some((ds) => ds.data.some((v) => v !== 0));
 
-  // Scored against what that day's own body mass would burn at ACTIVITY_TARGET_MIN —
-  // the same activityTargetKcal the calorie target uses, so the two can't disagree. Met
-  // is green, short by up to ACTIVITY_NEAR_TARGET_FRACTION gray, further short red.
-  // Without a body mass there's no target, so the dot stays neutral violet.
+  // Scored against what that day's own body mass would burn at ACTIVITY_TARGET_MIN — or
+  // the pinned calorie burn, if that's what's pinned instead — via the same
+  // getActivityTargetKcal the activity tile uses, so the two can't disagree. Met is
+  // green, short by up to ACTIVITY_NEAR_TARGET_FRACTION gray, further short red. Without
+  // a body mass there's no target, so the dot stays neutral violet.
   const dotColor = (date, kcal) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
     if (kcal === null || bodyMassKg === null) return '#7c3aed';
-    const target = activityTargetKcal(bodyMassKg);
+    const target = getActivityTargetKcal(bodyMassKg);
     if (kcal >= target) return '#16a34a';
     return target - kcal <= target * ACTIVITY_NEAR_TARGET_FRACTION ? '#9ca3af' : '#dc2626';
   };
@@ -1912,12 +1950,13 @@ function renderWellnessActivityChart(entries) {
 
   // TARGET BURN on the kcal axis, not the flat minutes target it used to be — that sat
   // on the other axis from the dots it appeared to judge, so a day could clear it on a
-  // walk while burning less than a day that lifted. It moves day to day because
-  // activityTargetKcal scales with body mass. No body mass, no figure, so it breaks
-  // there rather than inventing one.
+  // walk while burning less than a day that lifted. It moves day to day when time is
+  // what's pinned, since activityTargetKcal scales with body mass; flat when calorie
+  // burn is pinned instead. No body mass, no figure, so it breaks there rather than
+  // inventing one.
   const targetBurnKcal = dates.map((date) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
-    return bodyMassKg === null ? null : activityTargetKcal(bodyMassKg);
+    return bodyMassKg === null ? null : getActivityTargetKcal(bodyMassKg);
   });
 
   // A cap per column, the same mark Caloric Intake and Calorie Balance use. It was a

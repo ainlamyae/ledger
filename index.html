@@ -96,7 +96,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🎯 Personalized Daily Targets</span>
-                        <span class="node-graph-tooltip">Set your target body mass and pace, and your daily calorie figure is calculated for you from three things you can each check yourself: your Mifflin-St Jeor BMR, plus the calories your own daily activity target actually burns at your current body mass, minus the deficit that delivers your target pace. There's no lifestyle "activity multiplier" guess anywhere in it — and because it's the same BMR-plus-activity basis the Calorie Balance and Body Mass Forecast charts use, none of the three can disagree about what maintenance is. It's never presented as a "target" to hit dead-on, because it isn't one: if your target body mass is below today's it's a maximum to stay at or under, and if you're gaining it's a minimum to stay at or above. The Calories tile, the Caloric Intake chart and Wellness Insight all say which of the two it is, so eating 400 under a bulk's minimum is never scored as a good day. Your Protein target follows the way nutrition guidance actually states it — a range of grams per kg of your TARGET body mass, not a single number pinned to today's body mass. Enter the range once (e.g. 1.6~2 g/kg) and you get a live band in grams: it's shaded on the Protein Intake chart so you can see which days landed inside it, and the Protein tile reads as a range and only turns green while you're within it. Because it's built on your target body mass, it feeds you for the body you're heading for instead of shrinking with every kg you lose.</span>
+                        <span class="node-graph-tooltip">Set your target body mass and pace, and your daily calorie figure is calculated for you from three things you can each check yourself: your Mifflin-St Jeor BMR, plus the calories your own daily activity target actually burns at your current body mass, minus the deficit that delivers your target pace. There's no lifestyle "activity multiplier" guess anywhere in it — and because it's the same BMR-plus-activity basis the Calorie Balance and Body Mass Forecast charts use, none of the three can disagree about what maintenance is. It's never presented as a "target" to hit dead-on, because it isn't one: if your target body mass is below today's it's a maximum to stay at or under, and if you're gaining it's a minimum to stay at or above. The Calories tile, the Caloric Intake chart and Wellness Insight all say which of the two it is, so eating 400 under a bulk's minimum is never scored as a good day. Your Protein target follows the way nutrition guidance actually states it — a range of grams per kg of your TARGET body mass, not a single number pinned to today's body mass. Enter the range once (e.g. 1.6~2 g/kg) and you get a live band in grams: it's shaded on the Protein Intake chart so you can see which days landed inside it, and the Protein tile reads as a range and only turns green while you're within it. Because it's built on your target body mass, it feeds you for the body you're heading for instead of shrinking with every kg you lose. Your activity target itself can be pinned either way, too, from the Formula Playground: hold the minutes fixed and the calorie burn it implies falls as you get lighter (the default), or pin the calorie burn instead and the minutes needed rise to match — so the workout goal doesn't quietly get easier just because you weigh less.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📉 Body Mass Forecast</span>
@@ -116,11 +116,11 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">💡 AI Health Insight</span>
-                        <span class="node-graph-tooltip">One panel, three AI reads over any date range you pick — Wellness (your habits vs. your own targets and the period before), Food (every ingredient you actually ate, totaled by amount, calories and protein, for a nutrient-gap review), and Activity (consistency, volume trend, and which muscle groups have gone neglected). Ask a free-text question with any of them. Nothing is computed until you press a button, so the page stays fast, and every report is saved and waiting next visit instead of vanishing when you navigate away.</span>
+                        <span class="node-graph-tooltip">One panel, four AI reads over any date range you pick — Wellness (your habits vs. your own targets and the period before), Food (every ingredient you actually ate, totaled by amount, calories and protein, for a nutrient-gap review), Activity (consistency, volume trend, and which muscle groups have gone neglected), and Protein Sources (how closely your actual eating matched the target rotation share you set for each protein source, and which one's furthest short). Ask a free-text question with any of them. Nothing is computed until you press a button, so the page stays fast, and every report is saved and waiting next visit instead of vanishing when you navigate away.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🧪 Formula Playground</span>
-                        <span class="node-graph-tooltip">See exactly how your daily calorie figure is built — resting metabolic rate, activity burn, and the deficit your weekly fat-loss target implies — each as its own formula with your own numbers substituted in. Change any input (body mass, height, age, sex, activity target, fat-loss rate) and both the calorie figure and the predicted date you hit your target body mass update as you type. Save the ones you like straight back to your settings.</span>
+                        <span class="node-graph-tooltip">See exactly how your daily calorie figure is built — resting metabolic rate, activity burn, and the deficit your weekly fat-loss target implies — each as its own formula with your own numbers substituted in. Change any input (body mass, height, age, sex, activity target, fat-loss rate) and both the calorie figure and the predicted date you hit your target body mass update as you type. Two pin choices decide what stays fixed as your body mass changes — your daily calorie intake vs. your deficit, and your activity minutes vs. the calorie burn they're worth — save the ones you like straight back to your settings.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🔄 Protein Source Rotation</span>
@@ -441,6 +441,7 @@
                 <button type="button" class="btn" data-insight-mode="wellness" aria-pressed="false">Wellness</button>
                 <button type="button" class="btn" data-insight-mode="food" aria-pressed="false">Food</button>
                 <button type="button" class="btn" data-insight-mode="activity" aria-pressed="false">Activity</button>
+                <button type="button" class="btn" data-insight-mode="protein" aria-pressed="false">Protein Sources</button>
             </div>
 
             <p class="hint" id="insight-mode-status"></p>
@@ -861,7 +862,7 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Work Log</h2>
+                <h2>Work</h2>
                 <!-- "Log Time", matching the modal it opens — "Log a Day" collided
                      with Physique's button of the same name in the Health tab. -->
                 <button id="log-today-btn" class="btn btn-primary panel-header-btn">Log Time</button>
@@ -936,7 +937,7 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Travel Log</h2>
+                <h2>Travel</h2>
                 <button id="add-travel-btn" class="btn btn-primary panel-header-btn">Log a Travel</button>
             </div>
 
@@ -983,7 +984,7 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Application Log</h2>
+                <h2>Application</h2>
                 <button id="add-application-btn" class="btn btn-primary panel-header-btn">Log an Application</button>
             </div>
 
@@ -1502,6 +1503,18 @@
             </label>
         </fieldset>
 
+        <fieldset class="formula-solve-for formula-activity-pin-mode">
+            <legend>Which stays fixed on the activity target as your weight changes</legend>
+            <label title="Holds τ, the activity minutes target. The calorie burn it implies falls as you get lighter, since the same minutes move less body mass.">
+                <input type="radio" name="formula-activity-pin-mode" value="time" checked>
+                Pin target activity time
+            </label>
+            <label title="Holds this calorie burn. The minutes needed to reach it rise as you get lighter, since it takes more time to burn the same calories at a lower body mass.">
+                <input type="radio" name="formula-activity-pin-mode" value="calorie">
+                Pin target calorie burn
+            </label>
+        </fieldset>
+
         <p class="hint" id="formula-profile-note"></p>
         <p id="formula-status" class="status" hidden></p>
 
@@ -1825,7 +1838,8 @@
 <script src="assets/script/insight.js"></script>
 <script src="assets/script/food-insight.js"></script>
 <script src="assets/script/activity-insight.js"></script>
-<!-- After the three above: INSIGHT_MODES reads their prompt constants by value. -->
+<script src="assets/script/protein-source-rotation-insight.js"></script>
+<!-- After the four above: INSIGHT_MODES reads their prompt constants by value. -->
 <script src="assets/script/insight-panel.js"></script>
 <script src="assets/script/formula-playground.js"></script>
 <script src="assets/script/protein-rotation.js"></script>

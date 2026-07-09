@@ -172,7 +172,7 @@ function renderNutritionList() {
 
   if (pageItems.length === 0) {
     const message = allNutritionEntries.length === 0
-      ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add Ingredient" to add one yourself.'
+      ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add" in the panel heading to add one yourself.'
       : 'No ingredients match your search.';
     tbody.appendChild(renderEmptyRow(10, message));
   }

@@ -157,8 +157,14 @@ function renderWorkoutPlanProgress() {
     box.title = quantity !== undefined ? `Already logged today: ${quantity}` : '';
   });
 
-  document.getElementById('log-workout-btn').textContent =
-    logged.size ? "Add to Today's Workout" : 'Log a Workout';
+  // Short either way — the heading line holds three buttons, and a phone runs out of
+  // room long before "Add to Today's Workout" fits. "Log More", not "Add": the panel's
+  // other button is already Add (a catalogue row), and these two do different things.
+  const logBtn = document.getElementById('log-workout-btn');
+  logBtn.textContent = logged.size ? 'Log More' : 'Log';
+  logBtn.title = logged.size
+    ? "Add the newly ticked activities to today's workout"
+    : "Log the ticked activities as today's workout";
 }
 
 function initWorkoutPlan() {

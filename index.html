@@ -480,10 +480,12 @@
 
         <div class="panel" id="workout-plan-panel">
             <div class="panel-header">
-                <h2>Activity Plan</h2>
-                <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add Activity</button>
-                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Instruction</button>
-                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn">Log a Workout</button>
+                <h2>Activity</h2>
+                <!-- Three buttons on one phone heading line, so each label is cut to a
+                     word and carries the full wording in its tooltip. -->
+                <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
+                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
+                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
             </div>
 
             <!-- Rebuilt from the Activities sheet tab by activities.js -->
@@ -493,7 +495,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Physique</h2>
-                <button id="add-physique-btn" class="btn btn-primary panel-header-btn">Log a Day</button>
+                <button id="add-physique-btn" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
             </div>
 
             <div class="filters">
@@ -540,8 +542,11 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Nutrition Facts</h2>
-                <button id="add-nutrition-btn" class="btn btn-primary panel-header-btn">Add Ingredient</button>
+                <!-- "Nutrition", not "Nutrition Facts": the sheet tab it reads keeps the
+                     longer name, but the heading only has to share its line with a
+                     button. -->
+                <h2>Nutrition</h2>
+                <button id="add-nutrition-btn" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
             </div>
 
             <div class="filters">
@@ -747,7 +752,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Transaction</h2>
-                <button id="add-transaction-btn" class="btn btn-primary panel-header-btn">Log a Transaction</button>
+                <button id="add-transaction-btn" class="btn btn-primary panel-header-btn" title="Log a transaction">Log</button>
             </div>
 
             <div class="panel-actions">
@@ -813,7 +818,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Account Summary</h2>
-                <button id="add-account-btn" class="btn btn-primary panel-header-btn">Add Account</button>
+                <button id="add-account-btn" class="btn btn-primary panel-header-btn" title="Add an account">Add</button>
             </div>
 
             <!-- The reconciliation readout stays put: it's a status line about the
@@ -863,9 +868,9 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Work</h2>
-                <!-- "Log Time", matching the modal it opens — "Log a Day" collided
-                     with Physique's button of the same name in the Health tab. -->
-                <button id="log-today-btn" class="btn btn-primary panel-header-btn">Log Time</button>
+                <!-- One word, like every other panel's action button. Which day and what
+                     it logs is the modal's job to say; the tooltip carries the long form. -->
+                <button id="log-today-btn" class="btn btn-primary panel-header-btn" title="Log time for a day">Log</button>
             </div>
 
             <!-- What used to be a separate "Work Analytics" panel: the charts read
@@ -938,7 +943,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Travel</h2>
-                <button id="add-travel-btn" class="btn btn-primary panel-header-btn">Log a Travel</button>
+                <button id="add-travel-btn" class="btn btn-primary panel-header-btn" title="Log a travel entry">Log</button>
             </div>
 
             <!-- What used to be a separate "Travel Insights" panel, same as Work
@@ -985,7 +990,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Application</h2>
-                <button id="add-application-btn" class="btn btn-primary panel-header-btn">Log an Application</button>
+                <button id="add-application-btn" class="btn btn-primary panel-header-btn" title="Log a job application">Log</button>
             </div>
 
             <div class="filters">
@@ -998,7 +1003,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Contact List</h2>
-                <button id="add-contact-btn" class="btn btn-primary panel-header-btn">Add Contact</button>
+                <button id="add-contact-btn" class="btn btn-primary panel-header-btn" title="Add a contact">Add</button>
             </div>
 
             <div class="panel-actions">
@@ -1041,7 +1046,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Settings</h2>
-                <button id="add-setting-btn" class="btn btn-primary panel-header-btn">Add Setting</button>
+                <button id="add-setting-btn" class="btn btn-primary panel-header-btn" title="Add a setting">Add</button>
             </div>
 
             <div class="table-responsive">
@@ -1221,6 +1226,10 @@
                     <option>PROTEIN_TARGET_G_PER_KG</option>
                     <option>PROTEIN_TARGET_G_PER_KG_MIN</option>
                     <option>PROTEIN_TARGET_G_PER_KG_MAX</option>
+                    <option>PROTEIN_TARGET_G_MIN</option>
+                    <option>PROTEIN_TARGET_G_MAX</option>
+                    <option>PROTEIN_G_PER_KG_LBM_MIN</option>
+                    <option>PROTEIN_G_PER_KG_LBM_MAX</option>
                     <option>HEIGHT_CM</option>
                     <option>BIRTH_DATE</option>
                     <option>SEX</option>
@@ -1457,6 +1466,18 @@
                 <input type="text" id="formula-weekly-loss" inputmode="decimal">
                 <span class="formula-unit">kg/week</span>
             </label>
+            <label class="formula-row">
+                <span class="formula-sym">p_min</span>
+                <span class="formula-name">protein floor per kg of lean mass</span>
+                <input type="text" id="formula-protein-per-kg-min" inputmode="decimal">
+                <span class="formula-unit">g/kg LBM/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">p_max</span>
+                <span class="formula-name">protein ceiling per kg of lean mass</span>
+                <input type="text" id="formula-protein-per-kg-max" inputmode="decimal">
+                <span class="formula-unit">g/kg LBM/day</span>
+            </label>
             <div class="formula-row formula-row-fixed">
                 <span class="formula-sym">ρ</span>
                 <span class="formula-name">fat energy density</span>
@@ -1487,8 +1508,33 @@
                 <input type="date" id="formula-eta">
                 <span class="formula-unit" id="formula-eta-note"></span>
             </label>
+            <!-- Last, and always readonly: derived from m, h, σ and the p_min/p_max pair,
+                 and no "Solve for" mode turns them into inputs — no calorie identity
+                 involves protein, so they compute in all four. -->
+            <label class="formula-row">
+                <span class="formula-sym">LBM</span>
+                <span class="formula-name">lean body mass — Boer (1984)</span>
+                <input type="text" id="formula-lbm" inputmode="decimal" readonly>
+                <span class="formula-unit">kg</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">P_min</span>
+                <span class="formula-name">daily protein target, lower end</span>
+                <input type="text" id="formula-protein-min" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">P_max</span>
+                <span class="formula-name">daily protein target, upper end</span>
+                <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
         </div>
 
+        <!-- LBM, P_min and P_max trace their arithmetic here alongside every other
+             substituted term, rather than in a block of their own — appended in all four
+             modes by renderFormulaSubstituted itself, since no calorie identity involves
+             protein and a failed calorie solve has no bearing on them. -->
         <div id="formula-substituted" class="formula-substituted"></div>
 
         <fieldset class="formula-solve-for formula-pin-mode">

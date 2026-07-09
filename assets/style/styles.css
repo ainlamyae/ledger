@@ -2728,7 +2728,7 @@ td .btn {
     /* No divider between rows: the boxed inputs already mark where one variable
        ends and the next begins, so the rules were 14 lines of ink doing nothing
        but adding height. */
-    padding: .15rem 0;
+    padding: .05rem 0;
     font-size: .8rem;
 }
 
@@ -2752,12 +2752,17 @@ td .btn {
     opacity: .85;
 }
 
+/* The list runs to 18 variables, so each row's height is paid 18 times: the boxes carry
+   the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) but give
+   up the vertical padding and the inherited line-height around it, which is where a
+   field's height actually comes from. ~9px a row, ~160px off the modal. */
 .formula-row input,
 .formula-row select {
     width: 100%;
     font: inherit;
     font-size: var(--input-font-size);
-    padding: .3rem .4rem;
+    padding: .15rem .4rem;
+    line-height: 1.15;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
     background: var(--color-surface);
@@ -2773,7 +2778,8 @@ td .btn {
 .formula-fixed {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: var(--input-font-size);
-    padding: .3rem .4rem;
+    padding: .15rem .4rem;
+    line-height: 1.15;
     /* Left, like the text inside every input above it — it used to be centred,
        which left 7700 and 200 visibly offset from the column of editable
        figures they sit under. */
@@ -2812,7 +2818,7 @@ td .btn {
     .formula-row input,
     .formula-row select,
     .formula-fixed {
-        padding: .3rem .25rem;
+        padding: .15rem .25rem;
     }
 
     /* Right-aligned so each value sits against its own unit rather than

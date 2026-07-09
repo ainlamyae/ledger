@@ -94,7 +94,7 @@ function renderTravelList() {
 
   if (pageItems.length === 0) {
     const message = allTravel.length === 0
-      ? 'No travel entries yet — click "Log a Travel" to get started.'
+      ? 'No travel entries yet — click "Log" in the panel heading to get started.'
       : 'No travel entries match your search.';
     tbody.appendChild(renderEmptyRow(8, message));
   }

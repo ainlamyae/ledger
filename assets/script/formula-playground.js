@@ -34,6 +34,15 @@ const FORMULA_FIELDS = [
   { key: 'BODY_MASS_TARGET_KG', inputId: 'formula-target', fallback: () => BODY_MASS_TARGET_KG_DEFAULT },
 ];
 
+// The lean-mass protein band: its own pair of fields, kept out of FORMULA_FIELDS on
+// purpose. Those are read unconditionally and a blank one invalidates the whole calorie
+// preview — but protein feeds nothing in the calorie identities, so an empty p_min
+// should only stop protein from being computed and saved, not the target.
+const PROTEIN_FORMULA_FIELDS = [
+  { key: 'PROTEIN_G_PER_KG_LBM_MIN', inputId: 'formula-protein-per-kg-min', fallback: () => PROTEIN_G_PER_KG_LBM_MIN_DEFAULT },
+  { key: 'PROTEIN_G_PER_KG_LBM_MAX', inputId: 'formula-protein-per-kg-max', fallback: () => PROTEIN_G_PER_KG_LBM_MAX_DEFAULT },
+];
+
 // Which box each "Solve for" radio value fills in. Activity intensity (MET)
 // isn't offered as a solvable target — only τ, on the activity side, is.
 const FORMULA_SOLVE_FIELD_ID = {
@@ -133,7 +142,12 @@ Body mass at which Eᵢₙ becomes maintenance
     m∞   =  (Eᵢₙ  −  A) / B
 Exponential decay toward m∞, not linear loss
     m(t) =  m∞  +  (m − m∞) × e^(−B×t/ρ)
-    t    =  (ρ / B) × ln[ (m − m∞) / (m_g − m∞) ]`;
+    t    =  (ρ / B) × ln[ (m − m∞) / (m_g − m∞) ]
+Lean body mass — Boer (1984)
+    LBM  =  0.407×m  +  0.267×h  −  19.2      (♂)
+    LBM  =  0.252×m  +  0.473×h  −  48.3      (♀)
+Daily protein band, scaled to lean mass
+    P_min = p_min × LBM        P_max = p_max × LBM`;
 
 function formulaFieldValue(field) {
   return getSetting(field.key, null) ?? field.fallback();
@@ -261,12 +275,25 @@ function readFormulaInputs() {
 // (BMR/Eₐ/D would describe maintenance at the current mass, which this mode
 // never claims equals the typed Eᵢₙ); DELTA_M runs the TARGET_MASS half
 // backwards for m∞→Eᵢₙ, then continues on into BMR→Eₐ→D→Δm.
+// The lean-mass protein rows are appended here rather than by each mode: they're the same
+// three lines in all four, and `null` (a failed calorie solve) blanks the calorie half
+// while leaving them — nothing about LBM or the protein band depends on that solve. This
+// is also where the three protein BOXES are filled, so a shown figure and its shown
+// arithmetic always come from one read of the inputs.
 function renderFormulaSubstituted(rows) {
   const el = document.getElementById('formula-substituted');
   el.innerHTML = '';
-  if (rows === null) return;
+  // Guarded, and deliberately: this element is cleared above, so anything thrown while
+  // building the protein half would leave the whole trace — BMR, Eₐ, D, Eᵢₙ, A, B, m∞, t
+  // — blank, which is a far worse failure than three missing protein lines.
+  let proteinRows = [];
+  try {
+    proteinRows = renderProteinFields();
+  } catch (err) {
+    console.error('Protein band failed to render', err);
+  }
 
-  rows.forEach(([label, value]) => {
+  [...(rows ?? []), ...proteinRows].forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
@@ -345,6 +372,72 @@ function solveBForTypedDays({ deficit, massToLose, t, rho }) {
     if (Math.sign(h(mid)) === Math.sign(hLo)) low = mid; else high = mid;
   }
   return (low + high) / 2;
+}
+
+// LBM and the protein band it implies, from whatever m, h and σ currently read — or
+// null when any of the four numbers it needs is missing. Solving for something else
+// never changes this: no calorie identity involves protein, so it's the one block here
+// that's the same in all four modes.
+//
+// Boer takes the CURRENT body mass, not m_g, and what Save writes is the resulting
+// grams rather than a per-kg rule. That's what keeps the target from sliding down as
+// you diet — the g/kg band in charts.js needs BODY_MASS_TARGET_KG as its basis for
+// exactly that reason, whereas a gram figure is already frozen at the mass it was
+// computed from, and only moves when you re-save here.
+function readProteinFormula() {
+  const bodyMassKg = formulaNumber('formula-body-mass');
+  const heightCm = formulaNumber('formula-height');
+  const sex = document.getElementById('formula-sex').value;
+  const perKgMin = formulaNumber('formula-protein-per-kg-min');
+  const perKgMax = formulaNumber('formula-protein-per-kg-max');
+  if (bodyMassKg === null || heightCm === null || perKgMin === null || perKgMax === null) return null;
+
+  // Rounded to 0.1 kg BEFORE the grams are taken off it, not just for display: the trace
+  // below shows `p × LBM = P`, and a hidden extra decimal in LBM is exactly what would
+  // make that line fail to multiply out by a gram.
+  const raw = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  const lbmKg = Math.round(raw * 10) / 10;
+
+  // Sorted, so a band typed in backwards still reads as a band — the same courtesy
+  // getProteinGPerKgBand extends to the g/kg pair.
+  const low = Math.min(perKgMin, perKgMax);
+  const high = Math.max(perKgMin, perKgMax);
+  return {
+    bodyMassKg, heightCm, sex, lbmKg, perKgMin: low, perKgMax: high,
+    minG: Math.round(lbmKg * low),
+    maxG: Math.round(lbmKg * high),
+  };
+}
+
+// The three protein boxes, and the [label, substituted] rows the trace below appends for
+// them — always as a pair, so a shown number and its shown arithmetic come from the same
+// read. Empty rows when the band isn't computable, which is the trace's own "nothing to
+// say" for these three, not a failure of the calorie solve.
+function renderProteinFields() {
+  const protein = readProteinFormula();
+
+  // A dash in all three boxes is the whole message: which of m, h, p_min, p_max is
+  // missing is already visible in the box that's empty, and #formula-profile-note is
+  // reporting it for the calorie solve too.
+  if (protein === null) {
+    ['formula-lbm', 'formula-protein-min', 'formula-protein-max'].forEach((id) => setComputedField(id, '—'));
+    return [];
+  }
+
+  const { lbmKg, perKgMin, perKgMax, minG, maxG, bodyMassKg, heightCm, sex } = protein;
+  setComputedField('formula-lbm', String(lbmKg));
+  setComputedField('formula-protein-min', String(minG));
+  setComputedField('formula-protein-max', String(maxG));
+
+  const coefficients = sex === 'male'
+    ? `0.407 × ${bodyMassKg} + 0.267 × ${heightCm} − 19.2`
+    : `0.252 × ${bodyMassKg} + 0.473 × ${heightCm} − 48.3`;
+  return [
+    ['LBM', `${coefficients}  =  ${lbmKg} kg`],
+    ['P_min', `${perKgMin} × ${lbmKg}  =  ${minG} g/day`],
+    ['P_max', `${perKgMax} × ${lbmKg}  =  ${maxG} g/day`],
+  ];
 }
 
 function renderFormulaPreview() {
@@ -589,7 +682,7 @@ function renderFormulaPreview() {
 }
 
 function loadFormulaInputsFromSettings() {
-  FORMULA_FIELDS.forEach((field) => {
+  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS].forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
   });
   // Seeded from the same places the charts read, so the figure shown on open
@@ -669,6 +762,18 @@ async function saveFormulaSettings() {
     overrides[ACTIVITY_TARGET_PIN_KEY] = activityPinned ? activityKcalToPin : '';
   }
 
+  // Both the rule and the grams it produced. The per-kg pair is only ever read back into
+  // these two boxes, while PROTEIN_TARGET_G_MIN/MAX is what the tile, the chart and the
+  // Insight prompt actually use — so the sheet keeps the reasoning next to the result
+  // instead of leaving two unexplained gram figures behind.
+  const protein = readProteinFormula();
+  if (protein !== null) {
+    overrides.PROTEIN_G_PER_KG_LBM_MIN = protein.perKgMin;
+    overrides.PROTEIN_G_PER_KG_LBM_MAX = protein.perKgMax;
+    overrides.PROTEIN_TARGET_G_MIN = protein.minG;
+    overrides.PROTEIN_TARGET_G_MAX = protein.maxG;
+  }
+
   const saveBtn = document.getElementById('formula-save-btn');
   const statusEl = document.getElementById('formula-status');
   const originalLabel = saveBtn.textContent;
@@ -693,7 +798,10 @@ async function saveFormulaSettings() {
     const activityNote = activityPinned
       ? `Activity burn is pinned at ${activityKcalToPin} kcal/day — the activity tile and chart now show the minutes that takes, rising as your body mass falls.`
       : 'Activity time (τ) is what stays fixed on the activity target; the calorie burn it implies falls as your body mass does.';
-    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote}`);
+    const proteinNote = protein === null
+      ? 'The protein band was left alone — it needs body mass, height and both per-kg ends.'
+      : `Protein target is now ${protein.minG}–${protein.maxG} g/day, from ${protein.perKgMin}–${protein.perKgMax} g per kg of ${protein.lbmKg} kg lean mass.`;
+    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {
@@ -707,7 +815,8 @@ function initFormulaPlayground() {
   // a button inside it would close the panel on the way to opening the modal.
   document.getElementById('formula-playground-btn').addEventListener('click', openFormulaPlayground);
 
-  [...FORMULA_FIELDS.map((f) => f.inputId), 'formula-body-mass', 'formula-height', 'formula-age'].forEach((id) => {
+  [...FORMULA_FIELDS.map((f) => f.inputId), ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
+    'formula-body-mass', 'formula-height', 'formula-age'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderFormulaPreview);
   });
   document.getElementById('formula-sex').addEventListener('change', renderFormulaPreview);

@@ -133,7 +133,7 @@ function renderContactsList() {
 
   if (pageItems.length === 0) {
     const message = allContacts.length === 0
-      ? 'No contacts yet — click "Add Contact" to get started.'
+      ? 'No contacts yet — click "Add" in the panel heading to get started.'
       : 'No contacts match your search.';
     tbody.appendChild(renderEmptyRow(7, message));
   }

@@ -110,7 +110,7 @@ function workoutNoteMinutes(notes) {
 function estimateWorkoutActivity(notes, bodyMassKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
-    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log a Workout button, or write one \"Nx  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
+    throw new Error("Couldn't find any exercises in Notes — log via the Activity panel's Log button, or write one \"Nx  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
   }
 
   let totalSeconds = 0;

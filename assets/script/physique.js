@@ -333,7 +333,7 @@ function renderPhysiqueList() {
 
   if (pageEntries.length === 0) {
     const message = allPhysiqueEntries.length === 0
-      ? 'No days logged yet — click "Log a Day" to get started.'
+      ? 'No days logged yet — click "Log" in the panel heading to get started.'
       : 'No days match this filter.';
     tbody.appendChild(renderEmptyRow(10, message));
   }

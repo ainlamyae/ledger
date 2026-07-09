@@ -56,7 +56,12 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Every form field has a 16px floor so mobile browsers never auto-zoom on focus.
 - Modals are full-width on phones; cards cap at a fixed column width on wide screens.
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
-- **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it — Log a Day, Add Ingredient, Log a Transaction, Add Account, Log Time, Add Setting and the rest. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
+- **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
+- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition Facts, Accounts, Contacts, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
+  - Driven by **Activity**, the one panel carrying three of them (**Add**, **Guide**, **Log**): "Activity Plan" + "Add Activity" + "Instruction" + "Log a Workout" could not share a phone's heading line, and `.panel-header` wraps rather than squeezing the heading, so the labels were what had to give.
+  - Modal `<h2>`s keep the long form (*Log a Transaction*, *Add Ingredient*) — a heading has the width, and it's where you land after clicking.
+  - Empty-state hints quote the new label (`click "Log" in the panel heading`), so no text in the app names a button that no longer exists.
+  - The one exception is the timesheet **reminder banner**'s Log Time — a standalone CTA in a sentence, not a crowded heading.
 - **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicators.
 - **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
@@ -140,6 +145,14 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - Every term of the calorie-target and forecast algebra, with your own numbers substituted in — not a black box you have to trust.
 - **Solve for** any one of Calories, Target body mass, Activity target or Weekly fat loss; the rest are inputs and the picked one is computed. Activity target and Weekly fat loss also let you type either Eᵢₙ or `t` and compute whichever you didn't touch.
 - Edits are live and local until **Save** writes them back to `Settings`; `projectTargetDays` is shared with the Body Mass chart, so the two can never disagree about a date.
+- **Box order is the order the algebra runs**: the profile and the knobs (`m`, `m_g`, `h`, `a`, `σ`, `MET`, `τ`, `κ`, `Δm`, `p_min`, `p_max`), the two population constants (`ρ`, `ε`), then the answers — `Eᵢₙ`, `t`, the arrival date, and the lean-mass block last.
+  - 18 rows, so each row's height is paid 18 times: the boxes keep the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) and give up their vertical padding and leading instead — `.15rem` and `line-height: 1.15`, about 9px a row off an already-tall modal.
+- **Lean body mass and the protein band it implies** close out the list: `LBM` (Boer 1984), then `P_min = p_min × LBM` and `P_max = p_max × LBM` from the editable `p_min`/`p_max` pair (defaults 1.8 and 2.2 g per kg of lean mass). All three are readonly in every mode, and trace their arithmetic in the substituted block with everything else.
+  - Independent of **Solve for** — no calorie identity involves protein — so they compute in all four modes, and survive a calorie solve that can't complete.
+  - The trace element is cleared before it's rebuilt, so the protein half is built inside a `try/catch`: three missing protein lines beat a blank trace where `BMR / Eₐ / D / Eᵢₙ / A / B / m∞ / t` used to be.
+  - **Save writes the grams**, to `PROTEIN_TARGET_G_MIN` / `PROTEIN_TARGET_G_MAX`, which outrank the g/kg-of-body-mass band everywhere the protein target is read (tile, chart, Insight, rotation). The `p_min`/`p_max` rule is saved too (`PROTEIN_G_PER_KG_LBM_MIN` / `_MAX`) so the sheet keeps the reasoning next to the result.
+  - LBM is taken at your **current** body mass, and rounded to 0.1 kg before the grams come off it — so the traced `p × LBM` line multiplies out exactly, and the saved grams stay put as you diet instead of shrinking with every weigh-in.
+  - `p_min`/`p_max` are deliberately **not** in `FORMULA_FIELDS`: those are read unconditionally and one blank invalidates the whole calorie preview, which nothing about protein should be able to do.
 - **Which stays fixed as you lose weight** — the one decision the algebra can't make for you:
   - **Pin target deficit/fat loss** (default) — holds your pace. Every weigh-in recalculates the intake that delivers it, so calories fall as you lighten. A straight line to the goal.
   - **Pin target daily intake** — holds the calorie number. Maintenance falls as you lighten, so the deficit shrinks and loss decelerates. This is the constant-Eᵢₙ journey `projectTargetDays` actually solves, so pinning it is what makes the number you eat and the date you're shown the same plan.
@@ -182,21 +195,22 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Activity Plan
 
+- The panel heading reads **Activity**, and its three buttons are one word each — **Add**, **Guide**, **Log** — the reason for the app-wide convention in [Layout and interaction](#layout-and-interaction). "Log More" is the one two-word label, and only when something is already logged: **Add** next to it means a catalogue row, not another set.
 - Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row a "Done" checkbox.
 - **All seven tables are one grid.** Five columns each — a NEAT row carries an empty Rest cell — with the four right-hand columns pinned to the same widths, so Sets x Reps, Rest, Done and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~526px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
 - **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover.
-- **Log a Workout sends only what's newly ticked**, and extends today's entry instead of opening a second row.
-  - The button reads "Add to Today's Workout" once something is already logged.
+- **Log sends only what's newly ticked**, and extends today's entry instead of opening a second row.
+  - The button reads "Log More" once something is already logged.
   - Free text already in the note is preserved; the description re-derives from everything in the session.
 - Duration counts active time only — rest, warm-up and transitions are excluded. The per-rep tempo is yours to set (`WORKOUT_REP_SEC`, default 3 s — a controlled machine rep is nearer 4-5), as is the steps-per-minute ratio (`WORKOUT_STEPS_PER_MIN`, default 100).
 - After Calculate, an **activity table** under the Workout field shows the working per exercise — its quantity, the MET it was priced at, its minutes and its kcal — summed to a Total row. Nothing about it is stored; it's local arithmetic over the Workout text, recomputed whenever the day is opened.
 - Opens the Physique day form pre-filled on today's row, then runs the workout half of Calculate; nothing is written until you Save.
-- **The catalogue is editable in the app.** ✏️ / 📋 / 🗑️ on every plan row, and **Add Activity** beside Instruction in the panel heading — same shape as Nutrition Facts' ingredient form, the app's other user-owned catalogue. One modal covers all eight columns, with datalists of the Categories, Groups and Muscle Groups already in use so a free-text column doesn't fragment into `Push`/`push`/`Pusg`.
+- **The catalogue is editable in the app.** ✏️ / 📋 / 🗑️ on every plan row, and **Add** in the panel heading — same shape as Nutrition Facts' ingredient form, the app's other user-owned catalogue. One modal covers all eight columns, with datalists of the Categories, Groups and Muscle Groups already in use so a free-text column doesn't fragment into `Push`/`push`/`Pusg`.
   - **Name is guarded as the join key.** A second row under an existing name wouldn't be a duplicate, it would be invisible — `activitiesByName` keeps one entry per name, so the newer row would shadow the older everywhere (MET, muscle group, the plan's ticks). Saving one is refused with the clash named; 📋 Duplicate pre-fills `… (copy)` so it saves cleanly and can be renamed.
   - Sets x Reps and Rest are two inputs but one cell (column E), rejoined on the comma `splitAmountAndRest` splits on — verified to round-trip byte-for-byte, including a hold's own `3 x 45 sec, 45 sec`.
   - Deleting a row leaves days already logged against it untouched: those lines are free text on a Physique day. They just lose their own MET and stack under `Other` if recalculated, which the confirmation says out loud.
   - The row actions sit **last**, after Done: `strength-plan.js` reads a ticked row's name from `children[0]` and its quantity from `children[1]`, so anything new has to go on the end. Rebuilding the tables also re-applies today's ticks, so an edit doesn't make the plan look unlogged.
-- **Instruction** in the panel heading opens "Instructions on the Activities" — all 34 strength exercises, grouped by category (Legs / Push / Pull / Full Body / Core & Bodyweight) rather than by the day they fall on.
+- **Guide** in the panel heading opens "Instructions on the Activities" — all 34 strength exercises, grouped by category (Legs / Push / Pull / Full Body / Core & Bodyweight) rather than by the day they fall on.
   - Every figure shows the **muscle worked picked out in red**. 23 are **animated loops**; the remaining 11 are stills carrying **the start and the finish side by side**.
   - Under each name, at plain weight: the **muscle group** it trains and its **sets × reps · rest** — both straight from the `Activities` sheet, so the modal can't disagree with the plan table.
   - Animated and still differ by nothing but file extension — a browser loops a GIF in a plain `<img>`, so there is no `<video>` element and no fallback path. Which file a row gets is simply what its `Image` cell on the `Activities` tab points at.
@@ -218,6 +232,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Nutrition Facts
 
+- The panel heading reads **Nutrition**; `Nutrition Facts` stays the name of the sheet tab behind it, and of the Source label a Calculate row gets when it matched that tab.
 - Searchable, sortable ingredient table backed by its own sheet tab.
 - **Classification** is the first column — a free-text grouping (Dairy, Poultry, Grain).
   - The Add/Edit form offers a datalist of classifications already in use, so the column doesn't fragment.
@@ -419,7 +434,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 28 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
 | 29 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
 | 30 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 31 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, save back to `Settings`, and the deficit/intake and time/calorie-burn pins |
+| 31 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the lean-mass protein band, save back to `Settings`, and the deficit/intake and time/calorie-burn pins |
 | 32 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
 | 33 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
 | 34 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
@@ -651,7 +666,14 @@ BMI                = bodyMassKg / (heightCm/100)²
 age                = years since BIRTH_DATE (−1 before this year's birthday)
 bodyFat%           = 1.20·BMI + 0.23·age − 10.8·(sex==male ? 1 : 0) − 5.4
                      clamped to [3, 60]                       (Deurenberg 1991)
+LBM (kg)           = 0.407·kg + 0.267·cm − 19.2     ♂       (Boer 1984)
+                   = 0.252·kg + 0.473·cm − 48.3     ♀
+                     rounded to 0.1 kg before anything scales off it
+```
 
+- **Boer, not `kg × (1 − bodyFat%)`.** That route would square a BMI-only approximation; Boer was regressed against measured lean mass directly, and is the LBM equation clinical dosing uses. Age doesn't enter it. Lives in `charts.js` as `boerLeanBodyMassKg`, next to the Deurenberg chain it deliberately doesn't reuse.
+
+```
 trend[i]           = mean(values[i−2 … i+2])   centered SMA over logged points
 plateau            = |trend[last] − trend[start]| < 0.3 kg over ≥10 days, ≥3 points
 ```
@@ -781,13 +803,18 @@ fatEnergy  = fatMass × 7700
 ### Protein
 
 ```
-band (g/day) = { round(basisKg × gPerKg.low), round(basisKg × gPerKg.high) }
+band (g/day) = { PROTEIN_TARGET_G_MIN, PROTEIN_TARGET_G_MAX }          ← if either is set
+   else       = { round(basisKg × gPerKg.low), round(basisKg × gPerKg.high) }
    basisKg    = BODY_MASS_TARGET_KG, else the latest logged body mass
    fallback   = flat PROTEIN_TARGET_G as a zero-width band
 midpoint     = round((min + max) / 2)
 in band?     = g ≥ min AND (max == min OR g ≤ max)
 protein/100kcal = protein / calories × 100
 ```
+
+- Three sources, most specific first. The **absolute gram band wins**: it is already a mass × a per-kg figure (the playground's `p × LBM`), so re-scaling it by a basis mass would double-count. The g/kg band is next, and the flat `PROTEIN_TARGET_G` last.
+- Absolute grams don't drift as you diet — which is what the g/kg band needs `BODY_MASS_TARGET_KG` for. A gram figure is frozen at the lean mass it was computed from and only moves when you re-save the playground.
+- Written by the [Formula Playground](#health--formula-playground) as `p_min/p_max × LBM`, which is the only place in the app that scales anything to **lean** mass rather than total mass. Set the pair by hand on the `Settings` tab and it behaves the same; either end alone is enough, and a backwards pair is sorted.
 
 **Protein Source Rotation**, per tracked ingredient:
 
@@ -836,10 +863,10 @@ minutes  = max(1, round(Σ activeSec / 60))
 calories = Σ metKcal( MET(exercise) ?? 3.5, bodyMassKg, activeSecᵢ / 60 )
 ```
 
-- `activeSecondsForNoteLine` (`activity-estimator.js`) is the single place this is decided — Log a Workout's prefill and Calculate both read it.
+- `activeSecondsForNoteLine` (`activity-estimator.js`) is the single place this is decided — Log's prefill and Calculate both read it.
 - **Only the two converted units are tunable**, both from `Settings`: `WORKOUT_REP_SEC` (default `3`, a brisk tempo — a controlled machine rep is nearer 4-5 s) and `WORKOUT_STEPS_PER_MIN` (default `100`). A hold carries its own seconds and a cardio row its own minutes, so neither has anything to set. The tempo is global, not per exercise — the whole session moves together when you change it. `WORKOUT_STEPS_PER_MIN` also rescales the Activity chart and target, since both convert steps the same way.
 - Note parsing: `30x Name` → 30 total reps; legacy `3x10 Name` → 30; `135sec`, `30min`, `6000step`.
-- A second Log a Workout the same day appends its new lines to today's entry rather than opening a new row.
+- A second Log the same day appends its new lines to today's entry rather than opening a new row.
 
 ### Food logging (Calculate)
 

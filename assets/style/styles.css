@@ -1198,7 +1198,8 @@ td .btn {
 #wellness-form label,
 #contact-form label,
 #travel-form label,
-#application-form label {
+#application-form label,
+#setting-form label {
     display: block;
     margin-bottom: .6rem;
     font-size: .9rem;
@@ -1223,7 +1224,9 @@ td .btn {
 #travel-form input,
 #travel-form select,
 #application-form input,
-#application-form select {
+#application-form select,
+#setting-form input,
+#setting-form select {
     display: block;
     width: 100%;
     margin-top: .25rem;
@@ -1560,11 +1563,58 @@ td .btn {
     }
 
     .modal {
-        padding: 1rem;
+        padding: .5rem;
     }
 
     .modal-card {
-        padding: 1rem;
+        max-width: 320px;
+        padding: .85rem;
+    }
+
+    .modal-card h2 {
+        margin-bottom: .6rem;
+        font-size: 1.05rem;
+    }
+
+    #tx-form label,
+    #tx-bulk-edit-form label,
+    #account-form label,
+    #timesheet-form label,
+    #wellness-form label,
+    #contact-form label,
+    #travel-form label,
+    #application-form label,
+    #setting-form label {
+        margin-bottom: .35rem;
+        font-size: .82rem;
+    }
+
+    #tx-form input,
+    #tx-form select,
+    #tx-bulk-edit-form input,
+    #tx-bulk-edit-form select,
+    #account-form input,
+    #account-form select,
+    #timesheet-form input,
+    #timesheet-form select,
+    #timesheet-form textarea,
+    #wellness-form input,
+    #wellness-form select,
+    #wellness-form textarea,
+    #contact-form input,
+    #contact-form select,
+    #contact-form textarea,
+    #travel-form input,
+    #travel-form select,
+    #application-form input,
+    #application-form select,
+    #setting-form input,
+    #setting-form select {
+        padding: .4rem;
+    }
+
+    .modal-actions {
+        gap: .4rem;
     }
 
     .error-banner {

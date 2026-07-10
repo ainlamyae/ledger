@@ -7,10 +7,8 @@ let editingApplicationRow = null;
 const expandedApplicationRows = new Set();
 
 async function fetchApplicationsSheetId() {
-  const { sheets } = await getSpreadsheetMetadata();
-  const sheet = sheets.find((s) => s.properties.title === CONFIG.SHEETS.APPLICATIONS);
-  if (!sheet) throw new Error(`Sheet "${CONFIG.SHEETS.APPLICATIONS}" not found`);
-  return sheet.properties.sheetId;
+  const metadata = await getSpreadsheetMetadata();
+  return findSheetId(metadata, CONFIG.SHEETS.APPLICATIONS);
 }
 
 async function initApplications(forceRefresh = false) {
@@ -186,21 +184,10 @@ function buildApplicationCard(app) {
   const actions = document.createElement('div');
   actions.className = 'app-card-actions';
 
-  const editBtn = document.createElement('button');
-  editBtn.className = 'btn';
-  editBtn.textContent = '✏️';
-  editBtn.title = 'Edit';
-  editBtn.setAttribute('aria-label', 'Edit');
-  editBtn.addEventListener('click', (e) => { e.stopPropagation(); openApplicationForm(app); });
-
-  const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'btn';
-  deleteBtn.textContent = '🗑️';
-  deleteBtn.title = 'Delete';
-  deleteBtn.setAttribute('aria-label', 'Delete');
-  deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteApplication(app); });
-
-  actions.append(editBtn, deleteBtn);
+  actions.append(
+    makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (e) => { e.stopPropagation(); openApplicationForm(app); } }),
+    makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: (e) => { e.stopPropagation(); deleteApplication(app); } }),
+  );
   header.append(icon, title, actions);
 
   const toggle = () => {
@@ -260,7 +247,7 @@ function openApplicationForm(app) {
     document.getElementById(`application-${id}`).value = values[i];
   });
 
-  document.getElementById('application-form-error').hidden = true;
+  clearFieldError('application-form-error');
   document.getElementById('application-modal').hidden = false;
 }
 
@@ -271,7 +258,6 @@ function closeApplicationForm() {
 async function submitApplicationForm(event) {
   event.preventDefault();
 
-  const errorEl = document.getElementById('application-form-error');
   const [type, appNumber, date, action] = APPLICATION_FIELD_IDS.map((id) => document.getElementById(`application-${id}`).value.trim());
 
   try {
@@ -295,16 +281,14 @@ async function submitApplicationForm(event) {
     await refreshApplications(true);
     closeApplicationForm();
   } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('application-form-error', err.message);
   }
 }
 
 async function deleteApplication(app) {
   const historyNote = app.updates.length > 0 ? ` and its ${app.updates.length} status update(s)` : '';
-  if (!confirm(`Delete "${app.type} — ${app.appNumber}"${historyNote}? This cannot be undone.`)) return;
 
-  try {
+  await confirmAndDelete(`Delete "${app.type} — ${app.appNumber}"${historyNote}? This cannot be undone.`, async () => {
     if (!applicationsSheetId) applicationsSheetId = await fetchApplicationsSheetId();
     await batchUpdate([{
       deleteDimension: {
@@ -318,7 +302,5 @@ async function deleteApplication(app) {
     }]);
     expandedApplicationRows.delete(app.headerRow);
     await refreshApplications(true);
-  } catch (err) {
-    alert(`Couldn't delete application: ${err.message}`);
-  }
+  }, "Couldn't delete application");
 }

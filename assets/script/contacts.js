@@ -10,10 +10,8 @@ let editingContactRow = null;
 let selectedContactRows = new Set();
 
 async function fetchContactsSheetId() {
-  const { sheets } = await getSpreadsheetMetadata();
-  const sheet = sheets.find((s) => s.properties.title === CONFIG.SHEETS.CONTACTS);
-  if (!sheet) throw new Error(`Sheet "${CONFIG.SHEETS.CONTACTS}" not found`);
-  return sheet.properties.sheetId;
+  const metadata = await getSpreadsheetMetadata();
+  return findSheetId(metadata, CONFIG.SHEETS.CONTACTS);
 }
 
 async function initContacts(forceRefresh = false) {
@@ -57,40 +55,10 @@ function setupContactsBulkActions() {
 }
 
 function setupContactsSorting() {
-  document.querySelectorAll('#contacts-table th.sortable').forEach((th) => {
-    const label = document.createElement('span');
-    label.textContent = th.textContent;
-    const indicator = document.createElement('span');
-    indicator.className = 'sort-indicator';
-    th.textContent = '';
-    th.append(label, indicator);
-    th.setAttribute('tabindex', '0');
-
-    th.addEventListener('click', () => {
-      const key = th.dataset.sort;
-      if (cSort.key === key) {
-        cSort.dir *= -1;
-      } else {
-        cSort.key = key;
-        cSort.dir = 1;
-      }
-      updateContactsSortIndicators();
-      cCurrentPage = 1;
-      selectedContactRows.clear();
-      renderContactsList();
-    });
-    th.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); }
-    });
-  });
-  updateContactsSortIndicators();
-}
-
-function updateContactsSortIndicators() {
-  document.querySelectorAll('#contacts-table th.sortable').forEach((th) => {
-    const indicator = th.querySelector('.sort-indicator');
-    if (!indicator) return;
-    indicator.textContent = th.dataset.sort === cSort.key ? (cSort.dir === 1 ? ' ▲' : ' ▼') : '';
+  makeSortableHeaders('#contacts-table', cSort, () => {
+    cCurrentPage = 1;
+    selectedContactRows.clear();
+    renderContactsList();
   });
 }
 
@@ -173,13 +141,6 @@ function renderContactsList() {
   pageItems.forEach((c) => {
     const tr = document.createElement('tr');
 
-    const makeCell = (text, title) => {
-      const td = document.createElement('td');
-      td.textContent = text;
-      if (title) td.title = title;
-      return td;
-    };
-
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -207,22 +168,10 @@ function renderContactsList() {
     );
 
     const actionsCell = document.createElement('td');
-
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn';
-    editBtn.textContent = '✏️';
-    editBtn.title = 'Edit';
-    editBtn.setAttribute('aria-label', 'Edit');
-    editBtn.addEventListener('click', () => openContactForm(c));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn';
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.title = 'Delete';
-    deleteBtn.setAttribute('aria-label', 'Delete');
-    deleteBtn.addEventListener('click', () => deleteContact(c));
-
-    actionsCell.append(editBtn, deleteBtn);
+    actionsCell.append(
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openContactForm(c) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteContact(c) }),
+    );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);
   });
@@ -248,30 +197,15 @@ function updateContactsBulkActionsUI() {
 }
 
 function renderContactsPagination(totalPages) {
-  const container = document.getElementById('contacts-pagination');
-  container.innerHTML = '';
-  if (totalPages <= 1) return;
-
-  const prev = document.createElement('button');
-  prev.className = 'btn';
-  prev.textContent = '⬅️';
-  prev.title = 'Previous page';
-  prev.setAttribute('aria-label', 'Previous page');
-  prev.disabled = cCurrentPage === 1;
-  prev.addEventListener('click', () => { cCurrentPage--; selectedContactRows.clear(); renderContactsList(); });
-
-  const info = document.createElement('span');
-  info.textContent = `${cCurrentPage} of ${totalPages}`;
-
-  const next = document.createElement('button');
-  next.className = 'btn';
-  next.textContent = '➡️';
-  next.title = 'Next page';
-  next.setAttribute('aria-label', 'Next page');
-  next.disabled = cCurrentPage === totalPages;
-  next.addEventListener('click', () => { cCurrentPage++; selectedContactRows.clear(); renderContactsList(); });
-
-  container.append(prev, info, next);
+  renderPager('contacts-pagination', {
+    page: cCurrentPage,
+    totalPages,
+    onChange: (p) => {
+      cCurrentPage = p;
+      selectedContactRows.clear();
+      renderContactsList();
+    },
+  });
 }
 
 const CONTACT_FIELD_IDS = [
@@ -290,7 +224,7 @@ function openContactForm(contact) {
     document.getElementById(`contact-${id}`).value = contact ? (contact[id] || '') : '';
   });
 
-  document.getElementById('contact-form-error').hidden = true;
+  clearFieldError('contact-form-error');
   document.getElementById('contact-modal').hidden = false;
 }
 
@@ -304,11 +238,9 @@ async function submitContactForm(event) {
   const val = (id) => document.getElementById(`contact-${id}`).value.trim();
   const first = val('first');
   const last = val('last');
-  const errorEl = document.getElementById('contact-form-error');
 
   if (!first && !last) {
-    errorEl.textContent = 'Enter at least a first or last name.';
-    errorEl.hidden = false;
+    showFieldError('contact-form-error', 'Enter at least a first or last name.');
     return;
   }
 
@@ -323,8 +255,7 @@ async function submitContactForm(event) {
     await refreshContacts(true);
     closeContactForm();
   } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('contact-form-error', err.message);
   }
 }
 
@@ -333,9 +264,7 @@ function contactDisplayName(c) {
 }
 
 async function deleteContact(contact) {
-  if (!confirm(`Delete ${contactDisplayName(contact)}?`)) return;
-
-  try {
+  await confirmAndDelete(`Delete ${contactDisplayName(contact)}?`, async () => {
     if (!contactsSheetId) contactsSheetId = await fetchContactsSheetId();
     await batchUpdate([{
       deleteDimension: {
@@ -348,33 +277,32 @@ async function deleteContact(contact) {
       },
     }]);
     await refreshContacts(true);
-  } catch (err) {
-    alert(`Couldn't delete contact: ${err.message}`);
-  }
+  }, "Couldn't delete contact");
 }
 
 async function bulkDeleteContacts() {
   const selected = allContacts.filter((c) => selectedContactRows.has(c.row));
   if (selected.length === 0) return;
-  if (!confirm(`Delete ${selected.length} selected contact(s)?\n\n${selected.map(contactDisplayName).join(', ')}`)) return;
 
-  try {
-    if (!contactsSheetId) contactsSheetId = await fetchContactsSheetId();
-    // Descending by row so each request's startIndex/endIndex is still valid
-    // by the time the API processes the next one in the same batchUpdate call.
-    const requests = [...selected]
-      .sort((a, b) => b.row - a.row)
-      .map((c) => ({
-        deleteDimension: {
-          range: { sheetId: contactsSheetId, dimension: 'ROWS', startIndex: c.row - 1, endIndex: c.row },
-        },
-      }));
-    await batchUpdate(requests);
-    selectedContactRows.clear();
-    await refreshContacts(true);
-  } catch (err) {
-    alert(`Couldn't delete contacts: ${err.message}`);
-  }
+  await confirmAndDelete(
+    `Delete ${selected.length} selected contact(s)?\n\n${selected.map(contactDisplayName).join(', ')}`,
+    async () => {
+      if (!contactsSheetId) contactsSheetId = await fetchContactsSheetId();
+      // Descending by row so each request's startIndex/endIndex is still valid
+      // by the time the API processes the next one in the same batchUpdate call.
+      const requests = [...selected]
+        .sort((a, b) => b.row - a.row)
+        .map((c) => ({
+          deleteDimension: {
+            range: { sheetId: contactsSheetId, dimension: 'ROWS', startIndex: c.row - 1, endIndex: c.row },
+          },
+        }));
+      await batchUpdate(requests);
+      selectedContactRows.clear();
+      await refreshContacts(true);
+    },
+    "Couldn't delete contacts",
+  );
 }
 
 // Merges values from multiple contact list-type fields into one, deduplicating
@@ -458,49 +386,38 @@ async function mergeSelectedContacts() {
 
   const target = selected[0];
   const others = selected.slice(1);
+  const merged = mergeContactFields(target, others);
 
-  if (!confirm(
+  await confirmAndDelete(
     `Merge ${selected.length} contacts into "${contactDisplayName(target)}"?\n\n` +
     `${others.map(contactDisplayName).join(', ')} will be combined into "${contactDisplayName(target)}" ` +
     `and their rows deleted. Fields already filled on "${contactDisplayName(target)}" are kept as-is; ` +
-    `blanks are filled in from the others. This cannot be undone.`
-  )) return;
+    `blanks are filled in from the others. This cannot be undone.`,
+    async () => {
+      if (!contactsSheetId) contactsSheetId = await fetchContactsSheetId();
 
-  const merged = mergeContactFields(target, others);
+      await updateValues(`'${CONFIG.SHEETS.CONTACTS}'!A${target.row}:U${target.row}`, [contactToRowArray(merged)]);
 
-  try {
-    if (!contactsSheetId) contactsSheetId = await fetchContactsSheetId();
+      const deleteRequests = others
+        .map((c) => c.row)
+        .sort((a, b) => b - a)
+        .map((row) => ({
+          deleteDimension: {
+            range: { sheetId: contactsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
+          },
+        }));
+      await batchUpdate(deleteRequests);
 
-    await updateValues(`'${CONFIG.SHEETS.CONTACTS}'!A${target.row}:U${target.row}`, [contactToRowArray(merged)]);
-
-    const deleteRequests = others
-      .map((c) => c.row)
-      .sort((a, b) => b - a)
-      .map((row) => ({
-        deleteDimension: {
-          range: { sheetId: contactsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
-        },
-      }));
-    await batchUpdate(deleteRequests);
-
-    selectedContactRows.clear();
-    await refreshContacts(true);
-  } catch (err) {
-    alert(`Couldn't merge contacts: ${err.message}`);
-  }
+      selectedContactRows.clear();
+      await refreshContacts(true);
+    },
+    "Couldn't merge contacts",
+  );
 }
 
 function downloadCSV(filename, headerRow, rows) {
   const csv = [headerRow, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-
-  URL.revokeObjectURL(url);
+  downloadTextFile(filename, csv, 'text/csv;charset=utf-8;');
 }
 
 // Google Contacts' CSV import accepts a reduced header set (it doesn't require
@@ -532,7 +449,7 @@ function exportContactsGoogleCSV(contacts, label = '') {
     c.telegram ? 'Telegram' : '', c.telegram, c.telegram2 ? 'Telegram' : '', c.telegram2, c.tags,
   ]);
 
-  downloadCSV(`contacts-google${label}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+  downloadCSV(`contacts-google${label}-${todayStamp()}.csv`, header, rows);
 }
 
 // Standard Outlook CSV import template. LinkedIn/Telegram have no matching
@@ -556,5 +473,5 @@ function exportContactsOutlookCSV(contacts, label = '') {
     c.birthday, c.street, c.city, c.region, c.postal, c.country, c.website, c.tags, c.note,
   ]);
 
-  downloadCSV(`contacts-outlook${label}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+  downloadCSV(`contacts-outlook${label}-${todayStamp()}.csv`, header, rows);
 }

@@ -291,13 +291,7 @@ function renderTimesheetList() {
     }
 
     const actionsCell = document.createElement('td');
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn';
-    editBtn.textContent = '✏️';
-    editBtn.title = 'Edit';
-    editBtn.setAttribute('aria-label', 'Edit');
-    editBtn.addEventListener('click', () => openTimesheetForm(e.date));
-    actionsCell.appendChild(editBtn);
+    actionsCell.appendChild(makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTimesheetForm(e.date) }));
 
     tr.append(dateCell, dayCell, startCell, endCell, breakCell, durationCell, taskCell, actionsCell);
     if (weekend) tr.classList.add('timesheet-weekend');
@@ -310,36 +304,14 @@ function renderTimesheetList() {
 }
 
 function renderTsPagination(totalPages) {
-  const container = document.getElementById('ts-pagination');
-  container.innerHTML = '';
-  if (totalPages <= 1) return;
-
-  const prev = document.createElement('button');
-  prev.className = 'btn';
-  prev.textContent = '⬅️';
-  prev.title = 'Previous page';
-  prev.setAttribute('aria-label', 'Previous page');
-  prev.disabled = tsCurrentPage === 1;
-  prev.addEventListener('click', () => {
-    tsCurrentPage--;
-    renderTimesheetList();
+  renderPager('ts-pagination', {
+    page: tsCurrentPage,
+    totalPages,
+    onChange: (p) => {
+      tsCurrentPage = p;
+      renderTimesheetList();
+    },
   });
-
-  const info = document.createElement('span');
-  info.textContent = `${tsCurrentPage} of ${totalPages}`;
-
-  const next = document.createElement('button');
-  next.className = 'btn';
-  next.textContent = '➡️';
-  next.title = 'Next page';
-  next.setAttribute('aria-label', 'Next page');
-  next.disabled = tsCurrentPage === totalPages;
-  next.addEventListener('click', () => {
-    tsCurrentPage++;
-    renderTimesheetList();
-  });
-
-  container.append(prev, info, next);
 }
 
 function toggleTimesheetHolidayFields() {
@@ -380,7 +352,7 @@ function openTimesheetForm(dateStr) {
   toggleTimesheetHolidayFields();
   updateTimesheetLiveDuration();
 
-  document.getElementById('timesheet-form-error').hidden = true;
+  clearFieldError('timesheet-form-error');
   document.getElementById('timesheet-modal').hidden = false;
 }
 
@@ -427,10 +399,8 @@ async function submitTimesheetForm(event) {
   const breakValue = holiday ? '00:00' : (document.getElementById('timesheet-break').value || '00:00');
   const task = document.getElementById('timesheet-task').value;
 
-  const errorEl = document.getElementById('timesheet-form-error');
   if (!holiday && start && end && timeToMinutes(end) <= timeToMinutes(start)) {
-    errorEl.textContent = 'End time must be after Start time.';
-    errorEl.hidden = false;
+    showFieldError('timesheet-form-error', 'End time must be after Start time.');
     return;
   }
 
@@ -450,7 +420,6 @@ async function submitTimesheetForm(event) {
     await refreshTimeSheet(true);
     closeTimesheetForm();
   } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('timesheet-form-error', err.message);
   }
 }

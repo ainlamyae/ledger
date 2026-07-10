@@ -147,7 +147,8 @@ Lean body mass — Boer (1984)
     LBM  =  0.407×m  +  0.267×h  −  19.2      (♂)
     LBM  =  0.252×m  +  0.473×h  −  48.3      (♀)
 Daily protein band, scaled to lean mass
-    P_min = p_min × LBM        P_max = p_max × LBM`;
+    P_min =  p_min × LBM
+    P_max =  p_max × LBM`;
 
 function formulaFieldValue(field) {
   return getSetting(field.key, null) ?? field.fallback();

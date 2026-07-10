@@ -93,7 +93,10 @@ function onFormSubmit(formId, handler) {
 // double-fired while the sheet write is in flight.
 function makeRowActionButton({ emoji, title, onClick }) {
   const btn = document.createElement('button');
-  btn.className = 'btn';
+  // row-action-btn is a hook, not a style: it's how setupAuthGatedActions (app.js)
+  // recognises every ✏️/📋/🗑️ in the app as something that edits the sheet, without
+  // each table renderer having to opt in.
+  btn.className = 'btn row-action-btn';
   btn.textContent = emoji;
   btn.title = title;
   btn.setAttribute('aria-label', title);

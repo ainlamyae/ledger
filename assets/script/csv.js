@@ -9,6 +9,25 @@ function csvEscape(value) {
   return str;
 }
 
+function todayStamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Triggers a browser download of in-memory text content (CSV, etc.) without
+// a round trip to a server: wrap it in a Blob, point a throwaway <a> at an
+// object URL for it, click it, then release the URL.
+function downloadTextFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
 // Field-specific operator lists for the export filter builder. Amount is
 // numeric (comparison operators); the rest are plain text (substring/exact
 // match), matched case-insensitively.
@@ -201,16 +220,7 @@ function exportTransactionsCSV() {
   }
 
   const csv = [CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-
-  URL.revokeObjectURL(url);
+  downloadTextFile(`transactions-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
 }
 
 function parseCSV(text) {

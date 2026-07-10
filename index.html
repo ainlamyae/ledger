@@ -73,8 +73,6 @@
     </div>
 </header>
 
-<div id="top-banner" class="top-banner" hidden>"And will provide for him from where he does not expect."</div>
-
 <div id="gate" class="gate">
     <div class="landing">
         <div class="landing-hero">
@@ -93,6 +91,11 @@
             <div class="landing-feature">
                 <h3>Health Tracker</h3>
                 <p>Track Body Weight, Caloric Intake, Physical Activity, and Rest & Recovery. Charts show your last 7 days versus daily targets, and a Weight Forecast projects your goal arrival date.</p>
+            </div>
+
+            <div class="landing-feature">
+                <h3>AI Calorie Estimator</h3>
+                <p>Type what you ate in plain language and let AI do the math — ingredients are extracted automatically and calories are grounded against the USDA nutrition database for an accurate estimate.</p>
             </div>
 
             <div class="landing-feature">
@@ -175,7 +178,7 @@
                 </div>
             </div>
             <div class="widget-row widget-clock-row">
-                <span id="widget-clock-isfahan">—</span>
+                <span id="widget-clock-isfahan" class="widget-clock-time-value widget-clock-time-secondary">—</span>
                 <div class="location-picker" id="second-clock-picker">
                     <button type="button" id="second-clock-location-btn" class="location-picker-btn"></button>
 
@@ -193,9 +196,9 @@
 
         <div class="widget-card" id="widget-date">
             <h3>Date</h3>
-            <div class="widget-row" id="widget-date-gregorian">—</div>
-            <div class="widget-row" id="widget-date-shamsi">—</div>
-            <div class="widget-row" id="widget-date-ghamari">—</div>
+            <div class="widget-row widget-date-row" id="widget-date-gregorian">—</div>
+            <div class="widget-row widget-date-row" id="widget-date-shamsi">—</div>
+            <div class="widget-row widget-date-row" id="widget-date-ghamari">—</div>
         </div>
 
         <div class="widget-card" id="widget-prayer">
@@ -203,6 +206,7 @@
             <div class="widget-row"><span>Sobh</span><span id="widget-prayer-fajr">—</span></div>
             <div class="widget-row"><span>Zohr</span><span id="widget-prayer-dhuhr">—</span></div>
             <div class="widget-row"><span>Maghreb</span><span id="widget-prayer-maghrib">—</span></div>
+            <div class="widget-row"><span>Midnight</span><span id="widget-prayer-midnight">—</span></div>
             <p id="widget-prayer-status" class="status status-info" hidden></p>
         </div>
 
@@ -786,7 +790,7 @@
     <div class="modal-card">
         <h2 id="tx-modal-title">Add Transaction</h2>
 
-        <form id="tx-form">
+        <form id="tx-form" class="app-form">
             <label>Date
                 <input type="date" id="tx-date" required>
             </label>
@@ -825,7 +829,7 @@
     <div class="modal-card">
         <h2 id="tx-bulk-edit-modal-title">Edit Selected Transactions</h2>
 
-        <form id="tx-bulk-edit-form">
+        <form id="tx-bulk-edit-form" class="app-form">
             <label>Date
                 <input type="date" id="tx-bulk-date">
             </label>
@@ -862,7 +866,7 @@
     <div class="modal-card">
         <h2 id="account-modal-title">Add Account</h2>
 
-        <form id="account-form">
+        <form id="account-form" class="app-form">
             <label>Account Name
                 <input type="text" id="account-name" required>
             </label>
@@ -903,7 +907,7 @@
     <div class="modal-card">
         <h2 id="setting-modal-title">Add Setting</h2>
 
-        <form id="setting-form">
+        <form id="setting-form" class="app-form">
             <label>Key
                 <input type="text" id="setting-key" list="setting-key-options" required>
                 <datalist id="setting-key-options">
@@ -939,7 +943,7 @@
     <div class="modal-card">
         <h2 id="timesheet-modal-title">Log Time</h2>
 
-        <form id="timesheet-form">
+        <form id="timesheet-form" class="app-form">
             <label>Date
                 <input type="date" id="timesheet-date" required>
             </label>
@@ -975,7 +979,7 @@
     <div class="modal-card">
         <h2 id="wellness-modal-title">Log Entry</h2>
 
-        <form id="wellness-form">
+        <form id="wellness-form" class="app-form">
             <label>Date
                 <input type="date" id="wellness-entry-date" required>
             </label>
@@ -1020,7 +1024,7 @@
     <div class="modal-card">
         <h2 id="contact-modal-title">Add Contact</h2>
 
-        <form id="contact-form">
+        <form id="contact-form" class="app-form">
             <label>First Name
                 <input type="text" id="contact-first">
             </label>
@@ -1099,7 +1103,7 @@
     <div class="modal-card">
         <h2 id="travel-modal-title">Add Travel Entry</h2>
 
-        <form id="travel-form">
+        <form id="travel-form" class="app-form">
             <label>Country, City
                 <input type="text" id="travel-country-city" placeholder="e.g. Canada, Toronto" required>
             </label>
@@ -1143,7 +1147,7 @@
     <div class="modal-card">
         <h2 id="application-modal-title">Add Application</h2>
 
-        <form id="application-form">
+        <form id="application-form" class="app-form">
             <label>Type
                 <input type="text" id="application-type" placeholder="e.g. Visa 6, Work Permit" required>
             </label>
@@ -1192,8 +1196,10 @@
 <script src="assets/script/drive.js"></script>
 <script src="assets/script/sheets.js"></script>
 <script src="assets/script/cache.js"></script>
+<script src="assets/script/ui-helpers.js"></script>
 <script src="assets/script/groq.js"></script>
 <script src="assets/script/usda.js"></script>
+<script src="assets/script/calorie-estimator.js"></script>
 <script src="assets/script/widgets.js"></script>
 <script src="assets/script/charts.js"></script>
 <script src="assets/script/transactions.js"></script>

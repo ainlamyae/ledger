@@ -11,12 +11,7 @@ async function initAccountManager(forceRefresh = false) {
 
   if (!meta) {
     const spreadsheet = await getSpreadsheetMetadata();
-    const sheet = spreadsheet.sheets.find((s) => s.properties.title === CONFIG.SHEETS.ACCOUNTS);
-    if (!sheet) {
-      const available = spreadsheet.sheets.map((s) => s.properties.title).join(', ');
-      throw new Error(`Sheet tab "${CONFIG.SHEETS.ACCOUNTS}" not found. Available tabs: ${available}`);
-    }
-    meta = { accountsSheetId: sheet.properties.sheetId };
+    meta = { accountsSheetId: findSheetId(spreadsheet, CONFIG.SHEETS.ACCOUNTS) };
     setCached('accounts-meta', meta);
   }
 
@@ -34,46 +29,7 @@ async function initAccountManager(forceRefresh = false) {
 }
 
 function setupAccountSorting() {
-  document.querySelectorAll('#accounts-table th.sortable').forEach((th) => {
-    const label = document.createElement('span');
-    label.textContent = th.textContent;
-
-    const indicator = document.createElement('span');
-    indicator.className = 'sort-indicator';
-
-    th.textContent = '';
-    th.append(label, indicator);
-    th.setAttribute('tabindex', '0');
-
-    th.addEventListener('click', () => {
-      const key = th.dataset.sort;
-      if (accountSort.key === key) {
-        accountSort.dir *= -1;
-      } else {
-        accountSort.key = key;
-        accountSort.dir = 1;
-      }
-      updateAccountSortIndicators();
-      renderAccountsList();
-    });
-    th.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        th.click();
-      }
-    });
-  });
-}
-
-function updateAccountSortIndicators() {
-  document.querySelectorAll('#accounts-table th.sortable').forEach((th) => {
-    const indicator = th.querySelector('.sort-indicator');
-    if (th.dataset.sort === accountSort.key) {
-      indicator.textContent = accountSort.dir === 1 ? ' ▲' : ' ▼';
-    } else {
-      indicator.textContent = '';
-    }
-  });
+  makeSortableHeaders('#accounts-table', accountSort, renderAccountsList);
 }
 
 function getSortedAccounts() {
@@ -119,35 +75,18 @@ function renderAccountsList() {
   sortedAccounts.forEach((account) => {
     const tr = document.createElement('tr');
 
-    const nameCell = document.createElement('td');
-    nameCell.textContent = account.name;
+    const nameCell = makeCell(account.name);
+    const institutionCell = makeCell(account.institution);
+    const typeCell = makeCell(account.type);
 
-    const institutionCell = document.createElement('td');
-    institutionCell.textContent = account.institution;
-
-    const typeCell = document.createElement('td');
-    typeCell.textContent = account.type;
-
-    const balanceCell = document.createElement('td');
-    balanceCell.textContent = formatCurrency(account.balance);
+    const balanceCell = makeCell(formatCurrency(account.balance));
     balanceCell.className = account.balance < 0 ? 'expense' : 'income';
 
     const actionsCell = document.createElement('td');
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn';
-    editBtn.textContent = '✏️';
-    editBtn.title = 'Edit';
-    editBtn.setAttribute('aria-label', 'Edit');
-    editBtn.addEventListener('click', () => openAccountForm(account));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn';
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.title = 'Delete';
-    deleteBtn.setAttribute('aria-label', 'Delete');
-    deleteBtn.addEventListener('click', () => deleteAccount(account.row));
-
-    actionsCell.append(editBtn, deleteBtn);
+    actionsCell.append(
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openAccountForm(account) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteAccount(account.row) }),
+    );
 
     tr.append(nameCell, institutionCell, typeCell, balanceCell, actionsCell);
     tbody.appendChild(tr);
@@ -163,7 +102,7 @@ function openAccountForm(account) {
   document.getElementById('account-type').value = account ? account.type : '';
   document.getElementById('account-balance').value = account ? account.balance.toFixed(2) : '0.00';
 
-  document.getElementById('account-form-error').hidden = true;
+  clearFieldError('account-form-error');
   document.getElementById('account-modal').hidden = false;
 }
 
@@ -177,9 +116,7 @@ async function submitAccountForm(event) {
 
   const balance = evaluateNumberExpression(document.getElementById('account-balance').value);
   if (balance === null) {
-    const errorEl = document.getElementById('account-form-error');
-    errorEl.textContent = 'Balance must be a number or a simple expression, e.g. =5000-1234.56';
-    errorEl.hidden = false;
+    showFieldError('account-form-error', 'Balance must be a number or a simple expression, e.g. =5000-1234.56');
     return;
   }
 
@@ -201,16 +138,12 @@ async function submitAccountForm(event) {
     await refreshAccountOptions();
     await refreshNetWorth();
   } catch (err) {
-    const errorEl = document.getElementById('account-form-error');
-    errorEl.textContent = err.message;
-    errorEl.hidden = false;
+    showFieldError('account-form-error', err.message);
   }
 }
 
 async function deleteAccount(row) {
-  if (!confirm('Delete this account?')) return;
-
-  try {
+  await confirmAndDelete('Delete this account?', async () => {
     await batchUpdate([{
       deleteDimension: {
         range: { sheetId: accountsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
@@ -219,7 +152,5 @@ async function deleteAccount(row) {
     await refreshAccountsList(true);
     await refreshAccountOptions();
     await refreshNetWorth();
-  } catch (err) {
-    alert(`Failed to delete: ${err.message}`);
-  }
+  });
 }

@@ -298,6 +298,11 @@ function renderTimesheetList() {
     tbody.appendChild(renderEmptyRow(9, message));
   }
 
+  // Same tint the Activity Plan uses for a row already logged today, and the
+  // Physique table for today's day row. Read per render, so a tab left open across
+  // midnight moves the mark on its next redraw.
+  const todayIso = isoFromDate(new Date());
+
   pageEntries.forEach((e) => {
     const tr = document.createElement('tr');
     const weekend = isWeekend(e.date);
@@ -350,6 +355,11 @@ function renderTimesheetList() {
     if (weekend) tr.classList.add('timesheet-weekend');
     else if (isHoliday) tr.classList.add('timesheet-holiday');
     else if (isNoEntry) tr.classList.add('timesheet-no-entry');
+    // Not part of that chain: today can also be a weekend or a holiday, and both
+    // marks are worth keeping. The green lands on the cells (.today-row > td) while
+    // weekend/holiday tint the row itself, so today's tint paints over theirs while
+    // their muted text colour survives.
+    if (e.date === todayIso) tr.classList.add('today-row');
     tbody.appendChild(tr);
   });
 

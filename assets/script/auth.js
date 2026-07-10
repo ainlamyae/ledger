@@ -25,6 +25,38 @@ let refreshTimer = null;
 // Refresh this long before actual expiry, so the new token is in place with
 // margin to spare even if the silent request itself takes a few seconds.
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+// How much life a stored token must have left for ensureAccessToken() to hand it
+// straight back. Deliberately longer than a save takes and shorter than
+// REFRESH_BUFFER_MS: inside this window the scheduled refresh is either running
+// or overdue, so a write is better off waiting for a new token than starting on
+// one that may die between opening a form and saving it.
+const TOKEN_MIN_REMAINING_MS = 2 * 60 * 1000;
+
+// Callers parked on an in-flight requestAccessToken. GIS reports through one
+// shared callback rather than per-request promises, so every waiter is resolved
+// together by whichever request lands — including the scheduled silent refresh.
+let authWaiters = [];
+// Whether any request is outstanding. Every requestAccessToken call in this file
+// goes through requestToken() so this stays true: two overlapping requests both
+// resolve the same waiter list, and the loser resolving second used to hand a
+// caller `null` from a request it never made.
+let tokenRequestInFlight = false;
+
+function requestToken(params) {
+  tokenRequestInFlight = true;
+  tokenClient.requestAccessToken(params);
+}
+
+function requestSilently() {
+  pendingSilent = true;
+  requestToken({ prompt: 'none' });
+}
+
+function resolveAuthWaiters(token) {
+  const waiters = authWaiters;
+  authWaiters = [];
+  waiters.forEach((resolve) => resolve(token));
+}
 
 function loadStoredToken() {
   const raw = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -48,10 +80,7 @@ function storeToken(token, expiresInSeconds) {
 function scheduleTokenRefresh(expiresAt) {
   clearTimeout(refreshTimer);
   const delay = Math.max(expiresAt - Date.now() - REFRESH_BUFFER_MS, 0);
-  refreshTimer = setTimeout(() => {
-    pendingSilent = true;
-    tokenClient.requestAccessToken({ prompt: 'none' });
-  }, delay);
+  refreshTimer = setTimeout(requestSilently, delay);
 }
 
 function initAuth(onAuthChange) {
@@ -65,36 +94,40 @@ function initAuth(onAuthChange) {
     callback: (response) => {
       const wasSilent = pendingSilent;
       pendingSilent = false;
+      tokenRequestInFlight = false;
 
       if (response.error) {
         console.error('OAuth error:', response);
         // Silent refresh failed while user is signed in — keep them signed in
         // and retry after a backoff rather than logging them out mid-session.
         if (wasSilent && accessToken) {
-          refreshTimer = setTimeout(() => {
-            pendingSilent = true;
-            tokenClient.requestAccessToken({ prompt: 'none' });
-          }, 2 * 60 * 1000);
+          // Waiters get null, not the token we're still holding: a silent refresh
+          // that fails is the signal that this session can't be renewed quietly,
+          // so ensureAccessToken() should escalate to the visible flow instead of
+          // letting a write start on a token that's about to expire.
+          resolveAuthWaiters(null);
+          refreshTimer = setTimeout(requestSilently, 2 * 60 * 1000);
           return;
         }
         accessToken = null;
+        resolveAuthWaiters(null);
         authChangeHandler(null, { ...response, silent: wasSilent });
         return;
       }
       accessToken = response.access_token;
       storeToken(accessToken, response.expires_in);
+      resolveAuthWaiters(accessToken);
       authChangeHandler(accessToken);
     },
     error_callback: (err) => {
       const wasSilent = pendingSilent;
       pendingSilent = false;
+      tokenRequestInFlight = false;
       console.error('OAuth flow error:', err);
+      resolveAuthWaiters(null);
       // Same: don't log out mid-session from a silent refresh failure.
       if (wasSilent && accessToken) {
-        refreshTimer = setTimeout(() => {
-          pendingSilent = true;
-          tokenClient.requestAccessToken({ prompt: 'none' });
-        }, 2 * 60 * 1000);
+        refreshTimer = setTimeout(requestSilently, 2 * 60 * 1000);
         return;
       }
       authChangeHandler(null, { ...err, silent: wasSilent });
@@ -116,8 +149,7 @@ function initAuth(onAuthChange) {
   if (/Mobi|Android|iPhone|iPad|IEMobile/i.test(navigator.userAgent)) {
     authChangeHandler(null);
   } else {
-    pendingSilent = true;
-    tokenClient.requestAccessToken({ prompt: 'none' });
+    requestSilently();
   }
 }
 
@@ -127,7 +159,7 @@ function signIn() {
   // GIS use the browser's active Google session — Chrome can often satisfy
   // this without any visible UI or with a single account-picker click.
   const hasConsented = localStorage.getItem(CONSENTED_STORAGE_KEY);
-  tokenClient.requestAccessToken({ prompt: hasConsented ? '' : 'consent' });
+  requestToken({ prompt: hasConsented ? '' : 'consent' });
 
   // On mobile, GIS opens the OAuth flow as a new browser tab rather than a
   // true popup. window.opener is often null in that context, so the token
@@ -174,6 +206,51 @@ async function fetchUserInfo() {
   });
   if (!res.ok) return null;
   return res.json();
+}
+
+// A token good for the next couple of minutes, or null if the user has to sign in
+// again. Awaited BEFORE a form opens rather than checked when it saves: the token
+// lives ~1hr and the app is a tab people leave open, so the failure people
+// actually hit was filling a long form and losing it to a 401 on Save.
+//
+// Three outcomes, cheapest first: a stored token with enough life left is handed
+// straight back (no network, no UI); otherwise one silent renewal is attempted
+// (GIS resolves the existing Google session in a hidden iframe — invisible when
+// it works); and only if that fails does the visible flow run, which is the one
+// case the user sees anything at all.
+//
+// `interactive: false` stops before that last step, for callers that would rather
+// skip the work than raise a popup.
+function ensureAccessToken({ interactive = true } = {}) {
+  // Before initAuth there is no client to ask, and nothing that needs a token has
+  // run yet — a null here beats a TypeError from inside a click handler.
+  if (!tokenClient) return Promise.resolve(null);
+
+  const stored = loadStoredToken();
+  if (stored && stored.expiresAt - Date.now() > TOKEN_MIN_REMAINING_MS) {
+    return Promise.resolve(stored.token);
+  }
+
+  return requestTokenAndWait(requestSilently).then((token) => {
+    if (token || !interactive) return token;
+    // Silent renewal is out, so this needs the account picker / consent screen.
+    // signIn() carries its own mobile handling, where GIS opens a tab instead of
+    // a popup and the token can only arrive once the user comes back.
+    return requestTokenAndWait(signIn);
+  });
+}
+
+// Parks the caller on the shared GIS callback, kicking `start` only when nothing
+// is already outstanding — a second click while the iframe is open, or a click
+// that lands on top of the scheduled hourly refresh, joins that request rather
+// than racing another one against it. Racing them meant two resolutions of the
+// same waiter list, and whichever landed second could hand a caller the result of
+// a request it never made.
+function requestTokenAndWait(start) {
+  return new Promise((resolve) => {
+    authWaiters.push(resolve);
+    if (!tokenRequestInFlight) start();
+  });
 }
 
 function getAccessToken() {

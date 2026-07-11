@@ -497,18 +497,24 @@ function withQuarterAverage(value, average) {
 
 function renderSummaryCards(data) {
   const avg = data.quarterAverage;
-  // Says what the second figure is, since the card heading can't carry it and
-  // the month count varies early on.
-  const avgTitle = avg
-    ? `This month / average of the previous ${avg.months} month${avg.months === 1 ? '' : 's'}`
-    : 'This month — no earlier months to average yet';
+  const priorMonths = avg ? `previous ${avg.months} month${avg.months === 1 ? '' : 's'}` : null;
+  // Says what a card's second figure is, since the heading can't carry it and the
+  // month count varies early on. Only Expenditure shows one on the card itself.
+  const avgTitle = avg ? `This month / average of the ${priorMonths}` : 'This month — no earlier months to average yet';
 
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
 
+  // The month's own figure alone. Income is lumpy in a way spending isn't — a
+  // quarter that caught a bonus or a contract makes every ordinary month look
+  // like a shortfall against its own baseline, which is a comparison that reads
+  // as a verdict without being one. The average is still on the card's tooltip
+  // and in Financial Insight, where it comes with context.
   document.getElementById('income-label').textContent = 'Monthly Income';
   const incomeEl = document.getElementById('income-value');
-  incomeEl.textContent = withQuarterAverage(data.income, avg?.income);
-  incomeEl.title = avgTitle;
+  incomeEl.textContent = formatCurrency(data.income);
+  incomeEl.title = avg
+    ? `This month. Average of the ${priorMonths}: ${formatCurrency(avg.income)}`
+    : 'This month — no earlier months to average yet';
 
   document.getElementById('expenses-label').textContent = 'Monthly Expenditure';
   const expensesEl = document.getElementById('expenses-value');
@@ -849,7 +855,7 @@ function setupScrollSpy() {
 // on purpose — a token check that raises a sign-in popup to look something up
 // would be worse than the problem it solves.
 const AUTH_GATED_SELECTOR = [
-  '.panel-header-btn',            // every panel's Log / Add, plus Formula
+  '.panel-header-btn',            // every panel's Log / Add, plus Tune
   '.row-action-btn',              // ✏️ / 📋 / 🗑️ on every table row
   '#physique-bulk-combine-btn',
   '#physique-bulk-calc-btn',

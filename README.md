@@ -82,8 +82,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 ### Finances
 
 - **Summary cards** — Net Worth, Monthly Cash Flow, Monthly Income, Monthly Expenditure.
-  - Income and Expenditure also show the average of the **previous 3 months**, separated by `/`.
-  - The current month is excluded from its own benchmark; a tooltip names the months averaged.
+  - **Expenditure** also shows the average of the **previous 3 months**, separated by `/`. The current month is excluded from its own benchmark; a tooltip names the months averaged.
+  - **Income shows this month alone.** Income is lumpy in a way spending isn't — one quarter catching a bonus or a contract makes every ordinary month read as a shortfall against its own baseline, which looks like a verdict without being one. Its average is still on the card's tooltip, and in Financial Insight, where it arrives with context.
 - **Financial Indicators** — Cumulative Net Worth (line), Revenue vs. Expenditure (stepped area), Category Expenditure Trend (stacked), grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months) plus four category donuts, then per-category Type donuts driven by a free-text `Description` prefix convention, built dynamically from `Insight`.
 - **Financial Insight (AI)** — click "Financial Snapshot" to preview net worth, total Market Value, monthly cash flow/income/expenditure, spending by category over four complete periods (Previous Month/Quarter/Year/Lifelong), and every open account's Balance vs. Market Value; optionally ask a question, then **Send to AI** for a plain-text read — Overview, Going well, Needs attention, Investment Outlook (short-term liquidity, long-term growth), Suggestions. Nothing is computed until that click — same as Health Insight below.
   - A same-day figure (Cash Flow/Income/Expenditure) is flagged "partial month in progress" so the AI doesn't mistake an early-month total for a decline; closed/empty accounts and Institution are left out of what's sent.
@@ -545,7 +545,7 @@ One Google Sheet per user, cloned from the template, with these tabs.
 
 - Category columns are matched by name; `Income`/`Expenses` are excluded even if `Insight` lists them.
 - `Saved`/`Cumulative` are always the last two columns, so inserting a category doesn't break them.
-- The summary cards' quarter average is the mean of the **3 rows before** the active month.
+- The summary cards' quarter average is the mean of the **3 rows before** the active month. Still computed for both Income and Expenditure — Income's is a tooltip and a Financial Insight figure rather than a second number on the card.
 
 ### `Insight` (formula-driven)
 

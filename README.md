@@ -59,11 +59,11 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Stacking order is explicit**: page chrome 0-1, sticky `header` 10, dropdowns hanging off it 20, landing tooltips 50, **modals 100**, and toasts / the floating dark-mode & privacy stack 110 so they stay reachable over an open form. A modal with no `z-index` of its own lost to the header — both are positioned, so the header's 10 beat the modal's `auto` and painted over the top of a centred card, which is where `.modal-close` sits. Any long form (the card maxes at `100vh − 4rem`, so its top lands ~32px down while the header is taller than that) became uncloseable.
 - **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
 - **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Accounts, Contacts, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
-- **Panel headings are one word too** where the longer form was only restating the tab it reads: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Accounts**. The sheet tabs keep their own names (`Nutrition Facts` is still the tab, and still the Source label on a matched Calculate row) — this is the heading line, not the data model.
   - Driven by **Activity**, the one panel carrying three of them (**Add**, **Guide**, **Log**): "Activity Plan" + "Add Activity" + "Instruction" + "Log a Workout" could not share a phone's heading line, and `.panel-header` wraps rather than squeezing the heading, so the labels were what had to give.
   - Modal `<h2>`s keep the long form (*Log a Transaction*, *Add Ingredient*) — a heading has the width, and it's where you land after clicking.
   - Empty-state hints quote the new label (`click "Log" in the panel heading`), so no text in the app names a button that no longer exists.
   - The one exception is the timesheet **reminder banner**'s Log Time — a standalone CTA in a sentence, not a crowded heading.
+- **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Accounts**, *Contact List* → **Contact**. The sheet tabs keep their own names (`Nutrition Facts` is still the tab, and still the Source label on a matched Calculate row) — this is the heading line, not the data model.
 - **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicators.
 - **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
@@ -433,7 +433,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 18 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
 | 19 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
 | 20 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
-| 21 | `contacts.js` | Contact List, CRUD, bulk export/delete/merge |
+| 21 | `contacts.js` | Contact panel, CRUD, bulk export/delete/merge |
 | 22 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
 | 23 | `travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
 | 24 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
@@ -958,7 +958,7 @@ ledger/
 │       ├── csv.js                # CSV import/export + filter engine
 │       ├── physique.js           # Physique (one row per day)
 │       ├── strength-plan.js      # Activity Plan
-│       ├── contacts.js           # Contact List
+│       ├── contacts.js           # Contact panel
 │       ├── settings-panel.js     # Settings table
 │       ├── travel.js             # Travel panel
 │       ├── applications.js       # Applications cards

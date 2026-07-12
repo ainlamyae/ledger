@@ -28,7 +28,7 @@ async function initTransactions(forceRefresh = false) {
     lists = {
       transactionsSheetId: findSheetId(meta, CONFIG.SHEETS.TRANSACTIONS),
       accountOptions: (listsResp.valueRanges[0].values || []).map((r) => r[0]).filter(Boolean),
-      // Insight!A2:A200 repeats each category once per Type plus one
+      // Breakdown!A2:A200 repeats each category once per Type plus one
       // blank-Type total row, so collapse to a unique list.
       categoryOptions: [...new Set((listsResp.valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))],
     };
@@ -46,6 +46,7 @@ async function initTransactions(forceRefresh = false) {
     listenersAttached = true;
     document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionForm());
     document.getElementById('tx-cancel-btn').addEventListener('click', closeTransactionForm);
+    document.getElementById('tx-tax-btn').addEventListener('click', applyTaxToAmount);
     onFormSubmit('tx-form', submitTransactionForm);
 
     // Deferred full refresh when the modal closes after a keepOpen add sequence.
@@ -151,7 +152,7 @@ function populateAutocompleteOptions() {
 
   fillDatalist('tx-payee-options', allTransactions.map((t) => t.payee));
   fillDatalist('tx-description-options', allTransactions.map((t) => t.description));
-  // Categories come from both the Insight sheet's known list and whatever
+  // Categories come from both the Breakdown sheet's known list and whatever
   // has actually been typed on past transactions (e.g. "Income"), so the
   // suggestions aren't limited to a hardcoded or sheet-only set.
   fillDatalist('tx-category-options', [...categoryOptions, ...allTransactions.map((t) => t.category)]);
@@ -338,6 +339,32 @@ function populateSelect(select, options, selected) {
   });
 }
 
+// The sales tax the Tax button applies. A setting rather than a constant because
+// it's a local rate — 13% is Ontario's HST — and read on each open so changing it
+// on the Settings tab takes effect without a reload.
+const TAX_RATE_PCT_DEFAULT = 13;
+
+function taxRatePct() {
+  return getSetting('TAX_RATE_PCT', TAX_RATE_PCT_DEFAULT);
+}
+
+// Rewrites Amount with the tax added: 1 becomes 1.13, and −45.50 becomes −51.42 —
+// an expense is negative and so is the tax on it, so the sign takes care of itself.
+// The box is left holding a plain number rather than an expression, which means a
+// second click compounds; that's the same "what's in the box is what saves" the
+// expression evaluator already gives, and the figure is on screen to check.
+function applyTaxToAmount() {
+  const input = document.getElementById('tx-amount');
+  const amount = input.value.trim() === '' ? null : evaluateNumberExpression(input.value);
+  if (amount === null) {
+    showFieldError('tx-form-error', 'Amount needs a number or an expression before tax can be added, e.g. -45.50 or =-9.97-1.30');
+    return;
+  }
+
+  input.value = (Math.round(amount * (1 + taxRatePct() / 100) * 100) / 100).toFixed(2);
+  clearFieldError('tx-form-error');
+}
+
 function openTransactionForm(transaction, duplicate = false) {
   editingRow = (transaction && !duplicate) ? transaction.row : null;
 
@@ -354,6 +381,12 @@ function openTransactionForm(transaction, duplicate = false) {
   // A duplicate is a new row (like Add), not an in-place edit, so "Save & Add
   // Another" should be offered just like it is for a brand-new transaction.
   document.getElementById('tx-save-add-btn').hidden = !!transaction && !duplicate;
+
+  // One word on the button, the rate in the tooltip — where it can also stay
+  // truthful about a TAX_RATE_PCT that isn't 13.
+  const rate = taxRatePct();
+  document.getElementById('tx-tax-btn').title =
+    `Add ${rate}% tax to the amount — multiplies it by ${Math.round((1 + rate / 100) * 10000) / 10000}.`;
 
   clearFieldError('tx-form-error');
   document.getElementById('tx-modal').hidden = false;

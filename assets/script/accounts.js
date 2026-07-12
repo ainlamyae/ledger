@@ -1,8 +1,17 @@
 const ACCOUNTS_RANGE = `'${CONFIG.SHEETS.ACCOUNTS}'!A3:E100`;
 
+// Every box on the form, in the sheet's own column order — so the row read back
+// from the sheet lines up with them by index.
+const ACCOUNT_FIELD_IDS = [
+  'account-name', 'account-institution', 'account-type', 'account-balance', 'account-current-value',
+];
+
 let allAccounts = [];
 let accountsSheetId = null;
 let editingAccountRow = null;
+// Which of those boxes were seeded with a formula rather than a value, and what
+// that formula was — see openAccountForm.
+let editingAccountFormulas = {};
 let accountListenersAttached = false;
 let accountSort = { key: null, dir: 1 };
 // Same purpose as physique.js's physiqueDataLoaded: lets a click that races
@@ -153,8 +162,36 @@ function renderAccountsTotalRow(hasAccounts) {
   currentValueCell.className = currentValueSum < 0 ? 'expense' : 'income';
 }
 
-function openAccountForm(account) {
+// A row as the SHEET holds it, not as it computes: a cell containing `=D7*1.02`
+// comes back as that text rather than as the number it currently evaluates to.
+// The list itself is read UNFORMATTED_VALUE, which is what the totals and the
+// composition chart need — this is the one place that wants the other rendering,
+// so it's a single-row read taken only when a form is about to open.
+//
+// Best-effort: a failed read leaves the form on the computed figures it always
+// showed, which is worse than a formula but better than an edit button that
+// doesn't open. null (not []) says it failed, so the form can warn that saving
+// would flatten a formula it couldn't read — silence there is indistinguishable
+// from a row that simply has no formulas in it.
+async function accountRowCells(row) {
+  try {
+    const resp = await getValues(
+      `'${CONFIG.SHEETS.ACCOUNTS}'!A${row}:E${row}`,
+      { valueRenderOption: 'FORMULA' }
+    );
+    return (resp.values && resp.values[0]) || [];
+  } catch (err) {
+    console.error('Failed to read account formulas:', err);
+    return null;
+  }
+}
+
+// Awaited BEFORE the modal opens rather than filled in behind it: the boxes are
+// editable the moment they're visible, and a formula landing in one a moment
+// later would overwrite whatever had been typed into it in the meantime.
+async function openAccountForm(account) {
   editingAccountRow = account ? account.row : null;
+  editingAccountFormulas = {};
 
   document.getElementById('account-modal-title').textContent = account ? 'Edit Account' : 'Add Account';
   document.getElementById('account-name').value = account ? account.name : '';
@@ -164,30 +201,66 @@ function openAccountForm(account) {
   document.getElementById('account-current-value').value =
     account && account.currentValue !== null ? account.currentValue.toFixed(2) : '';
 
+  // Whichever cells are formulas are shown AS their formula, so the form says
+  // what the sheet actually holds — and so leaving the box alone sends that
+  // same formula back. Editing an account used to write the computed figure
+  // into every one of these five cells, which silently replaced a market value
+  // like `=D7*1.02` with the number it produced that day and left the sheet no
+  // longer updating itself.
+  const cells = account ? await accountRowCells(account.row) : [];
+  (cells || []).forEach((cell, i) => {
+    const id = ACCOUNT_FIELD_IDS[i];
+    if (id && typeof cell === 'string' && cell.startsWith('=')) {
+      editingAccountFormulas[id] = cell;
+      document.getElementById(id).value = cell;
+    }
+  });
+
   clearFieldError('account-form-error');
+  if (cells === null) {
+    showFieldError('account-form-error', "Couldn't read this row's formulas — the boxes show computed values, so saving will replace any formula in this row with its current number.");
+  }
   document.getElementById('account-modal').hidden = false;
 }
 
 function closeAccountForm() {
   document.getElementById('account-modal').hidden = true;
   editingAccountRow = null;
+  editingAccountFormulas = {};
+}
+
+// What to send back for one box. Three cases, in this order:
+//   - the formula it was loaded with, untouched — returned verbatim, so a
+//     round-trip through the form is a no-op on the sheet even when the formula
+//     is plain arithmetic the evaluator below could have flattened to a number;
+//   - a number or the local calculator shorthand (=5000-1234.56), evaluated
+//     here as it always has been, so the sheet keeps a plain value;
+//   - anything else starting with `=` — a formula the user typed. It goes over
+//     as text and Sheets parses it, the same as typing it into the cell.
+function accountCellValue(id) {
+  const text = document.getElementById(id).value.trim();
+  if (editingAccountFormulas[id] === text) return text;
+  const number = evaluateNumberExpression(text);
+  if (number !== null) return number;
+  return text.startsWith('=') ? text : null;
 }
 
 async function submitAccountForm(event) {
   event.preventDefault();
 
-  const balance = evaluateNumberExpression(document.getElementById('account-balance').value);
+  const balance = accountCellValue('account-balance');
   if (balance === null) {
-    showFieldError('account-form-error', 'Balance must be a number or a simple expression, e.g. =5000-1234.56');
+    showFieldError('account-form-error', 'Balance must be a number, an expression like =5000-1234.56, or a sheet formula.');
     return;
   }
 
-  const currentValueInput = document.getElementById('account-current-value').value.trim();
+  // Blank stays blank — "not tracked" is a real state for this column, and
+  // accountCellValue would read an empty box as the number 0.
   let currentValue = '';
-  if (currentValueInput !== '') {
-    currentValue = evaluateNumberExpression(currentValueInput);
+  if (document.getElementById('account-current-value').value.trim() !== '') {
+    currentValue = accountCellValue('account-current-value');
     if (currentValue === null) {
-      showFieldError('account-form-error', 'Market Value must be a number or a simple expression, e.g. =5000-1234.56');
+      showFieldError('account-form-error', 'Market Value must be a number, an expression like =5000-1234.56, or a sheet formula.');
       return;
     }
   }

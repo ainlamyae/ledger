@@ -737,7 +737,7 @@ function runPhysiqueWorkoutCalc() {
 const PHYSIQUE_MASS_UNIT_TO_GRAMS = { g: 1, kg: 1000, mg: 0.001, oz: 28.3495, lb: 453.592 };
 
 // Best-effort calorie figure for one Consumption line, straight off the
-// Nutrition Facts table — the same two lookup paths calorie-estimator.js's
+// Nutrition table — the same two lookup paths calorie-estimator.js's
 // Calculate uses for an exact table hit (by weight or by unit count), minus
 // its USDA/AI fallback for a miss. Returns null (not 0) when there's nothing
 // local to go on, so a genuinely unknown ingredient doesn't masquerade as a

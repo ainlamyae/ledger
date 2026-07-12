@@ -1,4 +1,4 @@
-// Nutrition Facts: a personal, editable ingredient database Physique's
+// Nutrition: a personal, editable ingredient database Physique's
 // 🧮 Calculate button (calorie-estimator.js) checks before falling back to
 // the AI/USDA estimate — once an ingredient's real calories/protein (from
 // the specific brand/product actually bought) is recorded here, it's reused
@@ -439,7 +439,7 @@ async function submitNutritionForm(event) {
 }
 
 async function deleteNutritionEntry(entry) {
-  await confirmAndDelete(`Delete "${entry.name}" from Nutrition Facts?`, async () => {
+  await confirmAndDelete(`Delete "${entry.name}" from Nutrition?`, async () => {
     if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
     await batchUpdate([{
       deleteDimension: {

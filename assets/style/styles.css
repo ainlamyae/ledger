@@ -991,10 +991,11 @@ kbd {
 }
 
 /* Bottom-LEFT, not right: the modals' own buttons sit bottom-right, and on a
-   phone a right-hand stack overlaps them — which is only a concern because this
-   stack stays above an open modal (z-index 110, over .modal's 100), the order it
-   had back when .modal had no z-index at all. Dark mode and privacy mode both
-   want to be reachable while a form is open. */
+   phone a right-hand stack overlaps them. */
+/* Below .modal's 100, like the sticky header: on a phone the stack covered the
+   bottom-left corner of an open form, and a floating toggle is never worth a
+   field you can't reach. Dark mode and privacy mode are one Escape away
+   instead. The undo toast keeps its 110 — that one has a countdown. */
 .fab-stack {
     position: fixed;
     left: 1.25rem;
@@ -1005,7 +1006,7 @@ kbd {
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 2px 10px rgba(0,0,0,.25);
-    z-index: 110;
+    z-index: 90;
 }
 
 .fab {
@@ -1327,6 +1328,14 @@ th.sortable:hover {
 
 .account-closed {
     color: var(--color-text-muted);
+    text-align: right;
+}
+
+/* A column of figures reads by comparing magnitudes, so it lines up on the last
+   digit — header included. .income/.expense already right-align the coloured
+   cells; this is for the ones between them (a zero, a blank) and for any header
+   above a money column, which otherwise sat left over a right-aligned column. */
+.num {
     text-align: right;
 }
 
@@ -2779,6 +2788,10 @@ td .btn {
 .formula-unit {
     color: var(--color-text-muted);
     opacity: .85;
+    /* Like .formula-name: the column is a share of the leftover width, so on a
+       narrow phone it can end up thinner than "equivalents" is long, and a word
+       that can't break would push the row past the screen. */
+    overflow-wrap: anywhere;
 }
 
 /* The list runs to 20 variables, so each row's height is paid 20 times: the boxes carry
@@ -2788,6 +2801,12 @@ td .btn {
 .formula-row input,
 .formula-row select {
     width: 100%;
+    /* Every box is exactly its column, whatever type it is. A date input carries
+       three inner fields and a picker icon, so its min-content width is wider
+       than the column and `min-width: auto` let it — and it alone — bulge past
+       the shared box column, which read as one big field among twenty small
+       ones. The column is sized to hold a date comfortably below. */
+    min-width: 0;
     font: inherit;
     font-size: var(--input-font-size);
     padding: .15rem .4rem;
@@ -2825,11 +2844,18 @@ td .btn {
    really is too long for the screen. */
 @media (max-width: 560px) {
     .formula-row {
-        /* The box column fits "female" plus the native dropdown arrow at the
-           app-wide 16px field size — that size is what keeps iOS from zooming
-           the page on focus, so the column gives way to it rather than the
-           field shrinking. */
-        grid-template-columns: 1.6rem minmax(0, 1fr) 7.3rem minmax(0, 1fr);
+        /* The box column fits "female" plus the native dropdown arrow, and a
+           native date field's mm/dd/yyyy plus its picker icon, at the app-wide
+           16px field size — that size is what keeps iOS from zooming the page
+           on focus, so the column gives way to it rather than the field
+           shrinking. Sized for the widest control so all twenty match. */
+        /* Name gets nearly twice the unit's share rather than an equal one: the
+           units are "kg" and "days" while the names run to "weekly fat loss, as
+           a share of body mass", so an even split wrapped every name to three
+           lines and left the width it needed sitting empty to the right of the
+           unit. The long units ("metabolic equivalents") take two lines now,
+           which is the cheaper wrap — there are two of them, not twenty. */
+        grid-template-columns: 1.92rem minmax(0, 1.75fr) 8.1rem minmax(0, 1fr);
         gap: .3rem;
         font-size: .7rem;
     }

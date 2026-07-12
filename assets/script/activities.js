@@ -1,4 +1,4 @@
-// The exercise catalogue: one row per movement, read from the 'Activities'
+// The exercise catalogue: one row per movement, read from the 'Activity'
 // sheet tab. Single source for what used to live in five places at once — the
 // Activity Plan's static tables, the Instruction modal's name list, the MET
 // table (activity-estimator.js), the muscle-group map (activity-insight.js)
@@ -273,7 +273,7 @@ function renderActivityPlanTables() {
 // --- Add / Edit / Duplicate / Delete --------------------------------------
 //
 // The catalogue was read-only in the UI until now: changing an exercise meant
-// opening the sheet. Same shape as Nutrition Facts' ingredient form
+// opening the sheet. Same shape as Nutrition's ingredient form
 // (nutrition.js), which is the other user-owned catalogue the app reads.
 
 function openActivityForm(activity, duplicate = false) {
@@ -314,7 +314,7 @@ function activityFieldValue(id) {
 }
 
 // Values already in use for a free-text column, most-used first — the same
-// guard against fragmenting into "Push"/"push"/"Pusg" that Nutrition Facts'
+// guard against fragmenting into "Push"/"push"/"Pusg" that Nutrition's
 // Classification datalist provides.
 function renderActivityDatalist(datalistId, key) {
   const counts = new Map();

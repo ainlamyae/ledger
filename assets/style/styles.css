@@ -1578,6 +1578,34 @@ th.sortable:hover {
     flex-shrink: 0;
 }
 
+/* A legend entry that switches its series off is a <button> — that's what makes it
+   reachable by keyboard and announced as pressable — but it must not LOOK like one:
+   it's a swatch and a word, and the browser's default chrome put a box around every
+   name. Every default a button brings is stripped, so the only thing that changes
+   when an entry became clickable is the cursor.
+   font-family alone, not the `font` shorthand: that would also reset the .85rem
+   .donut-legend-item sets, which this rule comes after. */
+.donut-legend-item-toggle {
+    appearance: none;
+    -webkit-appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font-family: inherit;
+    line-height: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* Switched off: struck through and dimmed, still in the legend. The strike runs
+   across the swatch too, which is the clearest "this one isn't in the chart" the
+   entry can give without leaving. */
+.donut-legend-item-off {
+    opacity: .5;
+    text-decoration: line-through;
+}
+
 td .btn {
     padding: .15rem .5rem;
     font-size: .85rem;

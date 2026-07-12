@@ -214,36 +214,13 @@ function upsertChart(existingChart, ctx, config) {
   return new Chart(ctx, config);
 }
 
-let incomeExpenseChart = null;
-
-function renderIncomeExpenseChart(months) {
-  const ctx = document.getElementById('income-expense-chart');
-
-  renderCategoryLegend('income-expense-legend', [
-    { name: 'Income', color: '#16a34a' },
-    { name: 'Expenses', color: '#dc2626' },
-  ]);
-
-  incomeExpenseChart = upsertChart(incomeExpenseChart, ctx, {
-    type: 'line',
-    data: {
-      labels: months.map((m) => m.label),
-      datasets: [
-        { label: 'Income', data: months.map((m) => m.income), borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, .4)', stepped: true, fill: true, pointRadius: 0 },
-        { label: 'Expenses', data: months.map((m) => Math.abs(m.expenses)), borderColor: '#dc2626', backgroundColor: 'rgba(220, 38, 38, .4)', stepped: true, fill: true, pointRadius: 0 },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } } },
-    },
-  });
-}
-
 let expenseBreakdownTrendChart = null;
 
+// Stacked spend per month, with that month's INCOME over the top of it as a single
+// line — the two questions ("where did it go" and "was it more than came in") read
+// off one chart instead of two, which is what let the separate Revenue vs.
+// Expenditure area chart go: its expense series was this chart's stack total, and
+// its income series is the line below.
 function renderExpenseBreakdownTrendChart(months) {
   const ctx = document.getElementById('expense-breakdown-trend-chart');
   if (expenseBreakdownTrendChart) expenseBreakdownTrendChart.destroy();
@@ -251,22 +228,70 @@ function renderExpenseBreakdownTrendChart(months) {
 
   const categories = months[0].categories;
 
-  renderCategoryLegend('expense-breakdown-trend-legend', categories);
+  // Income leads the legend: it's the line every bar is read against, not another
+  // slice of the stack. Same order as `datasets` below, which is what lets the
+  // legend index BE the dataset index.
+  const legendItems = [{ name: 'Income', color: targetMarkColor() }, ...categories];
 
-  // 1.2x the SECOND-highest total, so one outlier month doesn't squash the rest.
-  const totals = months.map((m) => m.categories.reduce((sum, c) => sum + c.value, 0));
-  const sortedTotals = [...totals].sort((a, b) => b - a);
-  const yMax = niceAxisMax((sortedTotals[1] ?? sortedTotals[0]) * 1.2);
+  // 1.2x the SECOND-highest month, so one outlier doesn't squash the rest. Measured
+  // on whichever is taller that month, spend or income — sizing on the stack alone
+  // would draw the line off the top of the plot in any month that earned more than
+  // it spent, which is most of them.
+  //
+  // Takes a visibility test rather than measuring everything once, because this axis
+  // is PINNED: switching the biggest category off left the remaining bars in the
+  // bottom third of a plot still scaled for it. The legend recomputes this and
+  // reassigns scales.y.max on every click. Dataset 0 is the income line and 1..n are
+  // the categories in order, which is the index this is asked about.
+  const axisMaxFor = (isVisible) => {
+    const peaks = months.map((m) => {
+      const stack = categories.reduce(
+        (sum, c, ci) => sum + (isVisible(ci + 1) ? (m.categories.find((mc) => mc.name === c.name)?.value || 0) : 0),
+        0
+      );
+      return Math.max(stack, isVisible(0) ? Math.abs(m.income || 0) : 0);
+    });
+    const sortedPeaks = [...peaks].sort((a, b) => b - a);
+    const max = niceAxisMax((sortedPeaks[1] ?? sortedPeaks[0]) * 1.2);
+    // Everything switched off: hand the axis back to Chart.js rather than pinning
+    // it to zero, which has no gridlines to draw.
+    return max > 0 ? max : undefined;
+  };
+  const yMax = axisMaxFor(() => true);
 
   expenseBreakdownTrendChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: months.map((m) => m.label),
-      datasets: categories.map((c) => ({
-        label: c.name,
-        data: months.map((m) => m.categories.find((mc) => mc.name === c.name)?.value || 0),
-        backgroundColor: c.color,
-      })),
+      datasets: [
+        {
+          type: 'line',
+          label: 'Income',
+          data: months.map((m) => Math.abs(m.income || 0)),
+          borderColor: targetMarkColor(),
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: false,
+          // A month's income is one flat figure for that whole month, not a slope
+          // from last month's to this one's — sloping it invented a value for every
+          // point in between and turned a pay rise into a peak. 'middle' steps
+          // halfway between months, so each flat run sits centred over its own
+          // bar and the jump lands on the boundary between them.
+          stepped: 'middle',
+          // Its own stack, so a stacked y axis reads it as a line ACROSS the bars
+          // rather than another storey on top of them.
+          stack: 'income',
+          // Drawn last, so it stays legible over the tallest stack.
+          order: 0,
+        },
+        ...categories.map((c) => ({
+          label: c.name,
+          data: months.map((m) => m.categories.find((mc) => mc.name === c.name)?.value || 0),
+          backgroundColor: c.color,
+          order: 1,
+        })),
+      ],
     },
     options: {
       responsive: true,
@@ -278,6 +303,24 @@ function renderExpenseBreakdownTrendChart(months) {
       },
     },
   });
+
+  // After the chart, not before: the legend reads its dataset visibility, so it
+  // needs the chart to exist. Chart.js' own dataset hiding is enough here (unlike
+  // the by-category charts, which re-render) — the x axis is months, so a hidden
+  // series leaves the axis and every other series exactly where they were.
+  const drawLegend = () => renderCategoryLegend('expense-breakdown-trend-legend', legendItems, {
+    isHidden: (_, i) => !expenseBreakdownTrendChart.isDatasetVisible(i),
+    onToggle: (_, i) => {
+      expenseBreakdownTrendChart.setDatasetVisibility(i, !expenseBreakdownTrendChart.isDatasetVisible(i));
+      // The axis is pinned, so it has to be re-measured against what's left showing
+      // — otherwise hiding the biggest category just leaves a gap at the top.
+      expenseBreakdownTrendChart.options.scales.y.max =
+        axisMaxFor((di) => expenseBreakdownTrendChart.isDatasetVisible(di));
+      expenseBreakdownTrendChart.update();
+      drawLegend();
+    },
+  });
+  drawLegend();
 }
 
 let spendingTrendChart = null;
@@ -298,12 +341,32 @@ const SPENDING_TREND_PERIODS = [
 ];
 
 // Category-colour swatch legend, shared by several panels.
-function renderCategoryLegend(containerId, categories) {
+//
+// Pass `toggle` and every entry becomes a button that switches its series off and
+// on: `isHidden(entry, i)` decides how the entry is drawn, `onToggle(entry, i)`
+// does the hiding and redraws. What "hiding" means differs per chart — a dataset
+// on the trend chart, a category filtered out of a whole re-render on the ones
+// whose colours or ring proportions depend on what's showing — so that decision
+// stays with the chart and the legend only reports the click.
+//
+// A hidden entry stays in the legend, dimmed and struck through: it's the only way
+// back, and a legend that lost its entry on click would be a one-way door.
+function renderCategoryLegend(containerId, categories, toggle) {
   const legend = document.getElementById(containerId);
   legend.innerHTML = '';
-  categories.forEach((c) => {
-    const item = document.createElement('span');
+  categories.forEach((c, i) => {
+    const item = document.createElement(toggle ? 'button' : 'span');
     item.className = 'donut-legend-item';
+
+    if (toggle) {
+      const hidden = toggle.isHidden(c, i);
+      item.type = 'button';
+      item.classList.add('donut-legend-item-toggle');
+      item.classList.toggle('donut-legend-item-off', hidden);
+      item.setAttribute('aria-pressed', String(!hidden));
+      item.title = `${hidden ? 'Show' : 'Hide'} ${c.name}`;
+      item.addEventListener('click', () => toggle.onToggle(c, i));
+    }
 
     const swatch = document.createElement('span');
     swatch.className = 'donut-legend-swatch';
@@ -314,21 +377,39 @@ function renderCategoryLegend(containerId, categories) {
   });
 }
 
+// Categories switched off from this chart's legend, by name. Module-level, so the
+// choice survives the re-render each click triggers — and a plain refresh of the
+// dashboard, which is the same call again.
+const hiddenSpendingCategories = new Set();
+
 function renderSpendingTrendChart(categories, totalMonths) {
   const ctx = document.getElementById('spending-trend-chart');
   if (spendingTrendChart) spendingTrendChart.destroy();
 
-  renderCategoryLegend('spending-trend-legend', categories);
-  if (categories.length === 0) return;
+  // The legend lists every category and is drawn before the early return below, so
+  // switching the last one off still leaves something to switch back on.
+  renderCategoryLegend('spending-trend-legend', categories, {
+    isHidden: (c) => hiddenSpendingCategories.has(c.name),
+    onToggle: (c) => {
+      if (!hiddenSpendingCategories.delete(c.name)) hiddenSpendingCategories.add(c.name);
+      renderSpendingTrendChart(categories, totalMonths);
+    },
+  });
+
+  // Filtered out of the data rather than hidden inside it: a category is this
+  // chart's x axis, so Chart.js' own per-index hiding would leave a labelled gap
+  // where the bars were.
+  const shown = categories.filter((c) => !hiddenSpendingCategories.has(c.name));
+  if (shown.length === 0) return;
 
   spendingTrendChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: categories.map((c) => c.name),
+      labels: shown.map((c) => c.name),
       datasets: SPENDING_TREND_PERIODS.map((p) => ({
         label: p.label,
-        data: categories.map((c) => c[p.key] / (p.months || totalMonths || 1)),
-        backgroundColor: categories.map((c) => hslWithAlpha(c.color, p.alpha)),
+        data: shown.map((c) => c[p.key] / (p.months || totalMonths || 1)),
+        backgroundColor: shown.map((c) => hslWithAlpha(c.color, p.alpha)),
       })),
     },
     options: {
@@ -526,28 +607,31 @@ let accountCompositionChart = null;
 // Nested doughnut: account type (inner), institution (middle, one fixed colour each),
 // individual account (outer, shaded by institution). Slices size on the ABSOLUTE
 // balance, so a debt account renders normally instead of breaking the chart.
+// Types and institutions switched off from the two legends, by name. Module-level,
+// so a choice survives the re-render each click triggers and the next dashboard load.
+const hiddenAccountTypes = new Set();
+const hiddenInstitutions = new Set();
+
 function renderAccountCompositionChart(accounts) {
   const ctx = document.getElementById('account-composition-chart');
   if (accountCompositionChart) accountCompositionChart.destroy();
   if (accounts.length === 0) return;
 
-  const byType = new Map();
-  accounts.forEach((a) => {
-    const type = a.type || 'Other';
-    if (!byType.has(type)) byType.set(type, []);
-    byType.get(type).push(a);
-  });
+  // Largest absolute balance first, so a big debt still ranks near the top. Anything
+  // netting to zero is dropped rather than left as an empty legend entry.
+  const rankedByAbs = (list, keyOf) => {
+    const totals = new Map();
+    list.forEach((a) => {
+      const key = keyOf(a);
+      totals.set(key, (totals.get(key) || 0) + Math.abs(a.balance));
+    });
+    return [...totals.keys()]
+      .filter((key) => totals.get(key) > 0)
+      .sort((a, b) => totals.get(b) - totals.get(a));
+  };
 
-  const typeAbsTotals = new Map();
-  byType.forEach((group, type) => {
-    typeAbsTotals.set(type, group.reduce((sum, acc) => sum + Math.abs(acc.balance), 0));
-  });
-
-  // Largest absolute balance first, so a big debt still ranks near the top. Types
-  // netting to zero are dropped rather than left as an empty legend entry.
-  const types = [...byType.keys()]
-    .filter((type) => typeAbsTotals.get(type) > 0)
-    .sort((a, b) => typeAbsTotals.get(b) - typeAbsTotals.get(a));
+  const typeOf = (a) => a.type || 'Other';
+  const institutionOf = (a) => a.institution || 'Other';
 
   // Evenly-spaced hues, so no count repeats a colour the way a fixed palette would.
   //
@@ -564,20 +648,56 @@ function renderAccountCompositionChart(accounts) {
   const distinctColors = (count, band) => Array.from({ length: count }, (_, i) =>
     `hsl(${Math.round(((i + band.offset) * 360) / count) % 360}, ${band.saturation}%, ${band.lightness}%)`);
 
+  // Both palettes and both legends are built from EVERY account, not from what's
+  // currently shown: the hues are spaced by count, so recomputing them over a
+  // filtered list would recolour the survivors on every click — and a name dropped
+  // from its legend is a name with no way back on.
+  const allTypes = rankedByAbs(accounts, typeOf);
+  const allInstitutions = rankedByAbs(accounts, institutionOf);
+
   const typeColors = {};
-  distinctColors(types.length, TYPE_BAND).forEach((color, i) => { typeColors[types[i]] = color; });
+  distinctColors(allTypes.length, TYPE_BAND).forEach((color, i) => { typeColors[allTypes[i]] = color; });
 
   // One fixed colour per institution, whatever types its accounts span.
-  const institutionAbsTotals = new Map();
-  accounts.forEach((a) => {
-    const institution = a.institution || 'Other';
-    institutionAbsTotals.set(institution, (institutionAbsTotals.get(institution) || 0) + Math.abs(a.balance));
-  });
-  const institutionNames = [...institutionAbsTotals.keys()]
-    .filter((name) => institutionAbsTotals.get(name) > 0)
-    .sort((a, b) => institutionAbsTotals.get(b) - institutionAbsTotals.get(a));
   const institutionColorMap = {};
-  distinctColors(institutionNames.length, INSTITUTION_BAND).forEach((color, i) => { institutionColorMap[institutionNames[i]] = color; });
+  distinctColors(allInstitutions.length, INSTITUTION_BAND).forEach((color, i) => { institutionColorMap[allInstitutions[i]] = color; });
+
+  // Drawn before the early return below, so switching everything off still leaves
+  // both legends to switch something back on with. Hiding a type takes its
+  // institutions and accounts out of the two outer rings with it — the rings are
+  // built from the accounts that survive both filters, so the hierarchy holds.
+  const redraw = () => renderAccountCompositionChart(accounts);
+  renderCategoryLegend('account-composition-legend', allTypes.map((t) => ({ name: t, color: typeColors[t] })), {
+    isHidden: (t) => hiddenAccountTypes.has(t.name),
+    onToggle: (t) => {
+      if (!hiddenAccountTypes.delete(t.name)) hiddenAccountTypes.add(t.name);
+      redraw();
+    },
+  });
+  renderCategoryLegend('account-composition-institution-legend', allInstitutions.map((name) => ({ name, color: institutionColorMap[name] })), {
+    isHidden: (n) => hiddenInstitutions.has(n.name),
+    onToggle: (n) => {
+      if (!hiddenInstitutions.delete(n.name)) hiddenInstitutions.add(n.name);
+      redraw();
+    },
+  });
+
+  const shown = accounts.filter((a) => !hiddenAccountTypes.has(typeOf(a)) && !hiddenInstitutions.has(institutionOf(a)));
+  if (shown.length === 0) return;
+
+  const byType = new Map();
+  shown.forEach((a) => {
+    const type = typeOf(a);
+    if (!byType.has(type)) byType.set(type, []);
+    byType.get(type).push(a);
+  });
+
+  const typeAbsTotals = new Map();
+  byType.forEach((group, type) => {
+    typeAbsTotals.set(type, group.reduce((sum, acc) => sum + Math.abs(acc.balance), 0));
+  });
+
+  const types = allTypes.filter((type) => (typeAbsTotals.get(type) || 0) > 0);
 
   const accountLabels = [];
   const accountValues = [];
@@ -624,11 +744,6 @@ function renderAccountCompositionChart(accounts) {
   });
 
   const total = typeValues.reduce((sum, v) => sum + v, 0);
-
-  renderCategoryLegend('account-composition-legend', types.map((t) => ({ name: t, color: typeColors[t] })));
-
-  // Second legend line for the middle ring, largest institution first.
-  renderCategoryLegend('account-composition-institution-legend', institutionNames.map((name) => ({ name, color: institutionColorMap[name] })));
 
   // By datasetIndex (outer to inner), so the tooltip names whichever ring is hovered.
   const ringLabels = [accountLabels, institutionLabels, typeLabels];

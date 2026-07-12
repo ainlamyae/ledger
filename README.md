@@ -13,6 +13,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - [Features](#features)
 - [Architecture](#architecture)
   - [System Diagram](#system-diagram)
+  - [Section pages](#section-pages)
   - [System Flowchart](#system-flowchart)
   - [Frontend Module Map](#frontend-module-map)
   - [Data Flow](#data-flow)
@@ -58,14 +59,14 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
 - **Stacking order is explicit**: page chrome 0-1, sticky `header` 10, dropdowns hanging off it 20, landing tooltips 50, the floating dark-mode & privacy stack 90, **modals 100**, and toasts 110 so a countdown to undo something stays readable over an open form. The floating stack sits *below* a modal for the same reason the header does — on a phone it covered the bottom-left corner of an open form, and a toggle that's one Escape away isn't worth a field you can't reach. A modal with no `z-index` of its own lost to the header — both are positioned, so the header's 10 beat the modal's `auto` and painted over the top of a centred card, which is where `.modal-close` sits. Any long form (the card maxes at `100vh − 4rem`, so its top lands ~32px down while the header is taller than that) became uncloseable.
 - **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
-- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Accounts, Contacts, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
+- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Account, Contact, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
   - Driven by **Activity**, the one panel carrying three of them (**Add**, **Guide**, **Log**): "Activity Plan" + "Add Activity" + "Instruction" + "Log a Workout" could not share a phone's heading line, and `.panel-header` wraps rather than squeezing the heading, so the labels were what had to give.
   - Modal `<h2>`s keep the long form (*Log a Transaction*, *Add Ingredient*) — a heading has the width, and it's where you land after clicking.
   - Empty-state hints quote the new label (`click "Log" in the panel heading`), so no text in the app names a button that no longer exists.
   - The one exception is the timesheet **reminder banner**'s Log Time — a standalone CTA in a sentence, not a crowded heading.
-- **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Account**, *Contact List* → **Contact**. The sheet tabs now read the same way (`Transaction`, `Account`, `Nutrition`, `Activity`, `Statement`, `Breakdown`, …) — but that's a spreadsheet-side choice, not something the app depends on: **every tab name lives in `CONFIG.SHEETS` (`config.js`) and nowhere else**, so renaming a tab is one line there. Labels that have to agree with a tab name (the breakdown table's "from your own table" source) are read off the same object rather than spelled out again.
-- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicators.
-- **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
+- **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Account**, *Contact List* → **Contact**, *Accounts* → **Account**, *Health Indicators* → **Health Indicator**, *Financial Indicators* → **Financial Indicator**. The sheet tabs now read the same way (`Transaction`, `Account`, `Nutrition`, `Activity`, `Statement`, `Breakdown`, …) — but that's a spreadsheet-side choice, not something the app depends on: **every tab name lives in `CONFIG.SHEETS` (`config.js`) and nowhere else**, so renaming a tab is one line there. Labels that have to agree with a tab name (the breakdown table's "from your own table" source) are read off the same object rather than spelled out again.
+- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
+- **Panel groups** — Health, Finance, Other. Each is a page of its own at `/health/`, `/finance/` and `/other/`, and the nav links are those addresses rather than in-page anchors, so a group can be linked to, bookmarked and refreshed on its own (see [Section pages](#section-pages)). The logo is the way back to all three at once.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
 - **Dark mode** — floating toggle, persisted.
@@ -79,12 +80,12 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Default** — everything else, including all emoji buttons (close, delete) — an emoji on a dark fill is hard to read.
 - Slow actions append `…` to the label and block re-clicks until they settle: all form saves, bulk merge/delete, every row delete, and the AI/USDA calls.
 
-### Finances
+### Finance
 
 - **Summary cards** — Net Worth, Monthly Cash Flow, Monthly Income, Monthly Expenditure.
   - **Expenditure** also shows the average of the **previous 3 months**, separated by `/`. The current month is excluded from its own benchmark; a tooltip names the months averaged.
   - **Income shows this month alone.** Income is lumpy in a way spending isn't — one quarter catching a bonus or a contract makes every ordinary month read as a shortfall against its own baseline, which looks like a verdict without being one. Its average is still on the card's tooltip, and in Financial Insight, where it arrives with context.
-- **Financial Indicators** — Cumulative Net Worth (line), Category Expenditure Trend (stacked bars **with that month's income as a line over them**), grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months) plus four category donuts.
+- **Financial Indicator** — Cumulative Net Worth (line), Category Expenditure Trend (stacked bars **with that month's income as a line over them**), grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months) plus four category donuts.
   - The income line is what retired the separate **Revenue vs. Expenditure** area chart: that chart's expense series was this one's stack total, and its income series is now the line — so "where did it go" and "was it more than came in" are read off one shape instead of two. The line is `targetMarkColor()` (near-black on light, near-white on dark) rather than a literal black, which would vanish in dark mode; it carries its own `stack` so a stacked y axis draws it *across* the bars instead of on top of them, and `order: 0` keeps it drawn over the tallest month.
   - **`stepped: 'middle'`, not a sloped line.** A month's income is one flat figure for that month, so joining the points with a slope invents a value for every day in between and renders a pay rise as a peak. Stepping halfway between months puts each flat run centred over its own bar, with the jump on the boundary — the same read the old stepped area chart gave.
   - The axis maximum is 1.2× the **second**-highest month, measured on whichever is taller that month, spend or income — sizing on the stack alone drew the line off the top of the plot in every month that earned more than it spent.
@@ -95,16 +96,21 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - Payee/Description/Category autocomplete from history; new categories can be typed inline.
   - Amount accepts arithmetic (`=-9.97-1.30`, `-32/2`), rounded to the cent. The placeholder carries both the sign convention and the expression form, so the form has no hint line under it.
   - **Tax** button in the form's actions row multiplies Amount by the tax rate and writes the result back (`1` → `1.13`, `-45.50` → `-51.42` — an expense is negative and so is its tax). Not a submit: the taxed figure sits on screen to check before Save takes it, and clicking twice compounds, since the box is left holding a plain number. The rate is `TAX_RATE_PCT` on the Settings tab, defaulting to **13** (Ontario HST); the button says only "Tax" and the tooltip names the rate.
+  - **Update the account balance** — a tick box under Amount, **on by default**, that adds the amount to the selected account's Balance on the `Account` tab as part of the same save. The sign is the whole of it: `-10` on WV takes WV down ten, a deposit puts it back. A transaction and the balance it moves are one act, and doing them separately is how the two drift apart.
+    - **Never over a formula.** Balance is often the sheet's own arithmetic (`=SUMIF(Transaction!…)`, a GOOGLEFINANCE conversion), which already counts the row that was just appended — adding to it would count the transaction twice, and writing a number over it would cost the sheet its arithmetic for good. Picking such an account turns the box off and prints why under it. Same for a Balance holding a label like `Closed`: there's no amount to add to. A blank Balance counts as zero.
+    - Telling the two apart needs the column read **as formulas** — the accounts list is read `UNFORMATTED_VALUE`, where a formula and a typed number both arrive as today's figure. That read is lazy (nothing but this box wants it, so the dashboard's own load doesn't pay for it) and taken once per accounts refresh.
+    - **New rows only.** On an edit the balance would need the *difference* between the old amount and the new one — and nothing at all when the amount wasn't what changed — so rather than guess, the box is off the form there and the Account panel stays the place to correct a balance by hand. A duplicate counts as a new row, like Save & Add Another.
+    - Untick it and the choice sticks while the form is open, including across a change of account; each new form arms it again. The balance write happens **after** the transaction row is safely in, and is reported (not raised as a save failure) if the sheet refuses or the call fails — a failed save invites a second Save, which would be a duplicate row.
   - Advanced Filters: date range plus an AND/OR field-filter builder; Export CSV writes exactly what's filtered.
 - **Bulk transaction ops** — select rows for Edit Selected (only filled fields applied) or Delete Selected (one `batchUpdate`, highest row first).
 - **Undo** — toast after bulk edit/delete; deletes re-append, edits write original values back in place.
-- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the **Accounts** table (with a Total row summing Balance and Market Value) and reconciliation status.
+- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the **Account** table (with a Total row summing Balance and Market Value) and reconciliation status.
   - **The two rings are coloured from two bands of one hue wheel, not one.** Type keeps the vivid band (`65% / 55%`); institution takes a half-step hue offset and a deeper, less saturated one (`45% / 42%`), and the outer account ring is alpha-shaded from its institution's colour. Both palettes used to start at the same hue with the same step, so a similar number of types and institutions made them *identical* — the second-largest institution came out in exactly the second-largest type's colour, which is what made a TFSA (an Investment) read as "the Saving colour" against the legend above it. The offset separates neighbouring hues; the band is what still separates the rings when differing counts realign the wheel anyway.
 
 ### Breakdown
 
 - The `Breakdown` tab as a maintainable table rather than only a chart source (`breakdown.js`): searchable and sortable, one row per Category × Type, with that row's **Last Month / Last Quarter / Last Year / Lifelong** figures.
-- **The money is never written.** Columns C-F are the spreadsheet's own formulas — the same ones Financial Indicators is drawn from — so every write here is scoped to `A:B`, the two text columns that name the row. There is no path in this panel that can replace a formula with the number it produced.
+- **The money is never written.** Columns C-F are the spreadsheet's own formulas — the same ones Financial Indicator is drawn from — so every write here is scoped to `A:B`, the two text columns that name the row. There is no path in this panel that can replace a formula with the number it produced.
   - Editing therefore offers Category and Type only; the four amounts appear in the modal as text, labelled as the sheet's own.
 - **A blank Type is a category's own total row** (the one summing every Type under it) — kept blank rather than normalised, since that blank is what the sheet reads as "total". The table shows `—` with a tooltip saying so.
 - **Add and Duplicate both copy an existing row's formulas** via `copyPaste`, which rewrites relative references for the new row. A values-append would land a row with four permanently empty money columns; pasting formula text would leave it pointing at the row it came from. Add picks its template by shape — a typed row for a typed row, a total row for a total row — and takes the last such row, so a new one lands at the bottom instead of inside an existing category's block.
@@ -130,7 +136,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - The Calories heading carries which side of the target it is (max or min), since the number alone can't say it.
 - Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
 
-### Health — Health Indicators
+### Health — Health Indicator
 
 Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
 
@@ -144,6 +150,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - The status line under the chart speaks only when there is **no** forecast to draw — target reached, no net change, trending away, or levelling off short of target. A forecast that renders says nothing, since the meters and the curve already do.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
 - **Calorie Balance** — intake minus BMR minus activity, scored against the *target* deficit; grams-of-fat twin axis.
+  - The hover spells out the subtraction and **signs it**: `Actual Intake` as the figure it starts from, then `Maintenance` and `Activity` as negatives, so the column reads top-down as the arithmetic behind the bar. Activity printed as a positive read as something added to the day, which is the opposite of what burning it does. The intake row carries the same name Caloric Intake and Protein Intake use in their own hovers — one day's eating shouldn't be called three different things across one panel.
 - **Caloric Intake** — per-day bars with a per-day target drawn as a cap on each bar, not one shared line.
 - **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
@@ -159,7 +166,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Formula Playground
 
-**Tune** in the Health Indicators heading opens it.
+**Tune** in the Health Indicator heading opens it.
 
 - Every term of the calorie-target and forecast algebra, with your own numbers substituted in — not a black box you have to trust.
 - **Solve for** any one of Calories, Target body mass, Activity or Weekly fat loss; the rest are inputs and the picked one is computed. Activity and Weekly fat loss also let you type either Eᵢₙ or `t` and compute whichever you didn't touch.
@@ -167,8 +174,28 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - Picking it **ticks the fat-loss % pin**, since holding the percentage and pinning it are one decision — otherwise the plan you just built here would be saved as a fixed-kilogram one and the app would immediately stop doing what the modal showed. Not the reverse: the pin governs the saved plan and applies in every mode.
   - It's the only mode where a blank `Δm%` is a *missing input*, so it's named in the "Needs a number in" line; everywhere else the box is derived and its emptiness means nothing.
 - Edits are live and local until **Save** writes them back to `Setting`; `projectTargetDays` is shared with the Body Mass chart, so the two can never disagree about a date.
-- **Box order is the order the algebra runs**: the profile and the knobs (`m`, `m_g`, `h`, `a`, `σ`, `MET`, `τ`, `κ`, `Δm%`, `Δm`, `p_min`, `p_max`), the two population constants (`ρ`, `ε`), then the answers — `Eᵢₙ`, `t`, the arrival date, and the lean-mass block last.
-  - 20 rows, so each row's height is paid 20 times: the boxes keep the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) and give up their vertical padding and leading instead — `.15rem` and `line-height: 1.15`, about 9px a row off an already-tall modal.
+- **Box order is the order the algebra runs**: the profile and the knobs (`m`, `m̄`, `h`, `a`, `σ`, `BMR`, `M`, `MET`, `τ`, `κ`, `Δm%`, `Δm`), the two population constants (`ρ`, `ε`), then `D` (readonly — the deficit `Δm` and `ρ` imply, sitting between the two figures it's made of and the intake it comes off), `f` and the answers it feeds — `Eᵢₙ`, `TEF`, then the journey block (`m_g` and `BMI_g`, the destination you choose, immediately above the `t` and arrival date that measure the trip to it), the adaptation block, and the lean-mass block last (`LBM`, the `p_min`/`p_max` rule, then the `P_min`/`P_max` grams it produces — the rule sits with the grams rather than up among the other editable knobs, so `p × LBM = P` reads as one derivation instead of a multiplication split across the modal).
+  - Every row's height is paid two dozen times: the boxes keep the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) and give up their vertical padding and leading instead — `.15rem` and `line-height: 1.15`, about 9px a row off an already-tall modal. On a phone the date box is additionally stripped of `-webkit-appearance`, since a native date control ignores all of that and renders both wider than its grid column and visibly taller than the text boxes around it.
+  - `BMR` and `M` (maintenance, `BMR + Eₐ`) are **readonly display rows**, not settings — they're the two figures every target is measured down from, placed with the profile because that's what they describe: the body, before any plan is applied to it.
+- **The scale is smoothed before anything reads it.** `m` is your latest weigh-in and is readonly — a measurement, not a knob. `m̄`, directly below it, is the **7-day rolling average** (`smoothedBodyMassKg`, the mean of every reading in the 7 days ending at the latest one, rounded to 0.1 kg), and it is what every identity on the sheet substitutes. Type what-ifs into `m̄`.
+  - Water and glycogen move the scale by more than a week of fat loss does, and `m(t)` in the decay model means *clean* mass, so a single reading is the wrong input for a plan. The window ends at the latest **reading**, not at today, so a week away from the scale doesn't quietly empty it.
+  - `planBodyMassKg` is the app-wide accessor, and the same figure now drives the calorie tile (`getCalorieTargetKcal`), the ceiling-vs-floor decision (`getCalorieTargetKind`), Calorie Balance's target dash and the Health Plan prompt — so the modal and the app can't quote different targets. Deliberately **not** the per-day series (the Caloric Intake target line, Calorie Balance's per-day maintenance) or the Body Mass chart's bars and forecast start: those describe one specific day, where that day's own reading is the honest input.
+- **Resting metabolic rate is a choice of two equations**, and both are live — the radio pair above `where,` picks one and re-derives everything from it. `BMR_FORMULA` on the `Setting` tab; unset reads as Mifflin, which is what every existing sheet already runs on.
+  - **Mifflin-St Jeor** (default) — `10m + 6.25h − 5a + σ`, the app's original.
+  - **Katch-McArdle** — `370 + 21.6 × LBM`, from the Boer lean mass in the block below. Fat mass is nearly inert metabolically, so predicting from lean mass alone is the more accurate route *to the extent your LBM figure is* — with a real body-fat measurement it wins outright; here it's a second opinion built from the same three numbers. **Age drops out entirely**, so on this equation a blank birth date is no longer a missing input (`bmrNeedsAge`), and the Health Plan prompt says so rather than quoting an unused figure.
+  - Maintenance stays **affine in body mass under both**, which is what lets one decay model serve them: Boer's LBM is itself affine in `m`, so Katch contributes `370 + 21.6×(c_h·h + c_0)` to `A` and `21.6×c_m` to `B`. `maintenanceAffineCoefficients` takes `formula` as a parameter defaulting to the setting, so the playground can preview an unsaved choice through the same function the charts use.
+  - Katch is evaluated at the LBM **rounded to 0.1 kg** — the same figure the `LBM` box shows — so the traced `370 + 21.6 × 61.4` multiplies out to the BMR printed beside it. (`A + B×m` uses the unrounded coefficients, so the two can differ by under a kcal.)
+- **Thermic effect of food** (`f`, `TEF_PERCENT_OF_INTAKE`, default **0**) — the share of what you eat that is spent digesting it, ~10% on a mixed diet. It belongs to expenditure, so counting it *raises* the intake that produces the same deficit, and because it's a share of the very intake being solved for the identity is **solved, not summed**: `Eᵢₙ = (BMR + Eₐ − D) / (1 − f)`. Folding it into `Eₐ` and subtracting it separately give the same line, so the two conventions can't disagree.
+  - The divisor lands on `A` and `B` too (maintenance is the intake that holds mass still, and at that intake digestion is costing `f` of it), so `m∞`, the decay constant and every reverse solve get it for free. At `f = 0` every figure is byte-identical to before, the `/ 1` is left off the trace, and Calorie Balance's tooltip drops the row — that default is deliberate, since switching it on lifts every target by ~11%.
+  - Calorie Balance subtracts it from the day that actually happened (`f × logged intake`), so turning it on can't raise the target in one chart without raising the cost of eating it in the other.
+- **Metabolic adaptation** (`λ`, `λt_max`; `BMR_ADAPT_PCT_PER_WEEK` / `BMR_ADAPT_PCT_CAP`, defaults 1%/week and 12%) — on a sustained deficit BMR falls faster than the lost mass alone explains, and the gap widens with time on the diet before levelling off: `BMR_a(t) = BMR × (1 − λt)`, with `λt` capped near 10–15% by week 10–12. Refeeds and diet breaks push `λt` back toward 0, which is what setting `λ` to 0 models.
+  - **Reported, never planned with.** `Eᵢₙ`, `D` and `t` are all left as the un-adapted identities give them — the adaptation is a consequence of the diet rather than an input to it, and `t` is a moving target while `λt` is still growing. What it buys is the honest caveat on `m∞`: `m∞_a` scales the **BMR half** of `A` and `B` by `(1 − λt)` and leaves the activity half alone, and the gap between the two is the overshoot a constant-BMR forecast hides. Shown in the unit column as `— N kg above m∞`.
+  - `λt` is evaluated at the horizon `t` this render produced; with no arrival date the ceiling is quoted instead, and the trace says which. On the proportional journey there's no plateau to overshoot, so the row says so rather than inventing one.
+  - The overshoot, and the no-plateau case, are said in the **substituted trace** — the unit column reads `kg` and stops, the same rule the `Δm%` verdict follows.
+- **`m_g` and `BMI_g` are one quantity in two units** — `BMI_g = m_g / (h/100)²` — the same two-way pair as `Δm%`/`Δm` below, and the second one on the sheet. Type a target mass and the BMI follows; type a BMI and the target mass follows (`bodyMassKgFromBmi`, the inverse of `computeBmi`, kept beside it in `charts.js` so the pair can't drift). Whichever you last typed into is the known (`targetMassKnownField`), and the BMI → kg direction runs first in `renderFormulaPreview`, before anything reads `m_g`.
+  - A goal in kilograms is a number you pick; the BMI is what says whether picking it was sensible. Outside the healthy **18.5–24.9** band the box goes `--color-danger` and the trace line names the band (`underweight`, `overweight`, `obese (class I)`, …). Both ends are flagged, unlike the fat-loss band where only the ceiling is — an underweight target is as much a problem as an obese one. It never blocks Save.
+  - Only `BODY_MASS_TARGET_KG` is saved; the BMI is derived from it and the height, both already on the sheet.
+  - In **Solve for → Target body mass** both boxes go readonly: `m_g` is the answer there, so its BMI is an answer too.
 - **`Δm%` and `Δm` are one quantity in two units** — `Δm% = 100 × Δm / m` — not a fifth solve mode. Type a percentage and the kilograms follow; type kilograms and the percentage follows. The percentage sits *above* the kilograms because it's the unit the safety band is written in, so it's the one you set the pace in.
   - **0.5–1% of body mass per week** is the usual sustainable range and **1% the ceiling**. The band is named in the identity block's own heading, the verdict (`in the 0.5–1%/week band`, `above the 1%/week ceiling`, `under the 0.5%/week floor`, `maintenance`, `a surplus, not a deficit`) rides on the `Δm%` trace line, and above the ceiling the box itself goes `--color-danger`. **Nothing goes in the unit column** — it reads `%/week` and stops, like every other row's. Under the floor is merely slow, and a negative rate is a deliberate lean bulk, so neither is coloured — the same asymmetry `calorieTargetDetail` already allows. It never blocks Save: an aggressive target is the user's call.
   - Whichever box you last typed into is the known (`weeklyLossKnownField`), and the other is rewritten on every render — so a typed 1% keeps meaning 1% as `m` changes instead of freezing the kilograms it meant when you typed it. The pct → kg direction runs first in `renderFormulaPreview`, before anything reads `Δm`; the kg → pct direction is written where the trace is built, the one place every mode reaches exactly once, failure paths included.
@@ -213,7 +240,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - The target percentages are the user's own rotation plan, not a nutritional prescription — the system prompt tells the model to judge how well actual eating matched the mix, not to second-guess the mix itself.
 - **Health Plan** — the only mode that reads the app's **settings** rather than the day log: it sends the Formula Playground's whole plan and asks whether it's feasible.
   - Three blocks: the published identities (the playground's own `FORMULA_EXPRESSION`, so screen and prompt can't diverge), the inputs behind them (including which figure is pinned as body mass falls), and the substituted arithmetic those produce — `BMR → Eₐ → Δm% → D → Eᵢₙ → A → B → m∞ → t`, then `LBM → P_min → P_max`.
-  - Computed from `Setting` + the latest weigh-in, **not** the playground's input boxes: the modal may never have been opened, and the saved values are what the app actually runs on. Same functions as the playground and the charts (`calorieTargetDetail`, `maintenanceAffineCoefficients`, `projectTargetDays`, `boerLeanBodyMassKg`), so all three describe one plan.
+  - Computed from `Setting` + the smoothed body mass (`planBodyMassKg`), **not** the playground's input boxes: the modal may never have been opened, and the saved values are what the app actually runs on. Same functions as the playground and the charts (`calorieTargetDetail`, `maintenanceAffineCoefficients`, `projectTargetDays`, `boerLeanBodyMassKg`), so all three describe one plan.
+  - The prompt states which BMR equation is in force, quotes the raw weigh-in alongside `m̄` (so the model doesn't read the difference as an inconsistency), spells out the `(1 − f)` divisor only when digestion is being counted, and carries the adaptation caveat — `BMR_a` by the arrival date and the plateau it implies — next to the `m_inf` it qualifies.
   - A fourth block carries **Wellness' own aggregation** for the selected range, unchanged — feasibility is a question about the gap between the plan and the logging, so the model gets both. A plan whose activity burn assumes daily movement that isn't being logged is arithmetic, not a plan.
   - The system prompt names what to check: `Eᵢₙ` against BMR, the weekly rate against ~0.5-1% of body mass, whether τ is actually being done, whether protein is inside the band at that deficit, and whether `t` agrees with the measured trajectory. Sections are **Verdict / What works / Risks / Do this / Avoid this**, with the last two as numbered lines naming the input responsible.
   - Missing profile settings produce a prompt that says so plainly and still sends the logging, rather than a plan full of nulls.
@@ -221,7 +249,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Protein Source Rotation
 
-- Last block of the **Health Indicators** panel — every Health chart sits in that one panel, so they collapse together and share its one From/To window.
+- Last block of the **Health Indicator** panel — every Health chart sits in that one panel, so they collapse together and share its one From/To window.
 - The donut's two rings are fixed spans anchored to the window's **To** date (4 weeks and 1 week), not fractions of the window — so they keep meaning the same thing whatever range is picked.
 - One horizontal bar per ingredient carrying a Protein % on its Nutrition row.
 - Bar is actual protein eaten in range; a red tick marks its live target.
@@ -347,6 +375,16 @@ flowchart TD
 - Groq/USDA are opt-in and see only typed ingredient text or the aggregated Insight summary.
 - Open-Meteo/BigDataCloud are key-less and see only coordinates or a typed city name.
 
+### Section pages
+
+Each panel group is reachable at an address of its own — `/health/`, `/finance/`, `/other/` — showing that one group and nothing else. They are real paths, so a refresh, a bookmark or a shared link lands on the same page instead of falling back to the dashboard.
+
+- **The markup still lives in `index.html` alone.** Each of those directories holds an identical stub (`<base href="../">`, the theme bootstrap, the stylesheet, and `section-page.js`). The loader fetches `index.html`, replays its head, its body and its scripts into the stub, then hides everything outside the group the address names. A panel added to `index.html`, or moved from one group to another, appears on the right section page with nothing to keep in sync — there is no generated copy of the dashboard anywhere.
+- **The list of sections is the `<nav>` markup.** `section-page.js` matches the last path segment against each nav link's `href` and reads the group id off its `data-section`. A fourth group needs a nav link, a `<section>`, and a copy of the stub — no change to the loader, which enumerates nothing.
+- **Hidden, not removed.** The other two groups stay in the DOM: `loadDashboard` renders the whole dashboard, and every renderer expects its elements to exist. The Time/Date/Azan/Weather row is hidden too — it belongs to the dashboard as a whole — and `widgets.js` checks that row at both of its entry points, so a section page runs neither a ticking clock nor the forecast and prayer-time requests behind it.
+- **Start-up is registered, not listened for.** `index.html`'s scripts arrive after a section page's own `load` event, so `app.js` and `landing-graph.js` hand their start-up step to `window.ledgerSectionPage.onBoot()` when it exists instead of waiting on `load`/`DOMContentLoaded`. The loader runs those steps once every script — including the async Google ones, which `load` would also have waited for — has arrived, so the boot order is the one `index.html` gets.
+- **No address is written down.** Every URL in the markup and the loader is relative, and a section page's `canonical`/`og:url` are set from `location` at run time, so the whole thing moves with the repository.
+
 ### System Flowchart
 
 Where the diagram above shows *who the browser talks to*, this shows *what happens, in order*. Every branch is a real code path.
@@ -459,7 +497,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 11 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
 | 13 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
-| 14 | `accounts.js` | Accounts: balances, CRUD, sheet-formula round-trip |
+| 14 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
 | 15 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
 | 16 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
 | 17 | `csv.js` | CSV import, advanced filter engine, download helper |
@@ -478,11 +516,13 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 30 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
 | 31 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
 | 32 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 33 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
+| 33 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
 | 34 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
 | 35 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
 | 36 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
 | 37 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+
+`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 37 above into a page that has none of them (see [Section pages](#section-pages)).
 
 ### Data Flow
 
@@ -742,7 +782,8 @@ activityEntryKcal(entry)  = entry.amount2                    if logged
                           = metKcal(ACTIVITY_MET, kg, mins)  else, with a body mass on file
                           = mins × 5                         else
 
-BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)
+BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)   default
+BMR (Katch-McArdle)       = 370 + 21.6·LBM(kg, cm, sex)                    if BMR_FORMULA=katch
 activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)
 getActivityTargetKcal(kg) = ACTIVITY_TARGET_FIXED_KCAL, if set, else activityTargetKcal(kg)
 getActivityTargetMin(kg)  = ACTIVITY_TARGET_FIXED_KCAL / metKcal(ACTIVITY_MET, kg, 1), if set and kg known
@@ -752,11 +793,12 @@ getActivityTargetMin(kg)  = ACTIVITY_TARGET_FIXED_KCAL / metKcal(ACTIVITY_MET, k
 **Calorie target** — one number per day, directional rather than a point to land on (a ceiling heading down, a floor heading up):
 
 ```
-target = round( BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7 )
+target = round( (BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7) / (1 − f) )
 ```
 
-- Falls back to flat `CALORIE_TARGET_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing.
-- Re-evaluated **per day** from that day's carried-forward body mass.
+- Falls back to flat `CALORIE_TARGET_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing. Age only when the BMR equation in force reads it (`bmrNeedsAge`) — Katch-McArdle doesn't.
+- `f` is `TEF_PERCENT_OF_INTAKE / 100`, default **0**, in which case this is exactly the sum it has always been. See the [Formula Playground](#health--formula-playground) for why digestion divides rather than adds.
+- **Today's** figure is evaluated at the 7-day rolling average body mass (`planBodyMassKg`), not the last single reading — so a water-heavy morning doesn't move the day's ceiling. The per-day chart line still re-evaluates from that day's carried-forward body mass.
 - Moves ≈ 15.8 kcal per kg, so a 6 kg loss shifts it by roughly 95 kcal.
 - **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Formula Playground's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's Eᵢₙ — instead of being recalculated from each weigh-in. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
 - The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant Eᵢₙ — so pinning is also what makes the target you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
@@ -770,13 +812,15 @@ target = round( BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7 )
 
 ```
 maintenance = BMR(that day's carried-forward body mass, height, age, sex)
-balance     = intake − maintenance − activityKcal(that day)
+TEF         = f × intake                                    that day's logged intake
+balance     = intake − maintenance − activityKcal(that day) − TEF
 expected g  = (balance / 7700) × 1000
 ```
 
 - A day with no food logged is a gap, not a day of eating nothing.
+- The `TEF` term is a share of what was **actually eaten**, not of the target — this row scores the day that happened. At the default `f = 0` it's absent from the arithmetic and from the tooltip; it exists so that switching digestion on can't raise the target intake in one chart without also raising the cost of eating it here. The target dash is drawn at the smoothed body mass, like every other plan-level figure.
 
-### 7-day dash (all six Health Indicators charts)
+### 7-day dash (all six Health Indicator charts)
 
 ```
 bucket(i)  = floor((columnCount − 1 − i) / 7)      counted back from today
@@ -982,6 +1026,9 @@ energy-anchored ("300kcal cookie") — the same sources read backwards:
 ```text
 ledger/
 ├── index.html                    # Page shell: gates, dashboard, modals, footer
+├── health/index.html             # One-group pages: identical stubs, no markup of
+├── finance/index.html            #   their own — section-page.js builds each from
+├── other/index.html              #   index.html and shows that group alone
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
 ├── assets/
 │   ├── images/                   # Social preview, touch icon
@@ -1002,7 +1049,7 @@ ledger/
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts.js             # Chart.js renderers + health formulas
 │       ├── transactions.js       # Transaction Log
-│       ├── accounts.js           # Accounts panel
+│       ├── accounts.js           # Account panel
 │       ├── breakdown.js          # Breakdown panel (Category/Type rows, formula-safe)
 │       ├── timesheet.js          # Work panel + analytics data
 │       ├── csv.js                # CSV import/export + filter engine
@@ -1023,7 +1070,8 @@ ledger/
 │       ├── financial-insight.js  # Financial Insight panel
 │       ├── landing-graph.js      # Pre-login mind-maps
 │       ├── gate.js               # Pre-login flow
-│       └── app.js                # Orchestration
+│       ├── app.js                # Orchestration
+│       └── section-page.js       # Loaded only by the section stubs above
 ├── scripts/
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template
 │   ├── fetch_activity_images.mjs      # Still exercise guides → assets/images/activities

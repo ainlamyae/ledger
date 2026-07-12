@@ -30,7 +30,11 @@ function planProteinPerKgBand() {
 // a plan missing height or sex has no BMR and therefore no target at all.
 function gatherPlanSnapshot() {
   const entries = physiqueAsWellnessEntries();
-  const bodyMassKg = latestBodyMassKg(entries);
+  // The smoothed mass, exactly as the playground and the calorie tile use it — a plan
+  // described here at one mass and computed there at another would have the model judging
+  // arithmetic the app isn't running.
+  const bodyMassKg = planBodyMassKg(entries);
+  const rawBodyMassKg = latestBodyMassKg(entries);
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
@@ -43,7 +47,8 @@ function gatherPlanSnapshot() {
   const kappa = getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT);
   const targetKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
 
-  const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+  const coefficients = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+  const { a, b } = coefficients;
   // targetJourneyProjection, not projectTargetDays: with the percentage pinned the plan walks
   // the proportional journey, and the prompt has to be judging the same arrival date the Body
   // Mass chart is showing.
@@ -56,8 +61,26 @@ function gatherPlanSnapshot() {
   const lbmKg = Math.round(boerLeanBodyMassKg(bodyMassKg, heightCm, sex) * 10) / 10;
   const perKg = planProteinPerKgBand();
 
+  // λt by the arrival date, and where the plateau really lands once BMR has sagged that far
+  // — the caveat the constant-BMR m_inf can't carry on its own. Null on the proportional
+  // journey, which has no plateau to overshoot.
+  const adaptFraction = adaptationFraction(
+    projection.status === 'ok' ? projection.days : Infinity,
+    getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT),
+    getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT),
+  );
+  const adaptedPlateau = projection.journey === 'pct'
+    ? null
+    : Math.round(adaptedPlateauKg(detail.kcal, coefficients, adaptFraction) * 10) / 10;
+
   return {
-    bodyMassKg, heightCm, age, sex, targetKg, met, tau, kappa,
+    bodyMassKg, rawBodyMassKg, heightCm, age, sex, targetKg, met, tau, kappa,
+    formula: coefficients.formula,
+    tefPercent: Math.round((1 - coefficients.tefDivisor) * 1000) / 10,
+    tefKcal: Math.round(detail.tefKcal),
+    adaptPct: Math.round(adaptFraction * 1000) / 10,
+    adaptedBmr: Math.round(detail.bmr * (1 - adaptFraction)),
+    adaptedPlateau,
     deficitKcal: Math.round((detail.weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7),
     weeklyFatLossKg: detail.weeklyFatLossKg,
     bmr: Math.round(detail.bmr),
@@ -96,17 +119,33 @@ function gatherPlanInsight(fromIso, toIso) {
 // comes from and name the input to change, instead of only that it's aggressive.
 function planSubstitutedLines(p) {
   const sigma = p.sex === 'male' ? '+ 5' : '− 161';
+  const katch = p.formula === 'katch';
+  // Only when it changes something: at f = 0 there is no divisor to explain, and printing
+  // "/ 1" invites the model to reason about a term the plan doesn't use.
+  const byF = p.tefPercent > 0 ? `, all / (1 − ${p.tefPercent}/100)` : '';
   const lines = [
-    `BMR: 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.bmr} kcal/day`,
+    // The smoothed mass is what every line below substitutes, so it's stated as its own
+    // line first — otherwise a model comparing it against the trajectory in RECENT LOGGING
+    // would read the difference from the last weigh-in as an inconsistency.
+    `m_bar (7-day rolling average, the mass every line below uses): ${p.bodyMassKg} kg; latest single weigh-in was ${p.rawBodyMassKg} kg`,
+    katch
+      ? `BMR (Katch-McArdle, from lean mass): 370 + 21.6 × ${p.lbmKg} = ${p.bmr} kcal/day`
+      : `BMR (Mifflin-St Jeor): 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.bmr} kcal/day`,
     `Ea: ${p.met} × ${p.bodyMassKg} × ${p.tau} × ${p.kappa} / 200 = ${p.activityKcal} kcal/day`,
     // Spelled out rather than left for the model to divide: the sustainable band it's
     // asked to judge the plan against is written in percent, and this is the same figure
     // the playground shows beside the Δm box.
     `dm%: 100 × ${p.weeklyFatLossKg} / ${p.bodyMassKg} = ${p.weeklyFatLossPct} %/week`,
     `D: ${p.weeklyFatLossKg} × 7700 / 7 = ${p.deficitKcal} kcal/day`,
-    `Ein: ${p.bmr} + ${p.activityKcal} − ${p.deficitKcal} = ${p.intakeKcal} kcal/day`,
-    `A: 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.a} kcal/day`,
-    `B: 10 + ${p.met} × ${p.tau} × ${p.kappa} / 200 = ${p.b} kcal/day per kg`,
+    p.tefPercent > 0
+      ? `Ein: (${p.bmr} + ${p.activityKcal} − ${p.deficitKcal}) / (1 − ${p.tefPercent}/100) = ${p.intakeKcal} kcal/day, of which TEF (digestion) is ${p.tefKcal} kcal/day`
+      : `Ein: ${p.bmr} + ${p.activityKcal} − ${p.deficitKcal} = ${p.intakeKcal} kcal/day`,
+    katch
+      ? `A: 370 + 21.6 × (lean-mass terms in h)${byF} = ${p.a} kcal/day`
+      : `A: 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma}${byF} = ${p.a} kcal/day`,
+    katch
+      ? `B: 21.6 × (lean-mass kg term) + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`
+      : `B: 10 + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`,
   ];
 
   // Two journeys, two arrival dates, and m_inf only exists in one of them: with the
@@ -126,6 +165,13 @@ function planSubstitutedLines(p) {
   } else if (p.projection.status === 'reached') {
     lines.push('t: already at the target body mass');
   }
+  // The adaptation caveat, next to the plateau it qualifies. Reported, not planned with:
+  // nothing above was computed from it, which is exactly why the model has to be told that
+  // m_inf is the optimistic figure and this is where the mass tends to actually stall.
+  if (p.adaptedPlateau !== null && p.adaptPct > 0) {
+    lines.push(`BMR_adapt: ${p.bmr} × (1 − ${p.adaptPct}/100) = ${p.adaptedBmr} kcal/day by the arrival date, and m_inf_adapt = ${p.adaptedPlateau} kg — the plateau once metabolic adaptation is allowed for, i.e. ${Math.round((p.adaptedPlateau - p.equilibriumKg) * 10) / 10} kg above the m_inf above. Refeeds and diet breaks push this back toward the un-adapted figure.`);
+  }
+
   lines.push(
     `LBM: ${p.sex === 'male' ? `0.407 × ${p.bodyMassKg} + 0.267 × ${p.heightCm} − 19.2` : `0.252 × ${p.bodyMassKg} + 0.473 × ${p.heightCm} − 48.3`} = ${p.lbmKg} kg (${p.leanPercent}% of body mass)`,
     `P_min: ${p.proteinPerKgMin} × ${p.lbmKg} = ${p.proteinMinG} g/day`,
@@ -148,16 +194,18 @@ function planRatePinDescription(p) {
 
 function planInputLines(p) {
   return [
-    `m (current body mass): ${p.bodyMassKg} kg`,
+    `m (body mass used by the plan, a 7-day rolling average): ${p.bodyMassKg} kg`,
     `m_g (target body mass): ${p.targetKg} kg`,
     `h (height): ${p.heightCm} cm`,
-    `a (age): ${p.age} years`,
+    `a (age): ${p.age} years${p.formula === 'katch' ? ' (unused — the Katch-McArdle BMR equation does not read age)' : ''}`,
     `sigma (sex): ${p.sex}`,
     `MET (assumed activity intensity): ${p.met}`,
     `tau (daily activity target): ${p.tau} min/day`,
     `kappa (oxygen uptake per MET): ${p.kappa} mL O2/kg/min`,
     `dm (weekly fat loss target): ${p.weeklyFatLossKg} kg/week, i.e. ${p.weeklyFatLossPct}% of current body mass per week`,
     `p_min - p_max (protein per kg of lean mass): ${p.proteinPerKgMin} - ${p.proteinPerKgMax} g/kg LBM/day`,
+    `BMR equation in force: ${p.formula === 'katch' ? 'Katch-McArdle, BMR = 370 + 21.6 x LBM' : 'Mifflin-St Jeor, BMR = 10m + 6.25h - 5a + sigma'}`,
+    `f (thermic effect of food): ${p.tefPercent}% of intake${p.tefPercent > 0 ? '' : ' (not counted in this plan)'}`,
     'rho (fat energy density): 7700 kcal/kg (population constant)',
     'epsilon (oxygen energy yield): 200 mL O2/kcal (population constant)',
     `Which figure is held fixed as body mass falls: ${planRatePinDescription(p)}; ${p.activityIsPinned ? 'the activity calorie burn is pinned, so the minutes needed rise as body mass drops' : 'the activity minutes are pinned, so the burn they produce falls as body mass drops'}`,
@@ -195,7 +243,7 @@ function formatPlanInsightPrompt(data) {
 
 const PLAN_INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing a fat-loss plan someone built for themselves, and the self-tracked logging that shows how they are actually doing against it. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given three things: THE PLAN (the published formulas the app uses — Mifflin-St Jeor BMR, the ACSM activity equation, an exponential body-mass decay model, and the Boer lean-body-mass equation), PLAN INPUTS (the person's own numbers fed into them, plus which figure they hold fixed as body mass falls), WHAT THOSE INPUTS PRODUCE (the same arithmetic substituted, ending in a target daily intake Ein, a plateau body mass m_inf, an estimated number of days t to the target, and a daily protein band P_min-P_max scaled to lean mass), and RECENT LOGGING (their recent averages versus their targets and the preceding period, and their measured body-mass trajectory).
+You'll be given three things: THE PLAN (the published formulas the app uses — a BMR equation, either Mifflin-St Jeor or Katch-McArdle from lean mass, whichever PLAN INPUTS says is in force; the ACSM activity equation; an optional thermic-effect-of-food correction; an exponential body-mass decay model; and the Boer lean-body-mass equation. Body mass throughout is a 7-day rolling average, not a single weigh-in), PLAN INPUTS (the person's own numbers fed into them, plus which figure they hold fixed as body mass falls), WHAT THOSE INPUTS PRODUCE (the same arithmetic substituted, ending in a target daily intake Ein, a plateau body mass m_inf, an estimated number of days t to the target, and a daily protein band P_min-P_max scaled to lean mass), and RECENT LOGGING (their recent averages versus their targets and the preceding period, and their measured body-mass trajectory).
 
 Your job is to judge whether this plan is FEASIBLE and SAFE for this person, and whether their logging shows it being followed. Reason about the actual numbers you were given — quote them.
 

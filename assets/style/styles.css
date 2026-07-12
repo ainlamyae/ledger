@@ -111,6 +111,16 @@ header h1 {
     font-size: 1.25rem;
 }
 
+/* The logo is the way back to the whole dashboard from a section page, so it's
+   a link — styled to look exactly like the plain heading it replaced. */
+.logo-link {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    color: inherit;
+    text-decoration: none;
+}
+
 .logo-icon {
     width: 1.25rem;
     height: 1.25rem;
@@ -422,7 +432,7 @@ header .btn:hover {
     margin-top: 2.5rem;
 }
 
-/* Each Health/Finances/Other group renders as a small mind-map: a
+/* Each Health/Finance/Other group renders as a small mind-map: a
    round "hub" node for the group name, its feature nodes arranged in a ring
    around it, and an SVG line from the hub to every node. The ring itself is
    computed in JS (landing-graph.js's layoutNodesRadially), not pure CSS —
@@ -439,7 +449,7 @@ header .btn:hover {
 }
 
 .node-graph-health   { --group-color: var(--color-primary); }
-.node-graph-finances { --group-color: var(--color-income); }
+.node-graph-finance { --group-color: var(--color-income); }
 .node-graph-other    { --group-color: var(--color-other); }
 
 .node-graph-lines {
@@ -899,6 +909,14 @@ kbd {
     display: flex;
     flex-direction: column;
     gap: .5rem;
+}
+
+/* A section page hides the two wrappers it isn't, and the widget row, rather
+   than removing them — every renderer still expects its elements to exist. Both
+   set display, so [hidden] needs saying. */
+.panel-group[hidden],
+.widget-cards[hidden] {
+    display: none;
 }
 
 .panel-group-title {
@@ -1421,7 +1439,7 @@ th.sortable:hover {
 /* Same reason as .today-glance-cards below: three of these four now carry two
    figures ("-$1,675.26 / -$1,700.00"), which the dashboard's 1.6rem .value
    can't hold in a ~188px card. One size across all four keeps the row even. */
-#finances > .cards .value {
+#finance > .cards .value {
     font-size: 1.1rem;
 }
 
@@ -1430,7 +1448,7 @@ th.sortable:hover {
    so these go two-up early instead of shrinking further. Scoped by id so the
    Health glance tiles, whose values are shorter, keep their own breakpoint. */
 @media (max-width: 949px) {
-    #finances > .cards {
+    #finance > .cards {
         grid-template-columns: repeat(2, 1fr);
     }
 }
@@ -2519,7 +2537,7 @@ td .btn {
     }
 
     /* On mobile the pre-sign-in landing page shows just the header (logo +
-       sign-in) — the three Health/Finances/Other feature graphs are a wall of
+       sign-in) — the three Health/Finance/Other feature graphs are a wall of
        text on a small screen, so they're dropped rather than reflowed. */
     #gate .landing-features {
         display: none;
@@ -2764,12 +2782,15 @@ td .btn {
     font-weight: 600;
 }
 
-/* Δm% above the 1%/week ceiling. The colour is the whole warning — the unit column stays
-   `%/week` like every other row's, and the words are in the substituted trace. Must sit
-   after the read-only block above: same specificity, so source order is what lets an
-   over-ceiling figure stay red in Solve-for-weekly-fat-loss, where the box is also
-   readonly. Not an invalid value — nothing here is blocked, so no error background. */
-.formula-row input.formula-pct-over {
+/* Δm% above the 1%/week ceiling, and BMI_g outside the healthy 18.5–24.9 band. The colour is
+   the whole warning — the unit column stays `%/week` or `kg/m²` like every other row's, and
+   the words are in the substituted trace. Two names for one look because they mark different
+   things: a rate over a ceiling, and a goal outside a band at either end.
+   Must sit after the read-only block above: same specificity, so source order is what lets
+   a flagged figure stay red in the Solve-for mode that also makes its box readonly.
+   Not an invalid value — nothing here is blocked, so no error background. */
+.formula-row input.formula-pct-over,
+.formula-row input.formula-out-of-band {
     border-color: var(--color-danger);
     color: var(--color-danger);
     font-weight: 600;
@@ -2791,10 +2812,11 @@ td .btn {
     grid-template-columns: 2.5rem minmax(0, 1fr) 8.45rem minmax(0, 1fr);
     align-items: center;
     gap: .6rem;
-    /* No divider between rows: the boxed inputs already mark where one variable
-       ends and the next begins, so the rules were 14 lines of ink doing nothing
-       but adding height. */
-    padding: .05rem 0;
+    /* No divider between rows, and no padding either: the boxed inputs already mark
+       where one variable ends and the next begins, so the rules were 14 lines of ink
+       doing nothing but adding height — and the padding was the same mistake in
+       whitespace. The border around each box is the separation. */
+    padding: 0;
     font-size: .8rem;
 }
 
@@ -2822,10 +2844,13 @@ td .btn {
     overflow-wrap: anywhere;
 }
 
-/* The list runs to 20 variables, so each row's height is paid 20 times: the boxes carry
-   the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) but give
-   up the vertical padding and the inherited line-height around it, which is where a
-   field's height actually comes from. ~9px a row, ~180px off the modal. */
+/* The list runs to thirty variables, so each row's height is paid thirty times: the boxes
+   carry the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) but
+   give up the vertical padding and the inherited line-height around it, which is where a
+   field's height actually comes from. The vertical padding is now zero outright — the
+   line-height is already generous enough to keep the digits off the border, and thirty
+   rows × two paddings is most of a screen of nothing. Horizontal padding stays: that one
+   isn't whitespace around the field, it's what keeps the text off its own left edge. */
 .formula-row input,
 .formula-row select {
     width: 100%;
@@ -2837,7 +2862,7 @@ td .btn {
     min-width: 0;
     font: inherit;
     font-size: var(--input-font-size);
-    padding: .15rem .4rem;
+    padding: 0 .4rem;
     line-height: 1.15;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
@@ -2854,7 +2879,7 @@ td .btn {
 .formula-fixed {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: var(--input-font-size);
-    padding: .15rem .4rem;
+    padding: 0 .4rem;
     line-height: 1.15;
     /* Left, like the text inside every input above it — it used to be centred,
        which left 7700 and 200 visibly offset from the column of editable
@@ -2901,7 +2926,7 @@ td .btn {
     .formula-row input,
     .formula-row select,
     .formula-fixed {
-        padding: .15rem .25rem;
+        padding: 0 .25rem;
     }
 
     /* Right-aligned so each value sits against its own unit rather than
@@ -2909,6 +2934,38 @@ td .btn {
     .formula-row input,
     .formula-fixed {
         text-align: right;
+    }
+
+    /* The date box was the one field that ignored all of the above: a phone draws
+       input[type=date] as a native control with its own metrics, so it came out
+       both wider than its grid column and visibly taller than the twenty text
+       boxes around it — one fat field in a column of thin ones. Dropping the
+       native appearance hands its width back to the grid and its height back to
+       the padding/line-height every other box here is sized by. */
+    .formula-row input[type="date"] {
+        -webkit-appearance: none;
+        appearance: none;
+        min-height: 0;
+        height: auto;
+        line-height: 1.15;
+    }
+
+    /* WebKit renders the value in its own inner element, which carries a margin
+       and its own alignment — the two things that pushed the field past the
+       column and off the right-aligned column of figures. */
+    .formula-row input[type="date"]::-webkit-date-and-time-value {
+        margin: 0;
+        text-align: right;
+    }
+
+    /* And the picker glyph, which is sized for a full-width native field. Kept
+       (it's the only way to open the calendar on a phone) but given roughly a
+       character's worth of room instead of its default box. */
+    .formula-row input[type="date"]::-webkit-calendar-picker-indicator {
+        width: .85rem;
+        padding: 0;
+        margin: 0 0 0 .15rem;
+        opacity: .6;
     }
 
     .formula-solve-for {

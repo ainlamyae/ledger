@@ -120,7 +120,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🧪 Formula Playground</span>
-                        <span class="node-graph-tooltip">See exactly how your daily calorie figure is built — resting metabolic rate, activity burn, and the deficit your weekly fat-loss target implies — each as its own formula with your own numbers substituted in. Change any input (body mass, height, age, sex, activity target, fat-loss rate) and both the calorie figure and the predicted date you hit your target body mass update as you type. Two pin choices decide what stays fixed as your body mass changes — your daily calorie intake vs. your deficit, and your activity minutes vs. the calorie burn they're worth — save the ones you like straight back to your settings.</span>
+                        <span class="node-graph-tooltip">See exactly how your daily calorie figure is built — resting metabolic rate, activity burn, and the deficit your weekly fat-loss target implies — each as its own formula with your own numbers substituted in. Change any input (body mass, height, age, sex, activity target, fat-loss rate) and both the calorie figure and the predicted date you hit your target body mass update as you type. The fat-loss rate reads both ways — type kilograms a week or a percentage of your body mass a week, and the other follows — with the 0.5–1% a week the literature calls sustainable checked against whatever you land on. Two pin choices decide what stays fixed as your body mass changes — your daily calorie intake vs. your deficit, and your activity minutes vs. the calorie burn they're worth — save the ones you like straight back to your settings.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🔄 Protein Source Rotation</span>
@@ -294,7 +294,9 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Health Indicators</h2>
-                <button type="button" id="formula-playground-btn" class="btn panel-header-btn" title="Open the health formula playground">Formula</button>
+                <!-- Primary, not plain: this one writes back to Settings rather than
+                     just showing a formula. -->
+                <button type="button" id="formula-playground-btn" class="btn btn-primary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
             </div>
 
             <div class="body-mass-projection-wrap">
@@ -573,9 +575,9 @@
                 <h2>Activity</h2>
                 <!-- Three buttons on one phone heading line, so each label is cut to a
                      word and carries the full wording in its tooltip. -->
+                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
                 <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
                 <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
-                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
             </div>
 
             <!-- Rebuilt from the Activities sheet tab by activities.js -->
@@ -1235,6 +1237,7 @@
                     <option>BIRTH_DATE</option>
                     <option>SEX</option>
                     <option>WEEKLY_FAT_LOSS_KG</option>
+                    <option>WEEKLY_FAT_LOSS_PCT</option>
                     <option>WIDGET_DEFAULT_CITY</option>
                     <option>WIDGET_SECOND_CLOCK_CITY</option>
                     <option>GROQ_API_KEY</option>
@@ -1407,6 +1410,12 @@
             <label><input type="radio" name="formula-solve-for" value="TARGET_MASS"> Target body mass</label>
             <label><input type="radio" name="formula-solve-for" value="TAU"> Activity target</label>
             <label><input type="radio" name="formula-solve-for" value="DELTA_M"> Weekly fat loss</label>
+            <!-- The odd one out, and named for what you hold rather than what it solves:
+                 here the percentage of body mass is the fixed input and BOTH Eᵢₙ and t are
+                 computed from it, on the proportional journey a fixed share implies. -->
+            <label title="Hold the weekly fat loss at a percentage of your body mass. The kilograms per week, the calorie target and the arrival date are all computed from it — and the date follows the proportional journey, where the kilograms shrink as you do.">
+                <input type="radio" name="formula-solve-for" value="FIXED_PCT"> Weekly fat loss %
+            </label>
         </fieldset>
 
         <div class="formula-inputs">
@@ -1460,6 +1469,15 @@
                 <span class="formula-name">oxygen uptake per MET</span>
                 <input type="text" id="formula-met-o2" inputmode="decimal">
                 <span class="formula-unit">mL O₂/kg/min</span>
+            </label>
+            <!-- Δm's other face, and the row above it on purpose: the percentage is the
+                 unit the safety band is written in, so it's what you set the pace in and
+                 the kilograms below follow. Type either box and the other follows it. -->
+            <label class="formula-row" title="A weekly loss of 0.5–1% of body mass is the usual sustainable range, and 1% the ceiling — above it, more of what comes off is lean mass. Type a percentage and Δm below follows it; type kilograms there and this follows instead.">
+                <span class="formula-sym">Δm%</span>
+                <span class="formula-name">weekly fat loss, as a share of body mass</span>
+                <input type="text" id="formula-weekly-loss-pct" inputmode="decimal">
+                <span class="formula-unit">%/week</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">Δm</span>
@@ -1547,6 +1565,10 @@
             <label title="Holds this daily intake. Maintenance falls as you get lighter, so the deficit shrinks and fat loss decelerates — the constant-intake journey the forecast above solves for.">
                 <input type="radio" name="formula-pin-mode" value="intake">
                 Pin target daily intake
+            </label>
+            <label title="Holds the fat loss at a percentage of your body mass, so the kilograms per week shrink as you do and every weigh-in recalculates the intake. The gentlest of the three, and the only one with no plateau to fall short of — a constant share of a falling mass always reaches the target.">
+                <input type="radio" name="formula-pin-mode" value="pct">
+                Pin target fat-loss %
             </label>
         </fieldset>
 

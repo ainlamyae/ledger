@@ -13,6 +13,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - [Features](#features)
 - [Architecture](#architecture)
   - [System Diagram](#system-diagram)
+  - [Section pages](#section-pages)
   - [System Flowchart](#system-flowchart)
   - [Frontend Module Map](#frontend-module-map)
   - [Data Flow](#data-flow)
@@ -58,14 +59,14 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
 - **Stacking order is explicit**: page chrome 0-1, sticky `header` 10, dropdowns hanging off it 20, landing tooltips 50, the floating dark-mode & privacy stack 90, **modals 100**, and toasts 110 so a countdown to undo something stays readable over an open form. The floating stack sits *below* a modal for the same reason the header does — on a phone it covered the bottom-left corner of an open form, and a toggle that's one Escape away isn't worth a field you can't reach. A modal with no `z-index` of its own lost to the header — both are positioned, so the header's 10 beat the modal's `auto` and painted over the top of a centred card, which is where `.modal-close` sits. Any long form (the card maxes at `100vh − 4rem`, so its top lands ~32px down while the header is taller than that) became uncloseable.
 - **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
-- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Accounts, Contacts, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
+- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Account, Contact, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
   - Driven by **Activity**, the one panel carrying three of them (**Add**, **Guide**, **Log**): "Activity Plan" + "Add Activity" + "Instruction" + "Log a Workout" could not share a phone's heading line, and `.panel-header` wraps rather than squeezing the heading, so the labels were what had to give.
   - Modal `<h2>`s keep the long form (*Log a Transaction*, *Add Ingredient*) — a heading has the width, and it's where you land after clicking.
   - Empty-state hints quote the new label (`click "Log" in the panel heading`), so no text in the app names a button that no longer exists.
   - The one exception is the timesheet **reminder banner**'s Log Time — a standalone CTA in a sentence, not a crowded heading.
-- **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Account**, *Contact List* → **Contact**. The sheet tabs now read the same way (`Transaction`, `Account`, `Nutrition`, `Activity`, `Statement`, `Breakdown`, …) — but that's a spreadsheet-side choice, not something the app depends on: **every tab name lives in `CONFIG.SHEETS` (`config.js`) and nowhere else**, so renaming a tab is one line there. Labels that have to agree with a tab name (the breakdown table's "from your own table" source) are read off the same object rather than spelled out again.
-- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicators.
-- **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
+- **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Account**, *Contact List* → **Contact**, *Accounts* → **Account**, *Health Indicators* → **Health Indicator**, *Financial Indicators* → **Financial Indicator**. The sheet tabs now read the same way (`Transaction`, `Account`, `Nutrition`, `Activity`, `Statement`, `Breakdown`, …) — but that's a spreadsheet-side choice, not something the app depends on: **every tab name lives in `CONFIG.SHEETS` (`config.js`) and nowhere else**, so renaming a tab is one line there. Labels that have to agree with a tab name (the breakdown table's "from your own table" source) are read off the same object rather than spelled out again.
+- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
+- **Panel groups** — Health, Finance, Other. Each is a page of its own at `/health/`, `/finance/` and `/other/`, and the nav links are those addresses rather than in-page anchors, so a group can be linked to, bookmarked and refreshed on its own (see [Section pages](#section-pages)). The logo is the way back to all three at once.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
 - **Dark mode** — floating toggle, persisted.
@@ -79,12 +80,12 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Default** — everything else, including all emoji buttons (close, delete) — an emoji on a dark fill is hard to read.
 - Slow actions append `…` to the label and block re-clicks until they settle: all form saves, bulk merge/delete, every row delete, and the AI/USDA calls.
 
-### Finances
+### Finance
 
 - **Summary cards** — Net Worth, Monthly Cash Flow, Monthly Income, Monthly Expenditure.
   - **Expenditure** also shows the average of the **previous 3 months**, separated by `/`. The current month is excluded from its own benchmark; a tooltip names the months averaged.
   - **Income shows this month alone.** Income is lumpy in a way spending isn't — one quarter catching a bonus or a contract makes every ordinary month read as a shortfall against its own baseline, which looks like a verdict without being one. Its average is still on the card's tooltip, and in Financial Insight, where it arrives with context.
-- **Financial Indicators** — Cumulative Net Worth (line), Category Expenditure Trend (stacked bars **with that month's income as a line over them**), grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months) plus four category donuts.
+- **Financial Indicator** — Cumulative Net Worth (line), Category Expenditure Trend (stacked bars **with that month's income as a line over them**), grouped bars over four periods (Last Month, Quarter ÷3, Year ÷12, Lifelong ÷ months) plus four category donuts.
   - The income line is what retired the separate **Revenue vs. Expenditure** area chart: that chart's expense series was this one's stack total, and its income series is now the line — so "where did it go" and "was it more than came in" are read off one shape instead of two. The line is `targetMarkColor()` (near-black on light, near-white on dark) rather than a literal black, which would vanish in dark mode; it carries its own `stack` so a stacked y axis draws it *across* the bars instead of on top of them, and `order: 0` keeps it drawn over the tallest month.
   - **`stepped: 'middle'`, not a sloped line.** A month's income is one flat figure for that month, so joining the points with a slope invents a value for every day in between and renders a pay rise as a peak. Stepping halfway between months puts each flat run centred over its own bar, with the jump on the boundary — the same read the old stepped area chart gave.
   - The axis maximum is 1.2× the **second**-highest month, measured on whichever is taller that month, spend or income — sizing on the stack alone drew the line off the top of the plot in every month that earned more than it spent.
@@ -95,16 +96,21 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - Payee/Description/Category autocomplete from history; new categories can be typed inline.
   - Amount accepts arithmetic (`=-9.97-1.30`, `-32/2`), rounded to the cent. The placeholder carries both the sign convention and the expression form, so the form has no hint line under it.
   - **Tax** button in the form's actions row multiplies Amount by the tax rate and writes the result back (`1` → `1.13`, `-45.50` → `-51.42` — an expense is negative and so is its tax). Not a submit: the taxed figure sits on screen to check before Save takes it, and clicking twice compounds, since the box is left holding a plain number. The rate is `TAX_RATE_PCT` on the Settings tab, defaulting to **13** (Ontario HST); the button says only "Tax" and the tooltip names the rate.
+  - **Update the account balance** — a tick box under Amount, **on by default**, that adds the amount to the selected account's Balance on the `Account` tab as part of the same save. The sign is the whole of it: `-10` on WV takes WV down ten, a deposit puts it back. A transaction and the balance it moves are one act, and doing them separately is how the two drift apart.
+    - **Never over a formula.** Balance is often the sheet's own arithmetic (`=SUMIF(Transaction!…)`, a GOOGLEFINANCE conversion), which already counts the row that was just appended — adding to it would count the transaction twice, and writing a number over it would cost the sheet its arithmetic for good. Picking such an account turns the box off and prints why under it. Same for a Balance holding a label like `Closed`: there's no amount to add to. A blank Balance counts as zero.
+    - Telling the two apart needs the column read **as formulas** — the accounts list is read `UNFORMATTED_VALUE`, where a formula and a typed number both arrive as today's figure. That read is lazy (nothing but this box wants it, so the dashboard's own load doesn't pay for it) and taken once per accounts refresh.
+    - **New rows only.** On an edit the balance would need the *difference* between the old amount and the new one — and nothing at all when the amount wasn't what changed — so rather than guess, the box is off the form there and the Account panel stays the place to correct a balance by hand. A duplicate counts as a new row, like Save & Add Another.
+    - Untick it and the choice sticks while the form is open, including across a change of account; each new form arms it again. The balance write happens **after** the transaction row is safely in, and is reported (not raised as a save failure) if the sheet refuses or the call fails — a failed save invites a second Save, which would be a duplicate row.
   - Advanced Filters: date range plus an AND/OR field-filter builder; Export CSV writes exactly what's filtered.
 - **Bulk transaction ops** — select rows for Edit Selected (only filled fields applied) or Delete Selected (one `batchUpdate`, highest row first).
 - **Undo** — toast after bulk edit/delete; deletes re-append, edits write original values back in place.
-- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the **Accounts** table (with a Total row summing Balance and Market Value) and reconciliation status.
+- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the **Account** table (with a Total row summing Balance and Market Value) and reconciliation status.
   - **The two rings are coloured from two bands of one hue wheel, not one.** Type keeps the vivid band (`65% / 55%`); institution takes a half-step hue offset and a deeper, less saturated one (`45% / 42%`), and the outer account ring is alpha-shaded from its institution's colour. Both palettes used to start at the same hue with the same step, so a similar number of types and institutions made them *identical* — the second-largest institution came out in exactly the second-largest type's colour, which is what made a TFSA (an Investment) read as "the Saving colour" against the legend above it. The offset separates neighbouring hues; the band is what still separates the rings when differing counts realign the wheel anyway.
 
 ### Breakdown
 
 - The `Breakdown` tab as a maintainable table rather than only a chart source (`breakdown.js`): searchable and sortable, one row per Category × Type, with that row's **Last Month / Last Quarter / Last Year / Lifelong** figures.
-- **The money is never written.** Columns C-F are the spreadsheet's own formulas — the same ones Financial Indicators is drawn from — so every write here is scoped to `A:B`, the two text columns that name the row. There is no path in this panel that can replace a formula with the number it produced.
+- **The money is never written.** Columns C-F are the spreadsheet's own formulas — the same ones Financial Indicator is drawn from — so every write here is scoped to `A:B`, the two text columns that name the row. There is no path in this panel that can replace a formula with the number it produced.
   - Editing therefore offers Category and Type only; the four amounts appear in the modal as text, labelled as the sheet's own.
 - **A blank Type is a category's own total row** (the one summing every Type under it) — kept blank rather than normalised, since that blank is what the sheet reads as "total". The table shows `—` with a tooltip saying so.
 - **Add and Duplicate both copy an existing row's formulas** via `copyPaste`, which rewrites relative references for the new row. A values-append would land a row with four permanently empty money columns; pasting formula text would leave it pointing at the row it came from. Add picks its template by shape — a typed row for a typed row, a total row for a total row — and takes the last such row, so a new one lands at the bottom instead of inside an existing category's block.
@@ -130,7 +136,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - The Calories heading carries which side of the target it is (max or min), since the number alone can't say it.
 - Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
 
-### Health — Health Indicators
+### Health — Health Indicator
 
 Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
 
@@ -160,7 +166,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Formula Playground
 
-**Tune** in the Health Indicators heading opens it.
+**Tune** in the Health Indicator heading opens it.
 
 - Every term of the calorie-target and forecast algebra, with your own numbers substituted in — not a black box you have to trust.
 - **Solve for** any one of Calories, Target body mass, Activity or Weekly fat loss; the rest are inputs and the picked one is computed. Activity and Weekly fat loss also let you type either Eᵢₙ or `t` and compute whichever you didn't touch.
@@ -243,7 +249,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Protein Source Rotation
 
-- Last block of the **Health Indicators** panel — every Health chart sits in that one panel, so they collapse together and share its one From/To window.
+- Last block of the **Health Indicator** panel — every Health chart sits in that one panel, so they collapse together and share its one From/To window.
 - The donut's two rings are fixed spans anchored to the window's **To** date (4 weeks and 1 week), not fractions of the window — so they keep meaning the same thing whatever range is picked.
 - One horizontal bar per ingredient carrying a Protein % on its Nutrition row.
 - Bar is actual protein eaten in range; a red tick marks its live target.
@@ -369,6 +375,16 @@ flowchart TD
 - Groq/USDA are opt-in and see only typed ingredient text or the aggregated Insight summary.
 - Open-Meteo/BigDataCloud are key-less and see only coordinates or a typed city name.
 
+### Section pages
+
+Each panel group is reachable at an address of its own — `/health/`, `/finance/`, `/other/` — showing that one group and nothing else. They are real paths, so a refresh, a bookmark or a shared link lands on the same page instead of falling back to the dashboard.
+
+- **The markup still lives in `index.html` alone.** Each of those directories holds an identical stub (`<base href="../">`, the theme bootstrap, the stylesheet, and `section-page.js`). The loader fetches `index.html`, replays its head, its body and its scripts into the stub, then hides everything outside the group the address names. A panel added to `index.html`, or moved from one group to another, appears on the right section page with nothing to keep in sync — there is no generated copy of the dashboard anywhere.
+- **The list of sections is the `<nav>` markup.** `section-page.js` matches the last path segment against each nav link's `href` and reads the group id off its `data-section`. A fourth group needs a nav link, a `<section>`, and a copy of the stub — no change to the loader, which enumerates nothing.
+- **Hidden, not removed.** The other two groups stay in the DOM: `loadDashboard` renders the whole dashboard, and every renderer expects its elements to exist. The Time/Date/Azan/Weather row is hidden too — it belongs to the dashboard as a whole — and `widgets.js` checks that row at both of its entry points, so a section page runs neither a ticking clock nor the forecast and prayer-time requests behind it.
+- **Start-up is registered, not listened for.** `index.html`'s scripts arrive after a section page's own `load` event, so `app.js` and `landing-graph.js` hand their start-up step to `window.ledgerSectionPage.onBoot()` when it exists instead of waiting on `load`/`DOMContentLoaded`. The loader runs those steps once every script — including the async Google ones, which `load` would also have waited for — has arrived, so the boot order is the one `index.html` gets.
+- **No address is written down.** Every URL in the markup and the loader is relative, and a section page's `canonical`/`og:url` are set from `location` at run time, so the whole thing moves with the repository.
+
 ### System Flowchart
 
 Where the diagram above shows *who the browser talks to*, this shows *what happens, in order*. Every branch is a real code path.
@@ -481,7 +497,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 11 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
 | 13 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
-| 14 | `accounts.js` | Accounts: balances, CRUD, sheet-formula round-trip |
+| 14 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
 | 15 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
 | 16 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
 | 17 | `csv.js` | CSV import, advanced filter engine, download helper |
@@ -505,6 +521,8 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 35 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
 | 36 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
 | 37 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+
+`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 37 above into a page that has none of them (see [Section pages](#section-pages)).
 
 ### Data Flow
 
@@ -802,7 +820,7 @@ expected g  = (balance / 7700) × 1000
 - A day with no food logged is a gap, not a day of eating nothing.
 - The `TEF` term is a share of what was **actually eaten**, not of the target — this row scores the day that happened. At the default `f = 0` it's absent from the arithmetic and from the tooltip; it exists so that switching digestion on can't raise the target intake in one chart without also raising the cost of eating it here. The target dash is drawn at the smoothed body mass, like every other plan-level figure.
 
-### 7-day dash (all six Health Indicators charts)
+### 7-day dash (all six Health Indicator charts)
 
 ```
 bucket(i)  = floor((columnCount − 1 − i) / 7)      counted back from today
@@ -1008,6 +1026,9 @@ energy-anchored ("300kcal cookie") — the same sources read backwards:
 ```text
 ledger/
 ├── index.html                    # Page shell: gates, dashboard, modals, footer
+├── health/index.html             # One-group pages: identical stubs, no markup of
+├── finance/index.html            #   their own — section-page.js builds each from
+├── other/index.html              #   index.html and shows that group alone
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
 ├── assets/
 │   ├── images/                   # Social preview, touch icon
@@ -1028,7 +1049,7 @@ ledger/
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts.js             # Chart.js renderers + health formulas
 │       ├── transactions.js       # Transaction Log
-│       ├── accounts.js           # Accounts panel
+│       ├── accounts.js           # Account panel
 │       ├── breakdown.js          # Breakdown panel (Category/Type rows, formula-safe)
 │       ├── timesheet.js          # Work panel + analytics data
 │       ├── csv.js                # CSV import/export + filter engine
@@ -1049,7 +1070,8 @@ ledger/
 │       ├── financial-insight.js  # Financial Insight panel
 │       ├── landing-graph.js      # Pre-login mind-maps
 │       ├── gate.js               # Pre-login flow
-│       └── app.js                # Orchestration
+│       ├── app.js                # Orchestration
+│       └── section-page.js       # Loaded only by the section stubs above
 ├── scripts/
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template
 │   ├── fetch_activity_images.mjs      # Still exercise guides → assets/images/activities

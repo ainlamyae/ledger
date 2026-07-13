@@ -14,6 +14,14 @@ let editingAccountRow = null;
 let editingAccountFormulas = {};
 let accountListenersAttached = false;
 let accountSort = { key: null, dir: 1 };
+// The Balance column as the SHEET holds it, name -> raw cell, so a balance the
+// spreadsheet computes for itself (`=SUMIF(Transaction!…)`, a GOOGLEFINANCE
+// conversion) can be told from a typed number. The list above is read
+// UNFORMATTED_VALUE, where the two are indistinguishable — both arrive as
+// today's number. Filled lazily and only for the transaction form's "Update the
+// account balance" box, so the dashboard's own load doesn't pay for a read it
+// has no use for.
+let accountBalanceCells = null;
 // Same purpose as physique.js's physiqueDataLoaded: lets a click that races
 // the initial fetch (e.g. Financial Insight, loaded before this resolves)
 // tell "not loaded yet" apart from "loaded, zero accounts".
@@ -66,6 +74,10 @@ function getSortedAccounts() {
 }
 
 async function refreshAccountsList(forceRefresh = false) {
+  // Any refetch can have changed which balances are formulas — a re-read of the
+  // list is exactly when that map stops being trustworthy.
+  accountBalanceCells = null;
+
   let values = forceRefresh ? null : getCached('account-list');
 
   if (!values) {
@@ -286,6 +298,83 @@ async function submitAccountForm(event) {
   } catch (err) {
     showFieldError('account-form-error', err.message);
   }
+}
+
+async function loadAccountBalanceCells() {
+  if (accountBalanceCells) return accountBalanceCells;
+
+  const resp = await getValues(
+    `'${CONFIG.SHEETS.ACCOUNTS}'!A3:D100`,
+    { valueRenderOption: 'FORMULA' }
+  );
+
+  accountBalanceCells = new Map();
+  (resp.values || []).forEach((row) => {
+    if (row[0]) accountBalanceCells.set(row[0], row[3]);
+  });
+  return accountBalanceCells;
+}
+
+// Whether an account's Balance is a cell this app may add to, and when it isn't,
+// the sentence that says why — which is what the transaction form shows in place
+// of its tick box. A formula is the case worth naming: a balance defined as
+// `=SUMIF(Transaction!…)` already counts the row that was just appended, so
+// adding the amount on top would count it twice, and writing a number over it
+// would cost the sheet its own arithmetic for good.
+async function accountBalanceTarget(name) {
+  // accountsDataLoaded, not a length check: an empty list before the first fetch
+  // resolves would otherwise be reported as "no such account" (same distinction
+  // Financial Insight draws).
+  if (!accountsDataLoaded) {
+    return { writable: false, reason: `The ${CONFIG.SHEETS.ACCOUNTS} tab hasn't finished loading, so no balance is touched.` };
+  }
+
+  const account = allAccounts.find((a) => a.name === name);
+  if (!account) {
+    return { writable: false, reason: `"${name}" isn't a row on the ${CONFIG.SHEETS.ACCOUNTS} tab, so it has no balance to update.` };
+  }
+
+  let cell;
+  try {
+    cell = (await loadAccountBalanceCells()).get(name);
+  } catch (err) {
+    console.error('Failed to read account balances:', err);
+    return { writable: false, reason: `Couldn't read ${name}'s balance from the sheet (${err.message}), so it's left as it is.` };
+  }
+
+  if (typeof cell === 'string' && cell.trim().startsWith('=')) {
+    return { writable: false, reason: `${name}'s balance is a formula on the sheet, which keeps itself up to date — adding to it here would count this transaction twice.` };
+  }
+
+  // A blank Balance is a zero to start from; anything else non-numeric (a
+  // "Closed" marker) is a label, not an amount.
+  const raw = cell === undefined || cell === null ? '' : cell;
+  const current = raw === '' ? 0 : Number(raw);
+  if (!Number.isFinite(current)) {
+    return { writable: false, reason: `${name}'s balance reads "${raw}" rather than an amount, so there's nothing to add to.` };
+  }
+
+  return { writable: true, row: account.row, current };
+}
+
+// Moves an account's Balance by a transaction's amount. The sign does the work:
+// -10 on WV takes WV down by ten, and a deposit puts it back. Rounded to the
+// cent, since adding two two-decimal figures as floats lands on things like
+// 32.799999999999996.
+//
+// Returns the same {writable, reason} verdict as above rather than throwing on a
+// balance it won't touch — by the time this runs the transaction itself is
+// saved, and the caller has to be able to say so.
+async function addToAccountBalance(name, amount) {
+  const target = await accountBalanceTarget(name);
+  if (!target.writable) return target;
+
+  const next = Math.round((target.current + amount) * 100) / 100;
+  await updateValues(`'${CONFIG.SHEETS.ACCOUNTS}'!D${target.row}`, [[next]]);
+
+  await refreshAccountsList(true);
+  await refreshNetWorth();
+  return { writable: true, from: target.current, to: next };
 }
 
 async function deleteAccount(row) {

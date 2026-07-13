@@ -44,11 +44,17 @@
 <body>
 
 <header>
-    <h1><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></h1>
+    <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a></h1>
+
+    <!-- Each entry is a real address, not an in-page anchor: /health/, /finance/
+         and /other/ are pages of their own that show that one wrapper (see
+         assets/script/section-page.js). data-section names the wrapper the
+         address stands for, and is the only list of them anywhere — the section
+         pages and the scroll-spy both read this nav rather than repeating it. -->
     <nav id="main-nav" class="nav" hidden>
-        <a href="#health">Health</a>
-        <a href="#finances">Finances</a>
-        <a href="#other">Other</a>
+        <a href="health/" data-section="health">Health</a>
+        <a href="finance/" data-section="finance">Finance</a>
+        <a href="other/" data-section="other">Other</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -133,12 +139,12 @@
                 </div>
             </div>
 
-            <div class="node-graph node-graph-finances" aria-label="Finances features">
+            <div class="node-graph node-graph-finance" aria-label="Finance features">
                 <svg class="node-graph-lines" aria-hidden="true"></svg>
                 <div class="node-graph-hub-wrap">
                     <div class="node-graph-hub">
                         <span class="node-graph-hub-icon" aria-hidden="true">💰</span>
-                        <span class="node-graph-hub-label">Finances</span>
+                        <span class="node-graph-hub-label">Finance</span>
                     </div>
                 </div>
                 <div class="node-graph-spokes">
@@ -293,7 +299,7 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Health Indicators</h2>
+                <h2>Health Indicator</h2>
                 <!-- Primary, not plain: this one writes back to Settings rather than
                      just showing a formula. -->
                 <button type="button" id="formula-playground-btn" class="btn btn-primary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
@@ -585,8 +591,8 @@
 
     <div style="height:.5rem"></div>
 
-    <section id="finances" class="panel-group">
-        <h2 class="panel-group-title">Finances</h2>
+    <section id="finance" class="panel-group">
+        <h2 class="panel-group-title">Finance</h2>
 
         <div class="cards">
             <div class="card">
@@ -611,7 +617,7 @@
         </div>
 
         <div class="panel">
-        <h2>Financial Indicators</h2>
+        <h2>Financial Indicator</h2>
 
         <div class="panel-section">
             <h3>Cumulative Net Worth</h3>
@@ -817,7 +823,7 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Accounts</h2>
+                <h2>Account</h2>
                 <button id="add-account-btn" class="btn btn-primary panel-header-btn" title="Add an account">Add</button>
             </div>
 
@@ -1149,6 +1155,19 @@
             <label>Amount
                 <input type="text" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2" required>
             </label>
+
+            <!-- Directly under Amount, because the amount is what it moves: the
+                 sign does the work, so -10 on WV takes WV's Balance down ten and
+                 a deposit puts it back. Ticked by default — a transaction and the
+                 balance it moves are one act, and doing them separately is how
+                 the two drift apart. Offered for a new row only, and turned off
+                 with a reason where the sheet computes that Balance itself; see
+                 openTransactionForm. -->
+            <label class="checkbox-inline-label" id="tx-update-balance-label" title="Add this amount to the selected account's Balance on the Account tab">
+                <input type="checkbox" id="tx-update-balance" checked>
+                Update the account balance
+            </label>
+            <p id="tx-update-balance-note" class="status status-info" hidden></p>
 
             <!-- No hint line: the Amount placeholder already carries both halves of it
                  (the sign convention and the expression form), and the paragraph was

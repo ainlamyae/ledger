@@ -765,22 +765,6 @@ function setupPanelToggles() {
     panels.forEach((panel) => setPanelCollapsed(panel, headingsByPanel.get(panel), shouldCollapse));
     updateFab();
   });
-
-  // Jumping to a section via the nav also expands its panel(s), since
-  // everything starts collapsed. Panel-group targets expand every child
-  // panel; a lone .panel target expands directly.
-  document.querySelectorAll('#main-nav a').forEach((link) => {
-    link.addEventListener('click', () => {
-      const target = document.querySelector(link.getAttribute('href'));
-      if (!target) return;
-
-      const targetPanels = target.classList.contains('panel-group')
-        ? [...target.querySelectorAll('.panel')]
-        : [target];
-      targetPanels.forEach((p) => setPanelCollapsed(p, headingsByPanel.get(p), false));
-      updateFab();
-    });
-  });
 }
 
 function setupThemeToggle() {
@@ -842,15 +826,24 @@ function setupPrivacyToggle() {
 
 function setupScrollSpy() {
   const navLinks = [...document.querySelectorAll('#main-nav a')];
+
+  // On a section page there's one wrapper and nothing to scroll between, so its
+  // nav entry is simply the active one for as long as the page is open.
+  const onlySection = document.documentElement.dataset.section;
+  if (onlySection) {
+    navLinks.forEach((link) => link.classList.toggle('active', link.dataset.section === onlySection));
+    return;
+  }
+
   const sections = navLinks
-    .map((link) => document.querySelector(link.getAttribute('href')))
+    .map((link) => document.getElementById(link.dataset.section))
     .filter(Boolean);
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (!entry.isIntersecting) return;
       navLinks.forEach((link) => link.classList.remove('active'));
-      const activeLink = document.querySelector(`#main-nav a[href="#${entry.target.id}"]`);
+      const activeLink = navLinks.find((link) => link.dataset.section === entry.target.id);
       if (activeLink) activeLink.classList.add('active');
     });
   }, { rootMargin: '-50% 0px -50% 0px' });
@@ -933,7 +926,7 @@ function setupAuthGatedActions() {
   }, true);
 }
 
-window.addEventListener('load', () => {
+function bootDashboard() {
   // Belt-and-suspenders alongside the head script's history.scrollRestoration
   // = 'manual' — guarantees every load starts at the top even if the browser
   // still tried to restore a prior scroll position before this fired.
@@ -963,4 +956,11 @@ window.addEventListener('load', () => {
   initWidgets();
 
   document.getElementById('footer-year').textContent = new Date().getFullYear();
-});
+}
+
+// A section page (/health/, /finance/, /other/) builds this markup from
+// index.html after its own load event has already fired, so a load listener
+// there would never run: it starts the page itself instead, once every script
+// index.html asks for has arrived.
+if (window.ledgerSectionPage) window.ledgerSectionPage.onBoot(bootDashboard);
+else window.addEventListener('load', bootDashboard);

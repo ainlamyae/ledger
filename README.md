@@ -375,6 +375,8 @@ flowchart TD
 - Groq/USDA are opt-in and see only typed ingredient text or the aggregated Insight summary.
 - Open-Meteo/BigDataCloud are key-less and see only coordinates or a typed city name.
 
+![System architecture diagram — layered view of the browser SPA, Google Identity Services, Sheets/Drive/Picker APIs, the user's own spreadsheet, and the opt-in Groq/USDA/Open-Meteo/BigDataCloud APIs](assets/images/system-architecture.png)
+
 ### Section pages
 
 Each panel group is reachable at an address of its own — `/health/`, `/finance/`, `/other/` — showing that one group and nothing else. They are real paths, so a refresh, a bookmark or a shared link lands on the same page instead of falling back to the dashboard.
@@ -998,11 +1000,20 @@ by weight  kcalPer100g = row.calories / row.grams × 100
 energy-anchored ("300kcal cookie") — the same sources read backwards:
            grams = energyKcal / kcalPer100g × 100        (weight wins here)
            count = energyKcal / kcalPerUnit              (only if the row has no gram figure)
+
+protein-anchored ("20p chicken") — same backwards read, off protein density:
+           grams = proteinG / proteinPer100g × 100        (weight wins here)
+           count = proteinG / proteinPerUnit              (only if the row has no gram figure)
+
+divided ("200/5g bar") — resolved before any of the above runs:
+           quantity = numerator / denominator, glued back onto the same unit
 ```
 
 - Count wins normally: an exact count beats an estimated gram mass.
-- Weight wins on the energy-anchored path: "300kcal cookie" is most useful as a number to put on the scale.
+- Weight wins on an anchored path (energy or protein): "300kcal cookie" and "20p chicken" are both most useful as a number to put on the scale.
 - A new row is always banked per 100 g, whatever unit that mention used.
+- **A division in the quantity** (`200/5g`, `1/2cup`, …) is resolved arithmetically — `resolveDivisionQuantities`, `calorie-estimator.js` — before Groq or the Nutrition table ever see the text, rather than trusting the model to divide (not guaranteed reproducible run to run). It resolves in whatever unit it was typed in, so a weight or volume unit still gets its normal density handling (table hit, USDA, or AI estimate) afterward. A `2-3` range is left untouched — that's uncertainty, not arithmetic.
+- **`p` is a protein anchor**, the protein-flavoured twin of the kcal anchor: `20p chicken` means 20 g of protein were eaten, not 20 g of chicken. Either anchor rewrites Consumption with the real weight/count Calculate worked out — `20p chicken` → `74g chicken`, same as `300kcal cookie` resolving to a gram figure.
 
 ---
 

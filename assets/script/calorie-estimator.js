@@ -106,14 +106,33 @@ const ENERGY_UNIT_TO_KCAL = {
   kilojoules: 1 / 4.184, kilojoule: 1 / 4.184, kj: 1 / 4.184,
 };
 const ENERGY_UNIT_WORDS = 'kcal|kcals|calories|calorie|cals|cal|kilojoules|kilojoule|kj';
+// A protein anchor, same idea as the energy one above but for grams of
+// protein: "20p chicken" means 20g of protein were eaten, not 20g of chicken.
+const PROTEIN_UNIT_WORDS = 'p';
 // "x" is a placeholder pseudo-unit (see below) — included in the LEADING
 // pattern only (not the trailing one) so a note already standardized once
 // (e.g. "1x apple") still parses correctly on a later re-Calculate, instead
 // of leaving "1x" stuck in the name.
-const INGREDIENT_UNIT_WORDS = `x|${ENERGY_UNIT_WORDS}|${INGREDIENT_UNIT_WORDS_BASE}`;
+const INGREDIENT_UNIT_WORDS = `x|${ENERGY_UNIT_WORDS}|${PROTEIN_UNIT_WORDS}|${INGREDIENT_UNIT_WORDS_BASE}`;
 const INGREDIENT_QUANTITY_PATTERN = new RegExp(
   `^\\s*([\\d.]+)(?:\\s*[-/]\\s*[\\d.]+)?\\s*(${INGREDIENT_UNIT_WORDS})?\\b\\.?\\s*`, 'i'
 );
+
+// A quantity written as a division ("200/5g bar" — a 200g bar split 5 ways)
+// is resolved to one number before Groq ever sees the text, rather than
+// trusting an LLM to do the arithmetic itself. Only a unit-glued fraction
+// matches — a bare "2-3" (range/uncertainty, not arithmetic) is untouched.
+const DIVISION_QUANTITY_PATTERN = new RegExp(
+  `(^|[,\\n]\\s*)([\\d.]+)\\s*/\\s*([\\d.]+)\\s*(${INGREDIENT_UNIT_WORDS})\\b`, 'gi'
+);
+function resolveDivisionQuantities(notes) {
+  return notes.replace(DIVISION_QUANTITY_PATTERN, (full, lead, num, denom, unit) => {
+    const denomNum = parseFloat(denom);
+    if (!denomNum) return full;
+    return `${lead}${Math.round((parseFloat(num) / denomNum) * 100) / 100}${unit}`;
+  });
+}
+
 // A trailing descriptive unit word (e.g. "watermelon slice") is dropped too
 // — the leading pattern above only strips a unit stuck to the number, this
 // catches the same word when it shows up at the end of the name instead.
@@ -173,6 +192,17 @@ function gramsForEnergy(energyKcal, kcalPer100g, fallbackGrams) {
   return kcalPer100g > 0 ? (energyKcal / kcalPer100g) * 100 : fallbackGrams;
 }
 
+// Protein-anchor equivalent of extractEnergyTarget/gramsForEnergy above —
+// "20p chicken" gives the protein grams eaten instead of a weight, so the
+// weight is derived the same way, off protein density instead of calorie density.
+function extractProteinTarget({ quantity, unit }) {
+  if (unit !== 'p') return null;
+  return Math.max(0, quantity ?? 0);
+}
+function gramsForProtein(proteinG, proteinPer100g, fallbackGrams) {
+  return proteinPer100g > 0 ? (proteinG / proteinPer100g) * 100 : fallbackGrams;
+}
+
 // Canonical display form for the Notes standardization below — collapses
 // plurals/synonyms/abbreviation variants to one spelling (e.g. "shots" and
 // "shot" both -> "shot") so the same unit always reads the same way in a
@@ -214,7 +244,7 @@ const UNIT_CANONICAL = {
 // same-food duplicate row under the wrong name. Bulk Calculate (physique.js's
 // bulkCalculatePhysique) has no per-row review UI, so it leaves this true.
 async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
-  const notes = notesText.trim();
+  const notes = resolveDivisionQuantities(notesText.trim());
   if (!notes) throw new Error('No ingredients to calculate from.');
 
   // Only the ingredient SPLIT (Groq) is cached by exact text — that round
@@ -321,10 +351,17 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     //    the scale, so ×N is only used for a row that has no gram figure at
     //    all (e.g. "1 rice cake") and therefore can't express one.
     const energyKcal = pairingReliable ? extractEnergyTarget(segmentQuantities[i]) : null;
-    const tableEnergyUsable = !!tableEntry && energyKcal !== null && tableEntry.calories > 0;
+    // Protein anchor ("20p chicken") — same backwards read as the energy
+    // anchor above, off protein density instead of calorie density. The two
+    // are mutually exclusive (one unit per segment), so at most one is set.
+    const proteinG = pairingReliable ? extractProteinTarget(segmentQuantities[i]) : null;
+    const anchored = energyKcal !== null || proteinG !== null;
+    const tableAnchorUsable = !!tableEntry && (
+      (energyKcal !== null && tableEntry.calories > 0) || (proteinG !== null && tableEntry.protein > 0)
+    );
     const useTableCount = !!tableEntry && tableCount !== null
-      && (energyKcal === null ? item.count !== null : (tableEnergyUsable && tableGrams === null));
-    const useTableGrams = !!tableEntry && tableGrams !== null && (energyKcal === null || tableEnergyUsable);
+      && (!anchored ? item.count !== null : (tableAnchorUsable && tableGrams === null));
+    const useTableGrams = !!tableEntry && tableGrams !== null && (!anchored || tableAnchorUsable);
 
     let itemCalories;
     let itemProtein;
@@ -350,10 +387,13 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 
     if (useTableCount) {
       const kcalPerUnit = tableEntry.calories / tableCount;
-      usedCount = energyKcal !== null ? (kcalPerUnit > 0 ? energyKcal / kcalPerUnit : 0) : item.count;
+      const proteinPerUnit = tableEntry.protein / tableCount;
+      if (energyKcal !== null) usedCount = kcalPerUnit > 0 ? energyKcal / kcalPerUnit : 0;
+      else if (proteinG !== null) usedCount = proteinPerUnit > 0 ? proteinG / proteinPerUnit : 0;
+      else usedCount = item.count;
       usedCount = Math.round(usedCount * 100) / 100;
       itemCalories = kcalPerUnit * usedCount;
-      itemProtein = (tableEntry.protein / tableCount) * usedCount;
+      itemProtein = proteinPerUnit * usedCount;
       source = 'nutrition-table-count';
       amount = `×${usedCount}`;
       density = `${Math.round(kcalPerUnit * 10) / 10} kcal/unit`;
@@ -361,6 +401,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       kcal = (tableEntry.calories / tableGrams) * 100;
       protein = (tableEntry.protein / tableGrams) * 100;
       if (energyKcal !== null) usedGrams = gramsForEnergy(energyKcal, kcal, grams);
+      else if (proteinG !== null) usedGrams = gramsForProtein(proteinG, protein, grams);
       itemCalories = (kcal * usedGrams) / 100;
       itemProtein = (protein * usedGrams) / 100;
       source = 'nutrition-table-grams';
@@ -378,6 +419,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       }
       ({ kcal, protein } = pickPlausibleMacros(candidates, item.kcalPer100gFallback, item.proteinPer100gFallback));
       if (energyKcal !== null) usedGrams = gramsForEnergy(energyKcal, kcal, grams);
+      else if (proteinG !== null) usedGrams = gramsForProtein(proteinG, protein, grams);
       itemCalories = (kcal * usedGrams) / 100;
       itemProtein = (protein * usedGrams) / 100;
       source = lookupFailed ? 'usda-unreachable' : 'usda/ai';
@@ -408,7 +450,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     // (or the calorie target, which the Amount field now carries anyway) in
     // the saved note once the real number is known.
     let noteQuantity;
-    if (originalUnit && energyKcal === null) {
+    if (originalUnit && !anchored) {
       noteQuantity = `${originalQuantity ?? 1}${UNIT_CANONICAL[originalUnit] || originalUnit}`;
     } else if (source === 'nutrition-table-count') {
       noteQuantity = `${usedCount ?? originalQuantity ?? 1}x`;
@@ -422,6 +464,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       grams,
       count: item.count,
       energyKcal,
+      proteinG,
       usedGrams,
       usedCount,
       source,

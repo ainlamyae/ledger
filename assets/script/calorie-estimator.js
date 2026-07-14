@@ -496,7 +496,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   const SOURCE_LABELS = {
     'nutrition-table-count': NUTRITION_TABLE_SOURCE_LABEL,
     'nutrition-table-grams': NUTRITION_TABLE_SOURCE_LABEL,
-    'usda/ai': 'USDA estimate',
+    'usda/ai': 'USDA',
     'usda-unreachable': 'AI estimate (offline)',
   };
   const breakdown = sortedMacros.map((m) => ({

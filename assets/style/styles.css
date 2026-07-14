@@ -22,6 +22,7 @@ textarea {
     --color-danger: #dc2626;
     --color-danger-hover: #b91c1c;
     --color-income: #16a34a;
+    --color-income-high: #166534;
     --color-expense: #dc2626;
     --color-other: #7c3aed;
     --color-bg: #f5f7fb;
@@ -1339,6 +1340,13 @@ th.sortable:hover {
     text-align: right;
 }
 
+/* Same dark green the Protein Intake chart gives a day past its band's top edge —
+   still a hit, just past the point where more buys anything. */
+.income-high {
+    color: var(--color-income-high);
+    text-align: right;
+}
+
 .expense {
     color: var(--color-expense);
     text-align: right;
@@ -1950,11 +1958,55 @@ td .btn {
     opacity: .55;
 }
 
+/* Padding-top clears room for the callout bubble, which is positioned absolute
+   against this wrapper rather than the track itself — the track keeps its own
+   overflow:hidden for the fill's rounded corners, which would clip the bubble. */
+.body-mass-progress-meter-track-wrap {
+    position: relative;
+    padding-top: 1.5rem;
+}
+
 .body-mass-progress-meter-track {
     height: 8px;
     border-radius: 999px;
     background: var(--color-border);
     overflow: hidden;
+}
+
+/* Floats over the fill's leading edge, left offset set inline in JS to match the
+   fill's width so it tracks the same number the bar is showing. Blue like the
+   fill itself — this is the current reading, not a second, competing value. */
+.body-mass-progress-meter-callout {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    background: var(--color-primary);
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: .25rem .45rem;
+    border-radius: 5px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.body-mass-progress-meter-callout::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--color-primary);
+}
+
+.body-mass-progress-meter-callout.danger {
+    background: var(--color-expense);
+}
+
+.body-mass-progress-meter-callout.danger::after {
+    border-top-color: var(--color-expense);
 }
 
 .body-mass-progress-meter-fill {

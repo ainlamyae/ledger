@@ -94,15 +94,18 @@ async function initActivities(forceRefresh = false) {
     })
     .filter((a) => a.name);
 
-  activitiesByName = new Map(allActivities.map((a) => [a.name, a]));
+  activitiesByName = new Map(allActivities.map((a) => [a.name.toLowerCase(), a]));
   activitiesDataLoaded = true;
 
   renderActivityPlanTables();
   renderInstructionList();
 }
 
+// Case-insensitive: a workout note line is typed by hand, and "bench press"
+// should price the same as "Bench Press" rather than falling to the
+// unmatched-name fallback over casing alone.
 function activityByName(name) {
-  return activitiesByName.get(name) ?? null;
+  return activitiesByName.get(String(name || '').toLowerCase()) ?? null;
 }
 
 // Category is what the Physical Activity chart stacks by. 'Other' covers a

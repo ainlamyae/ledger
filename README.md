@@ -222,7 +222,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Health Insight (AI)
 
-- One panel, five modes: **Wellness**, **Food**, **Activity**, **Protein Sources**, **Health Plan**.
+- One panel, six modes: **Wellness**, **Food**, **Micronutrients**, **Activity**, **Protein Sources**, **Health Plan**.
+- **Micronutrients** is the one mode NOT built on model inference — it sums each logged ingredient's real, USDA-sourced Micronutrients panel (nutrition.js's Pull Micronutrients, scaled to how much was actually eaten) and asks the AI to judge sufficiency against standard dietary reference intakes. Coverage is necessarily partial (only ingredients that have been priced contribute), so the prompt leads with a coverage line naming what was and wasn't counted, and the AI is told never to read an unpriced nutrient as a confirmed zero.
 - **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
 - Clicking a mode shows a preview of exactly what would be sent; Send to AI sends that same data.
 - All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
@@ -359,8 +360,8 @@ flowchart TD
     App -- "pick / confirm spreadsheet file" --> Picker
     Picker -. "picked file ID" .-> App
 
-    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Activity)<br/>Financial Insight reports"]
-    USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup"]
+    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Financial Insight reports"]
+    USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup<br/>+ full nutrient panel (Pull Micronutrients)"]
     Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
 
@@ -471,7 +472,7 @@ flowchart TD
     Idle --> InsightPanel["Health Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
     InsightMode -- no --> Idle
-    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Classification-grouped ingredient rollup /<br/>per-muscle-group reps — no API call"]
+    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Classification-grouped ingredient rollup /<br/>real Micronutrients totals + coverage note /<br/>per-muscle-group reps — no API call"]
     InsightPreview --> InsightSend{"Send to AI<br/>clicked?"}
     InsightSend -- yes --> InsightReport["Groq chat-completions API<br/>renders free-text report,<br/>saved to that mode's INSIGHT_* keys"] --> Idle
     InsightSend -- no --> Idle
@@ -493,8 +494,8 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 5 | `cache.js` | `localStorage` cache with per-call TTL, hard refresh, numeric-expression evaluator |
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
 | 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes |
-| 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit |
-| 9 | `nutrition.js` | Nutrition table, Classification column + datalist, USDA lookup button, merge, `findNutritionEntry` |
+| 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
+| 9 | `nutrition.js` | Nutrition table, Classification column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry` |
 | 10 | `calorie-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
 | 11 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
@@ -513,14 +514,15 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 25 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
 | 26 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
 | 27 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
-| 28 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 29 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
-| 30 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
-| 31 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
-| 32 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 33 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
-| 34 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 35 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
+| 28 | `micronutrient-insight.js` | Micronutrients mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, with an explicit ingredient coverage note |
+| 29 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
+| 30 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
+| 31 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
+| 32 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 33 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 34 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
+| 35 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 36 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
 | 36 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
 | 37 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
@@ -1072,6 +1074,7 @@ ledger/
 │       ├── applications.js       # Applications cards
 │       ├── insight.js            # Insight shared helpers + Wellness mode
 │       ├── food-insight.js       # Insight Food mode
+│       ├── micronutrient-insight.js # Insight Micronutrients mode
 │       ├── activity-insight.js   # Insight Activity mode
 │       ├── protein-source-rotation-insight.js # Insight Protein Sources mode
 │       ├── plan-insight.js       # Insight Health Plan mode
@@ -1171,7 +1174,7 @@ Then open `http://localhost:8000`. No build step.
 | `'Account'!A3:E100` | `accounts.js` | Account name, institution, type, balance, market value |
 | `'Account'!A3:A100`, `Breakdown!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete |
 | `eTimeSheet!A2:H` | `timesheet.js` | Work rows |
-| `'Nutrition'!A2:G` | `nutrition.js`, `calorie-estimator.js`, `food-insight.js`, `protein-rotation.js` | Classification / Name / Amount / Calories / Protein / Verified / Protein % |
+| `'Nutrition'!A2:H` | `nutrition.js`, `calorie-estimator.js`, `food-insight.js`, `protein-rotation.js` | Classification / Name / Amount / Calories / Protein / Verified / Protein % / Micronutrients (JSON) |
 | `'Contact'!A2:U` | `contacts.js` | Contact rows |
 | `'Travel'!A2:H` | `travel.js` | Travel rows |
 | `'Application'!A2:E` | `applications.js` | Application header + status-update rows |
@@ -1186,7 +1189,7 @@ Then open `http://localhost:8000`. No build step.
 | `ledger_cache_transactions` | `transactions.js` | Raw `Transaction!A2:F` rows |
 | `ledger_cache_accounts-meta` / `account-list` | `accounts.js` | `Account` sheet ID / rows |
 | `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:H` rows |
-| `ledger_cache_nutrition` | `nutrition.js` | Raw `'Nutrition'!A2:G` rows |
+| `ledger_cache_nutrition` | `nutrition.js` | Raw `'Nutrition'!A2:H` rows |
 | `ledger_cache_breakdown` | `breakdown.js` | Raw `'Breakdown'!A2:F200` rows |
 | `ledger_cache_contacts` | `contacts.js` | Raw `'Contact'!A2:U` rows |
 | `ledger_cache_travel` | `travel.js` | Raw `'Travel'!A2:H` rows |

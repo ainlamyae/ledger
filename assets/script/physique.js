@@ -914,7 +914,7 @@ async function calculatePhysiqueDay() {
       // standardizedNotes, which only covers the lines that were re-estimated.
       physiqueField('consumption').value = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
       physiqueField('calories-in').value = calories;
-      physiqueField('protein-in').value = protein;
+      physiqueField('protein-in').value = protein.toFixed(1);
       // Writes the Breakdown field's JSON as well as drawing the table.
       renderPhysiqueBreakdown(breakdown, calories, protein);
 
@@ -994,11 +994,18 @@ function fillPhysiqueFieldIfBlank(id, savedValue) {
 
 // One decimal, the precision the calorie estimator itself rounds protein to.
 // Blank stays blank rather than becoming 0, so an untouched field doesn't start
-// claiming a zero the day didn't record.
+// claiming a zero the day didn't record. Protein always shows that decimal
+// (22.0, not 22) since it's the one field summed from already-rounded,
+// one-decimal per-ingredient figures; the others stay whole-number display.
 function addToPhysiqueTotal(id, savedNumber) {
   const field = physiqueField(id);
   const total = (savedNumber ?? 0) + (evaluateNumberExpression(field.value.trim()) ?? 0);
-  field.value = total ? String(Math.round(total * 10) / 10) : '';
+  if (!total) {
+    field.value = '';
+    return;
+  }
+  const rounded = Math.round(total * 10) / 10;
+  field.value = id === 'protein-in' ? rounded.toFixed(1) : String(rounded);
 }
 
 function appendToPhysiqueLines(id, savedText) {

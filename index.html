@@ -491,6 +491,7 @@
                             <th>Nutrient</th>
                             <th>Total (period)</th>
                             <th>Avg / day</th>
+                            <th>Ideal / day</th>
                         </tr>
                         </thead>
                         <tbody id="insight-micro-body"></tbody>
@@ -1392,8 +1393,8 @@
             <label>End
                 <input type="time" id="timesheet-end">
             </label>
-            <label>Break
-                <input type="time" id="timesheet-break" value="00:00">
+            <label>Break (minutes)
+                <input type="number" id="timesheet-break" min="0" step="1" value="0">
             </label>
             <p>Log Time: <span id="timesheet-live-duration">—</span></p>
             <label>Task
@@ -1846,8 +1847,6 @@
         <button type="button" id="activity-instruction-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="activity-instruction-title">Instructions on the Activities</h2>
 
-        <p class="hint instruction-key">Each guide shows the start and the finish, with the muscle worked picked out in red.</p>
-
         <div class="instruction-body" id="instruction-body"></div>
     </div>
 </div>
@@ -2140,6 +2139,7 @@
 <script src="assets/script/ui-helpers.js"></script>
 <script src="assets/script/groq.js"></script>
 <script src="assets/script/usda.js"></script>
+<script src="assets/script/nutrient-targets.js"></script>
 <script src="assets/script/nutrition.js"></script>
 <script src="assets/script/calorie-estimator.js"></script>
 <script src="assets/script/widgets.js"></script>

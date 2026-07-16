@@ -1173,6 +1173,27 @@ td {
     border-top: 2px solid var(--color-text-muted);
 }
 
+/* Micronutrients table gap flags (assets/script/micronutrient-insight.js) — a
+   row is flagged 'severe'/'mild' once its measured average sits well under a
+   get-enough-of nutrient's FDA Daily Value, or well over a limit one's, per
+   nutrient-targets.js's nutrientGapSeverity. Left-border rather than a filled
+   background so the row's own numbers stay legible at both severities. */
+#insight-micro-table tr.nutrient-gap-severe td {
+    border-left: 3px solid var(--color-danger);
+}
+
+#insight-micro-table tr.nutrient-gap-severe td:first-child {
+    color: var(--color-danger);
+}
+
+#insight-micro-table tr.nutrient-gap-mild td {
+    border-left: 3px solid #d97706;
+}
+
+#insight-micro-table tr.nutrient-gap-mild td:first-child {
+    color: #d97706;
+}
+
 #transactions-table th:first-child,
 #transactions-table td:first-child,
 #transactions-table th:nth-child(2),
@@ -1697,8 +1718,8 @@ td .btn {
     line-height: 1;
 }
 
-.instruction-key {
-    margin-bottom: 1rem;
+.instruction-body {
+    margin-top: 1rem;
 }
 
 /* The global `* { margin: 0 }` strips the gap a run-in heading needs. Grouped
@@ -2193,16 +2214,21 @@ td .btn {
 }
 
 /* One grid for all seven tables, keyed on column position rather than on table
-   type: every table now has the same five columns (a NEAT row carries an empty
-   Rest cell), so Sets x Reps, Rest, Done and the row actions line up straight
-   down the panel. They didn't before — a NEAT table had four columns and a 100px
-   second column against the strength tables' five and 116px, so every boundary
-   below the first table sat somewhere else.
-   Column 1 is deliberately unsized: it takes whatever the four fixed columns
+   type: every table now has the same six columns (a NEAT row carries an empty
+   Rest cell), so Muscle Group, Sets x Reps, Rest, Done and the row actions line
+   up straight down the panel. They didn't before — a NEAT table had four
+   columns and a 100px second column against the strength tables' five and
+   116px, so every boundary below the first table sat somewhere else.
+   Column 1 is deliberately unsized: it takes whatever the five fixed columns
    leave, which is the point — the exercise name is the only content here that
    varies, so it gets the slack instead of an equal share of it. */
 #workout-plan-panel th:nth-child(2),
 #workout-plan-panel td:nth-child(2) {
+    width: 140px;
+}
+
+#workout-plan-panel th:nth-child(3),
+#workout-plan-panel td:nth-child(3) {
     width: 116px;
 }
 
@@ -2210,8 +2236,8 @@ td .btn {
    with the base 24px of side padding, so 80px was a hint its own content
    overrode — invisible today only because nothing in the plan rests longer than
    90 sec. */
-#workout-plan-panel th:nth-child(3),
-#workout-plan-panel td:nth-child(3) {
+#workout-plan-panel th:nth-child(4),
+#workout-plan-panel td:nth-child(4) {
     width: 88px;
 }
 
@@ -2219,8 +2245,8 @@ td .btn {
    and needs ~60px, so the 44px this was declared at was never what the column
    actually took. It grew to fit in every table equally, so nothing looked wrong
    — but a declared width that gets overridden is one nobody can reason from. */
-#workout-plan-panel th:nth-child(4),
-#workout-plan-panel td:nth-child(4) {
+#workout-plan-panel th:nth-child(5),
+#workout-plan-panel td:nth-child(5) {
     width: 60px;
 }
 
@@ -2229,19 +2255,19 @@ td .btn {
    layout grows a column whose content overflows it, and one table growing is
    exactly the misalignment being fixed. The slack absorbs a platform that
    renders emoji wider than Segoe UI Emoji does. */
-#workout-plan-panel th:nth-child(5),
-#workout-plan-panel td:nth-child(5) {
+#workout-plan-panel th:nth-child(6),
+#workout-plan-panel td:nth-child(6) {
     width: 120px;
 }
 
-/* On a phone the three right-hand columns were eating most of the row: their
-   116px/80px/44px widths plus the base th/td .75rem side padding (24px per
-   cell, so 72px of pure padding across the three) left the exercise name too
-   little room and wrapped every longer one ("Dumbbell Romanian Deadlift",
+/* On a phone the four right-hand columns were eating most of the row: their
+   140px/116px/80px/44px widths plus the base th/td .75rem side padding (24px
+   per cell, so 96px of pure padding across the four) left the exercise name
+   too little room and wrapped every longer one ("Dumbbell Romanian Deadlift",
    "Leg Extension (quads)") onto a second line. Trimming the padding and the
-   width hints frees ~100px for the name column.
+   width hints frees room back for the name column.
 
-   The smaller font on columns 2-3 isn't cosmetic — it's what makes the
+   The smaller font on columns 2-4 isn't cosmetic — it's what makes the
    narrower widths actually take effect. Those headers are white-space: nowrap
    (see above), and auto table-layout grows a column past its width hint when
    nowrap content needs more room, so "Sets × Reps" at the full font size would
@@ -2266,33 +2292,40 @@ td .btn {
     #workout-plan-panel th:nth-child(2),
     #workout-plan-panel td:nth-child(2),
     #workout-plan-panel th:nth-child(3),
-    #workout-plan-panel td:nth-child(3) {
+    #workout-plan-panel td:nth-child(3),
+    #workout-plan-panel th:nth-child(4),
+    #workout-plan-panel td:nth-child(4) {
         font-size: .72rem;
+    }
+
+    #workout-plan-panel th:nth-child(2),
+    #workout-plan-panel td:nth-child(2) {
+        width: 70px;
     }
 
     /* 80/52, not the 72/50 these were before the tables became one grid: at
        .72rem the nowrap header "Sets x Reps" measures ~77px, and a hint narrower
        than its own header is a hint auto layout overrides — which would put this
        one table back out of line with the rest. */
-    #workout-plan-panel th:nth-child(2),
-    #workout-plan-panel td:nth-child(2) {
+    #workout-plan-panel th:nth-child(3),
+    #workout-plan-panel td:nth-child(3) {
         width: 80px;
     }
 
-    #workout-plan-panel th:nth-child(3),
-    #workout-plan-panel td:nth-child(3) {
+    #workout-plan-panel th:nth-child(4),
+    #workout-plan-panel td:nth-child(4) {
         width: 52px;
     }
 
     /* Same reasoning as the desktop rule — "Done" at the base font needs ~33px
        here, so the 30px this was is a hint the header overrides. */
-    #workout-plan-panel th:nth-child(4),
-    #workout-plan-panel td:nth-child(4) {
+    #workout-plan-panel th:nth-child(5),
+    #workout-plan-panel td:nth-child(5) {
         width: 36px;
     }
 
-    #workout-plan-panel th:nth-child(5),
-    #workout-plan-panel td:nth-child(5) {
+    #workout-plan-panel th:nth-child(6),
+    #workout-plan-panel td:nth-child(6) {
         width: 78px;
     }
 

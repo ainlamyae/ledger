@@ -40,9 +40,9 @@ function signedMinutesToHm(mins) {
   return mins >= 0 ? `+${minutesToHm(mins)}` : minutesToHm(mins);
 }
 
-// For the Break field's <input type="time">, which holds an HH:MM duration
-// rather than a clock time — same control as Start/End for visual
-// consistency, just reinterpreted.
+// The Break field itself is a plain minutes number (<input type="number">) —
+// this is only for turning that back into the "H:MM" string the sheet write
+// needs (see submitTimesheetForm's comment on why that format is required).
 function minutesToTimeInput(mins) {
   const abs = Math.max(0, Math.round(mins));
   return `${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
@@ -382,7 +382,7 @@ function toggleTimesheetHolidayFields() {
   ['timesheet-start', 'timesheet-end', 'timesheet-break'].forEach((id) => {
     const el = document.getElementById(id);
     el.disabled = holiday;
-    if (holiday) el.value = id === 'timesheet-break' ? '00:00' : '';
+    if (holiday) el.value = id === 'timesheet-break' ? '0' : '';
   });
 }
 
@@ -408,7 +408,7 @@ function openTimesheetForm(dateStr) {
   document.getElementById('timesheet-date').value = dateStr;
   document.getElementById('timesheet-start').value = existing?.start || '';
   document.getElementById('timesheet-end').value = existing?.end || '';
-  document.getElementById('timesheet-break').value = minutesToTimeInput(existing?.breakMinutes || 0);
+  document.getElementById('timesheet-break').value = String(Math.round(existing?.breakMinutes || 0));
   document.getElementById('timesheet-task').value = existing?.task || '';
 
   const isHoliday = !!(existing && !existing.start && !existing.end && existing.task);
@@ -456,12 +456,13 @@ async function submitTimesheetForm(event) {
   const holiday = document.getElementById('timesheet-holiday').checked;
   const start = holiday ? '' : document.getElementById('timesheet-start').value;
   const end = holiday ? '' : document.getElementById('timesheet-end').value;
-  // Written as an "H:MM" time string, not a raw minutes count: some Break
+  // The Break field is a plain minutes number in the UI, but written to the
+  // sheet as an "H:MM" time string, not a raw minutes count: some Break
   // cells carry pre-existing Excel-style duration formatting, and Sheets
   // reinterprets a plain integer written into those as a count of days
   // (e.g. 15 minutes becomes a 15-day duration). A time-string literal
   // parses correctly under that formatting either way.
-  const breakValue = holiday ? '00:00' : (document.getElementById('timesheet-break').value || '00:00');
+  const breakValue = minutesToTimeInput(holiday ? 0 : (Number(document.getElementById('timesheet-break').value) || 0));
   const task = document.getElementById('timesheet-task').value;
 
   if (!holiday && start && end && timeToMinutes(end) <= timeToMinutes(start)) {

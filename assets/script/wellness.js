@@ -30,6 +30,10 @@ async function initWellness(forceRefresh = false) {
     document.getElementById('wellness-category').addEventListener('change', onCategoryChange);
     document.getElementById('wellness-calc-btn').addEventListener('click', calculateWellnessCalories);
 
+    document.getElementById('wellness-search').addEventListener('input', () => {
+      wCurrentPage = 1;
+      renderWellnessList();
+    });
     document.getElementById('wellness-date-from').addEventListener('input', () => {
       wCurrentPage = 1;
       renderWellnessList();
@@ -101,6 +105,7 @@ async function refreshWellness(forceRefresh = false) {
 }
 
 function getFilteredWellnessEntries() {
+  const search = document.getElementById('wellness-search').value.trim().toLowerCase();
   const dateFrom = document.getElementById('wellness-date-from').value;
   const dateTo = document.getElementById('wellness-date-to').value;
   const catFilter = document.getElementById('wellness-category-filter').value;
@@ -108,6 +113,15 @@ function getFilteredWellnessEntries() {
   return allWellnessEntries
     .filter((e) => (!dateFrom || e.date >= dateFrom) && (!dateTo || e.date <= dateTo))
     .filter((e) => !catFilter || e.category === catFilter)
+    .filter((e) => {
+      if (!search) return true;
+      return (
+        e.description.toLowerCase().includes(search) ||
+        e.notes.toLowerCase().includes(search) ||
+        e.unit.toLowerCase().includes(search) ||
+        e.category.toLowerCase().includes(search)
+      );
+    })
     .sort((a, b) => {
       const dateCmp = a.date.localeCompare(b.date);
       if (dateCmp !== 0) return dateCmp * wSort.dir;
@@ -133,19 +147,28 @@ function renderWellnessList() {
     tbody.appendChild(renderEmptyRow(8, message));
   }
 
+  let previousDate = null;
+
   pageEntries.forEach((e) => {
     const tr = document.createElement('tr');
 
+    // A thicker top border where the date changes from the row above makes
+    // day boundaries visible at a glance — skipped for the first row on the
+    // page, since there's no prior row on the same page to compare against.
+    if (previousDate !== null && e.date !== previousDate) tr.classList.add('wellness-day-boundary');
+    previousDate = e.date;
+
     const notesShort = e.notes.length > 20 ? `${e.notes.slice(0, 20)}…` : e.notes;
+    const amountText = e.amount !== null ? String(e.amount) : '—';
 
     tr.append(
       makeCell(e.date),
       makeCell(e.time || '—'),
       makeCell(e.category),
       makeCell(e.description),
-      makeCell(e.amount !== null ? String(e.amount) : '—'),
+      makeCell(privacyMode ? maskDigits(amountText) : amountText),
       makeCell(e.unit),
-      makeCell(notesShort, e.notes),
+      makeCell(privacyMode ? maskText(notesShort) : notesShort, privacyMode ? maskText(e.notes) : e.notes),
     );
 
     const actionsCell = document.createElement('td');

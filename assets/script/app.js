@@ -16,6 +16,14 @@ function maskDigits(str) {
   return String(str).replace(/[0-9]/g, '*');
 }
 
+// Same idea as maskDigits, but for arbitrary free text (e.g. Health Log
+// Notes) rather than a formatted number — digits alone would leave every
+// word fully readable, so every non-whitespace character is replaced
+// instead, keeping only the word/line shape visible.
+function maskText(str) {
+  return String(str).replace(/\S/g, '*');
+}
+
 function formatCurrency(value) {
   const formatted = CURRENCY_FORMAT.format(value);
   return privacyMode ? maskDigits(formatted) : formatted;
@@ -161,7 +169,7 @@ async function populateAccountMenu() {
   document.getElementById('account-menu-email').textContent = info.email || '';
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'calibration-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -640,9 +648,32 @@ async function loadDashboard(forceRefresh = false) {
 
 // Each panel's <h2> toggles its own content, and the FAB flips every panel
 // at once between fully expanded and fully collapsed.
+// The CSS collapse animation (max-height/opacity, styles.css) only hides
+// panel content VISUALLY — it never removes it from the accessibility tree
+// or from text selection/"find in page"/copy-paste, since neither property
+// implies aria-hidden or display:none. A collapsed table-heavy panel (Health
+// Log, Contacts, Settings) has plenty of literal DOM text an a11y-tree-based
+// tool can still read even while a sighted user sees nothing; a collapsed
+// chart-only panel (canvas has no text content at all) looks "empty" either
+// way, which is what made this asymmetry hard to spot visually. `inert`
+// (supported in all current major browsers) is the correct fix: it pulls
+// the whole subtree out of the accessibility tree, tab order, and text
+// selection in one attribute, so collapsed really means collapsed for every
+// consumer, not just sighted mouse users.
+function setPanelCollapsed(panel, heading, collapsed) {
+  panel.classList.toggle('collapsed', collapsed);
+  heading.setAttribute('aria-expanded', String(!collapsed));
+  [...panel.children].forEach((child) => {
+    if (child === heading || child.classList.contains('panel-header')) return;
+    if (collapsed) child.setAttribute('inert', '');
+    else child.removeAttribute('inert');
+  });
+}
+
 function setupPanelToggles() {
   const panels = [...document.querySelectorAll('#dashboard .panel')];
   const fab = document.getElementById('toggle-panels-fab');
+  const headingsByPanel = new Map();
 
   // Reflects the panels' actual current state, so the FAB's icon/title are
   // correct no matter how that state changed — its own click, an individual
@@ -657,6 +688,7 @@ function setupPanelToggles() {
   panels.forEach((panel, i) => {
     const heading = panel.querySelector('h2');
     if (!heading) return;
+    headingsByPanel.set(panel, heading);
 
     const icon = document.createElement('span');
     icon.className = 'panel-toggle-icon';
@@ -667,14 +699,12 @@ function setupPanelToggles() {
     panel.style.animationDelay = `${i * 70}ms`;
     panel.classList.add('panel-enter');
 
-    panel.classList.add('collapsed');
     heading.setAttribute('role', 'button');
     heading.setAttribute('tabindex', '0');
-    heading.setAttribute('aria-expanded', 'false');
+    setPanelCollapsed(panel, heading, true);
 
     const toggle = () => {
-      panel.classList.toggle('collapsed');
-      heading.setAttribute('aria-expanded', String(!panel.classList.contains('collapsed')));
+      setPanelCollapsed(panel, heading, !panel.classList.contains('collapsed'));
       updateFab();
     };
 
@@ -696,7 +726,7 @@ function setupPanelToggles() {
 
   fab.addEventListener('click', () => {
     const shouldCollapse = panels.some((panel) => !panel.classList.contains('collapsed'));
-    panels.forEach((panel) => panel.classList.toggle('collapsed', shouldCollapse));
+    panels.forEach((panel) => setPanelCollapsed(panel, headingsByPanel.get(panel), shouldCollapse));
     updateFab();
   });
 
@@ -708,11 +738,10 @@ function setupPanelToggles() {
       const target = document.querySelector(link.getAttribute('href'));
       if (!target) return;
 
-      if (target.classList.contains('panel-group')) {
-        target.querySelectorAll('.panel').forEach((p) => p.classList.remove('collapsed'));
-      } else {
-        target.classList.remove('collapsed');
-      }
+      const targetPanels = target.classList.contains('panel-group')
+        ? [...target.querySelectorAll('.panel')]
+        : [target];
+      targetPanels.forEach((p) => setPanelCollapsed(p, headingsByPanel.get(p), false));
       updateFab();
     });
   });
@@ -805,6 +834,7 @@ window.addEventListener('load', () => {
   setupFileGate();
   setupAccountMenu();
   initCsvControls();
+  initCalibrationPanel();
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();

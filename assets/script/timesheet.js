@@ -12,6 +12,23 @@ function timeToMinutes(hhmm) {
   return h * 60 + m;
 }
 
+// A pre-existing Start/End cell can carry Sheets' own default time number
+// format (e.g. "9:40:00 AM") — the first USER_ENTERED write of a bare "09:40"
+// got auto-detected as a time value and the cell reformatted around it, so
+// FORMATTED_STRING reads it back dressed in seconds and/or AM/PM instead of
+// what was actually typed. Strips both back down to a plain 24-hour "HH:mm",
+// same tolerance parseBreakMinutes already applies to Break.
+function normalizeTimeString(raw) {
+  if (!raw) return '';
+  const match = String(raw).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (!match) return raw;
+  let hour = Number(match[1]);
+  const ampm = match[3] ? match[3].toUpperCase() : null;
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, '0')}:${match[2]}`;
+}
+
 // The Break cell is plain minutes once the app has written it, but a
 // pre-existing Excel-style duration-formatted cell (e.g. a Break column
 // carried over from before this app touched the sheet) comes back from
@@ -40,9 +57,10 @@ function signedMinutesToHm(mins) {
   return mins >= 0 ? `+${minutesToHm(mins)}` : minutesToHm(mins);
 }
 
-// The Break field itself is a plain minutes number (<input type="number">) —
-// this is only for turning that back into the "H:MM" string the sheet write
-// needs (see submitTimesheetForm's comment on why that format is required).
+// The Break field itself is already an "HH:mm" text input, but its value
+// still needs normalizing (zero-padding, rounding) into the exact "H:MM"
+// string the sheet write needs (see submitTimesheetForm's comment on why
+// that format is required).
 function minutesToTimeInput(mins) {
   const abs = Math.max(0, Math.round(mins));
   return `${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
@@ -185,8 +203,8 @@ async function refreshTimeSheet(forceRefresh = false) {
       row: i + 2,
       company: (row[0] || '').trim(),
       date: row[1] || '',
-      start: row[3] || '',
-      end: row[4] || '',
+      start: normalizeTimeString(row[3]),
+      end: normalizeTimeString(row[4]),
       breakMinutes: parseBreakMinutes(row[5]),
       task: row[7] || '',
     }))
@@ -382,7 +400,7 @@ function toggleTimesheetHolidayFields() {
   ['timesheet-start', 'timesheet-end', 'timesheet-break'].forEach((id) => {
     const el = document.getElementById(id);
     el.disabled = holiday;
-    if (holiday) el.value = id === 'timesheet-break' ? '0' : '';
+    if (holiday) el.value = id === 'timesheet-break' ? '00:00' : '';
   });
 }
 
@@ -408,7 +426,7 @@ function openTimesheetForm(dateStr) {
   document.getElementById('timesheet-date').value = dateStr;
   document.getElementById('timesheet-start').value = existing?.start || '';
   document.getElementById('timesheet-end').value = existing?.end || '';
-  document.getElementById('timesheet-break').value = String(Math.round(existing?.breakMinutes || 0));
+  document.getElementById('timesheet-break').value = minutesToTimeInput(existing?.breakMinutes || 0);
   document.getElementById('timesheet-task').value = existing?.task || '';
 
   const isHoliday = !!(existing && !existing.start && !existing.end && existing.task);
@@ -456,13 +474,15 @@ async function submitTimesheetForm(event) {
   const holiday = document.getElementById('timesheet-holiday').checked;
   const start = holiday ? '' : document.getElementById('timesheet-start').value;
   const end = holiday ? '' : document.getElementById('timesheet-end').value;
-  // The Break field is a plain minutes number in the UI, but written to the
-  // sheet as an "H:MM" time string, not a raw minutes count: some Break
-  // cells carry pre-existing Excel-style duration formatting, and Sheets
+  // The Break field is an "HH:mm" time input in the UI, and is written to
+  // the sheet the same way, not as a raw minutes count: some Break cells
+  // carry pre-existing Excel-style duration formatting, and Sheets
   // reinterprets a plain integer written into those as a count of days
   // (e.g. 15 minutes becomes a 15-day duration). A time-string literal
-  // parses correctly under that formatting either way.
-  const breakValue = minutesToTimeInput(holiday ? 0 : (Number(document.getElementById('timesheet-break').value) || 0));
+  // parses correctly under that formatting either way. Routed through
+  // parseBreakMinutes/minutesToTimeInput to normalize the typed value
+  // (zero-padding, rounding) into the exact string form the sheet needs.
+  const breakValue = minutesToTimeInput(holiday ? 0 : parseBreakMinutes(document.getElementById('timesheet-break').value));
   const task = document.getElementById('timesheet-task').value;
 
   if (!holiday && start && end && timeToMinutes(end) <= timeToMinutes(start)) {
@@ -477,11 +497,16 @@ async function submitTimesheetForm(event) {
       // Three calls so Day (C) and Duration (G), which this app never
       // writes, are never touched.
       await updateValues(`${CONFIG.SHEETS.TIMESHEET}!A${existing.row}`, [[company]]);
-      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!D${existing.row}:F${existing.row}`, [[start, end, breakValue]]);
+      // RAW, not the default USER_ENTERED: a bare "09:40" written USER_ENTERED
+      // gets auto-detected as a time value and the cell reformatted around it
+      // (seconds, AM/PM), so the next read back returns that reformatted
+      // string instead of what was typed — the same class of bug documented
+      // on the Settings tab's writes (see settings-panel.js).
+      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!D${existing.row}:F${existing.row}`, [[start, end, breakValue]], 'RAW');
       await updateValues(`${CONFIG.SHEETS.TIMESHEET}!H${existing.row}`, [[task]]);
     } else {
       await backfillMissingDates(date);
-      await appendValues(TIMESHEET_RANGE, [[company, date, dayNameFromDate(date), start, end, breakValue, '', task]]);
+      await appendValues(TIMESHEET_RANGE, [[company, date, dayNameFromDate(date), start, end, breakValue, '', task]], 'RAW');
     }
 
     await refreshTimeSheet(true);

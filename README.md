@@ -120,8 +120,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Time Tracker
 
-- **Log Time** modal — Company, Start/End, Break (minutes), optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
-  - Break is a plain minutes number (`<input type="number">`), not a clock time — it's a duration, and a `type="time"` control (still used for Start/End) would force an AM/PM time-of-day picker onto it. The sheet cell still stores it as an `"H:MM"` string on save (`minutesToTimeInput`), since some Break columns carry pre-existing Excel-style duration formatting that reinterprets a raw integer as a day count.
+- **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
+  - Break is an `HH:mm` duration typed into a plain text input (`pattern="[0-9]{1,2}:[0-5][0-9]"`), not a clock time — a `type="time"` control (still used for Start/End) would force an AM/PM time-of-day picker onto it. `parseBreakMinutes` reads the typed value back into minutes for the live duration preview, and `minutesToTimeInput` normalizes it back to an `"H:MM"` string on save, since some Break columns carry pre-existing Excel-style duration formatting that reinterprets a raw integer as a day count.
 - Company autocompletes and defaults to the most recently logged one.
 - Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
 - One **Work** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:

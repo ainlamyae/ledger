@@ -2192,91 +2192,26 @@ td .btn {
     background: rgba(22, 163, 74, .13);
 }
 
-/* Pins the four right-hand columns to the same width in every Activity Plan
-   table, regardless of that table's own longest exercise name, so all seven line
-   up with each other when stacked instead of each auto-sizing independently.
-   Left on default table-layout: auto rather than fixed — fixed layout introduced
-   a several-px rounding overflow (border-collapse + fractional column widths)
-   that made .table-responsive show a phantom horizontal scrollbar even though
-   every column's content fit well within its specified width; auto layout still
-   honors a width as a strong hint when the column's own content never needs more
-   (true here — "3 x 10"/"90 sec" never approach 116px/80px), so alignment holds
-   without the rounding bug.
-   That "never needs more" is the whole load-bearing condition: a hint narrower
-   than its column's widest content is simply overridden, and one table growing
-   past the others is the misalignment this exists to prevent. Hence the widths
-   below sized against real content, and white-space: nowrap on every header as a
-   permanent safeguard against a header wrapping onto 2 lines (as "Sets x Reps"
-   briefly did at a too-tight 100px) regardless of font/OS rendering. */
+/* Every column sized to its own content, not to a hardcoded pixel guess: the
+   table drops the app-wide `table { width: 100% }` (see the base rule above)
+   so there's no leftover container width for auto table-layout to redistribute
+   across columns. That redistribution was the actual bug — with width: 100%,
+   the browser stretched Sets x Reps/Rest/Weight/Done past what their own text
+   needed and starved the unconstrained name column of the space it was
+   supposed to get, wrapping "Exercise/Machine" / "Muscle Group" onto two lines
+   despite visible slack elsewhere in the row. white-space: nowrap on every
+   header still guards against a header itself wrapping ("Sets x Reps" onto 2
+   lines), independent of column width. */
+.workout-table-strength,
+.workout-table-neat {
+    width: auto;
+}
+
 .workout-table-strength th,
 .workout-table-neat th {
     white-space: nowrap;
 }
 
-/* One grid for all seven tables, keyed on column position rather than on table
-   type: every table now has the same six columns (a NEAT row carries an empty
-   Rest cell), so Muscle Group, Sets x Reps, Rest, Done and the row actions line
-   up straight down the panel. They didn't before — a NEAT table had four
-   columns and a 100px second column against the strength tables' five and
-   116px, so every boundary below the first table sat somewhere else.
-   Column 1 is deliberately unsized: it takes whatever the five fixed columns
-   leave, which is the point — the exercise name is the only content here that
-   varies, so it gets the slack instead of an equal share of it. */
-#workout-plan-panel th:nth-child(2),
-#workout-plan-panel td:nth-child(2) {
-    width: 140px;
-}
-
-#workout-plan-panel th:nth-child(3),
-#workout-plan-panel td:nth-child(3) {
-    width: 116px;
-}
-
-/* 88px, not the 80px this was: a three-digit rest ("120 sec") measures ~81px
-   with the base 24px of side padding, so 80px was a hint its own content
-   overrode — invisible today only because nothing in the plan rests longer than
-   90 sec. */
-#workout-plan-panel th:nth-child(4),
-#workout-plan-panel td:nth-child(4) {
-    width: 88px;
-}
-
-/* Sized for the word "Done" rather than for the checkbox: the header is nowrap
-   and needs ~60px, so the 44px this was declared at was never what the column
-   actually took. It grew to fit in every table equally, so nothing looked wrong
-   — but a declared width that gets overridden is one nobody can reason from. */
-#workout-plan-panel th:nth-child(5),
-#workout-plan-panel td:nth-child(5) {
-    width: 60px;
-}
-
-/* Wide enough that the three emoji buttons never need more (they measure ~87px
-   inside a 96px content box), because the width above is only a hint: auto
-   layout grows a column whose content overflows it, and one table growing is
-   exactly the misalignment being fixed. The slack absorbs a platform that
-   renders emoji wider than Segoe UI Emoji does. */
-#workout-plan-panel th:nth-child(6),
-#workout-plan-panel td:nth-child(6) {
-    width: 120px;
-}
-
-/* On a phone the four right-hand columns were eating most of the row: their
-   140px/116px/80px/44px widths plus the base th/td .75rem side padding (24px
-   per cell, so 96px of pure padding across the four) left the exercise name
-   too little room and wrapped every longer one ("Dumbbell Romanian Deadlift",
-   "Leg Extension (quads)") onto a second line. Trimming the padding and the
-   width hints frees room back for the name column.
-
-   The smaller font on columns 2-4 isn't cosmetic — it's what makes the
-   narrower widths actually take effect. Those headers are white-space: nowrap
-   (see above), and auto table-layout grows a column past its width hint when
-   nowrap content needs more room, so "Sets × Reps" at the full font size would
-   simply push the column back out to ~76px and ignore the new width.
-
-   The name column is left wrapping rather than forced to nowrap: the point is
-   to give it enough room that it doesn't NEED to wrap, while an unusually long
-   future exercise name still wraps instead of forcing .table-responsive into a
-   horizontal scroll. */
 @media (max-width: 820px) {
     #workout-plan-panel th,
     #workout-plan-panel td {
@@ -2289,51 +2224,28 @@ td .btn {
         font-size: .78rem;
     }
 
-    #workout-plan-panel th:nth-child(2),
-    #workout-plan-panel td:nth-child(2),
-    #workout-plan-panel th:nth-child(3),
-    #workout-plan-panel td:nth-child(3),
-    #workout-plan-panel th:nth-child(4),
-    #workout-plan-panel td:nth-child(4) {
+    /* Class-based, not nth-child: a table's own column count now depends on
+       columnVisibility (activities.js) — Muscle Group, Rest and Weight only
+       render at all when some row in that table's shape actually has a
+       value — so a fixed position no longer reliably means the same column
+       in every table. */
+
+    /* Muscle Group is reference info, not something needed mid-workout on a
+       phone — dropping it entirely frees room back for the exercise name and
+       the columns that matter on a small screen. */
+    .workout-muscle-group-cell {
+        display: none;
+    }
+
+    .workout-meta-cell {
         font-size: .72rem;
     }
 
-    #workout-plan-panel th:nth-child(2),
-    #workout-plan-panel td:nth-child(2) {
-        width: 70px;
-    }
-
-    /* 80/52, not the 72/50 these were before the tables became one grid: at
-       .72rem the nowrap header "Sets x Reps" measures ~77px, and a hint narrower
-       than its own header is a hint auto layout overrides — which would put this
-       one table back out of line with the rest. */
-    #workout-plan-panel th:nth-child(3),
-    #workout-plan-panel td:nth-child(3) {
-        width: 80px;
-    }
-
-    #workout-plan-panel th:nth-child(4),
-    #workout-plan-panel td:nth-child(4) {
-        width: 52px;
-    }
-
-    /* Same reasoning as the desktop rule — "Done" at the base font needs ~33px
-       here, so the 30px this was is a hint the header overrides. */
-    #workout-plan-panel th:nth-child(5),
-    #workout-plan-panel td:nth-child(5) {
-        width: 36px;
-    }
-
-    #workout-plan-panel th:nth-child(6),
-    #workout-plan-panel td:nth-child(6) {
-        width: 78px;
-    }
-
-    /* Three row-action buttons cost ~90px at the normal td .btn size, which is
-       most of what the rules above just clawed back for the name column. Pared
-       to the emoji plus a hair of padding they cost ~55px instead. They stay
-       three separate buttons rather than folding into a menu, so the plan reads
-       the same on a phone as on a desktop. */
+    /* Three row-action buttons cost ~90px at the normal td .btn size, which
+       crowds a narrow phone screen. Pared to the emoji plus a hair of padding
+       they cost ~55px instead. They stay three separate buttons rather than
+       folding into a menu, so the plan reads the same on a phone as on a
+       desktop. */
     .workout-actions-cell .btn {
         padding: .15rem .2rem;
         font-size: .72rem;

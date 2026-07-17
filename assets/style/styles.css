@@ -876,6 +876,14 @@ td {
     border-bottom: 1px solid var(--color-border);
 }
 
+/* Marks a day boundary in the Health Log table (assigned in wellness.js's
+   renderWellnessList whenever a row's date differs from the row above it),
+   so a scan down the table can spot where one day's entries end and the
+   next begin without reading every date cell. */
+#wellness-table tbody tr.wellness-day-boundary td {
+    border-top: 2px solid var(--color-text-muted);
+}
+
 #transactions-table th:first-child,
 #transactions-table td:first-child,
 #transactions-table th:nth-child(2),
@@ -1042,6 +1050,19 @@ th.sortable:hover {
     font-weight: 600;
 }
 
+.timesheet-overtime-summary {
+    font-size: .78rem;
+    color: var(--color-text-muted);
+    text-align: center;
+    margin: 4px 0 0;
+    min-height: 1.2em;
+}
+
+.timesheet-overtime-summary.warning {
+    color: var(--color-expense);
+    font-weight: 600;
+}
+
 .chart-box {
     position: relative;
     height: 200px;
@@ -1060,6 +1081,16 @@ th.sortable:hover {
 @media (max-width: 820px) {
     .donut-grid.travel-insights-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+.donut-grid.wellness-metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 820px) {
+    .donut-grid.wellness-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
@@ -1287,6 +1318,26 @@ td .btn {
     margin: 0 0 0.5rem;
     font-size: 0.9rem;
     color: var(--color-heading);
+}
+
+.weight-projection-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+}
+
+.weight-projection-header h4 {
+    margin: 0;
+}
+
+.calibration-summary-table td {
+    padding: .3rem .75rem .3rem 0;
+    font-size: .85rem;
+}
+
+.calibration-summary-table td:first-child {
+    color: var(--color-text-muted);
 }
 
 .weight-eta {

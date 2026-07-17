@@ -521,7 +521,12 @@ const CALORIE_TARGET_KCAL_DEFAULT = 2000;
 const SLEEP_TARGET_HOURS_DEFAULT = 8;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 
-let wellnessWeightChart = null;
+// Number of trailing days shown in the Health Metrics row (Caloric Intake,
+// Physical Activity, Rest & Recovery) — Body Weight has its own dedicated
+// history in the Weight Trend & Forecast chart below, so it's not repeated
+// here, and these 3 charts get the freed-up width to show more days.
+const WELLNESS_METRICS_DAYS = 14;
+
 let wellnessCaloriesChart = null;
 let wellnessSleepChart = null;
 let wellnessActivityChart = null;
@@ -538,66 +543,29 @@ function lastNDates(n) {
 }
 
 function renderWellnessCharts(entries) {
-  renderWellnessWeightChart(entries);
   renderWellnessCaloriesChart(entries);
   renderWellnessSleepChart(entries);
   renderWellnessActivityChart(entries);
   renderWellnessProjectionChart(entries);
 }
 
-function renderWellnessWeightChart(entries) {
-  const ctx = document.getElementById('wellness-weight-chart');
+// Health Tracker charts show plain physical units (kcal/hr/min/kg), not
+// dollars, so they never pass through formatCurrency's masking — but
+// they're still personal health data the privacy toggle should hide just
+// the same. These wrap a plain "${value} unit" tick/tooltip formatter so
+// both the axis and the tooltip (which would otherwise leak the exact
+// number on hover even with masked ticks) get masked identically.
+function maskedUnitTick(unit) {
+  return (v) => {
+    const label = `${v} ${unit}`;
+    return privacyMode ? maskDigits(label) : label;
+  };
+}
 
-  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
-
-  const dates = lastNDates(10);
-  const byDate = new Map();
-  entries
-    .filter((e) => e.category === 'Weight' && e.amount !== null)
-    .forEach((e) => byDate.set(e.date, e.amount));
-
-  wellnessWeightChart = upsertChart(wellnessWeightChart, ctx, {
-    data: {
-      labels: dates,
-      datasets: [
-        {
-          type: 'line',
-          label: 'Weight',
-          data: dates.map((d) => byDate.get(d) ?? null),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59, 130, 246, .1)',
-          fill: false,
-          tension: 0.3,
-          pointRadius: 3,
-          spanGaps: true,
-          order: 2,
-        },
-        {
-          type: 'line',
-          label: `${weightGoal} kg goal`,
-          data: new Array(10).fill(weightGoal),
-          borderColor: '#dc2626',
-          borderDash: [4, 4],
-          pointRadius: 0,
-          tension: 0,
-          order: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
-        y: {
-          beginAtZero: false,
-          afterFit: fixTrendYAxisWidth,
-          ticks: { callback: (v) => `${v} kg` },
-        },
-      },
-    },
-  });
+function maskedValueTooltipLabel(item) {
+  const prefix = item.dataset.label ? `${item.dataset.label}: ` : '';
+  const value = String(item.formattedValue);
+  return `${prefix}${privacyMode ? maskDigits(value) : value}`;
 }
 
 function renderWellnessCaloriesChart(entries) {
@@ -605,7 +573,7 @@ function renderWellnessCaloriesChart(entries) {
 
   const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
 
-  const dates = lastNDates(10);
+  const dates = lastNDates(WELLNESS_METRICS_DAYS);
   const byDate = new Map();
   entries
     .filter((e) => e.category === 'Calories' && e.amount !== null)
@@ -625,7 +593,7 @@ function renderWellnessCaloriesChart(entries) {
         {
           type: 'line',
           label: `${calorieTarget} kcal target`,
-          data: new Array(10).fill(calorieTarget),
+          data: new Array(WELLNESS_METRICS_DAYS).fill(calorieTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -637,13 +605,16 @@ function renderWellnessCaloriesChart(entries) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
+      },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: (v) => `${v} kcal` },
+          ticks: { callback: maskedUnitTick('kcal') },
         },
       },
     },
@@ -655,7 +626,7 @@ function renderWellnessSleepChart(entries) {
 
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
-  const dates = lastNDates(10);
+  const dates = lastNDates(WELLNESS_METRICS_DAYS);
   const byDate = new Map();
   entries
     .filter((e) => e.category === 'Sleep' && e.amount !== null)
@@ -677,7 +648,7 @@ function renderWellnessSleepChart(entries) {
         {
           type: 'line',
           label: `${sleepTarget} hr target`,
-          data: new Array(10).fill(sleepTarget),
+          data: new Array(WELLNESS_METRICS_DAYS).fill(sleepTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -689,13 +660,16 @@ function renderWellnessSleepChart(entries) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
+      },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: (v) => `${v} hr` },
+          ticks: { callback: maskedUnitTick('hr') },
         },
       },
     },
@@ -716,7 +690,7 @@ function renderWellnessActivityChart(entries) {
 
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
 
-  const dates = lastNDates(10);
+  const dates = lastNDates(WELLNESS_METRICS_DAYS);
   const byDate = new Map();
   entries
     .filter((e) => e.category === 'Activity' && e.amount !== null)
@@ -742,7 +716,7 @@ function renderWellnessActivityChart(entries) {
         {
           type: 'line',
           label: `${activityTarget} min target`,
-          data: new Array(10).fill(activityTarget),
+          data: new Array(WELLNESS_METRICS_DAYS).fill(activityTarget),
           borderColor: '#dc2626',
           borderDash: [4, 4],
           pointRadius: 0,
@@ -763,13 +737,14 @@ function renderWellnessActivityChart(entries) {
           font: { size: 12 },
           padding: { top: 40 },
         },
+        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 5 } },
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: (v) => `${v} min` },
+          ticks: { callback: maskedUnitTick('min') },
         },
       },
     },
@@ -784,6 +759,67 @@ function linearRegressionSlope(xs, ys) {
   const sumX2 = xs.reduce((s, x) => s + x * x, 0);
   const denom = n * sumX2 - sumX * sumX;
   return denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+}
+
+// Average of a Map's values (e.g. calories/activity/sleep summed per logged
+// date) — averaged over days that actually HAVE a log, not the calendar
+// length of the window. calibration.js's fit must use this exact semantics
+// when building its training averages, or the calibrated coefficients end up
+// tuned against a different quantity than calcProjection() feeds them here.
+function avg(map) {
+  return [...map.values()].reduce((a, b) => a + b, 0) / map.size;
+}
+
+// Parse/format in UTC throughout: `new Date("YYYY-MM-DD")` parses as UTC
+// midnight, and formatting that back with the LOCAL timezone can roll it
+// back a day in any negative-UTC-offset zone — staying in UTC end-to-end
+// avoids that mismatch.
+function parseIsoDateUTC(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+// Window size (in LOGGED POINTS, not calendar days) for the Weight Trend &
+// Forecast chart's "Weight Trend" line.
+const WEIGHT_TREND_WINDOW_SIZE = 5;
+
+// Centered simple moving average over the sorted per-day weight series:
+// each point is averaged together with its nearest neighbors on both sides,
+// so one noisy reading gets diluted by its surroundings instead of showing
+// up as a spike (or, with a trailing-only average, dragging the line up to
+// meet it and lagging behind afterwards). Windowing by logged points rather
+// than elapsed days means it smooths the same way whether entries are daily
+// or sporadic — unlike a time-decayed average, whose smoothing effectively
+// vanishes once gaps between weigh-ins approach the decay window.
+function computeWeightTrend(weightByDate, windowSize = WEIGHT_TREND_WINDOW_SIZE) {
+  const dates = [...weightByDate.keys()].sort();
+  const values = dates.map((d) => weightByDate.get(d));
+  const radius = Math.floor((windowSize - 1) / 2);
+
+  const trend = new Map();
+  values.forEach((_, i) => {
+    const windowValues = values.slice(Math.max(0, i - radius), Math.min(values.length, i + radius + 1));
+    trend.set(dates[i], windowValues.reduce((a, b) => a + b, 0) / windowValues.length);
+  });
+
+  return trend;
+}
+
+// A slope this large (kg/day) is well outside anything physiologically real
+// — a backstop so a noisy calibrated coefficient extrapolating past its
+// training data's range can't produce a runaway projection.
+const PROJ_SLOPE_CLAMP_KG_PER_DAY = 0.15;
+
+// Reads the 4 gains calibration.js's "Calibrate" flow can write to the
+// Settings tab. Returns null unless all 4 are present, so calcProjection()
+// falls back to the generic formula for anyone who hasn't calibrated.
+function getCalibratedGains() {
+  const beta0 = getSetting('PROJ_BASELINE_KG_PER_DAY', null);
+  const betaCal = getSetting('PROJ_CAL_KG_PER_KCAL_DAY', null);
+  const betaAct = getSetting('PROJ_ACTIVITY_KG_PER_MIN_DAY', null);
+  const betaSleep = getSetting('PROJ_SLEEP_KG_PER_HOUR_DAY', null);
+  if ([beta0, betaCal, betaAct, betaSleep].some((v) => v === null)) return null;
+  return { beta0, betaCal, betaAct, betaSleep };
 }
 
 function calcProjection(entries) {
@@ -824,21 +860,30 @@ function calcProjection(entries) {
     }
   });
 
-  const avg = (map) => [...map.values()].reduce((a, b) => a + b, 0) / map.size;
-
   let slope;
   let method;
+  let calibrated = false;
 
   if (caloriesByDate.size > 0 || activityByDate.size > 0) {
     const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
     const avgActivityMins = activityByDate.size > 0 ? avg(activityByDate) : 0;
     const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
 
-    // Negative balance = caloric deficit = weight loss
-    const balance = avgCalories - (calorieTarget + avgActivityMins * 5);
-    const baseSlope = balance / 7700;
-    const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
-    slope = baseSlope * sleepRatio;
+    const gains = getCalibratedGains();
+    if (gains) {
+      slope = gains.beta0
+        + gains.betaCal * (avgCalories - calorieTarget)
+        + gains.betaAct * avgActivityMins
+        + gains.betaSleep * (avgSleep - sleepTarget);
+      slope = Math.max(-PROJ_SLOPE_CLAMP_KG_PER_DAY, Math.min(PROJ_SLOPE_CLAMP_KG_PER_DAY, slope));
+      calibrated = true;
+    } else {
+      // Negative balance = caloric deficit = weight loss
+      const balance = avgCalories - (calorieTarget + avgActivityMins * 5);
+      const baseSlope = balance / 7700;
+      const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
+      slope = baseSlope * sleepRatio;
+    }
 
     const allPresent = caloriesByDate.size > 0 && activityByDate.size > 0 && sleepByDate.size > 0;
     method = allPresent ? 'full' : 'partial';
@@ -869,7 +914,7 @@ function calcProjection(entries) {
     projectedPoints.push({ date: isoFromDate(etaDate), weight: weightGoal });
   }
 
-  return { status: 'ok', slope, daysToGoal, etaDate, projectedPoints, method, weightGoal };
+  return { status: 'ok', slope, daysToGoal, etaDate, projectedPoints, method, weightGoal, calibrated };
 }
 
 function renderWellnessProjectionChart(entries) {
@@ -901,20 +946,24 @@ function renderWellnessProjectionChart(entries) {
   const lastDate = histLabels[histLabels.length - 1];
   const lastWeight = weightEntries[weightEntries.length - 1].amount;
 
+  // Same-day duplicate weigh-ins (e.g. morning + evening) are averaged
+  // before smoothing, rather than letting whichever entry happens to be
+  // last in histMap silently win.
+  const weightSumsByDate = new Map();
+  weightEntries.forEach((e) => {
+    const cur = weightSumsByDate.get(e.date) || { sum: 0, count: 0 };
+    cur.sum += e.amount;
+    cur.count += 1;
+    weightSumsByDate.set(e.date, cur);
+  });
+  const weightByDate = new Map([...weightSumsByDate].map(([d, { sum, count }]) => [d, sum / count]));
+  const trendMap = computeWeightTrend(weightByDate);
+
   // Daily history followed by weekly (then a single distant ETA) projected
   // points must NOT be spaced as equal category ticks — that visually
   // implies every gap is the same length. Plot on a true linear axis (day
   // offset from the first date) instead, so a week gap actually takes up
   // 7x the width of a one-day gap.
-  //
-  // Parse/format in UTC throughout: `new Date("YYYY-MM-DD")` parses as UTC
-  // midnight, and formatting that back with the LOCAL timezone can roll it
-  // back a day in any negative-UTC-offset zone — staying in UTC end-to-end
-  // avoids that mismatch.
-  const parseIsoDateUTC = (dateStr) => {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return Date.UTC(y, m - 1, d);
-  };
   const firstDateMs = parseIsoDateUTC(allLabels[0]);
   const dayOffset = (dateStr) => Math.round((parseIsoDateUTC(dateStr) - firstDateMs) / 86400000);
   const offsetToDateLabel = (offset) =>
@@ -934,6 +983,17 @@ function renderWellnessProjectionChart(entries) {
           pointRadius: 2,
           spanGaps: false,
           order: 3,
+        },
+        {
+          label: 'Weight Trend',
+          data: allLabels.map((d) => ({ x: dayOffset(d), y: trendMap.get(d) ?? null })),
+          borderColor: '#16a34a',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          spanGaps: false,
+          order: 4,
         },
         {
           label: 'Projected',
@@ -968,18 +1028,38 @@ function renderWellnessProjectionChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 14, font: { size: 11 } } },
-        tooltip: { callbacks: { title: (items) => offsetToDateLabel(items[0].parsed.x) } },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            boxWidth: 14,
+            font: { size: 11 },
+            // The goal-line dataset's label is literally "${weightGoal} kg
+            // goal" — mask its digits like everything else on this chart,
+            // rather than letting the legend leak the one number the ticks
+            // and tooltip already hide.
+            generateLabels: (chart) => {
+              const generated = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              return privacyMode ? generated.map((l) => ({ ...l, text: maskDigits(l.text) })) : generated;
+            },
+          },
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => offsetToDateLabel(items[0].parsed.x),
+            label: maskedValueTooltipLabel,
+          },
+        },
       },
       scales: {
         x: {
           type: 'linear',
-          ticks: { maxTicksLimit: 10, maxRotation: 0, callback: offsetToDateLabel },
+          ticks: { maxTicksLimit: 24, maxRotation: 45, minRotation: 0, autoSkip: true, callback: offsetToDateLabel },
         },
         y: {
           beginAtZero: false,
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: (v) => `${v} kg` },
+          ticks: { callback: maskedUnitTick('kg') },
         },
       },
     },
@@ -988,7 +1068,9 @@ function renderWellnessProjectionChart(entries) {
   const etaStr = proj.etaDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const note = proj.method === 'weight-only' ? ' · weight trend only'
     : proj.method === 'partial' ? ' · partial habit data' : '';
-  etaEl.textContent = `Projected to reach ${proj.weightGoal} kg on ${etaStr} (~${proj.daysToGoal} days)${note}`;
+  const calibNote = proj.calibrated ? ' · calibrated' : '';
+  const etaLine = `Projected to reach ${proj.weightGoal} kg on ${etaStr} (~${proj.daysToGoal} days)${note}${calibNote}`;
+  etaEl.textContent = privacyMode ? maskDigits(etaLine) : etaLine;
 }
 
 function mean(values) {
@@ -1085,6 +1167,59 @@ function renderDistributionChart(canvasId, dist) {
       },
     },
   });
+}
+
+const STANDARD_WORKDAY_MINUTES = 8 * 60;
+
+// Net/signed tally of (actual shift − 8h) across "qualifying" entries: has a
+// real Start/End (a missed weekday is excluded, not counted as -8h — no data
+// isn't the same as leaving early), isn't today's still-possibly-in-progress
+// shift, isn't a weekend (this app's Work Analytics already treats weekends
+// as non-representative of an 8h/day baseline — a logged weekend shift simply
+// doesn't count toward this tally either way, rather than partially counting
+// against a baseline that was never expected on a weekend), and has a
+// non-negative computed duration (guards a mis-keyed entry, same as the
+// duration histogram above). `days` is a trailing window (or lifelong if
+// falsy) — not calendar-aligned, matching averageDailyHours' periods.
+function computeOvertimeMinutes(entries, days) {
+  const todayIso = isoFromDate(new Date());
+  const windowStartIso = days
+    ? isoFromDate(new Date(new Date().setDate(new Date().getDate() - (days - 1))))
+    : null;
+
+  const qualifying = entries.filter((e) =>
+    e.start && e.end && e.date !== todayIso && !isWeekend(e.date)
+    && (!windowStartIso || e.date >= windowStartIso)
+    && computeDurationMinutes(e.start, e.end, e.breakMinutes) >= 0
+  );
+
+  const minutes = qualifying.reduce(
+    (sum, e) => sum + (computeDurationMinutes(e.start, e.end, e.breakMinutes) - STANDARD_WORKDAY_MINUTES),
+    0
+  );
+
+  return { minutes, count: qualifying.length };
+}
+
+function renderTimesheetOvertimeSummary(entries) {
+  const el = document.getElementById('timesheet-overtime-summary');
+  el.textContent = '';
+  el.classList.remove('warning');
+
+  const total = computeOvertimeMinutes(entries, null);
+  if (total.count === 0) return; // not enough logged full days yet — stay blank, same convention as .weight-eta
+
+  const year = computeOvertimeMinutes(entries, 365);
+  const month = computeOvertimeMinutes(entries, 30);
+  const week = computeOvertimeMinutes(entries, 7);
+
+  const icon = total.minutes > 0 ? '⏱️' : '✅';
+  const headline = total.minutes > 0
+    ? `${signedMinutesToHm(total.minutes)} beyond an 8h/day pace overall`
+    : 'At or under an 8h/day pace overall';
+
+  el.textContent = `${icon} ${headline} — Last Year ${signedMinutesToHm(year.minutes)} · Last Month ${signedMinutesToHm(month.minutes)} · Last Week ${signedMinutesToHm(week.minutes)}`;
+  el.classList.toggle('warning', total.minutes > 0);
 }
 
 function renderTimesheetDistributionCharts(entries) {

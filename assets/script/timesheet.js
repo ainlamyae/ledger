@@ -34,6 +34,12 @@ function minutesToHm(mins) {
   return `${sign}${Math.floor(abs / 60)}h ${abs % 60}m`;
 }
 
+// Same as minutesToHm, but always shows a sign — a bare "6h" reads as neutral,
+// while the overtime summary needs +/- to be unambiguous at a glance.
+function signedMinutesToHm(mins) {
+  return mins >= 0 ? `+${minutesToHm(mins)}` : minutesToHm(mins);
+}
+
 // For the Break field's <input type="time">, which holds an HH:MM duration
 // rather than a clock time — same control as Start/End for visual
 // consistency, just reinterpreted.
@@ -190,6 +196,7 @@ async function refreshTimeSheet(forceRefresh = false) {
   renderTimesheetList();
   renderTimesheetDistributionCharts(allTimeEntries);
   renderTimesheetDailyAverageChart(allTimeEntries);
+  renderTimesheetOvertimeSummary(allTimeEntries);
   checkTimesheetReminder();
 }
 

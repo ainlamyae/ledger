@@ -15,6 +15,19 @@
 // produces — can say what's measured vs. what's simply not priced yet, rather
 // than reading a genuinely unpriced nutrient as a confirmed zero.
 
+// FDC's names for these are pure chemistry (fatty-acid carbon count/bond
+// notation) — "Omega-3" doesn't appear anywhere in them, so it's added for
+// display only. Keyed by the exact FDC name; matching/lookup elsewhere still
+// uses that raw name, only the rendered label changes.
+const NUTRIENT_DISPLAY_NAME = {
+  'PUFA 18:3 n-3 c,c,c (ALA)': 'PUFA 18:3 n-3 c,c,c (ALA, Omega-3)',
+  'PUFA 18:4': 'PUFA 18:4 (Omega-3)',
+  'PUFA 20:3 n-3': 'PUFA 20:3 n-3 (Omega-3)',
+  'PUFA 20:5 n-3 (EPA)': 'PUFA 20:5 n-3 (EPA, Omega-3)',
+  'PUFA 22:5 n-3 (DPA)': 'PUFA 22:5 n-3 (DPA, Omega-3)',
+  'PUFA 22:6 n-3 (DHA)': 'PUFA 22:6 n-3 (DHA, Omega-3)',
+};
+
 // Every date in [from, to] that actually has a Calculate-derived breakdown —
 // the denominator for each nutrient's per-day average. Deliberately the same
 // "was Calculate actually run that day" bar aggregateFoodIntake's own source
@@ -81,13 +94,26 @@ function aggregateMicronutrientIntake(from, to) {
     });
   });
 
+  // Read once per aggregation, not once per nutrient — nutrientDailyTargets()
+  // (nutrient-targets.js) re-parses a Setting value on every call, and this
+  // loop runs over the whole nutrient list.
+  const targets = nutrientDailyTargets();
   const nutrients = [...totals.entries()]
-    .map(([name, v]) => ({
-      name,
-      unit: v.unit,
-      total: Math.round(v.total * 1000) / 1000,
-      perDay: daysLogged > 0 ? Math.round((v.total / daysLogged) * 1000) / 1000 : null,
-    }))
+    .map(([name, v]) => {
+      const perDay = daysLogged > 0 ? Math.round((v.total / daysLogged) * 1000) / 1000 : null;
+      const target = targets[name] || null;
+      return {
+        name,
+        displayName: NUTRIENT_DISPLAY_NAME[name] || name,
+        unit: v.unit,
+        total: Math.round(v.total * 1000) / 1000,
+        perDay,
+        ideal: target ? target.amount : null,
+        idealUnit: target ? target.unit : null,
+        kind: target ? target.kind : null,
+        severity: target ? nutrientGapSeverity(target.kind, perDay, target.amount) : null,
+      };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return {
@@ -103,15 +129,8 @@ function aggregateMicronutrientIntake(from, to) {
 // something very different depending on whether any iron-rich ingredient was
 // even priced this round.
 function formatMicronutrientCoverageLine(data) {
-  if (data.nutrients.length === 0) {
-    return data.missing.length
-      ? `No micronutrient data for this window yet — ${data.missing.length} ingredient(s) logged (${data.missing.join(', ')}), but none have been priced via Nutrition's 🧬 Pull Micronutrients.`
-      : 'No Calculate-derived ingredients logged in this window.';
-  }
-
-  const covered = `Based on ${data.contributing.length} ingredient${data.contributing.length === 1 ? '' : 's'} with pulled micronutrient data, over ${data.daysLogged} day${data.daysLogged === 1 ? '' : 's'} logged.`;
-  if (data.missing.length === 0) return covered;
-  return `${covered} ${data.missing.length} ingredient${data.missing.length === 1 ? '' : 's'} logged but not yet priced for micronutrients (excluded from totals below): ${data.missing.join(', ')}.`;
+  if (data.nutrients.length === 0) return 'No Calculate-derived ingredients logged in this window.';
+  return `Based on ${data.contributing.length} ingredient${data.contributing.length === 1 ? '' : 's'} with pulled micronutrient data, over ${data.daysLogged} day${data.daysLogged === 1 ? '' : 's'} logged.`;
 }
 
 function renderMicronutrientInsightPreview(data) {
@@ -124,16 +143,19 @@ function renderMicronutrientInsightPreview(data) {
   tbody.innerHTML = '';
 
   if (data.nutrients.length === 0) {
-    tbody.appendChild(renderEmptyRow(3, 'Nothing to show — see the coverage note above.'));
+    tbody.appendChild(renderEmptyRow(4, 'Nothing to show — see the coverage note above.'));
     return;
   }
 
   data.nutrients.forEach((n) => {
     const tr = document.createElement('tr');
+    if (n.severity === 'severe') tr.classList.add('nutrient-gap-severe');
+    else if (n.severity === 'mild') tr.classList.add('nutrient-gap-mild');
     tr.append(
-      makeCell(n.name),
+      makeCell(n.displayName),
       makeCell(`${n.total} ${n.unit}`),
       makeCell(n.perDay !== null ? `${n.perDay} ${n.unit}` : '—'),
+      makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
     );
     tbody.appendChild(tr);
   });
@@ -147,30 +169,35 @@ const MICRONUTRIENT_INSIGHT_DEFAULT_QUESTION = 'Is this amount enough? What is m
 function formatMicronutrientInsightPrompt(data, { from, to, question }) {
   const profile = formatProfileLines(gatherProfileSnapshot()).join('\n');
   const coverage = formatMicronutrientCoverageLine(data);
-  const header = `Real, measured nutrient totals (from USDA FoodData Central, via each ingredient's own Nutrition-table entry) for the ingredients logged from ${from} to ${to} that have been priced for micronutrients — name: total over the period (average per day):`;
+  const header = `Real, measured nutrient totals (from USDA FoodData Central, via each ingredient's own Nutrition-table entry) for the ingredients logged from ${from} to ${to} that have been priced for micronutrients — name: total over the period (average per day), ideal/day (a fixed FDA Daily Value, not personalized to this user), and whether the app's own math already flags a gap:`;
   const body = data.nutrients.length
-    ? data.nutrients.map((n) => `  - ${n.name}: ${n.total} ${n.unit} total (${n.perDay !== null ? `${n.perDay} ${n.unit}/day avg` : 'no logged days to average over'})`).join('\n')
+    ? data.nutrients.map((n) => {
+      const avgPart = n.perDay !== null ? `${n.perDay} ${n.unit}/day avg` : 'no logged days to average over';
+      const idealPart = n.ideal !== null
+        ? `, ideal ${n.ideal} ${n.idealUnit}/day (${n.kind === 'ceiling' ? 'limit' : n.kind})`
+        : ', no established daily value';
+      const gapPart = n.severity ? `, ${n.severity.toUpperCase()} GAP` : '';
+      return `  - ${n.displayName}: ${n.total} ${n.unit} total (${avgPart})${idealPart}${gapPart}`;
+    }).join('\n')
     : '(none — see the coverage note above)';
   const q = (question && question.trim()) ? question.trim() : MICRONUTRIENT_INSIGHT_DEFAULT_QUESTION;
   return `${profile}\n\n${coverage}\n\n${header}\n${body}\n\nQuestion: ${q}`;
 }
 
-const MICRONUTRIENT_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewing REAL, measured micronutrient totals — vitamins, minerals, and other nutrients — someone actually ate over a recent period. Unlike a rough estimate, these figures come from USDA FoodData Central, matched to the exact ingredients and amounts the user logged, so treat the numbers themselves as trustworthy for whatever they cover.
+const MICRONUTRIENT_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewing REAL, measured micronutrient totals — vitamins, minerals, and other nutrients — someone actually ate over a recent period. Unlike a rough estimate, these figures come from USDA FoodData Central, matched to the exact ingredients and amounts the user logged, so treat the numbers themselves as trustworthy for whatever they cover. A nutrient that's low or missing from the list may genuinely be low, or may simply not have been priced yet — never treat a nutrient missing from the list as confirmed zero intake.
 
-Coverage is the one thing that is NOT complete, and a coverage line before the nutrient list says exactly how partial it is: it names how many ingredients contributed real data and, when relevant, lists ingredients that were logged but excluded because they have not been priced yet (via the app's own Pull Micronutrients action). This is the most important caveat in the whole report — a nutrient that is low or absent from the list may genuinely be low, or may simply be undercounted because a rich source of it was logged but not yet priced. Read the excluded-ingredient names for hints: if a plausible source of a nutrient you'd flag as short is sitting in that excluded list, say so explicitly ("X wasn't counted because it hasn't been priced yet, and it's a likely source of Y") rather than presenting the gap as certain. Never treat a nutrient missing from the list as confirmed zero intake.
+Each nutrient line gives a total for the whole period AND an average per day, plus (where one exists) an ideal/day figure and whether the app's own math already flags a gap — use the per-day figure against the ideal to judge adequacy, since dietary reference intakes are per-day amounts, not per-period totals.
 
-Each nutrient line gives a total for the whole period AND an average per day — use the per-day figure to judge adequacy, since dietary reference intakes are per-day amounts, not per-period totals.
+The ideal/day figure is a FIXED FDA Daily Value (a general adult reference from a 2,000 kcal diet), NOT personalized to this user's own sex/age/body mass. SEVERE GAP / MILD GAP flags are already computed by the app (well under the ideal for a nutrient to get enough of, or well over it for one to limit, like sodium or saturated fat) — treat those as a starting point, not the final word: the report is preceded by the user's age, sex, height, current body mass and BMI, and reference intakes for iron, calcium, sodium, folate, B12 and most other nutrients differ meaningfully by sex and age (e.g. iron needs are markedly higher for a menstruating woman than for a man of the same age) — say explicitly when the fixed ideal is likely too low or too high for THIS person given their profile, rather than repeating the flag uncritically. A nutrient with "no established daily value" has no official reference — don't invent one. Any profile field may read "not set" or "not logged" — say what you'd need rather than assuming a figure.
 
-The report is preceded by the user's age, sex, height, current body mass and BMI. Use it: reference intakes for iron, calcium, sodium, folate, B12 and most other nutrients differ meaningfully by sex and age (e.g. iron needs are markedly higher for a menstruating woman than for a man of the same age). Any profile field may read "not set" or "not logged" — say what you'd need rather than assuming a figure, and where a judgment genuinely depends on a missing field (e.g. sex for iron), say so.
-
-Compare each covered nutrient's daily average against standard adult dietary reference intakes (RDA/AI), adjusted for the profile above where those intakes differ by sex/age. Flag both directions — a nutrient running low AND one running unusually high (e.g. sodium, or a fat-soluble vitamin like A or D, which can build up) both matter. You are not a doctor — do not diagnose a deficiency or excess as a medical condition, and do not recommend supplement doses; suggest specific food-based ways to close a real gap instead.
+You are not a doctor — do not diagnose a deficiency or excess as a medical condition, and do not recommend supplement doses; suggest specific food-based ways to close a real, flagged gap instead.
 
 Write a short plain-text report with exactly these five sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 
-Overview: one or two sentences on the overall picture this data shows, naming the coverage level (e.g. "based on N ingredients, M not yet priced") so the reader knows how complete a picture this is.
+Overview: one or two sentences on the overall picture this data shows, naming how many ingredients it's based on.
 Going well: nutrients that look adequately covered at this daily average, given the profile.
-Needs attention: nutrients that look short OR unusually high at this daily average — for a short one, note if an excluded (not-yet-priced) ingredient might already cover it in reality.
-Suggestions: 2-4 concrete, specific food-based ways to close the likely real gaps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — do not run them together in one line. If an excluded ingredient looks like it would close a gap, the first suggestion can simply be to price it via Pull Micronutrients rather than eat something new.
+Needs attention: nutrients that look short OR unusually high at this daily average.
+Suggestions: 2-4 concrete, specific food-based ways to close the likely real gaps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — do not run them together in one line.
 Answer: directly answers the question included below.
 
 Keep the whole report under 250 words.`;

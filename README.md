@@ -120,7 +120,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Time Tracker
 
-- **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
+- **Log Time** modal — Company, Start/End, Break (minutes), optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
+  - Break is a plain minutes number (`<input type="number">`), not a clock time — it's a duration, and a `type="time"` control (still used for Start/End) would force an AM/PM time-of-day picker onto it. The sheet cell still stores it as an `"H:MM"` string on save (`minutesToTimeInput`), since some Break columns carry pre-existing Excel-style duration formatting that reinterprets a raw integer as a day count.
 - Company autocompletes and defaults to the most recently logged one.
 - Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
 - One **Work** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
@@ -223,7 +224,10 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 ### Health — Health Insight (AI)
 
 - One panel, six modes: **Wellness**, **Food**, **Micronutrients**, **Activity**, **Protein Sources**, **Health Plan**.
-- **Micronutrients** is the one mode NOT built on model inference — it sums each logged ingredient's real, USDA-sourced Micronutrients panel (nutrition.js's Pull Micronutrients, scaled to how much was actually eaten) and asks the AI to judge sufficiency against standard dietary reference intakes. Coverage is necessarily partial (only ingredients that have been priced contribute), so the prompt leads with a coverage line naming what was and wasn't counted, and the AI is told never to read an unpriced nutrient as a confirmed zero.
+- **Micronutrients** is the one mode NOT built on model inference — it sums each logged ingredient's real, USDA-sourced Micronutrients panel (nutrition.js's Pull Micronutrients, scaled to how much was actually eaten) and asks the AI to judge sufficiency against standard dietary reference intakes. Coverage is necessarily partial (only ingredients that have been priced contribute) — a coverage line states how many ingredients and days it's based on, and the AI is told never to read a nutrient missing from the list as a confirmed zero. Deliberately doesn't name *which* ingredients were skipped, on screen or in the prompt — a bare count is enough to convey partial coverage without inviting the model to guess at a specific food's composition from its name alone.
+  - A fourth column, **Ideal / day**, next to Total (period) and Avg / day: reference daily amounts from `nutrient-targets.js`, mostly the FDA's 2016 Daily Values plus a handful of individually-sourced figures (omega-3 ALA, total water, caffeine, the indispensable amino acids, alcohol) for nutrients FDC reports that aren't on the FDA label at all. Fixed, general-adult numbers — not personalized to this user's own sex/age/body mass. Only a nutrient with a real citable reference gets one; most of what FDC reports (fatty-acid isomers, non-essential amino acids, individual sugars, sterols, carotenoids, lab-analysis fields like Ash/Nitrogen) has none, and shows `—` rather than an invented figure.
+  - Overridable per-nutrient via a `MICRONUTRIENT_DAILY_TARGETS_JSON` Setting — same `{unit, amount, kind}` shape as the file's own defaults, merged on top of them, so editing one nutrient's target doesn't require replacing the whole list.
+  - Rows flag **severe/mild** (red/amber left-border) once the average sits far enough from its ideal: for a "floor" nutrient (most vitamins/minerals) that means notably under *or* notably over; for a "ceiling" one (sodium, cholesterol, saturated fat) only running over is flagged, since being under a limit isn't a gap.
 - **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
 - Clicking a mode shows a preview of exactly what would be sent; Send to AI sends that same data.
 - All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
@@ -289,7 +293,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 - The panel heading reads **Activity**, and its three buttons are one word each — **Add**, **Guide**, **Log** — the reason for the app-wide convention in [Layout and interaction](#layout-and-interaction). "Log More" is the one two-word label, and only when something is already logged: **Add** next to it means a catalogue row, not another set.
 - Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row a "Done" checkbox.
-- **All seven tables are one grid.** Five columns each — a NEAT row carries an empty Rest cell — with the four right-hand columns pinned to the same widths, so Sets x Reps, Rest, Done and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~526px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
+- **All seven tables are one grid.** Six columns each — a NEAT row carries an empty Rest cell — with the five right-hand columns pinned to the same widths, so Muscle Group, Sets x Reps, Rest, Done and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~386px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
+- **Muscle Group** is its own column, between the exercise name and Sets x Reps/Amount — straight from the `Activity` sheet's own column, the same source the Instruction modal and the neglected-muscle Activity Insight already read.
 - **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover. The **Physique** and **Work** tables tint today's row the same green from the same declaration (`.workout-row-logged > td, .today-row > td`): in all three places it means "this is the row today's logging lands on", and two nearly-identical greens would read as a mistake.
   - In Work it's applied outside the weekend/holiday/no-entry chain, since today can also be a weekend or a holiday. Today's tint is on the cells and theirs is on the row, so today's green paints over while their muted text colour survives.
 - **Log sends only what's newly ticked**, and extends today's entry instead of opening a second row.
@@ -302,7 +307,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - **Name is guarded as the join key.** A second row under an existing name wouldn't be a duplicate, it would be invisible — `activitiesByName` keeps one entry per name, so the newer row would shadow the older everywhere (MET, muscle group, the plan's ticks). Saving one is refused with the clash named; 📋 Duplicate pre-fills `… (copy)` so it saves cleanly and can be renamed.
   - Sets x Reps and Rest are two inputs but one cell (column E), rejoined on the comma `splitAmountAndRest` splits on — verified to round-trip byte-for-byte, including a hold's own `3 x 45 sec, 45 sec`.
   - Deleting a row leaves days already logged against it untouched: those lines are free text on a Physique day. They just lose their own MET and stack under `Other` if recalculated, which the confirmation says out loud.
-  - The row actions sit **last**, after Done: `strength-plan.js` reads a ticked row's name from `children[0]` and its quantity from `children[1]`, so anything new has to go on the end. Rebuilding the tables also re-applies today's ticks, so an edit doesn't make the plan look unlogged.
+  - The row actions sit **last**, after Done: `strength-plan.js` reads a ticked row's name from `children[0]` and its Sets x Reps/Amount quantity from `children[2]` (Muscle Group sits at `children[1]` between them), so anything new besides Muscle Group has to go on the end. Rebuilding the tables also re-applies today's ticks, so an edit doesn't make the plan look unlogged.
 - **Guide** in the panel heading opens "Instructions on the Activities" — all 34 strength exercises, grouped by category (Legs / Push / Pull / Full Body / Core & Bodyweight) rather than by the day they fall on.
   - Every figure shows the **muscle worked picked out in red**. 23 are **animated loops**; the remaining 11 are stills carrying **the start and the finish side by side**.
   - Under each name, at plain weight: the **muscle group** it trains and its **sets × reps · rest** — both straight from the `Activity` sheet, so the modal can't disagree with the plan table.
@@ -472,7 +477,7 @@ flowchart TD
     Idle --> InsightPanel["Health Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
     InsightMode -- no --> Idle
-    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Classification-grouped ingredient rollup /<br/>real Micronutrients totals + coverage note /<br/>per-muscle-group reps — no API call"]
+    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Classification-grouped ingredient rollup /<br/>real Micronutrients totals vs. Ideal/day<br/>(nutrient-targets.js) + coverage count /<br/>per-muscle-group reps — no API call"]
     InsightPreview --> InsightSend{"Send to AI<br/>clicked?"}
     InsightSend -- yes --> InsightReport["Groq chat-completions API<br/>renders free-text report,<br/>saved to that mode's INSIGHT_* keys"] --> Idle
     InsightSend -- no --> Idle
@@ -495,38 +500,39 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
 | 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes |
 | 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
-| 9 | `nutrition.js` | Nutrition table, Classification column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry` |
-| 10 | `calorie-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
-| 11 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
-| 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
-| 13 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
-| 14 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
-| 15 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
-| 16 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
-| 17 | `csv.js` | CSV import, advanced filter engine, download helper |
-| 18 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
-| 19 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
-| 20 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
-| 21 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
-| 22 | `contacts.js` | Contact panel, CRUD, bulk export/delete/merge |
-| 23 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
-| 24 | `travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
-| 25 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
-| 26 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
-| 27 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
-| 28 | `micronutrient-insight.js` | Micronutrients mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, with an explicit ingredient coverage note |
-| 29 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 30 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
-| 31 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
-| 32 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
-| 33 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 34 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
-| 35 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 36 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
-| 36 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
-| 37 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 9 | `nutrient-targets.js` | Ideal/day reference amounts (mostly FDA Daily Values) and gap-severity thresholds for the Micronutrients mode, overridable via a `MICRONUTRIENT_DAILY_TARGETS_JSON` Setting |
+| 10 | `nutrition.js` | Nutrition table, Classification column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry` |
+| 11 | `calorie-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
+| 12 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
+| 13 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
+| 14 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
+| 15 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
+| 16 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
+| 17 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
+| 18 | `csv.js` | CSV import, advanced filter engine, download helper |
+| 19 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
+| 20 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
+| 21 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
+| 22 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
+| 23 | `contacts.js` | Contact panel, CRUD, bulk export/delete/merge |
+| 24 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
+| 25 | `travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
+| 26 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
+| 27 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
+| 28 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
+| 29 | `micronutrient-insight.js` | Micronutrients mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `nutrient-targets.js`'s Ideal/day figures |
+| 30 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
+| 31 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
+| 32 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
+| 33 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 34 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 35 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
+| 36 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 37 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
+| 38 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
+| 39 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
-`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 37 above into a page that has none of them (see [Section pages](#section-pages)).
+`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 39 above into a page that has none of them (see [Section pages](#section-pages)).
 
 ### Data Flow
 
@@ -1056,6 +1062,7 @@ ledger/
 │       ├── ui-helpers.js         # Shared table/modal/busy-button helpers
 │       ├── groq.js               # Groq chat client
 │       ├── usda.js               # USDA FoodData Central client
+│       ├── nutrient-targets.js   # Ideal/day targets for Micronutrients mode
 │       ├── nutrition.js          # Nutrition table, Classification, USDA lookup
 │       ├── calorie-estimator.js  # Calculate for food
 │       ├── activity-estimator.js # Calculate for workouts
@@ -1219,6 +1226,7 @@ Then open `http://localhost:8000`. No build step.
 - Every write refreshes only the affected cache entry, so the UI updates without a reload.
 - **Refresh** clears the cache and re-fetches everything.
 - **Clear Cache** also purges Cache Storage and unregisters service workers, then reloads.
+- **A cache write failure never blocks the data it was caching.** `setCached` catches its own `localStorage.setItem` (most commonly `QuotaExceededError` — Nutrition rows carrying a large banked Micronutrients JSON blob can push the origin over its ~5-10MB quota) and just skips that write with a console warning, since every caller already has the real, freshly-fetched data in memory regardless of whether the warm-start for next time succeeded.
 
 > After changing a sheet's column layout, expect up to 5 minutes of stale reads until the cache expires — or use Clear Cache. Writes always bypass the cache.
 
@@ -1239,7 +1247,8 @@ Then open `http://localhost:8000`. No build step.
   - Calculate sends the typed ingredient text only.
   - The USDA lookup sends the ingredient name only.
   - Wellness Insight sends age, height, BMI, body mass/target and aggregated averages.
-  - Food Insight sends the classification-grouped ingredient list plus your question. No vitamin/mineral data exists in this app, so none is ever sent.
+  - Food Insight sends the classification-grouped ingredient list plus your question — no real vitamin/mineral data, just the model's own inference from the ingredient names.
+  - Micronutrients Insight sends real, USDA-measured nutrient totals (from ingredients you've priced via Nutrition's Pull Micronutrients) and their Ideal/day reference figures — the one mode that does send vitamin/mineral data, because unlike Food Insight it's measured, not inferred.
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
   - Health Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
   - Nothing is sent until that panel's Send to AI is clicked.

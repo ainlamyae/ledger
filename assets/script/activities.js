@@ -179,19 +179,19 @@ function makeActivityTable(group, rows) {
   table.className = isStrength ? 'workout-table-strength' : 'workout-table-neat';
   table.dataset.day = group;
 
-  // Five columns in every table, whatever its type — a NEAT/Cardio row has no
+  // Six columns in every table, whatever its type — a NEAT/Cardio row has no
   // rest to take, but it still gets the (empty) Rest cell so all seven tables
   // are one grid and their columns line up when stacked down the panel. Only the
-  // two labels differ, since a step count isn't a set count.
+  // two quantity labels differ, since a step count isn't a set count.
   //
   // The row actions column is last and unlabelled, the same shape every other
   // table in the app uses. Order matters beyond looks: strength-plan.js reads a
-  // ticked row's name from children[0] and its quantity from children[1], so
-  // anything new has to go on the END, and the Done column is now marked by its
-  // label rather than by being last.
+  // ticked row's name from children[0] and its quantity from children[2], so
+  // anything new besides Muscle Group has to go on the END, and the Done column
+  // is now marked by its label rather than by being last.
   const headers = isStrength
-    ? ['Exercise/Machine', 'Sets x Reps', 'Rest', 'Done', '']
-    : ['Activity', 'Amount', 'Rest', 'Done', ''];
+    ? ['Exercise/Machine', 'Muscle Group', 'Sets x Reps', 'Rest', 'Done', '']
+    : ['Activity', 'Muscle Group', 'Amount', 'Rest', 'Done', ''];
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
@@ -206,7 +206,7 @@ function makeActivityTable(group, rows) {
   const tbody = document.createElement('tbody');
   rows.forEach((activity) => {
     const tr = document.createElement('tr');
-    tr.append(makeCell(activity.name), makeCell(activity.amount), makeCell(activity.rest));
+    tr.append(makeCell(activity.name), makeCell(activity.muscleGroup), makeCell(activity.amount), makeCell(activity.rest));
 
     const checkCell = document.createElement('td');
     checkCell.className = 'workout-check-cell';

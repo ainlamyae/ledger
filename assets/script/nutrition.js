@@ -192,7 +192,7 @@ function micronutrientsCell(n) {
   const parsed = parseMicronutrients(n.micronutrients);
   if (!parsed) return makeCell('—', 'Not pulled yet — select this row and click 🧬 Pull Micronutrients below');
 
-  const names = Object.keys(parsed);
+  const names = Object.keys(parsed).sort((a, b) => a.localeCompare(b));
   const tooltip = names
     .map((name) => `${name}: ${parsed[name].amount} ${parsed[name].unit}`)
     .join('\n');
@@ -332,7 +332,7 @@ function renderNutritionMicronutrientsDetails(entry) {
     return;
   }
 
-  Object.keys(parsed).forEach((name) => {
+  Object.keys(parsed).sort((a, b) => a.localeCompare(b)).forEach((name) => {
     const li = document.createElement('li');
     const nameSpan = document.createElement('span');
     nameSpan.textContent = name;
@@ -628,7 +628,10 @@ async function pullMicronutrientsForEntry(n) {
 
     const scale = grams / 100;
     const nutrients = {};
-    candidate.nutrients.forEach((nut) => {
+    // Alphabetical, not USDA's nutrient-ID order — so both the saved JSON and
+    // the Edit Ingredient disclosure list read the same way as everything
+    // else in the app.
+    [...candidate.nutrients].sort((a, b) => a.name.localeCompare(b.name)).forEach((nut) => {
       nutrients[nut.name] = { amount: Math.round(nut.amountPer100g * scale * 10000) / 10000, unit: nut.unit };
     });
 

@@ -5,10 +5,10 @@
 // and the gif/jpg animation list (strength-plan.js).
 //
 // Columns: Category · Group · Name · Unit · "Sets x Reps, Rest" · Image ·
-// MET · Muscle Group. Name is the join key everything else matches on — it has
-// to be exactly what the workout note lines carry.
+// MET · Muscle Group · Weight. Name is the join key everything else matches
+// on — it has to be exactly what the workout note lines carry.
 
-const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:H`;
+const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:I`;
 
 // Compendium 02054 general value, for a name the sheet doesn't price.
 // Distinct from charts.js's ACTIVITY_MET_FALLBACK, which is the assumed
@@ -90,6 +90,7 @@ async function initActivities(forceRefresh = false) {
         image: String(row[5] || '').trim(),
         met: (row[6] !== undefined && row[6] !== '') ? Number(row[6]) : null,
         muscleGroup: String(row[7] || '').trim(),
+        weight: String(row[8] || '').trim(),
       };
     })
     .filter((a) => a.name);
@@ -170,7 +171,37 @@ function makeActivityCheckbox(activity) {
   return box;
 }
 
-function makeActivityTable(group, rows) {
+// Muscle Group/Rest/Weight, checked across every row of one table SHAPE
+// (every strength day together, or NEAT+Cardio together) rather than table by
+// table — so a column with real data somewhere in that shape (e.g. Muscle
+// Group, blank on Bodyweight Day's own rows but filled on every other
+// strength day) still renders, while one nothing in that shape has ever
+// filled in (Rest/Weight on every NEAT/Cardio row; Weight everywhere, before
+// it's ever been typed once) is dropped instead of rendering as a permanently
+// empty column. Deciding per shape, not per table, is also what keeps Leg Day
+// and Bodyweight Day showing the same columns in the same order as each other.
+// "Rhomboids, Trapezius, Latissimus Dorsi" (Seated Row's actual value) is
+// long enough to widen the Muscle Group column past what any other cell
+// needs. Truncated for display only — the full text is in the title
+// attribute, same convention truncateSettingValue (settings-panel.js) uses
+// for an overlong Settings value.
+const ACTIVITY_MUSCLE_GROUP_DISPLAY_MAX = 16;
+
+function truncateMuscleGroup(text) {
+  return text.length > ACTIVITY_MUSCLE_GROUP_DISPLAY_MAX
+    ? `${text.slice(0, ACTIVITY_MUSCLE_GROUP_DISPLAY_MAX)}…`
+    : text;
+}
+
+function activityPlanColumnVisibility(activities) {
+  return {
+    muscleGroup: activities.some((a) => a.muscleGroup),
+    rest: activities.some((a) => a.rest),
+    weight: activities.some((a) => a.weight),
+  };
+}
+
+function makeActivityTable(group, rows, columnVisibility) {
   // A rep/hold group gets the Sets x Reps + Rest pair; an amount-based one
   // (steps, minutes) has no sets and no rest to show.
   const isStrength = rows.some((a) => a.quantity.sets !== undefined);
@@ -179,26 +210,33 @@ function makeActivityTable(group, rows) {
   table.className = isStrength ? 'workout-table-strength' : 'workout-table-neat';
   table.dataset.day = group;
 
-  // Six columns in every table, whatever its type — a NEAT/Cardio row has no
-  // rest to take, but it still gets the (empty) Rest cell so all seven tables
-  // are one grid and their columns line up when stacked down the panel. Only the
-  // two quantity labels differ, since a step count isn't a set count.
-  //
   // The row actions column is last and unlabelled, the same shape every other
   // table in the app uses. Order matters beyond looks: strength-plan.js reads a
-  // ticked row's name from children[0] and its quantity from children[2], so
-  // anything new besides Muscle Group has to go on the END, and the Done column
-  // is now marked by its label rather than by being last.
-  const headers = isStrength
-    ? ['Exercise/Machine', 'Muscle Group', 'Sets x Reps', 'Rest', 'Done', '']
-    : ['Activity', 'Muscle Group', 'Amount', 'Rest', 'Done', ''];
+  // ticked row's name from children[0] and its quantity from children[2] for
+  // every row where box.dataset.steps/minutes/hold are all unset (a plain
+  // reps-based strength row) — those always come from a shape where Muscle
+  // Group is visible, so that pairing never shifts. Anything conditionally
+  // shown (Muscle Group, Rest, Weight) has to sit between the name and Done,
+  // never before the quantity column.
+  //
+  // Every column between Name and Done gets a shared "workout-meta-cell"
+  // class, and Muscle Group its own class on top — nth-child can't target
+  // these reliably on mobile any more now that a table's own column count
+  // depends on columnVisibility, so mobile's font-size/hide rules key off
+  // these classes instead of position.
+  const headers = [{ label: isStrength ? 'Exercise/Machine' : 'Activity' }];
+  if (columnVisibility.muscleGroup) headers.push({ label: 'Muscle Group', className: 'workout-meta-cell workout-muscle-group-cell' });
+  headers.push({ label: isStrength ? 'Sets x Reps' : 'Amount', className: 'workout-meta-cell' });
+  if (columnVisibility.rest) headers.push({ label: 'Rest', className: 'workout-meta-cell' });
+  if (columnVisibility.weight) headers.push({ label: 'Weight', className: 'workout-meta-cell' });
+  headers.push({ label: 'Done', className: 'workout-check-col' }, { label: '' });
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  headers.forEach((label) => {
+  headers.forEach(({ label, className }) => {
     const th = document.createElement('th');
     th.textContent = label;
-    if (label === 'Done') th.className = 'workout-check-col';
+    if (className) th.className = className;
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -206,7 +244,18 @@ function makeActivityTable(group, rows) {
   const tbody = document.createElement('tbody');
   rows.forEach((activity) => {
     const tr = document.createElement('tr');
-    tr.append(makeCell(activity.name), makeCell(activity.muscleGroup), makeCell(activity.amount), makeCell(activity.rest));
+    const cells = [makeCell(activity.name)];
+    if (columnVisibility.muscleGroup) {
+      cells.push(makeCell(truncateMuscleGroup(activity.muscleGroup), activity.muscleGroup));
+    }
+    cells.push(makeCell(activity.amount));
+    if (columnVisibility.rest) cells.push(makeCell(activity.rest));
+    if (columnVisibility.weight) cells.push(makeCell(activity.weight));
+    // Cells 1..n-1 are the same conditionally-shown group the headers above
+    // are classed for (cells[0] is the Name column, never classed).
+    cells.slice(1).forEach((cell) => cell.classList.add('workout-meta-cell'));
+    if (columnVisibility.muscleGroup) cells[1].classList.add('workout-muscle-group-cell');
+    tr.append(...cells);
 
     const checkCell = document.createElement('td');
     checkCell.className = 'workout-check-cell';
@@ -229,6 +278,46 @@ function makeActivityTable(group, rows) {
   return table;
 }
 
+// Each table sizes to its own content independently (table-layout: auto, no
+// fixed table width — see .workout-table-strength/.workout-table-neat in
+// styles.css), so on its own a short table (Bodyweight Day) computes
+// different column widths than a long one (Push Day) and the stacked tables
+// stop lining up. This measures every table's own natural per-column width
+// AFTER they've all rendered, takes the max across the tables that share a
+// shape (strength tables together, NEAT+Cardio together — they no longer
+// have the same column count as each other), and pins every table in that
+// group to those widths via a <colgroup>. Alignment then comes from the
+// widest real value in the group, not a guessed pixel constant.
+function syncActivityPlanColumnWidths() {
+  ['.workout-table-strength', '.workout-table-neat'].forEach((selector) => {
+    const tables = [...document.querySelectorAll(`#workout-plan-panel ${selector}`)];
+    if (tables.length < 2) return;
+
+    const columnCount = tables[0].tHead.rows[0].cells.length;
+    const maxWidths = Array(columnCount).fill(0);
+
+    tables.forEach((table) => {
+      [...table.tHead.rows[0].cells].forEach((th, i) => {
+        maxWidths[i] = Math.max(maxWidths[i], th.getBoundingClientRect().width);
+      });
+    });
+
+    tables.forEach((table) => {
+      let colgroup = table.querySelector('colgroup');
+      if (!colgroup) {
+        colgroup = document.createElement('colgroup');
+        table.insertBefore(colgroup, table.firstChild);
+      }
+      colgroup.innerHTML = '';
+      maxWidths.forEach((w) => {
+        const col = document.createElement('col');
+        col.style.width = `${Math.ceil(w)}px`;
+        colgroup.appendChild(col);
+      });
+    });
+  });
+}
+
 function renderActivityPlanTables() {
   const container = document.getElementById('activity-plan-tables');
   container.innerHTML = '';
@@ -236,10 +325,13 @@ function renderActivityPlanTables() {
   if (!allActivities.length) {
     const empty = document.createElement('p');
     empty.className = 'hint';
-    empty.textContent = `No activities yet — click "Add Activity" above, or add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab directly (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group).`;
+    empty.textContent = `No activities yet — click "Add Activity" above, or add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab directly (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group, Weight).`;
     container.appendChild(empty);
     return;
   }
+
+  const strengthCols = activityPlanColumnVisibility(allActivities.filter((a) => a.quantity.sets !== undefined));
+  const amountCols = activityPlanColumnVisibility(allActivities.filter((a) => a.quantity.sets === undefined));
 
   groupInOrder(allActivities, 'category').forEach((categoryRows, category) => {
     const heading = document.createElement('h3');
@@ -260,7 +352,8 @@ function renderActivityPlanTables() {
 
       const wrap = document.createElement('div');
       wrap.className = 'table-responsive';
-      wrap.appendChild(makeActivityTable(group, rows));
+      const isStrength = rows.some((a) => a.quantity.sets !== undefined);
+      wrap.appendChild(makeActivityTable(group, rows, isStrength ? strengthCols : amountCols));
       day.appendChild(wrap);
 
       container.appendChild(day);
@@ -271,6 +364,7 @@ function renderActivityPlanTables() {
   // with them — put them back. Matters most after an edit here: the plan
   // shouldn't look like nothing was logged just because a row was renamed.
   renderWorkoutPlanProgress();
+  syncActivityPlanColumnWidths();
 }
 
 // --- Add / Edit / Duplicate / Delete --------------------------------------
@@ -298,6 +392,7 @@ function openActivityForm(activity, duplicate = false) {
   setActivityField('met', activity?.met);
   setActivityField('image', activity?.image);
   setActivityField('muscle-group', activity?.muscleGroup);
+  setActivityField('weight', activity?.weight);
 
   renderActivityDatalist('activity-category-options', 'category');
   renderActivityDatalist('activity-group-options', 'group');
@@ -386,11 +481,12 @@ async function submitActivityForm(event) {
     activityFieldValue('image'),
     met !== null ? met : '',
     activityFieldValue('muscle-group'),
+    activityFieldValue('weight'),
   ]];
 
   try {
     if (editingActivityRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:H${editingActivityRow}`, values);
+      await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:I${editingActivityRow}`, values);
     } else {
       await appendValues(ACTIVITIES_RANGE, values);
     }

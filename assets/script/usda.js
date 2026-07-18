@@ -22,7 +22,9 @@ async function usdaLookupKcalCandidates(query) {
   return (data.foods || [])
     .map((food) => {
       const energy = food.foodNutrients?.find((n) => n.nutrientName === 'Energy' && n.unitName === 'KCAL');
-      return energy ? { description: food.description, kcalPer100g: energy.value } : null;
+      if (!energy) return null;
+      const protein = food.foodNutrients?.find((n) => n.nutrientName === 'Protein' && n.unitName === 'G');
+      return { description: food.description, kcalPer100g: energy.value, proteinPer100g: protein ? protein.value : null };
     })
     .filter(Boolean);
 }

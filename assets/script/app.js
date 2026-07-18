@@ -814,9 +814,9 @@ function setupScrollSpy() {
 
   sections.forEach((section) => observer.observe(section));
 
-  // The cards row above the first section can push its midpoint past the
-  // viewport's center line, so the observer never fires for it near the top
-  // of the page. Force the first nav link active once the user scrolls back up.
+  // The widget cards row above the first section can push its midpoint past
+  // the viewport's center line, so the observer never fires for it near the
+  // top of the page. Force the first nav link active once the user scrolls back up.
   window.addEventListener('scroll', () => {
     if (window.scrollY < sections[0].offsetTop) {
       navLinks.forEach((link) => link.classList.remove('active'));
@@ -835,6 +835,7 @@ window.addEventListener('load', () => {
   setupAccountMenu();
   initCsvControls();
   initCalibrationPanel();
+  initInsightPanel();
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();

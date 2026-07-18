@@ -6,7 +6,42 @@ const CATEGORY_DEFAULTS = {
   Weight:   { unit: 'kg',   descriptions: ['Morning Weight', 'Evening Weight'] },
   Calories: { unit: 'kcal', descriptions: ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage', 'Other'] },
   Activity: { unit: 'steps', descriptions: ['Walk', 'Run', 'Workout', 'Cycling', 'Swimming', 'HIIT', 'Yoga', 'Strength Training', 'Basketball', 'Stretching'] },
+  // Composite category written by the Calculate button (calorie-estimator.js):
+  // one log entry carrying both macros, Amount/Unit each holding a ';'-joined
+  // pair ("320; 10" / "kcal; g") rather than a plain single number.
+  'Calories; Protein': { unit: 'kcal; g', descriptions: ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage', 'Other'] },
 };
+
+// True for the composite "Calories; Protein" category (or any future
+// ';'-joined category) — these rows carry paired Amount/Unit values instead
+// of a single number, and need their own parse/validate/display path.
+function isCompositeCategory(category) {
+  return category.includes(';');
+}
+
+// Round-trips an entry's Amount/Unit back into the raw ';'-joined form the
+// sheet stores (or a plain value for non-composite entries) — used both to
+// repopulate the edit form and to snapshot a row before bulk Recalculate
+// overwrites it, so an undo can restore the exact original cell text.
+function rawAmountString(e) {
+  if (e.amount === null) return '';
+  return e.amount2 !== null ? `${e.amount}; ${e.amount2}` : String(e.amount);
+}
+function rawUnitString(e) {
+  return e.unit2 ? `${e.unit}; ${e.unit2}` : e.unit;
+}
+
+// Only food entries with ingredient text can be (re)estimated from Notes.
+function eligibleForRecalc(e) {
+  return (e.category === 'Calories' || e.category === 'Calories; Protein') && e.notes.trim();
+}
+
+// Merge is scoped to the calorie/protein entries the user actually asked to
+// combine — summing e.g. two Weight readings wouldn't be meaningful the
+// same way, so Sleep/Weight/Activity aren't offered here.
+function mergeableCategory(category) {
+  return category === 'Calories' || category === 'Calories; Protein';
+}
 
 let allWellnessEntries = [];
 let wellnessListenersAttached = false;
@@ -14,6 +49,7 @@ let wSort = { dir: -1 };
 let wCurrentPage = 1;
 let wellnessSheetId = null;
 let editingWellnessRow = null;
+let selectedWellnessRows = new Set();
 
 async function fetchWellnessSheetId() {
   const metadata = await getSpreadsheetMetadata();
@@ -32,25 +68,41 @@ async function initWellness(forceRefresh = false) {
 
     document.getElementById('wellness-search').addEventListener('input', () => {
       wCurrentPage = 1;
+      selectedWellnessRows.clear();
       renderWellnessList();
     });
     document.getElementById('wellness-date-from').addEventListener('input', () => {
       wCurrentPage = 1;
+      selectedWellnessRows.clear();
       renderWellnessList();
     });
     document.getElementById('wellness-date-to').addEventListener('input', () => {
       wCurrentPage = 1;
+      selectedWellnessRows.clear();
       renderWellnessList();
     });
     document.getElementById('wellness-category-filter').addEventListener('change', () => {
       wCurrentPage = 1;
+      selectedWellnessRows.clear();
       renderWellnessList();
     });
 
     setupWellnessSorting();
+    setupWellnessBulkActions();
   }
 
   await refreshWellness(forceRefresh);
+}
+
+function setupWellnessBulkActions() {
+  document.getElementById('wellness-select-all').addEventListener('change', (e) => {
+    const pageRows = getFilteredWellnessEntries().slice((wCurrentPage - 1) * W_PAGE_SIZE, wCurrentPage * W_PAGE_SIZE);
+    pageRows.forEach((entry) => (e.target.checked ? selectedWellnessRows.add(entry.row) : selectedWellnessRows.delete(entry.row)));
+    renderWellnessList();
+  });
+
+  document.getElementById('wellness-bulk-recalc-btn').addEventListener('click', bulkRecalculateWellness);
+  document.getElementById('wellness-bulk-merge-btn').addEventListener('click', mergeSelectedWellnessEntries);
 }
 
 function setupWellnessSorting() {
@@ -72,6 +124,7 @@ function setupWellnessSorting() {
     wSort.dir *= -1;
     updateIndicator();
     wCurrentPage = 1;
+    selectedWellnessRows.clear();
     renderWellnessList();
   });
   th.addEventListener('keydown', (e) => {
@@ -88,16 +141,41 @@ async function refreshWellness(forceRefresh = false) {
   }
 
   allWellnessEntries = values
-    .map((row, i) => ({
-      row: i + 2,
-      date: row[0] || '',
-      time: String(row[1] || '').slice(0, 5),
-      category: row[2] || '',
-      description: row[3] || '',
-      amount: (row[4] !== undefined && row[4] !== '') ? Number(row[4]) : null,
-      unit: row[5] || '',
-      notes: row[6] || '',
-    }))
+    .map((row, i) => {
+      const category = row[2] || '';
+      const rawAmount = row[4];
+      const rawUnit = row[5] || '';
+      let amount = null;
+      let amount2 = null;
+      let unit = rawUnit;
+      let unit2 = null;
+
+      if (isCompositeCategory(category)) {
+        if (rawAmount !== undefined && rawAmount !== '') {
+          const [a1, a2] = String(rawAmount).split(';').map((s) => Number(s.trim()));
+          amount = Number.isNaN(a1) ? null : a1;
+          amount2 = Number.isNaN(a2) ? null : a2;
+        }
+        const [u1, u2] = rawUnit.split(';').map((s) => s.trim());
+        unit = u1 || '';
+        unit2 = u2 || null;
+      } else {
+        amount = (rawAmount !== undefined && rawAmount !== '') ? Number(rawAmount) : null;
+      }
+
+      return {
+        row: i + 2,
+        date: row[0] || '',
+        time: String(row[1] || '').slice(0, 5),
+        category,
+        description: row[3] || '',
+        amount,
+        amount2,
+        unit,
+        unit2,
+        notes: row[6] || '',
+      };
+    })
     .filter((e) => e.date);
 
   renderWellnessList();
@@ -144,7 +222,7 @@ function renderWellnessList() {
     const message = allWellnessEntries.length === 0
       ? 'No wellness entries yet — click "+ Add Entry" to get started.'
       : 'No entries match this filter.';
-    tbody.appendChild(renderEmptyRow(8, message));
+    tbody.appendChild(renderEmptyRow(9, message));
   }
 
   let previousDate = null;
@@ -159,15 +237,32 @@ function renderWellnessList() {
     previousDate = e.date;
 
     const notesShort = e.notes.length > 20 ? `${e.notes.slice(0, 20)}…` : e.notes;
-    const amountText = e.amount !== null ? String(e.amount) : '—';
+    const amountText = e.amount !== null
+      ? (e.amount2 !== null ? `${e.amount} / ${e.amount2}` : String(e.amount))
+      : '—';
+    const unitText = e.unit2 ? `${e.unit} / ${e.unit2}` : e.unit;
+
+    const checkboxCell = document.createElement('td');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = selectedWellnessRows.has(e.row);
+    checkbox.setAttribute('aria-label', 'Select entry');
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) selectedWellnessRows.add(e.row);
+      else selectedWellnessRows.delete(e.row);
+      updateWellnessSelectAllCheckbox(pageEntries);
+      updateWellnessBulkActionsUI();
+    });
+    checkboxCell.appendChild(checkbox);
 
     tr.append(
+      checkboxCell,
       makeCell(e.date),
       makeCell(e.time || '—'),
       makeCell(e.category),
       makeCell(e.description),
       makeCell(privacyMode ? maskDigits(amountText) : amountText),
-      makeCell(e.unit),
+      makeCell(unitText),
       makeCell(privacyMode ? maskText(notesShort) : notesShort, privacyMode ? maskText(e.notes) : e.notes),
     );
 
@@ -181,7 +276,31 @@ function renderWellnessList() {
     tbody.appendChild(tr);
   });
 
+  updateWellnessSelectAllCheckbox(pageEntries);
+  updateWellnessBulkActionsUI();
   renderWellnessPagination(totalPages);
+}
+
+function updateWellnessSelectAllCheckbox(pageEntries) {
+  const selectAll = document.getElementById('wellness-select-all');
+  const selectedOnPage = pageEntries.filter((e) => selectedWellnessRows.has(e.row)).length;
+  selectAll.checked = pageEntries.length > 0 && selectedOnPage === pageEntries.length;
+  selectAll.indeterminate = selectedOnPage > 0 && selectedOnPage < pageEntries.length;
+}
+
+function updateWellnessBulkActionsUI() {
+  const bar = document.getElementById('wellness-bulk-actions');
+  const selected = allWellnessEntries.filter((e) => selectedWellnessRows.has(e.row));
+  const count = selected.length;
+  bar.hidden = count === 0;
+  document.getElementById('wellness-bulk-summary').textContent = count > 0 ? `${count} selected` : '';
+
+  const eligibleRecalcCount = selected.filter(eligibleForRecalc).length;
+  document.getElementById('wellness-bulk-recalc-btn').disabled = eligibleRecalcCount === 0;
+
+  const categories = new Set(selected.map((e) => e.category));
+  const mergeOk = count >= 2 && categories.size === 1 && mergeableCategory(selected[0].category);
+  document.getElementById('wellness-bulk-merge-btn').disabled = !mergeOk;
 }
 
 function renderWellnessPagination(totalPages) {
@@ -190,6 +309,7 @@ function renderWellnessPagination(totalPages) {
     totalPages,
     onChange: (p) => {
       wCurrentPage = p;
+      selectedWellnessRows.clear();
       renderWellnessList();
     },
   });
@@ -207,14 +327,16 @@ function openWellnessForm(entry, duplicate = false) {
   document.getElementById('wellness-entry-date').value = entry ? entry.date : today;
   document.getElementById('wellness-entry-time').value = entry ? entry.time : currentTime;
   document.getElementById('wellness-category').value = entry ? entry.category : '';
-  document.getElementById('wellness-amount').value = entry && entry.amount !== null ? String(entry.amount) : '';
+  document.getElementById('wellness-amount').value = entry ? rawAmountString(entry) : '';
   document.getElementById('wellness-notes').value = entry ? entry.notes : '';
 
   onCategoryChange();
 
   // Restore the entry's own description and unit (onCategoryChange sets category defaults)
   document.getElementById('wellness-description').value = entry ? entry.description : '';
-  document.getElementById('wellness-unit').value = entry ? entry.unit : document.getElementById('wellness-unit').value;
+  document.getElementById('wellness-unit').value = entry
+    ? rawUnitString(entry)
+    : document.getElementById('wellness-unit').value;
 
   clearFieldError('wellness-form-error');
   document.getElementById('wellness-modal').hidden = false;
@@ -229,12 +351,18 @@ function onCategoryChange() {
   const defaults = CATEGORY_DEFAULTS[cat] || { unit: '', descriptions: [] };
 
   document.getElementById('wellness-unit').value = defaults.unit;
-  document.getElementById('wellness-description').value = '';
 
-  // Historical descriptions for this category, sorted by frequency (most used first)
+  // Historical descriptions for this category, sorted by frequency (most used first).
+  // 'Calories' and 'Calories; Protein' share one history — they're the same kind
+  // of entry (a meal), just with/without a protein estimate attached — so
+  // switching between them (e.g. via the Calculate button) doesn't wipe out
+  // years of description suggestions just because the composite category is new.
+  const relatedCategories = (cat === 'Calories' || cat === 'Calories; Protein')
+    ? ['Calories', 'Calories; Protein']
+    : [cat];
   const counts = new Map();
   allWellnessEntries
-    .filter((e) => e.category === cat && e.description)
+    .filter((e) => relatedCategories.includes(e.category) && e.description)
     .forEach((e) => counts.set(e.description, (counts.get(e.description) || 0) + 1));
   const historical = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([d]) => d);
 
@@ -262,13 +390,27 @@ async function submitWellnessForm(event) {
   const unit = document.getElementById('wellness-unit').value;
   const notes = document.getElementById('wellness-notes').value;
 
-  const amount = evaluateNumberExpression(amountRaw);
-  if (amountRaw && amount === null) {
-    showFieldError('wellness-form-error', 'Amount must be a number (e.g. 94 or 30+15).');
-    return;
+  let amount;
+  if (isCompositeCategory(category)) {
+    const parts = amountRaw.split(';').map((s) => s.trim());
+    const [calRaw, protRaw] = parts;
+    const cal = calRaw ? evaluateNumberExpression(calRaw) : null;
+    const prot = protRaw ? evaluateNumberExpression(protRaw) : null;
+    if (parts.length !== 2 || cal === null || prot === null) {
+      showFieldError('wellness-form-error', 'Amount must be two numbers separated by ";" (e.g. 320; 10).');
+      return;
+    }
+    amount = `${cal}; ${prot}`;
+  } else {
+    const evaluated = evaluateNumberExpression(amountRaw);
+    if (amountRaw && evaluated === null) {
+      showFieldError('wellness-form-error', 'Amount must be a number (e.g. 94 or 30+15).');
+      return;
+    }
+    amount = evaluated !== null ? evaluated : '';
   }
 
-  const rowData = [date, time, category, description, amount !== null ? amount : '', unit, notes];
+  const rowData = [date, time, category, description, amount, unit, notes];
 
   try {
     if (editingWellnessRow !== null) {
@@ -298,5 +440,130 @@ async function deleteWellnessEntry(entry) {
     }]);
     await refreshWellness(true);
   }, "Couldn't delete entry");
+}
+
+// Writes each snapshot's original values back to its own row — unlike
+// restoring a delete, these rows still exist, so undo is just an updateValues
+// per row (same idea as transactions.js's restoreBulkEdit).
+async function restoreWellnessSnapshots(snapshots) {
+  try {
+    await Promise.all(snapshots.map((s) =>
+      updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${s.row}:G${s.row}`,
+        [[s.date, s.time, s.category, s.description, s.amount, s.unit, s.notes]])));
+    await refreshWellness(true);
+  } catch (err) {
+    alert(`Failed to restore: ${err.message}`);
+  }
+}
+
+async function bulkRecalculateWellness() {
+  const selected = allWellnessEntries.filter((e) => selectedWellnessRows.has(e.row));
+  const eligible = selected.filter(eligibleForRecalc);
+  const skipped = selected.length - eligible.length;
+
+  if (eligible.length === 0) {
+    alert('None of the selected entries have ingredient text to recalculate — only Calories / Calories; Protein entries with Notes are eligible.');
+    return;
+  }
+
+  const btn = document.getElementById('wellness-bulk-recalc-btn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+
+  const snapshots = eligible.map((e) => ({
+    row: e.row, date: e.date, time: e.time, category: e.category,
+    description: e.description, amount: rawAmountString(e), unit: rawUnitString(e), notes: e.notes,
+  }));
+
+  let done = 0;
+  const succeededSnapshots = [];
+  const results = await Promise.allSettled(eligible.map(async (e, i) => {
+    try {
+      const { calories, protein, notes: standardizedNotes } = await estimateCaloriesAndProtein(e.notes);
+      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:G${e.row}`,
+        [[e.date, e.time, 'Calories; Protein', e.description, `${calories}; ${protein}`, 'kcal; g', standardizedNotes]]);
+      succeededSnapshots.push(snapshots[i]);
+    } finally {
+      done++;
+      btn.textContent = `Recalculating ${done}/${eligible.length}…`;
+    }
+  }));
+
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+
+  selectedWellnessRows.clear();
+  await refreshWellness(true);
+
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  const succeeded = succeededSnapshots.length;
+  const parts = [`${succeeded} entr${succeeded === 1 ? 'y' : 'ies'} recalculated`];
+  if (skipped) parts.push(`${skipped} skipped (no notes / not a Calories entry)`);
+  if (failed) parts.push(`${failed} failed`);
+
+  showUndoToast(`${parts.join(', ')}.`, () => restoreWellnessSnapshots(succeededSnapshots));
+}
+
+async function mergeSelectedWellnessEntries() {
+  const selected = allWellnessEntries.filter((e) => selectedWellnessRows.has(e.row)).sort((a, b) => a.row - b.row);
+  if (selected.length < 2) return;
+
+  const categories = new Set(selected.map((e) => e.category));
+  if (categories.size > 1) {
+    alert('Can only merge entries that share the same category.');
+    return;
+  }
+  const category = selected[0].category;
+  if (!mergeableCategory(category)) {
+    alert('Merge is only available for Calories / Calories; Protein entries.');
+    return;
+  }
+
+  const target = selected[0];
+  const others = selected.slice(1);
+  const hasProtein = category === 'Calories; Protein';
+
+  const totalCalories = selected.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const totalProtein = hasProtein ? selected.reduce((sum, e) => sum + (e.amount2 || 0), 0) : null;
+  const mergedAmount = hasProtein ? `${totalCalories}; ${totalProtein}` : String(totalCalories);
+  const mergedUnit = hasProtein ? 'kcal; g' : 'kcal';
+
+  const descriptions = [];
+  selected.forEach((e) => {
+    if (e.description && !descriptions.includes(e.description)) descriptions.push(e.description);
+  });
+  const mergedDescription = descriptions.join(', ');
+
+  const notesParts = [];
+  selected.forEach((e) => {
+    if (e.notes && !notesParts.includes(e.notes)) notesParts.push(e.notes);
+  });
+  const mergedNotes = notesParts.join('; ');
+
+  await confirmAndDelete(
+    `Merge ${selected.length} ${category} entries into one (${target.date})? Amounts will be summed` +
+    `${hasProtein ? ' (calories and protein separately)' : ''}, Notes and differing Descriptions combined, ` +
+    `and the other ${others.length} row(s) deleted. This cannot be undone.`,
+    async () => {
+      if (!wellnessSheetId) wellnessSheetId = await fetchWellnessSheetId();
+
+      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${target.row}:G${target.row}`,
+        [[target.date, target.time, category, mergedDescription, mergedAmount, mergedUnit, mergedNotes]]);
+
+      const deleteRequests = others
+        .map((e) => e.row)
+        .sort((a, b) => b - a)
+        .map((row) => ({
+          deleteDimension: {
+            range: { sheetId: wellnessSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
+          },
+        }));
+      await batchUpdate(deleteRequests);
+
+      selectedWellnessRows.clear();
+      await refreshWellness(true);
+    },
+    "Couldn't merge entries",
+  );
 }
 

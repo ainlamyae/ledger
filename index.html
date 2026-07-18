@@ -42,10 +42,10 @@
 <header>
     <h1><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></h1>
     <nav id="main-nav" class="nav" hidden>
-        <a href="#wellness">Health Tracker</a>
-        <a href="#timesheet">Time Tracker</a>
-        <a href="#transactions">Journal</a>
-        <a href="#accounts">Portfolio</a>
+        <a href="#health">Health</a>
+        <a href="#finances">Finances</a>
+        <a href="#time">Time</a>
+        <a href="#other">Other</a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
@@ -77,35 +77,34 @@
     <div class="landing">
         <div class="landing-hero">
             <h1>Your personal life dashboard</h1>
-            <p>Money, time, health, travel, and contacts — all in one dashboard, backed by your own Google Sheet with no third-party servers.</p>
-            <p class="hint">Use the 🔑 sign-in button in the top-right to get started.</p>
+            <p>Health, finances, time tracking, travel, applications, and contacts — all in one dashboard, backed by your own Google Sheet with no third-party servers.</p>
             <p id="auth-status" class="status" hidden></p>
         </div>
 
         <div class="landing-features">
             <div class="landing-feature">
-                <h3>At a Glance</h3>
-                <p>A live clock with a second time zone, today's date in three calendars, and the local weather — right above your numbers, no sign-in required.</p>
+                <h3>At a Glance &amp; Private by Design</h3>
+                <p>A live clock with a second time zone, today's date in three calendars, and the local weather — right above your numbers. Your data lives in your own private Google Sheet — never on a third-party server. Privacy mode masks all amounts on screen at a keystroke.</p>
             </div>
 
             <div class="landing-feature">
                 <h3>Health Tracker</h3>
-                <p>Track Body Weight, Caloric Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 7 days versus daily targets.</p>
+                <p>Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 14 days versus daily targets.</p>
             </div>
 
             <div class="landing-feature">
                 <h3>Weight Forecast</h3>
-                <p>A Weight Forecast chart projects your goal arrival date, with a Calibrate button that fits the formula to your own logged history instead of generic constants.</p>
+                <p>A Weight Forecast chart projects your goal arrival date, with a Calibrate button that fits the formula to your own logged history instead of generic constants — a personalized model calibrated from your own history of weight, calorie, activity, and sleep data.</p>
             </div>
 
             <div class="landing-feature">
-                <h3>AI Calorie Estimator</h3>
-                <p>Type what you ate in plain language and let AI do the math — ingredients are extracted automatically and calories are grounded against the USDA nutrition database for an accurate estimate.</p>
+                <h3>AI Calorie &amp; Protein Estimator</h3>
+                <p>Type what you ate in plain language and let AI do the math — ingredients are extracted automatically, and both calories and protein are grounded against the USDA nutrition database for an accurate estimate.</p>
             </div>
 
             <div class="landing-feature">
-                <h3>Time Tracker</h3>
-                <p>Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts.</p>
+                <h3>AI Health Insight</h3>
+                <p>Get a plain-language read on your recent habits: a 7/14/30-day snapshot compared against your own targets and trend, reviewed by AI in a closable report — nothing is sent until you ask, and nothing is saved.</p>
             </div>
 
             <div class="landing-feature">
@@ -129,6 +128,11 @@
             </div>
 
             <div class="landing-feature">
+                <h3>Time Tracker</h3>
+                <p>Log daily work hours, detect missed entries, and visualise arrival, departure, and hours-worked patterns with Work Analytics histogram charts.</p>
+            </div>
+
+            <div class="landing-feature">
                 <h3>Travel &amp; Applications</h3>
                 <p>Log every trip and see a Time Spent by Country breakdown plus a world map of visited countries. Track immigration/visa applications — grouped into Ongoing and Closed — from submission through every status update to final decision.</p>
             </div>
@@ -136,11 +140,6 @@
             <div class="landing-feature">
                 <h3>Contacts</h3>
                 <p>Keep a searchable Contact List with names, phones, emails, addresses, birthdays, and social links. Bulk-select rows to export CSVs for Google/Phone or Outlook, or merge duplicate entries into one.</p>
-            </div>
-
-            <div class="landing-feature">
-                <h3>Private by Design</h3>
-                <p>Your data lives in your own private Google Sheet — never on a third-party server. Privacy mode masks all amounts on screen at a keystroke.</p>
             </div>
         </div>
     </div>
@@ -223,30 +222,27 @@
         </div>
     </div>
 
-    <div class="cards">
-        <div class="card">
-            <h3>Net Worth</h3>
-            <div class="value" id="net-worth">—</div>
-        </div>
+    <section id="health" class="panel-group">
+        <h2 class="panel-group-title">Health</h2>
 
-        <div class="card">
-            <h3 id="income-label">Monthly Income</h3>
-            <div class="value income" id="income-value">—</div>
+        <div class="cards today-glance-cards">
+            <div class="card">
+                <h3>Calories Today</h3>
+                <div class="value" id="today-calories-value">—</div>
+            </div>
+            <div class="card">
+                <h3>Protein Today</h3>
+                <div class="value" id="today-protein-value">—</div>
+            </div>
+            <div class="card">
+                <h3>Activity Today</h3>
+                <div class="value" id="today-activity-value">—</div>
+            </div>
+            <div class="card">
+                <h3>Sleep Last Night</h3>
+                <div class="value" id="today-sleep-value">—</div>
+            </div>
         </div>
-
-        <div class="card">
-            <h3 id="expenses-label">Monthly Expenditure</h3>
-            <div class="value expense" id="expenses-value">—</div>
-        </div>
-
-        <div class="card">
-            <h3 id="cashflow-label">Monthly Cash Flow</h3>
-            <div class="value" id="savings-value">—</div>
-        </div>
-    </div>
-
-    <section id="wellness" class="panel-group">
-        <h2 class="panel-group-title">Health Tracker</h2>
 
         <div class="panel">
             <h2>Health Metrics</h2>
@@ -256,6 +252,13 @@
                     <h4>Caloric Intake</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-calories-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Protein Intake</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="wellness-protein-chart"></canvas>
                     </div>
                 </div>
 
@@ -277,12 +280,23 @@
             <div class="weight-projection-wrap">
                 <div class="weight-projection-header">
                     <h4>Weight Trend & Forecast</h4>
-                    <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
+                    <div class="weight-projection-actions">
+                        <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
+                        <button id="wellness-insight-btn" class="btn" title="Get an AI-generated read on your last 7 days">💡 Insight</button>
+                    </div>
                 </div>
                 <div class="chart-box">
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
-                <p id="weight-projection-eta" class="weight-eta"></p>
+                <div class="weight-progress-meter" id="weight-progress-meter" hidden>
+                    <div class="weight-progress-meter-track">
+                        <div class="weight-progress-meter-fill" id="weight-progress-meter-fill"></div>
+                    </div>
+                    <div class="weight-progress-meter-stats">
+                        <span id="weight-progress-meter-pct" class="weight-progress-meter-pct"></span>
+                        <span id="weight-projection-eta" class="weight-eta"></span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -299,8 +313,8 @@
                     <option value="">All Categories</option>
                     <option>Sleep</option>
                     <option>Weight</option>
-                    <option>Calories</option>
                     <option>Activity</option>
+                    <option>Calories; Protein</option>
                 </select>
             </div>
 
@@ -317,6 +331,7 @@
                 <table id="wellness-table">
                     <thead>
                     <tr>
+                        <th><input type="checkbox" id="wellness-select-all" aria-label="Select all entries on this page"></th>
                         <th class="sortable" data-sort="date">Date</th>
                         <th>Time</th>
                         <th>Category</th>
@@ -331,100 +346,42 @@
                 </table>
             </div>
 
+            <div class="panel-actions" id="wellness-bulk-actions" hidden>
+                <span id="wellness-bulk-summary"></span>
+                <button id="wellness-bulk-recalc-btn" class="btn" title="Recalculate Selected">🧮 Recalculate Selected</button>
+                <button id="wellness-bulk-merge-btn" class="btn" title="Merge Selected">🔗 Merge Selected</button>
+            </div>
+
             <div class="pagination" id="wellness-pagination"></div>
         </div>
     </section>
 
     <div style="height:.5rem"></div>
 
-    <section id="timesheet" class="panel-group">
-        <h2 class="panel-group-title">Time Tracker</h2>
+    <section id="finances" class="panel-group">
+        <h2 class="panel-group-title">Finances</h2>
 
-        <div id="timesheet-reminder-banner" class="info-banner" hidden>
-            <span>You haven't logged today's hours yet.</span>
-            <button id="timesheet-reminder-log-btn" class="btn">Log a Day</button>
-            <button id="timesheet-reminder-enable-btn" class="btn" hidden>🔔 Enable reminders</button>
+        <div class="cards">
+            <div class="card">
+                <h3>Net Worth</h3>
+                <div class="value" id="net-worth">—</div>
+            </div>
+
+            <div class="card">
+                <h3 id="income-label">Monthly Income</h3>
+                <div class="value income" id="income-value">—</div>
+            </div>
+
+            <div class="card">
+                <h3 id="expenses-label">Monthly Expenditure</h3>
+                <div class="value expense" id="expenses-value">—</div>
+            </div>
+
+            <div class="card">
+                <h3 id="cashflow-label">Monthly Cash Flow</h3>
+                <div class="value" id="savings-value">—</div>
+            </div>
         </div>
-
-        <div class="panel">
-            <h2>Work Analytics</h2>
-
-            <div class="donut-grid">
-                <div class="donut-item">
-                    <h4>Arrival Distribution</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-start-distribution-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Departure Distribution</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-end-distribution-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Hours Worked Distribution</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-duration-distribution-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Daily Hours Average</h4>
-                    <div class="chart-box">
-                        <canvas id="timesheet-daily-average-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <p id="timesheet-overtime-summary" class="timesheet-overtime-summary"></p>
-        </div>
-
-        <div class="panel">
-            <h2>Work Log</h2>
-
-            <div class="panel-actions">
-                <button id="log-today-btn" class="btn btn-primary">Log a Day</button>
-            </div>
-
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="timesheet-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="timesheet-date-to">
-                </label>
-            </div>
-
-            <div class="table-responsive">
-                <table id="timesheet-table">
-                    <thead>
-                    <tr>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th>Day</th>
-                        <th>Start</th>
-                        <th>End</th>
-                        <th>Break</th>
-                        <th>Duration</th>
-                        <th>Task</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-
-                    <tbody id="timesheet-body"></tbody>
-                </table>
-            </div>
-
-            <div class="pagination" id="ts-pagination"></div>
-        </div>
-    </section>
-
-    <div style="height:.5rem"></div>
-
-    <section id="transactions" class="panel-group">
-        <h2 class="panel-group-title">Journal</h2>
 
         <div class="panel">
         <h2>Spending by Category</h2>
@@ -592,12 +549,6 @@
 
             <div class="pagination" id="tx-pagination"></div>
         </div>
-    </section>
-
-    <div style="height:.5rem"></div>
-
-    <section id="accounts" class="panel-group">
-        <h2 class="panel-group-title">Portfolio</h2>
 
         <div class="panel">
             <h2>Portfolio Allocation</h2>
@@ -631,6 +582,92 @@
                     <tbody id="accounts-list-body"></tbody>
                 </table>
             </div>
+        </div>
+    </section>
+
+    <div style="height:.5rem"></div>
+
+    <section id="time" class="panel-group">
+        <h2 class="panel-group-title">Time</h2>
+
+        <div id="timesheet-reminder-banner" class="info-banner" hidden>
+            <span>You haven't logged today's hours yet.</span>
+            <button id="timesheet-reminder-log-btn" class="btn">Log a Day</button>
+            <button id="timesheet-reminder-enable-btn" class="btn" hidden>🔔 Enable reminders</button>
+        </div>
+
+        <div class="panel">
+            <h2>Work Analytics</h2>
+
+            <div class="donut-grid">
+                <div class="donut-item">
+                    <h4>Arrival Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-start-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Departure Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-end-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Hours Worked Distribution</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-duration-distribution-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Daily Hours Average</h4>
+                    <div class="chart-box">
+                        <canvas id="timesheet-daily-average-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <p id="timesheet-overtime-summary" class="timesheet-overtime-summary"></p>
+        </div>
+
+        <div class="panel">
+            <h2>Work Log</h2>
+
+            <div class="panel-actions">
+                <button id="log-today-btn" class="btn btn-primary">Log a Day</button>
+            </div>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="timesheet-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="timesheet-date-to">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="timesheet-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th>Day</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Break</th>
+                        <th>Duration</th>
+                        <th>Task</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+
+                    <tbody id="timesheet-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="ts-pagination"></div>
         </div>
     </section>
 
@@ -919,6 +956,8 @@
                     <option>CALORIE_TARGET_KCAL</option>
                     <option>SLEEP_TARGET_HOURS</option>
                     <option>ACTIVITY_TARGET_MIN</option>
+                    <option>PROTEIN_TARGET_G</option>
+                    <option>HEIGHT_CM</option>
                     <option>BIRTH_DATE</option>
                     <option>WIDGET_DEFAULT_CITY</option>
                     <option>WIDGET_SECOND_CLOCK_CITY</option>
@@ -928,6 +967,7 @@
                     <option>PROJ_CAL_KG_PER_KCAL_DAY</option>
                     <option>PROJ_ACTIVITY_KG_PER_MIN_DAY</option>
                     <option>PROJ_SLEEP_KG_PER_HOUR_DAY</option>
+                    <option>PROJ_PROTEIN_KG_PER_G_DAY</option>
                     <option>PROJ_CALIBRATED_AT</option>
                     <option>PROJ_CALIBRATION_R2</option>
                     <option>PROJ_CALIBRATION_SAMPLES</option>
@@ -964,6 +1004,31 @@
             <button type="button" id="calibration-cancel-btn" class="btn">Cancel</button>
             <button type="button" id="calibration-run-btn" class="btn">Run Calibration</button>
             <button type="button" id="calibration-save-btn" class="btn btn-primary" disabled>Save</button>
+        </div>
+    </div>
+</div>
+
+<div id="insight-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="insight-modal-title" hidden>
+    <div class="modal-card modal-card-wide">
+        <h2 id="insight-modal-title">💡 Health Insight</h2>
+        <p class="hint">A one-time AI read on your recent data — closing this doesn't save or change anything.</p>
+
+        <label class="insight-lookback-label">Look back
+            <select id="insight-lookback">
+                <option value="7">7 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+            </select>
+        </label>
+
+        <div id="insight-data-preview" class="insight-data-preview"></div>
+
+        <div id="insight-body"></div>
+        <p id="insight-status" class="status" hidden></p>
+
+        <div class="modal-actions">
+            <button type="button" id="insight-close-btn" class="btn">Close</button>
+            <button type="button" id="insight-generate-btn" class="btn btn-primary">🚀 Send to AI</button>
         </div>
     </div>
 </div>
@@ -1019,9 +1084,9 @@
                 <select id="wellness-category" required>
                     <option value="">— Select —</option>
                     <option>Weight</option>
-                    <option>Calories</option>
                     <option>Activity</option>
                     <option>Sleep</option>
+                    <option>Calories; Protein</option>
                 </select>
             </label>
             <label>Description
@@ -1241,6 +1306,7 @@
 <script src="assets/script/travel.js"></script>
 <script src="assets/script/applications.js"></script>
 <script src="assets/script/calibration.js"></script>
+<script src="assets/script/insight.js"></script>
 <script src="assets/script/app.js"></script>
 </body>
 </html>

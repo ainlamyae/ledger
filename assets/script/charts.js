@@ -1483,7 +1483,7 @@ function renderTodayGlanceCards(entries) {
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
-// and mask alike. `note` restates it in a second unit ("→ 394 kcal"), inside the same
+// and mask alike. `note` restates it in a second unit ("(394 kcal)"), inside the same
 // string rather than its own element, so the line reads at one size and masks as one.
 // `isHigh` gives Protein the same dark-green-past-the-band-top the chart uses; every
 // other tile leaves it false and gets the plain two-colour split.
@@ -1491,7 +1491,7 @@ function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, 
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'income-high', 'expense');
 
-  const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` → ${note}` : ''}`;
+  const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` (${note})` : ''}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
   if (value !== null) el.classList.add(isGood ? (isHigh ? 'income-high' : 'income') : 'expense');
 }

@@ -469,7 +469,7 @@ function syncPhysiquePatternMode() {
 function openPhysiqueForm(entry, duplicate = false) {
   editingPhysiqueRow = (entry && !duplicate) ? entry.row : null;
   document.getElementById('physique-modal-title').textContent =
-    duplicate ? 'Duplicate Day' : (entry ? 'Edit Day' : 'Log a Day');
+    duplicate ? 'Duplicate Physique' : (entry ? 'Edit Physique' : 'Log a Physique');
 
   PHYSIQUE_FIELDS.forEach(({ id, key }) => {
     const value = entry ? entry[key] : '';
@@ -980,7 +980,7 @@ function mergePhysiqueEntryIntoForm(saved) {
   refreshPhysiqueActivityBreakdown();
 
   editingPhysiqueRow = saved.row;
-  document.getElementById('physique-modal-title').textContent = 'Edit Day';
+  document.getElementById('physique-modal-title').textContent = 'Edit Physique';
   showFieldError('physique-form-error',
     `↩︎ ${saved.date} was already logged, so that day has been merged in above — nothing is saved yet. Check it over and press Save again to write it.`);
 }

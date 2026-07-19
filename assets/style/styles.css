@@ -667,7 +667,7 @@ kbd {
 .container {
     flex: 1;
     width: 100%;
-    max-width: 950px;
+    max-width: 1000px;
     margin: auto;
     padding: 2rem;
 }
@@ -1686,7 +1686,7 @@ td .btn {
     border-radius: var(--radius-lg);
     padding: 1.25rem;
     width: 100%;
-    max-width: 855px; /* 10% under .container's 950px */
+    max-width: 900px; /* 10% under .container's 1000px */
     max-height: calc(100vh - 4rem);
     overflow-y: auto;
 }

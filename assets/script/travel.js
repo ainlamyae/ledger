@@ -140,7 +140,7 @@ const TRAVEL_FIELD_IDS = ['country-city', 'port', 'type', 'via', 'date', 'time',
 function openTravelForm(travel) {
   editingTravelRow = travel ? travel.row : null;
 
-  document.getElementById('travel-modal-title').textContent = travel ? 'Edit Travel Entry' : 'Log a Travel';
+  document.getElementById('travel-modal-title').textContent = travel ? 'Edit Travel Entry' : 'Log a Travel Entry';
 
   const values = travel
     ? [travel.countryCity, travel.port, travel.type, travel.via, travel.date, travel.time, travel.reason, travel.detail]

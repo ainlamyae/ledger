@@ -59,13 +59,13 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
 - **Stacking order is explicit**: page chrome 0-1, sticky `header` 10, dropdowns hanging off it 20, landing tooltips 50, the floating dark-mode & privacy stack 90, **modals 100**, and toasts 110 so a countdown to undo something stays readable over an open form. The floating stack sits *below* a modal for the same reason the header does — on a phone it covered the bottom-left corner of an open form, and a toggle that's one Escape away isn't worth a field you can't reach. A modal with no `z-index` of its own lost to the header — both are positioned, so the header's 10 beat the modal's `auto` and painted over the top of a centred card, which is where `.modal-close` sits. Any long form (the card maxes at `100vh − 4rem`, so its top lands ~32px down while the header is taller than that) became uncloseable.
 - **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
-- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Account, Contact, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
+- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work Time, Travel, Application and Activity all read **Log**; Nutrition, Account, Contact, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
   - Driven by **Activity**, the one panel carrying three of them (**Add**, **Guide**, **Log**): "Activity Plan" + "Add Activity" + "Instruction" + "Log a Workout" could not share a phone's heading line, and `.panel-header` wraps rather than squeezing the heading, so the labels were what had to give.
   - Modal `<h2>`s keep the long form (*Log a Transaction*, *Add Ingredient*) — a heading has the width, and it's where you land after clicking.
   - Empty-state hints quote the new label (`click "Log" in the panel heading`), so no text in the app names a button that no longer exists.
   - The one exception is the timesheet **reminder banner**'s Log Time — a standalone CTA in a sentence, not a crowded heading.
 - **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Account**, *Contact List* → **Contact**, *Accounts* → **Account**, *Health Indicators* → **Health Indicator**, *Financial Indicators* → **Financial Indicator**. The sheet tabs now read the same way (`Transaction`, `Account`, `Nutrition`, `Activity`, `Statement`, `Breakdown`, …) — but that's a spreadsheet-side choice, not something the app depends on: **every tab name lives in `CONFIG.SHEETS` (`config.js`) and nowhere else**, so renaming a tab is one line there. Labels that have to agree with a tab name (the breakdown table's "from your own table" source) are read off the same object rather than spelled out again.
-- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
+- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work Time, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
 - **Panel groups** — Health, Finance, Other. Each is a page of its own at `/health/`, `/finance/` and `/other/`, and the nav links are those addresses rather than in-page anchors, so a group can be linked to, bookmarked and refreshed on its own (see [Section pages](#section-pages)). The logo is the way back to all three at once.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
@@ -120,11 +120,11 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Time Tracker
 
-- **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
+- **Log a Work Time** modal — Company, Start/End, Break, optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
   - Break is an `HH:mm` duration typed into a plain text input (`pattern="[0-9]{1,2}:[0-5][0-9]"`), not a clock time — a `type="time"` control (still used for Start/End) would force an AM/PM time-of-day picker onto it. `parseBreakMinutes` reads the typed value back into minutes for the live duration preview, and `minutesToTimeInput` normalizes it back to an `"H:MM"` string on save, since some Break columns carry pre-existing Excel-style duration formatting that reinterprets a raw integer as a day count.
 - Company autocompletes and defaults to the most recently logged one.
 - Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
-- One **Work** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
+- One **Work Time** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
   - Arrival, Departure and Hours Worked histograms with normal-curve overlays, plus Daily Hours Average by period.
   - **Overtime summary** — net time beyond an 8h/day pace, broken out Total/Year/Month/Week.
   - The table itself — date range, sortable, computed Duration, inline edit, paginated.
@@ -146,13 +146,17 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - **State Trend & Forecast is deliberately outside it**: that chart is the whole journey plus a projection, and clipping it to a month would be clipping the trend it exists to show.
   - `wellnessDateRange()` reads the two inputs straight from the DOM, falling back to the default when either is blank — so it can't matter whether a chart renders before or after the control is wired. `wellnessWindowDates()` turns that into the date list, clipped forward to the first day the metric in question has anything logged, so no chart opens on a run of empty days. An inverted range yields no days, which every caller already reads as "nothing to draw".
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward target; optional BMI twin axis.
-  - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (target body mass, or the projected arrival date).
+  - **A transparent amber zone around the trend line marks the glycogen + water swing** (`ΔM_gly`, the same figure the Formula Playground's glycogen block computes at its default knobs) — the day-to-day wobble glycogen and its bound water can account for on their own. The zone's own centre is an EMA of the trend, deliberately smoother/slower-moving than the trend line itself, so it reads as the stable thing on the chart: it only relocates once the trend strays further than the swing can explain, rather than chasing every minor fluctuation.
+  - **"Arrival" is judged past the target by that same swing**, in the direction travel is already headed (e.g. a 70 kg cutting target counts as reached once the trend passes 68.1 kg at a 1.9 kg swing) — so a bad-water-day reading can't land on the wrong side of the real target. This governs the projection's day count, ETA and "Target reached!" status; the progress bar's raw kg-to-go and the drawn target line still read the exact target.
+  - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (target body mass — shown with its `± swing` alongside it when the swing is known — or the projected arrival date).
   - Plateau alert when the smoothed trend has held flat.
   - The status line under the chart speaks only when there is **no** forecast to draw — target reached, no net change, trending away, or levelling off short of target. A forecast that renders says nothing, since the meters and the curve already do.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
+  - **A red day regrades to grey when the week isn't actually going the wrong way** — if that reading rose (or fell, for a bulk) against the target but the 7-day trend at that point still slopes the right direction, the single reading reads as noise rather than a miss.
 - **Calorie Balance** — intake minus BMR minus activity, scored against the *target* deficit; grams-of-fat twin axis.
   - The hover spells out the subtraction and **signs it**: `Actual Intake` as the figure it starts from, then `Maintenance` and `Activity` as negatives, so the column reads top-down as the arithmetic behind the bar. Activity printed as a positive read as something added to the day, which is the opposite of what burning it does. The intake row carries the same name Caloric Intake and Protein Intake use in their own hovers — one day's eating shouldn't be called three different things across one panel.
 - **Caloric Intake** — per-day bars with a per-day target drawn as a cap on each bar, not one shared line.
+  - **A red bar (past the target beyond the near-margin) regrades to grey when the 7-day average is still on the target's right side** — the same "one bad day, good week" read Body Mass gets, scored against the average instead of the trend.
 - **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
@@ -174,13 +178,14 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Weekly fat loss %** is the fifth radio and the odd one out — named for what it *holds*, not what it solves. `Δm%` is the typed input; the kilograms, `Eᵢₙ`, `t` and the arrival date are all computed from it, and `t` follows the proportional journey a fixed share implies. Same arithmetic as Calories otherwise, so the two share one branch: the only differences are where `Δm` came from and which journey `t` is measured along.
   - Picking it **ticks the fat-loss % pin**, since holding the percentage and pinning it are one decision — otherwise the plan you just built here would be saved as a fixed-kilogram one and the app would immediately stop doing what the modal showed. Not the reverse: the pin governs the saved plan and applies in every mode.
   - It's the only mode where a blank `Δm%` is a *missing input*, so it's named in the "Needs a number in" line; everywhere else the box is derived and its emptiness means nothing.
-- Edits are live and local until **Save** writes them back to `Setting`; `projectTargetDays` is shared with the Body Mass chart, so the two can never disagree about a date.
+- Edits are live and local until **Save** writes them back to `Setting`; `projectTargetDays` / `projectTargetDaysAtFixedPct` are shared with State Trend & Forecast (via `targetProjectionFromSettings`) — the chart returns that call's own `.days`/`.status`/`.equilibriumKg` rather than re-deriving the day count itself, and both read the smoothed `m̄` as the starting mass, so the two literally cannot disagree about a date for the same profile.
 - **Box order is the order the algebra runs**: the profile and the knobs (`m`, `m̄`, `h`, `a`, `σ`, `BMR`, `M`, `MET`, `τ`, `κ`, `Δm%`, `Δm`), the two population constants (`ρ`, `ε`), then `D` (readonly — the deficit `Δm` and `ρ` imply, sitting between the two figures it's made of and the intake it comes off), `f` and the answers it feeds — `Eᵢₙ`, `TEF`, then the journey block (`m_g` and `BMI_g`, the destination you choose, immediately above the `t` and arrival date that measure the trip to it), the adaptation block, and the lean-mass block last (`LBM`, the `p_min`/`p_max` rule, then the `P_min`/`P_max` grams it produces — the rule sits with the grams rather than up among the other editable knobs, so `p × LBM = P` reads as one derivation instead of a multiplication split across the modal).
   - Every row's height is paid two dozen times: the boxes keep the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) and give up their vertical padding and leading instead — `.15rem` and `line-height: 1.15`, about 9px a row off an already-tall modal. On a phone the date box is additionally stripped of `-webkit-appearance`, since a native date control ignores all of that and renders both wider than its grid column and visibly taller than the text boxes around it.
   - `BMR` and `M` (maintenance, `BMR + Eₐ`) are **readonly display rows**, not settings — they're the two figures every target is measured down from, placed with the profile because that's what they describe: the body, before any plan is applied to it.
+  - **`MET` defaults to the Activity catalogue's own Walk row** (`exerciseMet('Walk')`, `activities.js`) rather than the `ACTIVITY_MET` Setting — the number you'd otherwise re-type here already lives on the Activity tab (**Edit Activity → Walk → MET**), maintained in one place. It's still a plain, editable, settings-backed box: typing over it and Saving still writes `ACTIVITY_MET`, only the box's *opening* value changed.
 - **The scale is smoothed before anything reads it.** `m` is your latest weigh-in and is readonly — a measurement, not a knob. `m̄`, directly below it, is the **7-day rolling average** (`smoothedBodyMassKg`, the mean of every reading in the 7 days ending at the latest one, rounded to 0.1 kg), and it is what every identity on the sheet substitutes. Type what-ifs into `m̄`.
   - Water and glycogen move the scale by more than a week of fat loss does, and `m(t)` in the decay model means *clean* mass, so a single reading is the wrong input for a plan. The window ends at the latest **reading**, not at today, so a week away from the scale doesn't quietly empty it.
-  - `planBodyMassKg` is the app-wide accessor, and the same figure now drives the calorie tile (`getCalorieTargetKcal`), the ceiling-vs-floor decision (`getCalorieTargetKind`), Calorie Balance's target dash and the Health Plan prompt — so the modal and the app can't quote different targets. Deliberately **not** the per-day series (the Caloric Intake target line, Calorie Balance's per-day maintenance) or the Body Mass chart's bars and forecast start: those describe one specific day, where that day's own reading is the honest input.
+  - `planBodyMassKg` is the app-wide accessor, and the same figure now drives the calorie tile (`getCalorieTargetKcal`), the ceiling-vs-floor decision (`getCalorieTargetKind`), Calorie Balance's target dash, the Health Plan prompt, **and State Trend & Forecast's own target-method projection** (`calcProjection`, see below) — so the modal and the app can't quote different targets or different arrival dates for the same profile. Deliberately **not** the per-day series (the Caloric Intake target line, Calorie Balance's per-day maintenance) or the Body Mass chart's bars: those describe one specific day, where that day's own reading is the honest input.
 - **Resting metabolic rate is a choice of two equations**, and both are live — the radio pair above `where,` picks one and re-derives everything from it. `BMR_FORMULA` on the `Setting` tab; unset reads as Mifflin, which is what every existing sheet already runs on.
   - **Mifflin-St Jeor** (default) — `10m + 6.25h − 5a + σ`, the app's original.
   - **Katch-McArdle** — `370 + 21.6 × LBM`, from the Boer lean mass in the block below. Fat mass is nearly inert metabolically, so predicting from lean mass alone is the more accurate route *to the extent your LBM figure is* — with a real body-fat measurement it wins outright; here it's a second opinion built from the same three numbers. **Age drops out entirely**, so on this equation a blank birth date is no longer a missing input (`bmrNeedsAge`), and the Health Plan prompt says so rather than quoting an unused figure.
@@ -266,7 +271,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 ### Health — Physique
 
 - One row per day. Filterable/sortable table (search, date range), paginated; add/edit/delete/duplicate.
-- **Log a Day** sits in the panel heading — every panel's primary action does now (`.panel-header`), which also keeps it reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
+- **Log a Physique** sits in the panel heading — every panel's primary action does now (`.panel-header`), which also keeps it reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
 - **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout — all four of which are hidden fields, read instead off the Total row of the table under each of the two text areas.
 - Form layout: Date + Body Mass share a row, Bedtime + Wake-up Time the next. The pairs use `minmax(0, 1fr)` columns and the date/time inputs drop their native appearance — a bare `1fr` floors a track at its content's min-content width, and iOS Safari otherwise sizes a picker to its own content and ignores a smaller `width: 100%`, either of which leaves the plain text box beside it looking narrower.
 - **Saving onto a day already logged merges into it** rather than being refused: the first Save folds that row into the form, the second commits. Details under `Physique` below.
@@ -295,8 +300,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row a "Done" checkbox.
 - **All seven tables are one grid.** Six columns each — a NEAT row carries an empty Rest cell — with the five right-hand columns pinned to the same widths, so Muscle Group, Sets x Reps, Rest, Done and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~386px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
 - **Muscle Group** is its own column, between the exercise name and Sets x Reps/Amount — straight from the `Activity` sheet's own column, the same source the Instruction modal and the neglected-muscle Activity Insight already read.
-- **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover. The **Physique** and **Work** tables tint today's row the same green from the same declaration (`.workout-row-logged > td, .today-row > td`): in all three places it means "this is the row today's logging lands on", and two nearly-identical greens would read as a mistake.
-  - In Work it's applied outside the weekend/holiday/no-entry chain, since today can also be a weekend or a holiday. Today's tint is on the cells and theirs is on the row, so today's green paints over while their muted text colour survives.
+- **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover. The **Physique** and **Work Time** tables tint today's row the same green from the same declaration (`.workout-row-logged > td, .today-row > td`): in all three places it means "this is the row today's logging lands on", and two nearly-identical greens would read as a mistake.
+  - In Work Time it's applied outside the weekend/holiday/no-entry chain, since today can also be a weekend or a holiday. Today's tint is on the cells and theirs is on the row, so today's green paints over while their muted text colour survives.
 - **Log sends only what's newly ticked**, and extends today's entry instead of opening a second row.
   - The button reads "Log More" once something is already logged.
   - Free text already in the note is preserved; the description re-derives from everything in the session.
@@ -444,7 +449,7 @@ flowchart TD
     Idle --> CSVFlow["CSV Import (Transactions) /<br/>Export (Transactions, Contacts)"]
     CSVFlow --> CSVWork["Import: parse + appendValues rows<br/>Export: filter in-memory list →<br/>client-built CSV → browser download<br/>(no server round trip)"] --> Idle
 
-    Idle --> TSFlow["Time Tracker: 'Log a Day'"]
+    Idle --> TSFlow["Time Tracker: 'Log a Work Time'"]
     TSFlow --> TSWrite["backfillMissingDates() fills any<br/>gap, then appendValues/updateValues<br/>the logged day"]
     TSWrite --> TSReminder["checkTimesheetReminder() re-evaluates<br/>the banner, scoped to whichever<br/>company was last logged on/before today"]
     TSReminder --> Idle
@@ -508,7 +513,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 14 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
 | 15 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
 | 16 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
-| 17 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
+| 17 | `timesheet.js` | Work Time panel, holiday/missed detection, analytics data, reminder banner |
 | 18 | `csv.js` | CSV import, advanced filter engine, download helper |
 | 19 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
 | 20 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
@@ -752,6 +757,11 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `charts.js`, `activity-estimator.js` |
 | `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `charts.js` |
 | `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `charts.js` |
+| `GLYCOGEN_SKELETAL_FRAC_DEFAULT` | `45 %` of LBM is skeletal muscle | `charts.js` |
+| `GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT` | `14` g glycogen / kg muscle | `charts.js` |
+| `GLYCOGEN_LIVER_G_DEFAULT` | `100` g liver glycogen reserve | `charts.js` |
+| `GLYCOGEN_WATER_RATIO_DEFAULT` | `3` g H₂O bound per g glycogen | `charts.js` |
+| `GLYCOGEN_ZONE_SMOOTHING_ALPHA` | `1 / BODY_MASS_TREND_WINDOW_SIZE` (`0.2`) | `charts.js` |
 
 ### Scoring thresholds
 
@@ -762,6 +772,8 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* target stays green |
 | Protein over-band | — | Above the top end is a darker green (`#166534`), not red or grey. Below the floor stays red |
 | Calorie Balance vs. target | — | At/beyond target green, short but right side of zero grey, wrong side red |
+| Body Mass vs. its own 7-Day Trend | sign of the week's slope | A day scored red (moved the wrong way since the last reading) regrades to grey if that week's own least-squares trend (`weeklyTrendSeries`) still slopes toward the target. Stall-reds (a flat reading held too long) are untouched — a different signal |
+| Caloric Intake vs. its own 7-Day Average | `withinCalorieTarget` | A red bar (past the target beyond `CALORIE_TARGET_NEAR_FRACTION`) regrades to grey if the 7-day average is still on the target's right side |
 
 ### Body
 
@@ -851,20 +863,33 @@ sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
 
 ### State Trend & Forecast
 
+**Glycogen + water swing** (`ΔM_gly`) — computed first, since both the trend zone and the target-based forecast below read it:
+
+```
+m_musc = s × LBM(m̄, h, sex)                        s = GLYCOGEN_SKELETAL_FRAC_DEFAULT
+m_gly  = g_musc × m_musc + g_liver                  per-kg-muscle and liver constants above
+ΔM_gly = m_gly × (1 + r) / 1000                     r = GLYCOGEN_WATER_RATIO_DEFAULT, → kg
+```
+
+- `glycogenSwingKg` (`charts.js`) — the day-to-day swing glycogen and its bound water alone can account for, at this body. Same identity the Formula Playground's glycogen block walks through (`readGlycogenSwingFormula`), evaluated at its default knobs rather than whatever's currently typed there, so a reader who never opens that modal still gets the figure it would report for their own body. `null` without `HEIGHT_CM`/`SEX` on file, which the zone and the swing-adjusted arrival below both fall back around.
+- **Trend zone** — a transparent band drawn at `trend(t) ± ΔM_gly`, centred not on the trend line itself but on an EMA of it (`computeGlycogenZoneAnchor`, `α = GLYCOGEN_ZONE_SMOOTHING_ALPHA`) — deliberately smoother/slower-moving than the trend, so the zone reads as the stable reference and the trend as what moves inside it.
+- **Arrival target** — `arrivalTargetKg(target, m̄, h, sex, isDownward) = target ∓ ΔM_gly`, past the raw target by the swing **in the direction travel is already headed** (cutting subtracts, bulking adds) — so a reading on a high-water day still can't land on the wrong side of the real target. This is what `target` means everywhere below; the progress meter's raw kg-to-go bar and the drawn target line still use the unadjusted figure, shown alongside its `± ΔM_gly`.
+
 **Target-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the target being *followed*.
 
 ```
-Eᵢₙ    = BMR + Eₐ(target) − D                    calculated target at the latest reading
+Eᵢₙ    = BMR + Eₐ(target) − D                    calculated target at m̄
 A      = 6.25·cm − 5·age + (male ? +5 : −161)    mass-independent part of maintenance
 B      = 10 + MET·τ·κ/ε                          per-kg part, kcal/day/kg
 m∞     = (Eᵢₙ − A) / B                           where that intake IS maintenance
-m(t)   = m∞ + (m − m∞)·e^(−B·t/ρ)                every 7 days, capped at 365
-t      = (ρ / B) · ln[ (m − m∞) / (target − m∞) ]
+m(t)   = m∞ + (m̄ − m∞)·e^(−B·t/ρ)                every 7 days, capped at 365
+t      = (ρ / B) · ln[ (m̄ − m∞) / (target∓ΔM_gly − m∞) ]
 ```
 
 - `t` is the exact closed-form solution of `dm/dt = (Eᵢₙ − A − B·m) / ρ`, verified against numeric integration.
 - Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
-- `projectTargetDays` is shared with the Formula Playground, so the chart and the playground can't disagree.
+- **`m̄` (`planBodyMassKg`), not the last raw weigh-in** — the same smoothed mass the Formula Playground's own boxes run on, so the two start the curve from the same point.
+- `calcProjection` (`charts.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Formula Playground makes — rather than a second copy of this formula. The chart and the playground read one function, so they cannot print two different day counts for the same profile.
 - **With `WEEKLY_FAT_LOSS_PCT` pinned it's a different journey**, and `projectTargetDaysAtFixedPct` is the one that runs. A constant share of a falling mass is `dm/dt = −k·m`, `k = −ln(1 − p/100)/7` per day:
 
 ```
@@ -909,8 +934,9 @@ slope       = baseSlope × sleepRatio
 ```
 bar %       = clamp( (startBodyMass − lastBodyMass) / (startBodyMass − target) × 100, 0, 100 )
 done kg     = |startBodyMass − lastBodyMass|
-to-go kg    = |lastBodyMass − target|
-time bar %  = daysElapsed / (daysElapsed + daysToTarget) × 100
+to-go kg    = |lastBodyMass − target|                unadjusted target — the raw distance
+target text = target [± ΔM_gly]                      swing shown alongside, not folded into the kg above
+time bar %  = daysElapsed / (daysElapsed + daysToTarget) × 100     daysToTarget is t, so already swing-adjusted
 ```
 
 ### Fat energy — the Body Mass chart's second axis

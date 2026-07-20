@@ -3400,14 +3400,20 @@ function withExplicitSign(value) {
 
 let wellnessEnergyBalanceChart = null;
 
-// Against the target line, not just the sign: at or beyond it green, short of it but
-// still on the target's side of zero gray (real progress, only less than target), wrong
-// side of zero red. No target means no middle band, so it falls back to the sign.
-function energyBalanceColor(balance, isCut, target) {
+// Against the target line, not just the sign: at or beyond it on the day itself is a
+// darker green — a proper hit, not just a near-miss. Short of it falls back to the
+// week: a 7-day average that's still made the target reads as real progress despite
+// the one off day (green), but an average that's ALSO short means the day isn't an
+// outlier, it's the trend, so it reads red like the wrong-side-of-zero case. No target
+// means no band to compare against, so it falls back to the sign alone.
+function energyBalanceColor(balance, isCut, target, weeklyAvg) {
   const towardTarget = isCut ? balance < 0 : balance > 0;
   if (!towardTarget) return '#dc2626';
   if (target === null) return '#16a34a';
-  return (isCut ? balance <= target : balance >= target) ? '#16a34a' : '#9ca3af';
+  if (isCut ? balance <= target : balance >= target) return '#166534';
+  const weekOnTarget = weeklyAvg !== null && weeklyAvg !== undefined
+    && (isCut ? weeklyAvg <= target : weeklyAvg >= target);
+  return weekOnTarget ? '#16a34a' : '#dc2626';
 }
 
 // The daily deficit the weekly rate implies — the playground's D, from the same
@@ -3521,7 +3527,7 @@ function renderWellnessEnergyBalanceChart(entries) {
           type: 'bar',
           label: 'Calorie balance',
           data: balanceData,
-          backgroundColor: balanceData.map((v) => energyBalanceColor(v, isCut, target)),
+          backgroundColor: balanceData.map((v, i) => energyBalanceColor(v, isCut, target, weeklyAvg[i])),
           order: 2,
         },
         weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),

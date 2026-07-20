@@ -427,7 +427,6 @@ function updateTimesheetLiveDuration() {
 function openTimesheetForm(dateStr) {
   const existing = allTimeEntries.find((e) => e.date === dateStr);
 
-  document.getElementById('timesheet-modal-title').textContent = `Log Time — ${dateStr}`;
   document.getElementById('timesheet-company').value = existing?.company || getLastCompany(allTimeEntries) || '';
   document.getElementById('timesheet-date').value = dateStr;
   document.getElementById('timesheet-start').value = existing?.start || '';

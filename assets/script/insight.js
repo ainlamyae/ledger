@@ -48,6 +48,7 @@ function aggregateWindow(dates) {
   const caloriesByDate = new Map();
   const proteinByDate = new Map();
   const activityByDate = new Map();
+  const activityByDescriptionByDate = new Map();
   const sleepByDate = new Map();
 
   allWellnessEntries
@@ -60,12 +61,27 @@ function aggregateWindow(dates) {
         proteinByDate.set(e.date, (proteinByDate.get(e.date) || 0) + e.amount2);
       }
       if (e.category === 'Activity' && e.amount !== null) {
-        activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + toActivityMinutes(e.amount, e.unit));
+        const mins = toActivityMinutes(e.amount, e.unit);
+        activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + mins);
+
+        // Broken out per description (e.g. NEAT / Resistance / Cardio) as well
+        // as the combined total above, so formatInsightPrompt can report each
+        // activity type's own trend instead of just one merged number that
+        // hides whether e.g. Cardio dropped while Resistance held steady.
+        const description = e.description || 'Other';
+        if (!activityByDescriptionByDate.has(description)) activityByDescriptionByDate.set(description, new Map());
+        const byDate = activityByDescriptionByDate.get(description);
+        byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
       }
       if (e.category === 'Sleep' && e.amount !== null) {
         sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
       }
     });
+
+  const activityByDescription = {};
+  activityByDescriptionByDate.forEach((byDate, description) => {
+    activityByDescription[description] = { avgMins: Math.round(avg(byDate)), daysLogged: byDate.size };
+  });
 
   return {
     avgCalories: caloriesByDate.size ? Math.round(avg(caloriesByDate)) : null,
@@ -74,6 +90,7 @@ function aggregateWindow(dates) {
     proteinDaysLogged: proteinByDate.size,
     avgActivityMins: activityByDate.size ? Math.round(avg(activityByDate)) : null,
     activityDaysLogged: activityByDate.size,
+    activityByDescription,
     avgSleepHours: sleepByDate.size ? Math.round(avg(sleepByDate) * 10) / 10 : null,
     sleepDaysLogged: sleepByDate.size,
   };
@@ -122,6 +139,8 @@ function gatherInsightMetrics(lookbackDays) {
     prevAvgActivityMins: previous.avgActivityMins,
     activityTarget: getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT),
     activityDaysLogged: current.activityDaysLogged,
+    activityByDescription: current.activityByDescription,
+    prevActivityByDescription: previous.activityByDescription,
 
     avgSleepHours: current.avgSleepHours,
     prevAvgSleepHours: previous.avgSleepHours,
@@ -146,6 +165,23 @@ function formatTrajectoryLine(projection) {
   return `Weight trajectory: ${direction} ~${kgPerWeek} kg/week, estimated to reach the ${projection.weightGoal} kg goal around ${isoFromDate(projection.etaDate)} (~${projection.daysToGoal} days) — ${source}.`;
 }
 
+// One line per activity description (e.g. NEAT / Resistance / Cardio),
+// each with its own avg minutes/day, previous-period comparison, and
+// logging coverage — so the AI can reason about the mix of activity types,
+// not just their combined total (which the 'Avg activity total' line above
+// this still covers, since that's what the activity target is measured against).
+function formatActivityBreakdownLines(m) {
+  return Object.keys(m.activityByDescription)
+    .sort()
+    .map((description) => {
+      const cur = m.activityByDescription[description];
+      const prev = m.prevActivityByDescription[description];
+      const coverage = cur.daysLogged < m.lookbackDays ? ` [only ${cur.daysLogged}/${m.lookbackDays} days logged]` : '';
+      const trend = prev ? ` — previous ${m.lookbackDays} days: ${prev.avgMins} min/day` : ' — previous period: not logged';
+      return `Avg activity — ${description} (last ${m.lookbackDays} days): ${cur.avgMins} min/day${trend}${coverage}`;
+    });
+}
+
 function formatInsightPrompt(m) {
   const line = (label, value, unit, target, daysLogged, prevValue) => {
     if (value === null) return `${label} (last ${m.lookbackDays} days): not logged this period`;
@@ -161,7 +197,8 @@ function formatInsightPrompt(m) {
     m.bmi !== null ? `BMI: ${m.bmi}` : null,
     line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget, m.caloriesDaysLogged, m.prevAvgCalories),
     line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
-    line('Avg activity', m.avgActivityMins, ' min/day', m.activityTarget, m.activityDaysLogged, m.prevAvgActivityMins),
+    line('Avg activity total', m.avgActivityMins, ' min/day', m.activityTarget, m.activityDaysLogged, m.prevAvgActivityMins),
+    ...formatActivityBreakdownLines(m),
     line('Avg sleep', m.avgSleepHours, ' hr/day', m.sleepTarget, m.sleepDaysLogged, m.prevAvgSleepHours),
     formatTrajectoryLine(m.projection),
     m.energyDensityKcalPerKg !== null
@@ -174,7 +211,7 @@ function formatInsightPrompt(m) {
 
 const INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing someone's own self-tracked data. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given their age, height, BMI, current weight vs. goal, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal target and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a weight-trajectory line (their actual estimated rate of progress toward their goal, personalized if they've calibrated it, generic otherwise). Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero.
+You'll be given their age, height, BMI, current weight vs. goal, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal target and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a weight-trajectory line (their actual estimated rate of progress toward their goal, personalized if they've calibrated it, generic otherwise). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 

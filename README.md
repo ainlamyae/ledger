@@ -146,13 +146,17 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - **State Trend & Forecast is deliberately outside it**: that chart is the whole journey plus a projection, and clipping it to a month would be clipping the trend it exists to show.
   - `wellnessDateRange()` reads the two inputs straight from the DOM, falling back to the default when either is blank — so it can't matter whether a chart renders before or after the control is wired. `wellnessWindowDates()` turns that into the date list, clipped forward to the first day the metric in question has anything logged, so no chart opens on a run of empty days. An inverted range yields no days, which every caller already reads as "nothing to draw".
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward target; optional BMI twin axis.
-  - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (target body mass, or the projected arrival date).
+  - **A transparent amber zone around the trend line marks the glycogen + water swing** (`ΔM_gly`, the same figure the Formula Playground's glycogen block computes at its default knobs) — the day-to-day wobble glycogen and its bound water can account for on their own. The zone's own centre is an EMA of the trend, deliberately smoother/slower-moving than the trend line itself, so it reads as the stable thing on the chart: it only relocates once the trend strays further than the swing can explain, rather than chasing every minor fluctuation.
+  - **"Arrival" is judged past the target by that same swing**, in the direction travel is already headed (e.g. a 70 kg cutting target counts as reached once the trend passes 68.1 kg at a 1.9 kg swing) — so a bad-water-day reading can't land on the wrong side of the real target. This governs the projection's day count, ETA and "Target reached!" status; the progress bar's raw kg-to-go and the drawn target line still read the exact target.
+  - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (target body mass — shown with its `± swing` alongside it when the swing is known — or the projected arrival date).
   - Plateau alert when the smoothed trend has held flat.
   - The status line under the chart speaks only when there is **no** forecast to draw — target reached, no net change, trending away, or levelling off short of target. A forecast that renders says nothing, since the meters and the curve already do.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
+  - **A red day regrades to grey when the week isn't actually going the wrong way** — if that reading rose (or fell, for a bulk) against the target but the 7-day trend at that point still slopes the right direction, the single reading reads as noise rather than a miss.
 - **Calorie Balance** — intake minus BMR minus activity, scored against the *target* deficit; grams-of-fat twin axis.
   - The hover spells out the subtraction and **signs it**: `Actual Intake` as the figure it starts from, then `Maintenance` and `Activity` as negatives, so the column reads top-down as the arithmetic behind the bar. Activity printed as a positive read as something added to the day, which is the opposite of what burning it does. The intake row carries the same name Caloric Intake and Protein Intake use in their own hovers — one day's eating shouldn't be called three different things across one panel.
 - **Caloric Intake** — per-day bars with a per-day target drawn as a cap on each bar, not one shared line.
+  - **A red bar (past the target beyond the near-margin) regrades to grey when the 7-day average is still on the target's right side** — the same "one bad day, good week" read Body Mass gets, scored against the average instead of the trend.
 - **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
@@ -174,13 +178,14 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Weekly fat loss %** is the fifth radio and the odd one out — named for what it *holds*, not what it solves. `Δm%` is the typed input; the kilograms, `Eᵢₙ`, `t` and the arrival date are all computed from it, and `t` follows the proportional journey a fixed share implies. Same arithmetic as Calories otherwise, so the two share one branch: the only differences are where `Δm` came from and which journey `t` is measured along.
   - Picking it **ticks the fat-loss % pin**, since holding the percentage and pinning it are one decision — otherwise the plan you just built here would be saved as a fixed-kilogram one and the app would immediately stop doing what the modal showed. Not the reverse: the pin governs the saved plan and applies in every mode.
   - It's the only mode where a blank `Δm%` is a *missing input*, so it's named in the "Needs a number in" line; everywhere else the box is derived and its emptiness means nothing.
-- Edits are live and local until **Save** writes them back to `Setting`; `projectTargetDays` is shared with the Body Mass chart, so the two can never disagree about a date.
+- Edits are live and local until **Save** writes them back to `Setting`; `projectTargetDays` / `projectTargetDaysAtFixedPct` are shared with State Trend & Forecast (via `targetProjectionFromSettings`) — the chart returns that call's own `.days`/`.status`/`.equilibriumKg` rather than re-deriving the day count itself, and both read the smoothed `m̄` as the starting mass, so the two literally cannot disagree about a date for the same profile.
 - **Box order is the order the algebra runs**: the profile and the knobs (`m`, `m̄`, `h`, `a`, `σ`, `BMR`, `M`, `MET`, `τ`, `κ`, `Δm%`, `Δm`), the two population constants (`ρ`, `ε`), then `D` (readonly — the deficit `Δm` and `ρ` imply, sitting between the two figures it's made of and the intake it comes off), `f` and the answers it feeds — `Eᵢₙ`, `TEF`, then the journey block (`m_g` and `BMI_g`, the destination you choose, immediately above the `t` and arrival date that measure the trip to it), the adaptation block, and the lean-mass block last (`LBM`, the `p_min`/`p_max` rule, then the `P_min`/`P_max` grams it produces — the rule sits with the grams rather than up among the other editable knobs, so `p × LBM = P` reads as one derivation instead of a multiplication split across the modal).
   - Every row's height is paid two dozen times: the boxes keep the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) and give up their vertical padding and leading instead — `.15rem` and `line-height: 1.15`, about 9px a row off an already-tall modal. On a phone the date box is additionally stripped of `-webkit-appearance`, since a native date control ignores all of that and renders both wider than its grid column and visibly taller than the text boxes around it.
   - `BMR` and `M` (maintenance, `BMR + Eₐ`) are **readonly display rows**, not settings — they're the two figures every target is measured down from, placed with the profile because that's what they describe: the body, before any plan is applied to it.
+  - **`MET` defaults to the Activity catalogue's own Walk row** (`exerciseMet('Walk')`, `activities.js`) rather than the `ACTIVITY_MET` Setting — the number you'd otherwise re-type here already lives on the Activity tab (**Edit Activity → Walk → MET**), maintained in one place. It's still a plain, editable, settings-backed box: typing over it and Saving still writes `ACTIVITY_MET`, only the box's *opening* value changed.
 - **The scale is smoothed before anything reads it.** `m` is your latest weigh-in and is readonly — a measurement, not a knob. `m̄`, directly below it, is the **7-day rolling average** (`smoothedBodyMassKg`, the mean of every reading in the 7 days ending at the latest one, rounded to 0.1 kg), and it is what every identity on the sheet substitutes. Type what-ifs into `m̄`.
   - Water and glycogen move the scale by more than a week of fat loss does, and `m(t)` in the decay model means *clean* mass, so a single reading is the wrong input for a plan. The window ends at the latest **reading**, not at today, so a week away from the scale doesn't quietly empty it.
-  - `planBodyMassKg` is the app-wide accessor, and the same figure now drives the calorie tile (`getCalorieTargetKcal`), the ceiling-vs-floor decision (`getCalorieTargetKind`), Calorie Balance's target dash and the Health Plan prompt — so the modal and the app can't quote different targets. Deliberately **not** the per-day series (the Caloric Intake target line, Calorie Balance's per-day maintenance) or the Body Mass chart's bars and forecast start: those describe one specific day, where that day's own reading is the honest input.
+  - `planBodyMassKg` is the app-wide accessor, and the same figure now drives the calorie tile (`getCalorieTargetKcal`), the ceiling-vs-floor decision (`getCalorieTargetKind`), Calorie Balance's target dash, the Health Plan prompt, **and State Trend & Forecast's own target-method projection** (`calcProjection`, see below) — so the modal and the app can't quote different targets or different arrival dates for the same profile. Deliberately **not** the per-day series (the Caloric Intake target line, Calorie Balance's per-day maintenance) or the Body Mass chart's bars: those describe one specific day, where that day's own reading is the honest input.
 - **Resting metabolic rate is a choice of two equations**, and both are live — the radio pair above `where,` picks one and re-derives everything from it. `BMR_FORMULA` on the `Setting` tab; unset reads as Mifflin, which is what every existing sheet already runs on.
   - **Mifflin-St Jeor** (default) — `10m + 6.25h − 5a + σ`, the app's original.
   - **Katch-McArdle** — `370 + 21.6 × LBM`, from the Boer lean mass in the block below. Fat mass is nearly inert metabolically, so predicting from lean mass alone is the more accurate route *to the extent your LBM figure is* — with a real body-fat measurement it wins outright; here it's a second opinion built from the same three numbers. **Age drops out entirely**, so on this equation a blank birth date is no longer a missing input (`bmrNeedsAge`), and the Health Plan prompt says so rather than quoting an unused figure.
@@ -752,6 +757,11 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `charts.js`, `activity-estimator.js` |
 | `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `charts.js` |
 | `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `charts.js` |
+| `GLYCOGEN_SKELETAL_FRAC_DEFAULT` | `45 %` of LBM is skeletal muscle | `charts.js` |
+| `GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT` | `14` g glycogen / kg muscle | `charts.js` |
+| `GLYCOGEN_LIVER_G_DEFAULT` | `100` g liver glycogen reserve | `charts.js` |
+| `GLYCOGEN_WATER_RATIO_DEFAULT` | `3` g H₂O bound per g glycogen | `charts.js` |
+| `GLYCOGEN_ZONE_SMOOTHING_ALPHA` | `1 / BODY_MASS_TREND_WINDOW_SIZE` (`0.2`) | `charts.js` |
 
 ### Scoring thresholds
 
@@ -762,6 +772,8 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* target stays green |
 | Protein over-band | — | Above the top end is a darker green (`#166534`), not red or grey. Below the floor stays red |
 | Calorie Balance vs. target | — | At/beyond target green, short but right side of zero grey, wrong side red |
+| Body Mass vs. its own 7-Day Trend | sign of the week's slope | A day scored red (moved the wrong way since the last reading) regrades to grey if that week's own least-squares trend (`weeklyTrendSeries`) still slopes toward the target. Stall-reds (a flat reading held too long) are untouched — a different signal |
+| Caloric Intake vs. its own 7-Day Average | `withinCalorieTarget` | A red bar (past the target beyond `CALORIE_TARGET_NEAR_FRACTION`) regrades to grey if the 7-day average is still on the target's right side |
 
 ### Body
 
@@ -851,20 +863,33 @@ sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
 
 ### State Trend & Forecast
 
+**Glycogen + water swing** (`ΔM_gly`) — computed first, since both the trend zone and the target-based forecast below read it:
+
+```
+m_musc = s × LBM(m̄, h, sex)                        s = GLYCOGEN_SKELETAL_FRAC_DEFAULT
+m_gly  = g_musc × m_musc + g_liver                  per-kg-muscle and liver constants above
+ΔM_gly = m_gly × (1 + r) / 1000                     r = GLYCOGEN_WATER_RATIO_DEFAULT, → kg
+```
+
+- `glycogenSwingKg` (`charts.js`) — the day-to-day swing glycogen and its bound water alone can account for, at this body. Same identity the Formula Playground's glycogen block walks through (`readGlycogenSwingFormula`), evaluated at its default knobs rather than whatever's currently typed there, so a reader who never opens that modal still gets the figure it would report for their own body. `null` without `HEIGHT_CM`/`SEX` on file, which the zone and the swing-adjusted arrival below both fall back around.
+- **Trend zone** — a transparent band drawn at `trend(t) ± ΔM_gly`, centred not on the trend line itself but on an EMA of it (`computeGlycogenZoneAnchor`, `α = GLYCOGEN_ZONE_SMOOTHING_ALPHA`) — deliberately smoother/slower-moving than the trend, so the zone reads as the stable reference and the trend as what moves inside it.
+- **Arrival target** — `arrivalTargetKg(target, m̄, h, sex, isDownward) = target ∓ ΔM_gly`, past the raw target by the swing **in the direction travel is already headed** (cutting subtracts, bulking adds) — so a reading on a high-water day still can't land on the wrong side of the real target. This is what `target` means everywhere below; the progress meter's raw kg-to-go bar and the drawn target line still use the unadjusted figure, shown alongside its `± ΔM_gly`.
+
 **Target-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the target being *followed*.
 
 ```
-Eᵢₙ    = BMR + Eₐ(target) − D                    calculated target at the latest reading
+Eᵢₙ    = BMR + Eₐ(target) − D                    calculated target at m̄
 A      = 6.25·cm − 5·age + (male ? +5 : −161)    mass-independent part of maintenance
 B      = 10 + MET·τ·κ/ε                          per-kg part, kcal/day/kg
 m∞     = (Eᵢₙ − A) / B                           where that intake IS maintenance
-m(t)   = m∞ + (m − m∞)·e^(−B·t/ρ)                every 7 days, capped at 365
-t      = (ρ / B) · ln[ (m − m∞) / (target − m∞) ]
+m(t)   = m∞ + (m̄ − m∞)·e^(−B·t/ρ)                every 7 days, capped at 365
+t      = (ρ / B) · ln[ (m̄ − m∞) / (target∓ΔM_gly − m∞) ]
 ```
 
 - `t` is the exact closed-form solution of `dm/dt = (Eᵢₙ − A − B·m) / ρ`, verified against numeric integration.
 - Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
-- `projectTargetDays` is shared with the Formula Playground, so the chart and the playground can't disagree.
+- **`m̄` (`planBodyMassKg`), not the last raw weigh-in** — the same smoothed mass the Formula Playground's own boxes run on, so the two start the curve from the same point.
+- `calcProjection` (`charts.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Formula Playground makes — rather than a second copy of this formula. The chart and the playground read one function, so they cannot print two different day counts for the same profile.
 - **With `WEEKLY_FAT_LOSS_PCT` pinned it's a different journey**, and `projectTargetDaysAtFixedPct` is the one that runs. A constant share of a falling mass is `dm/dt = −k·m`, `k = −ln(1 − p/100)/7` per day:
 
 ```
@@ -909,8 +934,9 @@ slope       = baseSlope × sleepRatio
 ```
 bar %       = clamp( (startBodyMass − lastBodyMass) / (startBodyMass − target) × 100, 0, 100 )
 done kg     = |startBodyMass − lastBodyMass|
-to-go kg    = |lastBodyMass − target|
-time bar %  = daysElapsed / (daysElapsed + daysToTarget) × 100
+to-go kg    = |lastBodyMass − target|                unadjusted target — the raw distance
+target text = target [± ΔM_gly]                      swing shown alongside, not folded into the kg above
+time bar %  = daysElapsed / (daysElapsed + daysToTarget) × 100     daysToTarget is t, so already swing-adjusted
 ```
 
 ### Fat energy — the Body Mass chart's second axis

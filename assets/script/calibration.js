@@ -252,9 +252,9 @@ function validateCalibration(fit, samples) {
 }
 
 function runCalibration() {
-  const calorieTarget = getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+  const calorieTarget = getCalorieTargetKcal(allWellnessEntries);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
-  const proteinTarget = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  const proteinTarget = getProteinTargetG(allWellnessEntries);
 
   const summary = document.getElementById('calibration-summary');
   const saveBtn = document.getElementById('calibration-save-btn');

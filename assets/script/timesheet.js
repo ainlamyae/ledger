@@ -1,4 +1,4 @@
-const TIMESHEET_RANGE = `${CONFIG.SHEETS.TIMESHEET}!A2:G`;
+const TIMESHEET_RANGE = `${CONFIG.SHEETS.TIMESHEET}!A2:H`;
 const TS_PAGE_SIZE = 28;
 
 let allTimeEntries = [];
@@ -166,12 +166,12 @@ function setDefaultTimesheetDateRange() {
   toInput.value = isoFromDate(toDate);
 }
 
-// Start/End/Break/Date are read and written as plain text/numbers the app
-// fully owns (e.g. "09:00", not an Excel time-of-day cell), the same way
-// Transactions' Date column is a plain ISO string. Day (B) and Duration (F)
-// are never read or written — Duration is always computed client-side from
-// Start/End/Break, and Day only matters when appending a brand-new row that
-// has no formula to backfill it.
+// Company/Start/End/Break/Date are read and written as plain text/numbers
+// the app fully owns (e.g. "09:00", not an Excel time-of-day cell), the same
+// way Transactions' Date column is a plain ISO string. Day (C) and Duration
+// (G) are never read or written — Duration is always computed client-side
+// from Start/End/Break, and Day only matters when appending a brand-new row
+// that has no formula to backfill it.
 async function refreshTimeSheet(forceRefresh = false) {
   let values = forceRefresh ? null : getCached('timesheet');
 
@@ -184,20 +184,58 @@ async function refreshTimeSheet(forceRefresh = false) {
   allTimeEntries = values
     .map((row, i) => ({
       row: i + 2,
-      date: row[0] || '',
-      start: row[2] || '',
-      end: row[3] || '',
-      breakMinutes: parseBreakMinutes(row[4]),
-      task: row[6] || '',
+      company: row[0] || '',
+      date: row[1] || '',
+      start: row[3] || '',
+      end: row[4] || '',
+      breakMinutes: parseBreakMinutes(row[5]),
+      task: row[7] || '',
     }))
     .filter((e) => e.date);
 
   setDefaultTimesheetDateRange();
+  populateTimesheetCompanyOptions();
   renderTimesheetList();
   renderTimesheetDistributionCharts(allTimeEntries);
   renderTimesheetDailyAverageChart(allTimeEntries);
-  renderTimesheetOvertimeSummary(allTimeEntries);
+  renderTimesheetOvertimeSummary(entriesForLastCompany(allTimeEntries));
   checkTimesheetReminder();
+}
+
+// The 8h/day overtime pace and the "log today" reminder should reflect only
+// your current employer — entries from a company you've since left would
+// otherwise skew both. "Last company" is whichever company appears on the
+// most recently dated entry that has one; if no entry has a company yet
+// (e.g. existing data written before this column existed), nothing is
+// filtered out.
+function getLastCompany(entries) {
+  const withCompany = entries.filter((e) => e.company).sort((a, b) => b.date.localeCompare(a.date));
+  return withCompany.length ? withCompany[0].company : null;
+}
+
+function entriesForLastCompany(entries) {
+  const lastCompany = getLastCompany(entries);
+  return lastCompany ? entries.filter((e) => e.company === lastCompany) : entries;
+}
+
+// Fills the Company datalist with previously used values, most frequent
+// first, the same convention as Transactions' Payee/Description datalists.
+function populateTimesheetCompanyOptions() {
+  const counts = new Map();
+  allTimeEntries.forEach(({ company }) => {
+    if (!company) return;
+    counts.set(company, (counts.get(company) || 0) + 1);
+  });
+
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value]) => value);
+
+  const datalist = document.getElementById('timesheet-company-options');
+  datalist.innerHTML = '';
+  sorted.forEach((value) => {
+    const option = document.createElement('option');
+    option.value = value;
+    datalist.appendChild(option);
+  });
 }
 
 // A weekday with neither a logged entry nor a holiday/day-off note for
@@ -209,7 +247,7 @@ function checkTimesheetReminder() {
   const banner = document.getElementById('timesheet-reminder-banner');
   const today = isoFromDate(new Date());
 
-  if (isWeekend(today) || allTimeEntries.some((e) => e.date === today)) {
+  if (isWeekend(today) || entriesForLastCompany(allTimeEntries).some((e) => e.date === today)) {
     banner.hidden = true;
     return;
   }
@@ -254,12 +292,15 @@ function renderTimesheetList() {
     const message = allTimeEntries.length === 0
       ? 'No time logged yet — click "Log a Day" above.'
       : 'No entries match this date range.';
-    tbody.appendChild(renderEmptyRow(8, message));
+    tbody.appendChild(renderEmptyRow(9, message));
   }
 
   pageEntries.forEach((e) => {
     const tr = document.createElement('tr');
     const weekend = isWeekend(e.date);
+
+    const companyCell = document.createElement('td');
+    companyCell.textContent = e.company;
 
     const dateCell = document.createElement('td');
     dateCell.textContent = e.date;
@@ -300,7 +341,7 @@ function renderTimesheetList() {
     const actionsCell = document.createElement('td');
     actionsCell.appendChild(makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTimesheetForm(e.date) }));
 
-    tr.append(dateCell, dayCell, startCell, endCell, breakCell, durationCell, taskCell, actionsCell);
+    tr.append(companyCell, dateCell, dayCell, startCell, endCell, breakCell, durationCell, taskCell, actionsCell);
     if (weekend) tr.classList.add('timesheet-weekend');
     else if (isHoliday) tr.classList.add('timesheet-holiday');
     else if (isNoEntry) tr.classList.add('timesheet-no-entry');
@@ -348,6 +389,7 @@ function openTimesheetForm(dateStr) {
   const existing = allTimeEntries.find((e) => e.date === dateStr);
 
   document.getElementById('timesheet-modal-title').textContent = `Log Time — ${dateStr}`;
+  document.getElementById('timesheet-company').value = existing?.company || getLastCompany(allTimeEntries) || '';
   document.getElementById('timesheet-date').value = dateStr;
   document.getElementById('timesheet-start').value = existing?.start || '';
   document.getElementById('timesheet-end').value = existing?.end || '';
@@ -384,7 +426,7 @@ async function backfillMissingDates(targetDate) {
   const rows = [];
   while (cursor < target) {
     const iso = isoFromDate(cursor);
-    if (!existingDates.has(iso)) rows.push([iso, dayNameFromDate(iso), '', '', '', '', '']);
+    if (!existingDates.has(iso)) rows.push(['', iso, dayNameFromDate(iso), '', '', '', '', '']);
     cursor.setDate(cursor.getDate() + 1);
   }
 
@@ -394,6 +436,7 @@ async function backfillMissingDates(targetDate) {
 async function submitTimesheetForm(event) {
   event.preventDefault();
 
+  const company = document.getElementById('timesheet-company').value;
   const date = document.getElementById('timesheet-date').value;
   const holiday = document.getElementById('timesheet-holiday').checked;
   const start = holiday ? '' : document.getElementById('timesheet-start').value;
@@ -415,13 +458,14 @@ async function submitTimesheetForm(event) {
     const existing = allTimeEntries.find((e) => e.date === date);
 
     if (existing) {
-      // Two calls so Duration (F), sitting between Break (E) and Task (G),
-      // is never touched.
-      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!C${existing.row}:E${existing.row}`, [[start, end, breakValue]]);
-      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!G${existing.row}`, [[task]]);
+      // Three calls so Day (C) and Duration (G), which this app never
+      // writes, are never touched.
+      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!A${existing.row}`, [[company]]);
+      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!D${existing.row}:F${existing.row}`, [[start, end, breakValue]]);
+      await updateValues(`${CONFIG.SHEETS.TIMESHEET}!H${existing.row}`, [[task]]);
     } else {
       await backfillMissingDates(date);
-      await appendValues(TIMESHEET_RANGE, [[date, dayNameFromDate(date), start, end, breakValue, '', task]]);
+      await appendValues(TIMESHEET_RANGE, [[company, date, dayNameFromDate(date), start, end, breakValue, '', task]]);
     }
 
     await refreshTimeSheet(true);

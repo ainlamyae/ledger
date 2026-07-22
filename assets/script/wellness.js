@@ -65,6 +65,10 @@ async function initWellness(forceRefresh = false) {
     document.getElementById('wellness-form').addEventListener('submit', submitWellnessForm);
     document.getElementById('wellness-category').addEventListener('change', onCategoryChange);
     document.getElementById('wellness-calc-btn').addEventListener('click', calculateWellnessCalories);
+    // A real edit (not Calculate's own auto-fill, which sets .value
+    // directly and doesn't fire 'input') means the shown breakdown no
+    // longer reflects what's in the field.
+    document.getElementById('wellness-notes').addEventListener('input', hideCalcBreakdown);
 
     document.getElementById('wellness-search').addEventListener('input', () => {
       wCurrentPage = 1;
@@ -342,11 +346,13 @@ function openWellnessForm(entry, duplicate = false) {
     : document.getElementById('wellness-unit').value;
 
   clearFieldError('wellness-form-error');
+  hideCalcBreakdown();
   document.getElementById('wellness-modal').hidden = false;
 }
 
 function closeWellnessForm() {
   document.getElementById('wellness-modal').hidden = true;
+  hideCalcBreakdown();
 }
 
 function onCategoryChange() {

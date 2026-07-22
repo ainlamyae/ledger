@@ -341,7 +341,11 @@ header .btn:hover {
 }
 
 .landing {
-    max-width: 900px;
+    /* Wide enough that the largest group (Health, 6 cards) can lay out in
+       one row at the grid's existing 200px column floor (6 × 200px + 5 ×
+       1rem gaps ≈ 1360px) instead of always wrapping to ~4 per row the way
+       the previous 900px cap forced regardless of viewport width. */
+    max-width: 1400px;
     width: 100%;
     text-align: center;
 }
@@ -360,10 +364,23 @@ header .btn:hover {
 }
 
 .landing-features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
     margin-top: 2.5rem;
+}
+
+/* One flex row per group (intro card, then each Health/Finances/Time/Other
+   group) instead of one shared CSS grid — a grid places items left-to-right
+   into shared column tracks, so a short group (Time has 1 card, Other has 2)
+   would occupy only the first track(s) and leave visible empty space on the
+   right. Flex + wrap + centered justification centers every row's cards as
+   a group instead, including a wrapped group's own last (possibly partial)
+   line. */
+.landing-features-group-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
 }
 
 .landing-feature {
@@ -374,6 +391,8 @@ header .btn:hover {
     box-shadow: var(--shadow-card);
     border-left: 3px solid var(--color-border);
     transition: var(--transition-colors), transform .2s ease, box-shadow .2s ease;
+    flex: 1 1 200px;
+    max-width: 320px;
 }
 
 .landing-feature:hover {
@@ -385,6 +404,24 @@ header .btn:hover {
 .landing-feature-finances { border-left-color: var(--color-income); }
 .landing-feature-time     { border-left-color: var(--color-time); }
 .landing-feature-other    { border-left-color: var(--color-other); }
+
+/* Section labels grouping the landing feature cards below by the same
+   Health/Finances/Time/Other split the dashboard itself uses — its
+   underline color echoes the border-left color its group's cards use, so
+   the label reads as that group's header at a glance. */
+.landing-features-group {
+    margin: 1.5rem 0 .75rem;
+    padding-bottom: .35rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-heading);
+    border-bottom: 2px solid var(--color-border);
+}
+
+.landing-features-group-health   { border-bottom-color: var(--color-primary); }
+.landing-features-group-finances { border-bottom-color: var(--color-income); }
+.landing-features-group-time     { border-bottom-color: var(--color-time); }
+.landing-features-group-other    { border-bottom-color: var(--color-other); }
 
 .landing-feature h3 {
     margin-bottom: .5rem;
@@ -899,6 +936,14 @@ td {
     border-top: 2px solid var(--color-text-muted);
 }
 
+/* The 🧮 Calculate breakdown's summed last row (assets/script/calorie-estimator.js's
+   renderCalcBreakdown) — bold and a top border set it apart from the
+   per-item rows above it. */
+#wellness-calc-breakdown tr.calc-breakdown-total td {
+    font-weight: 600;
+    border-top: 2px solid var(--color-text-muted);
+}
+
 #transactions-table th:first-child,
 #transactions-table td:first-child,
 #transactions-table th:nth-child(2),
@@ -1278,7 +1323,7 @@ td .btn {
     border-radius: var(--radius-lg);
     padding: 1.25rem;
     width: 100%;
-    max-width: 420px;
+    max-width: 504px; /* 420px + 20% */
     max-height: calc(100vh - 4rem);
     overflow-y: auto;
 }
@@ -1685,11 +1730,9 @@ td .btn {
         font-size: 1.5rem;
     }
 
-    .landing-features {
-        grid-template-columns: 1fr;
-    }
-
     .landing-feature {
+        flex-basis: 100%;
+        max-width: none;
         padding: 1rem;
     }
 

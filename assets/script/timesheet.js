@@ -184,7 +184,7 @@ async function refreshTimeSheet(forceRefresh = false) {
   allTimeEntries = values
     .map((row, i) => ({
       row: i + 2,
-      company: row[0] || '',
+      company: (row[0] || '').trim(),
       date: row[1] || '',
       start: row[3] || '',
       end: row[4] || '',
@@ -205,11 +205,15 @@ async function refreshTimeSheet(forceRefresh = false) {
 // The 8h/day overtime pace and the "log today" reminder should reflect only
 // your current employer — entries from a company you've since left would
 // otherwise skew both. "Last company" is whichever company appears on the
-// most recently dated entry that has one; if no entry has a company yet
-// (e.g. existing data written before this column existed), nothing is
-// filtered out.
+// most recently dated entry, on or before today, that has one; if no entry
+// has a company yet (e.g. existing data written before this column existed),
+// nothing is filtered out. Future-dated rows are excluded even if they carry
+// a company — a day that hasn't happened yet (e.g. a pre-filled placeholder
+// row for the rest of the year) hasn't actually been "logged" and shouldn't
+// be able to define your current employer.
 function getLastCompany(entries) {
-  const withCompany = entries.filter((e) => e.company).sort((a, b) => b.date.localeCompare(a.date));
+  const today = isoFromDate(new Date());
+  const withCompany = entries.filter((e) => e.company && e.date <= today).sort((a, b) => b.date.localeCompare(a.date));
   return withCompany.length ? withCompany[0].company : null;
 }
 
@@ -438,7 +442,7 @@ async function backfillMissingDates(targetDate) {
 async function submitTimesheetForm(event) {
   event.preventDefault();
 
-  const company = document.getElementById('timesheet-company').value;
+  const company = document.getElementById('timesheet-company').value.trim();
   const date = document.getElementById('timesheet-date').value;
   const holiday = document.getElementById('timesheet-holiday').checked;
   const start = holiday ? '' : document.getElementById('timesheet-start').value;

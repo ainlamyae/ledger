@@ -49,12 +49,24 @@ function splitNotesIntoSegments(notes) {
 // here, "100g egg white" would strip only "100" and leave "g egg white" as
 // the name — a real bug that banked a bogus "g egg white" row alongside an
 // existing "egg white" one instead of matching it.
-const INGREDIENT_UNIT_WORDS = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays';
+const INGREDIENT_UNIT_WORDS = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays|shot|shots';
 const INGREDIENT_QUANTITY_PATTERN = new RegExp(
-  `^\\s*[\\d.]+(?:\\s*[-/]\\s*[\\d.]+)?\\s*(?:${INGREDIENT_UNIT_WORDS})?\\b\\.?\\s*`, 'i'
+  `^\\s*([\\d.]+)(?:\\s*[-/]\\s*[\\d.]+)?\\s*(${INGREDIENT_UNIT_WORDS})?\\b\\.?\\s*`, 'i'
 );
 function extractIngredientName(segment) {
   return segment.replace(INGREDIENT_QUANTITY_PATTERN, '').trim();
+}
+
+// A fixed real-world weight for a unit the AI otherwise has to guess at
+// (a "shot" gives no hint of its own) — 30g/ml is the standard single-shot
+// pour, so it's used to compute grams directly instead of trusting Groq's
+// estimate for it. Only "shot"/"shots" is hardcoded like this; other units
+// (cup, tbsp, ...) vary too much by ingredient density to do the same.
+const UNIT_TO_GRAMS = { shot: 30, shots: 30 };
+function extractIngredientQuantity(segment) {
+  const match = segment.match(INGREDIENT_QUANTITY_PATTERN);
+  if (!match) return { quantity: null, unit: null };
+  return { quantity: parseFloat(match[1]), unit: match[2] ? match[2].toLowerCase() : null };
 }
 
 // Pure calorie/protein estimation core — no DOM reads or writes — shared by
@@ -102,6 +114,19 @@ async function estimateCaloriesAndProtein(notesText) {
   const resolvedNames = items.map((item, i) =>
     (segments.length === items.length) ? extractIngredientName(segments[i]) : item.query
   );
+
+  // Override Groq's own gram-weight guess for units with a fixed real-world
+  // weight (currently just "shot" — see UNIT_TO_GRAMS) — deterministic and
+  // always right, instead of a per-call AI estimate for something that
+  // doesn't vary. Same 1:1 pairing guard as resolvedNames above.
+  if (segments.length === items.length) {
+    items.forEach((item, i) => {
+      const { quantity, unit } = extractIngredientQuantity(segments[i]);
+      if (unit && UNIT_TO_GRAMS[unit]) {
+        item.grams = (quantity ?? 1) * UNIT_TO_GRAMS[unit];
+      }
+    });
+  }
 
   let usdaAttempts = 0;
   let usdaFailureCount = 0;

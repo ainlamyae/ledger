@@ -32,10 +32,37 @@ function pickPlausibleMacros(candidates, kcalFallback, proteinFallback) {
   };
 }
 
+// Deterministic (non-AI) split of the Notes text into per-ingredient segments
+// — used to recover each AI-extracted item's identity from the user's OWN
+// text rather than the model's "query" field (see estimateCaloriesAndProtein
+// below). Split on comma/newline only (not " and " — that would wrongly
+// split e.g. "macaroni and cheese").
+function splitNotesIntoSegments(notes) {
+  return notes.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+}
+
+// Strips a leading quantity — a number (e.g. "2", "1.5", "2-3") plus an
+// optional unit glued directly onto it with no space (e.g. "100g", "30ml")
+// — off a segment, leaving just the food name portion. This is what's
+// matched against the Nutrition Facts table and what a new row gets banked
+// under, instead of the model's own "query" phrasing. Without the unit list
+// here, "100g egg white" would strip only "100" and leave "g egg white" as
+// the name — a real bug that banked a bogus "g egg white" row alongside an
+// existing "egg white" one instead of matching it.
+const INGREDIENT_UNIT_WORDS = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays';
+const INGREDIENT_QUANTITY_PATTERN = new RegExp(
+  `^\\s*[\\d.]+(?:\\s*[-/]\\s*[\\d.]+)?\\s*(?:${INGREDIENT_UNIT_WORDS})?\\b\\.?\\s*`, 'i'
+);
+function extractIngredientName(segment) {
+  return segment.replace(INGREDIENT_QUANTITY_PATTERN, '').trim();
+}
+
 // Pure calorie/protein estimation core — no DOM reads or writes — shared by
 // the single-entry Calculate button (below) and the Health Log table's bulk
-// Recalculate action (wellness.js). Returns {calories, protein, notes,
-// breakdown, usdaUnreachable} or throws (bad/empty input, Groq failure, etc.).
+// Recalculate action (wellness.js). Returns {calories, protein, breakdown,
+// usdaUnreachable} or throws (bad/empty input, Groq failure, etc.). Never
+// touches the Notes text itself — the caller's notes are the ones saved,
+// verbatim, no matter what the AI extraction below returns.
 async function estimateCaloriesAndProtein(notesText) {
   const notes = notesText.trim();
   if (!notes) throw new Error('No ingredients to calculate from.');
@@ -50,13 +77,31 @@ async function estimateCaloriesAndProtein(notesText) {
   // recalculating the exact same Notes text picks up the change immediately
   // instead of silently replaying a result computed before that row existed
   // or was corrected.
-  const extractCacheKey = `calc-extract-v1:${notes.toLowerCase()}`;
+  // Cache key versioned to "v2": v1 entries carry a "notes" field that no
+  // longer exists.
+  const extractCacheKey = `calc-extract-v2:${notes.toLowerCase()}`;
   let extraction = getCached(extractCacheKey, Infinity);
   if (!extraction) {
     extraction = await groqExtractIngredients(notes);
     setCached(extractCacheKey, extraction);
   }
-  const { items, notes: standardizedNotes } = extraction;
+  const { items } = extraction;
+
+  // The model's own "query" field is intentionally NOT trusted as an item's
+  // identity — it's free to phrase it however suits a database search (e.g.
+  // "egg" -> "egg, whole"), and using it for the Nutrition Facts match/bank
+  // below would let the AI silently rename what the user typed. Instead,
+  // deterministically split the user's OWN text the same way and, whenever
+  // that split lines up 1:1 with the model's items (the overwhelmingly
+  // common case — one segment per item), pair them by position and use the
+  // user's own text as that item's name. If the model split/merged
+  // differently this one time, there's no safe way to attribute a name back
+  // to a specific segment, so fall back to "query" for just this item rather
+  // than guess wrong.
+  const segments = splitNotesIntoSegments(notes);
+  const resolvedNames = items.map((item, i) =>
+    (segments.length === items.length) ? extractIngredientName(segments[i]) : item.query
+  );
 
   let usdaAttempts = 0;
   let usdaFailureCount = 0;
@@ -65,8 +110,9 @@ async function estimateCaloriesAndProtein(notesText) {
   // same food is a trusted lookup hit next time instead of a fresh guess.
   const newNutritionRows = [];
 
-  const perItemMacros = await Promise.all(items.map(async (item) => {
+  const perItemMacros = await Promise.all(items.map(async (item, i) => {
     const grams = item.grams;
+    const name = resolvedNames[i];
 
     // A previously-verified (or manually entered, brand-matched) row
     // always wins over a fresh guess — skip USDA/plausibility-checking
@@ -81,7 +127,10 @@ async function estimateCaloriesAndProtein(notesText) {
     // whole-unit count this time) does it fall back to weight: a gram
     // figure in Amount scaled against the AI's estimated grams eaten. A
     // row with neither usable is treated as a miss, same as no row at all.
-    const tableEntry = findNutritionEntry(item.query);
+    // Matched by the user's OWN name (see resolvedNames above) — never by
+    // the model's "query" — so the AI can't opportunistically match (or
+    // bank a new row under) a name it invented instead of what was typed.
+    const tableEntry = findNutritionEntry(name);
     const tableGrams = tableEntry ? parseGramsFromAmount(tableEntry.amount) : null;
     let tableCount = null;
     if (tableEntry && tableEntry.amount) {
@@ -95,12 +144,19 @@ async function estimateCaloriesAndProtein(notesText) {
     let amount;
     let kcal;
     let protein;
+    // Shown as its own "Density used" column in the Calculate breakdown
+    // table so the actual figure applied (not just the final total) is
+    // visible without needing DevTools — this is what distinguishes "the
+    // math is right but the stored density is wrong" from "the wrong branch
+    // fired" when a total looks implausible.
+    let density;
 
     if (tableEntry && tableCount !== null && item.count !== null) {
       itemCalories = (tableEntry.calories / tableCount) * item.count;
       itemProtein = (tableEntry.protein / tableCount) * item.count;
       source = 'nutrition-table-count';
       amount = `×${item.count}`;
+      density = `${Math.round((tableEntry.calories / tableCount) * 10) / 10} kcal/unit`;
     } else if (tableEntry && tableGrams !== null) {
       kcal = (tableEntry.calories / tableGrams) * 100;
       protein = (tableEntry.protein / tableGrams) * 100;
@@ -108,6 +164,7 @@ async function estimateCaloriesAndProtein(notesText) {
       itemProtein = (protein * grams) / 100;
       source = 'nutrition-table-grams';
       amount = `${Math.round(grams * 10) / 10}g`;
+      density = `${Math.round(kcal * 10) / 10} kcal/100g`;
     } else {
       usdaAttempts++;
       let candidates = [];
@@ -123,18 +180,22 @@ async function estimateCaloriesAndProtein(notesText) {
       itemProtein = (protein * grams) / 100;
       source = lookupFailed ? 'usda-unreachable' : 'usda/ai';
       amount = `${Math.round(grams * 10) / 10}g`;
+      density = `${Math.round(kcal * 10) / 10} kcal/100g`;
 
       // A failed lookup ran on a pure ungrounded AI guess — don't bank
       // that into the table as if it were verified. New rows are always
       // banked by weight (grams), even for a food that happened to be
       // logged by count this time — a stable per-100g figure is reusable
-      // regardless of how the next mention phrases the quantity.
+      // regardless of how the next mention phrases the quantity. Banked
+      // under the user's own name (never item.query) so the exact text
+      // they typed is what matches next time.
       if (!lookupFailed) {
-        newNutritionRows.push({ name: item.query, amount: '100g', calories: Math.round(kcal), protein: Math.round(protein) });
+        newNutritionRows.push({ name, amount: '100g', calories: Math.round(kcal), protein: Math.round(protein) });
       }
     }
 
-    console.debug(`[calc] ${item.query}: ${JSON.stringify({
+    console.debug(`[calc] ${name}: ${JSON.stringify({
+      query: item.query,
       grams,
       count: item.count,
       source,
@@ -145,7 +206,7 @@ async function estimateCaloriesAndProtein(notesText) {
       itemCalories,
       itemProtein,
     })}`);
-    return { name: item.query, amount, source, itemCalories, itemProtein };
+    return { name, amount, source, density, itemCalories, itemProtein };
   }));
   const calories = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemCalories, 0));
   const protein = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemProtein, 0));
@@ -169,6 +230,7 @@ async function estimateCaloriesAndProtein(notesText) {
     amount: m.amount,
     calories: Math.round(m.itemCalories),
     protein: Math.round(m.itemProtein * 10) / 10,
+    density: m.density,
     source: SOURCE_LABELS[m.source] || m.source,
   }));
 
@@ -186,7 +248,7 @@ async function estimateCaloriesAndProtein(notesText) {
     await refreshNutrition(true);
   }
 
-  return { calories, protein, notes: standardizedNotes, breakdown, usdaUnreachable };
+  return { calories, protein, breakdown, usdaUnreachable };
 }
 
 // Renders the per-item breakdown table under Notes so the combined Amount
@@ -204,6 +266,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
       makeCell(row.amount),
       makeCell(String(row.calories)),
       makeCell(String(row.protein)),
+      makeCell(row.density),
       makeCell(row.source),
     );
     tbody.appendChild(tr);
@@ -216,6 +279,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
     makeCell(''),
     makeCell(String(totalCalories)),
     makeCell(String(totalProtein)),
+    makeCell(''),
     makeCell(''),
   );
   tbody.appendChild(totalRow);
@@ -246,7 +310,7 @@ async function calculateWellnessCalories() {
   clearFieldError('wellness-form-error');
 
   try {
-    const { calories, protein, notes: standardizedNotes, breakdown, usdaUnreachable } = await estimateCaloriesAndProtein(notes);
+    const { calories, protein, breakdown, usdaUnreachable } = await estimateCaloriesAndProtein(notes);
 
     const description = document.getElementById('wellness-description').value;
     document.getElementById('wellness-category').value = 'Calories; Protein';
@@ -254,7 +318,6 @@ async function calculateWellnessCalories() {
     document.getElementById('wellness-description').value = description;
     document.getElementById('wellness-amount').value = `${calories}; ${protein}`;
     document.getElementById('wellness-unit').value = 'kcal; g';
-    document.getElementById('wellness-notes').value = standardizedNotes;
     renderCalcBreakdown(breakdown, calories, protein);
 
     const warnings = [];

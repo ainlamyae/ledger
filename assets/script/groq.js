@@ -6,6 +6,13 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SEED = 42;
 
+// Deliberately does NOT ask the model to rewrite/standardize the user's
+// ingredient text (an earlier version had a "notes" field for that) — it
+// would silently change names (e.g. "egg" -> "egg, whole") which then got
+// written back over what the user actually typed. The Notes field is never
+// touched by this response now; "query" below is used purely as an internal
+// USDA search term (calorie-estimator.js prefers the user's own text for the
+// Nutrition Facts table match/lookup whenever the split lines up 1:1).
 const GROQ_EXTRACT_SYSTEM_PROMPT = `You are a nutrition estimator for a personal health log. The user gives you a freeform
 description of food ingredients and amounts (e.g. "2 eggs, 1 slice toast, 1 tbsp butter").
 
@@ -17,11 +24,9 @@ Split it into individual food items. For each item, provide:
 - "proteinPer100gFallback": your best estimate of grams of protein per 100g for this food
 
 Do not calculate the total calories or protein yourself — that happens outside this response.
-Also rewrite the whole description as a short, standardized summary (e.g. "2 eggs, 1 toast, 1 tbsp butter").
 
 Respond with ONLY a JSON object, no other text, in exactly this shape:
-{"items": [{"query": "<generic food name>", "grams": <number>, "count": <number or null>, "kcalPer100gFallback": <number>, "proteinPer100gFallback": <number>}, ...],
- "notes": "<short standardized ingredient summary>"}`;
+{"items": [{"query": "<generic food name>", "grams": <number>, "count": <number or null>, "kcalPer100gFallback": <number>, "proteinPer100gFallback": <number>}, ...]}`;
 
 async function groqExtractIngredients(notesText) {
   const apiKey = getSettingString('GROQ_API_KEY', null);
@@ -93,7 +98,6 @@ async function groqExtractIngredients(notesText) {
   }
 
   if (!Array.isArray(parsed.items) || parsed.items.length === 0) fail('missing "items" array');
-  if (!parsed.notes) fail('missing "notes"');
 
   // Coerce rather than strictly type-check — models sometimes emit numeric
   // fields as strings (e.g. "50" or "50g"). "count" is nullable (not every
@@ -113,5 +117,5 @@ async function groqExtractIngredients(notesText) {
     fail('an item is missing query/grams/kcalPer100gFallback/proteinPer100gFallback, or has an invalid count');
   }
 
-  return { items, notes: parsed.notes };
+  return { items };
 }

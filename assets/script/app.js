@@ -6,8 +6,8 @@ const SETTINGS_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 // Amounts are shown by default each time the dashboard loads; clicking the
-// privacy FAB hides them for the rest of the session (for reading the
-// dashboard somewhere it can be seen over your shoulder).
+// "Hide amounts" menu item hides them for the rest of the session (for reading
+// the dashboard somewhere it can be seen over your shoulder).
 let privacyMode = false;
 
 // Replaces every digit with '*', so masked values keep their currency
@@ -532,11 +532,15 @@ function renderSummaryCards(data) {
 function renderReconciliationStatus(missingAmount) {
   const isReconciled = Math.abs(missingAmount) < 0.005;
 
-  const el = document.getElementById('reconciliation-status');
-  el.textContent = isReconciled
-    ? '✅ Reconciled'
-    : `⚠️ Reconciliation off by ${formatCurrency(missingAmount)} — check account balances or look for a missing transaction`;
-  el.classList.toggle('warning', !isReconciled);
+  // A sign, not a second control: it sits on the heading line so it survives the
+  // panel being collapsed (a status line below the header wouldn't — collapsed
+  // content goes `inert`), but it isn't a button and carries no click handler of
+  // its own. Silent when reconciled, the same "nothing to say" pattern the rest
+  // of the app uses for a clean state.
+  const flagEl = document.getElementById('account-reconciliation-flag');
+  flagEl.hidden = isReconciled;
+  flagEl.textContent = isReconciled ? '' : `${formatCurrency(missingAmount)} ⚠️`;
+  flagEl.title = isReconciled ? '' : `Reconciliation off by ${formatCurrency(missingAmount)}`;
 }
 
 async function refreshNetWorth() {
@@ -576,7 +580,7 @@ function showDashboardError(message) {
 }
 
 function setLastUpdated() {
-  document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour12: false })}`;
 }
 
 async function loadDashboard(forceRefresh = false) {
@@ -591,7 +595,7 @@ async function loadDashboard(forceRefresh = false) {
   const settingsPromise = loadSettings(forceRefresh).then((settings) => {
     currentSettings = settings;
     // 0 hides amounts, 1 (or unset) shows them — kept in the Settings tab so
-    // the FAB's state survives a refresh instead of always starting shown.
+    // this survives a refresh instead of always starting shown.
     privacyMode = getSetting('SHOW_AMOUNTS', 1) === 0;
     updatePrivacyButtonUI();
     applySettingsToWidgets();
@@ -673,8 +677,7 @@ async function loadDashboard(forceRefresh = false) {
   loading.hidden = true;
 }
 
-// Each panel's <h2> toggles its own content, and the FAB flips every panel
-// at once between fully expanded and fully collapsed.
+// Each panel's <h2> toggles its own content.
 // The CSS collapse animation (max-height/opacity, styles.css) only hides
 // panel content VISUALLY — it never removes it from the accessibility tree
 // or from text selection/"find in page"/copy-paste, since neither property
@@ -699,23 +702,10 @@ function setPanelCollapsed(panel, heading, collapsed) {
 
 function setupPanelToggles() {
   const panels = [...document.querySelectorAll('#dashboard .panel')];
-  const fab = document.getElementById('toggle-panels-fab');
-  const headingsByPanel = new Map();
-
-  // Reflects the panels' actual current state, so the FAB's icon/title are
-  // correct no matter how that state changed — its own click, an individual
-  // panel heading, or a nav link.
-  const updateFab = () => {
-    const anyExpanded = panels.some((panel) => !panel.classList.contains('collapsed'));
-    fab.textContent = anyExpanded ? '⊟' : '⊞';
-    fab.title = anyExpanded ? 'Collapse all panels' : 'Expand all panels';
-    fab.setAttribute('aria-label', fab.title);
-  };
 
   panels.forEach((panel, i) => {
     const heading = panel.querySelector('h2');
     if (!heading) return;
-    headingsByPanel.set(panel, heading);
 
     const icon = document.createElement('span');
     icon.className = 'panel-toggle-icon';
@@ -732,7 +722,6 @@ function setupPanelToggles() {
 
     const toggle = () => {
       setPanelCollapsed(panel, heading, !panel.classList.contains('collapsed'));
-      updateFab();
     };
 
     heading.addEventListener('click', () => {
@@ -748,23 +737,13 @@ function setupPanelToggles() {
       }
     });
   });
-
-  updateFab();
-
-  fab.addEventListener('click', () => {
-    const shouldCollapse = panels.some((panel) => !panel.classList.contains('collapsed'));
-    panels.forEach((panel) => setPanelCollapsed(panel, headingsByPanel.get(panel), shouldCollapse));
-    updateFab();
-  });
 }
 
 function setupThemeToggle() {
   const btn = document.getElementById('theme-toggle-btn');
 
   const updateButton = (dark) => {
-    btn.textContent = dark ? '☀️' : '🌙';
-    btn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
-    btn.setAttribute('aria-label', btn.title);
+    btn.textContent = dark ? 'Switch to light mode' : 'Switch to dark mode';
   };
 
   updateButton(document.documentElement.dataset.theme === 'dark');
@@ -787,14 +766,12 @@ function setupThemeToggle() {
   });
 }
 
-// Reflects the current privacyMode on the FAB's icon/tooltip. Standalone (not
+// Reflects the current privacyMode on the menu item's label. Standalone (not
 // nested in setupPrivacyToggle) so loadDashboard can call it too, once the
 // Settings tab's SHOW_AMOUNTS tells it what privacyMode actually is.
 function updatePrivacyButtonUI() {
-  const btn = document.getElementById('privacy-toggle-fab');
-  btn.textContent = privacyMode ? '🙈' : '👁️';
-  btn.title = privacyMode ? 'Show amounts' : 'Hide amounts';
-  btn.setAttribute('aria-label', btn.title);
+  const btn = document.getElementById('privacy-toggle-btn');
+  btn.textContent = privacyMode ? 'Show amounts' : 'Hide amounts';
 }
 
 // Masks every formatted amount on the page (cards, tables, chart ticks,
@@ -803,7 +780,7 @@ function updatePrivacyButtonUI() {
 function setupPrivacyToggle() {
   updatePrivacyButtonUI();
 
-  document.getElementById('privacy-toggle-fab').addEventListener('click', () => {
+  document.getElementById('privacy-toggle-btn').addEventListener('click', () => {
     privacyMode = !privacyMode;
     updatePrivacyButtonUI();
     if (!document.getElementById('dashboard').hidden) loadDashboard(false);

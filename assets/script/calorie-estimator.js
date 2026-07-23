@@ -64,7 +64,7 @@ function splitNotesIntoSegments(notes) {
 // here, "100g egg white" would strip only "100" and leave "g egg white" as
 // the name — a real bug that banked a bogus "g egg white" row alongside an
 // existing "egg white" one instead of matching it.
-const INGREDIENT_UNIT_WORDS_BASE = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays|shot|shots';
+const INGREDIENT_UNIT_WORDS_BASE = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays|shot|shots|can|cans|clove|cloves';
 // "x" is a placeholder pseudo-unit (see below) — included in the LEADING
 // pattern only (not the trailing one) so a note already standardized once
 // (e.g. "1x apple") still parses correctly on a later re-Calculate, instead
@@ -109,7 +109,7 @@ const UNIT_TO_GRAMS = { shot: 30, shots: 30 };
 // row's own per-unit count entirely. Deliberately excludes weight/volume
 // units (g, cup, tbsp, ...): those describe a measured amount, not "how
 // many", so forcing a count from them wouldn't mean anything.
-const COUNT_LIKE_UNITS = new Set(['x', 'piece', 'pieces', 'serving', 'servings', 'scoop', 'scoops', 'slice', 'slices', 'spray', 'sprays', 'shot', 'shots']);
+const COUNT_LIKE_UNITS = new Set(['x', 'piece', 'pieces', 'serving', 'servings', 'scoop', 'scoops', 'slice', 'slices', 'spray', 'sprays', 'shot', 'shots', 'can', 'cans', 'clove', 'cloves']);
 function extractIngredientQuantity(segment) {
   const match = segment.match(INGREDIENT_QUANTITY_PATTERN);
   if (!match) return { quantity: null, unit: null };
@@ -138,6 +138,8 @@ const UNIT_CANONICAL = {
   scoop: 'scoop', scoops: 'scoop',
   spray: 'spray', sprays: 'spray',
   shot: 'shot', shots: 'shot',
+  can: 'can', cans: 'can',
+  clove: 'clove', cloves: 'clove',
 };
 
 // Pure calorie/protein estimation core — no DOM reads or writes — shared by
@@ -146,7 +148,15 @@ const UNIT_CANONICAL = {
 // usdaUnreachable} or throws (bad/empty input, Groq failure, etc.). Never
 // touches the Notes text itself — the caller's notes are the ones saved,
 // verbatim, no matter what the AI extraction below returns.
-async function estimateCaloriesAndProtein(notesText) {
+// autoBank: whether a miss (USDA/AI-only estimate) gets saved to the
+// Nutrition Facts table immediately. The interactive Calculate button (see
+// calculateWellnessCalories) sets this false and instead surfaces an "Add"
+// button per row in the breakdown, so a typo'd/misphrased name (e.g. "oilve
+// oil" not matching an existing "olive oil" row) is caught and fixed by hand
+// — recalculate after editing Notes — rather than silently banking a
+// same-food duplicate row under the wrong name. Bulk recalculate (wellness.js
+// bulkRecalculateWellness) has no per-row review UI, so it leaves this true.
+async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   const notes = notesText.trim();
   if (!notes) throw new Error('No ingredients to calculate from.');
 
@@ -254,6 +264,10 @@ async function estimateCaloriesAndProtein(notesText) {
     // math is right but the stored density is wrong" from "the wrong branch
     // fired" when a total looks implausible.
     let density;
+    // Set only for a fresh USDA/AI miss (never for a Nutrition Facts hit) —
+    // the not-yet-saved row this item would bank, surfaced in the breakdown
+    // as an opt-in "Add" button when autoBank is false.
+    let newRow = null;
 
     if (tableEntry && tableCount !== null && item.count !== null) {
       itemCalories = (tableEntry.calories / tableCount) * item.count;
@@ -294,7 +308,8 @@ async function estimateCaloriesAndProtein(notesText) {
       // under the user's own name (never item.query) so the exact text
       // they typed is what matches next time.
       if (!lookupFailed) {
-        newNutritionRows.push({ name, amount: '100g', calories: Math.round(kcal), protein: Math.round(protein) });
+        newRow = { name, amount: '100g', calories: Math.round(kcal), protein: Math.round(protein) };
+        if (autoBank) newNutritionRows.push(newRow);
       }
     }
 
@@ -328,7 +343,7 @@ async function estimateCaloriesAndProtein(notesText) {
       itemCalories,
       itemProtein,
     })}`);
-    return { name, amount, source, density, itemCalories, itemProtein, noteLine };
+    return { name, amount, source, density, itemCalories, itemProtein, noteLine, newRow };
   }));
   const calories = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemCalories, 0));
   const protein = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemProtein, 0));
@@ -354,6 +369,10 @@ async function estimateCaloriesAndProtein(notesText) {
     protein: Math.round(m.itemProtein * 10) / 10,
     density: m.density,
     source: SOURCE_LABELS[m.source] || m.source,
+    // Already banked (autoBank) or never eligible (a table hit) — only a
+    // still-pending miss carries a newRow, which is what renderCalcBreakdown
+    // uses to decide whether to show an "Add" button for this row.
+    newRow: autoBank ? null : m.newRow,
   }));
 
   // Every USDA lookup that was actually attempted failed — almost certainly
@@ -377,6 +396,42 @@ async function estimateCaloriesAndProtein(notesText) {
   return { calories, protein, breakdown, standardizedNotes, usdaUnreachable };
 }
 
+// A row.newRow means this item missed the Nutrition Facts table and was
+// estimated fresh (USDA/AI) rather than looked up — nothing is banked
+// automatically (see estimateCaloriesAndProtein's autoBank param), so the
+// user reviews it here: either click "＋ Save" to bank it as-is, or leave it
+// and fix/retype the ingredient in Notes then Calculate again if the name
+// was wrong (e.g. a typo not matching an existing row).
+function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
+  const cell = document.createElement('td');
+  if (!row.newRow) return cell;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn';
+  btn.textContent = '＋ Save';
+  btn.title = `Not in your Nutrition Facts table yet — save "${row.name}" (${row.newRow.amount}, ${row.newRow.calories} kcal, ${row.newRow.protein}g protein) so it's a trusted lookup next time instead of a fresh guess`;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await addNutritionEntry(row.newRow);
+      await refreshNutrition(true);
+      // Same food may appear more than once in one breakdown (e.g. split
+      // across two Notes lines) — clear all matching rows' newRow so a
+      // second click can't bank the same name twice in one go.
+      breakdown.forEach((r) => { if (r.newRow && r.newRow.name === row.newRow.name) r.newRow = null; });
+      renderCalcBreakdown(breakdown, totalCalories, totalProtein);
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '＋ Save';
+      showFieldError('wellness-form-error', err.message);
+    }
+  });
+  cell.appendChild(btn);
+  return cell;
+}
+
 // Renders the per-item breakdown table under Notes so the combined Amount
 // can be checked by eye/pure arithmetic before saving — the Total row uses
 // the exact same rounded totals written into the Amount field, not a
@@ -394,6 +449,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
       makeCell(String(row.protein)),
       makeCell(row.density),
       makeCell(row.source),
+      makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein),
     );
     tbody.appendChild(tr);
   });
@@ -405,6 +461,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
     makeCell(''),
     makeCell(String(totalCalories)),
     makeCell(String(totalProtein)),
+    makeCell(''),
     makeCell(''),
     makeCell(''),
   );
@@ -437,7 +494,7 @@ async function calculateWellnessCalories() {
   clearFieldError('wellness-form-error');
 
   try {
-    const { calories, protein, breakdown, standardizedNotes, usdaUnreachable } = await estimateCaloriesAndProtein(notes);
+    const { calories, protein, breakdown, standardizedNotes, usdaUnreachable } = await estimateCaloriesAndProtein(notes, { autoBank: false });
 
     const description = document.getElementById('wellness-description').value;
     document.getElementById('wellness-category').value = 'Calories; Protein';

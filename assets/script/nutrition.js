@@ -31,7 +31,11 @@ function parseGramsFromAmount(amount) {
 // (31g)" have a genuine leading count of 1 alongside a separate, unrelated
 // gram figure later in the string. The negative lookahead tells those apart
 // by checking whether "g" immediately follows the leading number.
-const NUTRITION_LEADING_COUNT_PATTERN = /^\s*(\d+(?:\.\d+)?)(?!\s*g\b)/i;
+// The lookahead-then-backreference (\1) makes the digit run atomic: without
+// it, \d+ backtracks on a plain weight like "100g" (greedy match "100" fails
+// the "not followed by g" check, backtracks to "10", which IS followed by a
+// non-"g" char "0" and wrongly passes) — misreading a 100g weight as count 10.
+const NUTRITION_LEADING_COUNT_PATTERN = /^\s*(?=(\d+(?:\.\d+)?))\1(?!\s*g\b)/i;
 function parseCountFromAmount(amount) {
   const match = String(amount || '').match(NUTRITION_LEADING_COUNT_PATTERN);
   return match ? parseFloat(match[1]) : null;
@@ -317,13 +321,26 @@ async function mergeSelectedNutritionEntries() {
   );
 }
 
-// Used by calorie-estimator.js: exact, case-insensitive name match — the
-// "search + manual edit + merge" tools above are the intended way to
-// reconcile near-duplicate names the AI happens to phrase differently.
+// Naive singular fold — just enough to catch "egg"/"eggs"-style plural typos
+// (a stray/missing trailing "s") without a full stemming library. Only used
+// as a fallback below, after an exact match has already failed.
+function foldTrailingS(s) {
+  return s.length > 1 && s.endsWith('s') ? s.slice(0, -1) : s;
+}
+
+// Used by calorie-estimator.js: exact, case-insensitive name match first —
+// the "search + manual edit + merge" tools above are the intended way to
+// reconcile near-duplicate names the AI happens to phrase differently. Falls
+// back to matching with a trailing "s" folded off both sides, so a note
+// typed as "2 eggs" still hits an existing "egg" row (or vice versa) instead
+// of banking a same-food duplicate under the pluralized name.
 function findNutritionEntry(name) {
   const target = String(name || '').trim().toLowerCase();
   if (!target) return null;
-  return allNutritionEntries.find((n) => n.name.toLowerCase() === target) || null;
+  const exact = allNutritionEntries.find((n) => n.name.toLowerCase() === target);
+  if (exact) return exact;
+  const targetFolded = foldTrailingS(target);
+  return allNutritionEntries.find((n) => foldTrailingS(n.name.toLowerCase()) === targetFolded) || null;
 }
 
 // Appends a fallback-computed ingredient so it's a trusted lookup hit next

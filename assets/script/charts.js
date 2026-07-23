@@ -709,6 +709,20 @@ function trailingDatesForCategory(matchingEntries, maxDays) {
   return capped.filter((d) => d >= from);
 }
 
+// Formats an ISO 'YYYY-MM-DD' label as e.g. "Jun 29" — the same short style
+// the Weight Trend & Forecast chart's x-axis already uses (offsetToDateLabel
+// below), instead of the raw ISO string a category-scale axis shows by
+// default.
+function formatIsoDateShort(iso) {
+  return new Date(parseIsoDateUTC(iso)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+// Category-scale tick callback: `value` is the tick's index, not the label
+// itself, so getLabelForValue() resolves it back to the ISO string first.
+function shortDateTickCallback(value) {
+  return formatIsoDateShort(this.getLabelForValue(value));
+}
+
 function renderWellnessCaloriesChart(entries) {
   const ctx = document.getElementById('wellness-calories-chart');
 
@@ -747,10 +761,10 @@ function renderWellnessCaloriesChart(entries) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
+        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -801,10 +815,10 @@ function renderWellnessSleepChart(entries) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
+        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -905,10 +919,10 @@ function renderWellnessActivityChart(entries) {
           font: { size: 12 },
           padding: { top: 40 },
         },
-        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
+        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
-        x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
+        x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
           stacked: true,
           beginAtZero: true,
@@ -958,10 +972,10 @@ function renderWellnessProteinChart(entries) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: maskedValueTooltipLabel } },
+        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7 } },
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,

@@ -430,6 +430,7 @@
                         <th class="sortable" data-sort="bodyMass" title="Body Mass">Mass</th>
                         <th class="sortable" data-sort="caloriesIn" title="Calories In">Cal↓</th>
                         <th class="sortable" data-sort="proteinIn" title="Protein In">Pro↓</th>
+                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
                         <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
                         <th class="sortable" data-sort="caloriesOut" title="Calories Out">Cal↑</th>
                         <th></th>
@@ -442,6 +443,7 @@
             <div class="panel-actions" id="physique-bulk-actions" hidden>
                 <span id="physique-bulk-summary"></span>
                 <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit) and sort by calories — local only, no AI">Combine &amp; Sort</button>
+                <button id="physique-bulk-tef-btn" class="btn" title="For each selected day: estimate the Thermic Effect of Food from its own breakdown's protein/carb/fat grams (needs 🧬 Micronutrients pulled for those ingredients) — local only, no AI">TEF</button>
                 <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
             </div>
 
@@ -1347,6 +1349,27 @@
             <label hidden>Protein In
                 <input type="text" id="physique-protein-in" placeholder="e.g. 140 (g)">
             </label>
+
+            <div id="physique-tef-breakdown" class="table-responsive" hidden>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Macronutrient</th>
+                        <th>Amount</th>
+                        <th>Calories</th>
+                        <th title="Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default — tune under Settings (TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT)">Estimated TEF</th>
+                    </tr>
+                    </thead>
+                    <tbody id="physique-tef-breakdown-body"></tbody>
+                </table>
+            </div>
+            <!-- Read off the table above's Total row, same as Calories In /
+                 Protein In are off the breakdown's. Still the field Calculate
+                 writes and Save sends to column L. -->
+            <label hidden>TEF
+                <input type="text" id="physique-tef" placeholder="e.g. 96 (kcal)">
+            </label>
+
             <label>Workout
                 <textarea id="physique-workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
             </label>
@@ -1378,6 +1401,8 @@
 
             <div class="modal-actions">
                 <button type="button" id="physique-combine-btn" class="btn" title="Combine duplicate ingredient lines (same name and unit) and sort by calories — local only, no AI">Combine &amp; Sort</button>
+                <button type="button" id="physique-tef-btn" class="btn" title="Estimate the Thermic Effect of Food from this day's own Breakdown (needs 🧬 Micronutrients pulled for its ingredients) — local only, no AI">TEF</button>
+                <button type="button" id="physique-form-micro-btn" class="btn" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved">Micronutrients</button>
                 <button type="button" id="physique-calc-btn" class="btn btn-ai">Calculate</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>

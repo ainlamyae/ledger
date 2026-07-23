@@ -532,11 +532,15 @@ function renderSummaryCards(data) {
 function renderReconciliationStatus(missingAmount) {
   const isReconciled = Math.abs(missingAmount) < 0.005;
 
-  const el = document.getElementById('reconciliation-status');
-  el.textContent = isReconciled
-    ? '✅ Reconciled'
-    : `⚠️ Reconciliation off by ${formatCurrency(missingAmount)} — check account balances or look for a missing transaction`;
-  el.classList.toggle('warning', !isReconciled);
+  // A sign, not a second control: it sits on the heading line so it survives the
+  // panel being collapsed (a status line below the header wouldn't — collapsed
+  // content goes `inert`), but it isn't a button and carries no click handler of
+  // its own. Silent when reconciled, the same "nothing to say" pattern the rest
+  // of the app uses for a clean state.
+  const flagEl = document.getElementById('account-reconciliation-flag');
+  flagEl.hidden = isReconciled;
+  flagEl.textContent = isReconciled ? '' : `${formatCurrency(missingAmount)} ⚠️`;
+  flagEl.title = isReconciled ? '' : `Reconciliation off by ${formatCurrency(missingAmount)}`;
 }
 
 async function refreshNetWorth() {
@@ -576,7 +580,7 @@ function showDashboardError(message) {
 }
 
 function setLastUpdated() {
-  document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour12: false })}`;
 }
 
 async function loadDashboard(forceRefresh = false) {

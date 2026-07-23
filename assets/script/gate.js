@@ -16,8 +16,7 @@ function setUIState(state) {
   document.getElementById('signin-btn').hidden = state !== 'signedOut';
   document.getElementById('account-menu').hidden = state === 'signedOut';
   document.getElementById('refresh-btn').hidden = state !== 'dashboard';
-  document.getElementById('toggle-panels-fab').hidden = state !== 'dashboard';
-  document.getElementById('privacy-toggle-fab').hidden = state !== 'dashboard';
+  document.getElementById('privacy-toggle-btn').hidden = state !== 'dashboard';
 }
 
 function handleAuthChange(token, error) {

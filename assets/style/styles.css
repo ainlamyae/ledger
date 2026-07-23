@@ -862,52 +862,6 @@ kbd {
     animation: panel-enter .45s ease both;
 }
 
-/* Bottom-LEFT, not right: the modals' own buttons sit bottom-right, and on a
-   phone a right-hand stack overlaps them. */
-/* Below .modal's 100, like the sticky header: on a phone the stack covered the
-   bottom-left corner of an open form, and a floating toggle is never worth a
-   field you can't reach. Dark mode and privacy mode are one Escape away
-   instead. The undo toast keeps its 110 — that one has a countdown. */
-.fab-stack {
-    position: fixed;
-    left: 1.25rem;
-    bottom: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    background: var(--color-surface);
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,.25);
-    z-index: 90;
-}
-
-.fab {
-    width: 48px;
-    height: 48px;
-    border: none;
-    background: transparent;
-    color: var(--color-primary);
-    font-size: 1.3rem;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background-color .2s ease;
-}
-
-.fab:not(:last-child) {
-    border-bottom: 1px solid var(--color-border);
-}
-
-.fab[hidden] {
-    display: none;
-}
-
-.fab:hover {
-    background: var(--color-bg);
-}
-
 .panel-actions {
     display: flex;
     justify-content: flex-end;
@@ -2559,16 +2513,6 @@ td .btn {
         align-items: flex-start;
     }
 
-    .fab-stack {
-        left: 1rem;
-        bottom: 1rem;
-    }
-
-    .fab {
-        width: 42px;
-        height: 42px;
-        font-size: 1.15rem;
-    }
 }
 
 @media (max-width: 420px) {

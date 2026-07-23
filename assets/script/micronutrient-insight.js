@@ -204,6 +204,31 @@ function estimateTefBreakdown(breakdown) {
   return { rows, totalKcal, tefKcal: Math.round(totalTef) };
 }
 
+// Same estimate as estimateTefBreakdown above, but for one aggregateFoodIntake
+// row (food-insight.js's Food mode ingredient table) — that row already
+// carries its own {name, grams, count} totalled over the whole picked range,
+// so this reuses micronutrientScaleFactor directly instead of re-parsing an
+// amount string. Null on an ingredient with no 🧬 Micronutrients pulled, same
+// "not measured" rather than a confident zero.
+function estimateTefForFoodRow(row) {
+  const entry = findNutritionEntry(row.name);
+  const parsed = entry ? parseMicronutrients(entry.micronutrients) : null;
+  if (!parsed) return null;
+
+  const scale = micronutrientScaleFactor(entry, row);
+  if (scale <= 0) return null;
+
+  const rate = tefMacroRate();
+  let tef = 0;
+  let matched = false;
+  Object.keys(rate).forEach((name) => {
+    if (!parsed[name]) return;
+    tef += parsed[name].amount * scale * rate[name].kcalPerGram * rate[name].tefShare;
+    matched = true;
+  });
+  return matched ? Math.round(tef) : null;
+}
+
 // The one line every render of this mode leads with — what the totals below
 // actually cover, since "18 nutrients, none of them showing iron" means
 // something very different depending on whether any iron-rich ingredient was

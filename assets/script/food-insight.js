@@ -25,7 +25,7 @@ function aggregateFoodIntake(lookbackDays) {
 
   const byName = new Map();
 
-  allWellnessEntries
+  getDatedWellnessEntries()
     .filter((e) => e.category === 'Calories; Protein' && e.date >= from && e.date <= to)
     .forEach((e) => {
       (e.breakdown || []).forEach((item) => {

@@ -360,7 +360,7 @@ One row per wellness measurement, newest appended last. Data rows start at row 2
 
 | Column | Type | Notes |
 |---|---|---|
-| A — Date | Date | ISO format |
+| A — Date | Date | ISO format. Blank marks the row a reusable **pattern** — a template you can 📋 Duplicate and assign a real date to later, e.g. logging the same meal-prep across several days. Pattern rows always sort to the top of the Health Log table regardless of the Date column's sort direction, are excluded from every chart, target, and calibration calculation, and aren't hidden by an active date-range filter |
 | B — Time | Text | `HH:MM`, optional |
 | C — Category | Text | One of `Sleep`, `Weight`, `Calories`, `Activity`, or the composite `Calories; Protein` written by the 🧮 Calculate button |
 | D — Description | Text | E.g. "Morning Weight", "Lunch", "Run" |

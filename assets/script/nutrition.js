@@ -4,7 +4,7 @@
 // the specific brand/product actually bought) is recorded here, it's reused
 // instead of being re-guessed every time.
 
-const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:D`;
+const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:E`;
 const N_PAGE_SIZE = 25;
 
 // Amount is freeform serving-size text so it can read like a real nutrition
@@ -108,6 +108,10 @@ async function refreshNutrition(forceRefresh = false) {
       amount: row[1] || '',
       calories: (row[2] !== undefined && row[2] !== '') ? Number(row[2]) : null,
       protein: (row[3] !== undefined && row[3] !== '') ? Number(row[3]) : null,
+      // Column E: blank means computed by the USDA/AI fallback, "1" means
+      // you've checked it against the label on your own purchased
+      // ingredient — never written by the app itself, only by hand here.
+      verified: String(row[4] || '').trim() === '1',
     }))
     .filter((n) => n.name);
 
@@ -121,6 +125,7 @@ function getFilteredNutritionEntries() {
   const { key, dir } = nSort;
   return [...filtered].sort((a, b) => {
     if (key === 'calories' || key === 'protein') return ((a[key] ?? 0) - (b[key] ?? 0)) * dir;
+    if (key === 'verified') return ((a.verified ? 1 : 0) - (b.verified ? 1 : 0)) * dir;
     return String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * dir;
   });
 }
@@ -140,7 +145,7 @@ function renderNutritionList() {
     const message = allNutritionEntries.length === 0
       ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "+ Add Ingredient" to add one yourself.'
       : 'No ingredients match your search.';
-    tbody.appendChild(renderEmptyRow(6, message));
+    tbody.appendChild(renderEmptyRow(7, message));
   }
 
   pageItems.forEach((n) => {
@@ -171,6 +176,7 @@ function renderNutritionList() {
       amountCell,
       makeCell(n.calories !== null ? String(n.calories) : '—'),
       makeCell(n.protein !== null ? String(n.protein) : '—'),
+      makeCell(n.verified ? '✅' : '', n.verified ? 'Verified against the label on your own purchased ingredient' : 'From the USDA/AI fallback — not yet checked against a real label'),
     );
 
     const actionsCell = document.createElement('td');
@@ -222,6 +228,7 @@ function openNutritionForm(entry) {
   document.getElementById('nutrition-amount').value = entry ? entry.amount : '';
   document.getElementById('nutrition-calories').value = (entry && entry.calories !== null) ? entry.calories : '';
   document.getElementById('nutrition-protein').value = (entry && entry.protein !== null) ? entry.protein : '';
+  document.getElementById('nutrition-verified').checked = entry ? entry.verified : false;
 
   clearFieldError('nutrition-form-error');
   document.getElementById('nutrition-modal').hidden = false;
@@ -239,6 +246,7 @@ async function submitNutritionForm(event) {
   const amount = document.getElementById('nutrition-amount').value.trim();
   const calories = evaluateNumberExpression(document.getElementById('nutrition-calories').value);
   const protein = evaluateNumberExpression(document.getElementById('nutrition-protein').value);
+  const verified = document.getElementById('nutrition-verified').checked;
 
   if (!name) {
     showFieldError('nutrition-form-error', 'Name is required.');
@@ -249,11 +257,11 @@ async function submitNutritionForm(event) {
     return;
   }
 
-  const values = [[name, amount, calories, protein]];
+  const values = [[name, amount, calories, protein, verified ? '1' : '']];
 
   try {
     if (editingNutritionRow) {
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:D${editingNutritionRow}`, values);
+      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:E${editingNutritionRow}`, values);
     } else {
       await appendValues(NUTRITION_RANGE, values);
     }
@@ -293,6 +301,9 @@ async function mergeSelectedNutritionEntries() {
   if (!merged.amount) merged.amount = (others.find((o) => o.amount) || {}).amount || '';
   if (merged.calories === null) merged.calories = (others.find((o) => o.calories !== null) || {}).calories ?? null;
   if (merged.protein === null) merged.protein = (others.find((o) => o.protein !== null) || {}).protein ?? null;
+  // A row verified against a real label stays verified even if it's merged
+  // with unverified fallback duplicates — never the other way around.
+  merged.verified = merged.verified || others.some((o) => o.verified);
 
   await confirmAndDelete(
     `Merge ${selected.length} ingredients into "${target.name}"? ` +
@@ -301,8 +312,8 @@ async function mergeSelectedNutritionEntries() {
     async () => {
       if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
 
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${target.row}:D${target.row}`,
-        [[merged.name, merged.amount, merged.calories, merged.protein]]);
+      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${target.row}:E${target.row}`,
+        [[merged.name, merged.amount, merged.calories, merged.protein, merged.verified ? '1' : '']]);
 
       const deleteRequests = others
         .map((o) => o.row)

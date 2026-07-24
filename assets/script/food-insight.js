@@ -167,7 +167,7 @@ function renderFoodInsightPreview(rows, from, to) {
   tbody.innerHTML = '';
 
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(4, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
+    tbody.appendChild(renderEmptyRow(5, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
     return;
   }
 
@@ -177,18 +177,23 @@ function renderFoodInsightPreview(rows, from, to) {
     const groupRow = document.createElement('tr');
     groupRow.className = 'insight-food-group-row';
     const groupCell = document.createElement('td');
-    groupCell.colSpan = 4;
+    groupCell.colSpan = 5;
     groupCell.textContent = formatFoodGroupSummary(g);
     groupRow.appendChild(groupCell);
     tbody.appendChild(groupRow);
 
     g.items.forEach((r) => {
       const tr = document.createElement('tr');
+      // Null (no 🧬 Micronutrients pulled for this ingredient) reads as a
+      // blank dash, not a claimed zero — same convention the Physique TEF
+      // column and its own breakdown table use.
+      const tef = estimateTefForFoodRow(r);
       tr.append(
         makeCell(r.name),
         makeCell(r.amountLabel),
         makeCell(String(r.calories)),
         makeCell(String(r.protein)),
+        makeCell(tef !== null ? String(tef) : '—'),
       );
       tbody.appendChild(tr);
     });
@@ -207,12 +212,18 @@ const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missin
 // without knowing the body it's feeding.
 function formatFoodInsightPrompt(rows, from, to, question) {
   const profile = formatProfileLines(gatherProfileSnapshot()).join('\n');
-  const header = `Aggregated ingredients logged from ${from} to ${to}, grouped by the classification each ingredient is filed under in the user's own ingredient catalog. Each group line gives that group's ingredient count and totals, followed by its ingredients (name (total amount): total calories, total protein):`;
+  const header = `Aggregated ingredients logged from ${from} to ${to}, grouped by the classification each ingredient is filed under in the user's own ingredient catalog. Each group line gives that group's ingredient count and totals, followed by its ingredients (name (total amount): total calories, total protein, estimated TEF where measured):`;
   const groups = groupFoodIntakeByClassification(rows);
   const body = groups.length
     ? groups.map((g) => [
       formatFoodGroupSummary(g),
-      ...g.items.map((r) => `  - ${r.name} (${r.amountLabel}): ${r.calories} kcal, ${r.protein} g protein`),
+      // TEF only when this ingredient has 🧬 Micronutrients pulled — omitted
+      // rather than printed as 0, matching the preview table's own blank dash.
+      ...g.items.map((r) => {
+        const tef = estimateTefForFoodRow(r);
+        const tefPart = tef !== null ? `, ~${tef} kcal TEF (thermic effect of food)` : '';
+        return `  - ${r.name} (${r.amountLabel}): ${r.calories} kcal, ${r.protein} g protein${tefPart}`;
+      }),
     ].join('\n')).join('\n\n')
     : '(no Calculate-derived ingredient breakdown logged in this window)';
   const q = (question && question.trim()) ? question.trim() : FOOD_INSIGHT_DEFAULT_QUESTION;

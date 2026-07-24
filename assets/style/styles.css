@@ -1374,6 +1374,18 @@ td .btn {
     margin-top: 0 !important;
 }
 
+.wellness-pattern-label {
+    display: flex !important;
+    align-items: center;
+    gap: .5rem;
+}
+
+.wellness-pattern-label input[type="checkbox"] {
+    display: inline-block !important;
+    width: auto !important;
+    margin-top: 0 !important;
+}
+
 .timesheet-weekend {
     background: rgba(99, 102, 241, 0.07);
     color: var(--color-text-muted);

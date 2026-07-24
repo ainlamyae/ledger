@@ -37,8 +37,8 @@ function previousNDates(n) {
   });
 }
 
-// Aggregates allWellnessEntries over an arbitrary set of dates (a lastNDates
-// or previousNDates result) the same way calcProjection()/
+// Aggregates getDatedWellnessEntries() over an arbitrary set of dates (a
+// lastNDates or previousNDates result) the same way calcProjection()/
 // buildCalibrationSamples() do (charts.js/calibration.js) — shared so the
 // current and previous period get identical aggregation logic.
 function aggregateWindow(dates) {
@@ -51,7 +51,7 @@ function aggregateWindow(dates) {
   const activityByDescriptionByDate = new Map();
   const sleepByDate = new Map();
 
-  allWellnessEntries
+  getDatedWellnessEntries()
     .filter((e) => e.date >= from && e.date <= to)
     .forEach((e) => {
       if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
@@ -100,7 +100,7 @@ function gatherInsightMetrics(lookbackDays) {
   const current = aggregateWindow(lastNDates(lookbackDays));
   const previous = aggregateWindow(previousNDates(lookbackDays));
 
-  const weightEntries = allWellnessEntries
+  const weightEntries = getDatedWellnessEntries()
     .filter((e) => e.category === 'Weight' && e.amount !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -111,7 +111,7 @@ function gatherInsightMetrics(lookbackDays) {
   // Reuses the exact same trajectory/calibration logic the Weight Trend &
   // Forecast chart is built from (charts.js) — Insight doesn't compute its
   // own trend, it just reports this one.
-  const projection = calcProjection(allWellnessEntries);
+  const projection = calcProjection(getDatedWellnessEntries());
   const gains = getCalibratedGains();
   const energyDensityKcalPerKg = (gains && gains.betaCal > 0) ? Math.round(1 / gains.betaCal) : null;
 
@@ -127,12 +127,12 @@ function gatherInsightMetrics(lookbackDays) {
 
     avgCalories: current.avgCalories,
     prevAvgCalories: previous.avgCalories,
-    calorieTarget: getCalorieTargetKcal(allWellnessEntries),
+    calorieTarget: getCalorieTargetKcal(getDatedWellnessEntries()),
     caloriesDaysLogged: current.caloriesDaysLogged,
 
     avgProtein: current.avgProtein,
     prevAvgProtein: previous.avgProtein,
-    proteinTarget: getProteinTargetG(allWellnessEntries),
+    proteinTarget: getProteinTargetG(getDatedWellnessEntries()),
     proteinDaysLogged: current.proteinDaysLogged,
 
     avgActivityMins: current.avgActivityMins,

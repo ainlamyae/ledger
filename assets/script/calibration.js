@@ -252,9 +252,9 @@ function validateCalibration(fit, samples) {
 }
 
 function runCalibration() {
-  const calorieTarget = getCalorieTargetKcal(allWellnessEntries);
+  const calorieTarget = getCalorieTargetKcal(getDatedWellnessEntries());
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
-  const proteinTarget = getProteinTargetG(allWellnessEntries);
+  const proteinTarget = getProteinTargetG(getDatedWellnessEntries());
 
   const summary = document.getElementById('calibration-summary');
   const saveBtn = document.getElementById('calibration-save-btn');
@@ -262,7 +262,7 @@ function runCalibration() {
   saveBtn.disabled = true;
   lastCalibrationFit = null;
 
-  const { samples, excludedCount } = buildCalibrationSamples(allWellnessEntries, sleepTarget, proteinTarget);
+  const { samples, excludedCount } = buildCalibrationSamples(getDatedWellnessEntries(), sleepTarget, proteinTarget);
 
   if (samples.length < PROJ_CALIBRATION_MIN_SAMPLES) {
     summary.innerHTML = `<p>Only ${samples.length} usable weigh-in interval(s) found (need at least ${PROJ_CALIBRATION_MIN_SAMPLES}, each with calorie logs covering at least half the interval). Log Weight alongside Calories more consistently, then try again.</p>`;
@@ -357,7 +357,7 @@ async function saveCalibratedGains() {
     await refreshSettingsList(true);
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
-    renderWellnessProjectionChart(allWellnessEntries);
+    renderWellnessProjectionChart(getDatedWellnessEntries());
 
     closeCalibrationModal();
   } catch (err) {
@@ -393,7 +393,7 @@ async function resetCalibration() {
     await refreshSettingsList(true);
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
-    renderWellnessProjectionChart(allWellnessEntries);
+    renderWellnessProjectionChart(getDatedWellnessEntries());
     closeCalibrationModal();
   }, 'Failed to reset calibration');
 }

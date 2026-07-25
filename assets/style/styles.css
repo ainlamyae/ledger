@@ -940,18 +940,52 @@ td {
     margin-bottom: .5rem;
 }
 
+/* Both Calculate tables are dense (the breakdown carries 9 columns —
+   Name/Amount/Cal/Pro/Fiber/Fat/Carb/TEF/Source — now Fiber/Carbohydrate/Fat/TEF
+   folded into it; the activity table 5), so tighter padding and no per-row border
+   keeps them narrow instead of pushing the modal wide or wrapping onto a
+   second line on a phone screen. The Total row's own top border (above)
+   still marks it off from the per-item rows above it. */
+#physique-calc-breakdown th,
+#physique-calc-breakdown td,
+#physique-activity-breakdown th,
+#physique-activity-breakdown td {
+    padding: .15rem .4rem;
+    border-bottom: none;
+}
+
+/* Nutrition (assets/script/nutrition.js) carries more columns than any other
+   table in the app (14, including the checkbox and actions) — the same
+   dense/no-border treatment as the Calculate breakdown above, so the extra
+   Fiber/Fat/Carb/TEF columns don't force horizontal scrolling on their own. */
+#nutrition-table th,
+#nutrition-table td {
+    padding: .15rem .4rem;
+    border-bottom: none;
+}
+
+/* Every numeric/short column is bounded by its own (now abbreviated) header
+   rather than its data — same reasoning as the Calculate breakdown's column
+   widths below. Only Classification/Name/Amount are left wrappable, since
+   those are the genuinely variable-length columns. */
+#nutrition-table th:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)),
+#nutrition-table td:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)) {
+    white-space: nowrap;
+}
+
 /* Column widths from what the columns actually hold, rather than the even split
    `table { width: 100% }` produces on its own.
-   Every column but the first is bounded by its own HEADER, not its data: the word
-   "Calories" is wider than any calorie figure (integers, and the day ceiling is
-   6000), "Protein" wider than a one-decimal "140.3", "Density" wider than a
-   kcal/100g that can't exceed ~900, and "Save" wider than one 💾. Only the
-   ingredient/exercise name is genuinely variable. So nowrap pins each of the
-   others to its own content width, and the name column takes width: 100% of
-   whatever is left — which is how it stops being the one column that has to wrap
-   while the rest carry space they can't use. No fixed widths: change a header
-   word or a value's precision and the columns re-measure themselves.
-   Name itself is left wrappable, for the outlier long enough to need it. */
+   Every column but the first is bounded by its own HEADER, not its data: the
+   abbreviated "Cal"/"Pro"/"Carb"/"Fat"/"TEF" headers are each wider than the
+   figure they hold, "Calories" (the activity table's own header) wider than
+   any calorie figure (integers, and the day ceiling is 6000), and "Save" wider
+   than one 💾. Only the ingredient/exercise name is genuinely variable. So
+   nowrap pins each of the others to its own content width, and the name column
+   takes width: 100% of whatever is left — which is how it stops being the one
+   column that has to wrap while the rest carry space they can't use. No fixed
+   widths: change a header word or a value's precision and the columns
+   re-measure themselves. Name itself is left wrappable, for the outlier long
+   enough to need it. */
 #physique-calc-breakdown th:not(:first-child),
 #physique-calc-breakdown td:not(:first-child),
 #physique-activity-breakdown th:not(:first-child),
@@ -978,6 +1012,21 @@ td {
     font-weight: 600;
     background: var(--color-bg);
     border-top: 2px solid var(--color-text-muted);
+}
+
+/* The two summary rows closing out the Food insight table — Total across
+   every ingredient, then that Total divided by days logged. Same bold/top-border
+   treatment as the other summed-last-row tables above; the average row skips
+   its own top border since it reads as a continuation of the Total directly
+   above it, not a new section. */
+#insight-food-table tr.insight-food-total-row td {
+    font-weight: 600;
+    border-top: 2px solid var(--color-text-muted);
+}
+
+#insight-food-table tr.insight-food-average-row td {
+    font-weight: 600;
+    font-style: italic;
 }
 
 /* Micronutrients table gap flags (assets/script/micronutrient-insight.js,
@@ -1025,12 +1074,33 @@ td {
     text-align: right;
 }
 
+/* Overrides the base `table { width: 100% }` above: every Physique column is
+   a short date/time/number, so stretching the table to the panel's full
+   width just hands the auto layout algorithm leftover space to spread out
+   as gaps between columns — the opposite of compact. `width: auto` alone
+   does NOT shrink-wrap here — per the CSS2.1 automatic-table-layout algorithm,
+   an auto-width table still expands to fill its containing block whenever
+   that's wider than its content, which it always is inside this app's
+   full-width panels. `fit-content` is what actually sizes the table to its
+   own content; .table-responsive's overflow-x still catches the rare case
+   where content genuinely doesn't fit. */
+#physique-table {
+    width: fit-content;
+    max-width: 100%;
+}
+
 /* Every remaining Physique column is a short date/time/number now that
    Consumption/Workout/Breakdown are gone, so none of them need to wrap —
    letting one (usually Date) wrap mid-value was what starved the actions
-   column of width and forced its 3 buttons onto separate lines. */
+   column of width and forced its 3 buttons onto separate lines. Dense
+   padding and no per-row border — same treatment as the Nutrition table
+   above — keeps the now-wider row (DF/Fat/Carb added alongside Cal/Pro/TEF)
+   compact. The .today-row tint (below) is a plain `background` on the cell,
+   not a border, so it's untouched by dropping border-bottom here. */
 #physique-table th,
 #physique-table td {
+    padding: .15rem .4rem;
+    border-bottom: none;
     white-space: nowrap;
 }
 

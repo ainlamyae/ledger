@@ -21,10 +21,11 @@ function breakdownToJson(breakdown) {
 // type (grams vs count, "×N"), since those aren't the same quantity and
 // summing them would be meaningless.
 //
-// Carbohydrate/fat/tef are only present once 🧬 Micronutrients has been
-// pulled for a row (estimateTefBreakdown, micronutrient-insight.js) — summed
-// when both sides have a figure, kept as whichever side has one when only
-// one does, and left undefined (not a confident zero) when neither does.
+// Fiber/carbohydrate/fat/tef are only present once the matched Nutrition row
+// has a typed figure or a pulled 🧬 Micronutrients panel (estimateTefBreakdown,
+// micronutrient-insight.js) — summed when both sides have a figure, kept as
+// whichever side has one when only one does, and left undefined (not a
+// confident zero) when neither does.
 function sumOptional(a, b) {
   if (a === undefined && b === undefined) return undefined;
   return Math.round(((a || 0) + (b || 0)) * 100) / 100;
@@ -47,6 +48,7 @@ function mergeDuplicateBreakdownRows(rows) {
     existing.quantity += quantity;
     existing.calories += row.calories;
     existing.protein = Math.round((existing.protein + row.protein) * 10) / 10;
+    existing.fiber = sumOptional(existing.fiber, row.fiber);
     existing.carbohydrate = sumOptional(existing.carbohydrate, row.carbohydrate);
     existing.fat = sumOptional(existing.fat, row.fat);
     existing.tef = sumOptional(existing.tef, row.tef);
@@ -619,10 +621,10 @@ function sourceCell(row, breakdown, totalCalories, totalProtein, target) {
 
 // "—" for a cell whose ingredient has no 🧬 Micronutrients pulled yet
 // (carbohydrate/fat/tef stay undefined on that row — see estimateTefBreakdown,
-// micronutrient-insight.js) rather than a confident 0. Rounded to 2 decimals
-// so a raw scaled figure like 1.23456818 reads as 1.23, keeping the row
-// compact.
-function macroCell(value, decimals = 2) {
+// micronutrient-insight.js) rather than a confident 0. Rounded to 1 decimal
+// so a raw scaled figure like 1.23456818 reads as 1.2 — this is a quick-glance
+// table, not a lab report.
+function macroCell(value, decimals = 1) {
   return makeCell(value === undefined ? '—' : value.toFixed(decimals));
 }
 
@@ -636,8 +638,9 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
   // saved items back to Notes lines by exact noteLine, and merging that
   // field would make a duplicated ingredient re-estimate from scratch (an
   // extra Groq/USDA lookup) on every future Calculate instead of reusing it.
-  let totalCarbohydrate;
+  let totalFiber;
   let totalFat;
+  let totalCarbohydrate;
   let totalTef;
 
   mergeDuplicateBreakdownRows(breakdown).forEach((row) => {
@@ -647,15 +650,17 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(row.amount),
       makeCell(String(row.calories)),
       makeCell(row.protein.toFixed(1)),
-      macroCell(row.carbohydrate),
+      macroCell(row.fiber),
       macroCell(row.fat),
+      macroCell(row.carbohydrate),
       macroCell(row.tef, 0),
       sourceCell(row, breakdown, totalCalories, totalProtein, target),
     );
     tbody.appendChild(tr);
 
-    if (row.carbohydrate !== undefined) totalCarbohydrate = (totalCarbohydrate || 0) + row.carbohydrate;
+    if (row.fiber !== undefined) totalFiber = (totalFiber || 0) + row.fiber;
     if (row.fat !== undefined) totalFat = (totalFat || 0) + row.fat;
+    if (row.carbohydrate !== undefined) totalCarbohydrate = (totalCarbohydrate || 0) + row.carbohydrate;
     if (row.tef !== undefined) totalTef = (totalTef || 0) + row.tef;
   });
 
@@ -666,8 +671,9 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
     makeCell(''),
     makeCell(String(totalCalories)),
     makeCell(totalProtein.toFixed(1)),
-    macroCell(totalCarbohydrate),
+    macroCell(totalFiber),
     macroCell(totalFat),
+    macroCell(totalCarbohydrate),
     macroCell(totalTef, 0),
     makeCell(''),
   );

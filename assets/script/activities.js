@@ -210,26 +210,27 @@ function makeActivityTable(group, rows, columnVisibility) {
   table.className = isStrength ? 'workout-table-strength' : 'workout-table-neat';
   table.dataset.day = group;
 
-  // The row actions column is last and unlabelled, the same shape every other
-  // table in the app uses. Order matters beyond looks: strength-plan.js reads a
-  // ticked row's name from children[0] and its quantity from children[2] for
-  // every row where box.dataset.steps/minutes/hold are all unset (a plain
-  // reps-based strength row) — those always come from a shape where Muscle
-  // Group is visible, so that pairing never shifts. Anything conditionally
-  // shown (Muscle Group, Rest, Weight) has to sit between the name and Done,
-  // never before the quantity column.
+  // The checkbox column is first and unlabelled, same as every other
+  // selectable table in the app (Nutrition, Physique). The row actions column
+  // is last and unlabelled too. Order matters beyond looks: strength-plan.js
+  // reads a ticked row's name from children[1] and its quantity from
+  // children[3] for every row where box.dataset.steps/minutes/hold are all
+  // unset (a plain reps-based strength row) — those always come from a shape
+  // where Muscle Group is visible, so that pairing never shifts. Anything
+  // conditionally shown (Muscle Group, Rest, Weight) has to sit between the
+  // name and the actions column, never before the quantity column.
   //
-  // Every column between Name and Done gets a shared "workout-meta-cell"
-  // class, and Muscle Group its own class on top — nth-child can't target
-  // these reliably on mobile any more now that a table's own column count
-  // depends on columnVisibility, so mobile's font-size/hide rules key off
-  // these classes instead of position.
-  const headers = [{ label: isStrength ? 'Exercise/Machine' : 'Activity' }];
+  // Every column between Name and the actions column gets a shared
+  // "workout-meta-cell" class, and Muscle Group its own class on top —
+  // nth-child can't target these reliably on mobile any more now that a
+  // table's own column count depends on columnVisibility, so mobile's
+  // font-size/hide rules key off these classes instead of position.
+  const headers = [{ label: '', className: 'workout-check-col' }, { label: isStrength ? 'Exercise/Machine' : 'Activity' }];
   if (columnVisibility.muscleGroup) headers.push({ label: 'Muscle Group', className: 'workout-meta-cell workout-muscle-group-cell' });
   headers.push({ label: isStrength ? 'Sets x Reps' : 'Amount', className: 'workout-meta-cell' });
   if (columnVisibility.rest) headers.push({ label: 'Rest', className: 'workout-meta-cell' });
   if (columnVisibility.weight) headers.push({ label: 'Weight', className: 'workout-meta-cell' });
-  headers.push({ label: 'Done', className: 'workout-check-col' }, { label: '' });
+  headers.push({ label: '' });
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
@@ -244,6 +245,12 @@ function makeActivityTable(group, rows, columnVisibility) {
   const tbody = document.createElement('tbody');
   rows.forEach((activity) => {
     const tr = document.createElement('tr');
+
+    const checkCell = document.createElement('td');
+    checkCell.className = 'workout-check-cell';
+    checkCell.appendChild(makeActivityCheckbox(activity));
+    tr.appendChild(checkCell);
+
     const cells = [makeCell(activity.name)];
     if (columnVisibility.muscleGroup) {
       cells.push(makeCell(truncateMuscleGroup(activity.muscleGroup), activity.muscleGroup));
@@ -256,11 +263,6 @@ function makeActivityTable(group, rows, columnVisibility) {
     cells.slice(1).forEach((cell) => cell.classList.add('workout-meta-cell'));
     if (columnVisibility.muscleGroup) cells[1].classList.add('workout-muscle-group-cell');
     tr.append(...cells);
-
-    const checkCell = document.createElement('td');
-    checkCell.className = 'workout-check-cell';
-    checkCell.appendChild(makeActivityCheckbox(activity));
-    tr.appendChild(checkCell);
 
     const actionsCell = document.createElement('td');
     actionsCell.className = 'workout-actions-cell';

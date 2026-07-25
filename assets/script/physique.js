@@ -2,7 +2,10 @@
 // burned. The tab every chart, today-tile, Insight mode and Activity Plan tick
 // reads, via the physiqueAsWellnessEntries() adapter below.
 
-const PHYSIQUE_RANGE = `'${CONFIG.SHEETS.PHYSIQUE}'!A2:L`;
+// A2:O — Date, Bedtime, Wake-up Time, Body Mass, Consumption, Breakdown,
+// Calories In, Protein In, Fiber, Fat, Carbohydrate, TEF, Workout, Activity
+// Duration, Calories Out.
+const PHYSIQUE_RANGE = `'${CONFIG.SHEETS.PHYSIQUE}'!A2:O`;
 const P_PAGE_SIZE = 31;
 
 let allPhysiqueEntries = [];
@@ -128,10 +131,13 @@ async function refreshPhysique(forceRefresh = false) {
       breakdown: row[5] || '',
       caloriesIn: numberCell(row[6]),
       proteinIn: numberCell(row[7]),
-      workout: row[8] || '',
-      duration: numberCell(row[9]),
-      caloriesOut: numberCell(row[10]),
+      fiber: numberCell(row[8]),
+      fat: numberCell(row[9]),
+      carbohydrate: numberCell(row[10]),
       tef: numberCell(row[11]),
+      workout: row[12] || '',
+      duration: numberCell(row[13]),
+      caloriesOut: numberCell(row[14]),
     }))
     // A row with nothing in it at all isn't a logged day — but a dateless row
     // that carries anything is a pattern, so every column counts here, not
@@ -295,7 +301,7 @@ function logPhysiqueDataGaps() {
   });
 }
 
-const PHYSIQUE_NUMERIC_KEYS = ['bodyMass', 'caloriesIn', 'proteinIn', 'duration', 'caloriesOut', 'tef'];
+const PHYSIQUE_NUMERIC_KEYS = ['bodyMass', 'caloriesIn', 'proteinIn', 'fiber', 'fat', 'carbohydrate', 'duration', 'caloriesOut', 'tef'];
 
 function getFilteredPhysiqueEntries() {
   const search = document.getElementById('physique-search').value.trim().toLowerCase();
@@ -321,6 +327,27 @@ function getFilteredPhysiqueEntries() {
   });
 }
 
+// Day-level Fiber/Fat/Carbohydrate totals from an already-parsed breakdown
+// array — the same fiber/fat/carbohydrate estimateTefBreakdown annotates each
+// item with (micronutrient-insight.js). Used by Calculate/bulk-recalculate to
+// fill columns I/J/K alongside TEF (column L); unlike TEF's own persisted
+// figure this is never read back off the sheet — it's always recomputed from
+// the freshest breakdown at hand. Each field stays null when nothing in the
+// breakdown carries that macro (no 🧬 Micronutrients pulled and nothing typed
+// on any matched Nutrition row) — reads as "not measured" rather than a
+// confident zero, same rule the per-ingredient tables follow.
+function sumBreakdownMacros(items) {
+  let fiber = null;
+  let fat = null;
+  let carbohydrate = null;
+  (items || []).forEach((item) => {
+    if (item.fiber !== undefined) fiber = Math.round(((fiber || 0) + item.fiber) * 10) / 10;
+    if (item.fat !== undefined) fat = Math.round(((fat || 0) + item.fat) * 10) / 10;
+    if (item.carbohydrate !== undefined) carbohydrate = Math.round(((carbohydrate || 0) + item.carbohydrate) * 10) / 10;
+  });
+  return { fiber, fat, carbohydrate };
+}
+
 // A day's sleep length from its two clock times.
 function physiqueSleepHours(p) {
   const bed = parseClockTime(p.bedtime);
@@ -344,7 +371,7 @@ function renderPhysiqueList() {
     const message = allPhysiqueEntries.length === 0
       ? 'No days logged yet — click "Log" in the panel heading to get started.'
       : 'No days match this filter.';
-    tbody.appendChild(renderEmptyRow(11, message));
+    tbody.appendChild(renderEmptyRow(14, message));
   }
 
   // Same tint the Activity Plan uses for a row already logged today (.today-row and
@@ -392,6 +419,9 @@ function renderPhysiqueList() {
       makeCell(num(p.bodyMass)),
       makeCell(num(p.caloriesIn)),
       makeCell(num(p.proteinIn)),
+      makeCell(num(p.fiber)),
+      makeCell(num(p.fat)),
+      makeCell(num(p.carbohydrate)),
       makeCell(num(p.tef), p.tef !== null
         ? undefined
         : 'Not calculated yet — select this day and click TEF below (needs 🧬 Micronutrients pulled for its ingredients)'),
@@ -480,7 +510,9 @@ function openPhysiqueMicronutrients(p) {
   document.getElementById('physique-micro-modal').hidden = false;
 }
 
-// Form field id suffix → entry property, in column order (A–K).
+// Form field id suffix → entry property, in column order (A–O). submitPhysiqueForm
+// and openPhysiqueForm both walk this array positionally, so its order IS the
+// sheet's column order — reordering this list is what reorders the write.
 const PHYSIQUE_FIELDS = [
   { id: 'date', key: 'date' },
   { id: 'bedtime', key: 'bedtime' },
@@ -490,10 +522,13 @@ const PHYSIQUE_FIELDS = [
   { id: 'breakdown', key: 'breakdown' },
   { id: 'calories-in', key: 'caloriesIn', numeric: true },
   { id: 'protein-in', key: 'proteinIn', numeric: true },
+  { id: 'fiber', key: 'fiber', numeric: true },
+  { id: 'fat', key: 'fat', numeric: true },
+  { id: 'carbohydrate', key: 'carbohydrate', numeric: true },
+  { id: 'tef', key: 'tef', numeric: true },
   { id: 'workout', key: 'workout' },
   { id: 'activity-duration', key: 'duration', numeric: true },
   { id: 'calories-out', key: 'caloriesOut', numeric: true },
-  { id: 'tef', key: 'tef', numeric: true },
 ];
 
 function physiqueField(id) {
@@ -545,8 +580,9 @@ function openPhysiqueForm(entry, duplicate = false) {
   // so Save persists the figures on screen rather than the older ones behind
   // them. Body Mass is filled in by the loop above, which is what prices it.
   const openedBreakdown = entry ? parsePhysiqueBreakdown(entry.breakdown) : [];
-  // Freshens carbohydrate/fat/tef against whatever 🧬 Micronutrients is on
-  // file right now, same as the old standalone TEF table did on open.
+  // Freshens fiber/fat/carbohydrate/tef against whatever's typed on the
+  // Nutrition row (or its pulled 🧬 Micronutrients) right now, same as the
+  // old standalone TEF table did on open.
   estimateTefBreakdown(openedBreakdown);
   renderPhysiqueBreakdown(openedBreakdown, entry ? entry.caloriesIn : 0, entry ? entry.proteinIn : 0);
   refreshPhysiqueActivityBreakdown();
@@ -581,11 +617,12 @@ function physiqueBodyMassKgFromLog() {
   return lastLogged ? lastLogged.bodyMass : null;
 }
 
-// A day's raw A–L cells — what an undo writes straight back, and the starting
+// A day's raw A–O cells — what an undo writes straight back, and the starting
 // point a recalculation overwrites only the derived columns of.
 function physiqueRowValues(p) {
   return [p.date, p.bedtime, p.wakeTime, p.bodyMass ?? '', p.consumption, p.breakdown,
-    p.caloriesIn ?? '', p.proteinIn ?? '', p.workout, p.duration ?? '', p.caloriesOut ?? '', p.tef ?? ''];
+    p.caloriesIn ?? '', p.proteinIn ?? '', p.fiber ?? '', p.fat ?? '', p.carbohydrate ?? '', p.tef ?? '',
+    p.workout, p.duration ?? '', p.caloriesOut ?? ''];
 }
 
 // A corrupt or hand-mangled cell degrades to "no breakdown" rather than
@@ -739,7 +776,7 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
 }
 
 // Prices the Workout field, writing both the hidden Activity Duration and
-// Calories Out fields (columns J and K on Save) and the table they're read from,
+// Calories Out fields (columns N and O on Save) and the table they're read from,
 // so the two can't disagree. Warnings are returned rather than shown — 🧮
 // Calculate merges them with the food side's, Log a Workout (strength-plan.js)
 // shows them on their own, and opening the form
@@ -935,7 +972,7 @@ async function bulkCombineAndSortPhysique() {
       if (text !== p.consumption) {
         const values = physiqueRowValues(p);
         values[4] = text;
-        await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${p.row}:L${p.row}`, [values]);
+        await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${p.row}:O${p.row}`, [values]);
         changedCount += 1;
         combinedTotal += combinedCount;
         succeeded.push(snapshots[i]);
@@ -989,13 +1026,17 @@ async function calculatePhysiqueDay() {
       physiqueField('calories-in').value = calories;
       physiqueField('protein-in').value = protein.toFixed(1);
 
-      // Annotates each matched row with carbohydrate/fat/tef BEFORE drawing
-      // the table, so Carb/Fat/TEF show up in the same pass as Cal/Pro rather
-      // than a second one. Only when it's actually measurable — a day whose
-      // ingredients have no 🧬 Micronutrients pulled yet leaves the TEF field
-      // exactly as it was (blank, or whatever a previous Calculate last
-      // wrote) rather than overwriting a real figure with nothing.
+      // Annotates each matched row with fiber/fat/carbohydrate/tef BEFORE
+      // drawing the table, so DF/Fat/Carb/TEF show up in the same pass as
+      // Cal/Pro rather than a second one. Only when it's actually measurable —
+      // a day whose ingredients have no 🧬 Micronutrients pulled yet leaves
+      // each field exactly as it was (blank, or whatever a previous Calculate
+      // last wrote) rather than overwriting a real figure with nothing.
       const tef = estimateTefBreakdown(breakdown);
+      const dayMacros = sumBreakdownMacros(breakdown);
+      if (dayMacros.fiber !== null) physiqueField('fiber').value = dayMacros.fiber;
+      if (dayMacros.fat !== null) physiqueField('fat').value = dayMacros.fat;
+      if (dayMacros.carbohydrate !== null) physiqueField('carbohydrate').value = dayMacros.carbohydrate;
       if (tef) physiqueField('tef').value = tef.tefKcal;
       // Writes the Breakdown field's JSON as well as drawing the table.
       renderPhysiqueBreakdown(breakdown, calories, protein);
@@ -1042,9 +1083,12 @@ function mergePhysiqueEntryIntoForm(saved) {
 
   addToPhysiqueTotal('calories-in', saved.caloriesIn);
   addToPhysiqueTotal('protein-in', saved.proteinIn);
-  // Provisional — a linear sum of the two days' own TEF, same as the other
-  // totals here. Replaced below by the exact figure if the merged breakdown's
-  // own macros can be re-estimated straight away.
+  // Provisional — a linear sum of the two days' own Fiber/Fat/Carbohydrate/TEF,
+  // same as the other totals here. Replaced below by the exact figures if the
+  // merged breakdown's own macros can be re-estimated straight away.
+  addToPhysiqueTotal('fiber', saved.fiber);
+  addToPhysiqueTotal('fat', saved.fat);
+  addToPhysiqueTotal('carbohydrate', saved.carbohydrate);
   addToPhysiqueTotal('tef', saved.tef);
   addToPhysiqueTotal('activity-duration', saved.duration);
   addToPhysiqueTotal('calories-out', saved.caloriesOut);
@@ -1056,12 +1100,16 @@ function mergePhysiqueEntryIntoForm(saved) {
   // Breakdown field's JSON — so a later Calculate can still match a saved line
   // by noteLine and reuse its numbers instead of paying for it again.
   const mergedBreakdown = [...parsePhysiqueBreakdown(saved.breakdown), ...parsePhysiqueBreakdown(physiqueField('breakdown').value)];
-  // TEF is linear in each macro's own grams, so re-running it on the combined
-  // breakdown gives the same number the sum above already estimated — but
-  // exactly, off the actual merged ingredient list, rather than trusting two
-  // rounded figures added together. Run before rendering so Carb/Fat/TEF are
-  // on the rows the table is about to draw.
+  // Fiber/Fat/Carbohydrate/TEF are linear in each macro's own grams, so
+  // re-running them on the combined breakdown gives the same numbers the sums
+  // above already estimated — but exactly, off the actual merged ingredient
+  // list, rather than trusting rounded figures added together. Run before
+  // rendering so DF/Fat/Carb/TEF are on the rows the table is about to draw.
   const tef = estimateTefBreakdown(mergedBreakdown);
+  const dayMacros = sumBreakdownMacros(mergedBreakdown);
+  if (dayMacros.fiber !== null) physiqueField('fiber').value = dayMacros.fiber;
+  if (dayMacros.fat !== null) physiqueField('fat').value = dayMacros.fat;
+  if (dayMacros.carbohydrate !== null) physiqueField('carbohydrate').value = dayMacros.carbohydrate;
   if (tef) physiqueField('tef').value = tef.tefKcal;
   renderPhysiqueBreakdown(
     mergedBreakdown,
@@ -1148,7 +1196,7 @@ async function submitPhysiqueForm(event) {
 
   try {
     if (editingPhysiqueRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${editingPhysiqueRow}:L${editingPhysiqueRow}`, [rowData]);
+      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${editingPhysiqueRow}:O${editingPhysiqueRow}`, [rowData]);
     } else {
       await appendValues(PHYSIQUE_RANGE, [rowData]);
     }
@@ -1167,18 +1215,22 @@ async function submitPhysiqueForm(event) {
 // keeps its numbers, so re-running a stretch of days costs a lookup only for
 // what actually changed.
 
-// A day's recalculated A–L cells, or null if nothing about it changed.
+// A day's recalculated A–O cells, or null if nothing about it changed.
 async function recalculatePhysiqueDay(p, bodyMassKg) {
   const values = physiqueRowValues(p);
 
   if (p.consumption.trim()) {
     const { calories, protein, breakdown } =
       await estimateConsumptionIncrementally(p.consumption, p.breakdown);
-    // Annotates each matched row with carbohydrate/fat/tef before the JSON is
-    // stringified, so column F carries them too, not just the L total. Only
-    // overwritten when measurable — leaves an unpriced day's existing L cell
-    // (blank, or a manual/earlier figure) alone rather than blanking it.
+    // Annotates each matched row with fiber/fat/carbohydrate/tef before the
+    // JSON is stringified, so column F carries them too, not just I/J/K/L.
+    // Only overwritten when measurable — leaves an unpriced day's existing
+    // cells (blank, or a manual/earlier figure) alone rather than blanking them.
     const tef = estimateTefBreakdown(breakdown);
+    const dayMacros = sumBreakdownMacros(breakdown);
+    if (dayMacros.fiber !== null) values[8] = dayMacros.fiber;
+    if (dayMacros.fat !== null) values[9] = dayMacros.fat;
+    if (dayMacros.carbohydrate !== null) values[10] = dayMacros.carbohydrate;
     if (tef) values[11] = tef.tefKcal;
     values[4] = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
     values[5] = breakdownToJson(breakdown);
@@ -1188,8 +1240,8 @@ async function recalculatePhysiqueDay(p, bodyMassKg) {
 
   if (p.workout.trim() && bodyMassKg !== null) {
     const { minutes, calories } = estimateWorkoutActivity(p.workout, bodyMassKg);
-    values[9] = minutes;
-    values[10] = calories;
+    values[13] = minutes;
+    values[14] = calories;
   }
 
   return values;
@@ -1218,7 +1270,7 @@ async function bulkCalculatePhysique() {
   const results = await Promise.allSettled(eligible.map(async (p, i) => {
     try {
       const values = await recalculatePhysiqueDay(p, p.bodyMass ?? latestBodyMassKg);
-      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${p.row}:L${p.row}`, [values]);
+      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${p.row}:O${p.row}`, [values]);
       succeeded.push(snapshots[i]);
     } finally {
       done += 1;
@@ -1242,7 +1294,7 @@ async function bulkCalculatePhysique() {
 async function restorePhysiqueSnapshots(snapshots) {
   try {
     await Promise.all(snapshots.map((s) =>
-      updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${s.row}:L${s.row}`, [s.values])));
+      updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${s.row}:O${s.row}`, [s.values])));
     await refreshPhysique(true);
   } catch (err) {
     alert(`Failed to restore: ${err.message}`);

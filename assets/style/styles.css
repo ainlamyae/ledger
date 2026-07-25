@@ -940,18 +940,33 @@ td {
     margin-bottom: .5rem;
 }
 
+/* Both Calculate tables are dense (the breakdown carries 8 columns —
+   Name/Amount/Cal/Pro/Carb/Fat/TEF/Source — now Carbohydrate/Fat/TEF folded
+   into it; the activity table 5), so tighter padding and no per-row border
+   keeps them narrow instead of pushing the modal wide or wrapping onto a
+   second line on a phone screen. The Total row's own top border (above)
+   still marks it off from the per-item rows above it. */
+#physique-calc-breakdown th,
+#physique-calc-breakdown td,
+#physique-activity-breakdown th,
+#physique-activity-breakdown td {
+    padding: .15rem .4rem;
+    border-bottom: none;
+}
+
 /* Column widths from what the columns actually hold, rather than the even split
    `table { width: 100% }` produces on its own.
-   Every column but the first is bounded by its own HEADER, not its data: the word
-   "Calories" is wider than any calorie figure (integers, and the day ceiling is
-   6000), "Protein" wider than a one-decimal "140.3", "Density" wider than a
-   kcal/100g that can't exceed ~900, and "Save" wider than one 💾. Only the
-   ingredient/exercise name is genuinely variable. So nowrap pins each of the
-   others to its own content width, and the name column takes width: 100% of
-   whatever is left — which is how it stops being the one column that has to wrap
-   while the rest carry space they can't use. No fixed widths: change a header
-   word or a value's precision and the columns re-measure themselves.
-   Name itself is left wrappable, for the outlier long enough to need it. */
+   Every column but the first is bounded by its own HEADER, not its data: the
+   abbreviated "Cal"/"Pro"/"Carb"/"Fat"/"TEF" headers are each wider than the
+   figure they hold, "Calories" (the activity table's own header) wider than
+   any calorie figure (integers, and the day ceiling is 6000), and "Save" wider
+   than one 💾. Only the ingredient/exercise name is genuinely variable. So
+   nowrap pins each of the others to its own content width, and the name column
+   takes width: 100% of whatever is left — which is how it stops being the one
+   column that has to wrap while the rest carry space they can't use. No fixed
+   widths: change a header word or a value's precision and the columns
+   re-measure themselves. Name itself is left wrappable, for the outlier long
+   enough to need it. */
 #physique-calc-breakdown th:not(:first-child),
 #physique-calc-breakdown td:not(:first-child),
 #physique-activity-breakdown th:not(:first-child),

@@ -240,6 +240,10 @@ function physiqueAsWellnessEntries() {
         // calculated — charts.js falls back to the flat TEF_PERCENT_OF_INTAKE
         // estimate on null rather than treating it as a measured zero.
         tefKcal: p.tef,
+        // This day's own persisted Fiber (column I) — hand-typed or last
+        // backfilled from the breakdown, same as tefKcal above. Read by the
+        // Health tiles' Fiber card.
+        fiberG: p.fiber,
       });
     }
 

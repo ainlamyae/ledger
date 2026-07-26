@@ -58,7 +58,10 @@ function workoutNoteQuantityForBox(box) {
   // An isometric HOLD row (Plank) is held rather than repped, so its total is
   // sets × seconds held and the per-rep tempo doesn't apply.
   if (box.dataset.hold !== undefined) return `${Number(box.dataset.sets) * Number(box.dataset.hold)}sec`;
-  const cell = box.closest('tr').children[3].textContent;
+  // By class, not a fixed index — the column's position among Muscle
+  // Group/Weight/Rest shifts with that table's own columnVisibility
+  // (activities.js), so an index would drift as those come and go.
+  const cell = box.closest('tr').querySelector('.workout-quantity-cell').textContent;
   const totalReps = totalRepsFromSetsCell(cell);
   // An unrecognized cell writes its own text with the separator normalized to a
   // bare x — still a format activity-estimator.js reads back.

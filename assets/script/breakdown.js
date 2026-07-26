@@ -10,7 +10,7 @@
 //
 // A2:F — Category, Type, Last Month, Last Quarter, Last Year, Lifelong.
 const BREAKDOWN_RANGE = `'${CONFIG.SHEETS.INSIGHT}'!A2:F200`;
-const BREAKDOWN_PAGE_SIZE = 25;
+const BREAKDOWN_PAGE_SIZE = 100;
 
 // The four money columns, in sheet order — used for the table, the sort keys and
 // the modal's read-only summary, so the order is stated once.

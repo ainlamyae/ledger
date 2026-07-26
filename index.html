@@ -176,16 +176,16 @@
                 <div class="value" id="today-calories-value">—</div>
             </div>
             <div class="card">
-                <h3>Activity</h3>
-                <div class="value" id="today-activity-value">—</div>
-            </div>
-            <div class="card">
                 <h3>Protein</h3>
                 <div class="value" id="today-protein-value">—</div>
             </div>
             <div class="card">
-                <h3>Sleep</h3>
-                <div class="value" id="today-sleep-value">—</div>
+                <h3>Fiber</h3>
+                <div class="value" id="today-fiber-value">—</div>
+            </div>
+            <div class="card">
+                <h3>Activity</h3>
+                <div class="value" id="today-activity-value">—</div>
             </div>
         </div>
 
@@ -297,6 +297,13 @@
                     <h4>Protein Intake</h4>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-protein-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Fiber Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-fiber-chart"></canvas>
                     </div>
                 </div>
 
@@ -424,7 +431,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="physique-table">
+                <table id="physique-table" class="table-compact">
                     <thead>
                     <tr>
                         <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
@@ -467,7 +474,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="nutrition-table">
+                <table id="nutrition-table" class="table-compact">
                     <thead>
                     <tr>
                         <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
@@ -493,7 +500,7 @@
             <div class="panel-actions" id="nutrition-bulk-actions" hidden>
                 <span id="nutrition-bulk-summary"></span>
                 <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
-                <button id="nutrition-pull-micros-btn" class="btn" title="Pull the full USDA nutrient panel (vitamins, minerals, and more) for the selected ingredients, scaled to each row's own Amount, into the Micronutrients column — never touches Calories, Protein or Verified">🧬 Pull Micronutrients</button>
+                <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">🧬 Pull Micronutrients</button>
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
 
@@ -721,7 +728,7 @@
             <p id="export-summary-text" class="hint export-summary-text"></p>
 
             <div class="table-responsive">
-                <table id="transactions-table">
+                <table id="transactions-table" class="table-compact">
                     <thead>
                     <tr>
                         <th><input type="checkbox" id="tx-select-all" aria-label="Select all transactions on this page"></th>
@@ -756,7 +763,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="accounts-table">
+                <table id="accounts-table" class="table-compact">
                     <thead>
                     <tr>
                         <th class="sortable" data-sort="name">Account Name</th>
@@ -796,7 +803,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="breakdown-table">
+                <table id="breakdown-table" class="table-compact">
                     <thead>
                     <tr>
                         <th class="sortable" data-sort="category">Category</th>
@@ -880,7 +887,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="timesheet-table">
+                <table id="timesheet-table" class="table-compact">
                     <thead>
                     <tr>
                         <th>Company</th>
@@ -929,7 +936,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="travel-table">
+                <table id="travel-table" class="table-compact">
                     <thead>
                     <tr>
                         <th class="sortable" data-sort="date">Date</th>
@@ -978,7 +985,7 @@
             </div>
 
             <div class="table-responsive">
-                <table id="contacts-table">
+                <table id="contacts-table" class="table-compact">
                     <thead>
                     <tr>
                         <th><input type="checkbox" id="contacts-select-all" aria-label="Select all contacts on this page"></th>
@@ -1221,6 +1228,7 @@
                     <option>BODY_MASS_TARGET_KG</option>
                     <option>CALORIE_TARGET_KCAL</option>
                     <option>SLEEP_TARGET_HOURS</option>
+                    <option>FIBER_TARGET_G</option>
                     <option>ACTIVITY_TARGET_MIN</option>
                     <option>ACTIVITY_MET_DEFAULT</option>
                     <option>PROTEIN_TARGET_G</option>
@@ -1334,7 +1342,7 @@
                 <textarea id="physique-breakdown" rows="3"></textarea>
             </label>
 
-            <div id="physique-calc-breakdown" class="table-responsive" hidden>
+            <div id="physique-calc-breakdown" class="table-responsive table-compact" hidden>
                 <table>
                     <thead>
                     <tr>
@@ -1377,7 +1385,7 @@
             <label>Workout
                 <textarea id="physique-workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
             </label>
-            <div id="physique-activity-breakdown" class="table-responsive" hidden>
+            <div id="physique-activity-breakdown" class="table-responsive table-compact" hidden>
                 <table>
                     <thead>
                     <tr>
@@ -1887,6 +1895,7 @@
             <label>Image
                 <input type="text" id="activity-image" placeholder="e.g. assets/images/activities/seated-row.gif">
             </label>
+            <img id="activity-image-preview" class="activity-image-preview" alt="Movement guide preview" hidden>
 
             <p id="activity-form-error" class="status" hidden></p>
 
@@ -1939,8 +1948,6 @@
                 <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
             </label>
 
-            <div id="nutrition-usda-results" class="usda-results" hidden></div>
-
             <details id="nutrition-micronutrients-details" hidden>
                 <summary>Micronutrients</summary>
                 <ul id="nutrition-micronutrients-list" class="micronutrients-list"></ul>
@@ -1949,8 +1956,7 @@
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="nutrition-usda-btn" class="btn" title="Look the typed name up in USDA FoodData Central and fill Amount, Calories and Protein from it">🔍 Look up in USDA</button>
-                <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Pull the full USDA nutrient panel (vitamins, minerals, and more) for this ingredient, scaled to its own Amount, into the Micronutrients column — never touches Calories, Protein or Verified" hidden>🧬 Pull Micronutrients</button>
+                <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">🧬 Pull Micronutrients</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>

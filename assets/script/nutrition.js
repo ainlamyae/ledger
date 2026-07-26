@@ -54,6 +54,14 @@ let nCurrentPage = 1;
 let nutritionSheetId = null;
 let editingNutritionRow = null;
 let selectedNutritionRows = new Set();
+// Holds the micronutrient panel bundled with whichever USDA candidate 🔍 Look
+// Up last applied — the search response already carries every candidate's
+// full nutrient panel, so applying one is free, no second lookup. Deferred to
+// Save rather than written immediately (Edit mode used to write straight to
+// the sheet on pull) so browsing candidates before picking one doesn't fire a
+// write per click. Cleared whenever the form opens or closes so a stale pull
+// can't leak into the next ingredient.
+let pendingIngredientMicronutrients = null;
 
 async function fetchNutritionSheetId() {
   const metadata = await getSpreadsheetMetadata();
@@ -67,8 +75,7 @@ async function initNutrition(forceRefresh = false) {
     document.getElementById('add-nutrition-btn').addEventListener('click', () => openNutritionForm(null));
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
     onFormSubmit('nutrition-form', submitNutritionForm);
-    document.getElementById('nutrition-usda-btn').addEventListener('click', lookupNutritionFromUsda);
-    onAsyncClick('nutrition-pull-micros-single-btn', pullMicronutrientsForEditingRow);
+    document.getElementById('nutrition-pull-micros-single-btn').addEventListener('click', pullMicronutrientsForForm);
 
     document.getElementById('nutrition-search').addEventListener('input', () => {
       nCurrentPage = 1;
@@ -361,6 +368,7 @@ function renderNutritionPagination(totalPages) {
 
 function openNutritionForm(entry) {
   editingNutritionRow = entry ? entry.row : null;
+  pendingIngredientMicronutrients = null;
 
   document.getElementById('nutrition-modal-title').textContent = entry ? 'Edit Ingredient' : 'Add Ingredient';
   document.getElementById('nutrition-classification').value = entry ? entry.classification : '';
@@ -380,25 +388,28 @@ function openNutritionForm(entry) {
   document.getElementById('nutrition-verified').checked = entry ? entry.verified : false;
   document.getElementById('nutrition-protein-percent').value = (entry && entry.proteinPercent !== null) ? entry.proteinPercent : '';
 
-  // Pulling only makes sense against a row that already exists (it writes
-  // straight to that row's H cell by number) — hidden entirely in Add mode.
-  document.getElementById('nutrition-pull-micros-single-btn').hidden = !entry;
   renderNutritionMicronutrientsDetails(entry);
 
   clearFieldError('nutrition-form-error');
-  clearUsdaResults();
   document.getElementById('nutrition-modal').hidden = false;
 }
 
-// The Edit Ingredient form's collapsed-by-default Micronutrients disclosure —
-// hidden entirely when the row has never been pulled (nothing to show), open
-// state left alone once expanded across renders within one Pull click's refresh.
+// The ingredient form's collapsed-by-default Micronutrients disclosure —
+// hidden entirely when there's nothing pulled yet, open state left alone once
+// expanded across renders within one 🔍 Look Up's refresh. Prefers whatever
+// pendingIngredientMicronutrients holds (a candidate applied this session,
+// not yet saved) over the row's own saved panel, since that's the fresher
+// figure Save is about to commit.
 function renderNutritionMicronutrientsDetails(entry) {
+  const parsed = pendingIngredientMicronutrients ?? (entry ? parseMicronutrients(entry.micronutrients) : null);
+  renderMicronutrientsList(parsed);
+}
+
+function renderMicronutrientsList(parsed) {
   const details = document.getElementById('nutrition-micronutrients-details');
   const list = document.getElementById('nutrition-micronutrients-list');
   list.innerHTML = '';
 
-  const parsed = entry ? parseMicronutrients(entry.micronutrients) : null;
   if (!parsed) {
     details.hidden = true;
     return;
@@ -439,27 +450,23 @@ function renderNutritionClassificationOptions() {
 function closeNutritionForm() {
   document.getElementById('nutrition-modal').hidden = true;
   editingNutritionRow = null;
-  clearUsdaResults();
+  pendingIngredientMicronutrients = null;
 }
 
-function clearUsdaResults() {
-  const results = document.getElementById('nutrition-usda-results');
-  results.innerHTML = '';
-  results.hidden = true;
-}
-
-// Fills Amount/Calories/Protein from the typed Name via USDA FoodData Central
-// (the same database and search helper calorie-estimator.js already uses).
-//
-// Unlike Calculate, there's no AI estimate here to sanity-check a result
-// against — so pickPlausibleMacros's trust test can't run, and USDA's relevance
-// ranking is genuinely capable of putting "Oil, soybean" (884 kcal) above the
-// bean (~140) for "soybeans". Every candidate is therefore listed for the user
-// to judge, with the top one applied so the common case is still one click.
-async function lookupNutritionFromUsda() {
-  const btn = document.getElementById('nutrition-usda-btn');
+// The Add/Edit Ingredient form's own 🧬 Pull Micronutrients button — same
+// name, same icon, same job as the bulk one on the Nutrition table (see
+// pullNutritionFromUsda), just applied to whatever's currently typed rather
+// than a saved row. Amount is read, never written: fill it in with a real
+// gram figure first, the same way a row needs one before the bulk button can
+// touch it. Deferred to Save (pendingIngredientMicronutrients) rather than
+// written immediately — there's no row to write into yet in Add mode, and
+// Edit mode stays consistent with it rather than writing early.
+async function pullMicronutrientsForForm() {
+  const btn = document.getElementById('nutrition-pull-micros-single-btn');
   const name = document.getElementById('nutrition-name').value.trim();
+  const amount = document.getElementById('nutrition-amount').value.trim();
 
+  clearFieldError('nutrition-form-error');
   if (!name) {
     showFieldError('nutrition-form-error', 'Type an ingredient name first — that name is what gets looked up.');
     return;
@@ -467,78 +474,26 @@ async function lookupNutritionFromUsda() {
 
   btn.disabled = true;
   const originalLabel = btn.textContent;
-  btn.textContent = 'Looking up…';
-  clearFieldError('nutrition-form-error');
-  clearUsdaResults();
+  btn.textContent = 'Pulling…';
 
-  try {
-    const candidates = await usdaLookupKcalCandidates(name);
-    if (candidates.length === 0) {
-      showFieldError('nutrition-form-error', `No USDA match for "${name}" — try a plainer, more generic name (not a brand), or fill the figures in by hand.`);
-      return;
-    }
-    renderUsdaCandidates(candidates);
-    applyUsdaCandidate(candidates[0]);
-  } catch (err) {
-    showFieldError('nutrition-form-error', err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
+  const result = await pullNutritionFromUsda(name, amount);
+
+  btn.disabled = false;
+  btn.textContent = originalLabel;
+
+  if (!result.applied) {
+    showFieldError('nutrition-form-error', `Couldn't pull micronutrients for "${name}" — ${result.reason}.`);
+    return;
   }
-}
 
-function renderUsdaCandidates(candidates) {
-  const results = document.getElementById('nutrition-usda-results');
+  document.getElementById('nutrition-calories').value = String(result.calories);
+  document.getElementById('nutrition-protein').value = result.protein !== null ? String(result.protein) : '';
 
-  const hint = document.createElement('p');
-  hint.className = 'hint';
-  hint.textContent = candidates.length === 1
-    ? 'USDA FoodData Central match, per 100 g — applied below.'
-    : 'USDA FoodData Central matches, per 100 g. The first is applied below; pick another if it describes your ingredient better.';
-  results.appendChild(hint);
+  pendingIngredientMicronutrients = result.nutrients;
+  renderMicronutrientsList(pendingIngredientMicronutrients);
 
-  candidates.forEach((candidate) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn usda-candidate';
-    btn.dataset.description = candidate.description;
-    btn.setAttribute('aria-pressed', 'false');
-    btn.textContent = `${candidate.description} — ${Math.round(candidate.kcalPer100g)} kcal, ${formatUsdaProtein(candidate)}`;
-    btn.addEventListener('click', () => applyUsdaCandidate(candidate));
-    results.appendChild(btn);
-  });
-
-  results.hidden = false;
-}
-
-function formatUsdaProtein(candidate) {
-  return candidate.proteinPer100g !== null
-    ? `${Math.round(candidate.proteinPer100g * 10) / 10} g protein`
-    : 'no protein figure';
-}
-
-// USDA reports per 100 g, so Amount is set to match — it's the quantity the
-// Calories/Protein actually describe, and the same shape Calculate banks its
-// own USDA-derived rows in, which keeps every auto-filled row scalable.
-//
-// Name is left as typed and Verified is left alone: a database figure is not a
-// label checked against your own purchased product, which is the only thing
-// that tick is supposed to mean.
-function applyUsdaCandidate(candidate) {
-  document.getElementById('nutrition-amount').value = '100g';
-  document.getElementById('nutrition-calories').value = String(Math.round(candidate.kcalPer100g));
-  document.getElementById('nutrition-protein').value = candidate.proteinPer100g !== null
-    ? String(Math.round(candidate.proteinPer100g * 10) / 10)
-    : '';
-
-  document.querySelectorAll('#nutrition-usda-results .usda-candidate').forEach((btn) => {
-    btn.setAttribute('aria-pressed', String(btn.dataset.description === candidate.description));
-  });
-
-  if (candidate.proteinPer100g === null) {
-    showFieldError('nutrition-form-error', `"${candidate.description}" has no protein figure in USDA — fill Protein in yourself before saving.`);
-  } else {
-    clearFieldError('nutrition-form-error');
+  if (result.protein === null) {
+    showFieldError('nutrition-form-error', `"${result.description}" has no protein figure in USDA — fill Protein in yourself before saving.`);
   }
 }
 
@@ -592,21 +547,25 @@ async function submitNutritionForm(event) {
   const tef = tefResult.value;
 
   // Every hand-editable field (A-K) is one contiguous range now that
-  // Micronutrients (L, machine-written only by Pull Micronutrients) sits at
-  // the very end rather than splitting the row in two — one write instead of
-  // two, and L is never touched here either way.
+  // Micronutrients (L) sits at the very end rather than splitting the row in
+  // two. L itself is only ever included here when 🔍 Look Up applied a fresh
+  // candidate this session (pendingIngredientMicronutrients) — otherwise the
+  // write is scoped to A:K so an Edit save can't blank out a panel pulled in
+  // an earlier session.
   const rowData = [
     classification, name, amount, calories, protein,
     fiber !== null ? fiber : '', fat !== null ? fat : '', carb !== null ? carb : '', tef !== null ? tef : '',
     verified ? '1' : '', proteinPercent !== null ? proteinPercent : '',
   ];
+  if (pendingIngredientMicronutrients) rowData.push(JSON.stringify(pendingIngredientMicronutrients));
 
   try {
     if (editingNutritionRow) {
       await ensureNutritionColumns();
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:K${editingNutritionRow}`, [rowData]);
+      const lastCol = pendingIngredientMicronutrients ? 'L' : 'K';
+      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:${lastCol}${editingNutritionRow}`, [rowData]);
     } else {
-      if (fiber !== null || fat !== null || carb !== null || tef !== null) await ensureNutritionColumns();
+      if (fiber !== null || fat !== null || carb !== null || tef !== null || pendingIngredientMicronutrients) await ensureNutritionColumns();
       await appendValues(NUTRITION_RANGE, [rowData]);
     }
     closeNutritionForm();
@@ -708,63 +667,73 @@ async function ensureNutritionColumns() {
   await Promise.all(headers.map(([cell, label]) => updateValues(`'${CONFIG.SHEETS.NUTRITION}'!${cell}`, [[label]])));
 }
 
-// Core single-row pull, shared by the bulk button below and the single-row
-// one in the Edit Ingredient modal: looks up USDA, resolves a trustworthy
-// candidate (or asks via confirm() when its energy doesn't match this row's
-// own Calories), and writes the scaled nutrient panel to column L. Never
-// throws — a lookup/network failure is folded into `reason` too — so neither
-// caller needs its own try/catch around the USDA round trip.
-//
-// Columns A-K are never part of the write — the update below is scoped to
-// L{row}:L{row} only, so Calories/Protein/Fiber/Fat/Carb/TEF/Verified stay
-// exactly as they were, no matter how trusted the USDA match is or whether
-// the row is verified.
-async function pullMicronutrientsForEntry(n) {
-  // USDA's figures are per 100 g — a row with no gram figure in Amount
-  // (e.g. a bare count like "2 eggs") has nothing to scale them against.
-  const grams = parseGramsFromAmount(n.amount);
+// The one 🧬 Pull Micronutrients job, shared byte-for-byte by the bulk button
+// and the Add/Edit Ingredient form's own button — same name, same icon, same
+// work: given a Name and an Amount that already carries a real gram figure,
+// look up USDA's top match and scale its Calories/Protein/full nutrient panel
+// down to that gram figure. Amount itself is never read back out or written —
+// there's nothing to scale USDA's per-100g figures against without one
+// already there, so a blank/non-gram Amount is a failure, not a 100g guess.
+// Never writes anywhere itself (a row that doesn't exist yet — the Add
+// Ingredient form — has nowhere to write), and never throws — a lookup/
+// network failure folds into `reason` too, so no caller needs its own
+// try/catch around the USDA round trip.
+async function pullNutritionFromUsda(name, amount) {
+  const grams = parseGramsFromAmount(amount);
   if (grams === null) return { applied: false, reason: 'Amount has no gram figure to scale from' };
-  const kcalPer100gReference = (n.calories / grams) * 100;
 
   try {
-    const candidates = await usdaLookupKcalCandidates(n.name);
+    const candidates = await usdaLookupKcalCandidates(name);
     if (candidates.length === 0) return { applied: false, reason: 'no USDA match' };
 
-    let candidate = pickPlausibleUsdaCandidate(candidates, kcalPer100gReference);
-    if (!candidate) {
-      const top = candidates[0];
-      const apply = confirm(
-        `USDA's top match for "${n.name}" is "${top.description}" at ${Math.round(top.kcalPer100g)} kcal/100g — ` +
-        `far from this row's own ${Math.round(kcalPer100gReference)} kcal/100g, so it's probably the wrong food. ` +
-        `Apply its micronutrients anyway?`
-      );
-      if (!apply) return { applied: false, reason: "USDA match's energy didn't match — declined" };
-      candidate = top;
-    }
-
-    if (!candidate.nutrients.length) return { applied: false, reason: 'USDA match has no nutrient detail' };
-
+    const candidate = candidates[0];
     const scale = grams / 100;
-    const nutrients = {};
-    // Alphabetical, not USDA's nutrient-ID order — so both the saved JSON and
-    // the Edit Ingredient disclosure list read the same way as everything
-    // else in the app.
-    [...candidate.nutrients].sort((a, b) => a.name.localeCompare(b.name)).forEach((nut) => {
-      nutrients[nut.name] = { amount: Math.round(nut.amountPer100g * scale * 10000) / 10000, unit: nut.unit };
-    });
-
-    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!L${n.row}:L${n.row}`, [[JSON.stringify(nutrients)]]);
-    return { applied: true };
+    return {
+      applied: true,
+      description: candidate.description,
+      calories: Math.round(candidate.kcalPer100g * scale),
+      protein: candidate.proteinPer100g !== null ? Math.round(candidate.proteinPer100g * scale * 10) / 10 : null,
+      nutrients: candidate.nutrients.length ? nutrientPanelFromCandidate(candidate, grams) : null,
+    };
   } catch (err) {
     return { applied: false, reason: err.message };
   }
 }
 
-// Pulls the full USDA nutrient panel (macros AND micros — vitamins,
-// minerals, everything reported) for every selected row via
+// Scales one USDA candidate's per-100g nutrient panel to a real gram amount —
+// shared by pullNutritionFromUsda above, since it's the one place both
+// buttons end up with a USDA candidate and a gram figure needing this shape.
+function nutrientPanelFromCandidate(candidate, grams) {
+  const scale = grams / 100;
+  const nutrients = {};
+  // Alphabetical, not USDA's nutrient-ID order — so both the saved JSON and
+  // the ingredient form's disclosure list read the same way as everything
+  // else in the app.
+  [...candidate.nutrients].sort((a, b) => a.name.localeCompare(b.name)).forEach((nut) => {
+    nutrients[nut.name] = { amount: Math.round(nut.amountPer100g * scale * 10000) / 10000, unit: nut.unit };
+  });
+  return nutrients;
+}
+
+// Bulk wrapper: resolves and writes straight to this existing row's own
+// Calories/Protein (D:E) and, when USDA had nutrient detail, Micronutrients
+// (L) — Amount, Fiber/Fat/Carb/TEF and Verified are never part of either
+// write, so nothing else about the row moves.
+async function pullMicronutrientsForEntry(n) {
+  const result = await pullNutritionFromUsda(n.name, n.amount);
+  if (!result.applied) return result;
+
+  await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!D${n.row}:E${n.row}`, [[result.calories, result.protein !== null ? result.protein : '']]);
+  if (result.nutrients) {
+    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!L${n.row}:L${n.row}`, [[JSON.stringify(result.nutrients)]]);
+  }
+  return { applied: true };
+}
+
+// Pulls Calories/Protein and the full USDA nutrient panel (macros AND micros
+// — vitamins, minerals, everything reported) for every selected row via
 // pullMicronutrientsForEntry above. Runs one row at a time (not Promise.all)
-// so a per-row energy-mismatch confirm() doesn't fire for several rows at
-// once, and so a rate-limited USDA key fails predictably rather than in a burst.
+// so a rate-limited USDA key fails predictably rather than in a burst.
 async function pullMicronutrientsForSelected() {
   const btn = document.getElementById('nutrition-pull-micros-btn');
   const statusEl = document.getElementById('nutrition-pull-status');
@@ -802,40 +771,6 @@ async function pullMicronutrientsForSelected() {
     : `Pulled micronutrients for ${pulled} ingredient${pulled === 1 ? '' : 's'}.`;
 
   await refreshNutrition(true);
-}
-
-// Single-row equivalent for the Edit Ingredient modal's own 🧬 button — only
-// ever shown there for an already-saved row (see openNutritionForm), since a
-// row has to exist to have an H cell to write into. Reads the row's saved
-// Amount/Calories, not whatever's currently typed in the form but unsaved —
-// Save first if you want a just-edited Amount reflected in the scaling.
-async function pullMicronutrientsForEditingRow() {
-  if (!editingNutritionRow) return;
-  const entry = allNutritionEntries.find((n) => n.row === editingNutritionRow);
-  if (!entry) return;
-
-  const errorEl = document.getElementById('nutrition-form-error');
-  clearFieldError('nutrition-form-error');
-  errorEl.classList.remove('status-ok');
-
-  try {
-    await ensureNutritionColumns();
-  } catch (err) {
-    showFieldError('nutrition-form-error', `Couldn't prepare the Micronutrients column: ${err.message}`);
-    return;
-  }
-
-  const result = await pullMicronutrientsForEntry(entry);
-  if (!result.applied) {
-    showFieldError('nutrition-form-error', `Couldn't pull micronutrients for "${entry.name}" — ${result.reason}.`);
-    return;
-  }
-
-  await refreshNutrition(true);
-  renderNutritionMicronutrientsDetails(allNutritionEntries.find((n) => n.row === editingNutritionRow));
-  errorEl.textContent = `Pulled micronutrients for "${entry.name}".`;
-  errorEl.classList.add('status-ok');
-  errorEl.hidden = false;
 }
 
 // Naive singular fold — just enough to catch "egg"/"eggs"-style plural typos

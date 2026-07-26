@@ -466,6 +466,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Nutrition</h2>
+                <button type="button" id="log-nutrition-btn" class="btn btn-primary panel-header-btn" title="Log the ticked ingredients as today's Consumption">Log</button>
                 <button id="add-nutrition-btn" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
             </div>
 
@@ -1524,22 +1525,34 @@
                 </select>
                 <span class="formula-unit">+5 ♂ / −161 ♀</span>
             </label>
-            <!-- The two figures everything downstream is measured against, readonly because
-                 neither is a setting: BMR is whichever equation the radio above selected,
-                 evaluated at m̄, and M is that plus the activity burn the τ/MET rows below
-                 imply. Placed with the profile rather than beside Eᵢₙ because that's what
-                 they describe — the body, before any plan is applied to it. -->
+            <!-- Moved up from the protein block to sit with the rest of the profile it's
+                 derived from (m̄, h, σ) and directly above BMR: under Katch-McArdle, BMR is
+                 built from this figure rather than the other way around, so it has to be
+                 known before BMR is. -->
+            <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Feeds Katch-McArdle BMR above and the protein/glycogen bands below.">
+                <span class="formula-sym">LBM</span>
+                <span class="formula-name">lean body mass — Boer (1984)</span>
+                <input type="text" id="formula-lbm" inputmode="decimal" readonly>
+                <span class="formula-unit">kg</span>
+            </label>
+            <!-- The figure everything downstream is measured against, readonly because it
+                 isn't a setting: whichever equation the radio above selected, evaluated at
+                 m̄. Placed with the profile rather than beside Eᵢₙ because that's what it
+                 describes — the body, before any plan is applied to it. -->
             <label class="formula-row" title="Resting metabolic rate at your smoothed body mass, from whichever equation is selected above — what you burn before any movement. Not editable: it is derived from m̄, h, a and σ.">
                 <span class="formula-sym">BMR</span>
                 <span class="formula-name">resting metabolic rate, at m̄</span>
                 <input type="text" id="formula-bmr" inputmode="decimal" readonly>
                 <span class="formula-unit">kcal/day</span>
             </label>
-            <label class="formula-row" title="Maintenance: BMR + the activity burn Eₐ that hitting τ minutes at MET produces. The intake that would hold your body mass still — the deficit D is measured down from this, and Eᵢₙ is what's left.">
-                <span class="formula-sym">M</span>
-                <span class="formula-name">maintenance at m̄ — BMR + Eₐ</span>
-                <input type="text" id="formula-maintenance" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
+            <!-- Marks the end of the profile block (m, m̄, h, a, σ, LBM, BMR) before the
+                 activity block starts below. -->
+            <hr class="formula-divider">
+            <label class="formula-row">
+                <span class="formula-sym">τ</span>
+                <span class="formula-name">activity target</span>
+                <input type="text" id="formula-activity-min" inputmode="decimal">
+                <span class="formula-unit">min/day</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">MET</span>
@@ -1551,17 +1564,29 @@
                 <span class="formula-unit">MET</span>
             </label>
             <label class="formula-row">
-                <span class="formula-sym">τ</span>
-                <span class="formula-name">activity target</span>
-                <input type="text" id="formula-activity-min" inputmode="decimal">
-                <span class="formula-unit">min/day</span>
-            </label>
-            <label class="formula-row">
                 <span class="formula-sym">κ</span>
                 <span class="formula-name">oxygen uptake per MET</span>
                 <input type="text" id="formula-met-o2" inputmode="decimal">
                 <span class="formula-unit">mL O₂/kg/min</span>
             </label>
+            <!-- Directly under κ, the other half of the O₂-to-kcal conversion Eₐ runs: κ is
+                 how much oxygen the activity costs, ε is what that oxygen is worth in
+                 calories, and Eₐ right below is the two of them applied. -->
+            <div class="formula-row formula-row-fixed">
+                <span class="formula-sym">ε</span>
+                <span class="formula-name">oxygen energy yield</span>
+                <span class="formula-fixed">200</span>
+                <span class="formula-unit">mL O₂/kcal</span>
+            </div>
+            <label class="formula-row" title="Activity burn at that target: Eₐ = MET × m̄ × τ × κ / ε. Not editable: it is derived from MET, τ and κ above.">
+                <span class="formula-sym">Eₐ</span>
+                <span class="formula-name">activity burn at the daily target</span>
+                <input type="text" id="formula-activity-kcal" inputmode="decimal" readonly>
+                <span class="formula-unit">kcal/day</span>
+            </label>
+            <!-- Marks the end of the activity block (MET, τ, κ, Eₐ) before the rate block
+                 starts below. -->
+            <hr class="formula-divider">
             <!-- Δm's other face, and the row above it on purpose: the percentage is the
                  unit the safety band is written in, so it's what you set the pace in and
                  the kilograms below follow. Type either box and the other follows it. -->
@@ -1583,12 +1608,6 @@
                 <span class="formula-fixed">7700</span>
                 <span class="formula-unit">kcal/kg</span>
             </div>
-            <div class="formula-row formula-row-fixed">
-                <span class="formula-sym">ε</span>
-                <span class="formula-name">oxygen energy yield</span>
-                <span class="formula-fixed">200</span>
-                <span class="formula-unit">mL O₂/kcal</span>
-            </div>
             <!-- Directly under Δm and ρ, the two figures it's made of, and directly above Eᵢₙ,
                  the one it's subtracted from — so the three rows read as the sentence the
                  identity is. Readonly like BMR and M: it's derived from the rate you set, not
@@ -1602,20 +1621,17 @@
                 <input type="text" id="formula-deficit" inputmode="decimal" readonly>
                 <span class="formula-unit">kcal/day</span>
             </label>
-            <!-- Above Eᵢₙ because it's an input to it, and TEF below it because it's a share
-                 of the answer: digestion costs a fraction of whatever you end up eating, so
-                 the identity is solved (Eᵢₙ = (BMR + Eₐ − D)/(1 − f)) rather than summed. -->
+            <!-- Marks the end of the rate block (Δm%, Δm, ρ, D) before the calorie-solve
+                 block (f, TEF, M, Eᵢₙ) starts below. -->
+            <hr class="formula-divider">
+            <!-- Directly above TEF, the box it feeds: digestion costs a fraction of whatever
+                 you end up eating, so the identity is solved (Eᵢₙ = (BMR + Eₐ − D)/(1 − f))
+                 rather than summed, and TEF = f × Eᵢₙ reads as the very next line. -->
             <label class="formula-row" title="The thermic effect of food: the share of what you eat that is spent digesting it — about 10% on a mixed diet, higher on protein. It is part of expenditure, so counting it RAISES the intake that produces the same deficit. Left at 0 by default, which is the arithmetic this app has always used; type 10 and save to include it.">
                 <span class="formula-sym">f</span>
                 <span class="formula-name">thermic effect of food, as a share of Eᵢₙ</span>
                 <input type="text" id="formula-tef-pct" inputmode="decimal">
                 <span class="formula-unit">% of Eᵢₙ</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">Eᵢₙ</span>
-                <span class="formula-name">target daily intake</span>
-                <input type="text" id="formula-ein" inputmode="decimal">
-                <span class="formula-unit">kcal</span>
             </label>
             <label class="formula-row" title="What that share comes to in calories: TEF = f × Eᵢₙ. Zero while f is zero.">
                 <span class="formula-sym">TEF</span>
@@ -1623,6 +1639,27 @@
                 <input type="text" id="formula-tef" inputmode="decimal" readonly>
                 <span class="formula-unit">kcal/day</span>
             </label>
+            <!-- Marks the end of the TEF pair (f, TEF) before M and Eᵢₙ start below. -->
+            <hr class="formula-divider">
+            <!-- Directly under BMR and Eₐ, the two figures it's the sum of, and directly
+                 above Eᵢₙ — the rate is set against maintenance, so the identity reads as a
+                 sentence: BMR + Eₐ = M, and M minus the deficit above is what's left to eat. -->
+            <label class="formula-row" title="Maintenance: BMR + the activity burn Eₐ that hitting τ minutes at MET produces. The intake that would hold your body mass still — the deficit D is measured down from this, and Eᵢₙ is what's left.">
+                <span class="formula-sym">M</span>
+                <span class="formula-name">maintenance at m̄ — BMR + Eₐ</span>
+                <input type="text" id="formula-maintenance" inputmode="decimal" readonly>
+                <span class="formula-unit">kcal/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">Eᵢₙ</span>
+                <span class="formula-name">target daily intake</span>
+                <input type="text" id="formula-ein" inputmode="decimal">
+                <span class="formula-unit">kcal</span>
+            </label>
+            <!-- Marks the end of the calorie-solve block, Eᵢₙ, before the journey block
+                 (m_g, t, dates) starts below. -->
+            <hr class="formula-divider" title="TEF is already built into Eᵢₙ above — the identity is solved with f in the denominator, not summed — so it is not a further deficit to subtract on top of it.">
+
             <!-- The destination, immediately above the day count that measures the trip to
                  it: m_g used to sit second in the list, with t twelve rows below, which read
                  as though the target belonged with the profile. It doesn't — it's the one
@@ -1690,125 +1727,23 @@
                      follows — the unit column is a unit. -->
                 <span class="formula-unit">kg</span>
             </label>
-            <!-- The lean-mass block closes the list, and reads top to bottom as one
-                 derivation: LBM from m̄/h/σ, the p_min/p_max rule you set, then the grams
-                 that rule produces. Only the middle pair is editable — no "Solve for" mode
-                 turns the other three into inputs, since no calorie identity involves
-                 protein, so they compute in all five.
-                 LBM is the exception to that last point, though not to the readonly: under
-                 Katch-McArdle it's the input BMR itself is built from, which is why it's
-                 computed from m̄ and h alone rather than alongside the protein band. -->
-            <label class="formula-row">
-                <span class="formula-sym">LBM</span>
-                <span class="formula-name">lean body mass — Boer (1984)</span>
-                <input type="text" id="formula-lbm" inputmode="decimal" readonly>
-                <span class="formula-unit">kg</span>
-            </label>
-            <!-- The rule, immediately above the grams it produces: p_min/p_max used to sit
-                 with the other editable knobs several rows up, which split the protein block
-                 in two and left `p × LBM = P` as a multiplication whose two halves were
-                 nowhere near each other. Editable among readonly rows is the point — LBM
-                 above and the two P rows below are all derived, and these are the only part
-                 of the band you set. -->
-            <label class="formula-row">
-                <span class="formula-sym">p_min</span>
-                <span class="formula-name">protein floor per kg of lean mass</span>
-                <input type="text" id="formula-protein-per-kg-min" inputmode="decimal">
-                <span class="formula-unit">g/kg LBM/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">p_max</span>
-                <span class="formula-name">protein ceiling per kg of lean mass</span>
-                <input type="text" id="formula-protein-per-kg-max" inputmode="decimal">
-                <span class="formula-unit">g/kg LBM/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">P_min</span>
-                <span class="formula-name">daily protein target, lower end</span>
-                <input type="text" id="formula-protein-min" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">P_max</span>
-                <span class="formula-name">daily protein target, upper end</span>
-                <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <!-- The fiber band follows protein: a floor scaled to how much you eat (14 g per
-                 1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body weight
-                 (0.5 g/kg) — two different bases, unlike protein's single LBM, so both
-                 coefficients are editable and neither rides on a box the other computes. -->
-            <label class="formula-row">
-                <span class="formula-sym">f_min</span>
-                <span class="formula-name">fiber floor per 1,000 kcal of intake</span>
-                <input type="text" id="formula-fiber-per-1000kcal-min" inputmode="decimal">
-                <span class="formula-unit">g/1,000 kcal</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">f_max</span>
-                <span class="formula-name">fiber ceiling per kg of body weight</span>
-                <input type="text" id="formula-fiber-per-kg-max" inputmode="decimal">
-                <span class="formula-unit">g/kg/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">F_min</span>
-                <span class="formula-name">daily fiber target, lower end</span>
-                <input type="text" id="formula-fiber-min" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">F_max</span>
-                <span class="formula-name">daily fiber target, upper end</span>
-                <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <!-- The fat band follows fiber, same two-different-bases shape but both ends
-                 scaled off Eᵢₙ instead of one off body weight: 20-35% of total energy from fat
-                 is the Institute of Medicine's Acceptable Macronutrient Distribution Range for
-                 adults (Dietary Reference Intakes for Energy, Carbohydrate, Fiber, Fat, Fatty
-                 Acids, Cholesterol, Protein, and Amino Acids, 2005), also the range the USDA
-                 Dietary Guidelines for Americans carries forward — not the user's own guessed
-                 25%, which sits inside this band rather than defining it. 9 kcal/g is fat's
-                 fixed energy density (Atwater), not a personal parameter, so only the two
-                 percentages are editable. -->
-            <label class="formula-row">
-                <span class="formula-sym">k_min</span>
-                <span class="formula-name">fat floor, share of intake calories</span>
-                <input type="text" id="formula-fat-pct-min" inputmode="decimal">
-                <span class="formula-unit">% of Eᵢₙ</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">k_max</span>
-                <span class="formula-name">fat ceiling, share of intake calories</span>
-                <input type="text" id="formula-fat-pct-max" inputmode="decimal">
-                <span class="formula-unit">% of Eᵢₙ</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">G_min</span>
-                <span class="formula-name">daily fat target, lower end</span>
-                <input type="text" id="formula-fat-min" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">G_max</span>
-                <span class="formula-name">daily fat target, upper end</span>
-                <input type="text" id="formula-fat-max" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <!-- Glycogen closes the list, straight after LBM/protein since it reads the same
-                 LBM box above rather than a flat guess: glycogen is stored in muscle, not fat,
-                 so it has to scale with lean mass, not sit unrelated to weight/height/sex. Not
-                 read by any calorie identity — this is purely the explanation for why m and m̄
-                 above don't agree from one day to the next: glycogen stores pull water in with
-                 them, so a day of low carbs (or a big refeed) can move the scale by kilograms
-                 with no fat gained or lost at all. LBM alone overstates it: skeletal muscle is
-                 only ~40-50% of LBM (the rest is water, organs, skin and bone, none of which
-                 store meaningful glycogen), and a published muscle-tissue glycogen density
-                 (g/kg wet muscle) applied straight to LBM comes out roughly double what it
-                 should. s and m_musc below cut LBM down to that muscle share first, so g_musc
-                 can be the real muscle-tissue figure rather than a diluted per-LBM one. Only s,
-                 g_musc, g_liver and the water ratio are editable — same shape as p_min/p_max
-                 above. -->
+            <!-- Marks the end of the journey block (t, arrival date, adaptation) before the
+                 glycogen block starts below. -->
+            <hr class="formula-divider">
+            <!-- Glycogen follows the journey block now, straight after LBM up with the
+                 profile, since it reads that same LBM box rather than a flat guess: glycogen
+                 is stored in muscle, not fat, so it has to scale with lean mass, not sit
+                 unrelated to weight/height/sex. Not read by any calorie identity — this is
+                 purely the explanation for why m and m̄ above don't agree from one day to the
+                 next: glycogen stores pull water in with them, so a day of low carbs (or a
+                 big refeed) can move the scale by kilograms with no fat gained or lost at
+                 all. LBM alone overstates it: skeletal muscle is only ~40-50% of LBM (the
+                 rest is water, organs, skin and bone, none of which store meaningful
+                 glycogen), and a published muscle-tissue glycogen density (g/kg wet muscle)
+                 applied straight to LBM comes out roughly double what it should. s and
+                 m_musc below cut LBM down to that muscle share first, so g_musc can be the
+                 real muscle-tissue figure rather than a diluted per-LBM one. Only s, g_musc,
+                 g_liver and the water ratio are editable — same shape as p_min/p_max below. -->
             <label class="formula-row" title="Skeletal muscle, as a direct share of LBM — not of m̄, since it's a fat-free-mass ratio and m̄ still carries the fat. Skeletal muscle runs roughly 40-50% of lean body mass; the rest of LBM is water, organs, skin and bone, none of which store meaningful glycogen. Higher toward 50% for a more muscular frame, lower toward 40% otherwise.">
                 <span class="formula-sym">s</span>
                 <span class="formula-name">skeletal muscle, share of lean mass</span>
@@ -1850,6 +1785,111 @@
                 <span class="formula-name">glycogen + water swing</span>
                 <input type="text" id="formula-glycogen-swing" inputmode="decimal" readonly>
                 <span class="formula-unit">kg</span>
+            </label>
+            <!-- Marks the end of the glycogen block (s…ΔM_gly) before the protein block
+                 starts below. -->
+            <hr class="formula-divider">
+            <!-- The protein block closes the list, and reads top to bottom as one
+                 derivation: the p_min/p_max rule you set, applied to LBM (up with the
+                 profile now — see its own comment), then the grams that rule produces. Only
+                 the rule is editable — no "Solve for" mode turns the other two into inputs,
+                 since no calorie identity involves protein, so they compute in all five. -->
+            <!-- The rule, immediately above the grams it produces: p_min/p_max used to sit
+                 with the other editable knobs several rows up, which split the protein block
+                 in two and left `p × LBM = P` as a multiplication whose two halves were
+                 nowhere near each other. Editable among readonly rows is the point — LBM
+                 above and the two P rows below are all derived, and these are the only part
+                 of the band you set. -->
+            <label class="formula-row">
+                <span class="formula-sym">p_min</span>
+                <span class="formula-name">protein floor per kg of lean mass</span>
+                <input type="text" id="formula-protein-per-kg-min" inputmode="decimal">
+                <span class="formula-unit">g/kg LBM/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">p_max</span>
+                <span class="formula-name">protein ceiling per kg of lean mass</span>
+                <input type="text" id="formula-protein-per-kg-max" inputmode="decimal">
+                <span class="formula-unit">g/kg LBM/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">P_min</span>
+                <span class="formula-name">daily protein target, lower end</span>
+                <input type="text" id="formula-protein-min" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">P_max</span>
+                <span class="formula-name">daily protein target, upper end</span>
+                <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <!-- Marks the end of the protein block (P_min, P_max) before the fiber block
+                 starts below. -->
+            <hr class="formula-divider">
+            <!-- The fiber band follows protein: a floor scaled to how much you eat (14 g per
+                 1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body weight
+                 (0.5 g/kg) — two different bases, unlike protein's single LBM, so both
+                 coefficients are editable and neither rides on a box the other computes. -->
+            <label class="formula-row">
+                <span class="formula-sym">f_min</span>
+                <span class="formula-name">fiber floor per 1,000 kcal of intake</span>
+                <input type="text" id="formula-fiber-per-1000kcal-min" inputmode="decimal">
+                <span class="formula-unit">g/1,000 kcal</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">f_max</span>
+                <span class="formula-name">fiber ceiling per kg of body weight</span>
+                <input type="text" id="formula-fiber-per-kg-max" inputmode="decimal">
+                <span class="formula-unit">g/kg/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">F_min</span>
+                <span class="formula-name">daily fiber target, lower end</span>
+                <input type="text" id="formula-fiber-min" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">F_max</span>
+                <span class="formula-name">daily fiber target, upper end</span>
+                <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <!-- Marks the end of the fiber block (F_min, F_max) before the fat block
+                 starts below. -->
+            <hr class="formula-divider">
+            <!-- The fat band follows fiber, same two-different-bases shape but both ends
+                 scaled off Eᵢₙ instead of one off body weight: 20-35% of total energy from fat
+                 is the Institute of Medicine's Acceptable Macronutrient Distribution Range for
+                 adults (Dietary Reference Intakes for Energy, Carbohydrate, Fiber, Fat, Fatty
+                 Acids, Cholesterol, Protein, and Amino Acids, 2005), also the range the USDA
+                 Dietary Guidelines for Americans carries forward — not the user's own guessed
+                 25%, which sits inside this band rather than defining it. 9 kcal/g is fat's
+                 fixed energy density (Atwater), not a personal parameter, so only the two
+                 percentages are editable. -->
+            <label class="formula-row">
+                <span class="formula-sym">k_min</span>
+                <span class="formula-name">fat floor, share of intake calories</span>
+                <input type="text" id="formula-fat-pct-min" inputmode="decimal">
+                <span class="formula-unit">% of Eᵢₙ</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">k_max</span>
+                <span class="formula-name">fat ceiling, share of intake calories</span>
+                <input type="text" id="formula-fat-pct-max" inputmode="decimal">
+                <span class="formula-unit">% of Eᵢₙ</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">G_min</span>
+                <span class="formula-name">daily fat target, lower end</span>
+                <input type="text" id="formula-fat-min" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">G_max</span>
+                <span class="formula-name">daily fat target, upper end</span>
+                <input type="text" id="formula-fat-max" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
             </label>
         </div>
 

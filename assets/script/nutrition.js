@@ -118,6 +118,7 @@ function setupNutritionBulkActions() {
 
   onAsyncClick('nutrition-bulk-merge-btn', mergeSelectedNutritionEntries);
   onAsyncClick('nutrition-pull-micros-btn', pullMicronutrientsForSelected);
+  document.getElementById('log-nutrition-btn').addEventListener('click', logSelectedNutrition);
 }
 
 function setupNutritionSorting() {
@@ -322,8 +323,13 @@ function renderNutritionList() {
     tbody.appendChild(renderEmptyRow(15, message));
   }
 
+  // Computed once per render, not per row — todaysUsedNutritionRows walks
+  // today's whole breakdown, and this loop shouldn't repeat that per item.
+  const usedToday = todaysUsedNutritionRows();
+
   pageItems.forEach((n) => {
     const tr = document.createElement('tr');
+    tr.classList.toggle('nutrition-row-logged', usedToday.has(n.row));
 
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
@@ -390,6 +396,51 @@ function updateNutritionBulkActionsUI() {
   bar.hidden = count === 0;
   document.getElementById('nutrition-bulk-summary').textContent = count > 0 ? `${count} selected` : '';
   document.getElementById('nutrition-bulk-merge-btn').disabled = count < 2;
+  updateNutritionLogButtonLabel();
+}
+
+// Mirrors log-workout-btn's Log/Log More toggle in strength-plan.js: "Log"
+// while today's Physique row has no Consumption yet, "Log More" once it
+// does — there's no per-ingredient "already logged" state to compare against
+// the way workout rows have (the same ingredient can legitimately appear
+// twice in one day at different amounts), so this reads coarser, off the
+// whole day rather than off which rows are ticked.
+function updateNutritionLogButtonLabel() {
+  const today = todaysPhysiqueDay();
+  const hasToday = Boolean(today && today.consumption && today.consumption.trim());
+  const btn = document.getElementById('log-nutrition-btn');
+  btn.textContent = hasToday ? 'Log More' : 'Log';
+  btn.title = hasToday
+    ? "Add the ticked ingredients to today's Consumption"
+    : "Log the ticked ingredients as today's Consumption";
+}
+
+// Appends the ticked catalogue ingredients to Consumption as bare "g name"
+// lines and opens the Physique form on them — same shape as logWorkout in
+// strength-plan.js, but without its auto-Calculate step: a set/rep count is
+// already known when a workout row is ticked, while a serving size here
+// isn't, so the line is left for the user to type an amount at its front
+// before running Calculate themselves.
+function logSelectedNutrition() {
+  const selected = allNutritionEntries
+    .filter((n) => selectedNutritionRows.has(n.row))
+    .sort((a, b) => a.row - b.row);
+  if (selected.length === 0) {
+    alert('Tick at least one ingredient before logging it to Consumption.');
+    return;
+  }
+
+  const today = todaysPhysiqueDay();
+  const consumption = [today?.consumption ?? '', ...selected.map((n) => `g ${n.name}`)]
+    .filter((part) => part.trim())
+    .join('\n');
+
+  openPhysiqueForm(today);
+  if (today) document.getElementById('physique-modal-title').textContent = "Add to Today's Consumption";
+  physiqueField('consumption').value = consumption;
+
+  selectedNutritionRows.clear();
+  renderNutritionList();
 }
 
 function renderNutritionPagination(totalPages) {
@@ -844,6 +895,25 @@ async function pullMicronutrientsForSelected() {
 // Breakdown predates some ingredient's rename, or was never Calculated,
 // simply doesn't count towards it, same "only as fresh as the last
 // Calculate" caveat every other breakdown-derived figure in this app has.
+// Same match computeNutritionUsageCounts runs across every day, narrowed to
+// today's saved breakdown — what tints a Nutrition row .nutrition-row-logged
+// the same way strength-plan.js tints a ticked exercise, so a glance at the
+// table says which ingredients today's Consumption already resolved to.
+// Reads the SAVED breakdown, not the raw Consumption text: a line typed but
+// not yet Calculated (including one this panel's own Log button just added)
+// has no name to match until Calculate prices it, same as Activity Plan only
+// ticks a row once it's actually in today's saved Workout.
+function todaysUsedNutritionRows() {
+  const today = todaysPhysiqueDay();
+  const rows = new Set();
+  if (!today) return rows;
+  parsePhysiqueBreakdown(today.breakdown).forEach((item) => {
+    const entry = findNutritionEntry(item.name);
+    if (entry) rows.add(entry.row);
+  });
+  return rows;
+}
+
 function computeNutritionUsageCounts() {
   const counts = new Map();
   allPhysiqueEntries.forEach((p) => {

@@ -807,6 +807,18 @@ const PROTEIN_G_PER_KG_LBM_MAX_DEFAULT = 2.2;
 const FIBER_G_PER_1000_KCAL_MIN_DEFAULT = 14;
 const FIBER_G_PER_KG_MAX_DEFAULT = 0.5;
 
+// The fat band's two coefficients — 20-35% of total energy from fat is the Institute of
+// Medicine's Acceptable Macronutrient Distribution Range for adults (Dietary Reference
+// Intakes for Energy, Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino
+// Acids, 2005), the same range the USDA Dietary Guidelines for Americans carries forward.
+// Both ends scale off Eᵢₙ (percent of intake calories), unlike fiber's floor/ceiling on two
+// different bases, since that's how the AMDR itself is defined.
+const FAT_PCT_OF_KCAL_MIN_DEFAULT = 20;
+const FAT_PCT_OF_KCAL_MAX_DEFAULT = 35;
+// Fat's fixed energy density (Atwater) — grams per kcal, not a personal parameter, so it's a
+// plain constant rather than an overridable setting the way the two percentages above are.
+const KCAL_PER_G_FAT = 9;
+
 // Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 5.0 compound lifting, 7.0
 // jogging). Duplicates activity-estimator.js's EXERCISE_MET_DEFAULT rather than
 // referencing it: charts.js loads first, so that const is still in its dead zone.

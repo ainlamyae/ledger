@@ -1039,6 +1039,33 @@ function computeWeightTrend(weightByDate, windowSize = WEIGHT_TREND_WINDOW_SIZE)
   return trend;
 }
 
+// A net change this small in kg over ~10 days reads as a genuine stall
+// rather than normal day-to-day fluctuation (water, sodium, cycle) — checked
+// against the already-smoothed Weight Trend line, not raw weigh-ins, which
+// are noisy enough day-to-day to trip a naive threshold on their own.
+const PLATEAU_WINDOW_DAYS = 10;
+const PLATEAU_THRESHOLD_KG = 0.3;
+
+// Returns how many days the trend has actually held flat, or null if
+// there's not enough logged history spanning the full window to tell (a
+// couple of sparse entries can't confirm 10 days of flatness, only fail to
+// disprove it) or the trend has moved enough to not count as a plateau.
+function detectPlateau(trendMap) {
+  const dates = [...trendMap.keys()].sort();
+  if (dates.length < 3) return null;
+
+  const lastDate = dates[dates.length - 1];
+  const lastMs = parseIsoDateUTC(lastDate);
+  const windowStartMs = lastMs - (PLATEAU_WINDOW_DAYS - 1) * 86400000;
+  if (parseIsoDateUTC(dates[0]) > windowStartMs) return null;
+
+  const windowStartDate = dates.find((d) => parseIsoDateUTC(d) >= windowStartMs);
+  const change = trendMap.get(lastDate) - trendMap.get(windowStartDate);
+  if (Math.abs(change) >= PLATEAU_THRESHOLD_KG) return null;
+
+  return Math.round((lastMs - parseIsoDateUTC(windowStartDate)) / 86400000);
+}
+
 // A slope this large (kg/day) is well outside anything physiologically real
 // — a backstop so a noisy calibrated coefficient extrapolating past its
 // training data's range can't produce a runaway projection.
@@ -1171,9 +1198,12 @@ function renderWellnessProjectionChart(entries) {
   const meterFill = document.getElementById('weight-progress-meter-fill');
   const meterPct = document.getElementById('weight-progress-meter-pct');
   const etaEl = document.getElementById('weight-projection-eta');
+  const plateauNote = document.getElementById('weight-plateau-note');
   meterWrap.hidden = true;
   meterPct.textContent = '';
   etaEl.textContent = '';
+  plateauNote.textContent = '';
+  plateauNote.classList.remove('warning');
 
   const weightEntries = entries
     .filter((e) => e.category === 'Weight' && e.amount !== null)
@@ -1226,6 +1256,13 @@ function renderWellnessProjectionChart(entries) {
   });
   const weightByDate = new Map([...weightSumsByDate].map(([d, { sum, count }]) => [d, sum / count]));
   const trendMap = computeWeightTrend(weightByDate);
+
+  const plateauDays = detectPlateau(trendMap);
+  if (plateauDays) {
+    const plateauLine = `⚠️ Weight trend has been flat for ~${plateauDays} days — consider adjusting your calorie target`;
+    plateauNote.textContent = privacyMode ? maskDigits(plateauLine) : plateauLine;
+    plateauNote.classList.add('warning');
+  }
 
   // Daily history followed by weekly (then a single distant ETA) projected
   // points must NOT be spaced as equal category ticks — that visually

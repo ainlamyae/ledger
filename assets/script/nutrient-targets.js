@@ -93,6 +93,29 @@ function nutrientDailyTargets() {
   }
 }
 
+// Patches one or more nutrients' `amount` inside the MICRONUTRIENT_DAILY_TARGETS_JSON
+// override, preserving each one's unit/kind (and every other nutrient) untouched — the
+// Formula Playground's Save calls this so this table's own Protein/Fiber rows track the
+// band it just computed instead of sitting on the shipped FDA Daily Value forever. An
+// entry gains an override even if the setting was never customized before, since the
+// starting point is the shipped default for whichever name isn't already overridden.
+function patchMicronutrientDailyTargetAmounts(patch) {
+  const raw = getSettingString('MICRONUTRIENT_DAILY_TARGETS_JSON', null);
+  let overrides = {};
+  if (raw) {
+    try {
+      overrides = JSON.parse(raw);
+    } catch {
+      overrides = {};
+    }
+  }
+  Object.entries(patch).forEach(([name, amount]) => {
+    const base = overrides[name] || NUTRIENT_DAILY_TARGETS_DEFAULT[name] || { unit: 'G', kind: 'floor' };
+    overrides[name] = { ...base, amount };
+  });
+  return JSON.stringify(overrides);
+}
+
 const NUTRIENT_GAP_SEVERE_FLOOR_RATIO = 0.5;
 const NUTRIENT_GAP_MILD_FLOOR_RATIO = 0.8;
 

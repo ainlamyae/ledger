@@ -54,6 +54,14 @@ const PROTEIN_FORMULA_FIELDS = [
   { key: 'PROTEIN_G_PER_KG_LBM_MAX', inputId: 'formula-protein-per-kg-max', fallback: () => PROTEIN_G_PER_KG_LBM_MAX_DEFAULT },
 ];
 
+// The fiber band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
+// PROTEIN_FORMULA_FIELDS: fiber feeds no calorie identity, so a blank one should only stop
+// fiber from being computed and saved, not the target.
+const FIBER_FORMULA_FIELDS = [
+  { key: 'FIBER_G_PER_1000_KCAL_MIN', inputId: 'formula-fiber-per-1000kcal-min', fallback: () => FIBER_G_PER_1000_KCAL_MIN_DEFAULT },
+  { key: 'FIBER_G_PER_KG_MAX', inputId: 'formula-fiber-per-kg-max', fallback: () => FIBER_G_PER_KG_MAX_DEFAULT },
+];
+
 // Which box each "Solve for" radio value fills in. Activity intensity (MET)
 // isn't offered as a solvable target — only τ, on the activity side, is.
 const FORMULA_SOLVE_FIELD_ID = {
@@ -247,6 +255,9 @@ Lean body mass — Boer (1984)
 Daily protein band, scaled to lean mass
     P_min =  p_min × LBM
     P_max =  p_max × LBM
+Fiber band — a floor from daily intake, a ceiling from body weight
+    F_min =  f_min × (Eᵢₙ / 1000)
+    F_max =  f_max × m
 Skeletal muscle mass — the fraction of LBM that actually stores glycogen
     m_musc =  s × LBM
 Glycogen store, from muscle mass
@@ -441,6 +452,15 @@ function renderFormulaSubstituted(rows, plan = null) {
   } catch (err) {
     console.error('Protein band failed to render', err);
   }
+  // Independent of the protein block above — reads m̄ and Eᵢₙ, not LBM — but guarded
+  // separately for the same reason every block here is: one throwing can't take the others
+  // down with it.
+  let fiberRows = [];
+  try {
+    fiberRows = renderFiberFields();
+  } catch (err) {
+    console.error('Fiber band failed to render', err);
+  }
   // Reads the same LBM box protein just filled — guarded separately so a throw here can't
   // take LBM/protein down with it, same as every other block in this function.
   let glycogenRows = [];
@@ -460,10 +480,10 @@ function renderFormulaSubstituted(rows, plan = null) {
   }
 
   // Appended in the order the boxes themselves run — BMI_g sits with m_g near the top of the
-  // sheet, the adaptation pair sits above the lean-mass block, and glycogen closes the list
-  // right after protein — so the trace reads down in roughly the same order the eye just
-  // travelled.
-  [...(rows ?? []), ...bmiRows, ...pctRows, ...correctionRows, ...proteinRows, ...glycogenRows].forEach(([label, value]) => {
+  // sheet, the adaptation pair sits above the lean-mass block, fiber follows protein, and
+  // glycogen closes the list right after — so the trace reads down in roughly the same order
+  // the eye just travelled.
+  [...(rows ?? []), ...bmiRows, ...pctRows, ...correctionRows, ...proteinRows, ...fiberRows, ...glycogenRows].forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
@@ -681,6 +701,48 @@ function renderProteinFields() {
     ['LBM', `${coefficients}  =  ${lbmKg} kg`],
     ['P_min', `${perKgMin} × ${lbmKg}  =  ${minG} g/day`],
     ['P_max', `${perKgMax} × ${lbmKg}  =  ${maxG} g/day`],
+  ];
+}
+
+// The fiber band: a floor scaled to how much you eat (14 g/1000 kcal, the USDA/DGA rule of
+// thumb) and a ceiling scaled to body weight (0.5 g/kg) — two different bases, unlike
+// protein's single LBM, so neither end rides on a box the other computes.
+//
+// Reads formula-ein directly rather than re-deriving it: by the time renderFiberFields runs
+// (from renderFormulaSubstituted, after the calorie half of the sheet), that box already
+// holds this render's Eᵢₙ — typed or solved, in every mode — so this is the one read that
+// can't disagree with what the sheet just showed.
+function readFiberFormula() {
+  const bodyMassKg = formulaBodyMassKg();
+  const einKcal = formulaNumber('formula-ein');
+  const perKcalMin = formulaNumber('formula-fiber-per-1000kcal-min');
+  const perKgMax = formulaNumber('formula-fiber-per-kg-max');
+  if (bodyMassKg === null || einKcal === null || perKcalMin === null || perKgMax === null) return null;
+
+  return {
+    bodyMassKg, einKcal, perKcalMin, perKgMax,
+    minG: Math.round(perKcalMin * (einKcal / 1000)),
+    maxG: Math.round(perKgMax * bodyMassKg),
+  };
+}
+
+// The two fiber boxes and their trace rows — same pairing and same dash-on-missing-input
+// convention renderProteinFields uses.
+function renderFiberFields() {
+  const fiber = readFiberFormula();
+
+  if (fiber === null) {
+    ['formula-fiber-min', 'formula-fiber-max'].forEach((id) => setComputedField(id, '—'));
+    return [];
+  }
+
+  const { bodyMassKg, einKcal, perKcalMin, perKgMax, minG, maxG } = fiber;
+  setComputedField('formula-fiber-min', String(minG));
+  setComputedField('formula-fiber-max', String(maxG));
+
+  return [
+    ['F_min', `${perKcalMin} × (${einKcal} / 1000)  =  ${minG} g/day`],
+    ['F_max', `${perKgMax} × ${bodyMassKg}  =  ${maxG} g/day`],
   ];
 }
 
@@ -1340,7 +1402,7 @@ function renderFormulaPreview() {
 }
 
 function loadFormulaInputsFromSettings() {
-  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS].forEach((field) => {
+  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS].forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
   });
   // Seeded from the same places the charts read, so the figure shown on open
@@ -1473,6 +1535,31 @@ async function saveFormulaSettings() {
     overrides.PROTEIN_TARGET_G_MAX = protein.maxG;
   }
 
+  // Same shape as protein just above: both coefficients, and the grams they produced —
+  // FIBER_TARGET_G_MIN/MAX is what the tile and the chart actually read.
+  const fiber = readFiberFormula();
+  if (fiber !== null) {
+    overrides.FIBER_G_PER_1000_KCAL_MIN = fiber.perKcalMin;
+    overrides.FIBER_G_PER_KG_MAX = fiber.perKgMax;
+    overrides.FIBER_TARGET_G_MIN = fiber.minG;
+    overrides.FIBER_TARGET_G_MAX = fiber.maxG;
+  }
+
+  // Keeps the Micronutrients table's own Protein/Fiber rows (and their gap-severity
+  // coloring) in step with the band just computed above, instead of leaving them on
+  // whatever flat FDA Daily Value MICRONUTRIENT_DAILY_TARGETS_JSON shipped or was last
+  // typed with. The band's MIN is what's written — kind stays 'floor' either way, and
+  // that's the "did you get enough" question gap severity actually asks; the full
+  // min~max band still shows everywhere else (the tile, the chart, Food Insight's
+  // Ideal/day row), all read straight from PROTEIN_TARGET_G_MIN/MAX and
+  // FIBER_TARGET_G_MIN/MAX rather than from this JSON.
+  const micronutrientPatch = {};
+  if (protein !== null) micronutrientPatch['Protein'] = protein.minG;
+  if (fiber !== null) micronutrientPatch['Fiber, total dietary'] = fiber.minG;
+  if (Object.keys(micronutrientPatch).length > 0) {
+    overrides.MICRONUTRIENT_DAILY_TARGETS_JSON = patchMicronutrientDailyTargetAmounts(micronutrientPatch);
+  }
+
   // The adaptation pair, saved the same way and for the same reason as the per-kg protein
   // rule: they change no target, but the Health Plan prompt quotes them, so the sheet has to
   // remember what the plateau caveat was computed with. Each only when it holds a number —
@@ -1512,6 +1599,12 @@ async function saveFormulaSettings() {
     const proteinNote = protein === null
       ? 'The protein band was left alone — it needs body mass, height and both per-kg ends.'
       : `Protein target is now ${protein.minG}–${protein.maxG} g/day, from ${protein.perKgMin}–${protein.perKgMax} g per kg of ${protein.lbmKg} kg lean mass.`;
+    const fiberNote = fiber === null
+      ? ' The fiber band was left alone — it needs body mass, Eᵢₙ and both coefficients.'
+      : ` Fiber target is now ${fiber.minG}–${fiber.maxG} g/day, from ${fiber.perKcalMin} g per 1,000 kcal and ${fiber.perKgMax} g per kg body weight.`;
+    const micronutrientNote = Object.keys(micronutrientPatch).length > 0
+      ? ' The Micronutrients table’s Protein/Fiber floors now match these too.'
+      : '';
     // Which BMR equation is now in force, and whether digestion is being counted — the two
     // choices that move every calorie figure in the app at once, so a save that changed one
     // shouldn't leave you guessing which numbers just moved and why.
@@ -1520,7 +1613,7 @@ async function saveFormulaSettings() {
       : 'BMR stays on Mifflin-St Jeor.';
     const tefSaved = formulaNumber('formula-tef-pct');
     const tefNote = tefSaved ? ` The thermic effect of food is counted at ${tefSaved}% of intake, which lifts every target accordingly.` : '';
-    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote} ${modelNote}${tefNote}`);
+    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${micronutrientNote} ${modelNote}${tefNote}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {
@@ -1545,6 +1638,7 @@ function initFormulaPlayground() {
   // listener firing first would let the previous known overwrite the box being typed into.
   [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss' && id !== 'formula-target'),
     ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
+    ...FIBER_FORMULA_FIELDS.map((f) => f.inputId),
     ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
     'formula-body-mass-smooth', 'formula-height', 'formula-age',
     'formula-glycogen-skeletal-frac', 'formula-glycogen-per-kg-muscle', 'formula-glycogen-liver',

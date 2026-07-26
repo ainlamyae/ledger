@@ -1026,6 +1026,15 @@ td {
     font-style: italic;
 }
 
+/* Ideal/day — a target, not a measurement, so it's set off from Total/Avg with a
+   dashed top border instead of their solid one, the same idiom the wellness charts'
+   own dashed target lines use. */
+#insight-food-table tr.insight-food-ideal-row td {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    border-top: 2px dashed var(--color-text-muted);
+}
+
 /* Micronutrients table gap flags (assets/script/micronutrient-insight.js,
    assets/script/physique.js) — a row is flagged 'severe'/'mild' once its
    measured average sits well under a get-enough-of nutrient's FDA Daily Value;

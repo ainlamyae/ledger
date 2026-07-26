@@ -4,7 +4,7 @@
 // the specific brand/product actually bought) is recorded here, it's reused
 // instead of being re-guessed every time.
 
-const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:E`;
+const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:F`;
 const N_PAGE_SIZE = 25;
 
 // Amount is freeform serving-size text so it can read like a real nutrition
@@ -112,10 +112,23 @@ async function refreshNutrition(forceRefresh = false) {
       // you've checked it against the label on your own purchased
       // ingredient — never written by the app itself, only by hand here.
       verified: String(row[4] || '').trim() === '1',
+      // Column F: blank means "not tracked" — protein-rotation.js's Protein
+      // Source Rotation chart only includes rows with a number here: what
+      // % of your (live, weight/activity-driven) protein target this
+      // ingredient should cover, e.g. 10 for "turkey = 10% of my protein".
+      proteinPercent: (row[5] !== undefined && row[5] !== '') ? Number(row[5]) : null,
     }))
     .filter((n) => n.name);
 
   renderNutritionList();
+}
+
+// Grams of protein per 100 kcal — a leanness/efficiency read on an
+// ingredient (higher = more protein for the calories), computed here for
+// display/sorting only; never written back to the sheet.
+function proteinDensity(n) {
+  if (n.calories === null || n.protein === null || n.calories <= 0) return null;
+  return (n.protein / n.calories) * 100;
 }
 
 function getFilteredNutritionEntries() {
@@ -124,7 +137,8 @@ function getFilteredNutritionEntries() {
 
   const { key, dir } = nSort;
   return [...filtered].sort((a, b) => {
-    if (key === 'calories' || key === 'protein') return ((a[key] ?? 0) - (b[key] ?? 0)) * dir;
+    if (key === 'calories' || key === 'protein' || key === 'proteinPercent') return ((a[key] ?? 0) - (b[key] ?? 0)) * dir;
+    if (key === 'proteinDensity') return ((proteinDensity(a) ?? 0) - (proteinDensity(b) ?? 0)) * dir;
     if (key === 'verified') return ((a.verified ? 1 : 0) - (b.verified ? 1 : 0)) * dir;
     return String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * dir;
   });
@@ -145,7 +159,7 @@ function renderNutritionList() {
     const message = allNutritionEntries.length === 0
       ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "+ Add Ingredient" to add one yourself.'
       : 'No ingredients match your search.';
-    tbody.appendChild(renderEmptyRow(7, message));
+    tbody.appendChild(renderEmptyRow(9, message));
   }
 
   pageItems.forEach((n) => {
@@ -170,13 +184,17 @@ function renderNutritionList() {
       (n.amount && !isUsable) ? 'No gram weight or leading count found — Calculate will skip this row and re-estimate instead' : undefined
     );
 
+    const density = proteinDensity(n);
+
     tr.append(
       checkboxCell,
       makeCell(n.name),
       amountCell,
       makeCell(n.calories !== null ? String(n.calories) : '—'),
       makeCell(n.protein !== null ? String(n.protein) : '—'),
+      makeCell(density !== null ? density.toFixed(1) : '—', 'Grams of protein per 100 kcal — higher means a leaner protein source'),
       makeCell(n.verified ? '✅' : '', n.verified ? 'Verified against the label on your own purchased ingredient' : 'From the USDA/AI fallback — not yet checked against a real label'),
+      makeCell(n.proteinPercent !== null ? `${n.proteinPercent}%` : '—', 'Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover'),
     );
 
     const actionsCell = document.createElement('td');
@@ -229,6 +247,7 @@ function openNutritionForm(entry) {
   document.getElementById('nutrition-calories').value = (entry && entry.calories !== null) ? entry.calories : '';
   document.getElementById('nutrition-protein').value = (entry && entry.protein !== null) ? entry.protein : '';
   document.getElementById('nutrition-verified').checked = entry ? entry.verified : false;
+  document.getElementById('nutrition-protein-percent').value = (entry && entry.proteinPercent !== null) ? entry.proteinPercent : '';
 
   clearFieldError('nutrition-form-error');
   document.getElementById('nutrition-modal').hidden = false;
@@ -247,6 +266,8 @@ async function submitNutritionForm(event) {
   const calories = evaluateNumberExpression(document.getElementById('nutrition-calories').value);
   const protein = evaluateNumberExpression(document.getElementById('nutrition-protein').value);
   const verified = document.getElementById('nutrition-verified').checked;
+  const proteinPercentRaw = document.getElementById('nutrition-protein-percent').value.trim();
+  const proteinPercent = proteinPercentRaw ? evaluateNumberExpression(proteinPercentRaw) : null;
 
   if (!name) {
     showFieldError('nutrition-form-error', 'Name is required.');
@@ -256,12 +277,16 @@ async function submitNutritionForm(event) {
     showFieldError('nutrition-form-error', 'Calories and Protein must be numbers.');
     return;
   }
+  if (proteinPercentRaw && proteinPercent === null) {
+    showFieldError('nutrition-form-error', 'Protein % must be a number.');
+    return;
+  }
 
-  const values = [[name, amount, calories, protein, verified ? '1' : '']];
+  const values = [[name, amount, calories, protein, verified ? '1' : '', proteinPercent !== null ? proteinPercent : '']];
 
   try {
     if (editingNutritionRow) {
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:E${editingNutritionRow}`, values);
+      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:F${editingNutritionRow}`, values);
     } else {
       await appendValues(NUTRITION_RANGE, values);
     }
@@ -304,6 +329,7 @@ async function mergeSelectedNutritionEntries() {
   // A row verified against a real label stays verified even if it's merged
   // with unverified fallback duplicates — never the other way around.
   merged.verified = merged.verified || others.some((o) => o.verified);
+  if (merged.proteinPercent === null) merged.proteinPercent = (others.find((o) => o.proteinPercent !== null) || {}).proteinPercent ?? null;
 
   await confirmAndDelete(
     `Merge ${selected.length} ingredients into "${target.name}"? ` +
@@ -312,8 +338,8 @@ async function mergeSelectedNutritionEntries() {
     async () => {
       if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
 
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${target.row}:E${target.row}`,
-        [[merged.name, merged.amount, merged.calories, merged.protein, merged.verified ? '1' : '']]);
+      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${target.row}:F${target.row}`,
+        [[merged.name, merged.amount, merged.calories, merged.protein, merged.verified ? '1' : '', merged.proteinPercent !== null ? merged.proteinPercent : '']]);
 
       const deleteRequests = others
         .map((o) => o.row)

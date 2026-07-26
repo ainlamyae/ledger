@@ -336,6 +336,17 @@ header .btn:hover {
     padding: 2rem;
 }
 
+/* The sign-in gate's own banner needs to sit flush against the header, not
+   vertically centered in the remaining viewport the way #file-gate's
+   (unrelated) centered hero still should — scoped by ID so only this
+   screen switches to a top-aligned column layout. */
+#gate {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 0;
+}
+
 .gate[hidden] {
     display: none;
 }
@@ -350,6 +361,8 @@ header .btn:hover {
     text-align: center;
 }
 
+/* Still used by #file-gate's "Connect your Ledger spreadsheet" step — only
+   the sign-in gate's own intro was replaced by .landing-banner below. */
 .landing-hero h1 {
     font-size: 2.25rem;
     margin-bottom: .75rem;
@@ -363,6 +376,46 @@ header .btn:hover {
     line-height: 1.6;
 }
 
+/* A flat strip, not a card — same visual language as .info-banner (the
+   Time Tracker's reminder banner): tinted background, thin border,
+   no shadow/elevation, so it reads as a banner rather than another
+   rounded/shadowed "bulb" like .card or .node-graph-node. Full-bleed edge to
+   edge (the 100vw/negative-margin trick) rather than boxed inside
+   .landing's centered 1400px column — a banner should span the viewport,
+   not sit as another contained block above the feature graphs. */
+.landing-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    margin-left: -50vw;
+    background: var(--color-info-bg);
+    border-top: 1px solid var(--color-info-border);
+    border-bottom: 1px solid var(--color-info-border);
+    padding: .9rem 1.5rem;
+    text-align: center;
+}
+
+.landing-banner-text {
+    max-width: 900px;
+}
+
+.landing-banner-text h1 {
+    font-size: 1.3rem;
+    margin-bottom: .35rem;
+    color: var(--color-heading);
+}
+
+.landing-banner-text p {
+    color: var(--color-text-muted);
+    font-size: .9rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
 .landing-features {
     display: flex;
     flex-direction: column;
@@ -370,47 +423,15 @@ header .btn:hover {
     margin-top: 2.5rem;
 }
 
-.landing-intro-card {
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem;
-    text-align: left;
-    box-shadow: var(--shadow-card);
-    border-left: 3px solid var(--color-border);
-    transition: var(--transition-colors), transform .2s ease, box-shadow .2s ease;
-    max-width: 460px;
-}
-
-.landing-intro-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(0,0,0,.12);
-}
-
-.landing-intro-card h3 {
-    margin-bottom: .5rem;
-    color: var(--color-heading);
-    font-size: 1rem;
-}
-
-.landing-intro-card p {
-    color: var(--color-text-muted);
-    font-size: .9rem;
-    line-height: 1.5;
-    margin: 0;
-}
-
-.node-graph-hint {
-    margin: 1.75rem 0 0;
-    font-size: .8rem;
-    color: var(--color-text-muted);
-    font-style: italic;
-}
-
 /* Each Health/Finances/Time/Other group renders as a small mind-map: a
-   round "hub" node for the group name, its feature nodes fanned out below,
-   and an SVG line from the hub to every node — drawn/redrawn by
-   landing-graph.js once layout settles, since a pure-CSS radial layout
-   can't track how many nodes wrap onto each line at a given viewport width. */
+   round "hub" node for the group name, its feature nodes arranged in a ring
+   around it, and an SVG line from the hub to every node. The ring itself is
+   computed in JS (landing-graph.js's layoutNodesRadially), not pure CSS —
+   the radius has to grow with however many nodes a given group has (Health
+   has roughly double Other's count) and the container's own height has to
+   grow to match, which a static stylesheet can't express. Below 640px this
+   falls back to a plain stacked list instead (see that breakpoint below) —
+   a ring that small reads as clutter, not a diagram. */
 .node-graph {
     position: relative;
     width: 100%;
@@ -437,11 +458,11 @@ header .btn:hover {
 }
 
 .node-graph-hub-wrap {
-    position: relative;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     z-index: 1;
-    display: flex;
-    justify-content: center;
-    margin-bottom: 2rem;
 }
 
 .node-graph-hub {
@@ -470,25 +491,21 @@ header .btn:hover {
 }
 
 .node-graph-spokes {
-    position: relative;
+    position: absolute;
+    inset: 0;
     z-index: 1;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1.1rem 1.25rem;
-}
-
-/* Health has 7 nodes — left to auto-width flex-wrap they pack 5-then-2
-   (however many narrow pills fit the row), which reads as an accident of
-   text length rather than a deliberate grouping. A fixed 4-per-row basis
-   forces a clean 4-then-3 instead, and flex-wrap centers each wrapped row
-   independently, so the second row of 3 centers itself under the first. */
-.node-graph-health .node-graph-node {
-    flex: 0 0 calc(25% - .9375rem);
 }
 
 .node-graph-node {
-    position: relative;
+    /* position: absolute (not relative) — landing-graph.js's
+       layoutNodesRadially sets left/top in px to place each node around the
+       hub. Deliberately left/top, not transform: translate(): this element
+       is its .node-graph-tooltip child's own containing block once that
+       tooltip is position: fixed, and a transform here would make IT the
+       tooltip's containing block instead of the viewport (see the tooltip
+       rule below) — left/top carry no such side effect. */
+    position: absolute;
+    width: 172px;
     font: inherit;
     font-weight: 600;
     font-size: .85rem;
@@ -1268,19 +1285,16 @@ th.sortable:hover {
     grid-template-columns: 1fr;
 }
 
-/* The 4 chart tiles get the same card framing as the 4 stat tiles above
-   them (.today-glance-cards .card) — .donut-item is bare everywhere else in
-   the app, so this is scoped to just this grid rather than changing the
-   shared class. */
-.wellness-metrics-grid.donut-grid .donut-item {
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    padding: .75rem;
-    box-shadow: var(--shadow-card);
-}
-
+/* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
+   exactly — these 4 tiles sit in the same Health Metrics panel as the
+   Weight Trend & Forecast / Body Composition Change h4s below, so all 6
+   headings share one consistent style instead of each chart picking its
+   own size/color/alignment. */
 .wellness-metrics-grid.donut-grid .donut-item h4 {
-    font-size: .85rem;
+    text-align: left;
+    color: var(--color-text);
+    font-size: 1rem;
+    margin-bottom: .25rem;
 }
 
 .today-glance-cards {
@@ -1518,14 +1532,16 @@ td .btn {
 
 .weight-projection-wrap {
     margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border);
 }
 
+/* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
+   — same style as the 4 donut-item h4s above, so every Health Metrics chart
+   heading (Weight Trend & Forecast, Body Composition Change, Caloric Intake,
+   Protein Intake, Physical Activity, Rest & Recovery) is visually one set. */
 .weight-projection-wrap h4 {
-    margin: 0 0 0.5rem;
-    font-size: 0.9rem;
-    color: var(--color-heading);
+    margin: 0 0 .25rem;
+    font-size: 1rem;
+    color: var(--color-text);
 }
 
 .weight-projection-header {
@@ -1887,9 +1903,12 @@ td .btn {
         font-size: 1.5rem;
     }
 
-    .landing-intro-card {
-        max-width: none;
+    .landing-banner {
         padding: 1rem;
+    }
+
+    .landing-banner-text h1 {
+        font-size: 1.15rem;
     }
 
     /* The fan-out graph loses its main draw (an at-a-glance web of related
@@ -1902,7 +1921,13 @@ td .btn {
         display: none;
     }
 
+    /* Undoes the desktop ring layout's absolute positioning (JS skips
+       setting left/top/height below this breakpoint — see
+       layoutNodesRadially) back to plain top-to-bottom flow. */
     .node-graph-hub-wrap {
+        position: static;
+        transform: none;
+        display: flex;
         justify-content: flex-start;
         margin-bottom: 1rem;
     }
@@ -1917,16 +1942,18 @@ td .btn {
     }
 
     .node-graph-spokes {
+        position: static;
+        display: flex;
         flex-direction: column;
         align-items: stretch;
+        gap: 1.1rem 1.25rem;
     }
 
-    .node-graph-node,
-    .node-graph-health .node-graph-node {
-        flex-basis: auto;
+    .node-graph-node {
+        position: static;
+        width: auto;
         text-align: left;
         cursor: default;
-        transform: none !important;
     }
 
     .node-graph-tooltip {
@@ -1941,10 +1968,6 @@ td .btn {
         border: none;
         padding: .35rem 0 0;
         margin: 0;
-    }
-
-    .node-graph-hint {
-        display: none;
     }
 
     .card {

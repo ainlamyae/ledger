@@ -236,6 +236,21 @@
 
                     <p id="body-mass-projection-eta" class="body-mass-eta"></p>
                 </div>
+
+                <!-- Governs every chart from here down — State Trend & Forecast, Body Mass,
+                     Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Fiber
+                     Intake, Fat Intake, Sleep and Protein Source Rotation — so it sits right
+                     above State Trend & Forecast's own heading rather than under one chart's
+                     label, which would read as belonging to that chart alone. -->
+                <div class="export-date-range">
+                    <label>From
+                        <input type="date" id="wellness-date-from">
+                    </label>
+                    <label>To
+                        <input type="date" id="wellness-date-to">
+                    </label>
+                </div>
+
                 <div class="body-mass-projection-header">
                     <h4>State Trend &amp; Forecast</h4>
                 </div>
@@ -243,21 +258,6 @@
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
-            </div>
-
-            <!-- Above the Body Mass heading, not inside its block: it governs every
-                 chart from here down — Body Mass, Calorie Balance, Caloric Intake,
-                 Physical Activity, Protein Intake, Rest & Recovery and Protein Source
-                 Rotation — so sitting under one chart's label would read as belonging
-                 to that chart alone. State Trend & Forecast above is deliberately
-                 outside it: that one reads the whole history. -->
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="wellness-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="wellness-date-to">
-                </label>
             </div>
 
             <div class="body-mass-projection-wrap">
@@ -280,16 +280,16 @@
 
             <div class="donut-grid wellness-metrics-grid">
                 <div class="donut-item">
-                    <h4 id="wellness-calories-label">Caloric Intake</h4>
+                    <h4>Physical Activity</h4>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-calories-chart"></canvas>
+                        <canvas id="wellness-activity-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Physical Activity</h4>
+                    <h4 id="wellness-calories-label">Caloric Intake</h4>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-activity-chart"></canvas>
+                        <canvas id="wellness-calories-chart"></canvas>
                     </div>
                 </div>
 
@@ -308,7 +308,14 @@
                 </div>
 
                 <div class="donut-item">
-                    <h4>Rest &amp; Recovery</h4>
+                    <h4>Fat Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-fat-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Sleep</h4>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-sleep-chart"></canvas>
                     </div>
@@ -436,8 +443,7 @@
                     <tr>
                         <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
                         <th class="sortable" data-sort="date">Date</th>
-                        <th title="Bedtime">Bed</th>
-                        <th title="Wake-up Time">Wake</th>
+                        <th title="Hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">Sleep</th>
                         <th class="sortable" data-sort="bodyMass" title="Body Mass">Mass</th>
                         <th class="sortable" data-sort="caloriesIn" title="Calories In">Cal↓</th>
                         <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
@@ -1395,8 +1401,8 @@
                         <th>Name</th>
                         <th>Amount</th>
                         <th title="Metabolic Equivalent of Task — the intensity this exercise is priced at">MET</th>
-                        <th title="Active time in minutes, net of rest">Duration</th>
-                        <th>Calories</th>
+                        <th title="Active time in minutes, net of rest">Dur</th>
+                        <th title="Calories">Cal</th>
                     </tr>
                     </thead>
                     <tbody id="physique-activity-breakdown-body"></tbody>

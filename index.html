@@ -246,11 +246,11 @@
             </div>
 
             <!-- Above the Body Mass heading, not inside its block: it governs every
-                 chart from here down — Body Mass, Calorie Balance, Caloric Intake,
-                 Physical Activity, Protein Intake, Sleep and Protein Source
-                 Rotation — so sitting under one chart's label would read as belonging
-                 to that chart alone. State Trend & Forecast above is deliberately
-                 outside it: that one reads the whole history. -->
+                 chart from here down — Body Mass, Calorie Balance, Physical Activity,
+                 Caloric Intake, Protein Intake, Fiber Intake, Fat Intake, Sleep and
+                 Protein Source Rotation — so sitting under one chart's label would
+                 read as belonging to that chart alone. State Trend & Forecast above
+                 is deliberately outside it: that one reads the whole history. -->
             <div class="export-date-range">
                 <label>From
                     <input type="date" id="wellness-date-from">
@@ -304,6 +304,13 @@
                     <h4>Fiber Intake</h4>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-fiber-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Fat Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-fat-chart"></canvas>
                     </div>
                 </div>
 

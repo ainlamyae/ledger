@@ -386,7 +386,7 @@ function renderPhysiqueList() {
     const message = allPhysiqueEntries.length === 0
       ? 'No days logged yet — click "Log" in the panel heading to get started.'
       : 'No days match this filter.';
-    tbody.appendChild(renderEmptyRow(14, message));
+    tbody.appendChild(renderEmptyRow(13, message));
   }
 
   // Same tint the Activity Plan uses for a row already logged today (.today-row and
@@ -404,13 +404,14 @@ function renderPhysiqueList() {
       if (value === null) return '—';
       return privacyMode ? maskDigits(String(value)) : String(value);
     };
-    const time = (value) => {
-      if (!value) return '—';
-      return privacyMode ? maskDigits(value) : value;
-    };
-
     const sleepHours = physiqueSleepHours(p);
-    const sleepTitle = sleepHours !== null ? `${sleepHours} hr of sleep` : '';
+    // Wake minus bed, not the two clock times — those still open on Edit
+    // (the form's own Bedtime/Wake-up Time fields), same as every other
+    // computed table figure that keeps its raw inputs one click away rather
+    // than in the table itself.
+    const sleepTitle = sleepHours !== null
+      ? `${sleepHours} hr of sleep (${p.bedtime} → ${p.wakeTime}) — open Edit to change the clock times`
+      : '';
     const maskedSleepTitle = privacyMode ? maskDigits(sleepTitle) : sleepTitle;
 
     const checkboxCell = document.createElement('td');
@@ -429,8 +430,7 @@ function renderPhysiqueList() {
     tr.append(
       checkboxCell,
       makeCell(p.date || '🔁 Pattern'),
-      makeCell(time(p.bedtime), maskedSleepTitle),
-      makeCell(time(p.wakeTime), maskedSleepTitle),
+      makeCell(num(sleepHours), maskedSleepTitle),
       makeCell(num(p.bodyMass)),
       makeCell(num(p.caloriesIn)),
       makeCell(num(p.proteinIn)),

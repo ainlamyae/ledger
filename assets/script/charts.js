@@ -2988,12 +2988,11 @@ function renderWellnessFiberChart(entries) {
 }
 
 // Fiber's chart just above, with one deliberate difference: the band edges draw as a
-// single dashed line spanning the whole window rather than fiber's per-day caps + shaded
-// fill between them. Fiber's floor and ceiling come off two different bases (per-1000kcal,
-// per-kg body weight), so a fill between them reads as "the band itself"; fat's two ends
-// are both a share of the same Eᵢₙ (the AMDR), so one flat dashed line at each edge already
-// says "this held for the whole window" without needing the fill to say it again. Read
-// from the same Physique-day Fat figure (fatG) physiqueAsWellnessEntries adds beside fiberG.
+// single dashed line spanning the whole window rather than fiber's per-day caps. The
+// shaded fill between the two edges is the same green band fill as Protein/Fiber though —
+// it draws behind the bars via its own invisible-stroke datasets, same as theirs, while
+// the visible dashed line stays a separate on-top dataset. Read from the same Physique-day
+// Fat figure (fatG) physiqueAsWellnessEntries adds beside fiberG.
 function renderWellnessFatChart(entries) {
   const ctx = document.getElementById('wellness-fat-chart');
 
@@ -3004,13 +3003,27 @@ function renderWellnessFatChart(entries) {
   const byDate = new Map();
   fatEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.fatG));
 
-  // Same three-way split as Fiber/Protein Intake: under the floor is red, in the band (or
-  // unlogged) is green, and past the ceiling is a darker green — still a hit, not a miss.
-  const FAT_OVER_BAND_COLOR = '#166534';
+  // Under the floor is red, in the band (or unlogged) is green. Past the ceiling is a
+  // lighter green — still inside the AMDR's own upper bound, just not the plain in-band hit.
+  const FAT_OVER_BAND_COLOR = '#4ade80';
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
     if (!byDate.has(d) || withinFatBand(values[i], band)) return '#16a34a';
     return values[i] > band.max ? FAT_OVER_BAND_COLOR : '#dc2626';
+  });
+
+  // Same shape as Protein/Fiber Intake's bandFill — two flat line datasets whose only job
+  // is the `fill: '+1'` shading between them, stroke off, drawn behind the bars.
+  const bandFill = (value, extra = {}) => ({
+    type: 'line',
+    label: `${value} g band edge`,
+    data: new Array(dates.length).fill(value),
+    borderWidth: 0,
+    pointRadius: 0,
+    tension: 0,
+    isTargetLine: true,
+    order: 3,
+    ...extra,
   });
 
   // targetMarkColor() is near-black in light mode, near-white in dark — the same colour
@@ -3030,7 +3043,12 @@ function renderWellnessFatChart(entries) {
   });
 
   const targetDatasets = band.max > band.min
-    ? [targetLine(band.max, `${band.max} g upper target`), targetLine(band.min, `${band.min} g target floor`)]
+    ? [
+      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.min),
+      targetLine(band.max, `${band.max} g upper target`),
+      targetLine(band.min, `${band.min} g target floor`),
+    ]
     : [targetLine(band.min, `${band.min} g target`)];
 
   const weekColumns = bucketedColumnCount(dates);
@@ -3710,7 +3728,32 @@ function renderWellnessProjectionChart(entries) {
 
   const histLabels = bodyMassEntries.map((e) => e.date);
   const projLabels = projPoints.map((p) => p.date);
-  const allLabels = [...new Set([...histLabels, ...projLabels])].sort();
+
+  // The same From/To window every other chart under this one reads
+  // (wellnessDateRange), bounding BOTH ends — nothing plots outside it, forecast
+  // included, same as Body Mass/Calorie Balance/Physical Activity/Caloric Intake
+  // never show a "tomorrow" bar either. With the default To (today) that means no
+  // projected segment is visible until To is pushed into the future.
+  //
+  // Filtered from histLabels/projLabels themselves, NOT wellnessWindowDates —
+  // that helper returns every CALENDAR day in the window (what the bar charts
+  // want, so an unlogged day still draws an empty column), but this chart's
+  // datasets are sparse points on a linear day-offset axis with spanGaps:
+  // false (see the comment below): only real weigh-in days and real WEEKLY
+  // projected points belong in allLabels. Filling the gaps between them with
+  // dateless "empty" days would put null right next to the sparse projected
+  // points and spanGaps would refuse to bridge them, breaking the dashed line
+  // into invisible fragments.
+  //
+  // histLabels/lastDate stay the TRUE full history regardless of the window —
+  // the trend, adaptation and calorie-implied trajectory all need that full
+  // run to compute correctly at the window's own left edge, the same reason
+  // renderWellnessBodyMassChart's mirrored overlay does.
+  const { from: windowFromDate, to: windowToDate } = wellnessDateRange();
+  const windowHistLabels = histLabels.filter((d) => d >= windowFromDate && d <= windowToDate);
+  const windowProjLabels = projLabels.filter((d) => d >= windowFromDate && d <= windowToDate);
+  const allLabels = [...new Set([...windowHistLabels, ...windowProjLabels])].sort();
+  if (!allLabels.length) return;
 
   const projMap = new Map(projPoints.map((p) => [p.date, p.bodyMass]));
   const lastDate = histLabels[histLabels.length - 1];
@@ -3731,7 +3774,6 @@ function renderWellnessProjectionChart(entries) {
   const sex = getSettingString('SEX', null);
   const swingKg = glycogenSwingKg(lastBodyMass, heightCm, sex);
   const trendMap = computeBodyMassTrend(bodyMassByDate);
-  const zoneAnchorMap = swingKg === null ? null : computeGlycogenZoneAnchor(trendMap);
 
   // The body-mass trajectory implied by logged calories alone: start at the first
   // weigh-in, then walk forward a day at a time adding that day's calorie balance
@@ -3778,6 +3820,13 @@ function renderWellnessProjectionChart(entries) {
     });
   }
 
+  // Anchored to the calorie-implied trajectory above, not an EMA of the smoothed trend
+  // itself. That trajectory assumes intake vs. burn is the ONLY thing moving the scale,
+  // so it's the driest the smoothed trend could read — the trend's own wobble above it
+  // is the glycogen/water noise. The zone's top edge has to BE that line, not straddle
+  // it, so the band sits entirely below rather than centered on it.
+  const zoneAnchorMap = (swingKg === null || !haveProfile) ? null : calorieTrendMap;
+
   const plateauDays = detectPlateau(trendMap);
   if (plateauDays) {
     const plateauLine = `⚠️ Body mass trend has been flat for ~${plateauDays} days — consider adjusting your calorie limit`;
@@ -3795,24 +3844,25 @@ function renderWellnessProjectionChart(entries) {
 
   // No raw per-reading series: Body Mass already plots every reading, this is the trend.
   const datasets = [
-    // The zone anchor ± the glycogen/water swing — a band the trend line can wander
-    // inside without it being a real change. Tension matches the trend line's own
-    // curve — the anchor is an EMA (see computeGlycogenZoneAnchor), so it's already a
-    // continuous, slower-moving line, not a stepped one. Two line datasets rather than
-    // one: Chart.js fills the area BETWEEN a dataset and the one its `fill` points at,
-    // so the zone needs both edges plotted, just invisibly (borderWidth 0). Omitted
-    // whenever the swing can't be estimated (no height/sex on file) rather than drawn
-    // at 0, which would claim glycogen accounts for nothing.
+    // The zone anchor (the calorie-implied trajectory) down to anchor − the glycogen/water
+    // swing — a band the trend line can wander inside without it being a real change. The
+    // upper edge is the anchor itself, unshifted, so it draws exactly on top of the gray
+    // Calorie-Implied Trajectory line — tension 0 to match that line's own straight
+    // segments, not the smoothed trend's curve. Two line datasets rather than one:
+    // Chart.js fills the area BETWEEN a dataset and the one its `fill` points at, so the
+    // zone needs both edges plotted, just invisibly (borderWidth 0). Omitted whenever the
+    // swing or the calorie trajectory can't be computed (no profile on file) rather than
+    // drawn at 0, which would claim glycogen accounts for nothing.
     ...(zoneAnchorMap !== null ? [
       {
         label: 'Glycogen + Water Swing (upper)',
         data: allLabels.map((d) => {
           const a = zoneAnchorMap.get(d);
-          return { x: dayOffset(d), y: a === undefined ? null : a + swingKg };
+          return { x: dayOffset(d), y: a === undefined ? null : a };
         }),
         borderWidth: 0,
         pointRadius: 0,
-        tension: 0.3,
+        tension: 0,
         fill: false,
         spanGaps: false,
         isSwingBand: true,
@@ -3829,7 +3879,7 @@ function renderWellnessProjectionChart(entries) {
         backgroundColor: 'rgba(245, 158, 11, 0.15)',
         borderWidth: 0,
         pointRadius: 0,
-        tension: 0.3,
+        tension: 0,
         // Fills to the upper-bound dataset just above this one in the array.
         fill: '-1',
         spanGaps: false,

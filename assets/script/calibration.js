@@ -27,12 +27,16 @@ const PROJ_CALIBRATION_MIN_R2 = 0.15;
 const PROJ_SETTING_KEYS = [
   'PROJ_BASELINE_KG_PER_DAY',
   'PROJ_CAL_KG_PER_KCAL_DAY',
-  'PROJ_ACTIVITY_KG_PER_MIN_DAY',
+  'PROJ_ACTIVITY_KG_PER_KCAL_DAY',
   'PROJ_SLEEP_KG_PER_HOUR_DAY',
   'PROJ_PROTEIN_KG_PER_G_DAY',
   'PROJ_CALIBRATED_AT',
   'PROJ_CALIBRATION_R2',
   'PROJ_CALIBRATION_SAMPLES',
+  // Superseded by PROJ_ACTIVITY_KG_PER_KCAL_DAY (see charts.js's
+  // getCalibratedGains) — kept here only so Reset still cleans up a
+  // leftover row from before this rename, on anyone who calibrated earlier.
+  'PROJ_ACTIVITY_KG_PER_MIN_DAY',
 ];
 
 let calibrationListenersAttached = false;
@@ -84,7 +88,7 @@ function closeCalibrationModal() {
 function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
   const weightSums = new Map();
   const caloriesByDate = new Map();
-  const activityByDate = new Map();
+  const activityKcalByDate = new Map();
   const sleepByDate = new Map();
   const proteinByDate = new Map();
 
@@ -100,9 +104,14 @@ function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
       if (e.category === 'Calories; Protein' && e.amount2 !== null) {
         proteinByDate.set(e.date, (proteinByDate.get(e.date) || 0) + e.amount2);
       }
-    } else if (e.category === 'Activity') {
+    } else if (e.category === 'Activity' || e.category === 'Activity; Calories') {
+      // Real Calculate-derived kcal (amount2) when this entry has one —
+      // otherwise the flat per-minute estimate calcProjection()'s
+      // un-calibrated formula also uses, so an older entry without a kcal
+      // figure still contributes something to the fit rather than nothing.
       const mins = toActivityMinutes(e.amount, e.unit);
-      activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + mins);
+      const kcal = e.amount2 !== null ? e.amount2 : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
+      activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
     } else if (e.category === 'Sleep') {
       sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
     }
@@ -137,7 +146,7 @@ function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
       continue;
     }
 
-    const actSlice = sliceByRange(activityByDate, dateA, dateB);
+    const actSlice = sliceByRange(activityKcalByDate, dateA, dateB);
     const sleepSlice = sliceByRange(sleepByDate, dateA, dateB);
     const proteinSlice = sliceByRange(proteinByDate, dateA, dateB);
 
@@ -145,7 +154,7 @@ function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
       days,
       ratePerDay: (weightByDate.get(dateB) - weightByDate.get(dateA)) / days,
       avgCalories: avg(calSlice),
-      avgActivityMins: actSlice.size > 0 ? avg(actSlice) : 0,
+      avgActivityKcal: actSlice.size > 0 ? avg(actSlice) : 0,
       avgSleepHours: sleepSlice.size > 0 ? avg(sleepSlice) : sleepTarget,
       avgProteinG: proteinSlice.size > 0 ? avg(proteinSlice) : proteinTarget,
     });
@@ -180,13 +189,17 @@ function solveLinearSystem(A, b) {
 
 // Weighted least squares (weight = days, capped, so one abnormally long gap
 // can't dominate the fit) of:
-//   ratePerDay ≈ β0 + β1·(avgCalories−calorieTarget) + β2·avgActivityMins + β3·(avgSleepHours−sleepTarget) + β4·(avgProteinG−proteinTarget)
+//   ratePerDay ≈ β0 + β1·(avgCalories−calorieTarget) + β2·avgActivityKcal + β3·(avgSleepHours−sleepTarget) + β4·(avgProteinG−proteinTarget)
+// avgActivityKcal (not raw activity minutes) so this term is in the same
+// energy units as avgCalories — β2 then means the same thing β1 does, just
+// for calories burned instead of eaten, rather than requiring a separate
+// minutes-to-kcal conversion bolted on afterward for display purposes only.
 // Centering calories/sleep/protein on the user's existing target settings
 // makes β0 a clean "baseline kg/day drift my logged habits don't explain"
 // term (adaptive thermogenesis / intake under-reporting / noise) —
 // something the generic formula has no provision for at all.
 function fitWeightedOLS(samples, calorieTarget, sleepTarget, proteinTarget) {
-  const X = samples.map((s) => [1, s.avgCalories - calorieTarget, s.avgActivityMins, s.avgSleepHours - sleepTarget, s.avgProteinG - proteinTarget]);
+  const X = samples.map((s) => [1, s.avgCalories - calorieTarget, s.avgActivityKcal, s.avgSleepHours - sleepTarget, s.avgProteinG - proteinTarget]);
   const y = samples.map((s) => s.ratePerDay);
   const w = samples.map((s) => Math.min(s.days, PROJ_CALIBRATION_MAX_INTERVAL_WEIGHT_DAYS));
 
@@ -244,6 +257,13 @@ function validateCalibration(fit, samples) {
     }
   }
 
+  // A soft warning rather than blocking (unlike betaCal above) — activity is
+  // the secondary predictor here, so one noisy fit shouldn't throw away an
+  // otherwise-usable calibration the way a backwards calorie coefficient does.
+  if (fit.betaAct > 0) {
+    warnings.push("The fit implies burning more calories through activity slows weight loss, which is not physiologically plausible — the activity term is likely just noise; the rest of the calibration is still usable.");
+  }
+
   if (fit.r2 < PROJ_CALIBRATION_MIN_R2) {
     warnings.push(`Low-confidence fit (R² ${fit.r2.toFixed(2)}) — your logged habits don't explain much of your weight trend yet. Save anyway, or log more consistently first for a better calibration.`);
   }
@@ -276,20 +296,19 @@ function runCalibration() {
   }
 
   const effectiveKcalPerKg = fit.betaCal > 0 ? Math.round(1 / fit.betaCal) : null;
-  // The generic formula subtracts activity's kcal-equivalent from balance
-  // (more activity -> more deficit -> more negative slope), so betaAct is
-  // expected to fit NEGATIVE (more activity minutes -> more weight loss).
-  // Flip the sign here to show it in the same positive "kcal burned per
-  // minute" framing as the generic model's flat constant of 5, rather than
-  // literally printing the negative coefficient and making a physically
-  // correct fit look backwards.
-  const activityKcalEquivPerMin = effectiveKcalPerKg !== null ? Math.round(-fit.betaAct * effectiveKcalPerKg) : null;
+  // betaAct is now in the same units as betaCal (kg/day per kcal, just for
+  // burning instead of eating), so its own implied energy density is
+  // directly comparable to the intake-derived one above — similar values
+  // are a sanity check that the model is internally consistent; wildly
+  // different ones (or a positive betaAct, flagged separately below) mean
+  // the activity term is mostly noise.
+  const activityKcalPerKg = fit.betaAct < 0 ? Math.round(-1 / fit.betaAct) : null;
 
   summary.innerHTML = `<table class="calibration-summary-table">
     <tr><td>Intervals used</td><td>${fit.n}${excludedCount ? ` (${excludedCount} excluded — insufficient calorie logs)` : ''}</td></tr>
     <tr><td>Fit quality (R²)</td><td>${fit.r2.toFixed(2)}</td></tr>
     <tr><td>Energy density</td><td>${effectiveKcalPerKg !== null ? `~${effectiveKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(generic: 7,700)</span>` : 'n/a'}</td></tr>
-    <tr><td>Activity</td><td>${activityKcalEquivPerMin !== null ? `~${activityKcalEquivPerMin} kcal/min-equivalent <span class="hint">(generic: 5)</span>` : `${(fit.betaAct * 1000).toFixed(1)} g/day per active minute`}</td></tr>
+    <tr><td>Activity</td><td>${activityKcalPerKg !== null ? `~${activityKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(compare to Energy density above — similar values mean the model is internally consistent)</span>` : `${(fit.betaAct * 1000).toFixed(2)} g/day per kcal burned`}</td></tr>
     <tr><td>Sleep</td><td>${(fit.betaSleep * 1000).toFixed(0)} g/day per hour above/below your ${sleepTarget} hr target</td></tr>
     <tr><td>Protein</td><td>${(fit.betaProtein * 1000).toFixed(0)} g/day per gram above/below your ${proteinTarget} g target</td></tr>
     <tr><td>Baseline drift</td><td>${(fit.beta0 * 1000).toFixed(0)} g/day unexplained by logged intake/activity/sleep/protein</td></tr>
@@ -297,11 +316,16 @@ function runCalibration() {
 
   const validation = validateCalibration(fit, samples);
   if (validation.blocking.length > 0) {
-    showFieldError('calibration-status', validation.blocking.join(' '));
+    showFieldError('calibration-status', `❌ Could not calibrate: ${validation.blocking.join(' ')}`);
     return;
   }
   if (validation.warnings.length > 0) {
-    showFieldError('calibration-status', validation.warnings.join(' '));
+    // Both cases render through the same red .status element (no separate
+    // warning color in this app's CSS) — spelling out "calibration
+    // succeeded" and "still enabled" in the text itself, rather than relying
+    // on color, is what actually tells a blocking failure apart from a
+    // heads-up here.
+    showFieldError('calibration-status', `⚠️ Calibrated successfully — Save below is still enabled. Heads up: ${validation.warnings.join(' ')}`);
   }
 
   lastCalibrationFit = fit;
@@ -320,7 +344,7 @@ async function saveCalibratedGains() {
     await saveSettingValues({
       PROJ_BASELINE_KG_PER_DAY: fit.beta0,
       PROJ_CAL_KG_PER_KCAL_DAY: fit.betaCal,
-      PROJ_ACTIVITY_KG_PER_MIN_DAY: fit.betaAct,
+      PROJ_ACTIVITY_KG_PER_KCAL_DAY: fit.betaAct,
       PROJ_SLEEP_KG_PER_HOUR_DAY: fit.betaSleep,
       PROJ_PROTEIN_KG_PER_G_DAY: fit.betaProtein,
       PROJ_CALIBRATED_AT: new Date().toISOString().slice(0, 10),

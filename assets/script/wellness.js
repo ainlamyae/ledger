@@ -10,6 +10,10 @@ const CATEGORY_DEFAULTS = {
   // one log entry carrying both macros, Amount/Unit each holding a ';'-joined
   // pair ("320; 10" / "kcal; g") rather than a plain single number.
   'Calories; Protein': { unit: 'kcal; g', descriptions: ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Beverage', 'Other'] },
+  // Same idea, for the Activity side — written by the Calculate button
+  // (activity-estimator.js) once it can derive both a duration and a
+  // calorie burn (currently just Strength Training, from the workout note).
+  'Activity; Calories': { unit: 'min; kcal', descriptions: ['Walk', 'Run', 'Workout', 'Cycling', 'Swimming', 'HIIT', 'Yoga', 'Strength Training', 'Basketball', 'Stretching'] },
 };
 
 // True for the composite "Calories; Protein" category (or any future
@@ -18,6 +22,12 @@ const CATEGORY_DEFAULTS = {
 function isCompositeCategory(category) {
   return category.includes(';');
 }
+
+// Accepted separators between a Sleep entry's bed and wake time. '/' is the
+// canonical, always-written form; ';' is also accepted on read/input since a
+// few rows ended up saved that way (edited directly in the Sheet) — saving
+// one of those again through the app normalizes it back to '/'.
+const SLEEP_PAIR_SEPARATOR = /[/;]/;
 
 // Parses "HH:MM" (1 or 2-digit hour) into minutes since midnight, or null if
 // malformed — the shared validator for both typing a Sleep bed/wake pair into
@@ -57,9 +67,15 @@ function rawBreakdownString(e) {
   return breakdownToJson(e.breakdown);
 }
 
-// Only food entries with ingredient text can be (re)estimated from Notes.
+function isActivityCategory(category) {
+  return category === 'Activity' || category === 'Activity; Calories';
+}
+
+// Food entries and Activity/workout entries can both be (re)estimated from
+// Notes — anything else (Sleep, Weight, a category-less row) has no formula
+// to re-derive from.
 function eligibleForRecalc(e) {
-  return (e.category === 'Calories' || e.category === 'Calories; Protein') && e.notes.trim();
+  return (e.category === 'Calories' || e.category === 'Calories; Protein' || isActivityCategory(e.category)) && e.notes.trim();
 }
 
 // Merge is scoped to the calorie/protein entries the user actually asked to
@@ -71,6 +87,12 @@ function mergeableCategory(category) {
 
 let allWellnessEntries = [];
 let wellnessListenersAttached = false;
+// Flips true once refreshWellness has populated allWellnessEntries at least
+// once — lets a click that races the initial page-load fetch (e.g. Log
+// Workout's auto-Calculate reading Weight entries) tell "still loading" apart
+// from "genuinely nothing logged", instead of reporting the empty in-memory
+// array as if it were the real answer.
+let wellnessDataLoaded = false;
 let wSort = { dir: -1 };
 let wCurrentPage = 1;
 let wellnessSheetId = null;
@@ -82,6 +104,19 @@ async function fetchWellnessSheetId() {
   return findSheetId(metadata, CONFIG.SHEETS.WELLNESS);
 }
 
+// The 🧮 Calculate button means something different per category: food
+// (calorie-estimator.js) vs. workout (activity-estimator.js). Dispatched by
+// whatever's currently selected rather than two separate buttons, since only
+// one of Amount's two numbers ever needs computing at a time.
+function handleCalculateClick() {
+  const category = document.getElementById('wellness-category').value;
+  if (category === 'Activity' || category === 'Activity; Calories') {
+    calculateWellnessActivity();
+  } else {
+    calculateWellnessCalories();
+  }
+}
+
 async function initWellness(forceRefresh = false) {
   if (!wellnessListenersAttached) {
     wellnessListenersAttached = true;
@@ -91,7 +126,7 @@ async function initWellness(forceRefresh = false) {
     document.getElementById('wellness-form').addEventListener('submit', submitWellnessForm);
     document.getElementById('wellness-category').addEventListener('change', onCategoryChange);
     document.getElementById('wellness-is-pattern').addEventListener('change', syncWellnessPatternMode);
-    document.getElementById('wellness-calc-btn').addEventListener('click', calculateWellnessCalories);
+    document.getElementById('wellness-calc-btn').addEventListener('click', handleCalculateClick);
     // A real edit (not Calculate's own auto-fill, which sets .value
     // directly and doesn't fire 'input') means the shown breakdown no
     // longer reflects what's in the field.
@@ -195,12 +230,14 @@ async function refreshWellness(forceRefresh = false) {
         const [u1, u2] = rawUnit.split(';').map((s) => s.trim());
         unit = u1 || '';
         unit2 = u2 || null;
-      } else if (category === 'Sleep' && typeof rawAmount === 'string' && rawAmount.includes('/')) {
-        // Bed/wake pair typed as "HH:MM/HH:MM" instead of a plain duration —
-        // a legacy plain-number Sleep cell comes back from UNFORMATTED_VALUE
-        // as a JS number, not a string, so the typeof check above already
-        // keeps this branch from ever misfiring on an old entry.
-        const [bedStr, wakeStr] = rawAmount.split('/').map((s) => s.trim());
+      } else if (category === 'Sleep' && typeof rawAmount === 'string' && SLEEP_PAIR_SEPARATOR.test(rawAmount)) {
+        // Bed/wake pair typed as "HH:MM/HH:MM" (or, for a few rows edited
+        // directly in the Sheet, "HH:MM; HH:MM") instead of a plain duration
+        // — a legacy plain-number Sleep cell comes back from
+        // UNFORMATTED_VALUE as a JS number, not a string, so the typeof
+        // check above already keeps this branch from ever misfiring on an
+        // old entry.
+        const [bedStr, wakeStr] = rawAmount.split(SLEEP_PAIR_SEPARATOR).map((s) => s.trim());
         const bedMin = parseClockTime(bedStr);
         const wakeMin = parseClockTime(wakeStr);
         if (bedMin !== null && wakeMin !== null) {
@@ -252,6 +289,7 @@ async function refreshWellness(forceRefresh = false) {
   // be mistaken for a logged sample (e.g. sorting first as the "earliest"
   // date, or corrupting a calibration interval).
 
+  wellnessDataLoaded = true;
   renderWellnessList();
   renderWellnessCharts(getDatedWellnessEntries());
 }
@@ -524,11 +562,11 @@ async function submitWellnessForm(event) {
       return;
     }
     amount = `${cal}; ${prot}`;
-  } else if (category === 'Sleep' && amountRaw.includes('/')) {
-    const parts = amountRaw.split('/').map((s) => s.trim());
+  } else if (category === 'Sleep' && SLEEP_PAIR_SEPARATOR.test(amountRaw)) {
+    const parts = amountRaw.split(SLEEP_PAIR_SEPARATOR).map((s) => s.trim());
     const [bedMin, wakeMin] = parts.map((s) => parseClockTime(s));
     if (parts.length !== 2 || bedMin === null || wakeMin === null) {
-      showFieldError('wellness-form-error', 'Bed/wake time must be HH:MM/HH:MM (e.g. 23:30/07:00).');
+      showFieldError('wellness-form-error', 'Bed/wake time must be HH:MM/HH:MM (e.g. 23:30/07:00 — "HH:MM; HH:MM" also works).');
       return;
     }
     if (bedMin === wakeMin) {
@@ -601,7 +639,7 @@ async function bulkRecalculateWellness() {
   const skipped = selected.length - eligible.length;
 
   if (eligible.length === 0) {
-    alert('None of the selected entries have ingredient text to recalculate — only Calories / Calories; Protein entries with Notes are eligible.');
+    alert('None of the selected entries have Notes to recalculate — only Calories / Calories; Protein / Activity / Activity; Calories entries with Notes are eligible.');
     return;
   }
 
@@ -615,13 +653,25 @@ async function bulkRecalculateWellness() {
     breakdown: rawBreakdownString(e),
   }));
 
+  // Same latest-Weight lookup calculateWellnessActivity uses for a single
+  // entry — computed once here rather than per row, since it's the same
+  // "right now" bodyweight either way and doesn't vary per selected entry.
+  const weightKg = getLatestWeightKg();
+
   let done = 0;
   const succeededSnapshots = [];
   const results = await Promise.allSettled(eligible.map(async (e, i) => {
     try {
-      const { calories, protein, standardizedNotes, breakdown } = await estimateCaloriesAndProtein(e.notes);
-      await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:H${e.row}`,
-        [[e.date, e.time, 'Calories; Protein', e.description, `${calories}; ${protein}`, 'kcal; g', standardizedNotes, breakdownToJson(breakdown)]]);
+      if (isActivityCategory(e.category)) {
+        if (weightKg === null) throw new Error('Log your weight first — the calorie formula needs it.');
+        const { minutes, calories } = estimateWorkoutActivity(e.notes, weightKg);
+        await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:H${e.row}`,
+          [[e.date, e.time, 'Activity; Calories', e.description, `${minutes}; ${calories}`, 'min; kcal', e.notes, '']]);
+      } else {
+        const { calories, protein, standardizedNotes, breakdown } = await estimateCaloriesAndProtein(e.notes);
+        await updateValues(`'${CONFIG.SHEETS.WELLNESS}'!A${e.row}:H${e.row}`,
+          [[e.date, e.time, 'Calories; Protein', e.description, `${calories}; ${protein}`, 'kcal; g', standardizedNotes, breakdownToJson(breakdown)]]);
+      }
       succeededSnapshots.push(snapshots[i]);
     } finally {
       done++;
@@ -638,7 +688,7 @@ async function bulkRecalculateWellness() {
   const failed = results.filter((r) => r.status === 'rejected').length;
   const succeeded = succeededSnapshots.length;
   const parts = [`${succeeded} entr${succeeded === 1 ? 'y' : 'ies'} recalculated`];
-  if (skipped) parts.push(`${skipped} skipped (no notes / not a Calories entry)`);
+  if (skipped) parts.push(`${skipped} skipped (no notes / not a Calories or Activity entry)`);
   if (failed) parts.push(`${failed} failed`);
 
   showUndoToast(`${parts.join(', ')}.`, () => restoreWellnessSnapshots(succeededSnapshots));

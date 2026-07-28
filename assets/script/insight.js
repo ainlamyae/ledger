@@ -51,6 +51,8 @@ function aggregateWindow(dates) {
   const proteinByDate = new Map();
   const activityByDate = new Map();
   const activityByDescriptionByDate = new Map();
+  const activityKcalByDate = new Map();
+  const activityKcalByDescriptionByDate = new Map();
   const sleepByDate = new Map();
 
   getDatedWellnessEntries()
@@ -62,7 +64,7 @@ function aggregateWindow(dates) {
       if (e.category === 'Calories; Protein' && e.amount2 !== null) {
         proteinByDate.set(e.date, (proteinByDate.get(e.date) || 0) + e.amount2);
       }
-      if (e.category === 'Activity' && e.amount !== null) {
+      if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
         const mins = toActivityMinutes(e.amount, e.unit);
         activityByDate.set(e.date, (activityByDate.get(e.date) || 0) + mins);
 
@@ -74,6 +76,16 @@ function aggregateWindow(dates) {
         if (!activityByDescriptionByDate.has(description)) activityByDescriptionByDate.set(description, new Map());
         const byDate = activityByDescriptionByDate.get(description);
         byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
+
+        // Only an Activity; Calories entry carries a calorie-burn figure
+        // (amount2) — a plain Activity row simply doesn't contribute here,
+        // same as it doesn't contribute to avgProtein above.
+        if (e.amount2 !== null) {
+          activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + e.amount2);
+          if (!activityKcalByDescriptionByDate.has(description)) activityKcalByDescriptionByDate.set(description, new Map());
+          const kcalByDate = activityKcalByDescriptionByDate.get(description);
+          kcalByDate.set(e.date, (kcalByDate.get(e.date) || 0) + e.amount2);
+        }
       }
       if (e.category === 'Sleep' && e.amount !== null) {
         sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
@@ -82,7 +94,12 @@ function aggregateWindow(dates) {
 
   const activityByDescription = {};
   activityByDescriptionByDate.forEach((byDate, description) => {
-    activityByDescription[description] = { avgMins: Math.round(avg(byDate)), daysLogged: byDate.size };
+    const kcalByDate = activityKcalByDescriptionByDate.get(description);
+    activityByDescription[description] = {
+      avgMins: Math.round(avg(byDate)),
+      daysLogged: byDate.size,
+      avgKcal: kcalByDate && kcalByDate.size ? Math.round(avg(kcalByDate)) : null,
+    };
   });
 
   return {
@@ -92,6 +109,7 @@ function aggregateWindow(dates) {
     proteinDaysLogged: proteinByDate.size,
     avgActivityMins: activityByDate.size ? Math.round(avg(activityByDate)) : null,
     activityDaysLogged: activityByDate.size,
+    avgActivityKcal: activityKcalByDate.size ? Math.round(avg(activityKcalByDate)) : null,
     activityByDescription,
     avgSleepHours: sleepByDate.size ? Math.round(avg(sleepByDate) * 10) / 10 : null,
     sleepDaysLogged: sleepByDate.size,
@@ -141,6 +159,8 @@ function gatherInsightMetrics(lookbackDays) {
     prevAvgActivityMins: previous.avgActivityMins,
     activityTarget: getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT),
     activityDaysLogged: current.activityDaysLogged,
+    avgActivityKcal: current.avgActivityKcal,
+    prevAvgActivityKcal: previous.avgActivityKcal,
     activityByDescription: current.activityByDescription,
     prevActivityByDescription: previous.activityByDescription,
 
@@ -168,10 +188,12 @@ function formatTrajectoryLine(projection) {
 }
 
 // One line per activity description (e.g. NEAT / Resistance / Cardio),
-// each with its own avg minutes/day, previous-period comparison, and
-// logging coverage — so the AI can reason about the mix of activity types,
-// not just their combined total (which the 'Avg activity total' line above
-// this still covers, since that's what the activity target is measured against).
+// each with its own avg minutes/day (and, where a Calculate-derived calorie
+// figure exists, avg kcal/day burned alongside it), previous-period
+// comparison, and logging coverage — so the AI can reason about the mix of
+// activity types, not just their combined total (which the 'Avg activity
+// total' line above this still covers, since that's what the activity
+// target is measured against).
 function formatActivityBreakdownLines(m) {
   return Object.keys(m.activityByDescription)
     .sort()
@@ -179,8 +201,10 @@ function formatActivityBreakdownLines(m) {
       const cur = m.activityByDescription[description];
       const prev = m.prevActivityByDescription[description];
       const coverage = cur.daysLogged < m.lookbackDays ? ` [only ${cur.daysLogged}/${m.lookbackDays} days logged]` : '';
-      const trend = prev ? ` — previous ${m.lookbackDays} days: ${prev.avgMins} min/day` : ' — previous period: not logged';
-      return `Avg activity — ${description} (last ${m.lookbackDays} days): ${cur.avgMins} min/day${trend}${coverage}`;
+      const kcalNow = cur.avgKcal !== null ? `, ${cur.avgKcal} kcal/day burned` : '';
+      const kcalPrev = prev && prev.avgKcal !== null ? `, ${prev.avgKcal} kcal/day burned` : '';
+      const trend = prev ? ` — previous ${m.lookbackDays} days: ${prev.avgMins} min/day${kcalPrev}` : ' — previous period: not logged';
+      return `Avg activity — ${description} (last ${m.lookbackDays} days): ${cur.avgMins} min/day${kcalNow}${trend}${coverage}`;
     });
 }
 
@@ -192,6 +216,19 @@ function formatInsightPrompt(m) {
     return `${label} (last ${m.lookbackDays} days): ${value}${unit} (target: ${target}${unit})${trend}${coverage}`;
   };
 
+  // Bespoke rather than built from the generic line() helper above, since
+  // this is the one metric with a second, target-less figure (kcal burned)
+  // riding alongside its primary one (minutes) — line() only has room for
+  // one value + one target.
+  const activityTotalLine = (() => {
+    if (m.avgActivityMins === null) return `Avg activity total (last ${m.lookbackDays} days): not logged this period`;
+    const coverage = m.activityDaysLogged < m.lookbackDays ? ` [only ${m.activityDaysLogged}/${m.lookbackDays} days logged]` : '';
+    const kcalNow = m.avgActivityKcal !== null ? `, ${m.avgActivityKcal} kcal/day burned` : '';
+    const kcalPrev = m.prevAvgActivityKcal !== null ? `, ${m.prevAvgActivityKcal} kcal/day burned` : '';
+    const trend = m.prevAvgActivityMins !== null ? ` — previous ${m.lookbackDays} days: ${m.prevAvgActivityMins} min/day${kcalPrev}` : '';
+    return `Avg activity total (last ${m.lookbackDays} days): ${m.avgActivityMins} min/day${kcalNow} (target: ${m.activityTarget} min/day)${trend}${coverage}`;
+  })();
+
   const lines = [
     `Age: ${m.age !== null ? m.age : 'not set'}`,
     `Height: ${m.heightCm !== null ? `${m.heightCm} cm` : 'not set'}`,
@@ -199,7 +236,7 @@ function formatInsightPrompt(m) {
     m.bmi !== null ? `BMI: ${m.bmi}` : null,
     line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget, m.caloriesDaysLogged, m.prevAvgCalories),
     line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
-    line('Avg activity total', m.avgActivityMins, ' min/day', m.activityTarget, m.activityDaysLogged, m.prevAvgActivityMins),
+    activityTotalLine,
     ...formatActivityBreakdownLines(m),
     line('Avg sleep', m.avgSleepHours, ' hr/day', m.sleepTarget, m.sleepDaysLogged, m.prevAvgSleepHours),
     formatTrajectoryLine(m.projection),

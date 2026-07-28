@@ -5,6 +5,9 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 // wellness.js guarantees a consistent repeat answer regardless of the model.
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SEED = 42;
+// Llama 4 Scout is Groq's fastest vision-capable model — used only for the
+// food-photo scan path where image_url content is required.
+const GROQ_VISION_MODEL = 'qwen/qwen3.6-27b';
 
 // The free-text chat call every Health Insight mode makes: same model, key
 // guard and error shape all three used to hand-roll separately. Returns the
@@ -155,4 +158,48 @@ async function groqExtractIngredients(notesText) {
   }
 
   return { items };
+}
+
+// Sends a food photo to the Groq vision model and returns a plain ingredient
+// list in the same format the Consumption textarea expects (one item per line,
+// e.g. "250g chicken breast" or "2 eggs"), ready to be appended directly.
+async function groqAnalyzeFoodImage(base64Image, mimeType) {
+  const apiKey = getSettingString('GROQ_API_KEY', null);
+  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
+
+  const res = await fetch(GROQ_API, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROQ_VISION_MODEL,
+      temperature: 0,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+          {
+            type: 'text',
+            text: `You are a nutrition assistant. Identify every food item visible in this image and estimate realistic portion sizes.
+
+Return ONLY a plain list, one item per line:
+- Weighed items: "<grams>g <food name>"  →  e.g. "250g chicken breast"
+- Countable items: "<count> <food name>"  →  e.g. "2 eggs"
+
+No headings, no explanations, no bullet points — just the list.`,
+          },
+        ],
+      }],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message || `Groq API error ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
 }

@@ -81,6 +81,8 @@ async function initPhysique(forceRefresh = false) {
       document.getElementById('physique-micro-modal').hidden = true;
     });
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
+    document.getElementById('physique-scan-btn').addEventListener('click', () => document.getElementById('physique-scan-input').click());
+    document.getElementById('physique-scan-input').addEventListener('change', handlePhysiqueScanInput);
     document.getElementById('physique-combine-btn').addEventListener('click', combineAndSortPhysiqueConsumptionField);
     physiqueField('consumption').addEventListener('input', syncPhysiqueCombineButtonVisibility);
     setupConsumptionAutocomplete();
@@ -1273,6 +1275,41 @@ async function bulkCombineAndSortPhysique() {
   if (failed) parts.push(`${failed} failed`);
 
   showUndoToast(`${parts.join(', ')}.`, () => restorePhysiqueSnapshots(succeeded));
+}
+
+async function handlePhysiqueScanInput(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  e.target.value = '';
+
+  const btn = document.getElementById('physique-scan-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analyzing…';
+
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const ingredientText = await groqAnalyzeFoodImage(base64, file.type);
+
+    // Open a blank Log form for today, then pre-fill Consumption and Calculate.
+    openPhysiqueForm(null);
+    physiqueField('consumption').value = ingredientText;
+    syncPhysiqueCombineButtonVisibility();
+    await calculatePhysiqueDay();
+  } catch (err) {
+    console.error('[Scan Food]', err);
+    // openPhysiqueForm calls clearFieldError, so show the error after it.
+    openPhysiqueForm(null);
+    showFieldError('physique-form-error', `Scan failed: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan';
+  }
 }
 
 // Both estimators run together:

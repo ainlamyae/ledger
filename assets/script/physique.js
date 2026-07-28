@@ -83,6 +83,7 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
     document.getElementById('physique-combine-btn').addEventListener('click', combineAndSortPhysiqueConsumptionField);
     physiqueField('consumption').addEventListener('input', syncPhysiqueCombineButtonVisibility);
+    setupConsumptionAutocomplete();
     document.getElementById('physique-form-micro-btn').addEventListener('click', openPhysiqueMicronutrientsFromForm);
     document.getElementById('physique-is-pattern').addEventListener('change', syncPhysiquePatternMode);
     onFormSubmit('physique-form', submitPhysiqueForm);
@@ -614,6 +615,7 @@ function closePhysiqueForm() {
   document.getElementById('physique-modal').hidden = true;
   hideCalcBreakdown('physique');
   hidePhysiqueActivityBreakdown();
+  hideConsumptionSuggestions();
 }
 
 // A whole day, not one meal, so a per-meal ceiling would fire
@@ -1016,6 +1018,169 @@ function syncPhysiqueCombineButtonVisibility() {
   const normalizedCurrent = current.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
   const { text } = combineAndSortConsumptionText(field.value);
   btn.hidden = text === normalizedCurrent;
+}
+
+// Ingredient-name suggestions for the Consumption textarea, scoped to
+// whichever line the caret is on — a <datalist> (tx-payee-options in
+// transactions.js) only ever suggests a whole <input>'s value, and Consumption
+// is a multi-line textarea where each line is its own "1x apple"-style entry,
+// so this is a hand-rolled dropdown instead. Source list is the Nutrition
+// catalogue (allNutritionEntries, nutrition.js) — the same names Log/Add
+// ingredient and Calculate itself resolve Consumption lines against.
+let consumptionSuggestionMatches = [];
+let consumptionSuggestionIndex = -1;
+
+function consumptionSuggestionsList() {
+  return document.getElementById('physique-consumption-suggestions');
+}
+
+function setupConsumptionAutocomplete() {
+  physiqueField('consumption').addEventListener('input', renderConsumptionSuggestions);
+  physiqueField('consumption').addEventListener('keydown', handleConsumptionSuggestionKey);
+  // Deferred so a mousedown on a suggestion (which fires blur first) still
+  // lands — applyConsumptionSuggestion below already hides the list itself,
+  // this is only the fallback for e.g. Tab-ing or clicking away.
+  physiqueField('consumption').addEventListener('blur', () => setTimeout(hideConsumptionSuggestions, 150));
+
+  consumptionSuggestionsList().addEventListener('mousedown', (e) => {
+    const item = e.target.closest('li');
+    if (!item) return;
+    e.preventDefault(); // keeps focus (and the caret position) on the textarea
+    applyConsumptionSuggestion(item.dataset.name);
+  });
+
+  // The keyboard opening/closing on mobile resizes the visual viewport, not
+  // the layout one — this is what lets positionConsumptionSuggestions track
+  // it live instead of just placing it once on show.
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', positionConsumptionSuggestions);
+    window.visualViewport.addEventListener('scroll', positionConsumptionSuggestions);
+  }
+}
+
+function isMobileConsumptionViewport() {
+  return window.matchMedia('(max-width: 820px)').matches;
+}
+
+// Desktop keeps the plain dropdown (CSS: right under the line you're typing).
+// On a narrow viewport with a real on-screen keyboard, pin it to the bottom
+// of the visual viewport instead — same spot Description's native datalist
+// bar shows on iPhone, just not OS-native since a <datalist> can't attach to
+// a <textarea> (see the comment above consumptionSuggestionMatches).
+function positionConsumptionSuggestions() {
+  const list = consumptionSuggestionsList();
+  if (list.hidden) return;
+
+  if (!isMobileConsumptionViewport() || !window.visualViewport) {
+    list.classList.remove('autocomplete-suggestions--pinned');
+    list.style.removeProperty('bottom');
+    list.style.removeProperty('left');
+    list.style.removeProperty('width');
+    return;
+  }
+
+  const fieldRect = physiqueField('consumption').getBoundingClientRect();
+  const vv = window.visualViewport;
+  const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+
+  list.classList.add('autocomplete-suggestions--pinned');
+  list.style.left = `${fieldRect.left}px`;
+  list.style.width = `${fieldRect.width}px`;
+  list.style.bottom = `${keyboardHeight}px`;
+}
+
+// The line the caret's currently on, split at the caret — "prefix" is what's
+// been typed so far on that line, which is what gets matched against and,
+// on accept, replaced.
+function currentConsumptionLinePrefix() {
+  const field = physiqueField('consumption');
+  const before = field.value.slice(0, field.selectionStart);
+  const lineStart = before.lastIndexOf('\n') + 1;
+  return { lineStart, prefix: before.slice(lineStart) };
+}
+
+function renderConsumptionSuggestions() {
+  const { prefix } = currentConsumptionLinePrefix();
+  const query = extractIngredientName(prefix).toLowerCase();
+  if (!query) { hideConsumptionSuggestions(); return; }
+
+  // Prefix matches ("a" -> "apple") before substring matches ("a" -> "salad"),
+  // same ranking a browser's own datalist applies.
+  const starts = [];
+  const contains = [];
+  allNutritionEntries.forEach((n) => {
+    const name = n.name.toLowerCase();
+    if (name === query) return; // already typed in full — nothing to suggest
+    if (name.startsWith(query)) starts.push(n.name);
+    else if (name.includes(query)) contains.push(n.name);
+  });
+  consumptionSuggestionMatches = [...starts, ...contains].slice(0, 8);
+  if (consumptionSuggestionMatches.length === 0) { hideConsumptionSuggestions(); return; }
+
+  const list = consumptionSuggestionsList();
+  list.innerHTML = '';
+  consumptionSuggestionMatches.forEach((name) => {
+    const li = document.createElement('li');
+    li.textContent = name;
+    li.dataset.name = name;
+    list.appendChild(li);
+  });
+  consumptionSuggestionIndex = -1;
+  list.hidden = false;
+  positionConsumptionSuggestions();
+}
+
+function hideConsumptionSuggestions() {
+  const list = consumptionSuggestionsList();
+  list.hidden = true;
+  list.innerHTML = '';
+  list.classList.remove('autocomplete-suggestions--pinned');
+  list.style.removeProperty('bottom');
+  list.style.removeProperty('left');
+  list.style.removeProperty('width');
+  consumptionSuggestionMatches = [];
+  consumptionSuggestionIndex = -1;
+}
+
+function handleConsumptionSuggestionKey(e) {
+  const list = consumptionSuggestionsList();
+  if (list.hidden || consumptionSuggestionMatches.length === 0) return;
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const count = consumptionSuggestionMatches.length;
+    consumptionSuggestionIndex = e.key === 'ArrowDown'
+      ? (consumptionSuggestionIndex + 1) % count
+      : (consumptionSuggestionIndex - 1 + count) % count;
+    [...list.children].forEach((li, i) => li.classList.toggle('active', i === consumptionSuggestionIndex));
+    list.children[consumptionSuggestionIndex].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    applyConsumptionSuggestion(consumptionSuggestionMatches[consumptionSuggestionIndex] ?? consumptionSuggestionMatches[0]);
+  } else if (e.key === 'Escape') {
+    hideConsumptionSuggestions();
+  }
+}
+
+// Replaces just the name portion of the current line — everything after
+// whatever quantity/unit (extractIngredientQuantity's own leading tokens)
+// already parsed off the front — leaving the quantity typed and the rest of
+// the textarea untouched.
+function applyConsumptionSuggestion(name) {
+  const field = physiqueField('consumption');
+  const { lineStart, prefix } = currentConsumptionLinePrefix();
+  const nameStart = lineStart + (prefix.length - stripLeadingIngredientTokens(prefix).rest.length);
+
+  const before = field.value.slice(0, nameStart);
+  const after = field.value.slice(field.selectionEnd);
+  field.value = `${before}${name}${after}`;
+
+  const caret = before.length + name.length;
+  field.setSelectionRange(caret, caret);
+  field.focus();
+
+  hideConsumptionSuggestions();
+  syncPhysiqueCombineButtonVisibility();
 }
 
 // The modal's own Combine & Sort button — same tidy-up as the bulk action

@@ -108,7 +108,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - Advanced Filters: date range plus an AND/OR field-filter builder; Export CSV writes exactly what's filtered.
 - **Bulk transaction ops** — select rows for Edit Selected (only filled fields applied) or Delete Selected (one `batchUpdate`, highest row first).
 - **Undo** — toast after bulk edit/delete; deletes re-append, edits write original values back in place.
-- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the **Account** table (with a Total row summing Balance and Market Value) and reconciliation status.
+- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the **Account** table (with a Total row summing Balance and Market Value) and reconciliation status. The reconciliation flag shows the direction of the gap — `Accounts>Transactions` when recorded balances exceed what the transaction history sums to, `Accounts<Transactions` when the opposite — so the source of the discrepancy is immediately clear without opening the sheet.
   - **The two rings are coloured from two bands of one hue wheel, not one.** Type keeps the vivid band (`65% / 55%`); institution takes a half-step hue offset and a deeper, less saturated one (`45% / 42%`), and the outer account ring is alpha-shaded from its institution's colour. Both palettes used to start at the same hue with the same step, so a similar number of types and institutions made them *identical* — the second-largest institution came out in exactly the second-largest type's colour, which is what made a TFSA (an Investment) read as "the Saving colour" against the legend above it. The offset separates neighbouring hues; the band is what still separates the rings when differing counts realign the wheel anyway.
 
 ### Breakdown
@@ -295,6 +295,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 - One row per day. Filterable/sortable table (search, date range), paginated; add/edit/delete/duplicate.
 - **Log a Physique** sits in the panel heading — every panel's primary action does now (`.panel-header`), which also keeps it reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
+- **Scan** sits beside Log in the panel heading. Click it, pick a photo of a meal, and the Groq vision model (`qwen/qwen3.6-27b`) identifies every visible food item and estimates realistic portion sizes — returning a plain ingredient list in the same format the Consumption field expects. The Log form opens pre-filled with that list and Calculate runs automatically, so the breakdown table is already visible before any editing. On failure the form still opens blank and the error is shown inside it.
 - **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout — all four of which are hidden fields, read instead off the Total row of the table under each of the two text areas. Both text areas themselves are rewritten too: Consumption through the same tidy-up Combine & Sort runs (below), Workout through its own counterpart — see the Combine & Sort bullets below for both.
 - Form layout: Date + Body Mass share a row, Bedtime + Wake-up Time the next. The pairs use `minmax(0, 1fr)` columns and the date/time inputs drop their native appearance — a bare `1fr` floors a track at its content's min-content width, and iOS Safari otherwise sizes a picker to its own content and ignores a smaller `width: 100%`, either of which leaves the plain text box beside it looking narrower.
 - **Saving onto a day already logged merges into it** rather than being refused: the first Save folds that row into the form, the second commits. Details under `Physique` below.
@@ -401,7 +402,7 @@ flowchart TD
     App -- "pick / confirm spreadsheet file" --> Picker
     Picker -. "picked file ID" .-> App
 
-    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Financial Insight reports"]
+    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Financial Insight reports<br/>Food photo scan (vision — qwen/qwen3.6-27b)"]
     USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup<br/>+ full nutrient panel (Pull Micronutrients)"]
     Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
@@ -534,7 +535,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 4 | `sheets.js` | Sheets API v4 wrapper; `USER_ENTERED` by default, `RAW` for Settings writes |
 | 5 | `cache.js` | `localStorage` cache with per-call TTL, hard refresh, numeric-expression evaluator |
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
-| 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes |
+| 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes; vision call (`groqAnalyzeFoodImage`) for food-photo scanning via `qwen/qwen3.6-27b` |
 | 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
 | 9 | `nutrient-targets.js` | Ideal/day reference amounts (mostly FDA Daily Values) and gap-severity thresholds for the Micronutrients mode, overridable via a `MICRONUTRIENT_DAILY_TARGETS_JSON` Setting |
 | 10 | `nutrition.js` | Nutrition table, Classification column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry`, Log/Log More into today's Physique Consumption |

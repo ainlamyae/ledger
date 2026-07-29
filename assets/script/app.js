@@ -557,7 +557,7 @@ async function loadDashboard(forceRefresh = false) {
       // than leaving whatever initFoodInsightPanel/initInsightPanel rendered
       // at window 'load' time, before any data existed.
       renderFoodInsightPreview(currentFoodInsightLookbackDays());
-      renderInsightDataPreview(currentInsightLookbackDays());
+      renderInsightDataPreview(getInsightDateRange());
     }),
     nutritionPromise,
     // Protein Source Rotation needs wellness (actual servings eaten),
@@ -565,7 +565,7 @@ async function loadDashboard(forceRefresh = false) {
     // (protein target) all loaded — refresh only once all three are in,
     // rather than off just one of them like the two panels above.
     Promise.all([wellnessPromise, nutritionPromise]).then(() => {
-      renderProteinRotationChart(currentProteinRotationLookbackDays());
+      renderProteinRotationChart(getProteinRotationDateRange());
     }),
     initContacts(forceRefresh),
     initSettingsPanel(forceRefresh),

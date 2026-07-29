@@ -631,6 +631,47 @@ function lastNDates(n) {
   });
 }
 
+// Every ISO date from fromIso to toIso inclusive, ascending. Empty if either
+// date is missing/unparseable or fromIso is after toIso — callers treat that
+// the same as "no data in range" rather than special-casing it.
+function datesInRange(fromIso, toIso) {
+  if (!fromIso || !toIso) return [];
+  const from = dateFromIso(fromIso);
+  const to = dateFromIso(toIso);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return [];
+
+  const dates = [];
+  const cursor = new Date(from);
+  while (cursor <= to) {
+    dates.push(isoFromDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+
+// Wires up a From/To date-range picker (two <input type="date">) shared by
+// any panel that lets the user pick an arbitrary custom range instead of a
+// fixed N-day lookback (Wellness Insight, Protein Source Rotation, ...) —
+// one implementation instead of each panel re-deriving its own defaulting
+// and listener wiring. Defaults both inputs to the last defaultDays days
+// (today inclusive) the first time they're empty, fires onChange on every
+// edit, and returns a getter for the current {from, to} value.
+function initDateRangeControl(fromId, toId, defaultDays, onChange) {
+  const fromEl = document.getElementById(fromId);
+  const toEl = document.getElementById(toId);
+
+  if (!fromEl.value || !toEl.value) {
+    const defaultDates = lastNDates(defaultDays);
+    fromEl.value = defaultDates[0];
+    toEl.value = defaultDates[defaultDates.length - 1];
+  }
+
+  fromEl.addEventListener('change', onChange);
+  toEl.addEventListener('change', onChange);
+
+  return () => ({ from: fromEl.value, to: toEl.value });
+}
+
 function renderWellnessCharts(entries) {
   renderTodayGlanceCards(entries);
   renderWellnessCaloriesChart(entries);

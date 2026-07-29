@@ -1929,71 +1929,13 @@ td .btn {
         font-size: 1.5rem;
     }
 
-    .landing-banner {
-        padding: 1rem;
-    }
-
-    .landing-banner-text h1 {
-        font-size: 1.15rem;
-    }
-
-    /* The fan-out graph loses its main draw (an at-a-glance web of related
-       features) once nodes stack to one per row anyway, and the connecting
-       lines get visually noisy at that width — so small screens fall back
-       to a plain grouped list: hub becomes a left-aligned section label,
-       nodes stack full-width, tooltip text is always visible instead of
-       hidden-until-hover (nothing to hover on a touchscreen). */
-    .node-graph-lines {
+    /* On mobile the pre-sign-in landing page shows just the header (logo +
+       sign-in) — the hero blurb and the three Health/Finances/Other feature
+       graphs below it are a wall of text on a small screen, so they're
+       dropped entirely here rather than reflowed. Desktop is untouched. */
+    #gate .landing-banner,
+    #gate .landing-features {
         display: none;
-    }
-
-    /* Undoes the desktop ring layout's absolute positioning (JS skips
-       setting left/top/height below this breakpoint — see
-       layoutNodesRadially) back to plain top-to-bottom flow. */
-    .node-graph-hub-wrap {
-        position: static;
-        transform: none;
-        display: flex;
-        justify-content: flex-start;
-        margin-bottom: 1rem;
-    }
-
-    .node-graph-hub {
-        flex-direction: row;
-        width: auto;
-        height: auto;
-        border-radius: var(--radius-md);
-        padding: .4rem .9rem;
-        gap: .4rem;
-    }
-
-    .node-graph-spokes {
-        position: static;
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 1.1rem 1.25rem;
-    }
-
-    .node-graph-node {
-        position: static;
-        width: auto;
-        text-align: left;
-        cursor: default;
-    }
-
-    .node-graph-tooltip {
-        position: static;
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-        transform: none;
-        width: auto;
-        max-width: none;
-        box-shadow: none;
-        border: none;
-        padding: .35rem 0 0;
-        margin: 0;
     }
 
     .card {

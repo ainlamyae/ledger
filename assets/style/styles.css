@@ -581,6 +581,13 @@ header .btn:hover {
     color: var(--color-text-muted);
 }
 
+/* .status is red by default (it's overwhelmingly used for errors) — this is
+   for the confirmations that need to read as success, e.g. Calibrate's
+   "saved and verified" line. */
+.status-success {
+    color: var(--color-income);
+}
+
 .error-banner {
     display: flex;
     justify-content: space-between;
@@ -1528,6 +1535,13 @@ td .btn {
     color: var(--color-text-muted);
 }
 
+/* The calibrated/standard toggle sits directly above the first chart wrap,
+   which brings its own 1.25rem top margin — so this row drops the .panel-actions
+   bottom margin instead of stacking both into an oversized gap. */
+.formula-toggle-row {
+    margin-bottom: 0;
+}
+
 .weight-projection-wrap {
     margin-top: 1.25rem;
 }
@@ -1553,12 +1567,6 @@ td .btn {
     margin: 0;
 }
 
-.weight-projection-actions {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-}
-
 .calibration-summary-table td {
     padding: .3rem .75rem .3rem 0;
     font-size: .85rem;
@@ -1578,6 +1586,13 @@ td .btn {
 
 .weight-progress-meter {
     margin-top: .75rem;
+}
+
+/* The time meter is a second, nested .weight-progress-meter directly under the
+   weight one. Its track is drawn a touch lighter so the pair reads as
+   "distance (primary) / time (secondary)" rather than two competing bars. */
+.time-progress-meter .weight-progress-meter-fill {
+    opacity: .55;
 }
 
 .weight-progress-meter-track {
@@ -1682,6 +1697,18 @@ td .btn {
     margin-top: 1.75rem;
 }
 
+/* .panel-actions carries a bottom margin only, which left Log Workout visually
+   glued to the last Cardio row directly above it. 1.75rem matches the gap
+   .workout-day + .workout-day and this panel's h3s already use between tables,
+   so the button separates from the plan on the same rhythm. Scoped to
+   :not(.collapsed) for the reason spelled out on the h3 rule below: an
+   id-prefixed selector outranks the class-based .panel.collapsed margin reset,
+   so an unscoped margin-top here would survive collapsing and leave a gap under
+   the panel's own h2. */
+#workout-plan-panel:not(.collapsed) .panel-actions {
+    margin-top: 1.75rem;
+}
+
 .workout-day h4 {
     margin-bottom: .5rem;
 }
@@ -1730,6 +1757,64 @@ td .btn {
 .workout-table-neat th:nth-child(2),
 .workout-table-neat td:nth-child(2) {
     width: 100px;
+}
+
+/* On a phone the three right-hand columns were eating most of the row: their
+   116px/80px/44px widths plus the base th/td .75rem side padding (24px per
+   cell, so 72px of pure padding across the three) left the exercise name too
+   little room and wrapped every longer one ("Dumbbell Romanian Deadlift",
+   "Leg Extension (quads)") onto a second line. Trimming the padding and the
+   width hints frees ~100px for the name column.
+
+   The smaller font on columns 2-3 isn't cosmetic — it's what makes the
+   narrower widths actually take effect. Those headers are white-space: nowrap
+   (see above), and auto table-layout grows a column past its width hint when
+   nowrap content needs more room, so "Sets × Reps" at the full font size would
+   simply push the column back out to ~76px and ignore the new width.
+
+   The name column is left wrapping rather than forced to nowrap: the point is
+   to give it enough room that it doesn't NEED to wrap, while an unusually long
+   future exercise name still wraps instead of forcing .table-responsive into a
+   horizontal scroll. */
+@media (max-width: 820px) {
+    #workout-plan-panel th,
+    #workout-plan-panel td {
+        padding-left: .3rem;
+        padding-right: .3rem;
+    }
+
+    #workout-plan-panel td:first-child,
+    #workout-plan-panel th:first-child {
+        font-size: .78rem;
+    }
+
+    .workout-table-strength th:nth-child(2),
+    .workout-table-strength td:nth-child(2),
+    .workout-table-strength th:nth-child(3),
+    .workout-table-strength td:nth-child(3),
+    .workout-table-neat th:nth-child(2),
+    .workout-table-neat td:nth-child(2) {
+        font-size: .72rem;
+    }
+
+    .workout-table-strength th:nth-child(2),
+    .workout-table-strength td:nth-child(2) {
+        width: 72px;
+    }
+
+    .workout-table-strength th:nth-child(3),
+    .workout-table-strength td:nth-child(3) {
+        width: 50px;
+    }
+
+    .workout-table-neat th:nth-child(2),
+    .workout-table-neat td:nth-child(2) {
+        width: 66px;
+    }
+
+    .workout-check-col {
+        width: 30px;
+    }
 }
 
 .modal-actions {

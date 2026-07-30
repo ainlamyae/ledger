@@ -46,6 +46,7 @@ function initCalibrationPanel() {
   if (calibrationListenersAttached) return;
   calibrationListenersAttached = true;
 
+  initFormulaToggle();
   document.getElementById('calibrate-projection-btn').addEventListener('click', openCalibrationModal);
   document.getElementById('calibration-cancel-btn').addEventListener('click', closeCalibrationModal);
   document.getElementById('calibration-run-btn').addEventListener('click', runCalibration);
@@ -53,12 +54,77 @@ function initCalibrationPanel() {
   document.getElementById('calibration-reset-btn').addEventListener('click', resetCalibration);
 }
 
+// Health Metrics' "which formula am I looking at" toggle. Everything
+// calibration-dependent funnels through charts.js's getCalibratedGains(), so
+// flipping one flag switches the whole section between the calibrated view and
+// the generic one — the Weight Trend & Forecast slope/ETA, the calculated
+// calorie target (and with it the Caloric Intake target line and the Calories
+// Today tile), and Wellness Insight's trajectory/energy-density lines. It
+// writes nothing to the Settings tab: this is a display switch for comparing
+// the two, not an edit to the saved fit, so it can't damage a calibration and
+// resets to calibrated on reload.
+//
+// Calorie Deficit & Fat Loss follows it too, and relabels its right axis when
+// it does — the fitted density measures scale weight rather than fat, so that
+// axis means a different thing in each view (see
+// renderWellnessEnergyBalanceChart). Body Composition Change is the one chart
+// that stays put in both: the fit has no composition parameter to substitute
+// (it's an energy model; Forbes/Deurenberg are anthropometric), and it's the
+// measured-magnitude reference the predictive charts get compared against.
+function initFormulaToggle() {
+  const btn = document.getElementById('formula-toggle-btn');
+
+  btn.addEventListener('click', () => {
+    useCalibratedFormula = !useCalibratedFormula;
+    refreshFormulaToggle();
+
+    // Re-render straight from the already-loaded entries rather than going
+    // through loadDashboard — the toggle changes only how these numbers are
+    // computed, not what data they're computed from, so there's nothing to
+    // re-fetch. renderWellnessCharts covers the projection chart, the target
+    // lines, and the Today at a glance tiles in one call.
+    renderWellnessCharts(getDatedWellnessEntries());
+    renderInsightDataPreview(getInsightDateRange());
+  });
+
+  refreshFormulaToggle();
+}
+
+// Label reports the ACTIVE view, so the button doubles as a status readout;
+// the title says what clicking will do.
+//
+// The no-saved-fit state gets its OWN label rather than reusing the plain
+// "Generic formula" one: with nothing on file the button is disabled, and a
+// disabled button reading exactly what the enabled generic view reads is
+// indistinguishable from "you toggled to generic and it won't toggle back."
+// Naming the reason inline is what makes a dead button legible.
+function refreshFormulaToggle() {
+  const btn = document.getElementById('formula-toggle-btn');
+  const hasSavedFit = readSavedCalibratedGains() !== null;
+
+  btn.disabled = !hasSavedFit;
+  const showingCalibrated = hasSavedFit && useCalibratedFormula;
+
+  btn.textContent = !hasSavedFit
+    ? '📊 Generic formula (nothing calibrated)'
+    : showingCalibrated ? '📐 Calibrated formula' : '📊 Generic formula';
+  btn.setAttribute('aria-pressed', String(showingCalibrated));
+  btn.title = !hasSavedFit
+    ? 'No calibration is saved, so there are no calibrated numbers to compare against — run ⚙️ Calibrate, then Save'
+    : showingCalibrated
+      ? 'Showing your calibrated formula — click to compare against the generic one'
+      : 'Showing the generic formula — click to switch back to your calibrated one';
+}
+
 function openCalibrationModal() {
   lastCalibrationFit = null;
   document.getElementById('calibration-save-btn').disabled = true;
-  clearFieldError('calibration-status');
+  clearCalibrationStatus();
 
-  const gains = getCalibratedGains();
+  // The saved fit, not the active view — this modal is about what's on file,
+  // so a user comparing against the generic formula must still see (and be
+  // able to reset) the calibration they actually have.
+  const gains = readSavedCalibratedGains();
   const summary = document.getElementById('calibration-summary');
   if (gains) {
     const calibratedAt = getSettingString('PROJ_CALIBRATED_AT', 'an earlier session');
@@ -278,7 +344,7 @@ function runCalibration() {
 
   const summary = document.getElementById('calibration-summary');
   const saveBtn = document.getElementById('calibration-save-btn');
-  clearFieldError('calibration-status');
+  clearCalibrationStatus();
   saveBtn.disabled = true;
   lastCalibrationFit = null;
 
@@ -332,35 +398,116 @@ function runCalibration() {
   saveBtn.disabled = false;
 }
 
+// Which of the just-written keys can't be found (or came back changed) on the
+// sheet. PROJ_CALIBRATED_AT is excluded from the value comparison on purpose:
+// it's cosmetic, and a date-formatted cell can legitimately read back in the
+// sheet's own display format rather than the ISO string that was written,
+// which would fail a strict comparison for no real reason. Every other key is
+// numeric and functional.
+function unverifiedCalibrationKeys(written) {
+  return Object.entries(written)
+    .filter(([key]) => key !== 'PROJ_CALIBRATED_AT')
+    .filter(([key, value]) => {
+      const stored = getSetting(key, null);
+      // Relative tolerance — Sheets round-trips a double through ~15
+      // significant digits, so demanding bit-for-bit equality would flag a
+      // perfectly good write. The +1e-12 floor keeps a legitimate 0 (e.g. a
+      // zero protein gain) from failing on a zero relative tolerance.
+      return stored === null || Math.abs(stored - value) > Math.abs(value) * 1e-9 + 1e-12;
+    })
+    .map(([key]) => key);
+}
+
+function setCalibrationStatus(message, isSuccess = false) {
+  const el = document.getElementById('calibration-status');
+  el.classList.toggle('status-success', isSuccess);
+  el.textContent = message;
+  el.hidden = false;
+}
+
+// clearFieldError only hides the element, so the success styling and the
+// relabeled Cancel button have to be undone explicitly or they leak into the
+// next run.
+function clearCalibrationStatus() {
+  document.getElementById('calibration-status').classList.remove('status-success');
+  document.getElementById('calibration-cancel-btn').textContent = 'Cancel';
+  clearFieldError('calibration-status');
+}
+
 async function saveCalibratedGains() {
   if (!lastCalibrationFit) return;
 
   const btn = document.getElementById('calibration-save-btn');
   btn.disabled = true;
-  clearFieldError('calibration-status');
+  clearCalibrationStatus();
+
+  const fit = lastCalibrationFit;
+  const written = {
+    PROJ_BASELINE_KG_PER_DAY: fit.beta0,
+    PROJ_CAL_KG_PER_KCAL_DAY: fit.betaCal,
+    PROJ_ACTIVITY_KG_PER_KCAL_DAY: fit.betaAct,
+    PROJ_SLEEP_KG_PER_HOUR_DAY: fit.betaSleep,
+    PROJ_PROTEIN_KG_PER_G_DAY: fit.betaProtein,
+    PROJ_CALIBRATED_AT: new Date().toISOString().slice(0, 10),
+    PROJ_CALIBRATION_R2: Math.round(fit.r2 * 1000) / 1000,
+    PROJ_CALIBRATION_SAMPLES: fit.n,
+  };
 
   try {
-    const fit = lastCalibrationFit;
-    await saveSettingValues({
-      PROJ_BASELINE_KG_PER_DAY: fit.beta0,
-      PROJ_CAL_KG_PER_KCAL_DAY: fit.betaCal,
-      PROJ_ACTIVITY_KG_PER_KCAL_DAY: fit.betaAct,
-      PROJ_SLEEP_KG_PER_HOUR_DAY: fit.betaSleep,
-      PROJ_PROTEIN_KG_PER_G_DAY: fit.betaProtein,
-      PROJ_CALIBRATED_AT: new Date().toISOString().slice(0, 10),
-      PROJ_CALIBRATION_R2: Math.round(fit.r2 * 1000) / 1000,
-      PROJ_CALIBRATION_SAMPLES: fit.n,
-    });
-
-    applySettingsToWidgets();
-    renderWellnessProjectionChart(getDatedWellnessEntries());
-
-    closeCalibrationModal();
+    await saveSettingValues(written);
   } catch (err) {
-    showFieldError('calibration-status', `Failed to save calibration: ${err.message}`);
-  } finally {
+    setCalibrationStatus(`Failed to save calibration: ${err.message}`);
     btn.disabled = false;
+    return;
   }
+
+  // saveSettingValues re-reads the whole Settings tab back into
+  // currentSettings, so this checks what the sheet NOW HOLDS rather than
+  // re-inspecting what we just tried to write. A partial write is the one
+  // failure that would otherwise pass silently: the formula needs all four
+  // core gains present, so a single missing row means every consumer quietly
+  // falls back to the generic formula while the modal reports success.
+  const unverified = unverifiedCalibrationKeys(written);
+  const engaged = readSavedCalibratedGains() !== null;
+  if (unverified.length > 0 || !engaged) {
+    refreshFormulaToggle();
+
+    // EVERY key coming back missing means the read-back itself returned
+    // nothing, not that eight separate writes each silently no-op'd — the
+    // writes are awaited above and throw on any API error, so they reached the
+    // sheet. Saying "couldn't confirm" without that distinction previously led
+    // to a Reset to Default that deleted a calibration which was safely
+    // written, so this case explicitly warns against exactly that.
+    const readBackEmpty = unverified.length === Object.keys(written).length - 1;
+    setCalibrationStatus(readBackEmpty
+      ? 'The calibration was written to the sheet, but reading the Settings tab back returned nothing, so it can\'t be confirmed here. Do NOT use "Reset to Default" — that would delete a fit that is probably saved. Reload the page and reopen this dialog to check, and see the browser console for the underlying Sheets error.'
+      : `Wrote the calibration, but couldn't confirm ${unverified.join(', ')} on the Settings tab — the forecast is still using the generic formula. Check those rows on that tab before re-running Calibrate.`);
+    btn.disabled = false;
+    return;
+  }
+
+  // Saved AND verified. Everything below is display refresh only, so it's
+  // wrapped separately: a rendering failure must never be reported as a failed
+  // save. Conflating the two is what previously told a user their calibration
+  // hadn't saved when it had — and sent them to "Reset to Default", deleting a
+  // fit that was already safely on the sheet.
+  useCalibratedFormula = true;
+  try {
+    refreshFormulaToggle();
+    applySettingsToWidgets();
+    // Whole section, not just the projection chart: a new energy density also
+    // moves the calculated calorie target, and with it the Caloric Intake
+    // target line and the Calories Today tile.
+    renderWellnessCharts(getDatedWellnessEntries());
+  } catch (err) {
+    console.error('Calibration saved and verified, but refreshing the display failed:', err);
+  }
+
+  // Modal deliberately stays open on success — the whole point of verifying is
+  // to be able to say so, which a modal that closes itself can't do. Save is
+  // left disabled since this fit is now written, and Cancel becomes Close.
+  setCalibrationStatus(`✅ Saved and verified — all ${Object.keys(written).length} values were written to the Settings tab and read back. The forecast is now using your calibrated formula (${fit.n} intervals, R² ${fit.r2.toFixed(2)}).`, true);
+  document.getElementById('calibration-cancel-btn').textContent = 'Close';
 }
 
 async function resetCalibration() {
@@ -389,7 +536,11 @@ async function resetCalibration() {
     await refreshSettingsList(true);
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
-    renderWellnessProjectionChart(getDatedWellnessEntries());
+    // No saved fit left, so the toggle has nothing to compare and disables
+    // itself — reset first so the re-render below already reads the new state.
+    useCalibratedFormula = true;
+    refreshFormulaToggle();
+    renderWellnessCharts(getDatedWellnessEntries());
     closeCalibrationModal();
   }, 'Failed to reset calibration');
 }

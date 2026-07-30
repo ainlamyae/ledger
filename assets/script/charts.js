@@ -1877,6 +1877,11 @@ function carryForwardWeightByDate(weightByDate, dates) {
 // the plot area.
 const ENERGY_BALANCE_AXIS_MIN_KCAL = 200;
 
+// Bounds on the resting expenditure implied by a calibrated fit, as a multiple of
+// the same person's Mifflin BMR. A real TDEE never sits far outside this.
+const CALIBRATED_RESTING_MIN_BMR_RATIO = 0.75;
+const CALIBRATED_RESTING_MAX_BMR_RATIO = 1.75;
+
 // "+320" / "-450" — the sign carries the entire meaning on this chart (a
 // deficit vs a surplus), so a positive figure is shown with an explicit + in
 // the tooltip rather than bare.
@@ -1970,19 +1975,25 @@ function renderWellnessEnergyBalanceChart(entries) {
   // switches both constants and both labels below.
   const gains = getCalibratedGains();
   const kcalPerKg = gains ? kcalPerKgFat() : GENERIC_KCAL_PER_KG_FAT;
-  // Also the toggle's visible output on this chart: a fitted density measures
-  // scale weight, the generic 7,700 measures fat, and the bars themselves only
-  // move when the two densities differ.
-  const axisUnit = gains ? 'g weight' : 'g fat';
   const massLabel = gains ? 'Expected scale weight' : 'Expected fat';
 
   // Levels the whole Mifflin curve onto the fit's own resting-equivalent
   // expenditure, measured at the latest weigh-in — the one day where the
   // calibrated maintenance is exactly target − β₀·K.
+  // beta0 * kcalPerKg converts the fit's whole unexplained drift into kcal/day, so
+  // a noisy fit can imply a resting expenditure no body can have — a -195 g/day
+  // drift at 34,986 kcal/kg adds 6,822 kcal and put maintenance near 8,600,
+  // rendering every day as a 5,000+ kcal deficit. Outside a plausible multiple of
+  // Mifflin the offset is dropped and the plain curve is used.
   const latestWeight = latestWeightKg(entries);
-  const maintenanceOffset = (gains && latestWeight !== null)
-    ? (getCalorieTargetKcal(entries) - gains.beta0 * kcalPerKg) - mifflinStJeorBmr(latestWeight, heightCm, age, sex)
-    : 0;
+  const bmrAtLatest = latestWeight !== null ? mifflinStJeorBmr(latestWeight, heightCm, age, sex) : null;
+  const calibratedResting = (gains && bmrAtLatest !== null)
+    ? getCalorieTargetKcal(entries) - gains.beta0 * kcalPerKg
+    : null;
+  const restingIsPlausible = calibratedResting !== null
+    && calibratedResting >= bmrAtLatest * CALIBRATED_RESTING_MIN_BMR_RATIO
+    && calibratedResting <= bmrAtLatest * CALIBRATED_RESTING_MAX_BMR_RATIO;
+  const maintenanceOffset = restingIsPlausible ? calibratedResting - bmrAtLatest : 0;
 
   const detailByDate = new Map();
 
@@ -2081,7 +2092,7 @@ function renderWellnessEnergyBalanceChart(entries) {
           position: 'right',
           afterFit: fixTrendYAxisWidth,
           grid: { drawOnChartArea: false },
-          ticks: { includeBounds: false, callback: maskedUnitTick(axisUnit) },
+          ticks: { includeBounds: false, callback: maskedUnitTick('g') },
         },
       },
     },

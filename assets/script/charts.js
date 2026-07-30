@@ -53,14 +53,8 @@ function niceAxisMax(value) {
   return niceResidual * magnitude;
 }
 
-// Same idea as niceAxisMax but with a much finer ladder, for axes where a
-// coarse round-up wastes visible chart area. niceAxisMax steps 1 → 2 → 5 → 10,
-// so anything just past 2,000 lands on 5,000 and leaves over half the plot
-// empty: a 2,100 kcal deficit — an ordinary day of eating light — got an axis
-// twice the height of the tallest bar. These steps keep the round-up to at most
-// 25% instead of 150%, while still landing on values a reader parses at a
-// glance. Kept separate rather than widening niceAxisMax itself so the other
-// chart using that helper keeps the bounds it was tuned with.
+// Finer-grained niceAxisMax, for axes where its 1/2/5/10 ladder rounds up far
+// enough to waste most of the plot area.
 const NICE_AXIS_STEPS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 
 function niceAxisBound(value) {
@@ -1976,10 +1970,6 @@ function renderWellnessEnergyBalanceChart(entries) {
   // switches both constants and both labels below.
   const gains = getCalibratedGains();
   const kcalPerKg = gains ? kcalPerKgFat() : GENERIC_KCAL_PER_KG_FAT;
-  // Ticks carry the bare unit, matching the left axis's "kcal" — naming the
-  // quantity on every tick repeated it eight times and crowded out the numbers.
-  // Whether the figure is fat or scale weight is said in the tooltip
-  // (massLabel), which is where the rest of this chart's detail already lives.
   const massLabel = gains ? 'Expected scale weight' : 'Expected fat';
 
   // Levels the whole Mifflin curve onto the fit's own resting-equivalent

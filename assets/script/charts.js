@@ -1970,6 +1970,10 @@ function renderWellnessEnergyBalanceChart(entries) {
   // switches both constants and both labels below.
   const gains = getCalibratedGains();
   const kcalPerKg = gains ? kcalPerKgFat() : GENERIC_KCAL_PER_KG_FAT;
+  // Also the toggle's visible output on this chart: a fitted density measures
+  // scale weight, the generic 7,700 measures fat, and the bars themselves only
+  // move when the two densities differ.
+  const axisUnit = gains ? 'g weight' : 'g fat';
   const massLabel = gains ? 'Expected scale weight' : 'Expected fat';
 
   // Levels the whole Mifflin curve onto the fit's own resting-equivalent
@@ -2077,7 +2081,7 @@ function renderWellnessEnergyBalanceChart(entries) {
           position: 'right',
           afterFit: fixTrendYAxisWidth,
           grid: { drawOnChartArea: false },
-          ticks: { includeBounds: false, callback: maskedUnitTick('g') },
+          ticks: { includeBounds: false, callback: maskedUnitTick(axisUnit) },
         },
       },
     },

@@ -844,18 +844,43 @@ function renderWellnessCaloriesChart(entries) {
   });
 }
 
-// Maps a clock time (minutes since midnight) onto a fixed 18:00 -> next-day
-// 12:00 axis (18 hours) so the y-axis can carry fixed "18:00".."12:00"
-// reference labels instead of autoscaling to whatever range of bedtimes
-// happens to be visible. Covers virtually every real bedtime/waketime;
-// daytime-only naps fall outside [0, 18] and are treated as a gap by the
-// caller rather than drawn wrapped/garbled.
+// Maps a clock time (minutes since midnight) onto a noon-anchored axis, so a
+// bedtime/waketime pair that crosses midnight (the normal case) renders as
+// one contiguous span instead of wrapping/splitting at a raw 0:00 boundary.
+// Anchored at noon rather than a specific assumed bedtime — an earlier fixed
+// 18:00 anchor baked in an "everyone goes to bed in the evening" assumption
+// that doesn't generalize (e.g. to a night-shift sleep schedule) — noon is
+// the one instant of the day virtually guaranteed to fall in the middle of
+// anyone's *awake* period, so the same wrap-avoidance trick works regardless
+// of actual schedule.
+const SLEEP_AXIS_ANCHOR_MIN = 12 * 60;
 function sleepAxisValue(clockMin) {
-  return (((clockMin - 18 * 60) + 24 * 60) % (24 * 60)) / 60;
+  return (((clockMin - SLEEP_AXIS_ANCHOR_MIN) + 24 * 60) % (24 * 60)) / 60;
 }
-const SLEEP_AXIS_TICK_LABELS = { 0: '18:00', 3: '21:00', 6: '00:00', 9: '03:00', 12: '06:00', 15: '09:00', 18: '12:00' };
+
+// Ticks are always whole-hour-aligned (both the anchor and the 3h step below
+// are multiples of 60 minutes), so the real clock time is always derivable
+// from the axis math directly via the same formatClockTime24 helper the
+// tooltip uses (wellness.js) — no fixed label lookup table needed.
 function sleepAxisTickLabel(v) {
-  return SLEEP_AXIS_TICK_LABELS[v] ?? '';
+  const clockMin = Math.round((SLEEP_AXIS_ANCHOR_MIN + v * 60) % (24 * 60));
+  return formatClockTime24(clockMin);
+}
+
+// Rounds the actual earliest-bedtime/latest-waketime span (in axis units,
+// across the pairs actually being charted) out to the nearest 3-hour tick
+// with a little padding, instead of always reserving a fixed 18-hour window —
+// so the chart tightly fits real bed/wake times instead of wasting space on
+// hours nobody actually sleeps through. Falls back to the old 0-18 default
+// only when there's no valid data to compute a range from.
+function computeSleepAxisRange(shiftedPairs) {
+  if (shiftedPairs.length === 0) return { axisMin: 0, axisMax: 18 };
+  const min = Math.min(...shiftedPairs.map((p) => p.start));
+  const max = Math.max(...shiftedPairs.map((p) => p.end));
+  return {
+    axisMin: Math.max(0, Math.floor(min / 3) * 3 - 3),
+    axisMax: Math.min(24, Math.ceil(max / 3) * 3 + 3),
+  };
 }
 
 function lerpHex(hexA, hexB, t) {
@@ -896,14 +921,31 @@ function renderWellnessSleepChart(entries) {
     if (!current || e.amount > current.amount) bestByDate.set(e.date, e);
   });
 
+  // Shift every shown date's bed/wake pair onto the noon-anchored axis once,
+  // up front — both to derive the axis's own min/max range below and to
+  // reuse when building the chart data, so the shift math and the "is this
+  // pair valid" check (wake must land after bed once shifted) happen in
+  // exactly one place.
+  const shiftedByDate = new Map();
+  const validShiftedPairs = [];
+  dates.forEach((d) => {
+    const e = bestByDate.get(d);
+    if (!e) return;
+    const start = sleepAxisValue(e.sleepBedMin);
+    const end = sleepAxisValue(e.sleepWakeMin);
+    if (end <= start) return;
+    shiftedByDate.set(d, { start, end, e });
+    validShiftedPairs.push({ start, end });
+  });
+
+  const { axisMin, axisMax } = computeSleepAxisRange(validShiftedPairs);
+
   const rangeByDate = new Map(); // date -> { bedMin, wakeMin, durationHr }
   const barColors = [];
   const sleepData = dates.map((d) => {
-    const e = bestByDate.get(d);
-    if (!e) { barColors.push(null); return null; }
-    const start = sleepAxisValue(e.sleepBedMin);
-    const end = sleepAxisValue(e.sleepWakeMin);
-    if (end <= start || start < 0 || start > 18 || end < 0 || end > 18) { barColors.push(null); return null; }
+    const shifted = shiftedByDate.get(d);
+    if (!shifted) { barColors.push(null); return null; }
+    const { start, end, e } = shifted;
     rangeByDate.set(d, { bedMin: e.sleepBedMin, wakeMin: e.sleepWakeMin, durationHr: e.amount });
     barColors.push(sleepStatusColor(e.amount, sleepTarget));
     return [start, end];
@@ -941,8 +983,8 @@ function renderWellnessSleepChart(entries) {
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
-          min: 0,
-          max: 18,
+          min: axisMin,
+          max: axisMax,
           afterFit: fixTrendYAxisWidth,
           ticks: { stepSize: 3, callback: sleepAxisTickLabel },
         },
@@ -1377,10 +1419,13 @@ function renderWellnessProjectionChart(entries) {
   const meterWrap = document.getElementById('weight-progress-meter');
   const meterFill = document.getElementById('weight-progress-meter-fill');
   const meterPct = document.getElementById('weight-progress-meter-pct');
+  const meterRemaining = document.getElementById('weight-progress-meter-remaining');
   const etaEl = document.getElementById('weight-projection-eta');
   const plateauNote = document.getElementById('weight-plateau-note');
   meterWrap.hidden = true;
   meterPct.textContent = '';
+  meterRemaining.textContent = '';
+  meterRemaining.classList.remove('danger');
   etaEl.textContent = '';
   plateauNote.textContent = '';
   plateauNote.classList.remove('warning');
@@ -1401,15 +1446,26 @@ function renderWellnessProjectionChart(entries) {
   // shown whenever there's a real start point and a distinct goal,
   // regardless of trajectory status (even "wrong direction" is worth
   // seeing visually, just in the danger color instead of the accent).
+  // Shows both the concrete kg remaining (the motivating, actionable number
+  // a bare percentage doesn't convey) and the percentage already covered,
+  // rather than just the one abstract figure.
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
   const totalDelta = startWeight - weightGoal;
   if (Math.abs(totalDelta) >= 0.1) {
     const pct = Math.max(0, Math.min(100, ((startWeight - lastWeight) / totalDelta) * 100));
+    const remainingKg = Math.round(Math.abs(lastWeight - weightGoal) * 10) / 10;
+    const isWrongDirection = proj.status === 'wrong-direction';
+
     meterWrap.hidden = false;
     meterFill.style.width = `${pct}%`;
-    meterFill.classList.toggle('danger', proj.status === 'wrong-direction');
+    meterFill.classList.toggle('danger', isWrongDirection);
+
     const pctText = `${Math.round(pct)}%`;
     meterPct.textContent = privacyMode ? maskDigits(pctText) : pctText;
+
+    const remainingText = `${remainingKg} kg`;
+    meterRemaining.textContent = privacyMode ? maskDigits(remainingText) : remainingText;
+    meterRemaining.classList.toggle('danger', isWrongDirection);
   }
 
   if (proj.status === 'reached') { etaEl.textContent = 'Goal reached! 🎉'; return; }

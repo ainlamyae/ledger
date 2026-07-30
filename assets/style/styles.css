@@ -1600,16 +1600,34 @@ td .btn {
 
 .weight-progress-meter-stats {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
     gap: .75rem;
     margin-top: .4rem;
+}
+
+/* Each stat is a single line, number then label — "23% there" / "16.9 kg to
+   go" — shown with equal visual weight side by side, instead of one
+   abstract percentage standing alone. */
+.weight-progress-meter-stat {
+    display: flex;
+    align-items: baseline;
+    gap: .3rem;
+}
+
+.weight-progress-meter-stat-label {
+    font-size: 1.1rem;
+    color: var(--color-text-muted);
 }
 
 .weight-progress-meter-pct {
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--color-text);
+}
+
+.weight-progress-meter-pct.danger {
+    color: var(--color-expense);
 }
 
 .weight-plateau-note {
@@ -1625,11 +1643,6 @@ td .btn {
     font-weight: 600;
 }
 
-.weight-progress-meter-stats .weight-eta {
-    text-align: right;
-    margin: 0;
-    min-height: 0;
-}
 
 #account-type::-webkit-calendar-picker-indicator {
     display: none !important;
@@ -1639,6 +1652,30 @@ td .btn {
     color: var(--color-text-muted);
     font-size: .85rem;
     margin-bottom: 1rem;
+}
+
+/* Bare h3s ("Strength Training", "NEAT", "Cardio") had no override, so they
+   fell back to the browser's default ~1.17em h3 size — larger than this
+   panel's own h2 (.panel h2, 1.1rem) and its h4 day headings (1rem via
+   default sizing), an inverted, inconsistent hierarchy. Matches
+   .panel-section > h3's existing 1rem convention used elsewhere in the app
+   for a sub-heading directly under a panel's h2. 1.75rem top margin (same
+   gap .workout-day + .workout-day already uses between strength days) before
+   NEAT/Cardio separates them from the table above; the first one right under
+   h2 needs none. Scoped to :not(.collapsed) — .panel.collapsed > *:not(h2)
+   zeroes every direct child's margin to collapse the panel down to just its
+   h2, but that rule is class-based while this one used to be a bare
+   #workout-plan-panel id selector, so it won ID-vs-class specificity even
+   while collapsed and left a visible gap under the (invisible) h3s; scoping
+   the margin rule itself out while collapsed removes the conflict instead of
+   fighting it with specificity. */
+#workout-plan-panel:not(.collapsed) h3 {
+    font-size: 1rem;
+    margin: 1.75rem 0 .5rem;
+}
+
+#workout-plan-panel:not(.collapsed) h3:first-of-type {
+    margin-top: 0;
 }
 
 .workout-day + .workout-day {
@@ -1658,6 +1695,43 @@ td .btn {
     text-align: center;
 }
 
+/* Pins every strength table's Sets×Reps/Rest columns (and every NEAT/Cardio
+   table's Amount column) to the same width regardless of that table's own
+   longest exercise name, so the 6 Activity Plan tables' columns line up with
+   each other when stacked instead of each auto-sizing independently. Left on
+   default table-layout: auto rather than fixed — fixed layout introduced a
+   several-px rounding overflow (border-collapse + fractional column widths)
+   that made .table-responsive show a phantom horizontal scrollbar even
+   though every column's content fit well within its specified width; auto
+   layout still honors a <th> width as a strong hint when its column's own
+   content never needs more (true here — "3 × 10"/"90 sec" never approach
+   116px/80px), so alignment holds without the rounding bug. The first column
+   (Exercise/Activity) takes the rest of the width; Done stays pinned via the
+   existing .workout-check-col. white-space: nowrap on every header is a
+   permanent safeguard so a header can never wrap onto 2 lines again (as
+   "Sets × Reps" briefly did at a too-tight 100px) regardless of font/OS
+   rendering differences — auto layout still grows the column past its width
+   hint if nowrap content needs more room. */
+.workout-table-strength th,
+.workout-table-neat th {
+    white-space: nowrap;
+}
+
+.workout-table-strength th:nth-child(2),
+.workout-table-strength td:nth-child(2) {
+    width: 116px;
+}
+
+.workout-table-strength th:nth-child(3),
+.workout-table-strength td:nth-child(3) {
+    width: 80px;
+}
+
+.workout-table-neat th:nth-child(2),
+.workout-table-neat td:nth-child(2) {
+    width: 100px;
+}
+
 .modal-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1671,25 +1745,6 @@ td .btn {
 
 .modal-card-xwide {
     max-width: 960px;
-}
-
-.insight-lookback-label {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    font-size: .85rem;
-    color: var(--color-text-muted);
-    margin-bottom: .75rem;
-}
-
-.insight-lookback-label select {
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .3rem .5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
 }
 
 .insight-data-preview {
@@ -1719,6 +1774,27 @@ td .btn {
 }
 
 #insight-body strong {
+    color: var(--color-text);
+}
+
+/* Activity Insight renders the exact same bolded-section-label format
+   Wellness Insight does (both reuse insight.js's renderInsightText /
+   INSIGHT_SECTION_LABELS) — matches #insight-body's paragraph spacing/line-
+   height/strong color 1:1 so the two read as one consistent style instead of
+   this panel falling back to the global reset's zero paragraph margin (the
+   gap this rule was missing entirely, unlike Food Insight below, whose own
+   response is freeform Q&A text with no fixed labels, so its look is
+   legitimately plainer, not a bug). */
+#activity-insight-body p {
+    margin: 0 0 1rem;
+    line-height: 1.55;
+}
+
+#activity-insight-body p:last-child {
+    margin-bottom: 0;
+}
+
+#activity-insight-body strong {
     color: var(--color-text);
 }
 
@@ -1754,6 +1830,14 @@ td .btn {
 
 #food-insight-body p:last-child {
     margin-bottom: 0;
+}
+
+/* Food Insight's report now uses the same bolded-section-label format
+   Wellness/Activity Insight do (renderInsightText), so it needs the same
+   strong color override — this rule was never added since the prompt used
+   to ask for a plain freeform answer with no labels at all. */
+#food-insight-body strong {
+    color: var(--color-text);
 }
 
 .export-date-range {

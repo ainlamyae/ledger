@@ -5,14 +5,65 @@
 // resulting gains to the Settings tab so calcProjection() picks them up via
 // getCalibratedGains(). Never runs automatically — a user who doesn't click
 // Calibrate keeps the generic formula exactly as-is.
+//
+// Weigh-in noise no longer stops a calibration outright, which is what it used
+// to do ("your data is too noisy to calibrate yet"). Two things replace that
+// refusal:
+//   1. Each fitted sample now spans at least three weeks and takes its rate
+//      from every weigh-in inside that span, instead of differencing whichever
+//      two weigh-ins happened to be consecutive — so scale/water noise is
+//      averaged down before the regression sees it, without the response and
+//      the habit averages ending up describing different days
+//      (buildCalibrationSamples).
+//   2. If the fitted calorie sensitivity still comes out implausible, the
+//      calorie term alone is PINNED to the generic 7,700 kcal/kg and the rest
+//      of the model is fitted around it, instead of the whole calibration being
+//      thrown away over one bad coefficient (fitCalibration).
+// So Run Calibration always yields a saveable fit as long as there's enough
+// history to build the minimum number of windows at all — what varies is how
+// much of the model is genuinely the user's, which the summary and warnings say
+// outright rather than hiding behind a pass/fail.
 
 const PROJ_CALIBRATION_MIN_SAMPLES = 6;
 const PROJ_CALIBRATION_MIN_CALORIE_COVERAGE = 0.5;
 const PROJ_CALIBRATION_MAX_INTERVAL_WEIGHT_DAYS = 60;
-const PROJ_CALIBRATION_MIN_CALORIE_STD_DEV = 100;
-// Blocking bounds: only reject an energy density this extreme, since it's
-// almost certainly a numerical artifact (near-singular fit) rather than a
-// real physiological signal.
+
+// Minimum calendar span of one fitted sample. Two consecutive weigh-ins used to
+// be the unit, and that unit is dominated by noise: at a fairly ordinary ±0.4 kg
+// of scale/water variation, a 3-day gap carries about 0.19 kg/day of noise
+// against a real signal nearer 0.03 kg/day. Regressing on that pulls the calorie
+// coefficient toward zero, and since the reported energy density is 1/βcal, a
+// βcal squashed toward zero surfaces as an absurd density — the "34,986 kcal/kg,
+// your data is too noisy" failure. Endpoint noise doesn't grow with the length of
+// the baseline but the signal does, so a longer span is the fix.
+//
+// Chosen by running this whole pipeline over 200 simulated histories with a
+// known 7,700 kcal/kg density (180 days, weigh-ins every 3 days, ±0.4 kg of
+// scale noise). Pairing consecutive weigh-ins produced a usable fitted density
+// 30 times out of 200 — median 9,300 kcal/kg, skewed high exactly as the bug
+// report showed — and fell back to the generic density the other 170. Three-week
+// windows produced one 155 times out of 200, median 8,300. The gap widens with
+// more history (184/200 at a year) and survives daily weigh-ins on a ±0.8 kg
+// scale with 6% freak readings (142/200 vs 5/200). Going longer still (28 days)
+// stopped improving the estimate and only cost samples, so this is the knee.
+const PROJ_CALIBRATION_MIN_INTERVAL_DAYS = 21;
+// Below this much spread in intake BETWEEN WINDOWS, the density is only weakly
+// supported however plausible it looks, so it's flagged. Deliberately a warning
+// and not a pin: an implausible density is caught by the bounds below on its own
+// merits, and a plausible one is worth keeping even if the evidence for it is
+// thin. Scaled to what a window average actually varies by — a 21-day mean of
+// intake that swings ±400 kcal daily only moves about ±50 kcal from window to
+// window, so the ±100 kcal figure this replaced (written for 3-day averages)
+// would now flag literally everyone.
+const PROJ_CALIBRATION_WEAK_CALORIE_STD_DEV = 25;
+// Pinning bounds: an energy density this extreme is a numerical artifact of a
+// near-singular fit rather than a real physiological signal, so the calorie
+// term gets pinned instead of stored. These no longer block a calibration —
+// they only decide whether the density is the user's or the generic one. That
+// distinction matters beyond the forecast: getCalorieTargetKcal() converts
+// WEEKLY_FAT_LOSS_KG into a daily deficit using this density, so saving an
+// absurd one would move the user's actual calorie target, which is why it's
+// substituted rather than merely warned about.
 const PROJ_CALIBRATION_MIN_KCAL_PER_KG = 1500;
 const PROJ_CALIBRATION_MAX_KCAL_PER_KG = 20000;
 // Warn-only band: 7,700 kcal/kg (pure fat) is a ceiling, not a norm — real
@@ -132,7 +183,7 @@ function openCalibrationModal() {
     const calibratedAt = getSettingString('PROJ_CALIBRATED_AT', 'an earlier session');
     const r2 = getSetting('PROJ_CALIBRATION_R2', null);
     const n = getSetting('PROJ_CALIBRATION_SAMPLES', null);
-    const details = [n !== null ? `${n} intervals` : null, r2 !== null ? `R² ${r2.toFixed(2)}` : null]
+    const details = [n !== null ? `${n} windows` : null, r2 !== null ? `R² ${r2.toFixed(2)}` : null]
       .filter(Boolean).join(', ');
     summary.innerHTML = `<p>Currently calibrated (${calibratedAt}${details ? `, ${details}` : ''}). Run again to refit from your latest history, or reset to the generic formula.</p>`;
   } else {
@@ -146,13 +197,42 @@ function closeCalibrationModal() {
   document.getElementById('calibration-modal').hidden = true;
 }
 
-// Collapses same-day Weight entries (averaged), pairs up consecutive
-// weigh-ins into intervals, and computes each interval's average
+// Collapses same-day Weight entries (averaged), spans weigh-ins into multi-week
+// windows, and computes each window's average
 // calories/activity/sleep using the exact same day-with-a-log averaging
 // convention calcProjection() uses (charts.js's avg()) — training and
 // projection must agree on what "average calories" means, or the fitted
 // coefficients end up calibrated against a quantity calcProjection() never
 // actually feeds them.
+//
+// A sample is a WINDOW of at least PROJ_CALIBRATION_MIN_INTERVAL_DAYS, not a
+// pair of consecutive weigh-ins, and its rate is the least-squares slope through
+// every weigh-in inside that window. Both parts fight noise, and neither one
+// distorts what's being related to what:
+//   - the long baseline is where the signal finally outweighs the ±0.4 kg of
+//     scale/water variation on the endpoints (see the constant's own comment);
+//   - the in-window slope uses all the readings rather than just the two ends,
+//     so one freak reading (salty dinner, scale on carpet) can't define a whole
+//     sample by landing on a boundary.
+//
+// What this deliberately does NOT do is smooth the weight series first and then
+// difference the smoothed line. That sounds like the same idea and measurably
+// makes things worse: a centered moving average at each endpoint pulls in
+// readings from outside the window, so the response ends up describing a ~15-day
+// span while avgCalories and friends describe the 3-day gap between the
+// weigh-ins, and relating one to the other is what manufactures a 30,000+
+// kcal/kg density in the first place. Simulated against a known 7,700 kcal/kg it
+// landed in the plausible band essentially never (0–5% depending on noise, with
+// a median density around 30,000) — strictly worse than the raw weigh-ins it was
+// meant to clean up, and a faithful reproduction of the reported symptom. The
+// response and the predictors have to cover the same days; smoothing only helps
+// when it's the same smoothing on both sides, which is what a longer window
+// achieves by construction.
+//
+// Windows start at every weigh-in, so they overlap. That's deliberate — it keeps
+// the sample count usable on a few months of history — but it does mean
+// neighbouring samples share most of their days, which makes the leave-one-out
+// score in fitWeightedRidge optimistic and is called out where that's reported.
 function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
   const weightSums = new Map();
   const caloriesByDate = new Map();
@@ -187,6 +267,7 @@ function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
 
   const weightByDate = new Map([...weightSums].map(([date, { sum, count }]) => [date, sum / count]));
   const dates = [...weightByDate.keys()].sort();
+  const daysBetween = (from, to) => Math.round((parseIsoDateUTC(to) - parseIsoDateUTC(from)) / 86400000);
 
   const sliceByRange = (map, fromInclusive, toExclusive) => {
     const sliced = new Map();
@@ -201,12 +282,20 @@ function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
 
   for (let i = 0; i < dates.length - 1; i++) {
     const dateA = dates[i];
-    const dateB = dates[i + 1];
-    const days = Math.round((parseIsoDateUTC(dateB) - parseIsoDateUTC(dateA)) / 86400000);
-    if (days <= 0) continue;
+
+    // Close the window on the first weigh-in far enough out to carry signal,
+    // rather than on whichever one happens to come next.
+    let j = i + 1;
+    while (j < dates.length && daysBetween(dateA, dates[j]) < PROJ_CALIBRATION_MIN_INTERVAL_DAYS) j++;
+    // Every later start is closer to the end of the history than this one, so
+    // once one window runs off the end none of the rest can qualify either.
+    if (j >= dates.length) break;
+
+    const dateB = dates[j];
+    const days = daysBetween(dateA, dateB);
 
     // Missing intake data must not be silently treated as "0" or "at
-    // target" — calories is the primary driver, so an interval with too
+    // target" — calories is the primary driver, so a window with too
     // sparse a calorie log is excluded outright rather than guessed at.
     const calSlice = sliceByRange(caloriesByDate, dateA, dateB);
     if (calSlice.size / days < PROJ_CALIBRATION_MIN_CALORIE_COVERAGE) {
@@ -218,9 +307,19 @@ function buildCalibrationSamples(entries, sleepTarget, proteinTarget) {
     const sleepSlice = sliceByRange(sleepByDate, dateA, dateB);
     const proteinSlice = sliceByRange(proteinByDate, dateA, dateB);
 
+    // Slope through every weigh-in from dateA to dateB inclusive. Both
+    // endpoints belong in it, while the habit slices above stop before dateB —
+    // that isn't an inconsistency: a weigh-in reflects the days BEFORE it, so
+    // the intake that moved the scale from dateA's reading to dateB's is the
+    // intake logged on dateA through dateB-1.
+    const windowDates = dates.slice(i, j + 1);
+
     samples.push({
       days,
-      ratePerDay: (weightByDate.get(dateB) - weightByDate.get(dateA)) / days,
+      ratePerDay: linearRegressionSlope(
+        windowDates.map((date) => daysBetween(dateA, date)),
+        windowDates.map((date) => weightByDate.get(date)),
+      ),
       avgCalories: avg(calSlice),
       avgActivityKcal: actSlice.size > 0 ? avg(actSlice) : 0,
       avgSleepHours: sleepSlice.size > 0 ? avg(sleepSlice) : sleepTarget,
@@ -267,6 +366,15 @@ const PROJ_RIDGE_TIE_TOLERANCE = 0.01;
 // Predictor order for every coefficient array below: calories, activity,
 // sleep, protein. The intercept is handled separately (it isn't penalized).
 const PROJ_PREDICTOR_COUNT = 4;
+const PROJ_CALORIE_PREDICTOR = 0;
+
+// Which predictors the solver may estimate, one entry per fallback stage in
+// fitCalibration. Anything left out isn't dropped from the MODEL — it's held at
+// a fixed value the solver fits around: the calorie term at the generic energy
+// density, the rest at zero.
+const PROJ_FITTABLE_ALL = [0, 1, 2, 3];
+const PROJ_FITTABLE_HABITS = [1, 2, 3];
+const PROJ_FITTABLE_NONE = [];
 
 // The model being fitted, in the units each coefficient is reported in:
 //   ratePerDay ≈ β0 + β1·(avgCalories−calorieTarget) + β2·avgActivityKcal + β3·(avgSleepHours−sleepTarget) + β4·(avgProteinG−proteinTarget)
@@ -278,18 +386,36 @@ const PROJ_PREDICTOR_COUNT = 4;
 // makes β0 a clean "baseline kg/day drift my logged habits don't explain"
 // term (adaptive thermogenesis / intake under-reporting / noise) —
 // something the generic formula has no provision for at all.
-function buildDesign(samples, calorieTarget, sleepTarget, proteinTarget) {
+//
+// `pinnedBetaCal` (null, or a kg/day-per-kcal value) holds β1 fixed instead of
+// estimating it, and `fittable` lists the predictor indices the solver may move.
+function buildDesign(samples, calorieTarget, sleepTarget, proteinTarget, pinnedBetaCal, fittable) {
+  const x = samples.map((s) => [
+    s.avgCalories - calorieTarget,
+    s.avgActivityKcal,
+    s.avgSleepHours - sleepTarget,
+    s.avgProteinG - proteinTarget,
+  ]);
+  const yObserved = samples.map((s) => s.ratePerDay);
+
   return {
-    x: samples.map((s) => [
-      s.avgCalories - calorieTarget,
-      s.avgActivityKcal,
-      s.avgSleepHours - sleepTarget,
-      s.avgProteinG - proteinTarget,
-    ]),
-    y: samples.map((s) => s.ratePerDay),
+    x,
+    // Kept alongside `y` for R²: the denominator has to be variance around the
+    // mean OBSERVED rate, or "better than assuming your average rate" stops
+    // meaning that once part of the model is pinned.
+    yObserved,
+    // What the solver actually minimizes. A pinned calorie term's contribution
+    // is known up front, so it's subtracted from the response first (a standard
+    // regression offset) and the remaining terms plus the intercept fit only
+    // what it leaves behind.
+    y: pinnedBetaCal === null
+      ? yObserved
+      : yObserved.map((rate, i) => rate - pinnedBetaCal * x[i][PROJ_CALORIE_PREDICTOR]),
     // Weight = interval length in days, capped, so one abnormally long gap
     // can't dominate the fit.
     w: samples.map((s) => Math.min(s.days, PROJ_CALIBRATION_MAX_INTERVAL_WEIGHT_DAYS)),
+    pinnedBetaCal,
+    fittable,
   };
 }
 
@@ -309,7 +435,7 @@ function buildDesign(samples, calorieTarget, sleepTarget, proteinTarget) {
 //
 // Returns null if the penalized system still can't be solved.
 function solveRidge(design, rows, alpha) {
-  const { x, y, w } = design;
+  const { x, y, w, fittable } = design;
   const wSum = rows.reduce((sum, i) => sum + w[i], 0);
   if (wSum <= 0) return null;
 
@@ -320,16 +446,22 @@ function solveRidge(design, rows, alpha) {
   // and can't be standardized. It's dropped with a zero coefficient rather than
   // making the whole system singular — which is what the un-regularized fit did,
   // refusing to calibrate the other three terms at all over one unused input.
-  const mean = [];
-  const sd = [];
+  //
+  // Non-fittable predictors keep mean 0 / sd 0 and are never entered: their
+  // coefficient stays 0 here, so the intercept expression below ignores them,
+  // which is what makes a pinned term's β0 come out in the same units and with
+  // the same meaning as an unpinned one's (the pinned term contributes nothing
+  // at x = 0 either way).
+  const mean = new Array(PROJ_PREDICTOR_COUNT).fill(0);
+  const sd = new Array(PROJ_PREDICTOR_COUNT).fill(0);
   const active = [];
-  for (let j = 0; j < PROJ_PREDICTOR_COUNT; j++) {
+  fittable.forEach((j) => {
     const m = rows.reduce((sum, i) => sum + w[i] * x[i][j], 0) / wSum;
     const variance = rows.reduce((sum, i) => sum + w[i] * (x[i][j] - m) ** 2, 0) / wSum;
-    mean.push(m);
-    sd.push(Math.sqrt(variance));
+    mean[j] = m;
+    sd[j] = Math.sqrt(variance);
     if (sd[j] > 0) active.push(j);
-  }
+  });
 
   const beta = new Array(PROJ_PREDICTOR_COUNT).fill(0);
 
@@ -365,7 +497,7 @@ function solveRidge(design, rows, alpha) {
   // target intake, zero logged activity, target sleep, and target protein.
   const beta0 = yMean - beta.reduce((sum, bj, j) => sum + bj * mean[j], 0);
 
-  return { beta0, beta, droppedCount: PROJ_PREDICTOR_COUNT - active.length };
+  return { beta0, beta, droppedCount: fittable.length - active.length };
 }
 
 function predictRate(coefficients, xi) {
@@ -406,11 +538,16 @@ function looSquaredError(design, alpha) {
 // pulls the sensitivities toward zero, and β0 follows them back toward the
 // weighted mean rate actually observed, which is the honest answer when the
 // habit data explains little.
-function fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget) {
-  const design = buildDesign(samples, calorieTarget, sleepTarget, proteinTarget);
+function fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget, pinnedBetaCal, fittable) {
+  const design = buildDesign(samples, calorieTarget, sleepTarget, proteinTarget, pinnedBetaCal, fittable);
   const allRows = design.y.map((_, i) => i);
 
-  const scored = PROJ_RIDGE_ALPHAS
+  // With no predictor being estimated there's nothing to shrink, so there's no
+  // penalty to choose either — searching would just report whichever α won a
+  // tie between identical scores, which reads in the summary as a real finding.
+  const alphas = fittable.length === 0 ? [0] : PROJ_RIDGE_ALPHAS;
+
+  const scored = alphas
     .map((alpha) => ({ alpha, sse: looSquaredError(design, alpha) }))
     .filter((s) => s.sse !== null);
   if (scored.length === 0) return { status: 'singular' };
@@ -428,18 +565,23 @@ function fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget) {
   if (!fit) return { status: 'singular' };
 
   const wSum = design.w.reduce((a, b) => a + b, 0);
-  const yMeanW = design.w.reduce((s, wi, i) => s + wi * design.y[i], 0) / wSum;
+  const yMeanW = design.w.reduce((s, wi, i) => s + wi * design.yObserved[i], 0) / wSum;
   let ssRes = 0;
   let ssTot = 0;
   design.y.forEach((yi, i) => {
+    // Residuals are taken in the solver's own (offset) space while ssTot comes
+    // from the observed rates. That's not a mismatch: subtracting a pinned
+    // term's contribution from both the observation and the prediction cancels,
+    // so these ARE the full model's residuals on the observed rates. The
+    // denominator, though, has to stay the spread of what was actually measured.
     ssRes += design.w[i] * (yi - predictRate(fit, design.x[i])) ** 2;
-    ssTot += design.w[i] * (yi - yMeanW) ** 2;
+    ssTot += design.w[i] * (design.yObserved[i] - yMeanW) ** 2;
   });
 
   return {
     status: 'ok',
     beta0: fit.beta0,
-    betaCal: fit.beta[0],
+    betaCal: pinnedBetaCal === null ? fit.beta[PROJ_CALORIE_PREDICTOR] : pinnedBetaCal,
     betaAct: fit.beta[1],
     betaSleep: fit.beta[2],
     betaProtein: fit.beta[3],
@@ -451,41 +593,101 @@ function fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget) {
     r2Cv: ssTot > 0 ? 1 - chosen.sse / ssTot : 0,
     alpha: chosen.alpha,
     droppedCount: fit.droppedCount,
+    habitTermsFitted: fittable.some((j) => j !== PROJ_CALORIE_PREDICTOR),
     n: samples.length,
   };
 }
 
-// Guardrails independent of the fit-time solver succeeding — a technically
-// "solvable" system can still be statistically meaningless (near-zero
-// calorie variance) or physiologically nonsensical (wrong-signed or
-// wildly-scaled energy density).
-function validateCalibration(fit, samples) {
-  const blocking = [];
+// Spread of the window-average intake across the samples the fit is handed. Low
+// spread means little leverage to separate "ate more" from everything else that
+// moved, so it's what the weak-evidence warning is measured against. Note this
+// is inherently much smaller than daily variation: averaging three weeks of
+// intake flattens most of it, and overlapping windows share days on top of that.
+function calorieSpread(samples) {
+  const values = samples.map((s) => s.avgCalories);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  return Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length);
+}
+
+// Why this fit's calorie coefficient can't serve as the user's energy density —
+// or null if it can. Phrased as a mid-sentence clause because it's reported to
+// the user inside the pinning warning, not thrown away.
+//
+// Only implausibility pins. Thin evidence for a plausible number doesn't: a
+// density inside the physiological bounds is a usable density whether the data
+// supports it strongly or weakly, and swapping it for 7,700 on the grounds that
+// we're not confident enough would replace the user's own estimate with a
+// stranger's for no gain. Weak support is warned about instead.
+function calorieTermRejection(fit) {
+  if (!(fit.betaCal > 0)) {
+    return 'the unconstrained fit came out implying that eating more speeds up weight loss';
+  }
+  const kcalPerKg = 1 / fit.betaCal;
+  if (kcalPerKg < PROJ_CALIBRATION_MIN_KCAL_PER_KG || kcalPerKg > PROJ_CALIBRATION_MAX_KCAL_PER_KG) {
+    return `the unconstrained fit came out at an impossible ${Math.round(kcalPerKg).toLocaleString()} kcal/kg`;
+  }
+  return null;
+}
+
+// Fits as much of the model as this history can actually support, degrading
+// instead of refusing. Three stages, each keeping everything the previous one
+// established:
+//   1. Everything fitted — the calorie term included.
+//   2. Calorie term pinned to the generic 7,700 kcal/kg, activity/sleep/protein
+//      and the baseline drift fitted around it. This is the case that used to be
+//      an outright "could not calibrate": a scale-noise-dominated response
+//      leaves β1 unidentifiable long before it costs you the other three terms
+//      or the baseline drift, which are the parts the generic formula has no
+//      equivalent for at all.
+//   3. Generic density and baseline drift only, if the habit predictors are so
+//      collinear that even the penalized system won't solve. Thin, but it's
+//      still the user's own measured drift rather than a shrug.
+// `pinReason` (null in stage 1) is what the summary and warnings report, so a
+// pinned fit never passes itself off as a fully personal one.
+function fitCalibration(samples, calorieTarget, sleepTarget, proteinTarget) {
+  const calorieStdDev = calorieSpread(samples);
+  const attempt = (pin, fittable) => fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget, pin, fittable);
+
+  const free = attempt(null, PROJ_FITTABLE_ALL);
+  const pinReason = free.status === 'ok'
+    ? calorieTermRejection(free)
+    : 'the unconstrained fit had no stable solution at all';
+  if (!pinReason) return { ...free, calorieStdDev, pinReason: null };
+
+  const genericBetaCal = 1 / GENERIC_KCAL_PER_KG_FAT;
+  const pinned = attempt(genericBetaCal, PROJ_FITTABLE_HABITS);
+  if (pinned.status === 'ok') return { ...pinned, calorieStdDev, pinReason };
+
+  return { ...attempt(genericBetaCal, PROJ_FITTABLE_NONE), calorieStdDev, pinReason };
+}
+
+// What's worth telling the user about a fit that is, by construction, always
+// saveable. Nothing here blocks: fitCalibration has already substituted the
+// generic energy density for anything implausible, so what's left is disclosure
+// — which parts of this calibration are genuinely theirs, and how much to trust
+// the parts that are.
+function validateCalibration(fit) {
   const warnings = [];
 
-  const calorieValues = samples.map((s) => s.avgCalories);
-  const calorieMean = calorieValues.reduce((a, b) => a + b, 0) / calorieValues.length;
-  const calorieStdDev = Math.sqrt(calorieValues.reduce((s, v) => s + (v - calorieMean) ** 2, 0) / calorieValues.length);
-  if (calorieStdDev < PROJ_CALIBRATION_MIN_CALORIE_STD_DEV) {
-    blocking.push(`Your logged calorie intake barely varies across weigh-ins (±${calorieStdDev.toFixed(0)} kcal) — not enough signal to calibrate reliably yet.`);
-  }
-
-  if (fit.betaCal <= 0) {
-    blocking.push('The fit implies eating more speeds up weight loss, which is not physiologically plausible — your data is too noisy to calibrate yet.');
+  if (fit.pinReason) {
+    const fittedRest = fit.habitTermsFitted
+      ? 'your baseline drift plus the activity, sleep, and protein sensitivities are all still fitted from your own history'
+      : 'your baseline drift is still fitted from your own history';
+    warnings.push(`Energy density couldn't be read off your data (${fit.pinReason}), so it's pinned to the generic 7,700 kcal/kg and the rest of the model was fitted around it — ${fittedRest}. Recalibrate once you've logged more varied intake alongside your weigh-ins to get a density of your own.`);
   } else {
     const effectiveKcalPerKg = 1 / fit.betaCal;
-    if (effectiveKcalPerKg < PROJ_CALIBRATION_MIN_KCAL_PER_KG || effectiveKcalPerKg > PROJ_CALIBRATION_MAX_KCAL_PER_KG) {
-      blocking.push(`The fit implies an extreme ${Math.round(effectiveKcalPerKg).toLocaleString()} kcal/kg energy density — your data is too noisy to calibrate yet.`);
-    } else if (effectiveKcalPerKg < PROJ_CALIBRATION_TYPICAL_MIN_KCAL_PER_KG || effectiveKcalPerKg > PROJ_CALIBRATION_TYPICAL_MAX_KCAL_PER_KG) {
+    if (effectiveKcalPerKg < PROJ_CALIBRATION_TYPICAL_MIN_KCAL_PER_KG || effectiveKcalPerKg > PROJ_CALIBRATION_TYPICAL_MAX_KCAL_PER_KG) {
       warnings.push(`Energy density of ${Math.round(effectiveKcalPerKg).toLocaleString()} kcal/kg is outside the typical 5,000–9,500 range — often reflects water/glycogen swings rather than fat loss in a shorter logging window. Still usable; recalibrating later with more history may tighten it.`);
+    }
+    if (fit.calorieStdDev < PROJ_CALIBRATION_WEAK_CALORIE_STD_DEV) {
+      warnings.push(`Your average intake barely differs from one window to the next (±${fit.calorieStdDev.toFixed(0)} kcal), so this energy density is only weakly supported — it came out physiologically sensible, which is why it was kept, but there isn't much in your history separating "ate more" from everything else that changed. Varying your intake more, or logging longer, is what firms it up.`);
     }
   }
 
-  // A soft warning rather than blocking (unlike betaCal above) — activity is
-  // the secondary predictor here, so one noisy fit shouldn't throw away an
-  // otherwise-usable calibration the way a backwards calorie coefficient does.
-  if (fit.droppedCount > 0) {
-    warnings.push(`${fit.droppedCount} of the four habit inputs never varied across your weigh-ins, so ${fit.droppedCount === 1 ? 'it was' : 'they were'} left out of the fit rather than guessed at — log ${fit.droppedCount === 1 ? 'it' : 'them'} alongside your weight to include ${fit.droppedCount === 1 ? 'it' : 'them'} next time.`);
+  if (!fit.habitTermsFitted) {
+    warnings.push('None of the activity, sleep, or protein terms could be separated from each other in this history, so this calibration is the generic formula plus your own measured baseline drift and nothing more.');
+  } else if (fit.droppedCount > 0) {
+    warnings.push(`${fit.droppedCount} of the habit inputs never varied across your weigh-ins, so ${fit.droppedCount === 1 ? 'it was' : 'they were'} left out of the fit rather than guessed at — log ${fit.droppedCount === 1 ? 'it' : 'them'} alongside your weight to include ${fit.droppedCount === 1 ? 'it' : 'them'} next time.`);
   }
 
   if (fit.betaAct > 0) {
@@ -498,15 +700,18 @@ function validateCalibration(fit, samples) {
   // weigh-in it never saw, and at or below zero it does worse than simply
   // assuming the average rate — so the calibrated forecast is not yet an
   // improvement on the generic one, whatever R2 says.
+  // Overlapping windows (see buildCalibrationSamples) make this score somewhat
+  // generous, since a held-out window shares most of its days with its
+  // neighbours — so at or below zero it's a clear verdict, not a marginal one.
   if (fit.r2Cv <= 0) {
-    warnings.push(`This fit has no predictive power yet (predictive R² ${fit.r2Cv.toFixed(2)}) — on weigh-ins it hadn't seen it does no better than assuming your average rate, so the calibrated forecast isn't an improvement on the generic one. The energy density is still worth keeping; the habit sensitivities aren't reliable yet.`);
+    warnings.push(`This fit has no predictive power yet (predictive R² ${fit.r2Cv.toFixed(2)}) — on weigh-ins it hadn't seen it does no better than assuming your average rate, so the calibrated forecast isn't an improvement on the generic one.${fit.pinReason ? '' : ' The energy density is still worth keeping; the habit sensitivities aren\'t reliable yet.'}`);
   }
 
   if (fit.r2 < PROJ_CALIBRATION_MIN_R2) {
     warnings.push(`Low-confidence fit (R² ${fit.r2.toFixed(2)}) — your logged habits don't explain much of your weight trend yet. Save anyway, or log more consistently first for a better calibration.`);
   }
 
-  return { blocking, warnings };
+  return warnings;
 }
 
 function runCalibration() {
@@ -523,11 +728,14 @@ function runCalibration() {
   const { samples, excludedCount } = buildCalibrationSamples(getDatedWellnessEntries(), sleepTarget, proteinTarget);
 
   if (samples.length < PROJ_CALIBRATION_MIN_SAMPLES) {
-    summary.innerHTML = `<p>Only ${samples.length} usable weigh-in interval(s) found (need at least ${PROJ_CALIBRATION_MIN_SAMPLES}, each with calorie logs covering at least half the interval). Log Weight alongside Calories more consistently, then try again.</p>`;
+    summary.innerHTML = `<p>Only ${samples.length} usable ${PROJ_CALIBRATION_MIN_INTERVAL_DAYS}-day window(s) found (need at least ${PROJ_CALIBRATION_MIN_SAMPLES}, each with calorie logs covering at least half the window). Windows start at every weigh-in and run to the first weigh-in ${PROJ_CALIBRATION_MIN_INTERVAL_DAYS}+ days later, so this needs roughly ${PROJ_CALIBRATION_MIN_INTERVAL_DAYS} days of history plus ${PROJ_CALIBRATION_MIN_SAMPLES} more weigh-ins after that, with Calories logged alongside.</p>`;
     return;
   }
 
-  const fit = fitWeightedRidge(samples, calorieTarget, sleepTarget, proteinTarget);
+  // The only remaining way to come back without a fit: every stage of
+  // fitCalibration's fallback chain failed to solve, which needs a degenerate
+  // design (zero total interval weight) rather than merely noisy data.
+  const fit = fitCalibration(samples, calorieTarget, sleepTarget, proteinTarget);
   if (fit.status !== 'ok') {
     summary.innerHTML = '<p>Could not fit a stable model from this history — try logging more varied calorie intake alongside your weigh-ins.</p>';
     return;
@@ -543,29 +751,26 @@ function runCalibration() {
   const activityKcalPerKg = fit.betaAct < 0 ? Math.round(-1 / fit.betaAct) : null;
 
   summary.innerHTML = `<table class="calibration-summary-table">
-    <tr><td>Intervals used</td><td>${fit.n}${excludedCount ? ` (${excludedCount} excluded — insufficient calorie logs)` : ''}</td></tr>
+    <tr><td>Windows used</td><td>${fit.n}${excludedCount ? ` (${excludedCount} excluded — insufficient calorie logs)` : ''} <span class="hint">each spans at least ${PROJ_CALIBRATION_MIN_INTERVAL_DAYS} days and takes its rate from every weigh-in inside it, so day-to-day water and sodium swings average out instead of drowning the signal; windows start at every weigh-in, so they overlap</span></td></tr>
     <tr><td>Fit quality (R²)</td><td>${fit.r2.toFixed(2)} <span class="hint">in-sample</span></td></tr>
-    <tr><td>Predictive (R²)</td><td>${fit.r2Cv.toFixed(2)} <span class="hint">on weigh-ins the fit never saw — at or below 0 means your habit data doesn't predict a new interval better than assuming your average rate</span></td></tr>
-    <tr><td>Shrinkage</td><td>${fit.alpha === 0 ? 'none needed' : `α ${fit.alpha}`} <span class="hint">${fit.alpha === 0 ? 'the fit held up on its own' : 'chosen from your own data by leave-one-out; pulls noisy sensitivities toward zero'}</span></td></tr>
-    <tr><td>Energy density</td><td>${effectiveKcalPerKg !== null ? `~${effectiveKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(generic: 7,700)</span>` : 'n/a'}</td></tr>
+    <tr><td>Predictive (R²)</td><td>${fit.r2Cv.toFixed(2)} <span class="hint">on windows the fit never saw — at or below 0 means your habit data doesn't predict a new window better than assuming your average rate. Reads a little generously, since overlapping windows share days</span></td></tr>
+    <tr><td>Shrinkage</td><td>${!fit.habitTermsFitted ? 'n/a' : fit.alpha === 0 ? 'none needed' : `α ${fit.alpha}`} <span class="hint">${!fit.habitTermsFitted ? 'no habit sensitivities were estimated, so there was nothing to shrink' : fit.alpha === 0 ? 'the fit held up on its own' : 'chosen from your own data by leave-one-out; pulls noisy sensitivities toward zero'}</span></td></tr>
+    <tr><td>Energy density</td><td>${effectiveKcalPerKg !== null
+      ? `~${effectiveKcalPerKg.toLocaleString()} kcal/kg <span class="hint">${fit.pinReason ? 'pinned to the generic value — your history couldn\'t identify one of its own; see the note below' : '(generic: 7,700)'}</span>`
+      : 'n/a'}</td></tr>
     <tr><td>Activity</td><td>${activityKcalPerKg !== null ? `~${activityKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(compare to Energy density above — similar values mean the model is internally consistent)</span>` : `${(fit.betaAct * 1000).toFixed(2)} g/day per kcal burned`}</td></tr>
     <tr><td>Sleep</td><td>${(fit.betaSleep * 1000).toFixed(0)} g/day per hour above/below your ${sleepTarget} hr target</td></tr>
     <tr><td>Protein</td><td>${(fit.betaProtein * 1000).toFixed(0)} g/day per gram above/below your ${proteinTarget} g target</td></tr>
     <tr><td>Baseline drift</td><td>${(fit.beta0 * 1000).toFixed(0)} g/day unexplained by logged intake/activity/sleep/protein</td></tr>
   </table>`;
 
-  const validation = validateCalibration(fit, samples);
-  if (validation.blocking.length > 0) {
-    showFieldError('calibration-status', `❌ Could not calibrate: ${validation.blocking.join(' ')}`);
-    return;
-  }
-  if (validation.warnings.length > 0) {
-    // Both cases render through the same red .status element (no separate
-    // warning color in this app's CSS) — spelling out "calibration
-    // succeeded" and "still enabled" in the text itself, rather than relying
-    // on color, is what actually tells a blocking failure apart from a
-    // heads-up here.
-    showFieldError('calibration-status', `⚠️ Calibrated successfully — Save below is still enabled. Heads up: ${validation.warnings.join(' ')}`);
+  const warnings = validateCalibration(fit);
+  if (warnings.length > 0) {
+    // Rendered through the same red .status element a real failure would use
+    // (no separate warning color in this app's CSS) — spelling out "calibration
+    // succeeded" and "still enabled" in the text itself, rather than relying on
+    // color, is what keeps a heads-up from reading as a refusal.
+    showFieldError('calibration-status', `⚠️ Calibrated successfully — Save below is still enabled. Heads up: ${warnings.join(' ')}`);
   }
 
   lastCalibrationFit = fit;
@@ -683,7 +888,7 @@ async function saveCalibratedGains() {
   // Modal deliberately stays open on success — the whole point of verifying is
   // to be able to say so, which a modal that closes itself can't do. Save is
   // left disabled since this fit is now written, and Cancel becomes Close.
-  setCalibrationStatus(`✅ Saved and verified — all ${Object.keys(written).length} values were written to the Settings tab and read back. The forecast is now using your calibrated formula (${fit.n} intervals, R² ${fit.r2.toFixed(2)}).`, true);
+  setCalibrationStatus(`✅ Saved and verified — all ${Object.keys(written).length} values were written to the Settings tab and read back. The forecast is now using your calibrated formula (${fit.n} windows, R² ${fit.r2.toFixed(2)}).`, true);
   document.getElementById('calibration-cancel-btn').textContent = 'Close';
 }
 

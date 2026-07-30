@@ -824,8 +824,33 @@ kbd {
     text-align: center;
 }
 
+.panel-group-title a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.panel-group-title a:hover {
+    text-decoration: underline;
+}
+
 .panel-group .panel {
     box-shadow: none;
+}
+
+/* The home page's own "bulb" view: with no data-section (see section-page.js,
+   which stamps one on /health/, /finance/ and /other/), each panel-group shows
+   only its title link and its summary cards row — the same tiles the full
+   section page leads with — so the front page loads and paints without the
+   heavier panels behind them. */
+html:not([data-section]) .panel-group > *:not(.panel-group-title):not(.cards) {
+    display: none;
+}
+
+/* Other has no summary cards row to lead with, so it has nothing to show on
+   the bulb view — the full group (title included) stays reachable only via
+   the top nav's own Other link. */
+html:not([data-section]) #other {
+    display: none;
 }
 
 .panel:hover {
@@ -1802,6 +1827,13 @@ td .btn {
     border: 1px solid var(--color-border);
     background: var(--color-surface);
     color: var(--color-text);
+}
+
+/* The class+element rule above outranks the UA [hidden] rule's own specificity,
+   so an input marked hidden (the Scan file picker, triggered by its own button
+   rather than shown directly) would otherwise render anyway. */
+.app-form input[hidden] {
+    display: none;
 }
 
 /* One height for every single-line control, because they don't agree on their

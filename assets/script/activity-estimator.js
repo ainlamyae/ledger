@@ -28,6 +28,10 @@
 // app's existing 100 steps/min pace assumption (toActivityMinutes, charts.js)
 // lands at ~44.5 kcal — MET 3.5 would have overshot to ~52).
 //
+// Cardio rows: 7.0 for Running (code 12020, "running, jog, general" — a
+// moderate recreational jogging pace, same leisurely-effort framing as Swim/
+// Walk above rather than a competitive-pace running value).
+//
 // Keyed by the exact name text as it appears in the Activity Plan tables
 // (index.html), so a name typo/mismatch is caught explicitly (falls back to
 // EXERCISE_MET_DEFAULT with a surfaced warning) rather than silently
@@ -44,7 +48,8 @@ const EXERCISE_MET = {
   'Hip Adduction machine': 3.5,
   'Calf Raise machine': 3.5,
   'Pec Deck / Chest Fly machine': 3.5,
-  'Lateral Raise machine (or cable)': 3.5,
+  'Left Lateral Raise machine (or cable)': 3.5,
+  'Right Lateral Raise machine (or cable)': 3.5,
   'Cable Tricep Pushdown': 3.5,
   'Rear Delt Fly machine (or cable)': 3.5,
   'Cable Bicep Curl': 3.5,
@@ -58,6 +63,7 @@ const EXERCISE_MET = {
   'Dumbbell Tricep Extension': 3.5,
   Swim: 6.0,
   Walk: 3.0,
+  Running: 7.0,
 };
 // Compendium 02054 general value — used for any name not in the table above
 // (a hand-typed or future-added one) so a miss still gets a reasonable

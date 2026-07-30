@@ -41,16 +41,21 @@ function batchGetValues(ranges, params = {}) {
   return sheetsRequest(`/values:batchGet?${query.toString()}`);
 }
 
-function appendValues(range, values) {
+// valueInputOption defaults to USER_ENTERED — what the entity forms
+// (transactions, timesheet, ...) want, since a typed date or formula should be
+// parsed the way typing it into the cell would be. Pass 'RAW' for values that
+// must round-trip byte-for-byte instead of being reinterpreted; see
+// settings-panel.js's saveSettingValues for why that matters.
+function appendValues(range, values, valueInputOption = 'USER_ENTERED') {
   return sheetsRequest(
-    `/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    `/values/${encodeURIComponent(range)}:append?valueInputOption=${valueInputOption}&insertDataOption=INSERT_ROWS`,
     { method: 'POST', body: JSON.stringify({ values }) }
   );
 }
 
-function updateValues(range, values) {
+function updateValues(range, values, valueInputOption = 'USER_ENTERED') {
   return sheetsRequest(
-    `/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+    `/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`,
     { method: 'PUT', body: JSON.stringify({ values }) }
   );
 }

@@ -6,9 +6,10 @@ const SETTINGS_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-// Amounts are hidden by default each time the dashboard loads; clicking
-// the privacy FAB reveals them for the rest of the session.
-let privacyMode = true;
+// Amounts are shown by default each time the dashboard loads; clicking the
+// privacy FAB hides them for the rest of the session (for reading the
+// dashboard somewhere it can be seen over your shoulder).
+let privacyMode = false;
 
 // Replaces every digit with '*', so masked values keep their currency
 // symbol, sign, and separators (e.g. "$1,234.56" -> "$*,***.**").
@@ -394,27 +395,41 @@ async function loadReport(forceRefresh) {
 
 let currentSettings = {};
 
-// 'Settings'!A2:C is optional and user-managed — unlike every other tab,
-// most users won't have added it. Any failure here (most commonly: the tab
-// doesn't exist yet) is swallowed and treated as "no settings", never as a
-// dashboard-load failure; every reader falls back to its own default via
-// getSetting() below.
+// Last successfully parsed Settings tab, kept so a FAILED refresh can fall
+// back to it instead of wiping everything — see the catch below.
+let lastLoadedSettings = null;
+
+// 'Settings'!A2:C is optional and user-managed — unlike every other tab, most
+// users won't have added it. A failure here is never a dashboard-load failure;
+// every reader falls back to its own default via getSetting() below.
+//
+// A read failure is NOT the same as "there are no settings", though, and
+// conflating the two was a real bug: returning {} here — and caching it for
+// the full 5-minute TTL — silently wiped every setting in memory on one
+// transient read error. Targets reverted to their defaults, a saved
+// calibration read back as "not calibrated" (so Calibrate's own save
+// verification couldn't confirm a write that had in fact landed, and the
+// calibrated/standard toggle went dead), and Wellness Insight reported age and
+// height as "not set" — all while the spreadsheet itself was perfectly intact,
+// which is exactly why it looked like a dozen unrelated bugs. So: keep the
+// last known-good copy, never poison the cache with a failure, and log the
+// cause, which used to be discarded entirely by a bare `catch {}`.
 async function loadSettings(forceRefresh) {
   if (!forceRefresh) {
     const cached = getCached('settings');
     if (cached) return cached;
   }
 
-  let settings = {};
   try {
     const resp = await getValues(SETTINGS_RANGE, VALUE_PARAMS);
-    settings = parseSettings(resp.values || []);
-  } catch {
-    settings = {};
+    const settings = parseSettings(resp.values || []);
+    lastLoadedSettings = settings;
+    setCached('settings', settings);
+    return settings;
+  } catch (err) {
+    console.error(`Failed to read the "${CONFIG.SHEETS.SETTINGS}" tab — keeping the previously loaded settings:`, err);
+    return lastLoadedSettings ?? {};
   }
-
-  setCached('settings', settings);
-  return settings;
 }
 
 // Row-reduce idiom mirroring parseTypeBreakdown — column A is the key,
@@ -522,6 +537,9 @@ async function loadDashboard(forceRefresh = false) {
     applySettingsToWidgets();
     renderSavedFoodInsight();
     renderSavedWellnessInsight();
+    // Whether a saved calibration exists is only knowable once settings are
+    // in — until then the Health Metrics formula toggle renders disabled.
+    refreshFormulaToggle();
   });
 
   const wellnessPromise = settingsPromise.then(() => initWellness(forceRefresh));

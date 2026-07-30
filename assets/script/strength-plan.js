@@ -15,14 +15,18 @@
 const WORKOUT_REP_SEC = 3;
 
 // A ticked row's own active seconds: sets × reps × rep time for a strength
-// row (data-sets/data-reps), a flat data-minutes for a fixed-duration NEAT
-// row (Swim), or data-steps converted via the same steps↔minutes ratio the
-// Activity chart already uses (toActivityMinutes, charts.js — ~100
-// steps/min) for a step-count row (Walk) — net of rest either way, so the
-// total is time actually spent moving, not time spent at the gym.
+// row (data-sets/data-reps), sets × data-hold for an isometric HOLD row
+// (Plank — held for a set number of seconds rather than repped, so the
+// per-rep tempo above doesn't apply and its seconds are already the active
+// time), a flat data-minutes for a fixed-duration NEAT row (Swim), or
+// data-steps converted via the same steps↔minutes ratio the Activity chart
+// already uses (toActivityMinutes, charts.js — ~100 steps/min) for a
+// step-count row (Walk) — net of rest in every case, so the total is time
+// actually spent moving, not time spent at the gym.
 function activeSecondsForBox(box) {
   if (box.dataset.steps !== undefined) return toActivityMinutes(Number(box.dataset.steps), 'steps') * 60;
   if (box.dataset.minutes !== undefined) return Number(box.dataset.minutes) * 60;
+  if (box.dataset.hold !== undefined) return Number(box.dataset.sets) * Number(box.dataset.hold);
   const sets = Number(box.dataset.sets);
   const reps = Number(box.dataset.reps);
   return sets * reps * WORKOUT_REP_SEC;
@@ -44,7 +48,10 @@ function collectCheckedByDay() {
     .filter((group) => group.boxes.length > 0);
 }
 
-const STRENGTH_DAY_NAMES = new Set(['Leg Day', 'Push Day', 'Pull Day', 'Dumbbell Day']);
+// Bodyweight Day counts as strength: crunches, planks and push-ups are
+// resistance work against body weight, not NEAT or cardio, so a session that
+// includes them should still describe itself as "Strength Training".
+const STRENGTH_DAY_NAMES = new Set(['Leg Day', 'Push Day', 'Pull Day', 'Dumbbell Day', 'Bodyweight Day']);
 
 // Description defaults to "Strength Training" whenever any strength exercise
 // is ticked (even alongside a NEAT/Cardio activity — it's the dominant,
@@ -74,6 +81,13 @@ function logWorkout() {
       let quantity;
       if (box.dataset.steps !== undefined) quantity = `${box.dataset.steps}step`;
       else if (box.dataset.minutes !== undefined) quantity = `${box.dataset.minutes}min`;
+      // A hold row's TOTAL held seconds, in the same "<number><unit>  Name"
+      // shape as the min/step rows — not the "3 × 45 sec" the cell displays,
+      // which wouldn't survive the round trip: activity-estimator.js parses
+      // these lines back on Recalculate, and its sets×reps pattern requires two
+      // bare numbers, so a trailing " sec" would silently make the line
+      // unparseable and drop the exercise from the recalculated total.
+      else if (box.dataset.hold !== undefined) quantity = `${activeSecondsForBox(box)}sec`;
       else quantity = cells[1].textContent.trim().replace(/\s*×\s*/, '×');
       return `${quantity}  ${name}`;
     })

@@ -573,6 +573,42 @@ function getProteinTargetG(entries) {
   return getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
 }
 
+// Mifflin-St Jeor resting/basal metabolic rate (kcal/day) — the energy cost
+// of simply staying alive, before any movement is added. Shared by
+// getCalorieTargetKcal below (× ACTIVITY_MULTIPLIER, giving a TDEE the
+// deficit target is subtracted from) and the Calorie Deficit & Fat Loss chart
+// (which adds each day's own logged activity burn instead of a multiplier),
+// so the formula itself exists in exactly one place.
+function mifflinStJeorBmr(weightKg, heightCm, age, sex) {
+  return 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
+}
+
+// Resting maintenance (kcal/day) from the profile settings and the most
+// recently logged weight — null if any input is missing. Deliberately the same
+// Mifflin-St Jeor basis the Calorie Deficit & Fat Loss chart applies per-day,
+// so calcProjection and that chart measure a deficit against the SAME baseline
+// instead of two different ones. Excludes activity: callers add whatever
+// activity figure is appropriate for their own window (see both call sites).
+function restingMaintenanceKcal(entries) {
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const weightKg = latestWeightKg(entries);
+
+  if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female') || weightKg === null) return null;
+  return mifflinStJeorBmr(weightKg, heightCm, age, sex);
+}
+
+// Energy density of body fat (kcal per kg) used wherever a calorie figure has
+// to be converted into a body-mass one: the user's own calibrated value (the
+// Calibrate button's fitted calorie coefficient, inverted) once one exists,
+// otherwise the generic 7,700 — the same convention calcProjection() and the
+// calculated calorie target both already follow.
+function kcalPerKgFat() {
+  const gains = getCalibratedGains();
+  return (gains && gains.betaCal > 0) ? 1 / gains.betaCal : GENERIC_KCAL_PER_KG_FAT;
+}
+
 // Calorie target can be a flat kcal amount (CALORIE_TARGET_KCAL) or, if
 // HEIGHT_CM, BIRTH_DATE, SEX, ACTIVITY_MULTIPLIER, and WEEKLY_FAT_LOSS_KG
 // are all set (and a Weight entry has been logged), a calculated one:
@@ -595,11 +631,8 @@ function getCalorieTargetKcal(entries) {
     && activityMultiplier !== null && weeklyFatLossKg !== null && weightKg !== null;
 
   if (haveAllInputs) {
-    const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
-    const tdee = bmr * activityMultiplier;
-    const gains = getCalibratedGains();
-    const kcalPerKg = (gains && gains.betaCal > 0) ? 1 / gains.betaCal : GENERIC_KCAL_PER_KG_FAT;
-    const dailyDeficit = (weeklyFatLossKg * kcalPerKg) / 7;
+    const tdee = mifflinStJeorBmr(weightKg, heightCm, age, sex) * activityMultiplier;
+    const dailyDeficit = (weeklyFatLossKg * kcalPerKgFat()) / 7;
     return Math.round(tdee - dailyDeficit);
   }
 
@@ -679,6 +712,7 @@ function renderWellnessCharts(entries) {
   renderWellnessActivityChart(entries);
   renderWellnessProteinChart(entries);
   renderWellnessProjectionChart(entries);
+  renderWellnessEnergyBalanceChart(entries);
   renderWellnessCompositionChart(entries);
 }
 
@@ -1292,7 +1326,7 @@ const PROJ_SLOPE_CLAMP_KG_PER_DAY = 0.15;
 // reinterpreted in place, so an old per-minute calibration under the old key
 // simply reads as "not calibrated" (safe fallback to the generic formula)
 // instead of silently applying a per-minute coefficient to a now-kcal input.
-function getCalibratedGains() {
+function readSavedCalibratedGains() {
   const beta0 = getSetting('PROJ_BASELINE_KG_PER_DAY', null);
   const betaCal = getSetting('PROJ_CAL_KG_PER_KCAL_DAY', null);
   const betaAct = getSetting('PROJ_ACTIVITY_KG_PER_KCAL_DAY', null);
@@ -1300,6 +1334,27 @@ function getCalibratedGains() {
   if ([beta0, betaCal, betaAct, betaSleep].some((v) => v === null)) return null;
   const betaProtein = getSetting('PROJ_PROTEIN_KG_PER_G_DAY', 0);
   return { beta0, betaCal, betaAct, betaSleep, betaProtein };
+}
+
+// Health Metrics' calibrated/generic toggle (calibration.js's
+// initFormulaToggle). True — the default every load — means "use my
+// calibration wherever it applies"; flipping it to false makes
+// getCalibratedGains() report no calibration, so every consumer takes the
+// generic path it already falls back to for a user who never calibrated. That
+// one gate is the whole switch: nothing else needs a parallel "generic mode"
+// code path, and no setting is written, so the comparison can't corrupt the
+// saved fit. Session-only (not persisted) so a reload always returns to the
+// truthful calibrated view rather than silently leaving the app in the
+// what-if mode.
+let useCalibratedFormula = true;
+
+// The active view's gains — what every formula should read. Use
+// readSavedCalibratedGains() directly ONLY to report on the saved
+// calibration itself (the Calibrate modal's summary, the toggle's own
+// enabled/disabled state), which must reflect what's on file regardless of
+// which view is being displayed.
+function getCalibratedGains() {
+  return useCalibratedFormula ? readSavedCalibratedGains() : null;
 }
 
 function calcProjection(entries) {
@@ -1374,7 +1429,29 @@ function calcProjection(entries) {
       // already folds in the *5-per-minute estimate for any entry lacking
       // a real kcal figure, so it's added here directly rather than
       // re-deriving it from minutes.
-      const balance = avgCalories - (calorieTarget + avgActivityKcal);
+      //
+      // Measured against MAINTENANCE, not against calorieTarget. Using the
+      // target here was a real error: the calculated target is already
+      // maintenance MINUS the planned deficit, so someone eating exactly their
+      // target came out at a balance of ~zero and the forecast reported "no net
+      // change at current habits" — when hitting that target is precisely what
+      // should deliver the planned WEEKLY_FAT_LOSS_KG. It also added logged
+      // activity on top of a target derived from BMR × ACTIVITY_MULTIPLIER,
+      // double-counting the movement the multiplier already assumed. The two
+      // errors pointed in opposite directions, which is why the result looked
+      // plausible while contradicting the Calorie Deficit & Fat Loss chart,
+      // which measures against maintenance. Both now share one baseline.
+      const resting = restingMaintenanceKcal(entries);
+      const maintenance = resting !== null
+        ? resting + avgActivityKcal
+        // No profile on file, so there's no BMR to work from and no calculated
+        // target either — getCalorieTargetKcal fell back to the flat
+        // CALORIE_TARGET_KCAL setting, a number the user chose directly with no
+        // deficit arithmetic inside it. Treating that as the reference is the
+        // best available baseline in that case.
+        : calorieTarget + avgActivityKcal;
+
+      const balance = avgCalories - maintenance;
       const baseSlope = balance / GENERIC_KCAL_PER_KG_FAT;
       const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
       slope = baseSlope * sleepRatio;
@@ -1389,10 +1466,14 @@ function calcProjection(entries) {
     method = 'weight-only';
   }
 
-  if (slope === 0) return { status: 'no-change', method };
+  // slope/calibrated are reported even when no forecast can be drawn — the
+  // rate is the one number that distinguishes the calibrated model from the
+  // generic one in these states, so the ETA line can show it instead of a
+  // bare "projection unavailable" that reads identically for both.
+  if (slope === 0) return { status: 'no-change', method, slope, calibrated };
 
   const goingDown = weightGoal < lastWeight;
-  if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method };
+  if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method, slope, calibrated };
 
   const daysToGoal = Math.round((weightGoal - lastWeight) / slope);
   const etaDate = new Date(today);
@@ -1420,12 +1501,19 @@ function renderWellnessProjectionChart(entries) {
   const meterFill = document.getElementById('weight-progress-meter-fill');
   const meterPct = document.getElementById('weight-progress-meter-pct');
   const meterRemaining = document.getElementById('weight-progress-meter-remaining');
+  const timeWrap = document.getElementById('time-progress-meter');
+  const timeFill = document.getElementById('time-progress-meter-fill');
+  const timeElapsed = document.getElementById('time-progress-meter-elapsed');
+  const timeRemaining = document.getElementById('time-progress-meter-remaining');
   const etaEl = document.getElementById('weight-projection-eta');
   const plateauNote = document.getElementById('weight-plateau-note');
   meterWrap.hidden = true;
   meterPct.textContent = '';
   meterRemaining.textContent = '';
   meterRemaining.classList.remove('danger');
+  timeWrap.hidden = true;
+  timeElapsed.textContent = '';
+  timeRemaining.textContent = '';
   etaEl.textContent = '';
   plateauNote.textContent = '';
   plateauNote.classList.remove('warning');
@@ -1468,16 +1556,83 @@ function renderWellnessProjectionChart(entries) {
     meterRemaining.classList.toggle('danger', isWrongDirection);
   }
 
-  if (proj.status === 'reached') { etaEl.textContent = 'Goal reached! 🎉'; return; }
-  if (proj.status === 'no-change') { etaEl.textContent = 'No net change at current habits'; return; }
-  if (proj.status === 'wrong-direction') { etaEl.textContent = 'Current habits trend away from goal — projection unavailable'; return; }
+  // A projection that can't be drawn (already at goal, flat trend, or
+  // trending away from it) used to `return` here — but the chart was already
+  // destroyed at the top of this function, so the panel went fully blank and
+  // took the weight history, the smoothed trend line, and the goal line with
+  // it. None of those three depend on a projection existing. Now only the
+  // projected segment itself is dropped: the status line says why, and
+  // everything actually MEASURED stays on screen. That's also what makes the
+  // calibrated/generic toggle legible — flipping between a drawable and an
+  // undrawable projection no longer blanks the whole chart, it just adds or
+  // removes the dashed forecast.
+  // The rate is included on the two "can't forecast" statuses because it's the
+  // only figure that differs between the calibrated and the generic model in
+  // those states — without it the calibrated/generic toggle looks inert here,
+  // since both would print the same bare sentence.
+  // Always names the model behind the number — "· calibrated" or "· generic"
+  // — rather than labeling only the calibrated case. Now that a toggle switches
+  // between them, an unlabelled line reads as "unknown", not as "generic".
+  // Skipped for the weight-only method, where the slope is a plain regression
+  // on the weigh-ins and NEITHER formula ran, so claiming either would mislead;
+  // that path's own "· weight trend only" note already says as much.
+  const modelNote = () => {
+    if (proj.method === 'weight-only') return '';
+    return proj.calibrated ? ' · calibrated' : ' · generic';
+  };
+
+  const rateNote = () => {
+    const kgPerWeek = Math.abs(proj.slope * 7).toFixed(2);
+    const direction = proj.slope > 0 ? 'gaining' : 'losing';
+    return `${direction} ~${kgPerWeek} kg/week${modelNote()}`;
+  };
+  const statusNote = {
+    reached: () => 'Goal reached! 🎉',
+    'no-change': () => `No net change at current habits${modelNote()}`,
+    'wrong-direction': () => `Current habits trend away from goal — ${rateNote()}, so no arrival date can be projected`,
+  }[proj.status];
+  if (statusNote) {
+    const note = statusNote();
+    etaEl.textContent = privacyMode ? maskDigits(note) : note;
+  }
+
+  const hasProjection = proj.status === 'ok';
+  const projPoints = hasProjection ? proj.projectedPoints : [];
+
+  // Companion to the weight meter above: the same journey measured in time
+  // rather than in kg. "Elapsed" is days since the first weigh-in (how long
+  // you've been at this), "to go" is the forecast's own remaining days — so the
+  // two bars together answer "how far along am I" on both axes at once, and a
+  // long time bar beside a short weight bar is itself the signal that progress
+  // is slower than the effort. Needs an actual arrival date, so it's hidden for
+  // any status that can't produce one.
+  if (hasProjection) {
+    // Today's own Y-M-D re-parsed as UTC, so it's on the same footing as every
+    // other date here (see parseIsoDateUTC) rather than mixing zones.
+    const todayMs = parseIsoDateUTC(isoFromDate(new Date()));
+    const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(weightEntries[0].date)) / 86400000));
+    const daysToGo = Math.max(0, proj.daysToGoal);
+    const totalDays = daysElapsed + daysToGo;
+
+    if (totalDays > 0) {
+      const timePct = Math.max(0, Math.min(100, (daysElapsed / totalDays) * 100));
+      timeWrap.hidden = false;
+      timeFill.style.width = `${timePct}%`;
+
+      const elapsedText = `${daysElapsed} ${daysElapsed === 1 ? 'day' : 'days'}`;
+      timeElapsed.textContent = privacyMode ? maskDigits(elapsedText) : elapsedText;
+
+      const toGoText = `${daysToGo} ${daysToGo === 1 ? 'day' : 'days'}`;
+      timeRemaining.textContent = privacyMode ? maskDigits(toGoText) : toGoText;
+    }
+  }
 
   const histLabels = weightEntries.map((e) => e.date);
-  const projLabels = proj.projectedPoints.map((p) => p.date);
+  const projLabels = projPoints.map((p) => p.date);
   const allLabels = [...new Set([...histLabels, ...projLabels])].sort();
 
   const histMap = new Map(weightEntries.map((e) => [e.date, e.amount]));
-  const projMap = new Map(proj.projectedPoints.map((p) => [p.date, p.weight]));
+  const projMap = new Map(projPoints.map((p) => [p.date, p.weight]));
   const lastDate = histLabels[histLabels.length - 1];
 
   // Same-day duplicate weigh-ins (e.g. morning + evening) are averaged
@@ -1533,7 +1688,9 @@ function renderWellnessProjectionChart(entries) {
       spanGaps: false,
       order: 4,
     },
-    {
+    // Omitted entirely rather than plotted empty when there's no drawable
+    // projection, so it doesn't sit in the legend claiming a forecast exists.
+    ...(hasProjection ? [{
       label: 'Projected',
       data: allLabels.map((d) => {
         let y = null;
@@ -1549,10 +1706,12 @@ function renderWellnessProjectionChart(entries) {
       pointRadius: 0,
       spanGaps: false,
       order: 2,
-    },
+    }] : []),
     {
-      label: `${proj.weightGoal} kg goal`,
-      data: allLabels.map((d) => ({ x: dayOffset(d), y: proj.weightGoal })),
+      // weightGoal, not proj.weightGoal — the latter is only set on an 'ok'
+      // projection, but the goal line is drawn either way.
+      label: `${weightGoal} kg goal`,
+      data: allLabels.map((d) => ({ x: dayOffset(d), y: weightGoal })),
       borderColor: '#dc2626',
       borderDash: [4, 4],
       pointRadius: 0,
@@ -1586,7 +1745,7 @@ function renderWellnessProjectionChart(entries) {
   // any explicit min/max was set. Flooring/ceiling to whole numbers keeps
   // that same clean stepping while still fixing the axis bounds so y1 can
   // be derived from them.
-  const weightValues = [...histMap.values(), ...trendMap.values(), ...projMap.values(), lastWeight, proj.weightGoal]
+  const weightValues = [...histMap.values(), ...trendMap.values(), ...projMap.values(), lastWeight, weightGoal]
     .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
   const weightMin = Math.min(...weightValues);
   const weightMax = Math.max(...weightValues);
@@ -1668,12 +1827,251 @@ function renderWellnessProjectionChart(entries) {
     },
   });
 
+  // etaDate/daysToGoal/method only exist on an 'ok' projection; the other
+  // statuses already had their explanation written to etaEl above.
+  if (!hasProjection) return;
+
   const etaStr = proj.etaDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const note = proj.method === 'weight-only' ? ' · weight trend only'
     : proj.method === 'partial' ? ' · partial habit data' : '';
-  const calibNote = proj.calibrated ? ' · calibrated' : '';
-  const etaLine = `Projected to reach ${proj.weightGoal} kg on ${etaStr} (~${proj.daysToGoal} days)${note}${calibNote}`;
+  const etaLine = `Projected to reach ${weightGoal} kg on ${etaStr} (~${proj.daysToGoal} days)${note}${modelNote()}`;
   etaEl.textContent = privacyMode ? maskDigits(etaLine) : etaLine;
+}
+
+// Weight (kg) in effect on each of `dates`: the most recent weigh-in on or
+// before that day, carried forward. A BMR has to be computed for every day in
+// the window, not only the days a weigh-in happens to land on. Days before the
+// very first weigh-in fall back to that first reading — the closest thing on
+// file — rather than dropping off the chart entirely.
+function carryForwardWeightByDate(weightByDate, dates) {
+  const weighInDates = [...weightByDate.keys()].sort();
+  if (weighInDates.length === 0) return new Map();
+
+  const carried = new Map();
+  let next = 0;
+  let current = weightByDate.get(weighInDates[0]);
+  dates.forEach((date) => {
+    while (next < weighInDates.length && weighInDates[next] <= date) {
+      current = weightByDate.get(weighInDates[next]);
+      next += 1;
+    }
+    carried.set(date, current);
+  });
+  return carried;
+}
+
+// Smallest half-span (kcal) the energy-balance y-axis is ever scaled to, so a
+// stretch of days that are all deficits still leaves a visible band above the
+// zero line to read them against, instead of pinning zero flush to the top of
+// the plot area.
+const ENERGY_BALANCE_AXIS_MIN_KCAL = 200;
+
+// "+320" / "-450" — the sign carries the entire meaning on this chart (a
+// deficit vs a surplus), so a positive figure is shown with an explicit + in
+// the tooltip rather than bare.
+function withExplicitSign(value) {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+let wellnessEnergyBalanceChart = null;
+
+// Per-day energy balance — what was eaten minus what was spent — with the
+// body-fat change that balance implies on a twin right-hand axis.
+//
+// Spend is Mifflin-St Jeor BMR (from Height/Birth Date/Sex plus that day's
+// carried-forward weight — the "cost of just being alive" the user has no log
+// for) PLUS that day's own logged activity burn. ACTIVITY_MULTIPLIER is
+// deliberately NOT applied on top of the BMR the way getCalorieTargetKcal
+// does it: activity is already logged in this app as real kcal, NEAT
+// included, so scaling BMR by a lifestyle multiplier as well would count the
+// same movement twice and overstate every deficit.
+//
+// Sign convention follows the Body Composition Change chart directly below —
+// negative is loss. A bar below zero is a deficit and reads as grams of fat
+// lost off the right axis; above zero is a surplus and grams gained. Keeping
+// both charts pointing the same way is what makes them comparable: this one
+// is the fat change your energy balance PREDICTS, that one is the fat change
+// your weigh-ins actually SHOW.
+//
+// Both of this chart's constants follow the Health Metrics calibrated/generic
+// toggle, and what the right axis MEASURES changes with them, so it's
+// relabelled rather than silently reinterpreted:
+//
+//   Generic — maintenance is plain Mifflin-St Jeor and the density is fat's
+//     ~7,700 kcal/kg, which is not a personal parameter. The axis reads
+//     "g fat".
+//   Calibrated — the density is the user's own fitted kcal/kg, which is a
+//     SCALE-WEIGHT response (how far the scale moves per kcal, water and
+//     glycogen included) and routinely fits well below 7,700 on short weigh-in
+//     windows; see calibration.js's typical-band comment. Under that model the
+//     number genuinely isn't fat, so the axis reads "g weight" and the tooltip
+//     says "Expected scale weight". Presenting a fitted 3,171 kcal/kg as fat
+//     would overstate fat loss by 2.4x by counting water as fat.
+//
+// Calibrated maintenance is derived even though the fit has no BMR term: β₀ is
+// its rate at target intake with no logged activity, so target − β₀·K is that
+// user's own resting-equivalent expenditure. It's applied as a fixed OFFSET to
+// the per-day Mifflin curve rather than as a flat constant, so the level comes
+// from the fit while the day-to-day response to weight change (~10 kcal/kg) is
+// preserved. Caveat no label can carry: β₀ also absorbs whatever the fit failed
+// to attribute to activity, so on a fit whose activity term came out as noise
+// this figure has habitual activity partly baked in — and the chart then adds
+// logged activity on top of it. The calibrated view is "what my own history
+// implies", not a cleaner measurement.
+//
+// There's no separate fat-loss line, for the same reason the Weight Trend
+// chart has no separate BMI line: grams of fat is balance ÷ kcal-per-kg, a
+// fixed linear rescale, so a plotted line would retrace the bars exactly.
+// Deriving y1's min/max from y's own bounds makes the right axis a true twin
+// of the left, so the gram figure can be read straight off the same bars.
+function renderWellnessEnergyBalanceChart(entries) {
+  const ctx = document.getElementById('wellness-energy-balance-chart');
+
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
+
+  const weightEntries = entries.filter((e) => e.category === 'Weight' && e.amount !== null);
+  const intakeEntries = entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
+
+  // Without a profile there's no maintenance figure, and without any weigh-in
+  // there's no weight to feed it — either way the chart renders as its
+  // explanatory empty state rather than a misleading partial one.
+  const canCompute = haveProfile && weightEntries.length > 0;
+  const labels = canCompute ? trailingDatesForCategory(intakeEntries, WELLNESS_METRICS_DAYS) : [];
+  const weightForDate = carryForwardWeightByDate(weightByDateMap(weightEntries), labels);
+
+  const intakeByDate = new Map();
+  intakeEntries.forEach((e) => intakeByDate.set(e.date, (intakeByDate.get(e.date) || 0) + e.amount));
+
+  // Real Calculate-derived kcal (amount2) where an Activity entry has one,
+  // else the same flat per-minute estimate calcProjection() falls back to for
+  // entries logged before that existed.
+  const activityKcalByDate = new Map();
+  entries.forEach((e) => {
+    if ((e.category !== 'Activity' && e.category !== 'Activity; Calories') || e.amount === null) return;
+    const kcal = e.amount2 !== null ? e.amount2 : toActivityMinutes(e.amount, e.unit) * GENERIC_KCAL_PER_ACTIVE_MIN;
+    activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
+  });
+
+  // null in generic view (that's what the toggle does), so this one read
+  // switches both constants and both labels below.
+  const gains = getCalibratedGains();
+  const kcalPerKg = gains ? kcalPerKgFat() : GENERIC_KCAL_PER_KG_FAT;
+  const axisUnit = gains ? 'g weight' : 'g fat';
+  const massLabel = gains ? 'Expected scale weight' : 'Expected fat';
+
+  // Levels the whole Mifflin curve onto the fit's own resting-equivalent
+  // expenditure, measured at the latest weigh-in — the one day where the
+  // calibrated maintenance is exactly target − β₀·K.
+  const latestWeight = latestWeightKg(entries);
+  const maintenanceOffset = (gains && latestWeight !== null)
+    ? (getCalorieTargetKcal(entries) - gains.beta0 * kcalPerKg) - mifflinStJeorBmr(latestWeight, heightCm, age, sex)
+    : 0;
+
+  const detailByDate = new Map();
+
+  const balanceData = labels.map((date) => {
+    // A day with no food logged isn't a day of eating nothing — it's a day
+    // with no data, so it's an empty slot rather than a huge fake deficit.
+    if (!intakeByDate.has(date)) return null;
+
+    const intake = Math.round(intakeByDate.get(date));
+    const maintenance = Math.round(mifflinStJeorBmr(weightForDate.get(date), heightCm, age, sex) + maintenanceOffset);
+    const activity = Math.round(activityKcalByDate.get(date) || 0);
+    const balance = intake - maintenance - activity;
+
+    detailByDate.set(date, { intake, maintenance, activity, balance, massG: Math.round((balance / kcalPerKg) * 1000) });
+    return balance;
+  });
+
+  const values = balanceData.filter((v) => v !== null);
+  const hasData = values.length > 0;
+
+  const maxDeficit = Math.max(0, ...values.map((v) => -v));
+  const maxSurplus = Math.max(0, ...values);
+  const yMin = -niceAxisMax(Math.max(maxDeficit * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL));
+  const yMax = niceAxisMax(Math.max(maxSurplus * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL));
+
+  wellnessEnergyBalanceChart = upsertChart(wellnessEnergyBalanceChart, ctx, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Calorie balance',
+          data: balanceData,
+          // Green for a deficit, red for a surplus — the same
+          // income/expense colors the rest of the app reads as
+          // "toward the goal" / "away from it".
+          backgroundColor: balanceData.map((v) => (v !== null && v < 0 ? '#16a34a' : '#dc2626')),
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: !hasData,
+          text: canCompute
+            ? 'No calories logged yet — log what you ate to see your daily deficit'
+            : 'Add Height, Birth Date, and Sex in Settings (and log a Weight) to estimate this',
+          color: Chart.defaults.color,
+          font: { size: 12 },
+          padding: { top: 40 },
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => formatIsoDateShort(items[0].label),
+            // The whole point of the chart is the subtraction, so every term
+            // of it is spelled out on hover — a bare "-450" wouldn't show
+            // which of eating less or moving more produced it.
+            label: (item) => {
+              const d = detailByDate.get(item.label);
+              if (!d) return '';
+              const lines = [
+                `Eaten: ${d.intake} kcal`,
+                `Maintenance: ${d.maintenance} kcal`,
+                `Activity: ${d.activity} kcal`,
+                `Balance: ${withExplicitSign(d.balance)} kcal`,
+                `${massLabel}: ${withExplicitSign(d.massG)} g`,
+              ];
+              return privacyMode ? lines.map(maskDigits) : lines;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        y: {
+          min: yMin,
+          max: yMax,
+          afterFit: fixTrendYAxisWidth,
+          // Zero is the line the whole chart is read against — deficit below
+          // it, surplus above — so it's drawn in the (theme-aware) tick-label
+          // color instead of receding into the ordinary gridlines. Evaluated
+          // at draw time, so a theme switch recolors it correctly.
+          grid: { color: (ctx) => (ctx.tick.value === 0 ? Chart.defaults.color : Chart.defaults.borderColor) },
+          ticks: { callback: maskedUnitTick('kcal') },
+        },
+        y1: {
+          // Left as the exact gram equivalent of y's own bounds (not rounded)
+          // — that exactness is what keeps this axis a true twin, so a given
+          // height on a bar reads as the right gram figure here.
+          min: (yMin / kcalPerKg) * 1000,
+          max: (yMax / kcalPerKg) * 1000,
+          position: 'right',
+          afterFit: fixTrendYAxisWidth,
+          grid: { drawOnChartArea: false },
+          ticks: { includeBounds: false, callback: maskedUnitTick(axisUnit) },
+        },
+      },
+    },
+  });
 }
 
 // Forbes' constant (kg) relating the fat-free share of ANY weight change to

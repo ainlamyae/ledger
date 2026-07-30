@@ -117,6 +117,14 @@
                         <span class="node-graph-tooltip">The estimator remembers what it learns: every ingredient it looks up is saved to your own Nutrition Facts table, so the next mention is calculated instantly from a trusted value instead of re-estimated from scratch. Fine-tune any entry to match the exact brand you buy, and merge near-duplicates the AI phrased differently.</span>
                     </button>
                     <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">🔥 Calorie Deficit &amp; Fat Loss</span>
+                        <span class="node-graph-tooltip">See each day's real energy balance as a bar: what you ate, minus the cost of simply being alive (Mifflin-St Jeor from your height, birth date, sex, and that day's weight), minus the activity you actually logged. Green below the line is a deficit, red above it is a surplus, and a twin right-hand axis reads off the body fat that balance implies — so you can compare what your eating predicts against what your weigh-ins actually show.</span>
+                    </button>
+                    <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">📐 Calibrated vs. Generic Formula</span>
+                        <span class="node-graph-tooltip">One button switches the whole Health section between your own calibrated constants and the generic population ones, so you can see exactly what calibrating changed — your goal arrival date, your daily calorie target, and your expected fat loss all move together, and every figure says which model produced it. It's a display switch that writes nothing, so comparing can never damage a saved calibration.</span>
+                    </button>
+                    <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📊 Body Composition Split</span>
                         <span class="node-graph-tooltip">See how much of your day-to-day weight change is fat, muscle, or water — estimated from established body-composition formulas (Forbes, Deurenberg), not a guess.</span>
                     </button>
@@ -300,12 +308,14 @@
         <div class="panel">
             <h2>Health Metrics</h2>
 
+            <div class="panel-actions formula-toggle-row">
+                <button type="button" id="formula-toggle-btn" class="btn" aria-pressed="true"></button>
+                <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
+            </div>
+
             <div class="weight-projection-wrap">
                 <div class="weight-projection-header">
                     <h4>Weight Trend & Forecast</h4>
-                    <div class="weight-projection-actions">
-                        <button id="calibrate-projection-btn" class="btn" title="Calibrate the forecast formula from your own history">⚙️ Calibrate</button>
-                    </div>
                 </div>
                 <div class="chart-box">
                     <canvas id="wellness-projection-chart"></canvas>
@@ -324,9 +334,35 @@
                             <span class="weight-progress-meter-stat-label">to go</span>
                         </span>
                     </div>
+
+                    <div class="weight-progress-meter time-progress-meter" id="time-progress-meter" hidden>
+                        <div class="weight-progress-meter-track">
+                            <div class="weight-progress-meter-fill" id="time-progress-meter-fill"></div>
+                        </div>
+                        <div class="weight-progress-meter-stats">
+                            <span class="weight-progress-meter-stat">
+                                <span id="time-progress-meter-elapsed" class="weight-progress-meter-pct"></span>
+                                <span class="weight-progress-meter-stat-label">elapsed</span>
+                            </span>
+                            <span class="weight-progress-meter-stat">
+                                <span id="time-progress-meter-remaining" class="weight-progress-meter-pct"></span>
+                                <span class="weight-progress-meter-stat-label">to go</span>
+                            </span>
+                        </div>
+                    </div>
+
                     <p id="weight-projection-eta" class="weight-eta"></p>
                 </div>
                 <p id="weight-plateau-note" class="weight-plateau-note"></p>
+            </div>
+
+            <div class="weight-projection-wrap">
+                <div class="weight-projection-header">
+                    <h4>Calorie Deficit &amp; Fat Loss</h4>
+                </div>
+                <div class="chart-box">
+                    <canvas id="wellness-energy-balance-chart"></canvas>
+                </div>
             </div>
 
             <div class="weight-projection-wrap">
@@ -493,7 +529,7 @@
                     <table id="workout-table-legs" class="workout-table-strength" data-day="Leg Day">
                         <thead>
                         <tr>
-                            <th>Exercise (machine)</th>
+                            <th>Exercise/Machine</th>
                             <th>Sets × Reps</th>
                             <th>Rest</th>
                             <th class="workout-check-col">Done</th>
@@ -547,7 +583,7 @@
                     <table id="workout-table-push" class="workout-table-strength" data-day="Push Day">
                         <thead>
                         <tr>
-                            <th>Exercise (machine)</th>
+                            <th>Exercise/Machine</th>
                             <th>Sets × Reps</th>
                             <th>Rest</th>
                             <th class="workout-check-col">Done</th>
@@ -601,7 +637,7 @@
                     <table id="workout-table-pull" class="workout-table-strength" data-day="Pull Day">
                         <thead>
                         <tr>
-                            <th>Exercise (machine)</th>
+                            <th>Exercise/Machine</th>
                             <th>Sets × Reps</th>
                             <th>Rest</th>
                             <th class="workout-check-col">Done</th>
@@ -643,7 +679,7 @@
                     <table id="workout-table-dumbbell" class="workout-table-strength" data-day="Dumbbell Day">
                         <thead>
                         <tr>
-                            <th>Exercise (machine)</th>
+                            <th>Exercise/Machine</th>
                             <th>Sets × Reps</th>
                             <th>Rest</th>
                             <th class="workout-check-col">Done</th>
@@ -697,6 +733,84 @@
                             <td>3 × 12</td>
                             <td>60 sec</td>
                             <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="workout-day">
+                <h4>Day 5 — Core &amp; Bodyweight (no equipment)</h4>
+                <div class="table-responsive">
+                    <table id="workout-table-bodyweight" class="workout-table-strength" data-day="Bodyweight Day">
+                        <thead>
+                        <tr>
+                            <th>Exercise/Machine</th>
+                            <th>Sets × Reps</th>
+                            <th>Rest</th>
+                            <th class="workout-check-col">Done</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Crunch</td>
+                            <td>3 × 20</td>
+                            <td>45 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="20" data-rest="45"></td>
+                        </tr>
+                        <tr>
+                            <td>Plank</td>
+                            <td>3 × 45 sec</td>
+                            <td>45 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-hold="45" data-rest="45"></td>
+                        </tr>
+                        <tr>
+                            <td>Side Plank (both sides)</td>
+                            <td>4 × 30 sec</td>
+                            <td>30 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="4" data-hold="30" data-rest="30"></td>
+                        </tr>
+                        <tr>
+                            <td>Leg Raise</td>
+                            <td>3 × 15</td>
+                            <td>45 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="45"></td>
+                        </tr>
+                        <tr>
+                            <td>Glute Bridge</td>
+                            <td>3 × 15</td>
+                            <td>45 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="45"></td>
+                        </tr>
+                        <tr>
+                            <td>Bird Dog (both sides)</td>
+                            <td>6 × 12</td>
+                            <td>45 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="6" data-reps="12" data-rest="45"></td>
+                        </tr>
+                        <tr>
+                            <td>Superman</td>
+                            <td>3 × 15</td>
+                            <td>45 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="45"></td>
+                        </tr>
+                        <tr>
+                            <td>Push-up</td>
+                            <td>3 × 12</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="12" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Bodyweight Squat</td>
+                            <td>3 × 15</td>
+                            <td>60 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="60"></td>
+                        </tr>
+                        <tr>
+                            <td>Mountain Climber</td>
+                            <td>3 × 20</td>
+                            <td>45 sec</td>
+                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="20" data-rest="45"></td>
                         </tr>
                         </tbody>
                     </table>

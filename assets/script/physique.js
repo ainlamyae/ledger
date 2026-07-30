@@ -705,7 +705,7 @@ function syncPhysiqueTotalsFromBreakdown(breakdown, calories, protein) {
 // the whole table is local arithmetic over the Workout text
 // (activity-estimator.js), so it can be rebuilt on demand and never has to be
 // kept in step with a saved copy of itself.
-function renderPhysiqueActivityBreakdown(perLine, minutes, calories) {
+function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg) {
   const tbody = document.getElementById('physique-activity-breakdown-body');
   tbody.innerHTML = '';
 
@@ -731,6 +731,20 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories) {
     makeCell(String(calories)),
   );
   tbody.appendChild(totalRow);
+
+  // ACTIVITY_TARGET_MIN's minutes/kcal at today's body mass — same pinned-vs-flat
+  // rule the Physical Activity tile/chart use (getActivityTargetMin/Kcal, charts.js),
+  // so this row can't drift from what "hitting the workout goal" means elsewhere.
+  const targetRow = document.createElement('tr');
+  targetRow.className = 'calc-breakdown-target';
+  targetRow.append(
+    makeCell('Target', 'Workout duration/burn goal — from the Health Formula Playground and Settings, not today\'s Workout'),
+    makeCell(''),
+    makeCell(''),
+    makeCell(String(Math.round(getActivityTargetMin(bodyMassKg)))),
+    makeCell(String(Math.round(getActivityTargetKcal(bodyMassKg)))),
+  );
+  tbody.appendChild(targetRow);
 
   document.getElementById('physique-activity-breakdown').hidden = false;
 }
@@ -919,7 +933,7 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
     }
     physiqueField('activity-duration').value = minutes;
     physiqueField('calories-out').value = calories;
-    renderPhysiqueActivityBreakdown(sortedPerLine, minutes, calories);
+    renderPhysiqueActivityBreakdown(sortedPerLine, minutes, calories, bodyMassKg);
     if (unmatchedNames.length) {
       messages.push(`⚠️ Couldn't find ${unmatchedNames.map((n) => `"${n}"`).join(', ')} in the Activity Plan — used a default MET.`);
     }
@@ -1312,11 +1326,51 @@ async function handlePhysiqueScanInput(e) {
   }
 }
 
+// A whole Consumption block wrapped as "(<lines>)/<n>" — typed to log a shared
+// portion (a recipe split n ways, a fraction of a batch eaten) without hand-dividing
+// every line's own amount first. Only the OUTER wrapper is this syntax:
+// resolveDivisionQuantities's existing single-line "200/5g" still means what it
+// always has, since that's resolved deep inside stripLeadingIngredientTokens on
+// each line's own text, never on this wrapper.
+const CONSUMPTION_DIVISOR_WRAP_RE = /^\(([\s\S]*)\)\s*\/\s*([\d.]+)\s*$/;
+
+// Rebuilds each wrapped line as its own quantity divided by n, same
+// `${quantity}${unit} ${name}` shape combineAndSortConsumptionText's rebuilt lines
+// use — so a divided line reads exactly like one typed that way to begin with. A
+// line whose quantity can't be parsed (extractIngredientQuantity finds none) is
+// left as-is rather than guessed at. Returns null (nothing to do) when the field
+// isn't wrapped this way at all, or the divisor is 0/unparseable.
+function applyConsumptionDivisor(text) {
+  const match = CONSUMPTION_DIVISOR_WRAP_RE.exec(text.trim());
+  if (!match) return null;
+
+  const divisor = parseFloat(match[2]);
+  if (!divisor) return null;
+
+  return match[1].split('\n').map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return trimmed;
+
+    const { quantity, unit } = extractIngredientQuantity(trimmed);
+    if (quantity === null) return trimmed;
+
+    const name = extractIngredientName(trimmed);
+    const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
+    return `${Math.round((quantity / divisor) * 100) / 100}${unitText} ${name}`.trim();
+  }).join('\n');
+}
+
 // Both estimators run together:
 // Consumption fills Breakdown/Calories In/Protein In, Workout fills Activity
 // Duration/Calories Out. Whichever field is empty is simply skipped, and
 // neither side's failure stops the other.
 async function calculatePhysiqueDay() {
+  const divided = applyConsumptionDivisor(physiqueField('consumption').value);
+  if (divided !== null) {
+    physiqueField('consumption').value = divided;
+    syncPhysiqueCombineButtonVisibility();
+  }
+
   const consumption = physiqueField('consumption').value.trim();
   const workout = physiqueField('workout').value.trim();
   const btn = document.getElementById('physique-calc-btn');

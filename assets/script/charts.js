@@ -1976,14 +1976,11 @@ function renderWellnessEnergyBalanceChart(entries) {
   // switches both constants and both labels below.
   const gains = getCalibratedGains();
   const kcalPerKg = gains ? kcalPerKgFat() : GENERIC_KCAL_PER_KG_FAT;
+  // Ticks carry the bare unit, matching the left axis's "kcal" — naming the
+  // quantity on every tick repeated it eight times and crowded out the numbers.
+  // Whether the figure is fat or scale weight is said in the tooltip
+  // (massLabel), which is where the rest of this chart's detail already lives.
   const massLabel = gains ? 'Expected scale weight' : 'Expected fat';
-  // Which quantity the right axis measures belongs on the axis ONCE, as its
-  // title — repeating "g weight" on all eight tick labels said the same thing
-  // eight times and crowded out the numbers. The ticks now carry the bare unit,
-  // matching the left axis's "kcal", and the calibrated-vs-generic distinction
-  // this label exists to make (see the comment above: a fitted density is a
-  // scale-weight response, not fat) is stated in the title and the tooltip.
-  const massAxisTitle = `${massLabel} (g)`;
 
   // Levels the whole Mifflin curve onto the fit's own resting-equivalent
   // expenditure, measured at the latest weigh-in — the one day where the
@@ -2090,7 +2087,6 @@ function renderWellnessEnergyBalanceChart(entries) {
           position: 'right',
           afterFit: fixTrendYAxisWidth,
           grid: { drawOnChartArea: false },
-          title: { display: true, text: massAxisTitle, color: Chart.defaults.color, font: { size: 11 } },
           ticks: { includeBounds: false, callback: maskedUnitTick('g') },
         },
       },

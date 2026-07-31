@@ -1867,6 +1867,9 @@ function renderWellnessBodyMassChart(entries) {
   const trendMap = computeBodyMassTrend(byDate);
   const trendDates = [...trendMap.keys()].sort();
   const lastTrendDate = trendDates[trendDates.length - 1];
+  // The green line's slope at each of ITS points — read back below alongside the raw
+  // day-to-day delta, so a single noisy weigh-in doesn't read as the real trend.
+  const trendSlopeByDate = computeBodyMassTrendSlopeGramsPerDay(trendMap);
   const swingKg = lastTrendDate !== undefined ? glycogenSwingKg(byDate.get(lastTrendDate), heightCm, sex) : null;
   const zoneAnchorMap = swingKg === null ? null : computeGlycogenZoneAnchor(trendMap);
   const stateTrendSeries = dates.map((d) => trendMap.get(d) ?? null);
@@ -1904,17 +1907,13 @@ function renderWellnessBodyMassChart(entries) {
       : 0;
     const progress = bodyMassChangeIsProgress(delta, kg, targetIsDownward, stallDays);
 
-    // The change BETWEEN the two readings, each converted at its own body mass — the
-    // fat share of a kg moves with BMI, so a flat 7,700 would be wrong.
     const fatKcal = haveProfile ? fatEnergyKcal(kg, heightCm, age, sex) : null;
-    const fatDeltaKcal = (haveProfile && delta !== null)
-      ? fatKcal - fatEnergyKcal(previousKg, heightCm, age, sex)
-      : null;
     const bodyFatPct = haveProfile ? clampedBodyFatPercent(kg, heightCm, age, sex) : null;
     const fatMassKg = haveProfile ? estimatedFatMassKg(kg, heightCm, age, sex) : null;
     // BMI needs only height, so it survives a profile missing birth date or sex.
     const bmi = heightCm !== null ? computeBmi(kg, heightCm) : null;
-    detailByDate.set(d, { delta, fatKcal, fatDeltaKcal, bodyFatPct, fatMassKg, bmi });
+    const smoothedChangeGPerDay = trendSlopeByDate.get(d) ?? null;
+    detailByDate.set(d, { delta, fatKcal, bodyFatPct, fatMassKg, bmi, smoothedChangeGPerDay });
 
     values.push(kg);
     barColors.push(progress === null ? BODY_MASS_UNSCORED_COLOR : (progress ? '#16a34a' : '#dc2626'));
@@ -2055,7 +2054,12 @@ function renderWellnessBodyMassChart(entries) {
               // Against the previous READING, not "yesterday" — on an every-third-day
               // habit those differ. Omitted on the first bar.
               if (d.delta !== null && d.delta !== undefined) {
-                lines.push(`Changed Mass: ${withExplicitSign(d.delta)} kg`);
+                lines.push(`Changed Mass: ${withExplicitSign(Math.round(d.delta * 1000))} g`);
+              }
+              // The green line's own slope here, not the raw day-to-day delta above —
+              // a single water/glycogen-heavy weigh-in swings that one, this doesn't.
+              if (d.smoothedChangeGPerDay !== null && d.smoothedChangeGPerDay !== undefined) {
+                lines.push(`Smoothed Change: ${withExplicitSign(d.smoothedChangeGPerDay)} g/day`);
               }
               // BMI leads the derived rows because the rest are computed from it.
               // Unitless by definition, so no unit.
@@ -2068,9 +2072,6 @@ function renderWellnessBodyMassChart(entries) {
               }
               if (d.fatKcal !== null && d.fatKcal !== undefined) {
                 lines.push(`Fat Energy: ${Math.round(d.fatKcal / 1000)}k kcal`);
-              }
-              if (d.fatDeltaKcal !== null && d.fatDeltaKcal !== undefined) {
-                lines.push(`Fat Energy Change: ${withExplicitSign(Math.round(d.fatDeltaKcal))} kcal`);
               }
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -3160,6 +3161,30 @@ function computeBodyMassTrend(bodyMassByDate, windowSize = BODY_MASS_TREND_WINDO
   const trend = new Map();
   smoothed.forEach((v, i) => trend.set(dates[i], v));
   return trend;
+}
+
+// The green line's own slope at each of its points, in g/day — a day-to-day kg delta
+// swings with whatever water or glycogen moved that reading, but the SMOOTHED line
+// barely bends, so its slope is what's left once that noise is averaged out. Centered
+// on both neighbours where they exist (divided by the calendar gap between them, since
+// logged points aren't always consecutive days); one-sided at either end of the series.
+function computeBodyMassTrendSlopeGramsPerDay(trendMap) {
+  const dates = [...trendMap.keys()].sort();
+  const slope = new Map();
+  dates.forEach((d, i) => {
+    const prev = i > 0 ? dates[i - 1] : null;
+    const next = i < dates.length - 1 ? dates[i + 1] : null;
+    if (prev === null && next === null) {
+      slope.set(d, null);
+      return;
+    }
+    const fromDate = prev ?? d;
+    const toDate = next ?? d;
+    const days = (parseIsoDateUTC(toDate) - parseIsoDateUTC(fromDate)) / 86400000;
+    const kgPerDay = (trendMap.get(toDate) - trendMap.get(fromDate)) / days;
+    slope.set(d, Math.round(kgPerDay * 1000));
+  });
+  return slope;
 }
 
 // Where the ±swingKg band drawn AROUND the trend line is centered — deliberately
@@ -4331,7 +4356,7 @@ function renderWellnessEnergyBalanceChart(entries) {
               }
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) {
-                lines.push(`7-Day Average: ${withExplicitSign(Math.round(weeklyAvg[i]))} kcal`);
+                lines.push(`7-Day Average: ${withExplicitSign(Math.round(weeklyAvg[i]))} kcal/day`);
                 const weeklyMassG = Math.round(((weeklyAvg[i] * 7) / GENERIC_KCAL_PER_KG_FAT) * 1000);
                 lines.push(`7-Day Expected Fat: ${withExplicitSign(weeklyMassG)} g`);
               }

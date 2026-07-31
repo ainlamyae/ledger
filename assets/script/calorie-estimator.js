@@ -65,11 +65,24 @@ function splitNotesIntoSegments(notes) {
 // the name — a real bug that banked a bogus "g egg white" row alongside an
 // existing "egg white" one instead of matching it.
 const INGREDIENT_UNIT_WORDS_BASE = 'g|gram|grams|kg|kilogram|kilograms|mg|milligram|milligrams|oz|ounce|ounces|lb|lbs|pound|pounds|ml|milliliter|milliliters|l|liter|liters|litre|litres|cup|cups|tbsp|tbsps|tablespoon|tablespoons|tsp|tsps|teaspoon|teaspoons|slice|slices|piece|pieces|serving|servings|scoop|scoops|spray|sprays|shot|shots|can|cans|clove|cloves';
+// An energy "unit" is an anchor, not a quantity: "300kcal cookie" says how
+// much energy was eaten, not how much cookie — so Calculate runs its usual
+// scaling backwards (density → how much of the food that is) and rewrites
+// the note with the real weight/count it worked out. Longest spelling first
+// so the capture group reads the whole word. Leading-only, like "x": a
+// trailing "calories" belongs to a food's name, not to a unit slot.
+// "cal"/"cals" are food labelling's usual shorthand for kilocalories, not
+// gram-calories, so they map 1:1 to kcal; kJ (EU labels) is converted.
+const ENERGY_UNIT_TO_KCAL = {
+  kcal: 1, kcals: 1, calories: 1, calorie: 1, cals: 1, cal: 1,
+  kilojoules: 1 / 4.184, kilojoule: 1 / 4.184, kj: 1 / 4.184,
+};
+const ENERGY_UNIT_WORDS = 'kcal|kcals|calories|calorie|cals|cal|kilojoules|kilojoule|kj';
 // "x" is a placeholder pseudo-unit (see below) — included in the LEADING
 // pattern only (not the trailing one) so a note already standardized once
 // (e.g. "1x apple") still parses correctly on a later re-Calculate, instead
 // of leaving "1x" stuck in the name.
-const INGREDIENT_UNIT_WORDS = `x|${INGREDIENT_UNIT_WORDS_BASE}`;
+const INGREDIENT_UNIT_WORDS = `x|${ENERGY_UNIT_WORDS}|${INGREDIENT_UNIT_WORDS_BASE}`;
 const INGREDIENT_QUANTITY_PATTERN = new RegExp(
   `^\\s*([\\d.]+)(?:\\s*[-/]\\s*[\\d.]+)?\\s*(${INGREDIENT_UNIT_WORDS})?\\b\\.?\\s*`, 'i'
 );
@@ -114,6 +127,22 @@ function extractIngredientQuantity(segment) {
   const match = segment.match(INGREDIENT_QUANTITY_PATTERN);
   if (!match) return { quantity: null, unit: null };
   return { quantity: parseFloat(match[1]), unit: match[2] ? match[2].toLowerCase() : null };
+}
+
+// The calorie figure this item was anchored to, or null if the user gave a
+// normal quantity instead. Everything downstream works in kcal, so a kJ
+// amount is converted here rather than carrying its own unit around.
+function extractEnergyTarget({ quantity, unit }) {
+  if (!unit || ENERGY_UNIT_TO_KCAL[unit] === undefined) return null;
+  return Math.max(0, (quantity ?? 0) * ENERGY_UNIT_TO_KCAL[unit]);
+}
+
+// The inverse of the usual grams → calories scaling: how much of a food of
+// known density adds up to a target calorie count. A zero/unknown density
+// (e.g. "300kcal water" — a contradiction) would divide to Infinity, so it
+// falls back to the AI's own gram estimate for the item instead.
+function gramsForEnergy(energyKcal, kcalPer100g, fallbackGrams) {
+  return kcalPer100g > 0 ? (energyKcal / kcalPer100g) * 100 : fallbackGrams;
 }
 
 // Canonical display form for the Notes standardization below — collapses
@@ -252,6 +281,23 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       tableCount = explicitCount !== null ? explicitCount : (tableGrams === null ? 1 : null);
     }
 
+    // An energy-anchored item ("300kcal cookie") uses the same three sources
+    // in the same order of trust, just read backwards — the calories are
+    // already known exactly, and it's the weight/count that gets derived
+    // from the density. Two things differ from the normal path:
+    //  - the table row has to carry a positive calorie figure to divide by,
+    //    otherwise there's nothing to convert against and it's treated as a
+    //    miss (falls through to USDA/AI) rather than dividing by zero;
+    //  - weight wins over count here, the reverse of the precedence below.
+    //    "300kcal cookie" is most useful rewritten as the weight to put on
+    //    the scale, so ×N is only used for a row that has no gram figure at
+    //    all (e.g. "1 rice cake") and therefore can't express one.
+    const energyKcal = pairingReliable ? extractEnergyTarget(segmentQuantities[i]) : null;
+    const tableEnergyUsable = !!tableEntry && energyKcal !== null && tableEntry.calories > 0;
+    const useTableCount = !!tableEntry && tableCount !== null
+      && (energyKcal === null ? item.count !== null : (tableEnergyUsable && tableGrams === null));
+    const useTableGrams = !!tableEntry && tableGrams !== null && (energyKcal === null || tableEnergyUsable);
+
     let itemCalories;
     let itemProtein;
     let source;
@@ -268,20 +314,29 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     // the not-yet-saved row this item would bank, surfaced in the breakdown
     // as an opt-in "Add" button when autoBank is false.
     let newRow = null;
+    // The quantity actually used, once an energy anchor has been resolved
+    // against a density — the AI's own grams/count estimate otherwise. Read
+    // back below to rewrite this item's Notes line in the resolved unit.
+    let usedCount = null;
+    let usedGrams = grams;
 
-    if (tableEntry && tableCount !== null && item.count !== null) {
-      itemCalories = (tableEntry.calories / tableCount) * item.count;
-      itemProtein = (tableEntry.protein / tableCount) * item.count;
+    if (useTableCount) {
+      const kcalPerUnit = tableEntry.calories / tableCount;
+      usedCount = energyKcal !== null ? (kcalPerUnit > 0 ? energyKcal / kcalPerUnit : 0) : item.count;
+      usedCount = Math.round(usedCount * 100) / 100;
+      itemCalories = kcalPerUnit * usedCount;
+      itemProtein = (tableEntry.protein / tableCount) * usedCount;
       source = 'nutrition-table-count';
-      amount = `×${item.count}`;
-      density = `${Math.round((tableEntry.calories / tableCount) * 10) / 10} kcal/unit`;
-    } else if (tableEntry && tableGrams !== null) {
+      amount = `×${usedCount}`;
+      density = `${Math.round(kcalPerUnit * 10) / 10} kcal/unit`;
+    } else if (useTableGrams) {
       kcal = (tableEntry.calories / tableGrams) * 100;
       protein = (tableEntry.protein / tableGrams) * 100;
-      itemCalories = (kcal * grams) / 100;
-      itemProtein = (protein * grams) / 100;
+      if (energyKcal !== null) usedGrams = gramsForEnergy(energyKcal, kcal, grams);
+      itemCalories = (kcal * usedGrams) / 100;
+      itemProtein = (protein * usedGrams) / 100;
       source = 'nutrition-table-grams';
-      amount = `${Math.round(grams * 10) / 10}g`;
+      amount = `${Math.round(usedGrams * 10) / 10}g`;
       density = `${Math.round(kcal * 10) / 10} kcal/100g`;
     } else {
       usdaAttempts++;
@@ -294,10 +349,11 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
         lookupFailed = true;
       }
       ({ kcal, protein } = pickPlausibleMacros(candidates, item.kcalPer100gFallback, item.proteinPer100gFallback));
-      itemCalories = (kcal * grams) / 100;
-      itemProtein = (protein * grams) / 100;
+      if (energyKcal !== null) usedGrams = gramsForEnergy(energyKcal, kcal, grams);
+      itemCalories = (kcal * usedGrams) / 100;
+      itemProtein = (protein * usedGrams) / 100;
       source = lookupFailed ? 'usda-unreachable' : 'usda/ai';
-      amount = `${Math.round(grams * 10) / 10}g`;
+      amount = `${Math.round(usedGrams * 10) / 10}g`;
       density = `${Math.round(kcal * 10) / 10} kcal/100g`;
 
       // A failed lookup ran on a pure ungrounded AI guess — don't bank
@@ -316,16 +372,18 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     // Standardized Notes line for this item: if the user typed a real unit
     // themselves (e.g. "50 g yogurt"), keep it — canonicalized and glued
     // straight to the number, no space (e.g. "50g"). Otherwise there was
-    // just a bare count ("1 apple", "3 egg") — replace that placeholder
-    // with whatever Calculate actually determined: the real gram weight for
-    // a weight-resolved item (Nutrition Facts or USDA/AI), or the matched
-    // unit count for a count-resolved one, since that's more informative
-    // than leaving "1x" in the saved note once the real number is known.
+    // just a bare count ("1 apple", "3 egg") or a calorie anchor ("300kcal
+    // cookie") — replace that placeholder with whatever Calculate actually
+    // determined: the real gram weight for a weight-resolved item
+    // (Nutrition Facts or USDA/AI), or the matched unit count for a
+    // count-resolved one, since that's more informative than leaving "1x"
+    // (or the calorie target, which the Amount field now carries anyway) in
+    // the saved note once the real number is known.
     let noteQuantity;
-    if (originalUnit) {
+    if (originalUnit && energyKcal === null) {
       noteQuantity = `${originalQuantity ?? 1}${UNIT_CANONICAL[originalUnit] || originalUnit}`;
     } else if (source === 'nutrition-table-count') {
-      noteQuantity = `${item.count ?? originalQuantity ?? 1}x`;
+      noteQuantity = `${usedCount ?? originalQuantity ?? 1}x`;
     } else {
       noteQuantity = amount;
     }
@@ -335,6 +393,9 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       query: item.query,
       grams,
       count: item.count,
+      energyKcal,
+      usedGrams,
+      usedCount,
       source,
       kcalPer100gFallback: item.kcalPer100gFallback,
       proteinPer100gFallback: item.proteinPer100gFallback,

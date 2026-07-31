@@ -113,8 +113,17 @@ function formatAggregatedAmount(grams, count) {
   return parts.length ? parts.join(', ') : '—';
 }
 
-// Renders the (locally computed, not AI) ingredient table.
+// Renders the (locally computed, not AI) ingredient table, plus the profile
+// line that now rides along with it in the prompt — the panel shows everything
+// it sends, the same rule Wellness/Activity Insight's data previews follow, so
+// the profile can't be silently attached to the request.
 function renderFoodInsightPreview({ from, to }) {
+  // Unmasked, like the other two panels' data previews: this is the request
+  // being shown to the person whose data it is, not a dashboard figure the
+  // privacy toggle hides from someone glancing over at the charts.
+  const profileEl = document.getElementById('food-insight-profile');
+  profileEl.textContent = `Sent with your food: ${formatProfileLines(gatherProfileSnapshot()).join(' · ')}`;
+
   const tbody = document.getElementById('food-insight-ingredients-body');
   tbody.innerHTML = '';
   const rows = aggregateFoodIntake(from, to);
@@ -136,19 +145,25 @@ function renderFoodInsightPreview({ from, to }) {
   });
 }
 
-// Plain-text ingredient list + the user's question (or the default). Kept
-// intentionally simple — ingredient totals only, no day-by-day breakdown
-// (that's what Insight is for).
+// Who's eating it (the shared profile block from insight.js) + the plain-text
+// ingredient list + the user's question (or the default). Still no day-by-day
+// breakdown — that's what Wellness Insight is for. The profile leads, because
+// nutrient adequacy is a per-body judgement: iron and calcium needs differ by
+// sex and age, and "is this enough food" can't be read off an ingredient list
+// without knowing the body it's feeding.
 function formatFoodInsightPrompt(rows, from, to, question) {
+  const profile = formatProfileLines(gatherProfileSnapshot()).join('\n');
   const header = `Aggregated ingredients logged from ${from} to ${to} (name: total amount, total calories, total protein):`;
   const body = rows.length
     ? rows.map((r) => `- ${r.name} (${r.amountLabel}): ${r.calories} kcal, ${r.protein} g protein`).join('\n')
     : '(no Calculate-derived ingredient breakdown logged in this window)';
   const q = (question && question.trim()) ? question.trim() : FOOD_INSIGHT_DEFAULT_QUESTION;
-  return `${header}\n${body}\n\nQuestion: ${q}`;
+  return `${profile}\n\n${header}\n${body}\n\nQuestion: ${q}`;
 }
 
 const FOOD_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewing a plain list of foods someone logged over a recent period — each ingredient's total amount eaten and the total calories/protein it contributed. No vitamin or mineral data is provided; none was measured. Use your general knowledge of typical food composition to infer which vitamins/minerals this pattern of eating is likely rich in or short on, and answer the user's specific question.
+
+The list is preceded by their age, sex, height, current weight and BMI. Use it: reference intakes for iron, calcium, folate, B12 and protein differ by sex and age, and whether a day's total food is a lot or a little depends on the body eating it. Any of those fields may read "not set" or "not logged" — that means the app doesn't have it, so say what you'd need rather than assuming a figure.
 
 Be explicit that this is an inference from typical food composition, not a lab-measured nutrient analysis, and that specific products/brands/preparation can vary. You are not a doctor — do not diagnose a deficiency or recommend supplement dosages; suggest food-based ways to close likely gaps instead.
 

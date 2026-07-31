@@ -98,11 +98,11 @@
                 <div class="node-graph-spokes">
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🩺 Health Tracker</span>
-                        <span class="node-graph-tooltip">Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus daily targets — protein against a shaded target band, since the recommended intake is a range rather than one number.</span>
+                        <span class="node-graph-tooltip">Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus your daily figures — calories against a shaded out-of-bounds zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🎯 Personalized Daily Targets</span>
-                        <span class="node-graph-tooltip">Set your target weight and pace, and your Calorie target is calculated for you with the Mifflin-St Jeor formula — BMR × your activity level for maintenance, minus a deficit sized to hit your goal, using your own calibrated energy density once available. Your Protein target follows the way nutrition guidance actually states it — a range of grams per kg of your TARGET weight, not a single number pinned to today's weight. Enter the range once (e.g. 1.6~2 g/kg) and you get a live band in grams: it's shaded on the Protein Intake chart so you can see which days landed inside it, and the Protein Today tile reads as a range and only turns green while you're within it. Because it's built on your goal weight, it feeds you for the body you're heading for instead of shrinking with every kg you lose.</span>
+                        <span class="node-graph-tooltip">Set your target weight and pace, and your daily calorie figure is calculated for you with the Mifflin-St Jeor formula — BMR × your activity level for maintenance, minus a deficit sized to hit your goal, using your own calibrated energy density once available. It's never presented as a "target" to hit dead-on, because it isn't one: if your goal weight is below today's it's a maximum to stay at or under, and if you're gaining it's a minimum to stay at or above. The Calories tile, the Caloric Intake chart and Wellness Insight all say which of the two it is, so eating 400 under a bulk's minimum is never scored as a good day. Your Protein target follows the way nutrition guidance actually states it — a range of grams per kg of your TARGET weight, not a single number pinned to today's weight. Enter the range once (e.g. 1.6~2 g/kg) and you get a live band in grams: it's shaded on the Protein Intake chart so you can see which days landed inside it, and the Protein tile reads as a range and only turns green while you're within it. Because it's built on your goal weight, it feeds you for the body you're heading for instead of shrinking with every kg you lose.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📉 Weight Forecast</span>
@@ -117,12 +117,12 @@
                         <span class="node-graph-tooltip">The estimator remembers what it learns: every ingredient it looks up is saved to your own Nutrition Facts table, so the next mention is calculated instantly from a trusted value instead of re-estimated from scratch. Fine-tune any entry to match the exact brand you buy, and merge near-duplicates the AI phrased differently.</span>
                     </button>
                     <button type="button" class="node-graph-node">
-                        <span class="node-graph-node-title">🔥 Calorie Deficit &amp; Fat Loss</span>
-                        <span class="node-graph-tooltip">See each day's real energy balance as a bar: what you ate, minus the cost of simply being alive (Mifflin-St Jeor from your height, birth date, sex, and that day's weight), minus the activity you actually logged. Green below the line is a deficit, red above it is a surplus, and a twin right-hand axis reads off the body fat that balance implies — so you can compare what your eating predicts against what your weigh-ins actually show.</span>
+                        <span class="node-graph-node-title">🔥 Calorie Balance &amp; Body Change</span>
+                        <span class="node-graph-tooltip">See each day's real energy balance as a bar: what you ate, minus the cost of simply being alive (Mifflin-St Jeor from your height, birth date, sex, and that day's weight), minus the activity you actually logged. Below the line is a deficit, above it a surplus — which of the two you're aiming for depends on whether your goal weight is below or above today's — and a twin right-hand axis reads off the body change that balance implies, so you can compare what your eating predicts against what your weigh-ins actually show.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📐 Calibrated vs. Generic Formula</span>
-                        <span class="node-graph-tooltip">One button switches the whole Health section between your own calibrated constants and the generic population ones, so you can see exactly what calibrating changed — your goal arrival date, your daily calorie target, and your expected fat loss all move together, and every figure says which model produced it. It's a display switch that writes nothing, so comparing can never damage a saved calibration.</span>
+                        <span class="node-graph-tooltip">One button switches the whole Health section between your own calibrated constants and the generic population ones, so you can see exactly what calibrating changed — your goal arrival date, your daily calorie maximum (or minimum), and your expected fat loss all move together, and every figure says which model produced it. It's a display switch that writes nothing, so comparing can never damage a saved calibration.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📊 Body Composition Split</span>
@@ -288,19 +288,19 @@
 
         <div class="cards today-glance-cards">
             <div class="card">
-                <h3>Calories Today</h3>
+                <h3 id="today-calories-label">Calories</h3>
                 <div class="value" id="today-calories-value">—</div>
             </div>
             <div class="card">
-                <h3>Protein Today</h3>
+                <h3>Protein</h3>
                 <div class="value" id="today-protein-value">—</div>
             </div>
             <div class="card">
-                <h3>Activity Today</h3>
+                <h3>Activity</h3>
                 <div class="value" id="today-activity-value">—</div>
             </div>
             <div class="card">
-                <h3>Sleep Last Night</h3>
+                <h3>Sleep</h3>
                 <div class="value" id="today-sleep-value">—</div>
             </div>
         </div>
@@ -358,7 +358,7 @@
 
             <div class="weight-projection-wrap">
                 <div class="weight-projection-header">
-                    <h4>Calorie Deficit &amp; Fat Loss</h4>
+                    <h4>Calorie Balance &amp; Body Change</h4>
                 </div>
                 <div class="chart-box">
                     <canvas id="wellness-energy-balance-chart"></canvas>
@@ -376,7 +376,7 @@
 
             <div class="donut-grid wellness-metrics-grid">
                 <div class="donut-item">
-                    <h4>Caloric Intake</h4>
+                    <h4 id="wellness-calories-label">Caloric Intake</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-calories-chart"></canvas>
                     </div>
@@ -445,6 +445,8 @@
                     <input type="date" id="food-insight-date-to">
                 </label>
             </div>
+
+            <p id="food-insight-profile" class="hint"></p>
 
             <div class="table-responsive">
                 <table id="food-insight-table">

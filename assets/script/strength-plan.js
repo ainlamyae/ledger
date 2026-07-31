@@ -81,7 +81,7 @@ function logWorkout() {
       let quantity;
       if (box.dataset.steps !== undefined) quantity = `${box.dataset.steps}step`;
       else if (box.dataset.minutes !== undefined) quantity = `${box.dataset.minutes}min`;
-      // A hold row's TOTAL held seconds, in the same "<number><unit>  Name"
+      // A hold row's TOTAL held seconds, in the same "<number><unit> Name"
       // shape as the min/step rows — not the "3 × 45 sec" the cell displays,
       // which wouldn't survive the round trip: activity-estimator.js parses
       // these lines back on Recalculate, and its sets×reps pattern requires two
@@ -97,7 +97,7 @@ function logWorkout() {
       // same ticked exercises despite the two paths claiming to mirror each
       // other exactly. Keep any new row's attributes and display in step.
       else quantity = cells[1].textContent.trim().replace(/\s*×\s*/, '×');
-      return `${quantity}  ${name}`;
+      return `${quantity} ${name}`;
     })
     .join('\n');
 

@@ -98,7 +98,7 @@
                 <div class="node-graph-spokes">
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🩺 Health Tracker</span>
-                        <span class="node-graph-tooltip">Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus your daily figures — calories against a shaded out-of-bounds zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number.</span>
+                        <span class="node-graph-tooltip">Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus your daily figures — calories against a shaded out-of-bounds zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's weigh-in colored green or red by whether the scale moved toward your goal or away from it.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🎯 Personalized Daily Targets</span>
@@ -317,9 +317,6 @@
                 <div class="weight-projection-header">
                     <h4>Weight Trend & Forecast</h4>
                 </div>
-                <div class="chart-box">
-                    <canvas id="wellness-projection-chart"></canvas>
-                </div>
                 <div class="weight-progress-meter" id="weight-progress-meter" hidden>
                     <div class="weight-progress-meter-track">
                         <div class="weight-progress-meter-fill" id="weight-progress-meter-fill"></div>
@@ -353,6 +350,9 @@
 
                     <p id="weight-projection-eta" class="weight-eta"></p>
                 </div>
+                <div class="chart-box">
+                    <canvas id="wellness-projection-chart"></canvas>
+                </div>
                 <p id="weight-plateau-note" class="weight-plateau-note"></p>
             </div>
 
@@ -363,6 +363,7 @@
                 <div class="chart-box">
                     <canvas id="wellness-energy-balance-chart"></canvas>
                 </div>
+                <p id="energy-balance-note" class="weight-plateau-note"></p>
             </div>
 
             <div class="weight-projection-wrap">
@@ -376,10 +377,18 @@
 
             <div class="donut-grid wellness-metrics-grid">
                 <div class="donut-item">
+                    <h4>Body Weight</h4>
+                    <div class="chart-box chart-box-donut">
+                        <canvas id="wellness-weight-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
                     <h4 id="wellness-calories-label">Caloric Intake</h4>
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-calories-chart"></canvas>
                     </div>
+                    <p id="calorie-bound-note" class="weight-plateau-note"></p>
                 </div>
 
                 <div class="donut-item">

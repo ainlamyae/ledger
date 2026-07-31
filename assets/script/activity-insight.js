@@ -54,22 +54,31 @@ const EXERCISE_MUSCLE_GROUP = {
   'Dumbbell Tricep Extension': 'Triceps',
 };
 
-// Total resistance-training sets logged in [fromIso, toIso], across every
+// Total resistance-training REPS logged in [fromIso, toIso], across every
 // exercise (mapped or not) — the simple whole-body volume-trend figure,
 // independent of the per-muscle breakdown below.
-function sumStrengthSetsInWindow(fromIso, toIso) {
+//
+// Reps rather than sets because the workout note records total reps per exercise
+// ("30× Leg Press"): 30 could have been 3×10 or 5×6, so a set count is no longer
+// recoverable from the log. Reps are the finer figure of the two and the older
+// two-number lines convert into them exactly (3×10 = 30 reps, done by
+// parseWorkoutNoteLines), so volume stays comparable across entries logged either
+// side of that format change — which matters here, since this figure's whole job
+// is a current-vs-previous-period comparison.
+function sumStrengthRepsInWindow(fromIso, toIso) {
   let total = 0;
   getDatedWellnessEntries()
     .filter((e) => isActivityCategory(e.category) && e.date >= fromIso && e.date <= toIso && e.notes.trim())
     .forEach((e) => {
       parseWorkoutNoteLines(e.notes).forEach((line) => {
-        if (line.type === 'sets') total += line.sets;
+        if (line.type === 'reps') total += line.reps;
       });
     });
   return total;
 }
 
-// Per muscle group: sets performed and sessions (distinct dates trained) in
+// Per muscle group: reps performed (see sumStrengthRepsInWindow for why reps
+// rather than sets) and sessions (distinct dates trained) in
 // [fromIso, toIso], plus the last-trained date searched across the entry's
 // *full* history — so a long-neglected muscle still reads correctly even
 // when it falls outside the selected range, rather than showing as "never
@@ -77,20 +86,20 @@ function sumStrengthSetsInWindow(fromIso, toIso) {
 // most-neglected-first (never logged, then longest gap, then lowest volume)
 // so the muscle needing attention next always leads the list.
 function computeMuscleGroupRows(fromIso, toIso) {
-  const stats = new Map(MUSCLE_GROUPS.map((m) => [m, { setsInRange: 0, sessionDatesInRange: new Set(), lastTrainedDate: null }]));
+  const stats = new Map(MUSCLE_GROUPS.map((m) => [m, { repsInRange: 0, sessionDatesInRange: new Set(), lastTrainedDate: null }]));
 
   getDatedWellnessEntries()
     .filter((e) => isActivityCategory(e.category) && e.notes.trim())
     .forEach((e) => {
       parseWorkoutNoteLines(e.notes)
-        .filter((line) => line.type === 'sets')
+        .filter((line) => line.type === 'reps')
         .forEach((line) => {
           const muscle = EXERCISE_MUSCLE_GROUP[line.name];
           if (!muscle) return;
           const s = stats.get(muscle);
           if (!s.lastTrainedDate || e.date > s.lastTrainedDate) s.lastTrainedDate = e.date;
           if (e.date >= fromIso && e.date <= toIso) {
-            s.setsInRange += line.sets;
+            s.repsInRange += line.reps;
             s.sessionDatesInRange.add(e.date);
           }
         });
@@ -104,7 +113,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
       : null;
     return {
       muscle,
-      setsInRange: s.setsInRange,
+      repsInRange: s.repsInRange,
       sessionsInRange: s.sessionDatesInRange.size,
       lastTrainedDate: s.lastTrainedDate,
       daysSinceLastTrained,
@@ -115,7 +124,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
       return a.lastTrainedDate === null ? -1 : 1;
     }
     if (a.daysSinceLastTrained !== b.daysSinceLastTrained) return b.daysSinceLastTrained - a.daysSinceLastTrained;
-    return a.setsInRange - b.setsInRange;
+    return a.repsInRange - b.repsInRange;
   });
 }
 
@@ -135,7 +144,7 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
     lookbackDays,
     rangeLabel,
     // Same age/sex/height/weight/BMI block Wellness and Food Insight send
-    // (insight.js) — set volume, rest needs and what counts as a heavy session
+    // (insight.js) — training volume, rest needs and what counts as a heavy session
     // all depend on the body doing the lifting, so the coach shouldn't be
     // reasoning about this log without knowing whose it is.
     profile: gatherProfileSnapshot(),
@@ -148,8 +157,8 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
     activityByDescription: current.activityByDescription,
     prevActivityByDescription: previous.activityByDescription,
     muscleRows: computeMuscleGroupRows(fromIso, toIso),
-    totalSetsInRange: sumStrengthSetsInWindow(fromIso, toIso),
-    prevTotalSetsInRange: prevRange.length ? sumStrengthSetsInWindow(prevRange[0], prevRange[prevRange.length - 1]) : 0,
+    totalRepsInRange: sumStrengthRepsInWindow(fromIso, toIso),
+    prevTotalRepsInRange: prevRange.length ? sumStrengthRepsInWindow(prevRange[0], prevRange[prevRange.length - 1]) : 0,
   };
 }
 
@@ -158,13 +167,13 @@ function formatMuscleGroupLines(rows, rangeLabel) {
     const last = r.lastTrainedDate
       ? `last trained ${r.daysSinceLastTrained} day${r.daysSinceLastTrained === 1 ? '' : 's'} ago (${r.lastTrainedDate})`
       : 'never logged';
-    return `${r.muscle}: ${r.setsInRange} sets, ${r.sessionsInRange} session${r.sessionsInRange === 1 ? '' : 's'} in ${rangeLabel} — ${last}`;
+    return `${r.muscle}: ${r.repsInRange} reps, ${r.sessionsInRange} session${r.sessionsInRange === 1 ? '' : 's'} in ${rangeLabel} — ${last}`;
   });
 }
 
 function formatActivityInsightPrompt(m) {
   const consistencyLine = `Workout days logged (${m.rangeLabel}): ${m.activityDaysLogged}/${m.lookbackDays} — previous period: ${m.prevActivityDaysLogged}/${m.lookbackDays}`;
-  const volumeLine = `Total resistance-training sets, all muscle groups (${m.rangeLabel}): ${m.totalSetsInRange} — previous period: ${m.prevTotalSetsInRange}`;
+  const volumeLine = `Total resistance-training reps, all muscle groups (${m.rangeLabel}): ${m.totalRepsInRange} — previous period: ${m.prevTotalRepsInRange}`;
 
   const lines = [
     ...formatProfileLines(m.profile),
@@ -182,7 +191,7 @@ function formatActivityInsightPrompt(m) {
 
 const ACTIVITY_INSIGHT_SYSTEM_PROMPT = `You are a supportive strength-training coach reviewing someone's own self-tracked workout log. You are not a doctor — do not diagnose injuries or prescribe rehab; if something sounds like pain or an injury, tell them to see a professional instead of advising around it.
 
-You'll be given: their age, sex, height, current weight and BMI (any of which may read "not set" — treat that as missing, never guess a value, and note it if it matters to your answer); how many days they logged any activity this period vs. the immediately preceding period of the same length; their total resistance-training set volume this period vs. that previous period; the same activity-type breakdown (minutes/day and kcal/day burned by type, e.g. NEAT/Cardio/Strength Training) the app's Wellness Insight also reports; and a muscle-group breakdown (sets performed and sessions this period, plus days since it was actually last trained) covering Legs, Chest, Back, Shoulders, Biceps, and Triceps, sorted most-neglected-first. A muscle marked "never logged" has no training history in the data at all — treat that as a real gap to flag, not a rounding artifact.
+You'll be given: their age, sex, height, current weight and BMI (any of which may read "not set" — treat that as missing, never guess a value, and note it if it matters to your answer); how many days they logged any activity this period vs. the immediately preceding period of the same length; their total resistance-training rep volume this period vs. that previous period; the same activity-type breakdown (minutes/day and kcal/day burned by type, e.g. NEAT/Cardio/Strength Training) the app's Wellness Insight also reports; and a muscle-group breakdown (reps performed and sessions this period, plus days since it was actually last trained) covering Legs, Chest, Back, Shoulders, Biceps, and Triceps, sorted most-neglected-first. A muscle marked "never logged" has no training history in the data at all — treat that as a real gap to flag, not a rounding artifact.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 

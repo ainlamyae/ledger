@@ -88,14 +88,16 @@ const EXERCISE_MET = {
 // estimate instead of blocking Calculate entirely.
 const EXERCISE_MET_DEFAULT = 3.5;
 
-// Matches one standardized workout note line — a strength row ("3×10  Leg
-// Press"), an isometric hold ("135sec  Plank"), a fixed-duration NEAT row
-// ("30min  Swim"), or a step-count row ("6000step  Walk"). Any line matching none of these (e.g. a blank line,
+// Matches one standardized workout note line — a strength row ("3×10 Leg
+// Press"), an isometric hold ("135sec Plank"), a fixed-duration NEAT row
+// ("30min Swim"), or a step-count row ("6000step Walk"). Any line matching none of these (e.g. a blank line,
 // or a leftover day-header line from an older-format saved entry) is skipped.
+// The gap is `\s+`, so entries saved back when Log Workout emitted two spaces
+// still parse identically to the single-spaced ones it writes now.
 const STRENGTH_NOTE_LINE_PATTERN = /^(\d+)×(\d+)\s+(.+)$/;
 const DURATION_NOTE_LINE_PATTERN = /^(\d+)min\s+(.+)$/;
 const STEPS_NOTE_LINE_PATTERN = /^(\d+)step\s+(.+)$/;
-// An isometric hold row's total held seconds ("135sec  Plank") — seconds
+// An isometric hold row's total held seconds ("135sec Plank") — seconds
 // rather than minutes because a hold is typically well under a minute per set,
 // and rounding 3 × 45 sec to whole minutes would lose most of the precision.
 // Distinct prefix from "step"/"min" so the three can't be confused.

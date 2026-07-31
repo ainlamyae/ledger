@@ -552,7 +552,7 @@ const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 const PROTEIN_TARGET_G_DEFAULT = 100;
 
 // Standard estimate for 1kg of body fat — the same generic energy density
-// calibration.js's un-calibrated formula and getCalorieTargetKcal() below
+// calibration.js's un-calibrated formula and getCalorieBoundKcal() below
 // both fall back to until the user's own history is fitted via Calibrate.
 const GENERIC_KCAL_PER_KG_FAT = 7700;
 
@@ -651,10 +651,20 @@ function formatProteinTargetBand(band, separator = '~') {
   return band.max > band.min ? `${band.min}${separator}${band.max}` : `${band.min}`;
 }
 
+// Did a day's protein land INSIDE the band? Under the floor and over the top
+// end are both misses, since the band's upper end is a real ceiling rather than
+// headroom. A zero-width band (flat PROTEIN_TARGET_G, no per-kg range set) has
+// no inside to land in, so it keeps the plain at-or-over rule it always had.
+// Shared by the glance tile and the Protein Intake chart's bar colors so the
+// two can't score the same day differently.
+function withinProteinBand(g, band) {
+  return g >= band.min && (band.max === band.min || g <= band.max);
+}
+
 // Mifflin-St Jeor resting/basal metabolic rate (kcal/day) — the energy cost
 // of simply staying alive, before any movement is added. Shared by
-// getCalorieTargetKcal below (× ACTIVITY_MULTIPLIER, giving a TDEE the
-// deficit target is subtracted from) and the Calorie Deficit & Fat Loss chart
+// getCalorieBoundKcal below (× ACTIVITY_MULTIPLIER, giving a TDEE the planned
+// deficit is subtracted from) and the Calorie Balance & Body Change chart
 // (which adds each day's own logged activity burn instead of a multiplier),
 // so the formula itself exists in exactly one place.
 function mifflinStJeorBmr(weightKg, heightCm, age, sex) {
@@ -663,7 +673,7 @@ function mifflinStJeorBmr(weightKg, heightCm, age, sex) {
 
 // Resting maintenance (kcal/day) from the profile settings and the most
 // recently logged weight — null if any input is missing. Deliberately the same
-// Mifflin-St Jeor basis the Calorie Deficit & Fat Loss chart applies per-day,
+// Mifflin-St Jeor basis the Calorie Balance & Body Change chart applies per-day,
 // so calcProjection and that chart measure a deficit against the SAME baseline
 // instead of two different ones. Excludes activity: callers add whatever
 // activity figure is appropriate for their own window (see both call sites).
@@ -687,7 +697,7 @@ function kcalPerKgFat() {
   return (gains && gains.betaCal > 0) ? 1 / gains.betaCal : GENERIC_KCAL_PER_KG_FAT;
 }
 
-// Calorie target can be a flat kcal amount (CALORIE_TARGET_KCAL) or, if
+// The daily calorie bound in kcal — a flat amount (CALORIE_TARGET_KCAL) or, if
 // HEIGHT_CM, BIRTH_DATE, SEX, ACTIVITY_MULTIPLIER, and WEEKLY_FAT_LOSS_KG
 // are all set (and a Weight entry has been logged), a calculated one:
 // Mifflin-St Jeor BMR × ACTIVITY_MULTIPLIER gives maintenance calories
@@ -697,7 +707,11 @@ function kcalPerKgFat() {
 // kcal/kg otherwise, the same convention the Weight Trend & Forecast
 // projection already uses. Missing any one input falls back to the flat
 // CALORIE_TARGET_KCAL setting, same as protein above.
-function getCalorieTargetKcal(entries) {
+//
+// This is only the FIGURE. Which side of it to be on is getCalorieBoundKind()
+// below — every label goes through getCalorieBound() so the two travel
+// together.
+function getCalorieBoundKcal(entries) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
@@ -715,6 +729,61 @@ function getCalorieTargetKcal(entries) {
   }
 
   return getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+}
+
+// There is no "target" daily intake in this app — the figure above is a BOUND,
+// and which bound it is follows the direction of the goal. Someone heading DOWN
+// in weight has to eat at MOST that many calories (a ceiling); someone heading
+// UP has to eat at LEAST that many (a floor). Eating 400 kcal under a bulk's
+// figure is not a good day, and neither is eating 400 over a cut's, so calling
+// both of them "target" told half the users the exact opposite of the truth.
+//
+// Direction comes from goal weight vs. the latest weigh-in, which is the user's
+// intent in its plainest form. With no goal, no weigh-in, or a goal already
+// reached (same 0.1 kg tolerance calcProjection() treats as "there"), the sign
+// of WEEKLY_FAT_LOSS_KG decides instead — negative is a lean bulk, so a floor.
+// Neither available keeps the ceiling, matching the at-or-under rule the
+// Calories tile has always applied.
+function getCalorieBoundKind(entries) {
+  const goalKg = getSetting('WEIGHT_GOAL_KG', null);
+  const currentKg = latestWeightKg(entries);
+
+  if (goalKg !== null && currentKg !== null && Math.abs(goalKg - currentKg) >= 0.1) {
+    return goalKg < currentKg ? 'max' : 'min';
+  }
+
+  const weeklyFatLossKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
+  return (weeklyFatLossKg !== null && weeklyFatLossKg < 0) ? 'min' : 'max';
+}
+
+// The bound as one object — the kcal figure, which bound it is, and the two
+// display forms the labels need ('max' inline, 'Max' leading a line) — so the
+// glance tile, the Caloric Intake chart and the Insight prompt can't drift into
+// describing the same number two different ways.
+function getCalorieBound(entries) {
+  const kind = getCalorieBoundKind(entries);
+  return {
+    kcal: getCalorieBoundKcal(entries),
+    kind,
+    isMax: kind === 'max',
+    word: kind === 'max' ? 'Max' : 'Min',
+  };
+}
+
+// Is a day's intake on the right side of the bound? At-or-under a ceiling,
+// at-or-over a floor — hitting it exactly counts as met either way.
+function withinCalorieBound(kcal, bound) {
+  return bound.isMax ? kcal <= bound.kcal : kcal >= bound.kcal;
+}
+
+// "150 under" / "120 over" / "exactly on it" — the day's distance from the
+// bound, for the Caloric Intake tooltip. Direction words rather than a signed
+// number, since which direction is GOOD depends on the bound and the reader
+// already knows which one they're looking at from the line above it.
+function calorieBoundGapText(kcal, bound) {
+  const diff = Math.round(kcal - bound.kcal);
+  if (diff === 0) return 'exactly on it';
+  return diff > 0 ? `${diff} over` : `${-diff} under`;
 }
 
 // Number of trailing days shown in each Health Metrics chart (Caloric
@@ -825,22 +894,25 @@ function renderTodayGlanceCards(entries) {
     });
   if (sleepHours !== null) sleepHours = Math.round(sleepHours * 10) / 10;
 
-  const calorieTarget = getCalorieTargetKcal(entries);
+  const calorieBound = getCalorieBound(entries);
   const proteinBand = getProteinTargetBandG(entries);
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
-  // Which direction is "good" differs per metric: at/under target is the
-  // win for Calories (a deficit target), at/over target is the win for
-  // Activity/Sleep. Protein is the one metric judged against a RANGE — green
-  // only while it's inside the band, red both under it and over it, since the
-  // band's top end is a real ceiling and not just headroom. A zero-width band
-  // (flat PROTEIN_TARGET_G, no per-kg range set) has no inside to land in, so
-  // it keeps the at-or-over-target rule it's always had.
-  const proteinInBand = protein !== null && protein >= proteinBand.min
-    && (proteinBand.max === proteinBand.min || protein <= proteinBand.max);
+  // The Calories tile's own heading carries which bound its figure is, because
+  // the number alone can't say it and the value line has no room: "Max Calories"
+  // on a cut, "Min Calories" on a bulk. Digit-free, so privacy mode has nothing
+  // to hide here. The four tiles are all today's figures (last night's, for
+  // Sleep) — the panel they sit in says so, so the headings don't repeat it.
+  document.getElementById('today-calories-label').textContent = `${calorieBound.word} Calories`;
 
-  setTodayGlanceTile('today-calories', calories, calorieTarget, 'kcal', calories !== null && calories <= calorieTarget);
+  // Which direction is "good" differs per metric: for Calories it's whichever
+  // side of the bound the goal points to (at/under a max, at/over a min);
+  // at/over target is the win for Activity/Sleep. Protein is judged against a
+  // RANGE (withinProteinBand above) — inside the band only.
+  const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
+
+  setTodayGlanceTile('today-calories', calories, calorieBound.kcal, 'kcal', calories !== null && withinCalorieBound(calories, calorieBound));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand);
   setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
   setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
@@ -916,12 +988,30 @@ function shortDateTickCallback(value) {
 function renderWellnessCaloriesChart(entries) {
   const ctx = document.getElementById('wellness-calories-chart');
 
-  const calorieTarget = getCalorieTargetKcal(entries);
+  const bound = getCalorieBound(entries);
 
   const calorieEntries = entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
   const dates = trailingDatesForCategory(calorieEntries, WELLNESS_METRICS_DAYS);
   const byDate = new Map();
   calorieEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
+
+  // The chart's heading says which bound the dashed line is, in the same
+  // Max/Min-first wording the glance tile uses — the shading shows which side to
+  // avoid, but only the word says whether that's a ceiling or a floor.
+  document.getElementById('wellness-calories-label').textContent = `${bound.word} Caloric Intake`;
+
+  // The dashed line is a ceiling on a cut and a floor on a bulk, so the shaded
+  // half is the side you don't want to be on: `fill: 'end'` shades upward from
+  // a max, `'start'` shades down from a min. Bars are scored against it in the
+  // app's own income/expense colors rather than a flat amber — green on the
+  // right side of the bound (at-or-under a max, at-or-over a min), red on the
+  // wrong one — so every day reads as pass/fail without eyeballing bar height
+  // against the line. A day with nothing logged is scored as neither: it plots
+  // as 0, which is a missing log rather than a day of fasting, so it takes the
+  // green (and is invisible at zero height anyway) instead of being counted as
+  // the worst day on the chart under a floor.
+  const values = dates.map((d) => byDate.get(d) || 0);
+  const barColors = dates.map((d, i) => (!byDate.has(d) || withinCalorieBound(values[i], bound) ? '#16a34a' : '#dc2626'));
 
   wellnessCaloriesChart = upsertChart(wellnessCaloriesChart, ctx, {
     data: {
@@ -930,18 +1020,22 @@ function renderWellnessCaloriesChart(entries) {
         {
           type: 'bar',
           label: 'Calories',
-          data: dates.map((d) => byDate.get(d) || 0),
-          backgroundColor: '#f59e0b',
+          data: values,
+          backgroundColor: barColors,
           order: 2,
         },
         {
           type: 'line',
-          label: `${calorieTarget} kcal target`,
-          data: new Array(dates.length).fill(calorieTarget),
+          label: `${bound.word} ${bound.kcal} kcal`,
+          data: new Array(dates.length).fill(bound.kcal),
           borderColor: '#dc2626',
           borderDash: [4, 4],
+          borderWidth: 1.5,
           pointRadius: 0,
           tension: 0,
+          fill: bound.isMax ? 'end' : 'start',
+          backgroundColor: 'rgba(220, 38, 38, 0.10)',
+          isBoundLine: true,
           order: 1,
         },
       ],
@@ -951,7 +1045,24 @@ function renderWellnessCaloriesChart(entries) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { title: (items) => formatIsoDateShort(items[0].label), label: maskedValueTooltipLabel } },
+        tooltip: {
+          // The bound line is the same constant on every day, so it's filtered
+          // out as its own tooltip row (the Protein and Activity charts do the
+          // same with theirs) and folded into the second line below instead,
+          // where it can be stated as a bound and compared to the day.
+          filter: (item) => !item.dataset.isBoundLine,
+          callbacks: {
+            title: (items) => formatIsoDateShort(items[0].label),
+            label: (item) => {
+              const text = `Eaten: ${item.parsed.y} kcal`;
+              return privacyMode ? maskDigits(text) : text;
+            },
+            afterLabel: (item) => {
+              const text = `${bound.word} ${bound.kcal} kcal — ${calorieBoundGapText(item.parsed.y, bound)}`;
+              return privacyMode ? maskDigits(text) : text;
+            },
+          },
+        },
       },
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
@@ -1293,15 +1404,28 @@ function renderWellnessProteinChart(entries) {
     ...extra,
   });
 
+  // Shaded green, not red: unlike the Caloric Intake chart — where the shading
+  // marks the half you must stay OUT of — the region between these two lines is
+  // the one you're aiming to land in, and it now sits behind bars scored in the
+  // same green.
   const targetDatasets = band.max > band.min
     ? [
       targetLine(band.max, `${band.max} g upper target`, {
         fill: '+1',
-        backgroundColor: 'rgba(220, 38, 38, 0.10)',
+        backgroundColor: 'rgba(22, 163, 74, 0.10)',
       }),
       targetLine(band.min, `${band.min} g target floor`),
     ]
     : [targetLine(band.min, `${band.min} g target`)];
+
+  // Green inside the band, red outside it in either direction — the same
+  // pass/fail scoring the Protein tile applies (withinProteinBand), so a day
+  // that turns the tile red can't sit here as an unremarkable blue bar. Over the
+  // top end is a miss too, not extra credit. A day with nothing logged is scored
+  // as neither and takes the green, since 0 g is a missing log rather than a day
+  // without protein (and a zero-height bar is invisible regardless).
+  const values = dates.map((d) => byDate.get(d) || 0);
+  const barColors = dates.map((d, i) => (!byDate.has(d) || withinProteinBand(values[i], band) ? '#16a34a' : '#dc2626'));
 
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
     data: {
@@ -1310,8 +1434,8 @@ function renderWellnessProteinChart(entries) {
         {
           type: 'bar',
           label: 'Protein',
-          data: dates.map((d) => byDate.get(d) || 0),
-          backgroundColor: '#0ea5e9',
+          data: values,
+          backgroundColor: barColors,
           order: 2,
         },
         ...targetDatasets,
@@ -1475,7 +1599,10 @@ function getCalibratedGains() {
 
 function calcProjection(entries) {
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
-  const calorieTarget = getCalorieTargetKcal(entries);
+  // The bound's figure only — the planned intake level the calibrated fit is
+  // centered on. Which side of it the user should be on doesn't enter the
+  // arithmetic here, so only the number is read.
+  const calorieTarget = getCalorieBoundKcal(entries);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
   const proteinTarget = getProteinTargetG(entries);
 
@@ -1555,13 +1682,13 @@ function calcProjection(entries) {
       // activity on top of a target derived from BMR × ACTIVITY_MULTIPLIER,
       // double-counting the movement the multiplier already assumed. The two
       // errors pointed in opposite directions, which is why the result looked
-      // plausible while contradicting the Calorie Deficit & Fat Loss chart,
+      // plausible while contradicting the Calorie Balance & Body Change chart,
       // which measures against maintenance. Both now share one baseline.
       const resting = restingMaintenanceKcal(entries);
       const maintenance = resting !== null
         ? resting + avgActivityKcal
         // No profile on file, so there's no BMR to work from and no calculated
-        // target either — getCalorieTargetKcal fell back to the flat
+        // bound either — getCalorieBoundKcal fell back to the flat
         // CALORIE_TARGET_KCAL setting, a number the user chose directly with no
         // deficit arithmetic inside it. Treating that as the reference is the
         // best available baseline in that case.
@@ -1766,7 +1893,7 @@ function renderWellnessProjectionChart(entries) {
 
   const plateauDays = detectPlateau(trendMap);
   if (plateauDays) {
-    const plateauLine = `⚠️ Weight trend has been flat for ~${plateauDays} days — consider adjusting your calorie target`;
+    const plateauLine = `⚠️ Weight trend has been flat for ~${plateauDays} days — consider adjusting your calorie limit`;
     plateauNote.textContent = privacyMode ? maskDigits(plateauLine) : plateauLine;
     plateauNote.classList.add('warning');
   }
@@ -2002,7 +2129,7 @@ let wellnessEnergyBalanceChart = null;
 // Spend is Mifflin-St Jeor BMR (from Height/Birth Date/Sex plus that day's
 // carried-forward weight — the "cost of just being alive" the user has no log
 // for) PLUS that day's own logged activity burn. ACTIVITY_MULTIPLIER is
-// deliberately NOT applied on top of the BMR the way getCalorieTargetKcal
+// deliberately NOT applied on top of the BMR the way getCalorieBoundKcal
 // does it: activity is already logged in this app as real kcal, NEAT
 // included, so scaling BMR by a lifestyle multiplier as well would count the
 // same movement twice and overstate every deficit.
@@ -2013,6 +2140,14 @@ let wellnessEnergyBalanceChart = null;
 // both charts pointing the same way is what makes them comparable: this one
 // is the fat change your energy balance PREDICTS, that one is the fat change
 // your weigh-ins actually SHOW.
+//
+// The COLORS follow the goal rather than the sign, which is why this chart is
+// no longer titled "Calorie Deficit & Fat Loss": a deficit is only progress for
+// someone heading down. Green is whichever side of zero the goal points to
+// (deficit on a cut, surplus on a gain — getCalorieBoundKind decides, the same
+// read the Caloric Intake bound uses), red is the other, so the app's
+// income/expense colors keep meaning "toward the goal" / "away from it" for
+// both kinds of user instead of congratulating a bulker for undereating.
 //
 // Both of this chart's constants follow the Health Metrics calibrated/generic
 // toggle, and what the right axis MEASURES changes with them, so it's
@@ -2076,6 +2211,11 @@ function renderWellnessEnergyBalanceChart(entries) {
     activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
   });
 
+  // Which side of zero is progress — a cut wants the bars below it, a gain
+  // wants them above. Same read the Caloric Intake bound is built on, so the
+  // two charts can't disagree about which direction the user is headed.
+  const isCut = getCalorieBoundKind(entries) === 'max';
+
   // null in generic view (that's what the toggle does), so this one read
   // switches both constants and both labels below.
   const gains = getCalibratedGains();
@@ -2093,7 +2233,7 @@ function renderWellnessEnergyBalanceChart(entries) {
   const latestWeight = latestWeightKg(entries);
   const bmrAtLatest = latestWeight !== null ? mifflinStJeorBmr(latestWeight, heightCm, age, sex) : null;
   const calibratedResting = (gains && bmrAtLatest !== null)
-    ? getCalorieTargetKcal(entries) - gains.beta0 * kcalPerKg
+    ? getCalorieBoundKcal(entries) - gains.beta0 * kcalPerKg
     : null;
   const restingIsPlausible = calibratedResting !== null
     && calibratedResting >= bmrAtLatest * CALIBRATED_RESTING_MIN_BMR_RATIO
@@ -2132,10 +2272,13 @@ function renderWellnessEnergyBalanceChart(entries) {
           type: 'bar',
           label: 'Calorie balance',
           data: balanceData,
-          // Green for a deficit, red for a surplus — the same
-          // income/expense colors the rest of the app reads as
-          // "toward the goal" / "away from it".
-          backgroundColor: balanceData.map((v) => (v !== null && v < 0 ? '#16a34a' : '#dc2626')),
+          // Green for the side of zero the goal points to, red for the other —
+          // the same income/expense colors the rest of the app reads as "toward
+          // the goal" / "away from it" (see the direction note above).
+          backgroundColor: balanceData.map((v) => {
+            const towardGoal = isCut ? v < 0 : v > 0;
+            return (v !== null && towardGoal) ? '#16a34a' : '#dc2626';
+          }),
         },
       ],
     },
@@ -2148,7 +2291,7 @@ function renderWellnessEnergyBalanceChart(entries) {
         title: {
           display: !hasData,
           text: canCompute
-            ? 'No calories logged yet — log what you ate to see your daily deficit'
+            ? 'No calories logged yet — log what you ate to see your daily balance'
             : 'Add Height, Birth Date, and Sex in Settings (and log a Weight) to estimate this',
           color: Chart.defaults.color,
           font: { size: 12 },

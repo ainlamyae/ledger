@@ -2495,36 +2495,26 @@ function withExplicitSign(value) {
   return value > 0 ? `+${value}` : String(value);
 }
 
-// The note under Calorie Balance & Body Change, reporting what calibrated view is
-// actually doing to this chart's maintenance figure — the only term of the
-// subtraction the formula toggle can move, so when the bars don't respond this
-// line is the explanation.
+// The note under Calorie Balance & Body Change, for the one case that needs
+// explaining: a calibrated maintenance figure REJECTED as implausible. Maintenance
+// is then plain Mifflin in both views, so both render identical bars and the
+// formula toggle looks broken on this chart until something says why.
 //
-// Three states. In generic view there's nothing to report. In calibrated view the
-// levelling offset is either applied — named, since a +570 kcal/day shift in
-// maintenance is the whole difference between the two views and was previously
-// invisible — or rejected by the plausibility guard, in which case maintenance is
-// plain Mifflin in BOTH views, both render identical bars, and the toggle looks
-// broken on this chart until something says why.
-//
-// An applied offset of ±0 is reported as such rather than suppressed: identical
-// bars in both views are then correct, and seeing "+0 kcal/day" is what
-// distinguishes that from a switch that isn't working.
-function reportCalibratedMaintenance(calibratedResting, bmrKcal, isPlausible) {
+// A successfully applied offset says nothing — the chart shows it, and narrating a
+// working switch is clutter. Every other case (generic view, no calibration, an
+// accepted offset) clears the note.
+function reportRejectedCalibratedMaintenance(calibratedResting, bmrKcal, isPlausible) {
   const el = document.getElementById('energy-balance-note');
   el.classList.remove('warning');
 
-  if (calibratedResting === null || bmrKcal === null) {
+  if (calibratedResting === null || bmrKcal === null || isPlausible) {
     el.textContent = '';
     return;
   }
 
-  const text = isPlausible
-    ? `Calibrated view: maintenance levelled onto your own fit — ${withExplicitSign(Math.round(calibratedResting - bmrKcal))} kcal/day against plain Mifflin-St Jeor (${Math.round(calibratedResting)} vs ${Math.round(bmrKcal)} kcal). Switch to Generic to read these bars against Mifflin alone.`
-    : `Your calibration implies a resting expenditure of ${Math.round(calibratedResting)} kcal — ${(calibratedResting / bmrKcal).toFixed(1)}× your ${Math.round(bmrKcal)} kcal BMR, outside the plausible ${CALIBRATED_RESTING_MIN_BMR_RATIO}–${CALIBRATED_RESTING_MAX_BMR_RATIO}× range — so these bars use plain Mifflin-St Jeor maintenance in both the calibrated and the generic view, and the formula toggle can't move them. Recalibrate to change that.`;
-
+  const text = `Your calibration implies a resting expenditure of ${Math.round(calibratedResting)} kcal — ${(calibratedResting / bmrKcal).toFixed(1)}× your ${Math.round(bmrKcal)} kcal BMR, outside the plausible ${CALIBRATED_RESTING_MIN_BMR_RATIO}–${CALIBRATED_RESTING_MAX_BMR_RATIO}× range — so these bars use plain Mifflin-St Jeor maintenance in both the calibrated and the generic view, and the formula toggle can't move them. Recalibrate to change that.`;
   el.textContent = privacyMode ? maskDigits(text) : text;
-  if (!isPlausible) el.classList.add('warning');
+  el.classList.add('warning');
 }
 
 let wellnessEnergyBalanceChart = null;
@@ -2651,11 +2641,10 @@ function renderWellnessEnergyBalanceChart(entries) {
   const maintenanceOffset = restingIsPlausible ? calibratedResting - bmrAtLatest : 0;
 
   // maintenanceOffset is the ONLY term of this chart's subtraction the toggle can
-  // move (the density it also switches lands on the right-hand grams axis, not the
-  // bars), so whatever it comes out as is reported under the chart — an applied
-  // offset, or the guard rejecting one — instead of leaving identical bars to be
-  // read as a broken switch.
-  reportCalibratedMaintenance(gains !== null ? calibratedResting : null, bmrAtLatest, restingIsPlausible);
+  // move (the density it also switches lands on the right-hand grams dots, not the
+  // bars), so a REJECTED offset is reported under the chart rather than leaving
+  // identical bars to be read as a broken switch. An accepted one needs no note.
+  reportRejectedCalibratedMaintenance(gains !== null ? calibratedResting : null, bmrAtLatest, restingIsPlausible);
 
   const detailByDate = new Map();
 

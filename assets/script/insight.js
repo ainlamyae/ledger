@@ -166,7 +166,11 @@ function gatherInsightMetrics(fromIso, toIso) {
 
     avgProtein: current.avgProtein,
     prevAvgProtein: previous.avgProtein,
-    proteinTarget: getProteinTargetG(getDatedWellnessEntries()),
+    // The band's display form ("131-164"), not a single number — the target
+    // genuinely is a range, and collapsing it to a midpoint here would have
+    // the AI calling an in-range day short of target. ASCII hyphen rather than
+    // the UI's en dash, since this string is headed for the prompt.
+    proteinTarget: formatProteinTargetBand(getProteinTargetBandG(getDatedWellnessEntries()), '-'),
     proteinDaysLogged: current.proteinDaysLogged,
 
     avgActivityMins: current.avgActivityMins,
@@ -264,7 +268,7 @@ function formatInsightPrompt(m) {
 
 const INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing someone's own self-tracked data. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given their age, height, BMI, current weight vs. goal, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal target and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a weight-trajectory line (their actual estimated rate of progress toward their goal, personalized if they've calibrated it, generic otherwise). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero.
+You'll be given their age, height, BMI, current weight vs. goal, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal target and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a weight-trajectory line (their actual estimated rate of progress toward their goal, personalized if they've calibrated it, generic otherwise). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
 

@@ -297,6 +297,10 @@ function validateCalibration(fit, samples) {
 function runCalibration() {
   const calorieTarget = getCalorieTargetKcal(getDatedWellnessEntries());
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  // The regression centers protein on one figure, so it uses the target
+  // band's midpoint (getProteinTargetG) — a band has no single center to
+  // measure "grams above/below target" from otherwise, and the fitted
+  // coefficient must be centered on the same figure calcProjection() feeds it.
   const proteinTarget = getProteinTargetG(getDatedWellnessEntries());
 
   const summary = document.getElementById('calibration-summary');
@@ -329,7 +333,7 @@ function runCalibration() {
     <tr><td>Energy density</td><td>${effectiveKcalPerKg !== null ? `~${effectiveKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(generic: 7,700)</span>` : 'n/a'}</td></tr>
     <tr><td>Activity</td><td>${activityKcalPerKg !== null ? `~${activityKcalPerKg.toLocaleString()} kcal/kg <span class="hint">(compare to Energy density above — similar values mean the model is internally consistent)</span>` : `${(fit.betaAct * 1000).toFixed(2)} g/day per kcal burned`}</td></tr>
     <tr><td>Sleep</td><td>${(fit.betaSleep * 1000).toFixed(0)} g/day per hour above/below your ${sleepTarget} hr target</td></tr>
-    <tr><td>Protein</td><td>${(fit.betaProtein * 1000).toFixed(0)} g/day per gram above/below your ${proteinTarget} g target</td></tr>
+    <tr><td>Protein</td><td>${(fit.betaProtein * 1000).toFixed(0)} g/day per gram above/below your ${proteinTarget} g mid-band protein target</td></tr>
     <tr><td>Baseline drift</td><td>${(fit.beta0 * 1000).toFixed(0)} g/day unexplained by logged intake/activity/sleep/protein</td></tr>
   </table>`;
 

@@ -1291,10 +1291,10 @@ th.sortable:hover {
 }
 
 /* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
-   exactly — these 4 tiles sit in the same Health Metrics panel as the
-   Weight Trend & Forecast / Body Composition Change h4s below, so all 6
-   headings share one consistent style instead of each chart picking its
-   own size/color/alignment. */
+   exactly — these 5 tiles sit in the same Health Metrics panel as the
+   Weight Trend & Forecast / Calorie Balance & Body Change / Body Composition
+   Change h4s above, so all 8 headings share one consistent style instead of
+   each chart picking its own size/color/alignment. */
 .wellness-metrics-grid.donut-grid .donut-item h4 {
     text-align: left;
     color: var(--color-text);
@@ -1547,9 +1547,10 @@ td .btn {
 }
 
 /* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
-   — same style as the 4 donut-item h4s above, so every Health Metrics chart
-   heading (Weight Trend & Forecast, Body Composition Change, Caloric Intake,
-   Protein Intake, Physical Activity, Rest & Recovery) is visually one set. */
+   — same style as the donut-item h4s above, so every Health Metrics chart
+   heading (Weight Trend & Forecast, Body Composition Change, Body Weight,
+   Caloric Intake, Protein Intake, Physical Activity, Rest & Recovery) is
+   visually one set. */
 .weight-projection-wrap h4 {
     margin: 0 0 .25rem;
     font-size: 1rem;
@@ -1586,6 +1587,15 @@ td .btn {
 
 .weight-progress-meter {
     margin-top: .75rem;
+}
+
+/* The meters and the ETA line sit BETWEEN the heading and the chart — where are
+   you now and when do you arrive, read before the plot rather than as a footnote
+   under it — so the block needs clearance below as well as above. Scoped to the
+   outer meter: the nested time meter must keep its bottom flush, since a gap
+   there would only push the ETA line away from the bars it explains. */
+.weight-projection-wrap > .weight-progress-meter {
+    margin-bottom: .75rem;
 }
 
 /* The time meter is a second, nested .weight-progress-meter directly under the

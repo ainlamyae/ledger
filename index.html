@@ -106,7 +106,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📉 Weight Forecast</span>
-                        <span class="node-graph-tooltip">A Weight Forecast chart projects your goal arrival date from a multi-factor model of caloric balance, activity, and sleep, with a progress meter showing both the percent of the way there and the kg still left to go. Click ⚙️ Calibrate to fit that model to your own logged weight, calorie, activity, and sleep history — instead of generic population constants — previewing the fit and a confidence score before you commit. A plateau alert flags when your trend has held flat for about 10 days, so a stall doesn't go unnoticed.</span>
+                        <span class="node-graph-tooltip">A Weight Forecast chart projects your goal arrival date from a model of caloric balance and activity, with a progress meter showing both the percent of the way there and the kg still left to go. Click ⚙️ Calibrate to fit that model to your own logged weight, calorie, and activity history — recovering your personal energy density in kcal per kg instead of assuming the generic 7,700 — previewing the fit and a confidence score before you commit. A plateau alert flags when your trend has held flat for about 10 days, so a stall doesn't go unnoticed.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🍽️ AI Calorie &amp; Protein Estimator</span>
@@ -388,7 +388,6 @@
                     <div class="chart-box chart-box-donut">
                         <canvas id="wellness-calories-chart"></canvas>
                     </div>
-                    <p id="calorie-bound-note" class="weight-plateau-note"></p>
                 </div>
 
                 <div class="donut-item">
@@ -1587,12 +1586,7 @@
                     <option>USDA_FDC_API_KEY</option>
                     <option>PROJ_BASELINE_KG_PER_DAY</option>
                     <option>PROJ_CAL_KG_PER_KCAL_DAY</option>
-                    <option>PROJ_ACTIVITY_KG_PER_MIN_DAY</option>
-                    <option>PROJ_SLEEP_KG_PER_HOUR_DAY</option>
-                    <option>PROJ_PROTEIN_KG_PER_G_DAY</option>
-                    <option>PROJ_CALIBRATED_AT</option>
-                    <option>PROJ_CALIBRATION_R2</option>
-                    <option>PROJ_CALIBRATION_SAMPLES</option>
+                    <option>PROJ_ACTIVITY_KG_PER_KCAL_DAY</option>
                 </datalist>
             </label>
             <label>Value
@@ -1615,7 +1609,13 @@
 <div id="calibration-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="calibration-modal-title" hidden>
     <div class="modal-card modal-card-wide">
         <h2 id="calibration-modal-title">Calibrate Weight Projection</h2>
-        <p class="hint">Fits your own historical weight, calorie, activity, and sleep logs to replace the forecast's built-in constants with ones tuned to your body — nothing changes until you click Save.</p>
+        <p class="hint">Fits your own historical weight, calorie, and activity logs to replace the forecast's built-in energy constants with ones measured from your body — nothing changes until you click Save.</p>
+
+        <fieldset id="calibration-method" class="calibration-method">
+            <legend>Which fit to save</legend>
+            <label><input type="radio" name="calibration-method" value="interval" checked> Weigh-in intervals <span class="hint">— the original: one sample per pair of consecutive weigh-ins</span></label>
+            <label><input type="radio" name="calibration-method" value="smoothed"> Smoothed <span class="hint">— the same centered 5-weigh-in smoothing the Weight Trend line uses, with calories and activity averaged over the days each window covers</span></label>
+        </fieldset>
 
         <div id="calibration-summary"></div>
 

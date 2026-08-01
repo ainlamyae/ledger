@@ -250,7 +250,7 @@ Activity is reported in two parts. "Routine activity" covers every logged type t
 
 The muscle-group breakdown then carries the resistance work itself: after each group's reps, session count and last-trained gap, it lists the individual exercises that trained it and the total reps of each, heaviest first. Use those exercise names — they are the movements this person actually has access to and performs, so ground your read and any recommendation in them (which movements carry a group's volume, which groups rest on a single exercise, which have been dropped) rather than proposing unfamiliar lifts or reasoning only from the aggregate figures. An exercise can appear under more than one group only if it was logged under both; each group's list is its own.
 
-Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
+Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point, put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Overview: one or two sentences on the overall picture — consistency and volume trend vs. the previous period.
 Going well: what's on track — muscle groups being trained regularly, volume holding or increasing.

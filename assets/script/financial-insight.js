@@ -233,7 +233,7 @@ The RRSP, TFSA and FHSA accounts are maxed out — there is no contribution room
 
 Monthly Cash Flow/Income/Expenditure may be marked "partial month in progress" — that figure is still accumulating and is NOT comparable to the completed-month average beside it. Never call it a shortfall, a decline, or "well below average" on that basis alone; say plainly that the month is still early and there isn't enough of it yet to judge. This caveat applies ONLY to those three lines — the Previous Month/Quarter/Year/Lifelong category figures are separate, already-complete periods with no partial-month effect, so lean on those for anything that needs a real trend read, and never call one of them low or high because of what day of the month it is today.
 
-Write a short plain-text report with exactly these five sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
+Write a short plain-text report with exactly these five sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point, put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Overview: one or two sentences on the overall financial picture — net worth, cash flow direction, and whether spending is trending up or down.
 Going well: what's healthy — positive cash flow, an account's market value growing ahead of its balance, a category trending down, etc.

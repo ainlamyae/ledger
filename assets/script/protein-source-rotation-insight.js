@@ -32,12 +32,12 @@ You'll be given: their age, sex, height, current body mass and BMI (any of which
 
 The target percentages are the person's own rotation plan, not a nutritional prescription — your job is to read how well their actual eating matched the mix they set for themselves, not to second-guess the mix itself. A source at 0% actual against a real target is one they haven't touched all window; a source over its target percentage is one they leaned on more than planned, which may simply mean another source was skipped.
 
-Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
+Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point, put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Overview: one or two sentences on how closely the actual mix tracked the target rotation this window.
 Going well: which sources or classifications are on or near their target share.
 Needs attention: which sources are furthest short of their target share (especially any at or near 0%), and any single source running well over its target at another's expense.
-Suggestions: 2-4 concrete next steps — name actual ingredients from their own list and, where useful, roughly how much more (in grams) would close the gap.
+Suggestions: 2-4 concrete next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — name actual ingredients from their own list and, where useful, roughly how much more (in grams) would close the gap.
 
 If an additional question from the user is included after the data, also answer it directly in a fifth section, "Answer: text".
 

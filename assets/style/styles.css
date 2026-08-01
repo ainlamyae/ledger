@@ -130,7 +130,8 @@ header h1 {
 
 .nav {
     display: flex;
-    gap: .5rem;
+    gap: 1.5rem;
+    margin-left: 1.5rem;
     flex: 1;
     min-width: 0;
     overflow-x: auto;
@@ -152,7 +153,7 @@ header h1 {
     color: rgba(255, 255, 255, .78);
     text-decoration: none;
     font-size: .85rem;
-    font-weight: 600;
+    font-weight: 700;
     padding: .5rem .25rem;
     transition: color .25s ease;
 }
@@ -1938,8 +1939,8 @@ td .btn {
 /* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
    — same style as the donut-item h4s above, so every Health Indicators chart
    heading (State Trend & Forecast, Calorie Balance, Body Mass, Physical
-   Activity, Caloric Intake, Protein Intake, Fiber Intake, Fat Intake, Sleep,
-   Protein Source Rotation) is visually one set. Wrapping a block in .body-mass-projection-wrap
+   Activity, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake,
+   Carbohydrate Intake, Sleep, Protein Source Rotation) is visually one set. Wrapping a block in .body-mass-projection-wrap
    is how a chart joins that set — which is what moving Protein Source Rotation
    in from its own panel needed. */
 .body-mass-projection-wrap h4 {

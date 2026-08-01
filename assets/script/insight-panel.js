@@ -24,7 +24,10 @@ const INSIGHT_MODES = {
     formatPrompt: (data) => formatInsightPrompt(data),
     renderPreview: (data) => renderInsightPreviewLines(formatInsightPrompt(data)),
     appendQuestion: true,
-    needsNutrition: false,
+    // Fat/fiber (insight.js's gatherInsightMetrics) are pulled the same way
+    // Micronutrients mode pulls its numbers — via aggregateMicronutrientIntake,
+    // which needs the Nutrition table loaded.
+    needsNutrition: true,
     systemPrompt: INSIGHT_SYSTEM_PROMPT,
     resultKeys: ['INSIGHT_WELLNESS_LAST_RESULT', 'WELLNESS_INSIGHT_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_WELLNESS_LAST_GENERATED_AT', 'WELLNESS_INSIGHT_LAST_GENERATED_AT'],

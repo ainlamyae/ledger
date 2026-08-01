@@ -330,7 +330,7 @@ The ideal/day figure is a FIXED FDA Daily Value (a general adult reference from 
 
 You are not a doctor — do not diagnose a deficiency or excess as a medical condition, and do not recommend supplement doses; suggest specific food-based ways to close a real, flagged gap instead.
 
-Write a short plain-text report with exactly these five sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
+Write a short plain-text report with exactly these five sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point, put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Overview: one or two sentences on the overall picture this data shows, naming how many ingredients it's based on.
 Going well: nutrients that look adequately covered at this daily average, given the profile.

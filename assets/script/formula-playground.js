@@ -70,6 +70,14 @@ const FAT_FORMULA_FIELDS = [
   { key: 'FAT_PCT_OF_KCAL_MAX', inputId: 'formula-fat-pct-max', fallback: () => FAT_PCT_OF_KCAL_MAX_DEFAULT },
 ];
 
+// The carb band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
+// FAT_FORMULA_FIELDS: carb feeds no calorie identity, so a blank one should only stop
+// carb from being computed and saved, not the target.
+const CARB_FORMULA_FIELDS = [
+  { key: 'CARB_PCT_OF_KCAL_MIN', inputId: 'formula-carb-pct-min', fallback: () => CARB_PCT_OF_KCAL_MIN_DEFAULT },
+  { key: 'CARB_PCT_OF_KCAL_MAX', inputId: 'formula-carb-pct-max', fallback: () => CARB_PCT_OF_KCAL_MAX_DEFAULT },
+];
+
 // Which box each "Solve for" radio value fills in. Activity intensity (MET)
 // isn't offered as a solvable target — only τ, on the activity side, is.
 const FORMULA_SOLVE_FIELD_ID = {
@@ -274,7 +282,10 @@ Fiber band — a floor from daily intake, a ceiling from body weight
     F_max =  f_max × m
 Fat band — both ends a share of intake, 20-35% AMDR
     G_min =  (k_min/100 × Eᵢₙ) / 9
-    G_max =  (k_max/100 × Eᵢₙ) / 9`;
+    G_max =  (k_max/100 × Eᵢₙ) / 9
+Carb band — both ends a share of intake, 45-65% AMDR
+    C_min =  (q_min/100 × Eᵢₙ) / 4
+    C_max =  (q_max/100 × Eᵢₙ) / 4`;
 
 function formulaFieldValue(field) {
   // `value` skips Settings entirely — for fields (like Activity Intensity) whose
@@ -471,6 +482,14 @@ function renderFormulaSubstituted(rows, plan = null) {
   } catch (err) {
     console.error('Fat band failed to render', err);
   }
+  // Independent of the fat block above too — reads only Eᵢₙ, no body mass — but guarded
+  // separately for the same reason.
+  let carbRows = [];
+  try {
+    carbRows = renderCarbFields();
+  } catch (err) {
+    console.error('Carb band failed to render', err);
+  }
   // Reads the same LBM box above — guarded separately so a throw here can't take LBM/protein
   // down with it, same as every other block in this function.
   let glycogenRows = [];
@@ -491,9 +510,9 @@ function renderFormulaSubstituted(rows, plan = null) {
 
   // LBM leads (it sits with the profile, ahead of everything `rows` itself starts with),
   // then `rows` — which now carries Δm%, TEF and BMI_g inline, at the legend's own
-  // positions — then the adaptation pair, then glycogen, protein, fiber and fat: the same
-  // order the legend lists them in, and the same order the eye travels down the sheet.
-  [...lbmRows, ...(rows ?? []), ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows].forEach(([label, value]) => {
+  // positions — then the adaptation pair, then glycogen, protein, fiber, fat and carb: the
+  // same order the legend lists them in, and the same order the eye travels down the sheet.
+  [...lbmRows, ...(rows ?? []), ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows].forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
@@ -810,6 +829,46 @@ function renderFatFields() {
   return [
     ['G_min', `(${pctMin}% × ${einKcal}) / ${KCAL_PER_G_FAT}  =  ${minG} g/day`],
     ['G_max', `(${pctMax}% × ${einKcal}) / ${KCAL_PER_G_FAT}  =  ${maxG} g/day`],
+  ];
+}
+
+// The carb band: both ends a share of Eᵢₙ (45-65%, the IOM's Acceptable Macronutrient
+// Distribution Range for adults) converted to grams at carbohydrate's fixed 4 kcal/g energy
+// density — same shape as readFatFormula, just the AMDR's other end and Atwater factor.
+//
+// Reads formula-ein directly, same reason readFatFormula does: by the time
+// renderCarbFields runs (from renderFormulaSubstituted, after the calorie half of the sheet),
+// that box already holds this render's Eᵢₙ — typed or solved, in every mode.
+function readCarbFormula() {
+  const einKcal = formulaNumber('formula-ein');
+  const pctMin = formulaNumber('formula-carb-pct-min');
+  const pctMax = formulaNumber('formula-carb-pct-max');
+  if (einKcal === null || pctMin === null || pctMax === null) return null;
+
+  return {
+    einKcal, pctMin, pctMax,
+    minG: Math.round((pctMin / 100) * einKcal / KCAL_PER_G_CARB),
+    maxG: Math.round((pctMax / 100) * einKcal / KCAL_PER_G_CARB),
+  };
+}
+
+// The two carb boxes and their trace rows — same pairing and same dash-on-missing-input
+// convention renderFatFields uses.
+function renderCarbFields() {
+  const carb = readCarbFormula();
+
+  if (carb === null) {
+    ['formula-carb-min', 'formula-carb-max'].forEach((id) => setComputedField(id, '—'));
+    return [];
+  }
+
+  const { einKcal, pctMin, pctMax, minG, maxG } = carb;
+  setComputedField('formula-carb-min', String(minG));
+  setComputedField('formula-carb-max', String(maxG));
+
+  return [
+    ['C_min', `(${pctMin}% × ${einKcal}) / ${KCAL_PER_G_CARB}  =  ${minG} g/day`],
+    ['C_max', `(${pctMax}% × ${einKcal}) / ${KCAL_PER_G_CARB}  =  ${maxG} g/day`],
   ];
 }
 
@@ -1500,7 +1559,7 @@ function renderFormulaPreview() {
 }
 
 function loadFormulaInputsFromSettings() {
-  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS].forEach((field) => {
+  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS].forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
   });
   // Seeded from the same places the charts read, so the figure shown on open
@@ -1654,18 +1713,30 @@ async function saveFormulaSettings() {
     overrides.FAT_TARGET_G_MAX = fat.maxG;
   }
 
-  // Keeps the Micronutrients table's own Protein/Fiber/Fat rows (and their gap-severity
+  // Same shape again: both coefficients (as the % of Eᵢₙ they are), and the grams they
+  // produced — CARB_TARGET_G_MIN/MAX so the Carbohydrate Intake chart reads the same band this
+  // sheet just computed.
+  const carb = readCarbFormula();
+  if (carb !== null) {
+    overrides.CARB_PCT_OF_KCAL_MIN = carb.pctMin;
+    overrides.CARB_PCT_OF_KCAL_MAX = carb.pctMax;
+    overrides.CARB_TARGET_G_MIN = carb.minG;
+    overrides.CARB_TARGET_G_MAX = carb.maxG;
+  }
+
+  // Keeps the Micronutrients table's own Protein/Fiber/Fat/Carb rows (and their gap-severity
   // coloring) in step with the band just computed above, instead of leaving them on
   // whatever flat FDA Daily Value MICRONUTRIENT_DAILY_TARGETS_JSON shipped or was last
-  // typed with. The band's MIN is what's written — kind stays 'floor' either way, and
-  // that's the "did you get enough" question gap severity actually asks; the full
+  // typed with. The band's MIN is what's written — kind stays 'floor'/'reference' either
+  // way, and that's the "did you get enough" question gap severity actually asks; the full
   // min~max band still shows everywhere else (the tile, the chart, Food Insight's
-  // Ideal/day row), all read straight from PROTEIN_TARGET_G_MIN/MAX and
-  // FIBER_TARGET_G_MIN/MAX rather than from this JSON.
+  // Ideal/day row), all read straight from PROTEIN_TARGET_G_MIN/MAX, FIBER_TARGET_G_MIN/MAX,
+  // FAT_TARGET_G_MIN/MAX and CARB_TARGET_G_MIN/MAX rather than from this JSON.
   const micronutrientPatch = {};
   if (protein !== null) micronutrientPatch['Protein'] = protein.minG;
   if (fiber !== null) micronutrientPatch['Fiber, total dietary'] = fiber.minG;
   if (fat !== null) micronutrientPatch['Total lipid (fat)'] = fat.minG;
+  if (carb !== null) micronutrientPatch['Carbohydrate, by difference'] = carb.minG;
   if (Object.keys(micronutrientPatch).length > 0) {
     overrides.MICRONUTRIENT_DAILY_TARGETS_JSON = patchMicronutrientDailyTargetAmounts(micronutrientPatch);
   }
@@ -1715,8 +1786,11 @@ async function saveFormulaSettings() {
     const fatNote = fat === null
       ? ' The fat band was left alone — it needs Eᵢₙ and both percentages.'
       : ` Fat target is now ${fat.minG}–${fat.maxG} g/day, from ${fat.pctMin}–${fat.pctMax}% of ${fat.einKcal} kcal at ${KCAL_PER_G_FAT} kcal/g.`;
+    const carbNote = carb === null
+      ? ' The carb band was left alone — it needs Eᵢₙ and both percentages.'
+      : ` Carb target is now ${carb.minG}–${carb.maxG} g/day, from ${carb.pctMin}–${carb.pctMax}% of ${carb.einKcal} kcal at ${KCAL_PER_G_CARB} kcal/g.`;
     const micronutrientNote = Object.keys(micronutrientPatch).length > 0
-      ? ' The Micronutrients table’s Protein/Fiber/Fat floors now match these too.'
+      ? ' The Micronutrients table’s Protein/Fiber/Fat/Carb floors now match these too.'
       : '';
     // Which BMR equation is now in force, and whether digestion is being counted — the two
     // choices that move every calorie figure in the app at once, so a save that changed one
@@ -1726,7 +1800,7 @@ async function saveFormulaSettings() {
       : 'BMR stays on Mifflin-St Jeor.';
     const tefSaved = formulaNumber('formula-tef-pct');
     const tefNote = tefSaved ? ` The thermic effect of food is counted at ${tefSaved}% of intake, which lifts every target accordingly.` : '';
-    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${fatNote}${micronutrientNote} ${modelNote}${tefNote}`);
+    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${fatNote}${carbNote}${micronutrientNote} ${modelNote}${tefNote}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {
@@ -1753,6 +1827,7 @@ function initFormulaPlayground() {
     ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
     ...FIBER_FORMULA_FIELDS.map((f) => f.inputId),
     ...FAT_FORMULA_FIELDS.map((f) => f.inputId),
+    ...CARB_FORMULA_FIELDS.map((f) => f.inputId),
     ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
     'formula-body-mass-smooth', 'formula-height', 'formula-age',
     'formula-glycogen-skeletal-frac', 'formula-glycogen-per-kg-muscle', 'formula-glycogen-liver',

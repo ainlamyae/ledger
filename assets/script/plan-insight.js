@@ -255,7 +255,7 @@ Check these specifically:
 - Is the timeline t plausible, and does it agree with the measured trajectory in RECENT LOGGING? If the plan says one date and the actual trend implies another, say so and explain which inputs are responsible.
 - Does anything in the plan contradict something else in it?
 
-Write a short plain-text report with exactly these sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
+Write a short plain-text report with exactly these sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point, put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Verdict: one or two sentences — is this plan feasible as written? Say plainly whether it is sound, aggressive but workable, or unsafe/unrealistic, and why.
 What works: the parts of the plan that are well set, quoting the figures.

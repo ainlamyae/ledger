@@ -39,6 +39,17 @@
     // are collapsed/re-rendered fresh on every load anyway.
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 </script>
+<script>
+    // App-shell offline support (sw.js) — never the live sheet data, just the
+    // static page itself. Registered here rather than from app.js so it's one
+    // inline block section-page.js's adoptHead() already duplicates onto
+    // /health/, /finance/ and /other/ too (the same mechanism that repeats the
+    // theme script above onto those pages), and 'sw.js' resolves correctly
+    // from all of them via their own <base href="../">.
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+</script>
 </head>
 
 <body>
@@ -51,7 +62,7 @@
          assets/script/section-page.js). data-section names the wrapper the
          address stands for, and is the only list of them anywhere — the section
          pages and the scroll-spy both read this nav rather than repeating it. -->
-    <nav id="main-nav" class="nav" hidden>
+    <nav id="main-nav" class="nav">
         <a href="health/" data-section="health">Health</a>
         <a href="finance/" data-section="finance">Finance</a>
         <a href="other/" data-section="other">Other</a>
@@ -72,6 +83,7 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                 </div>
                 <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
+                <button id="export-backup-btn" class="account-menu-item" disabled title="Load your data first">Export full backup (JSON)</button>
                 <button id="clear-cache-btn" class="account-menu-item">Clear cache</button>
                 <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
@@ -83,12 +95,6 @@
         </div>
     </div>
 </header>
-
-<div id="gate" class="gate">
-    <div class="landing">
-        <p id="auth-status" class="status" hidden></p>
-    </div>
-</div>
 
 <div id="file-gate" class="gate" hidden>
     <div class="landing">
@@ -102,7 +108,7 @@
     </div>
 </div>
 
-<div id="dashboard" class="container" hidden>
+<div id="dashboard" class="container">
 
     <p id="dashboard-loading" class="status status-info" hidden>Loading your data…</p>
 
@@ -172,21 +178,36 @@
 
         <div class="cards today-glance-cards">
             <div class="card">
-                <h3 id="today-calories-label">Calory Intake</h3>
-                <div class="value" id="today-calories-value">—</div>
-            </div>
-            <div class="card">
-                <h3>Protein</h3>
-                <div class="value" id="today-protein-value">—</div>
-            </div>
-            <div class="card">
-                <h3>Fiber</h3>
-                <div class="value" id="today-fiber-value">—</div>
+                <h3>Body Mass</h3>
+                <div class="widget-row"><span>Today</span><span id="today-bodymass-value">—</span></div>
+                <div class="widget-row"><span>Target</span><span id="today-bodymass-target-value">—</span></div>
+                <div class="widget-row"><span>Days left</span><span id="today-bodymass-days-value">—</span></div>
+                <div class="widget-row"><span>Estimate</span><span id="today-bodymass-eta-value">—</span></div>
             </div>
             <div class="card">
                 <h3>Activity</h3>
-                <div class="value" id="today-activity-value">—</div>
+                <div class="widget-row"><span>Duration</span><span id="today-activity-duration-value">—</span></div>
+                <div class="widget-row"><span>Calories</span><span id="today-activity-calories-value">—</span></div>
             </div>
+            <div class="card">
+                <h3>Macros</h3>
+                <div class="widget-row"><span id="today-calories-label">Max Calory</span><span id="today-calories-value">—</span></div>
+                <div class="widget-row"><span>Protein</span><span id="today-protein-value">—</span></div>
+                <div class="widget-row"><span>Fiber</span><span id="today-fiber-value">—</span></div>
+                <div class="widget-row"><span>Fat</span><span id="today-fat-value">—</span></div>
+                <div class="widget-row"><span>Carbohydrate</span><span id="today-carb-value">—</span></div>
+            </div>
+            <div class="card">
+                <h3>Sleep</h3>
+                <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
+                <div class="widget-row"><span>Bedtime</span><span id="today-sleep-bedtime-value">—</span></div>
+                <div class="widget-row"><span>Wake-up</span><span id="today-sleep-wake-value">—</span></div>
+            </div>
+        </div>
+
+        <div id="health-reminder-banner" class="info-banner" hidden>
+            <span>You haven't logged today's Physique entry yet.</span>
+            <button id="health-reminder-log-btn" class="btn btn-primary">Log</button>
         </div>
 
         <div class="panel">
@@ -478,6 +499,20 @@
             <div class="pagination" id="physique-pagination"></div>
         </div>
 
+        <div class="panel" id="workout-plan-panel">
+            <div class="panel-header">
+                <h2>Activity</h2>
+                <!-- Three buttons on one phone heading line, so each label is cut to a
+                     word and carries the full wording in its tooltip. -->
+                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
+                <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
+                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
+            </div>
+
+            <!-- Rebuilt from the Activity sheet tab by activities.js -->
+            <div id="activity-plan-tables"></div>
+        </div>
+
         <div class="panel">
             <div class="panel-header">
                 <h2>Nutrition</h2>
@@ -523,20 +558,6 @@
             <p id="nutrition-pull-status" class="status" hidden></p>
 
             <div class="pagination" id="nutrition-pagination"></div>
-        </div>
-
-        <div class="panel" id="workout-plan-panel">
-            <div class="panel-header">
-                <h2>Activity</h2>
-                <!-- Three buttons on one phone heading line, so each label is cut to a
-                     word and carries the full wording in its tooltip. -->
-                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
-                <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
-                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
-            </div>
-
-            <!-- Rebuilt from the Activity sheet tab by activities.js -->
-            <div id="activity-plan-tables"></div>
         </div>
 
     </section>
@@ -632,7 +653,7 @@
              Transportation, Grocery, Personal, Household …), four periods each plus an
              Untyped remainder. Commented out, not deleted: it's wanted again later.
              Uncomment this section AND the renderTypeBreakdownCharts call in app.js's
-             reportPromise — the renderer (charts.js) and its parsed data are untouched,
+             reportPromise — the renderer (finance-charts.js) and its parsed data are untouched,
              and the call is what fills this container.
         <div class="panel-section">
             <h3>Spending Breakdown by Type</h3>
@@ -1725,8 +1746,8 @@
             <!-- After t, because both of these are only meaningful measured along it: λ is a
                  rate per week ON the diet, and the two readonly rows below are what it has
                  done by the arrival date above. Nothing here changes Eᵢₙ, D or t — see
-                 adaptedPlateauKg in charts.js for why adaptation is reported and not planned
-                 with. -->
+                 adaptedPlateauKg in wellness-math.js for why adaptation is reported and not
+                 planned with. -->
             <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
                 <span class="formula-sym">λ</span>
                 <span class="formula-name">metabolic adaptation, per week on the diet</span>
@@ -2299,8 +2320,8 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js" async defer></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4" defer></script>
 <script src="assets/script/config.js"></script>
 <script src="assets/script/auth.js"></script>
 <script src="assets/script/drive.js"></script>
@@ -2313,7 +2334,12 @@
 <script src="assets/script/nutrition.js"></script>
 <script src="assets/script/calorie-estimator.js"></script>
 <script src="assets/script/widgets.js"></script>
-<script src="assets/script/charts.js"></script>
+<script src="assets/script/charts-base.js"></script>
+<script src="assets/script/wellness-math.js"></script>
+<script src="assets/script/wellness-charts.js"></script>
+<script src="assets/script/finance-charts.js"></script>
+<script src="assets/script/timesheet-charts.js"></script>
+<script src="assets/script/travel-charts.js"></script>
 <script src="assets/script/transactions.js"></script>
 <script src="assets/script/accounts.js"></script>
 <script src="assets/script/breakdown.js"></script>
@@ -2321,6 +2347,7 @@
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/activities.js"></script>
 <script src="assets/script/physique.js"></script>
+<script src="assets/script/physique-breakdown.js"></script>
 <script src="assets/script/strength-plan.js"></script>
 <script src="assets/script/activity-estimator.js"></script>
 <script src="assets/script/contacts.js"></script>
@@ -2335,6 +2362,8 @@
 <script src="assets/script/plan-insight.js"></script>
 <!-- After the five above: INSIGHT_MODES reads their prompt constants by value. -->
 <script src="assets/script/insight-panel.js"></script>
+<script src="assets/script/formula-fields.js"></script>
+<script src="assets/script/formula-render.js"></script>
 <script src="assets/script/formula-playground.js"></script>
 <script src="assets/script/protein-rotation.js"></script>
 <script src="assets/script/financial-insight.js"></script>

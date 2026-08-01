@@ -158,30 +158,9 @@ header h1 {
     transition: color .25s ease;
 }
 
-.nav a::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    right: 50%;
-    bottom: 4px;
-    height: 2px;
-    border-radius: 2px;
-    background: #fff;
-    box-shadow: 0 0 8px rgba(255, 255, 255, .9), 0 0 16px var(--color-nav-hover);
-    opacity: 0;
-    transition: left .3s ease, right .3s ease, opacity .3s ease;
-}
-
 .nav a:hover,
 .nav a.active {
     color: #fff;
-}
-
-.nav a:hover::after,
-.nav a.active::after {
-    left: 12%;
-    right: 12%;
-    opacity: 1;
 }
 
 .header-actions {
@@ -305,6 +284,15 @@ header .btn:hover {
     background: var(--color-bg);
 }
 
+.account-menu-item:disabled {
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
+.account-menu-item:disabled:hover {
+    background: none;
+}
+
 .account-menu-item-divider {
     margin-top: .25rem;
     border-top: 1px solid var(--color-border);
@@ -387,17 +375,6 @@ header .btn:hover {
     padding: 2rem;
 }
 
-/* The sign-in gate's own banner needs to sit flush against the header, not
-   vertically centered in the remaining viewport the way #file-gate's
-   (unrelated) centered hero still should — scoped by ID so only this
-   screen switches to a top-aligned column layout. */
-#gate {
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding-top: 0;
-}
-
 .gate[hidden] {
     display: none;
 }
@@ -412,8 +389,8 @@ header .btn:hover {
     text-align: center;
 }
 
-/* Still used by #file-gate's "Connect your Ledger spreadsheet" step; the sign-in
-   gate itself now opens straight onto the feature graphs. */
+/* Only #file-gate's "Connect your Ledger spreadsheet" step uses this now — the
+   sign-in step itself is just a banner over the dashboard shell (gate.js). */
 .landing-hero h1 {
     font-size: 2.25rem;
     margin-bottom: .75rem;
@@ -609,10 +586,18 @@ kbd {
 
 .widget-row {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: .5rem;
     font-size: .95rem;
     padding: .15rem 0;
+}
+
+/* A value that doesn't fit beside its label wraps as a whole onto its own line —
+   flex-wrap above moves the whole span down instead of this splitting mid-word
+   (e.g. "kcal" stranded alone under "— / 1300"). */
+.widget-row > span:last-child {
+    white-space: nowrap;
 }
 
 #widget-date {
@@ -836,22 +821,6 @@ kbd {
 
 .panel-group .panel {
     box-shadow: none;
-}
-
-/* The home page's own "bulb" view: with no data-section (see section-page.js,
-   which stamps one on /health/, /finance/ and /other/), each panel-group shows
-   only its title link and its summary cards row — the same tiles the full
-   section page leads with — so the front page loads and paints without the
-   heavier panels behind them. */
-html:not([data-section]) .panel-group > *:not(.panel-group-title):not(.cards) {
-    display: none;
-}
-
-/* Other has no summary cards row to lead with, so it has nothing to show on
-   the bulb view — the full group (title included) stays reachable only via
-   the top nav's own Other link. */
-html:not([data-section]) #other {
-    display: none;
 }
 
 .panel:hover {

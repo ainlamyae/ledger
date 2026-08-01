@@ -67,6 +67,10 @@ function showUndoToast(message, onUndo) {
 }
 
 let currentReport = null;
+// Gates #export-backup-btn — false until loadDashboard's first pass has
+// actually populated every module's in-memory array, so a backup can't be
+// taken of a half-loaded dashboard.
+let dashboardLoaded = false;
 
 // The Account tab's D1 holds the pre-computed net worth total.
 function parseBalance(balanceRows) {
@@ -229,6 +233,11 @@ function setupAccountMenu() {
     closeMenu();
     clearCache();
     loadDashboard(true);
+  });
+
+  document.getElementById('export-backup-btn').addEventListener('click', () => {
+    closeMenu();
+    exportFullBackup();
   });
 
   document.getElementById('clear-cache-btn').addEventListener('click', () => {
@@ -675,6 +684,11 @@ async function loadDashboard(forceRefresh = false) {
     showDashboardError(errors.join('; '));
   }
 
+  dashboardLoaded = true;
+  const exportBtn = document.getElementById('export-backup-btn');
+  exportBtn.disabled = false;
+  exportBtn.title = '';
+
   loading.hidden = true;
 }
 
@@ -916,6 +930,7 @@ function bootDashboard() {
   initProteinRotationPanel();
   initFinancialInsight();
   initWorkoutPlan();
+  initGlobalSearch();
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();

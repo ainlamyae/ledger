@@ -687,11 +687,25 @@ function restingMaintenanceKcal(entries) {
   return mifflinStJeorBmr(weightKg, heightCm, age, sex);
 }
 
-// Energy density of body fat (kcal per kg) used wherever a calorie figure has
-// to be converted into a body-mass one: the user's own calibrated value (the
-// Calibrate button's fitted calorie coefficient, inverted) once one exists,
-// otherwise the generic 7,700 — the same convention calcProjection() and the
-// calculated calorie target both already follow.
+// The user's own SCALE-WEIGHT response in kcal per kg — the Calibrate button's
+// fitted calorie coefficient, inverted — or the generic 7,700 when nothing is
+// calibrated.
+//
+// Despite the name this is not adipose energy density, and the difference is
+// load-bearing. It measures how far the scale moves per kcal, and over the
+// weigh-in windows anyone actually logs, that is dominated by water and
+// glycogen rather than fat: real fits land around 2,700-3,200 where fat's own
+// density is 7,700. Simulated against a two-compartment body (fat plus a water
+// pool with a ~4-day time constant), the fitted figure came out 3,400-5,900
+// against a fat truth of 7,700, and adding a balance-trend control regressor
+// did not recover it — the two cannot be separated from scale readings alone.
+//
+// So there is exactly ONE caller: the Calorie Balance chart's right-hand mass
+// axis, which relabels its output "Expected scale weight" rather than
+// "Expected fat" precisely because of this. Do not reintroduce it into
+// calorieBoundDetail — converting WEEKLY_FAT_LOSS_KG into a deficit needs fat's
+// energy density, and using this number there under-prescribed the deficit by
+// ~356 kcal/day on a measured 2,722 kcal/kg fit.
 function kcalPerKgFat() {
   const gains = getCalibratedGains();
   return (gains && gains.betaCal > 0) ? 1 / gains.betaCal : GENERIC_KCAL_PER_KG_FAT;
@@ -709,21 +723,15 @@ function kcalPerKgFat() {
 // it evaluated at each day's own weight, not only today's (calorieBoundSeries
 // below). Returns null when any input is missing — the caller's cue to fall back
 // to the flat CALORIE_TARGET_KCAL setting, same as protein above.
-// Plausibility band for the calculated bound, as a multiple of that day's own
-// Mifflin BMR — deliberately the same 0.75-2.5x the Calorie Balance chart applies
-// to a calibrated MAINTENANCE figure (CALIBRATED_RESTING_*_BMR_RATIO), for the same
-// reason: a calibrated energy density reaches the bound through the planned deficit
-// (weeklyFatLossKg × K / 7), so a noisy fit's K distorts it by the same order it's
-// wrong by. A 34,986 kcal/kg fit turns a 0.5 kg/week plan into a 2,499 kcal/day
-// deficit and a maximum of ~60 kcal — 0.03x BMR, which is not a plan but an
-// artifact, and it also flattens the chart: every day's cap lands on the axis floor
-// where the ~70 kcal the bound genuinely moves across a window is invisible.
-const CALORIE_BOUND_MIN_BMR_RATIO = 0.75;
-const CALORIE_BOUND_MAX_BMR_RATIO = 2.5;
+//
+// There used to be a 0.75-2.5x-BMR plausibility band on the result, because a
+// noisy calibrated density reached the bound through the planned deficit
+// (weeklyFatLossKg × K / 7) and distorted it by the same order it was wrong by —
+// a 34,986 kcal/kg fit turned a 0.5 kg/week plan into a 2,499 kcal/day deficit
+// and a ~60 kcal maximum. The bound no longer reads a calibrated density at all
+// (see below), so the band has nothing left to guard and is gone.
 
-// The calculated bound plus what it took to get there — which density was used,
-// and what the fitted one would have produced — so the chart can report a rejected
-// fit instead of quietly substituting a different figure. null when the profile
+// The calculated bound and the inputs behind it. null when the profile
 // can't produce a calculated bound at all.
 function calorieBoundDetail(weightKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
@@ -740,24 +748,34 @@ function calorieBoundDetail(weightKg) {
   const tdee = bmr * activityMultiplier;
   const boundFrom = (kcalPerKg) => Math.round(tdee - (weeklyFatLossKg * kcalPerKg) / 7);
 
-  const fittedDensity = kcalPerKgFat();
+  // The DEFICIT conversion uses the generic fat energy density, never the
+  // calibrated one, and that is deliberate. The setting being converted is
+  // WEEKLY_FAT_LOSS_KG — a fat goal — and turning it into a daily deficit needs
+  // adipose tissue's energy density, which is not a personal parameter. The
+  // calibrated coefficient measures something else: how far the SCALE moves per
+  // kcal, which over short weigh-in windows is dominated by water and glycogen
+  // rather than fat. The Calorie Balance chart already draws this distinction —
+  // it uses the calibrated figure but relabels its output "Expected scale
+  // weight" instead of "Expected fat" for exactly this reason.
+  //
+  // Feeding the scale response in here was a category error with a real cost.
+  // On a measured fit of 2,722 kcal/kg it turned a 0.5 kg/week plan into a
+  // 194 kcal/day deficit instead of 550 — under-prescribing by ~356 kcal/day —
+  // and it was self-reinforcing: eating nearer maintenance leaves the scale
+  // moving mostly on water, which fits an even lower density next time.
+  //
+  // It also removes a feedback loop from calibration.js: that builder centers
+  // each sample on this bound, so a bound derived from the previous fit's
+  // density fed the old fit back into the new one.
+  const fittedDensity = GENERIC_KCAL_PER_KG_FAT;
   const fittedKcal = boundFrom(fittedDensity);
 
-  // The guard applies only to a figure a CALIBRATION produced. An implausible bound
-  // off the generic density is the user's own WEEKLY_FAT_LOSS_KG being aggressive —
-  // their setting to make, not a fit to reject — and there'd be nothing to fall back
-  // to anyway.
-  const isCalibrated = fittedDensity !== GENERIC_KCAL_PER_KG_FAT;
-  const isPlausible = fittedKcal >= bmr * CALORIE_BOUND_MIN_BMR_RATIO && fittedKcal <= bmr * CALORIE_BOUND_MAX_BMR_RATIO;
-  const rejected = isCalibrated && !isPlausible;
-
-  return {
-    kcal: rejected ? boundFrom(GENERIC_KCAL_PER_KG_FAT) : fittedKcal,
-    bmr,
-    weeklyFatLossKg,
-    rejectedDensity: rejected ? Math.round(fittedDensity) : null,
-    rejectedKcal: rejected ? fittedKcal : null,
-  };
+  // No plausibility guard here any more. It existed to catch a calibrated
+  // density distorting the bound, and the bound no longer reads one. A bound
+  // that now looks aggressive means WEEKLY_FAT_LOSS_KG itself is aggressive —
+  // the user's own setting to make, not a fit to reject, and there would be
+  // nothing to substitute anyway.
+  return { kcal: fittedKcal, bmr, weeklyFatLossKg };
 }
 
 function calculatedCalorieBoundKcal(weightKg) {
@@ -1293,41 +1311,15 @@ function calorieAxisBounds(loggedValues, boundValues) {
   };
 }
 
-// The note under Caloric Intake, for the case where a calibrated energy density was
-// rejected as implausible (calorieBoundDetail's guard). Without it the substitution
-// is invisible: calibrated view would show caps that are no longer the calibrated
-// figure, and the only clue would be that they'd stopped looking wrong.
-function reportRejectedCalorieBoundDensity(detail) {
-  const el = document.getElementById('calorie-bound-note');
-  el.classList.remove('warning');
-
-  if (detail === null || detail.rejectedDensity === null) {
-    el.textContent = '';
-    return;
-  }
-
-  const deficit = Math.round((detail.weeklyFatLossKg * detail.rejectedDensity) / 7);
-  const text = `Your calibration implies ${detail.rejectedDensity} kcal/kg, which turns a ${detail.weeklyFatLossKg} kg/week plan into a ${deficit} kcal/day deficit and a maximum of ${detail.rejectedKcal} kcal — ${(detail.rejectedKcal / detail.bmr).toFixed(2)}× your ${Math.round(detail.bmr)} kcal BMR, outside the plausible ${CALORIE_BOUND_MIN_BMR_RATIO}–${CALORIE_BOUND_MAX_BMR_RATIO}× range. These caps use the generic 7,700 kcal/kg for the deficit instead. Recalibrate to change that.`;
-  el.textContent = privacyMode ? maskDigits(text) : text;
-  el.classList.add('warning');
-}
-
 function renderWellnessCaloriesChart(entries) {
   const ctx = document.getElementById('wellness-calories-chart');
 
   const bound = getCalorieBound(entries);
-  reportRejectedCalorieBoundDensity(calorieBoundDetail(latestWeightKg(entries)));
 
   const calorieEntries = calorieLogEntries(entries);
   const dates = wellnessCalorieChartDates(entries);
   const byDate = new Map();
   calorieEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
-
-  // The chart's heading says which bound the caps mark, in the same Max/Min-first
-  // wording the glance tile uses — bar color shows whether a day was on the right
-  // side of its own cap, but only the word says whether that's a ceiling or a
-  // floor.
-  document.getElementById('wellness-calories-label').textContent = `${bound.word} Caloric Intake`;
 
   // The bound is re-evaluated for every day from the weight in effect that day
   // (calorieBoundSeries), so there is no single figure for this chart to draw:
@@ -1625,6 +1617,49 @@ function shortActivityLabel(description) {
   return description.split(' (')[0].trim();
 }
 
+// NEAT and Strength training get the app's blue and green rather than whichever
+// hue their alphabetical position happens to land on — they're the two segments
+// read most often, and a generated hue slides out from under them the moment a
+// new activity description is logged. Keyed on the SHORTENED label, so
+// "NEAT (Non-Exercise Activity Thermogenesis)" matches as well.
+const PINNED_ACTIVITY_COLORS = new Map([
+  ['neat', '#3b82f6'],
+  ['strength training', '#16a34a'],
+]);
+
+// Every other description still gets an evenly-spaced generated hue, but drawn
+// from the color circle MINUS a band around each pinned hue — otherwise a third
+// activity can land on a near-identical blue or green and the pinning buys
+// nothing. The surviving arcs are measured end to end and the remaining hues
+// spaced evenly along that total, so they stay as far from each other as the
+// reduced range allows instead of bunching at one edge.
+const RESERVED_ACTIVITY_HUES = [142, 217]; // the two pinned colors above
+const RESERVED_ACTIVITY_HUE_MARGIN = 25;
+
+function unreservedActivityHues(count) {
+  const allowed = [];
+  let cursor = 0;
+  RESERVED_ACTIVITY_HUES
+    .map((h) => [h - RESERVED_ACTIVITY_HUE_MARGIN, h + RESERVED_ACTIVITY_HUE_MARGIN])
+    .sort((a, b) => a[0] - b[0])
+    .forEach(([from, to]) => {
+      if (from > cursor) allowed.push([cursor, from]);
+      cursor = Math.max(cursor, to);
+    });
+  if (cursor < 360) allowed.push([cursor, 360]);
+
+  const total = allowed.reduce((sum, [from, to]) => sum + (to - from), 0);
+
+  return Array.from({ length: count }, (_, i) => {
+    let offset = ((i + 0.5) * total) / count;
+    for (const [from, to] of allowed) {
+      if (offset < to - from) return Math.round(from + offset);
+      offset -= to - from;
+    }
+    return Math.round(allowed[allowed.length - 1][1]);
+  });
+}
+
 function renderWellnessActivityChart(entries) {
   const ctx = document.getElementById('wellness-activity-chart');
 
@@ -1657,7 +1692,11 @@ function renderWellnessActivityChart(entries) {
     caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + e.amount2);
   });
 
-  const descriptionColors = descriptions.map((_, i) => `hsl(${Math.round((i * 360) / descriptions.length)}, 65%, 55%)`);
+  const pinnedColorFor = (d) => PINNED_ACTIVITY_COLORS.get(shortActivityLabel(d).toLowerCase()) ?? null;
+  const generatedHues = unreservedActivityHues(descriptions.filter((d) => pinnedColorFor(d) === null).length);
+  let nextGeneratedHue = 0;
+  const descriptionColors = descriptions.map((d) => pinnedColorFor(d)
+    ?? `hsl(${generatedHues[nextGeneratedHue++]}, 65%, 55%)`);
 
   const activityDatasets = descriptions.map((d, i) => ({
     type: 'bar',
@@ -1928,26 +1967,34 @@ function detectPlateau(trendMap) {
 // training data's range can't produce a runaway projection.
 const PROJ_SLOPE_CLAMP_KG_PER_DAY = 0.15;
 
-// Reads the 4 gains calibration.js's "Calibrate" flow can write to the
-// Settings tab. Returns null unless all 4 are present, so calcProjection()
+// Reads the 3 gains calibration.js's "Calibrate" flow can write to the
+// Settings tab. Returns null unless all 3 are present, so calcProjection()
 // falls back to the generic formula for anyone who hasn't calibrated.
-// betaProtein is read separately with a 0 (no effect) default rather than
-// added to that required set — an existing calibration from before protein
-// tracking existed stays valid as-is, and only starts factoring in protein
-// once the user next clicks Calibrate. PROJ_ACTIVITY_KG_PER_KCAL_DAY was
-// PROJ_ACTIVITY_KG_PER_MIN_DAY (kg/day per activity MINUTE) before activity
-// entries could carry a real calorie-burn figure — renamed rather than
-// reinterpreted in place, so an old per-minute calibration under the old key
-// simply reads as "not calibrated" (safe fallback to the generic formula)
-// instead of silently applying a per-minute coefficient to a now-kcal input.
+//
+// Three, not five: this calibration estimates an ENERGY model — kcal per kg
+// (1/betaCal), what a logged active kcal costs on the scale (betaAct), and the
+// drift intake and activity don't explain (beta0). Sleep hours and protein
+// grams aren't terms in an energy balance and aren't in the Mifflin-St Jeor
+// BMR the calorie bound is built on, so they're no longer fitted. An OLDER
+// calibration that still has PROJ_SLEEP_KG_PER_HOUR_DAY and
+// PROJ_PROTEIN_KG_PER_G_DAY rows on the sheet keeps working: those two are
+// simply not read any more. Their coefficients were fitted against CENTERED
+// predictors, so they contributed nothing at target sleep/protein anyway, and
+// dropping them shifts an old fit's projection only by however far the user
+// sits from those targets.
+//
+// PROJ_ACTIVITY_KG_PER_KCAL_DAY was PROJ_ACTIVITY_KG_PER_MIN_DAY (kg/day per
+// activity MINUTE) before activity entries could carry a real calorie-burn
+// figure — renamed rather than reinterpreted in place, so an old per-minute
+// calibration under the old key simply reads as "not calibrated" (safe
+// fallback to the generic formula) instead of silently applying a per-minute
+// coefficient to a now-kcal input.
 function readSavedCalibratedGains() {
   const beta0 = getSetting('PROJ_BASELINE_KG_PER_DAY', null);
   const betaCal = getSetting('PROJ_CAL_KG_PER_KCAL_DAY', null);
   const betaAct = getSetting('PROJ_ACTIVITY_KG_PER_KCAL_DAY', null);
-  const betaSleep = getSetting('PROJ_SLEEP_KG_PER_HOUR_DAY', null);
-  if ([beta0, betaCal, betaAct, betaSleep].some((v) => v === null)) return null;
-  const betaProtein = getSetting('PROJ_PROTEIN_KG_PER_G_DAY', 0);
-  return { beta0, betaCal, betaAct, betaSleep, betaProtein };
+  if ([beta0, betaCal, betaAct].some((v) => v === null)) return null;
+  return { beta0, betaCal, betaAct };
 }
 
 // Health Metrics' calibrated/generic toggle (calibration.js's
@@ -1977,8 +2024,10 @@ function calcProjection(entries) {
   // centered on. Which side of it the user should be on doesn't enter the
   // arithmetic here, so only the number is read.
   const calorieTarget = getCalorieBoundKcal(entries);
+  // Still read, but only by the GENERIC branch below (its 0.7-1.0 sleep
+  // multiplier). The calibrated branch is a pure energy model and has no sleep
+  // term to center — see readSavedCalibratedGains above.
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
-  const proteinTarget = getProteinTargetG(entries);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -2001,7 +2050,6 @@ function calcProjection(entries) {
   const caloriesByDate = new Map();
   const activityKcalByDate = new Map();
   const sleepByDate = new Map();
-  const proteinByDate = new Map();
 
   recentEntries.forEach((e) => {
     if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
@@ -2017,9 +2065,6 @@ function calcProjection(entries) {
     } else if (e.category === 'Sleep' && e.amount !== null) {
       sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
     }
-    if (e.category === 'Calories; Protein' && e.amount2 !== null) {
-      proteinByDate.set(e.date, (proteinByDate.get(e.date) || 0) + e.amount2);
-    }
   });
 
   let slope;
@@ -2030,15 +2075,16 @@ function calcProjection(entries) {
     const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
     const avgActivityKcal = activityKcalByDate.size > 0 ? avg(activityKcalByDate) : 0;
     const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
-    const avgProtein = proteinByDate.size > 0 ? avg(proteinByDate) : proteinTarget;
 
     const gains = getCalibratedGains();
     if (gains) {
+      // The fitted energy model, and only that: baseline drift, the user's own
+      // kcal-per-kg applied to how far intake sits from the bound, and what a
+      // logged active kcal actually costs them. Sleep and protein are tracked
+      // and charted elsewhere but are not energy terms, so they don't appear.
       slope = gains.beta0
         + gains.betaCal * (avgCalories - calorieTarget)
-        + gains.betaAct * avgActivityKcal
-        + gains.betaSleep * (avgSleep - sleepTarget)
-        + gains.betaProtein * (avgProtein - proteinTarget);
+        + gains.betaAct * avgActivityKcal;
       slope = Math.max(-PROJ_SLOPE_CLAMP_KG_PER_DAY, Math.min(PROJ_SLOPE_CLAMP_KG_PER_DAY, slope));
       calibrated = true;
     } else {
@@ -2074,7 +2120,12 @@ function calcProjection(entries) {
       slope = baseSlope * sleepRatio;
     }
 
-    const allPresent = caloriesByDate.size > 0 && activityKcalByDate.size > 0 && sleepByDate.size > 0;
+    // "Partial habit data" has to mean partial for the formula that actually
+    // ran. The calibrated branch is a pure energy model, so a missing sleep log
+    // costs it nothing and must not label an otherwise-complete history as
+    // partial; the generic branch still scales by sleep, so there it does.
+    const allPresent = caloriesByDate.size > 0 && activityKcalByDate.size > 0
+      && (calibrated || sleepByDate.size > 0);
     method = allPresent ? 'full' : 'partial';
   } else {
     const src = weightEntries.filter((e) => e.date >= cutoffIso);
@@ -2373,7 +2424,12 @@ function renderWellnessProjectionChart(entries) {
   const scales = {
     x: {
       type: 'linear',
-      ticks: { maxTicksLimit: 24, maxRotation: 45, minRotation: 0, autoSkip: true, callback: offsetToDateLabel },
+      // minRotation matches maxRotation so the labels sit at a fixed 45°, the
+      // same as every other Health chart's date axis, instead of Chart.js
+      // straightening them to horizontal whenever they happen to fit — which
+      // made this one chart's axis read differently from the ones stacked
+      // right below it, and flip angle as the window resized.
+      ticks: { maxTicksLimit: 24, maxRotation: 45, minRotation: 45, autoSkip: true, callback: offsetToDateLabel },
     },
     y: {
       min: yMin,

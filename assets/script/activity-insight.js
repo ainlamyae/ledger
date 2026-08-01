@@ -59,9 +59,9 @@ const EXERCISE_MUSCLE_GROUP = {
 // independent of the per-muscle breakdown below.
 //
 // Reps rather than sets because the workout note records total reps per exercise
-// ("30× Leg Press"): 30 could have been 3×10 or 5×6, so a set count is no longer
+// ("30x Leg Press"): 30 could have been 3x10 or 5x6, so a set count is no longer
 // recoverable from the log. Reps are the finer figure of the two and the older
-// two-number lines convert into them exactly (3×10 = 30 reps, done by
+// two-number lines convert into them exactly (3x10 = 30 reps, done by
 // parseWorkoutNoteLines), so volume stays comparable across entries logged either
 // side of that format change — which matters here, since this figure's whole job
 // is a current-vs-previous-period comparison.

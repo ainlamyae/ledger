@@ -65,13 +65,19 @@ function describeWorkout(groups) {
   return groups.map((g) => g.day).join(' + ');
 }
 
-// A "Sets × Reps" cell as one total-rep figure: "3 × 10" -> 30. Returns null if
-// the cell isn't two numbers around a ×, which leaves the caller writing the
+// The separator in a "Sets x Reps" cell and in the note's own rep unit. A plain
+// ASCII `x`, which is what the plan tables display and what the note is written
+// with — but `×` is accepted everywhere it's READ, since the tables used to show
+// it and notes already on the sheet still carry it.
+const REPS_SEPARATOR_PATTERN = /\s*[x×]\s*/;
+
+// A "Sets x Reps" cell as one total-rep figure: "3 x 10" -> 30. Returns null if
+// the cell isn't two numbers around an x, which leaves the caller writing the
 // cell's own text rather than a figure derived from a cell it didn't understand —
 // activity-estimator.js still parses that older two-number form, so an
 // unrecognized cell degrades to the previous behavior instead of a wrong number.
 function totalRepsFromSetsCell(text) {
-  const parts = text.trim().split(/\s*×\s*/).map(Number);
+  const parts = text.trim().split(REPS_SEPARATOR_PATTERN).map(Number);
   if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n))) return null;
   return parts[0] * parts[1];
 }
@@ -93,30 +99,33 @@ function logWorkout() {
       if (box.dataset.steps !== undefined) quantity = `${box.dataset.steps}step`;
       else if (box.dataset.minutes !== undefined) quantity = `${box.dataset.minutes}min`;
       // A hold row's TOTAL held seconds, in the same "<number><unit> Name"
-      // shape as every other row — not the "3 × 45 sec" the cell displays,
+      // shape as every other row — not the "3 x 45 sec" the cell displays,
       // which wouldn't survive the round trip: activity-estimator.js parses
       // these lines back on Recalculate against a `<number><unit>` pattern, so a
       // space before the unit would silently make the line unparseable and drop
       // the exercise from the recalculated total.
       else if (box.dataset.hold !== undefined) quantity = `${activeSecondsForBox(box)}sec`;
-      // A strength row's TOTAL REPS, with × as its unit ("30× Leg Press"). The
+      // A strength row's TOTAL REPS, with x as its unit ("30x Leg Press"). The
       // prescription is two numbers, but what the note records is work already
-      // done, and for that "3×10" made the reader multiply before they could
+      // done, and for that "3x10" made the reader multiply before they could
       // compare one line to another (or the same exercise to last week's) — so it
       // carries the product, the same way the hold row carries total seconds
-      // rather than "3 × 45 sec".
+      // rather than "3 x 45 sec".
       //
-      // Read off the DISPLAYED "Sets × Reps" cell, which makes the visible plan
+      // Read off the DISPLAYED "Sets x Reps" cell, which makes the visible plan
       // the authority — so every strength row's data-sets/data-reps must match
       // what its own cell shows. They didn't for 22 of the original 24 rows
-      // (e.g. a row displaying "3 × 10" carried data-reps="11"), and since
+      // (e.g. a row displaying "3 x 10" carried data-reps="11"), and since
       // estimateWorkoutMinutes above reads the ATTRIBUTES while this note reads
       // the TEXT, Log Workout and a later Recalculate disagreed by ~6% on the
       // same ticked exercises despite the two paths claiming to mirror each
       // other exactly. Keep any new row's attributes and display in step.
       else {
         const totalReps = totalRepsFromSetsCell(cells[1].textContent);
-        quantity = totalReps !== null ? `${totalReps}×` : cells[1].textContent.trim().replace(/\s*×\s*/, '×');
+        // The fallback normalizes whatever separator the cell used to a bare x,
+        // so an unrecognized cell still writes the note in the one format
+        // activity-estimator.js reads back.
+        quantity = totalReps !== null ? `${totalReps}x` : cells[1].textContent.trim().replace(REPS_SEPARATOR_PATTERN, 'x');
       }
       return `${quantity} ${name}`;
     })

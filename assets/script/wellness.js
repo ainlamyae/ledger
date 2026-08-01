@@ -284,10 +284,9 @@ async function refreshWellness(forceRefresh = false) {
   // A blank date (column A) marks a reusable "pattern" row — a template a
   // user can Duplicate and assign a real date to later, rather than a
   // logged event. Kept in allWellnessEntries so it's editable/duplicable
-  // like any other row, but every chart/insight/calibration consumer must
-  // use getDatedWellnessEntries() instead so an undated template can never
-  // be mistaken for a logged sample (e.g. sorting first as the "earliest"
-  // date, or corrupting a calibration interval).
+  // like any other row, but every chart/insight consumer must use
+  // getDatedWellnessEntries() instead so an undated template can never be
+  // mistaken for a logged sample (e.g. sorting first as the "earliest" date).
 
   wellnessDataLoaded = true;
   renderWellnessList();

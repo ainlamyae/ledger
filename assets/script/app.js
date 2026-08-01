@@ -106,7 +106,7 @@ function parseTypeBreakdown(insightRows) {
   return breakdown;
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'wellness-bulk-edit-modal', 'nutrition-modal', 'calibration-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'wellness-bulk-edit-modal', 'nutrition-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -406,12 +406,10 @@ let lastLoadedSettings = null;
 // A read failure is NOT the same as "there are no settings", though, and
 // conflating the two was a real bug: returning {} here — and caching it for
 // the full 5-minute TTL — silently wiped every setting in memory on one
-// transient read error. Targets reverted to their defaults, a saved
-// calibration read back as "not calibrated" (so Calibrate's own save
-// verification couldn't confirm a write that had in fact landed, and the
-// calibrated/standard toggle went dead), and Wellness Insight reported age and
-// height as "not set" — all while the spreadsheet itself was perfectly intact,
-// which is exactly why it looked like a dozen unrelated bugs. So: keep the
+// transient read error. Targets reverted to their defaults and Wellness Insight
+// reported age and height as "not set" — all while the spreadsheet itself was
+// perfectly intact, which is exactly why it looked like a dozen unrelated bugs.
+// So: keep the
 // last known-good copy, never poison the cache with a failure, and log the
 // cause, which used to be discarded entirely by a bare `catch {}`.
 async function loadSettings(forceRefresh) {
@@ -537,9 +535,6 @@ async function loadDashboard(forceRefresh = false) {
     applySettingsToWidgets();
     renderSavedFoodInsight();
     renderSavedWellnessInsight();
-    // Whether a saved calibration exists is only knowable once settings are
-    // in — until then the Health Metrics formula toggle renders disabled.
-    refreshFormulaToggle();
   });
 
   const wellnessPromise = settingsPromise.then(() => initWellness(forceRefresh));
@@ -793,7 +788,6 @@ window.addEventListener('load', () => {
 
   setupAccountMenu();
   initCsvControls();
-  initCalibrationPanel();
   initInsightPanel();
   initFoodInsightPanel();
   initActivityInsightPanel();

@@ -170,19 +170,19 @@ async function clearSettingValueFormats(rowNumbers) {
 // exist in place, appending new ones for keys seen for the first time — then
 // refreshes both the settings-panel list and currentSettings so callers see
 // their own write immediately. Shared by every feature that persists an
-// AI/computed result there (calibration.js, insight.js, food-insight.js).
+// AI/computed result there (insight.js, food-insight.js).
 //
 // RAW, not USER_ENTERED: every value routed through here is already a finished
 // computed value that has to survive the round trip byte-for-byte, and
 // USER_ENTERED reinterprets it the way typing into the cell would. That caused
-// a genuinely destructive bug — PROJ_CALIBRATED_AT's "2026-07-30" was parsed
-// into a real date, which turned its cell into a DATE-formatted one, and rows
-// appended beside it inherited that format. A coefficient like 0.00031534 is a
-// perfectly valid date serial, so it then displayed as "1899-12-30 0:00" and
-// (via VALUE_PARAMS' FORMATTED_STRING dateTimeRenderOption) read back as that
-// STRING rather than a number. getSetting() saw NaN and reported the setting as
-// absent, so a correctly-written calibration silently vanished — as did any
-// other numeric setting whose cell caught the same format.
+// a genuinely destructive bug — a written "2026-07-30" was parsed into a real
+// date, which turned its cell into a DATE-formatted one, and rows appended
+// beside it inherited that format. A value like 0.00031534 is a perfectly valid
+// date serial, so it then displayed as "1899-12-30 0:00" and (via VALUE_PARAMS'
+// FORMATTED_STRING dateTimeRenderOption) read back as that STRING rather than a
+// number. getSetting() saw NaN and reported the setting as absent, so a
+// correctly-written value silently vanished — as did any other numeric setting
+// whose cell caught the same format.
 async function saveSettingValues(values) {
   await initSettingsPanel(true);
   if (settingsSheetMissing) {

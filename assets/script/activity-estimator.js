@@ -2,16 +2,15 @@
 // when the current category is Activity — the Activity counterpart to
 // calorie-estimator.js. Understands the Activity Plan's standardized workout
 // note (see strength-plan.js's logWorkout): one line per ticked row —
-// "N×  Exercise Name" (total reps) for a strength row, "Nsec  Exercise Name" for an
+// "Nx  Exercise Name" (total reps) for a strength row, "Nsec  Exercise Name" for an
 // isometric hold (Plank), "Nmin  Activity Name" for a fixed-duration row
 // (Swim), or "Nstep  Activity Name" for a step-count row (Walk). Wired up by wellness.js — see its calc-btn click dispatcher in
 // initWellness() — and called directly by strength-plan.js's logWorkout()
 // right after it fills the note in.
 
-// kcal = MET × bodyweight(kg) × hours — the standard Compendium of Physical
-// Activities formula. Applied only to active time (see estimateWorkoutActivity
-// below) — rest between sets, warm-up, and moving between machines aren't
-// counted as activity, so they don't get charged a MET either.
+// Calories come from charts.js's metKcal(). Applied only to ACTIVE time — rest
+// between sets, warm-up and walking between machines aren't activity, so they
+// aren't charged a MET.
 //
 // Strength rows: two sourced MET values, not a fabricated per-machine number
 // for each. 5.0 (code 02052, compound/explosive-effort resistance work) for
@@ -88,22 +87,24 @@ const EXERCISE_MET = {
 // estimate instead of blocking Calculate entirely.
 const EXERCISE_MET_DEFAULT = 3.5;
 
-// Matches one standardized workout note line — a strength row ("30× Leg
+// Matches one standardized workout note line — a strength row ("30x Leg
 // Press"), an isometric hold ("135sec Plank"), a fixed-duration NEAT row
 // ("30min Swim"), or a step-count row ("6000step Walk"). Any line matching none of these (e.g. a blank line,
 // or a leftover day-header line from an older-format saved entry) is skipped.
 // The gap is `\s+`, so entries saved back when Log Workout emitted two spaces
 // still parse identically to the single-spaced ones it writes now.
 //
-// Strength rows carry TOTAL REPS with × as the unit ("30×"), in the same
-// <number><unit> shape as the other three. The two-number "3×10" form Log Workout
-// used to write is still matched below, so entries already saved to the sheet keep
-// parsing — it's normalized to the same total-rep figure (3 × 10 = 30) rather than
-// kept as a separate shape, so nothing downstream has to handle two strength
-// forms. The two can't be confused: the total-rep form has whitespace after the ×,
-// the legacy one has a digit.
-const REPS_NOTE_LINE_PATTERN = /^(\d+)×\s+(.+)$/;
-const LEGACY_SETS_REPS_NOTE_LINE_PATTERN = /^(\d+)×(\d+)\s+(.+)$/;
+// Strength rows carry TOTAL REPS with x as the unit ("30x"), in the same
+// <number><unit> shape as the other three. Both `x` and `×` are accepted, since
+// Log Workout wrote the `×` form before the plan tables switched to a plain
+// ASCII x — a note already on the sheet has to keep parsing, or Recalculate
+// would silently drop every strength line from an older entry. The two-number
+// "3x10" form Log Workout wrote earlier still matches too, normalized to the same
+// total-rep figure (3 × 10 = 30) rather than kept as a separate shape, so nothing
+// downstream has to handle two strength forms. None of the three can be confused:
+// the total-rep form has whitespace after the x, the two-number one has a digit.
+const REPS_NOTE_LINE_PATTERN = /^(\d+)[x×]\s+(.+)$/;
+const LEGACY_SETS_REPS_NOTE_LINE_PATTERN = /^(\d+)[x×](\d+)\s+(.+)$/;
 const DURATION_NOTE_LINE_PATTERN = /^(\d+)min\s+(.+)$/;
 const STEPS_NOTE_LINE_PATTERN = /^(\d+)step\s+(.+)$/;
 // An isometric hold row's total held seconds ("135sec Plank") — seconds
@@ -150,7 +151,7 @@ function parseWorkoutNoteLines(notes) {
 function estimateWorkoutActivity(notes, weightKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
-    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log Workout button, or write one \"N×  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
+    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log Workout button, or write one \"Nx  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
   }
 
   let totalSeconds = 0;
@@ -170,7 +171,7 @@ function estimateWorkoutActivity(notes, weightKg) {
     else activeSeconds = line.minutes * 60;
 
     totalSeconds += activeSeconds;
-    calories += met * weightKg * (activeSeconds / 3600);
+    calories += metKcal(met, weightKg, activeSeconds / 60);
   });
 
   return {

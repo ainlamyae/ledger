@@ -19,7 +19,6 @@ function setUIState(state) {
   document.getElementById('account-menu').hidden = state === 'signedOut';
   document.getElementById('refresh-btn').hidden = state !== 'dashboard';
   document.getElementById('privacy-toggle-btn').hidden = state !== 'dashboard';
-  document.getElementById('global-search-wrap').hidden = state !== 'dashboard';
   if (state !== 'signedOut') removeSignInBanner();
 }
 

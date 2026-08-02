@@ -140,12 +140,11 @@ A private, serverless personal life dashboard — health, finances, time trackin
 ### Health — Today at a glance
 
 - **Reminder banner** above Health Indicator when today has no Physique row yet (`checkHealthReminder`, `physique.js`, re-evaluated at the end of every `refreshPhysique`) — no weekend skip (unlike the Time Tracker's own reminder below, since people eat every day) and no separate OS-notification opt-in, just the banner and a Log button that opens today's entry the same way the panel's own **Today** button does.
-- Four tiles, in order: **Max/Min Calory Intake**, **Protein**, **Fiber**, **Activity**.
-- Each reads `actual / target unit`, green on the right side of the figure, red otherwise, grey when nothing's logged.
-- Activity also restates its target in kcal — `— / 100 min → 394 kcal` — from `getActivityTargetKcal`, the same pin-aware figure the Physical Activity chart's target line uses.
-- The Calories heading carries which side of the target it is (max or min), since the number alone can't say it.
-- Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
-- **Fiber is a band too**, same shape and coloring as Protein's — `14.8 / 14~30 g`, over the top end a darker green rather than red or grey. Reads the day's own persisted Physique Fiber figure (`fiberG`, see `physiqueAsWellnessEntries`) against `getFiberTargetBandG` (below), which falls back to a flat `FIBER_TARGET_G` (default 30g) — a zero-width band, so the tile reads as a single number — until the Formula Playground's fiber rows are saved.
+- Four cards, in the same order as the Health Indicator charts below them: **Body Mass**, **Activity**, **Macros**, **Sleep**. Each is a stack of label/value rows rather than one figure, and every row reads green on the right side of its target, red otherwise, grey when nothing's logged — the same target functions the chart underneath it uses, so a card can't disagree with its own chart.
+- **Body Mass** — Today (colored by whether it's on the correct side of `BODY_MASS_TARGET_KG` for a cut or a bulk, via `bodyMassTargetIsDownward`), Target, Days left and Estimate. The last two are read straight off `calcProjection` — the same day count and arrival date State Trend & Forecast's own time-progress meter shows, so the two can't quote different numbers. Estimate reads "Reached" once there, `—` whenever no projection can be drawn (no profile, wrong direction, fewer than two weigh-ins).
+- **Activity** — Duration (`actual / target min`, target from `getActivityTargetMin`) and Calories (`actual / target kcal`). Calories sums `activityEntryKcal` per logged entry — the same per-entry rule the Activity/Calorie Balance charts and Insight use (a Calculate-derived figure wins, else a flat per-minute estimate) — against `getActivityTargetKcal`, so it can't disagree with what hitting the Duration target would burn.
+- **Macros** — one card, one row per metric. The **Calories** row's own label carries which side of the target it is (Max or Min), since the number alone can't say it, then **Protein**, **Fiber**, **Fat** and **Carbohydrate** each follow as a **band** (`53 / 112~154 g`) from their own `get*TargetBandG` function. Protein, Fiber and Fat all score the same way — under the floor is red, in the band is green, over the ceiling is a darker green rather than a miss. Carbohydrate reads the opposite way: under the floor is grey/unscored rather than a miss, and it's the ceiling that turns red — matching the Carbohydrate Intake chart's own bar coloring, since too little carbohydrate isn't the deficiency too little fiber or protein is.
+- **Sleep** — Duration (colored on the same red→amber→green gradient the Sleep chart's bars use, `sleepStatusColor`, rather than a flat green/red split), Bedtime and Wake-up, straight off that day's `sleepBedMin`/`sleepWakeMin`.
 
 ### Health — Health Indicator
 
@@ -237,10 +236,10 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - **Save also patches `MICRONUTRIENT_DAILY_TARGETS_JSON`** — the Micronutrients Insight mode's own separate "Ideal / day" reference reads that flat setting, not this band, so without this it would keep quoting the shipped FDA Daily Value (or whatever was last typed by hand) forever. Save writes the band's **min** end into that JSON's `Protein`/`Fiber, total dietary` `amount`, preserving their `unit`/`kind` and every other nutrient untouched (`patchMicronutrientDailyTargetAmounts`, `nutrient-targets.js`) — the min end because that's the "did you get enough" question the JSON's gap-severity coloring actually asks; the full band still shows everywhere else (tile, chart, Food Insight's Ideal/day row), all read straight from `FIBER_TARGET_G_MIN`/`MAX` rather than from this JSON.
 - **The fat band follows fiber**, both ends scaled off the same base rather than two different ones: `G_min = (k_min/100 × Eᵢₙ) / 9` and `G_max = (k_max/100 × Eᵢₙ) / 9`, from the editable `k_min`/`k_max` pair (defaults **20** and **35**, percent of `Eᵢₙ`) — the Institute of Medicine's Acceptable Macronutrient Distribution Range for adult total fat (*Dietary Reference Intakes for Energy, Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids*, 2005), the same range the USDA Dietary Guidelines for Americans carries forward. `9` (kcal per gram of fat, Atwater) is a plain constant, not a Setting — fat's energy density isn't a personal parameter the way the two percentages are.
   - Reads `Eᵢₙ` the same way the fiber block does — straight off the sheet's own box, already this render's target (typed or solved) by the time the fat block runs.
-  - **Save writes the grams**, to `FAT_TARGET_G_MIN` / `FAT_TARGET_G_MAX`, which outrank the flat `FAT_TARGET_G` (default 65g, the USDA %DV reference) everywhere the fat target is read — currently just the Fat Intake chart, no glance tile yet. The `k_min`/`k_max` rule is saved too (`FAT_PCT_OF_KCAL_MIN` / `FAT_PCT_OF_KCAL_MAX`), same reasoning-next-to-result shape as protein and fiber.
+  - **Save writes the grams**, to `FAT_TARGET_G_MIN` / `FAT_TARGET_G_MAX`, which outrank the flat `FAT_TARGET_G` (default 65g, the USDA %DV reference) everywhere the fat target is read — the Fat Intake chart and its glance tile. The `k_min`/`k_max` rule is saved too (`FAT_PCT_OF_KCAL_MIN` / `FAT_PCT_OF_KCAL_MAX`), same reasoning-next-to-result shape as protein and fiber.
   - **Save also patches `MICRONUTRIENT_DAILY_TARGETS_JSON`**, writing the band's min end into `Total lipid (fat)`'s `amount` alongside `Protein`/`Fiber, total dietary` — same call, same file, one more key.
 - **The carb band follows fat**, same shape again — both ends scaled off `Eᵢₙ`: `C_min = (q_min/100 × Eᵢₙ) / 4` and `C_max = (q_max/100 × Eᵢₙ) / 4`, from the editable `q_min`/`q_max` pair (defaults **45** and **65**, percent of `Eᵢₙ`) — the same IOM AMDR report's range for carbohydrate, also carried forward by the USDA Dietary Guidelines for Americans. `4` (kcal per gram of carbohydrate, Atwater) is a plain constant, not a Setting. Too much carbohydrate at once means more glycogen stored (see the glycogen block above) and the water that binds to it — the ceiling here is about energy balance, not that swing directly, but staying inside it keeps the two from compounding.
-  - **Save writes the grams**, to `CARB_TARGET_G_MIN` / `CARB_TARGET_G_MAX`, which outrank the flat `CARB_TARGET_G` (default 275g, the USDA %DV reference) everywhere the carb target is read — the Carbohydrate Intake chart and the Wellness Insight prompt. The `q_min`/`q_max` rule is saved too (`CARB_PCT_OF_KCAL_MIN` / `CARB_PCT_OF_KCAL_MAX`).
+  - **Save writes the grams**, to `CARB_TARGET_G_MIN` / `CARB_TARGET_G_MAX`, which outrank the flat `CARB_TARGET_G` (default 275g, the USDA %DV reference) everywhere the carb target is read — the Carbohydrate Intake chart, its glance tile, and the Wellness Insight prompt. The `q_min`/`q_max` rule is saved too (`CARB_PCT_OF_KCAL_MIN` / `CARB_PCT_OF_KCAL_MAX`).
   - **Save also patches `MICRONUTRIENT_DAILY_TARGETS_JSON`**, writing the band's min end into `Carbohydrate, by difference`'s `amount` alongside `Protein`/`Fiber, total dietary`/`Total lipid (fat)` — same call, same file, one more key.
 - **Which stays fixed as you lose weight** — the one decision the algebra can't make for you. Three mutually exclusive plans, each a different journey to the same goal:
   - **Pin target deficit/fat loss** (default) — holds your pace in **kilograms**. Every weigh-in recalculates the intake that delivers it, so calories fall as you lighten. A straight line to the goal.
@@ -598,7 +597,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 **Widgets** (independent of sign-in)
 
-1. `initWidgets()` runs unconditionally on `window.load`.
+1. `initWidgets()` runs unconditionally on `DOMContentLoaded` (or immediately, if the document has already finished parsing) — deliberately not `window.load`, which also waits on every image and the Chart.js CDN scripts, none of which the widgets or the sign-in check have anything to do with.
 2. `applySettingsToWidgets()` later lets Settings override defaults, without overriding a manual pick.
 
 **Sign-in**
@@ -1053,10 +1052,13 @@ sort key  = classification group gap, then targetG − actualG within it, both d
 
 ### Today at a Glance
 
-- Order: Calory Intake, Protein, Fiber, Activity.
-- Sums today's entries per category; Fiber reads the day's own persisted Physique Fiber figure.
-- Green/red by `withinCalorieTarget`, `withinProteinBand`, `fiberG ≥ FIBER_TARGET_G`, `mins ≥ getActivityTargetMin(latest body mass)`.
-- The Activity tile appends `→ getActivityTargetKcal(latest body mass)` rounded to whole kcal.
+- Card order: Body Mass, Activity, Macros (Calories/Protein/Fiber/Fat/Carbohydrate), Sleep — the same order as the Health Indicator charts below.
+- Sums today's entries per category; Fiber/Fat/Carbohydrate each read the day's own persisted Physique figure (`fiberG`/`fatG`/`carbG`).
+- Green/red by `withinCalorieTarget`, `withinProteinBand`, `withinFiberBand`, `withinFatBand`, `withinCarbBand`, `mins ≥ getActivityTargetMin(latest body mass)`, `kcal ≥ getActivityTargetKcal(latest body mass)`, and (Body Mass) which side of `BODY_MASS_TARGET_KG` `bodyMassTargetIsDownward` calls for.
+- Carbohydrate's under-band case reads grey, not red — same as its chart's bar coloring.
+- Activity's Calories row sums `activityEntryKcal` per entry rather than just the logged minutes, so it agrees with the Activity/Calorie Balance charts.
+- Body Mass's Days left/Estimate come straight off `calcProjection` — "Reached" once there, `—` when no projection can be drawn.
+- Sleep's Duration is colored by `sleepStatusColor` (the chart's own red→amber→green gradient), not a flat two-colour split; Bedtime/Wake-up are `sleepBedMin`/`sleepWakeMin` as `HH:MM`.
 
 ### Sleep
 

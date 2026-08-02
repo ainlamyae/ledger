@@ -694,6 +694,45 @@ function renderTefField() {
   return [['TEF', `${tefPct}% × ${einKcal}  =  ${tefKcal} kcal/day`]];
 }
 
+// The `δ` box and its trace rows (η, δ) — always as a pair with the box, so the
+// number shown and the arithmetic behind it come from one call. `sleepInfo` is
+// `{ weeklyFatLossKg, rawDeficit, deficit, sleepDeprivationEffectKcal, factor, pctPerHour,
+// planSleepHours, sleepTargetHours }` — either calorieTargetDetail's own return
+// (EIN/FIXED_PCT) or the equivalent object TAU builds locally from the same
+// sleepAdjustedDeficitKcal call. Both already ran that call through the render's own
+// `preview` overlay, so `factor`/`pctPerHour` reflect a typed-but-unsaved γ — this reads
+// them back off the object rather than re-deriving either, which would read the SAVED
+// setting instead and disagree with the box on screen.
+// `null` in TARGET_MASS and DELTA_M: both those modes reverse-solve D FROM a typed Eᵢₙ
+// rather than building it from a target rate, so "how much bigger does D need to be" is
+// a question that doesn't arise there — see the mode-specific comments at each call site.
+function renderSleepDeprivationField(sleepInfo) {
+  if (sleepInfo === null) {
+    setComputedField('formula-deprivation-effect', '—');
+    return [];
+  }
+  const { rawDeficit, sleepDeprivationEffectKcal, factor, pctPerHour, planSleepHours, sleepTargetHours } = sleepInfo;
+  setComputedField('formula-deprivation-effect', String(sleepDeprivationEffectKcal));
+  // Only when there is one: at s ≥ s_target the identity is true and empty, same reason
+  // TEF's row above is skipped at f = 0.
+  if (sleepDeprivationEffectKcal <= 0) return [];
+  const factorRounded = Math.round(factor * 1000) / 1000;
+  return [
+    ['η', `1 − (${pctPerHour}/100) × max(0, ${sleepTargetHours} − ${planSleepHours})  =  ${factorRounded}`],
+    ['δ', `${Math.round(rawDeficit)} / ${factorRounded} − ${Math.round(rawDeficit)}  =  ${sleepDeprivationEffectKcal} kcal/day`],
+  ];
+}
+
+// The D row itself, in whichever form applies: the plain rate this app has always shown
+// when sleep isn't costing anything, or that same rate divided by η when it is — so a
+// reader can trace exactly where the extra kcal in δ above came from.
+function formulaDeficitTraceLine(sleepInfo) {
+  const raw = `${sleepInfo.weeklyFatLossKg} × 7700 / 7`;
+  if (sleepInfo.sleepDeprivationEffectKcal <= 0) return `${raw}  =  ${Math.round(sleepInfo.deficit)} kcal/day`;
+  const factorRounded = Math.round(sleepInfo.factor * 1000) / 1000;
+  return `(${raw}) / ${factorRounded}  =  ${Math.round(sleepInfo.deficit)} kcal/day`;
+}
+
 function renderCorrectionFields(plan) {
   const bmrEl = 'formula-bmr-adapt';
   const plateauEl = 'formula-plateau-adapt';
@@ -701,6 +740,7 @@ function renderCorrectionFields(plan) {
 
   if (plan === null) {
     ['formula-bmr', 'formula-activity-kcal', 'formula-maintenance', 'formula-deficit', bmrEl, plateauEl].forEach((id) => setComputedField(id, '—'));
+    renderSleepDeprivationField(null);
     return [];
   }
 
@@ -832,14 +872,18 @@ function renderFormulaPreview() {
     setComputedField('formula-ein', String(Math.round(detail.kcal)));
     renderFormulaDaysField(proj);
 
-    const deficit = (detail.weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7;
+    // calorieTargetDetail already ran the sleep adjustment (see sleepAdjustedDeficitKcal in
+    // wellness-math.js) — `detail` IS the sleepInfo shape renderSleepDeprivationField wants,
+    // so this mode reads the deficit straight off it rather than recomputing the raw rate.
+    const deficit = detail.deficit;
     const bRounded = Math.round(b * 100) / 100;
     const eqRounded = Math.round(((detail.kcal - a) / b) * 10) / 10;
     const rows = [
       bmrRow,
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
+      ...renderSleepDeprivationField(detail),
       ...renderWeeklyLossPctField(),
-      ['D', `${detail.weeklyFatLossKg} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
+      ['D', formulaDeficitTraceLine(detail)],
       ...renderTefField(),
       ...formulaEinRows(coefficients, {
         bmr: detail.bmr, activityKcal: detail.activityKcal, deficit, einKcal: detail.kcal,
@@ -870,9 +914,25 @@ function renderFormulaPreview() {
 
   if (mode === 'TAU') {
     const deltaM = preview.WEEKLY_FAT_LOSS_KG;
-    const deficit = (deltaM * GENERIC_KCAL_PER_KG_FAT) / 7;
     const targetKg = preview.BODY_MASS_TARGET_KG;
     const knownField = dualKnownField.TAU;
+
+    // Δm is the fixed known in BOTH directions of this mode — only τ (and, in the
+    // days-known direction, Eᵢₙ) is being solved for — so the sleep adjustment applies
+    // the same forward way calorieTargetDetail's own does, regardless of which box drove
+    // the solve.
+    const planSleepHours = preview.PLAN_SLEEP_HOURS;
+    const sleepTargetHours = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+    const rawDeficit = (deltaM * GENERIC_KCAL_PER_KG_FAT) / 7;
+    // Wrapped so a typed-but-unsaved γ (SLEEP_DEPRIVATION_PCT_PER_HOUR, read inside this
+    // call) reaches the preview the same way it reaches calorieTargetDetail's own call in
+    // EIN/FIXED_PCT mode above.
+    const { deficitKcal: deficit, sleepDeprivationEffectKcal, factor, pctPerHour } = withFormulaOverrides(
+      preview, () => sleepAdjustedDeficitKcal(rawDeficit, planSleepHours, sleepTargetHours),
+    );
+    const sleepInfo = {
+      weeklyFatLossKg: deltaM, rawDeficit, deficit, sleepDeprivationEffectKcal, factor, pctPerHour, planSleepHours, sleepTargetHours,
+    };
 
     // Both directions below solve the same identity the coefficients are built from, so they
     // read the thermic divisor and the BMR equation's per-kg term off ONE construction of it
@@ -948,8 +1008,9 @@ function renderFormulaPreview() {
     rows.push(
       bmrRow,
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
+      ...renderSleepDeprivationField(sleepInfo),
       ...renderWeeklyLossPctField(),
-      ['D', `${deltaM} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
+      ['D', formulaDeficitTraceLine(sleepInfo)],
       ...renderTefField(),
       ...formulaEinRows(coefficients, { bmr, activityKcal, deficit, einKcal: einForDisplay }),
       ...renderTargetBmiField(),
@@ -996,7 +1057,11 @@ function renderFormulaPreview() {
     const eqRounded = Math.round(equilibriumKg * 10) / 10;
     // No BMR/Eₐ/D/Eᵢₙ preamble here: those describe maintenance at the CURRENT
     // mass, which this mode never claims equals the typed Eᵢₙ — only A and B
-    // (the mass-independent / mass-scaling split) feed the m_g identity below.
+    // (the mass-independent / mass-scaling split) feed the m_g identity below. D isn't
+    // being built from a target rate here — Eᵢₙ is typed — so there's no forward "how
+    // much bigger does D need to be" question for the sleep adjustment to answer; dashed
+    // rather than computed.
+    renderSleepDeprivationField(null);
     renderFormulaSubstituted([
       ...renderTefField(),
       ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
@@ -1033,6 +1098,10 @@ function renderFormulaPreview() {
   const { a, b } = coefficients;
   const activityKcal = withFormulaOverrides(preview, () => activityTargetKcal(bodyMassKg));
   const knownField = dualKnownField.DELTA_M;
+  // D is reverse-solved FROM Eᵢₙ or m_g in this mode (below), never built from a target
+  // rate — so, same as TARGET_MASS, there's no forward question for the sleep adjustment
+  // to answer here; dashed rather than computed.
+  renderSleepDeprivationField(null);
 
   let einForDisplay;
   let decay;

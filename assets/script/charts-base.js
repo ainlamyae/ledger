@@ -381,6 +381,55 @@ function shortDateTickCallback(value) {
   return formatIsoDateShort(this.getLabelForValue(value));
 }
 
+// Up to `maxTicks` indices spread evenly across 0..length-1 inclusive (both ends
+// included whenever there's more than one). Only a fallback now — see
+// wellnessTickIndices below, which anchors to calendar weeks instead — for a window too
+// short to contain a Monday, and for thinning a long list of Mondays down to maxTicks.
+function evenlySpacedIndices(length, maxTicks = 7) {
+  if (length <= 0) return [];
+  if (length <= maxTicks) return Array.from({ length }, (_, i) => i);
+  const out = [];
+  for (let i = 0; i < maxTicks; i++) {
+    out.push(Math.round((i * (length - 1)) / (maxTicks - 1)));
+  }
+  return [...new Set(out)];
+}
+
+// Every Monday in `dates` — the grid anchored to calendar weeks rather than picked
+// evenly by array index. Index-evenly-spaced ticks land on a different weekday every
+// time the window's own length changes by even a single day (a 28-day window and a
+// 29-day window spread their 7 picks differently), which is what made the grid feel
+// "random" even once every chart was reading it off one shared date list. Thinned
+// toward maxTicks — still only Mondays — when a long window has more of them than that;
+// falls back to evenlySpacedIndices on a window too short to contain even one.
+function wellnessTickIndices(dates, maxTicks = 7) {
+  const mondays = [];
+  dates.forEach((d, i) => {
+    if (new Date(parseIsoDateUTC(d)).getUTCDay() === 1) mondays.push(i);
+  });
+  if (mondays.length === 0) return evenlySpacedIndices(dates.length, maxTicks);
+  if (mondays.length <= maxTicks) return mondays;
+  return evenlySpacedIndices(mondays.length, maxTicks).map((i) => mondays[i]);
+}
+
+// The x scale for every category-axis wellness chart (labels: dates) — forces its ticks
+// onto wellnessTickIndices instead of Chart.js's own autoSkip, so it can't drift from
+// State Trend & Forecast's linear axis, which is built to pick the same indices over the
+// same window (see the scales.x block in renderWellnessProjectionChart).
+function wellnessCategoryXScale(dates) {
+  return {
+    afterBuildTicks: (axis) => {
+      axis.ticks = wellnessTickIndices(dates).map((i) => ({ value: i }));
+    },
+    // autoSkip false: it defaults to true and runs AFTER afterBuildTicks, so left on it
+    // was free to thin the ticks just set above however IT saw fit at the current
+    // canvas width — independently of whatever the linear axis's own autoSkip pass
+    // decided — which is exactly the kind of divergence afterBuildTicks was meant to
+    // rule out. Off here, the ticks this function chose are the ticks that get drawn.
+    ticks: { maxRotation: 45, minRotation: 45, autoSkip: false, callback: shortDateTickCallback },
+  };
+}
+
 // Fat energy runs to six figures against a capped axis width, so "175k kcal".
 function maskedThousandsTick(unit) {
   return (v) => {

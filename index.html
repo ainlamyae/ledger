@@ -203,8 +203,9 @@
             </div>
             <div class="card">
                 <h3>Sleep</h3>
-                <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
                 <div class="widget-row"><span>Window</span><span id="today-sleep-window-value">—</span></div>
+                <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
+                <div class="widget-row"><span>Deprivation Effect</span><span id="today-sleep-deprivation-value">—</span></div>
             </div>
         </div>
 
@@ -302,13 +303,6 @@
 
             <div class="donut-grid wellness-metrics-grid">
                 <div class="donut-item">
-                    <h4>Physical Activity</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-activity-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
                     <h4 id="wellness-calories-label">Caloric Intake</h4>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-calories-chart"></canvas>
@@ -340,6 +334,13 @@
                     <h4>Carbohydrate Intake</h4>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-carb-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Physical Activity</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-activity-chart"></canvas>
                     </div>
                 </div>
 
@@ -1636,8 +1637,32 @@
                 <input type="text" id="formula-activity-kcal" inputmode="decimal" readonly>
                 <span class="formula-unit">kcal/day</span>
             </label>
-            <!-- Marks the end of the activity block (MET, τ, κ, Eₐ) before the rate block
+            <!-- Marks the end of the activity block (MET, τ, κ, Eₐ) before the sleep block
                  starts below. -->
+            <hr class="formula-divider">
+            <!-- The sleep length the PLAN assumes, not a log of what actually happened — see
+                 the Sleep chart's own dot for the night-by-night reading. Defaults to the
+                 sleep target itself (0 kcal effect) so an untouched box changes nothing. -->
+            <label class="formula-row" title="How much sleep the plan assumes you're actually getting, compared against the Sleep target in Settings. Short of it and the Sleep Efficiency Factor η below 1 means the same weekly fat-loss rate needs a bigger real deficit — see the Deprivation Effect row right below. Defaults to the sleep target itself, which is 0 effect.">
+                <span class="formula-sym">s</span>
+                <span class="formula-name">sleep length</span>
+                <input type="text" id="formula-plan-sleep-hours" inputmode="decimal">
+                <span class="formula-unit">hr/day</span>
+            </label>
+            <label class="formula-row" title="Reduction in fat-loss efficiency per hour of sleep below target — η = 1 − (γ/100) × hours short. The literature's own range is 2-3%/hr; this defaults to the 2.5%/hr midpoint and can be tuned.">
+                <span class="formula-sym">γ</span>
+                <span class="formula-name">sleep deprivation rate</span>
+                <input type="text" id="formula-sleep-deprivation-pct" inputmode="decimal">
+                <span class="formula-unit">%/hr</span>
+            </label>
+            <label class="formula-row" title="η = 1 − (γ/100) × hours short of the sleep target. kcal/day this adds to D below because that much of the deficit stops translating into fat loss on a short night. Zero at or above the sleep target. Not editable: it is derived from s and γ above.">
+                <span class="formula-sym">δ</span>
+                <span class="formula-name">Sleep Deprivation Effect</span>
+                <input type="text" id="formula-deprivation-effect" inputmode="decimal" readonly>
+                <span class="formula-unit">kcal/day</span>
+            </label>
+            <!-- Marks the end of the sleep block (s, Deprivation Effect) before the rate
+                 block starts below. -->
             <hr class="formula-divider">
             <!-- Δm's other face, and the row above it on purpose: the percentage is the
                  unit the safety band is written in, so it's what you set the pace in and

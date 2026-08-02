@@ -488,6 +488,82 @@ function activityEntryKcal(entry, bodyMassKg) {
   return bodyMassKg != null ? metKcal(activityMet(), bodyMassKg, mins) : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
 }
 
+// Sleep Efficiency Factor: 1 − rate × hours below target — the per-hour cost a short
+// night has on fat-loss efficiency. 1.0 at or above target, floored at 0 rather than
+// going negative on an extreme night. The rate itself is a Formula Playground input (γ,
+// SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY), not a constant — this reads whatever's saved (or
+// overlaid by the playground's preview), defaulting to 2.5%/hr, the literature's own
+// 2–3%/hr range. Shared by calorieTargetDetail (the plan-level target, below), the
+// Calorie Balance / State Trend & Forecast charts' day-by-day reading, and the Sleep
+// chart's own dot, so none of them can disagree about what a given night is worth.
+const SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY = 'SLEEP_DEPRIVATION_PCT_PER_HOUR';
+const SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT = 2.5;
+
+function sleepEfficiencyFactor(sleepHours, sleepTargetHours) {
+  if (sleepHours === null || sleepHours === undefined || !sleepTargetHours) return 1;
+  const hoursBelow = Math.max(0, sleepTargetHours - sleepHours);
+  const pctPerHour = getSetting(SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY, SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT);
+  return Math.max(0, 1 - (pctPerHour / 100) * hoursBelow);
+}
+
+// kcal of ground given back to short sleep — (1 - factor) × how far the balance already
+// sat from zero, ALWAYS pushed toward the positive (surplus/weight-gain) direction,
+// whichever side of zero the balance started on. On a deficit that shrinks it — less of
+// it actually became fat loss. On a surplus (or maintenance) it GROWS it instead — short
+// sleep drives hunger and cuts NEAT, so someone already eating over maintenance ends up
+// further over it, not unaffected. Null with no sleep logged (no basis to apply the
+// factor to, not zero). This is the REVERSE question from sleepAdjustedDeficitKcal below
+// — "given what was actually eaten, how much did a short night cost or add" rather than
+// "how much BIGGER does the planned deficit need to be" — so it always multiplies by
+// (1 - factor) rather than dividing. See dailyEnergyBalanceKcal for where this feeds a
+// day's actual balance.
+function sleepDeprivationKcal(balanceKcal, sleepHours, sleepTargetHours) {
+  if (balanceKcal === null || sleepHours === null || sleepHours === undefined) return null;
+  const factor = sleepEfficiencyFactor(sleepHours, sleepTargetHours);
+  return Math.round(Math.abs(balanceKcal) * (1 - factor));
+}
+
+// One day's energy balance, effective: intake minus maintenance, activity and TEF, then
+// the Sleep Deprivation Effect (see sleepDeprivationKcal) added — a short night makes a
+// deficit less negative (less fat lost) and a surplus MORE positive (more gained), since
+// the adjustment always pushes toward the positive side regardless of which side the raw
+// balance started on. Shared by Calorie Balance and State Trend & Forecast's
+// Calorie-Implied Trajectory so the two can't disagree about what a day's shortfall (or
+// overshoot) actually cost.
+function dailyEnergyBalanceKcal(intake, maintenance, activity, tef, sleepHours, sleepTargetHours) {
+  const rawBalance = intake - maintenance - activity - tef;
+  const deprivationKcal = sleepDeprivationKcal(rawBalance, sleepHours, sleepTargetHours) ?? 0;
+  return { rawBalance, deprivationKcal, balance: rawBalance + deprivationKcal };
+}
+
+// Never divide the deficit up by more than this — realistic inputs (sleepTargetHours up
+// to a day, planSleepHours ≥ 0) never come close, but a typed extreme shouldn't be able to
+// send the target intake to ±Infinity.
+const SLEEP_EFFICIENCY_FACTOR_MIN = 0.2;
+
+// The FORWARD question calorieTargetDetail asks: given a night that only delivers
+// `sleepEfficiencyFactor` of full value, how much BIGGER does the raw deficit need to be
+// to still realize `rawDeficitKcal`/day of actual fat loss? Divides rather than
+// multiplies — the mirror of sleepDeprivationKcal's reverse (actual-balance) question
+// above. Only on an actual deficit; a surplus or maintenance passes through unchanged,
+// since poor sleep isn't modelled as making a bulk MORE effective. Shared by
+// calorieTargetDetail and every Formula Playground mode that constructs D from a target
+// rate (EIN/FIXED_PCT/TAU), so none of them can quote a different D for the same inputs.
+function sleepAdjustedDeficitKcal(rawDeficitKcal, planSleepHours, sleepTargetHours) {
+  // Read once and carried in the result, rather than re-read by every caller that wants
+  // to trace η back to γ — so a typed (unsaved) γ in the Formula Playground reaches the
+  // trace the same way it reached the factor, off this one read.
+  const pctPerHour = getSetting(SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY, SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT);
+  if (rawDeficitKcal === null || rawDeficitKcal <= 0) {
+    return { rawDeficitKcal, deficitKcal: rawDeficitKcal, sleepDeprivationEffectKcal: 0, factor: 1, pctPerHour };
+  }
+  const factor = sleepEfficiencyFactor(planSleepHours, sleepTargetHours);
+  const deficitKcal = rawDeficitKcal / Math.max(factor, SLEEP_EFFICIENCY_FACTOR_MIN);
+  return {
+    rawDeficitKcal, deficitKcal, sleepDeprivationEffectKcal: Math.round(deficitKcal - rawDeficitKcal), factor, pctPerHour,
+  };
+}
+
 // The target for ONE body mass: BMR + the burn ACTIVITY_TARGET_MIN implies − the deficit
 // that hits WEEKLY_FAT_LOSS_KG. No lifestyle multiplier, so it agrees with the forecast
 // and Calorie Balance. The trade, since no label carries it: BMR + target activity
@@ -517,16 +593,30 @@ function calorieTargetDetail(bodyMassKg) {
   // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the target
   // above maintenance, flipping it from a ceiling to a floor. No plausibility guard: an
   // aggressive target means an aggressive setting, which is the user's call.
-  //
+  const rawDeficit = (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7;
+
+  // PLAN_SLEEP_HOURS defaults to the sleep target itself — "assume you hit it" — so an
+  // untouched setting keeps this identical to the arithmetic before the sleep model
+  // existed. Type fewer hours in the Formula Playground's `s` box and the deficit below
+  // grows to compensate for the lost efficiency (see sleepAdjustedDeficitKcal).
+  const sleepTargetHours = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const planSleepHours = getSetting('PLAN_SLEEP_HOURS', sleepTargetHours);
+  const {
+    deficitKcal: deficit, sleepDeprivationEffectKcal, factor, pctPerHour,
+  } = sleepAdjustedDeficitKcal(rawDeficit, planSleepHours, sleepTargetHours);
+
   // The TEF divisor is the last step, not a term: digestion's cost is a share of the intake
   // being solved for, so it scales the whole balance rather than being added to one side of
   // it (see tefDivisor). At the default f = 0 it divides by 1 and this is the same figure the
   // app has always produced.
   const divisor = tefDivisor();
-  const kcal = Math.round((bmr + activityKcal - (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7) / divisor);
+  const kcal = Math.round((bmr + activityKcal - deficit) / divisor);
 
   // Off the ROUNDED intake, so `TEF = f × Eᵢₙ` multiplies out against the Eᵢₙ shown beside it.
-  return { kcal, bmr, activityKcal, weeklyFatLossKg, tefKcal: kcal * (1 - divisor), tefDivisor: divisor };
+  return {
+    kcal, bmr, activityKcal, weeklyFatLossKg, rawDeficit, deficit, sleepDeprivationEffectKcal, factor, pctPerHour,
+    planSleepHours, sleepTargetHours, tefKcal: kcal * (1 - divisor), tefDivisor: divisor,
+  };
 }
 
 // Δm as a share of body mass — the unit the safety literature is written in, and with

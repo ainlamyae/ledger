@@ -46,12 +46,12 @@ function renderWellnessCharts(entries) {
   renderTodayGlanceCards(entries);
   renderWellnessBodyMassChart(entries);
   renderWellnessCaloriesChart(entries);
-  renderWellnessSleepChart(entries);
-  renderWellnessActivityChart(entries);
   renderWellnessProteinChart(entries);
   renderWellnessFiberChart(entries);
   renderWellnessFatChart(entries);
   renderWellnessCarbChart(entries);
+  renderWellnessActivityChart(entries);
+  renderWellnessSleepChart(entries);
   renderWellnessProjectionChart(entries);
   renderWellnessEnergyBalanceChart(entries);
 }
@@ -59,7 +59,7 @@ function renderWellnessCharts(entries) {
 // The charts answer "how's the trend", not "am I on track right now" — these tiles give
 // today's actual-vs-target for every Health Indicator metric without reading the
 // rightmost bar of each chart. Ordered to match that panel: Body Mass, then the
-// donut-grid order (Activity, Caloric, Protein, Fiber, Fat, Carbohydrate, Sleep).
+// donut-grid order (Caloric, Protein, Fiber, Fat, Carbohydrate, Activity, Sleep).
 function renderTodayGlanceCards(entries) {
   const todayIso = isoFromDate(new Date());
   const todayEntries = entries.filter((e) => e.date === todayIso);
@@ -175,7 +175,7 @@ function renderTodayGlanceCards(entries) {
     document.getElementById(`today-activity-${prefix}-value`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
-  setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries, calories, activityKcal, tefKcalToday);
+  setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries, calories, activityKcal, tefKcalToday, sleepHours);
   setTodayGlanceTile('today-activity-duration', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
   setTodayGlanceTile('today-activity-calories', activityKcal, activityTargetKcal, 'kcal', activityKcal !== null && activityKcal >= activityTargetKcal);
   setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget), null, false, null, '<');
@@ -194,7 +194,7 @@ function renderTodayGlanceCards(entries) {
 // of the generic value-over-target line — Estimate reads calcProjection's own day count
 // and ETA, the same figures State Trend & Forecast's time-progress meter shows, so the
 // two can't disagree.
-function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries, caloriesToday, activityKcalToday, tefKcalToday) {
+function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries, caloriesToday, activityKcalToday, tefKcalToday, sleepHoursToday) {
   const todayEl = document.getElementById('today-bodymass-value');
   todayEl.classList.remove('income', 'income-high', 'expense');
 
@@ -249,21 +249,34 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
   balanceEl.classList.remove('income', 'income-high', 'expense');
 
   // Same formula the Calorie Balance chart plots (intake minus BMR minus activity minus
-  // TEF, measured TEF winning over the flat estimate) — just for today alone, so this
+  // TEF, then the Sleep Deprivation Effect added — dailyEnergyBalanceKcal, which pushes a
+  // deficit toward zero and a surplus further past it) — just for today alone, so this
   // can't disagree with what that chart's rightmost bar would show.
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
   const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
 
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
   let balanceKcal = null;
+  let deprivationKcal = null;
   if (haveProfile && caloriesToday !== null && bodyMassKg !== null) {
     const maintenance = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
     const activity = activityKcalToday ?? 0;
     const tef = tefKcalToday !== null
       ? Math.round(tefKcalToday)
       : Math.round(caloriesToday * (1 - tefDivisor()));
-    balanceKcal = Math.round(caloriesToday) - maintenance - activity - tef;
+    ({ deprivationKcal, balance: balanceKcal } = dailyEnergyBalanceKcal(
+      Math.round(caloriesToday), maintenance, activity, tef, sleepHoursToday, sleepTarget,
+    ));
   }
+
+  // Same gradient as the Sleep chart's own dot for this day, so the tile and the chart
+  // can't disagree about how bad the night was.
+  const deprivationEl = document.getElementById('today-sleep-deprivation-value');
+  const deprivationText = deprivationKcal !== null ? `${deprivationKcal} kcal` : '—';
+  deprivationEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
+  deprivationEl.style.color = deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : '';
 
   const isCut = getCalorieTargetKind(entries) === 'max';
   const balanceTargetKcal = targetBalanceKcal(planBodyMassKg(entries));
@@ -760,7 +773,7 @@ function renderWellnessBodyMassChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(dates),
         // Fat energy left, kg right — but kg keeps the gridlines: it's what the bars
         // are read against, and the only one that lands on round numbers. Only the
         // sides move; the bars stay on `y`.
@@ -985,7 +998,7 @@ function renderWellnessCaloriesChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(dates),
         y: {
           // NOT zero-based, unlike the other intake charts. The target drifts only a few
           // tens of kcal across a 12-week window — on a 0-2,500 axis that's a handful of
@@ -1060,13 +1073,34 @@ function sleepStatusColor(durationHr, targetHr) {
     : lerpHex('#f59e0b', '#16a34a', (ratio - 0.5) / 0.5);
 }
 
+// Green at 0 kcal, sliding to red as the Deprivation Effect itself grows — driven by the
+// same kcal figure the dot's position and the glance tile's number already show, not a
+// separate hours-based reading, so the colour can't tell a different story than the
+// value beside it. Full red at 60 kcal/day: roughly what one night a couple of hours
+// short costs a typical few-hundred-kcal target deficit — an hours-based ratio against
+// the full sleep target left ordinary night-to-night variation reading as the same
+// solid green. Shared by the Sleep chart's dot and the Deprivation Effect glance tile.
+const SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL = 60;
+
+function sleepDeprivationDotColor(deprivationEffectKcal) {
+  if (deprivationEffectKcal === null || deprivationEffectKcal === undefined) return '#16a34a';
+  const ratio = Math.min(1, Math.max(0, deprivationEffectKcal / SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL));
+  return lerpHex('#16a34a', '#dc2626', ratio);
+}
+
 function renderWellnessSleepChart(entries) {
   const ctx = document.getElementById('wellness-sleep-chart');
 
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
   const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
-  const dates = wellnessWindowDates(sleepEntries);
+  // Shared with every other chart in the panel (wellnessCalorieChartDates), not this
+  // metric's own earliest log — a Sleep chart clipped to its own first entry could pick
+  // a different-length date list than Body Mass/Calorie Balance/etc, and
+  // wellnessTickIndices (charts-base.js) would then choose DIFFERENT Mondays for its
+  // ticks even though every chart runs the identical selection algorithm. One shared list is the
+  // only way every chart's gridlines are guaranteed to land on the same dates.
+  const dates = wellnessCalorieChartDates(entries);
 
   // Only the longest bed/wake-bearing entry per date, so a nap logged separately
   // doesn't compete with the night. A date with only a duration is left as a gap.
@@ -1111,6 +1145,27 @@ function renderWellnessSleepChart(entries) {
   const bedAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null), weekColumns);
   const wakeAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null), weekColumns);
 
+  // Deprivation Effect = Target Deficit × (1 - Sleep Efficiency Factor) — the kcal of
+  // the plan's own deficit (targetBalanceKcal, not the day's actual eaten-vs-burned
+  // balance — that adjustment lives in Calorie Balance instead) that a short night cost,
+  // dotted on each night's bar. Zero — green — at a full night; red and rising the
+  // further that night fell short of the target. This is the impact, not what survived
+  // it, so a good night reads as "nothing lost" rather than a number worth reading.
+  const targetDeficitKcal = targetBalanceKcal(planBodyMassKg(entries));
+  const sleepHoursByDate = new Map();
+  sleepEntries.forEach((e) => {
+    sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount);
+  });
+  const dotColors = [];
+  const deprivationEffectData = dates.map((d) => {
+    const sleepHrs = sleepHoursByDate.get(d);
+    if (sleepHrs === undefined || targetDeficitKcal === null) { dotColors.push(null); return null; }
+    const factor = sleepEfficiencyFactor(sleepHrs, sleepTarget);
+    const kcal = Math.round(Math.abs(targetDeficitKcal) * (1 - factor));
+    dotColors.push(sleepDeprivationDotColor(kcal));
+    return kcal;
+  });
+
   wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
     data: {
       labels: dates,
@@ -1120,10 +1175,25 @@ function renderWellnessSleepChart(entries) {
           label: 'Sleep',
           data: sleepData,
           backgroundColor: barColors,
+          yAxisID: 'y1',
           order: 2,
         },
-        weeklyAverageDataset('7-Day Avg Bed', bedAvg, {}, weekColumns),
-        weeklyAverageDataset('7-Day Avg Wake', wakeAvg, {}, weekColumns),
+        weeklyAverageDataset('7-Day Avg Bed', bedAvg, { yAxisID: 'y1' }, weekColumns),
+        weeklyAverageDataset('7-Day Avg Wake', wakeAvg, { yAxisID: 'y1' }, weekColumns),
+        {
+          type: 'line',
+          label: 'Deprivation Effect',
+          data: deprivationEffectData,
+          showLine: false,
+          spanGaps: false,
+          pointRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? 4 : 0),
+          pointHoverRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? 5 : 0),
+          pointBackgroundColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
+          pointBorderColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
+          yAxisID: 'y',
+          // Paints on top of the bar it sits on, same convention as the target caps.
+          order: 0,
+        },
       ],
     },
     options: {
@@ -1139,6 +1209,10 @@ function renderWellnessSleepChart(entries) {
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
+              if (item.dataset.label === 'Deprivation Effect') {
+                const text = `Deprivation Effect: ${item.raw} kcal`;
+                return privacyMode ? maskDigits(text) : text;
+              }
               const r = rangeByDate.get(item.label);
               if (!r) return '';
               const lines = [
@@ -1162,14 +1236,20 @@ function renderWellnessSleepChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(dates),
         y: {
+          min: 0,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: maskedUnitTick('kcal') },
+        },
+        y1: {
+          position: 'right',
           min: axisMin,
           max: axisMax,
           afterFit: fixTrendYAxisWidth,
+          grid: { drawOnChartArea: false },
           ticks: { stepSize: 3, callback: sleepAxisTickLabel },
         },
-        y1: ghostRightAxis(),
       },
     },
   });
@@ -1273,7 +1353,9 @@ function renderWellnessActivityChart(entries) {
   const ctx = document.getElementById('wellness-activity-chart');
 
   const activityEntries = entries.filter((e) => (e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null);
-  const dates = wellnessWindowDates(activityEntries);
+  // Shared with every other chart in the panel — see the Sleep chart's own copy of this
+  // comment for why a per-metric clip broke cross-chart gridline alignment.
+  const dates = wellnessCalorieChartDates(entries);
 
   // One stacked segment per description rather than a summed bar, so each day's
   // composition shows and not just its total. Entries with no recognized
@@ -1447,7 +1529,7 @@ function renderWellnessActivityChart(entries) {
         },
       },
       scales: {
-        x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: { ...wellnessCategoryXScale(dates), stacked: true },
         // kcal left with the gridlines, minutes right with none: the comparison this
         // chart exists for — Actual against Target Burn — happens on the kcal scale,
         // so the lines have to be spaced in kcal. Only the sides move; the axis ids are
@@ -1479,7 +1561,9 @@ function renderWellnessProteinChart(entries) {
   const band = getProteinTargetBandG(entries);
 
   const proteinEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.amount2 !== null);
-  const dates = wellnessWindowDates(proteinEntries);
+  // Shared with every other chart in the panel — see the Sleep chart's own copy of this
+  // comment for why a per-metric clip broke cross-chart gridline alignment.
+  const dates = wellnessCalorieChartDates(entries);
   const byDate = new Map();
   proteinEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
 
@@ -1578,7 +1662,7 @@ function renderWellnessProteinChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(dates),
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -1601,7 +1685,9 @@ function renderWellnessFiberChart(entries) {
   const band = getFiberTargetBandG(entries);
 
   const fiberEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.fiberG !== null && e.fiberG !== undefined);
-  const dates = wellnessWindowDates(fiberEntries);
+  // Shared with every other chart in the panel — see the Sleep chart's own copy of this
+  // comment for why a per-metric clip broke cross-chart gridline alignment.
+  const dates = wellnessCalorieChartDates(entries);
   const byDate = new Map();
   fiberEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.fiberG));
 
@@ -1684,7 +1770,7 @@ function renderWellnessFiberChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(dates),
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -1708,7 +1794,9 @@ function renderWellnessFatChart(entries) {
   const band = getFatTargetBandG(entries);
 
   const fatEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.fatG !== null && e.fatG !== undefined);
-  const dates = wellnessWindowDates(fatEntries);
+  // Shared with every other chart in the panel — see the Sleep chart's own copy of this
+  // comment for why a per-metric clip broke cross-chart gridline alignment.
+  const dates = wellnessCalorieChartDates(entries);
   const byDate = new Map();
   fatEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.fatG));
 
@@ -1804,7 +1892,7 @@ function renderWellnessFatChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(dates),
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -1829,7 +1917,9 @@ function renderWellnessCarbChart(entries) {
   const band = getCarbTargetBandG(entries);
 
   const carbEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.carbG !== null && e.carbG !== undefined);
-  const dates = wellnessWindowDates(carbEntries);
+  // Shared with every other chart in the panel — see the Sleep chart's own copy of this
+  // comment for why a per-metric clip broke cross-chart gridline alignment.
+  const dates = wellnessCalorieChartDates(entries);
   const byDate = new Map();
   carbEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.carbG));
 
@@ -1923,7 +2013,7 @@ function renderWellnessCarbChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(dates),
         y: {
           beginAtZero: true,
           afterFit: fixTrendYAxisWidth,
@@ -2134,6 +2224,7 @@ function renderWellnessProjectionChart(entries) {
     const intakeByDate = new Map();
     const tefByDate = new Map();
     const activityKcalByDate = new Map();
+    const sleepHoursByDate = new Map();
     entries.forEach((e) => {
       if (e.amount === null) return;
       if (e.category === 'Calories' || e.category === 'Calories; Protein') {
@@ -2146,8 +2237,11 @@ function renderWellnessProjectionChart(entries) {
       } else if (e.category === 'Activity' || e.category === 'Activity; Calories') {
         const kcal = activityEntryKcal(e, calorieBodyMassForDate.get(e.date) ?? null);
         activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
+      } else if (e.category === 'Sleep') {
+        sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount);
       }
     });
+    const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
     let running = startBodyMass;
     calorieTrendDates.forEach((d) => {
@@ -2157,7 +2251,9 @@ function renderWellnessProjectionChart(entries) {
       const maintenance = bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex);
       const activity = activityKcalByDate.get(d) || 0;
       const tef = tefByDate.has(d) ? tefByDate.get(d) : intake * (1 - tefDivisor());
-      const balance = intake - maintenance - activity - tef;
+      // Same sleep-adjusted balance Calorie Balance itself scores (dailyEnergyBalanceKcal)
+      // — this walk can't disagree with that chart's own reading of a day's shortfall.
+      const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, sleepHoursByDate.get(d), sleepTarget);
       running += balance / GENERIC_KCAL_PER_KG_FAT;
     });
   }
@@ -2356,13 +2452,57 @@ function renderWellnessProjectionChart(entries) {
     ? Math.ceil(bodyMassMax + bodyMassPad)
     : Math.ceil(bodyMassTarget);
 
+  // The EXACT date list Body Mass and Caloric Intake already share (see
+  // wellnessCalorieChartDates) — clipped forward to the earliest CALORIE entry, not
+  // this chart's own earliest weigh-in, which can predate it and did: clipping to
+  // bodyMassEntries[0] here left this axis starting well before every bar chart's own
+  // leftmost bar, with empty space where they had none. Reused directly for both the
+  // axis edges and the tick list below, so this axis can't quote a different window
+  // than the one they're actually drawn on.
+  const axisDates = wellnessCalorieChartDates(entries);
+  const axisFromDate = axisDates.length ? axisDates[0] : windowFromDate;
+
   const scales = {
     x: {
       type: 'linear',
+      // Pinned to the window's own (clipped) edges, not left for Chart.js to auto-fit
+      // from whatever's actually plotted: allLabels is sparse (only weigh-ins and
+      // weekly projected points), so an auto-fit axis stretched to fit just those
+      // points ran a narrower — or wider — span than every category-axis chart above
+      // it, which always covers the full clipped window (every calendar day, even
+      // empty ones). That's what let the same calendar date land at a different
+      // fraction across this chart's width than everywhere else — "today" mid-plot
+      // here, far right there.
+      //
+      // The ±0.5 day pad on top of those edges matters just as much as the edges
+      // themselves: every bar chart above this one is a CATEGORY axis with Chart.js's
+      // default `offset: true` for bar charts, which reserves half a category's width
+      // as margin on EACH side and centers every gridline inside its own 1-day-wide
+      // band — so day N sits at pixel fraction (N+0.5)/numDays, not N/numDays. A plain
+      // linear axis has no such margin: value=min lands flush at the left edge.
+      // Padding this axis's min/max out by half a day reproduces that same
+      // band-centering, so a gridline for the same calendar day lands at the same
+      // fraction of the plot width on both kinds of axis.
+      min: dayOffset(axisFromDate) - 0.5,
+      max: dayOffset(windowToDate) + 0.5,
       // min = max, so the labels hold a fixed 45° like the rest of the section instead
       // of Chart.js straightening them whenever they happen to fit — which made this
       // axis flip angle on resize.
-      ticks: { maxTicksLimit: 7, maxRotation: 45, minRotation: 45, autoSkip: true, callback: offsetToDateLabel },
+      //
+      // Ticks forced onto the SAME calendar dates the section's category-axis charts
+      // pick (wellnessTickIndices, charts-base.js — Mondays, not an evenly-spaced-by-
+      // index pick) — Chart.js's own autoSkip runs a
+      // pixel-width heuristic that differs between a category axis and this linear
+      // day-offset one, so left to itself this axis could (and did) label different
+      // calendar dates than every bar chart above it for the exact same window.
+      afterBuildTicks: (axis) => {
+        axis.ticks = wellnessTickIndices(axisDates).map((i) => ({ value: dayOffset(axisDates[i]) }));
+      },
+      // autoSkip false for the same reason wellnessCategoryXScale disables it
+      // (charts-base.js): left on, it runs AFTER afterBuildTicks and could thin the 7
+      // ticks just chosen above independently of whatever the category axes' own
+      // autoSkip passes decide, undoing the point of picking them identically.
+      ticks: { maxRotation: 45, minRotation: 45, autoSkip: false, callback: offsetToDateLabel },
     },
     y: {
       min: yMin,
@@ -2468,7 +2608,15 @@ function energyBalanceColor(balance, isCut, target, weeklyAvg) {
 //
 // Takes a body mass because a pinned percentage makes the rate depend on it; unpinned the
 // argument is ignored and this is the flat WEEKLY_FAT_LOSS_KG it always was.
+//
+// Routed through calorieTargetDetail (which now folds in PLAN_SLEEP_HOURS — see
+// sleepAdjustedDeficitKcal in wellness-math.js) whenever a full profile is on file, so this
+// chart's own dash and the Sleep chart's dot can't quote a smaller target deficit than the
+// real Eᵢₙ was actually built from. Falls back to the un-adjusted rate with no profile,
+// same as calorieTargetDetail's own callers do.
 function targetBalanceKcal(bodyMassKg) {
+  const detail = calorieTargetDetail(bodyMassKg);
+  if (detail !== null) return -Math.round(detail.deficit);
   const weeklyKg = weeklyFatLossKgAt(bodyMassKg);
   if (weeklyKg === null || weeklyKg === 0) return null;
   return -Math.round((weeklyKg * GENERIC_KCAL_PER_KG_FAT) / 7);
@@ -2530,6 +2678,17 @@ function renderWellnessEnergyBalanceChart(entries) {
   // the two charts can't disagree about which way the user is headed.
   const isCut = getCalorieTargetKind(entries) === 'max';
 
+  // Sleep Deprivation Effect: how much of the day's OWN balance (not the flat plan
+  // target — see the Sleep chart's dot for that) a short night cost — shrinking a
+  // deficit's fat loss, or growing a surplus's fat gain, whichever side of zero the day
+  // was already on. Folded straight into "balance" itself, so this chart, its
+  // weekly average, and State Trend & Forecast's Calorie-Implied Trajectory (which
+  // walks this same arithmetic day by day) all read the sleep-adjusted figure.
+  const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
+  const sleepHoursByDate = new Map();
+  sleepEntries.forEach((e) => sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount));
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
   const detailByDate = new Map();
 
   const balanceData = labels.map((date) => {
@@ -2548,10 +2707,12 @@ function renderWellnessEnergyBalanceChart(entries) {
     // whenever Physique has calculated one for this day.
     const tefMeasured = tefByDate.has(date);
     const tef = Math.round(tefMeasured ? tefByDate.get(date) : intake * (1 - tefDivisor()));
-    const balance = intake - maintenance - activity - tef;
+    const { rawBalance, deprivationKcal, balance } = dailyEnergyBalanceKcal(
+      intake, maintenance, activity, tef, sleepHoursByDate.get(date), sleepTarget,
+    );
 
     detailByDate.set(date, {
-      intake, maintenance, activity, tef, tefMeasured, balance,
+      intake, maintenance, activity, tef, tefMeasured, rawBalance, deprivationKcal, balance,
       massG: Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000),
     });
     return balance;
@@ -2658,6 +2819,11 @@ function renderWellnessEnergyBalanceChart(entries) {
                 // TEF_PERCENT_OF_INTAKE fallback — the two can differ by a real amount,
                 // so which one produced this bar shouldn't be left ambiguous.
                 ...(d.tef > 0 ? [`Digestion (TEF, ${d.tefMeasured ? 'measured' : 'est.'}): ${withExplicitSign(-d.tef)} kcal`] : []),
+                // Added, not subtracted: on a deficit this is how much less of it became
+                // fat loss; on a surplus it's how much MORE was gained, since short sleep
+                // drives hunger and cuts NEAT rather than sitting out surplus days. Shown
+                // only when a night actually fell short of the target.
+                ...(d.deprivationKcal > 0 ? [`Sleep Deprivation Effect: ${withExplicitSign(d.deprivationKcal)} kcal`] : []),
                 `Expected Fat: ${withExplicitSign(d.massG)} g`,
                 `Actual ${actualWord}: ${withExplicitSign(d.balance)} kcal`,
               ];
@@ -2683,7 +2849,7 @@ function renderWellnessEnergyBalanceChart(entries) {
         },
       },
       scales: {
-        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        x: wellnessCategoryXScale(labels),
         y: {
           min: yMin,
           max: yMax,

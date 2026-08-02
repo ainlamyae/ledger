@@ -74,6 +74,7 @@ function renderTodayGlanceCards(entries) {
   let sleepHours = null;
   let sleepBedMin = null;
   let sleepWakeMin = null;
+  let tefKcalToday = null;
 
   todayEntries.forEach((e) => {
     if (e.category === 'Body Mass' && e.amount !== null) {
@@ -93,6 +94,9 @@ function renderTodayGlanceCards(entries) {
     }
     if (e.category === 'Calories; Protein' && e.carbG !== null && e.carbG !== undefined) {
       carb = (carb ?? 0) + e.carbG;
+    }
+    if (e.category === 'Calories; Protein' && e.tefKcal !== null && e.tefKcal !== undefined) {
+      tefKcalToday = (tefKcalToday ?? 0) + e.tefKcal;
     }
     if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
       activityMins = (activityMins ?? 0) + toActivityMinutes(e.amount, e.unit);
@@ -117,9 +121,6 @@ function renderTodayGlanceCards(entries) {
   // is pinned instead — see getActivityTargetMin.
   const activityTarget = Math.round(getActivityTargetMin(bodyMassKg));
 
-  // The heading carries which target it is, since the number can't and the value line
-  // has no room. Digit-free, so privacy mode has nothing to hide.
-  document.getElementById('today-calories-label').textContent = `${calorieTarget.word} Calory`;
 
   // Down on a cut, up on a bulk — same read as the Body Mass chart's bar colours.
   const bodyMassGood = bodyMassKgToday !== null
@@ -158,45 +159,115 @@ function renderTodayGlanceCards(entries) {
   // quote different numbers for one day.
   const activityTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
 
-  setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries);
+  setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries, calories, activityKcal, tefKcalToday);
   setTodayGlanceTile('today-activity-duration', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
   setTodayGlanceTile('today-activity-calories', activityKcal, activityTargetKcal, 'kcal', activityKcal !== null && activityKcal >= activityTargetKcal);
-  setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
+  setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget), null, false, null, '<');
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
   setTodayGlanceTile('today-fiber', fiber, formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
   setTodayGlanceTile('today-fat', fat, formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand, null, fatOverBand);
   setTodayGlanceTile('today-carb', carb, formatProteinTargetBand(carbBand), 'g', carbInBand, null, false, carbUnderBand ? BODY_MASS_UNSCORED_COLOR : null);
   setTodayGlanceTile('today-sleep-duration', sleepHours, sleepTarget, 'hr', null, null, false, sleepHours !== null ? sleepStatusColor(sleepHours, sleepTarget) : null);
-  const bedtimeText = sleepBedMin !== null ? formatClockTime24(sleepBedMin) : '—';
-  document.getElementById('today-sleep-bedtime-value').textContent = privacyMode ? maskDigits(bedtimeText) : bedtimeText;
-  const wakeText = sleepWakeMin !== null ? formatClockTime24(sleepWakeMin) : '—';
-  document.getElementById('today-sleep-wake-value').textContent = privacyMode ? maskDigits(wakeText) : wakeText;
+  const windowText = sleepBedMin !== null && sleepWakeMin !== null
+    ? `${formatClockTime24(sleepBedMin)}-${formatClockTime24(sleepWakeMin)}`
+    : '—';
+  document.getElementById('today-sleep-window-value').textContent = privacyMode ? maskDigits(windowText) : windowText;
 }
 
-// Body Mass gets its own four-row layout (Today/Target/Estimate/Days left) instead of
-// the generic value-over-target line — Estimate and Days left read calcProjection's own
-// ETA and day count, the same figures State Trend & Forecast's time-progress meter
-// shows, so none of them can disagree.
-function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries) {
+// Body Mass gets its own two-row layout (Today/Target combined, then Estimate) instead
+// of the generic value-over-target line — Estimate reads calcProjection's own day count
+// and ETA, the same figures State Trend & Forecast's time-progress meter shows, so the
+// two can't disagree.
+function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries, caloriesToday, activityKcalToday, tefKcalToday) {
   const todayEl = document.getElementById('today-bodymass-value');
   todayEl.classList.remove('income', 'income-high', 'expense');
-  const todayText = bodyMassKgToday !== null ? `${bodyMassKgToday} kg` : '—';
-  todayEl.textContent = privacyMode ? maskDigits(todayText) : todayText;
+
+  const todayPart = bodyMassKgToday !== null ? `${bodyMassKgToday}` : '—';
+  const combinedText = `${todayPart} / ${bodyMassTarget} kg`;
+  todayEl.textContent = privacyMode ? maskDigits(combinedText) : combinedText;
   if (bodyMassKgToday !== null) todayEl.classList.add(isGood ? 'income' : 'expense');
 
-  const targetText = `${bodyMassTarget} kg`;
-  document.getElementById('today-bodymass-target-value').textContent = privacyMode ? maskDigits(targetText) : targetText;
+  const bmiEl = document.getElementById('today-bodymass-bmi-value');
+  bmiEl.classList.remove('income', 'income-high', 'expense');
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const bmiText = bodyMassKgToday !== null && heightCm !== null
+    ? `${computeBmi(bodyMassKgToday, heightCm)} / ${computeBmi(bodyMassTarget, heightCm)} kg/m²`
+    : '—';
+  bmiEl.textContent = privacyMode ? maskDigits(bmiText) : bmiText;
+  if (bodyMassKgToday !== null && heightCm !== null) bmiEl.classList.add(isGood ? 'income' : 'expense');
+
+  const changeEl = document.getElementById('today-bodymass-change-value');
+  changeEl.classList.remove('income', 'income-high', 'expense');
+
+  // Same smoothed slope the Body Mass chart's own "Smoothed Change" tooltip line
+  // reads — computeBodyMassTrend/computeBodyMassTrendSlopeGramsPerDay off the FULL
+  // history, at its last point, so this can't quote a different figure than the chart.
+  const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
+  let actualGPerDay = null;
+  if (bodyMassEntries.length >= 2) {
+    const trendMap = computeBodyMassTrend(bodyMassByDateMap(bodyMassEntries));
+    const slopeByDate = computeBodyMassTrendSlopeGramsPerDay(trendMap);
+    const trendDates = [...slopeByDate.keys()].sort();
+    actualGPerDay = slopeByDate.get(trendDates[trendDates.length - 1]) ?? null;
+  }
+
+  // The Formula Playground's own weekly rate (weeklyFatLossKgAt), converted to a daily
+  // g/day figure in the same signed convention as actualGPerDay above (negative =
+  // losing) — this app's rate plans are always framed as a loss, so the sign flips only
+  // with which direction BODY_MASS_TARGET_KG itself calls for.
+  const bodyMassKg = latestBodyMassKg(entries);
+  const weeklyFatLossKg = weeklyFatLossKgAt(bodyMassKg);
+  const targetIsDownward = bodyMassTargetIsDownward(entries);
+  const targetGPerDay = weeklyFatLossKg ? Math.round((weeklyFatLossKg * 1000) / 7) * (targetIsDownward ? -1 : 1) : null;
+
+  const changeText = actualGPerDay !== null && targetGPerDay !== null
+    ? `${withExplicitSign(actualGPerDay)} / ${withExplicitSign(targetGPerDay)} g/day`
+    : '—';
+  changeEl.textContent = privacyMode ? maskDigits(changeText) : changeText;
+  if (actualGPerDay !== null && targetGPerDay !== null) {
+    const changeGood = targetIsDownward ? actualGPerDay <= targetGPerDay : actualGPerDay >= targetGPerDay;
+    changeEl.classList.add(changeGood ? 'income' : 'expense');
+  }
+
+  const balanceEl = document.getElementById('today-bodymass-balance-value');
+  balanceEl.classList.remove('income', 'income-high', 'expense');
+
+  // Same formula the Calorie Balance chart plots (intake minus BMR minus activity minus
+  // TEF, measured TEF winning over the flat estimate) — just for today alone, so this
+  // can't disagree with what that chart's rightmost bar would show.
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
+
+  let balanceKcal = null;
+  if (haveProfile && caloriesToday !== null && bodyMassKg !== null) {
+    const maintenance = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
+    const activity = activityKcalToday ?? 0;
+    const tef = tefKcalToday !== null
+      ? Math.round(tefKcalToday)
+      : Math.round(caloriesToday * (1 - tefDivisor()));
+    balanceKcal = Math.round(caloriesToday) - maintenance - activity - tef;
+  }
+
+  const isCut = getCalorieTargetKind(entries) === 'max';
+  const balanceTargetKcal = targetBalanceKcal(planBodyMassKg(entries));
+
+  const balanceText = balanceKcal !== null
+    ? `${withExplicitSign(balanceKcal)}${balanceTargetKcal !== null ? ` / ${withExplicitSign(balanceTargetKcal)}` : ''} kcal`
+    : '—';
+  balanceEl.textContent = privacyMode ? maskDigits(balanceText) : balanceText;
+  if (balanceKcal !== null) {
+    const balanceGood = balanceTargetKcal !== null
+      ? (isCut ? balanceKcal <= balanceTargetKcal : balanceKcal >= balanceTargetKcal)
+      : (isCut ? balanceKcal < 0 : balanceKcal > 0);
+    balanceEl.classList.add(balanceGood ? 'income' : 'expense');
+  }
 
   const proj = calcProjection(entries);
   const etaText = proj?.status === 'reached' ? 'Reached'
-    : (proj?.status === 'ok' && proj.etaDate) ? isoFromDate(proj.etaDate)
+    : (proj?.status === 'ok' && proj.etaDate) ? `${proj.daysToTarget} (${isoFromDate(proj.etaDate)})`
     : '—';
   document.getElementById('today-bodymass-eta-value').textContent = privacyMode ? maskDigits(etaText) : etaText;
-
-  const daysText = proj?.status === 'reached' ? '0'
-    : (proj?.status === 'ok' && proj.daysToTarget !== undefined) ? `${proj.daysToTarget}`
-    : '—';
-  document.getElementById('today-bodymass-days-value').textContent = privacyMode ? maskDigits(daysText) : daysText;
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
@@ -206,12 +277,12 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries)
 // other tile leaves it false and gets the plain two-colour split. `colorOverride`, when
 // given, paints the value that exact colour instead of picking one of the two/three
 // fixed classes — Sleep's own gradient read, see renderTodayGlanceCards above.
-function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, isHigh = false, colorOverride = null) {
+function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, isHigh = false, colorOverride = null, separator = '/') {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'income-high', 'expense');
   el.style.color = '';
 
-  const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` (${note})` : ''}`;
+  const text = `${value !== null ? value : '—'} ${separator} ${target} ${unit}${note !== null ? ` (${note})` : ''}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
   if (value === null) return;
   if (colorOverride !== null) {
@@ -760,6 +831,29 @@ function renderWellnessCaloriesChart(entries) {
   const byDate = new Map();
   calorieEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
+  // Resting metabolic rate, at THAT day's own carried-forward body mass and age — not a
+  // flat figure at today's, since both can move across the window (a multi-week range can
+  // span a birthday, and body mass is the whole point of the chart next to it). Drawn as
+  // its own dashed line below and restated in the hover (afterBody).
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const birthDateStr = getSettingString('BIRTH_DATE', null);
+  const sex = getSettingString('SEX', null);
+  const haveRestingProfile = heightCm !== null && (sex === 'male' || sex === 'female');
+  const bodyMassForDate = carryForwardBodyMassByDate(
+    bodyMassByDateMap(entries.filter((e) => e.category === 'Body Mass' && e.amount !== null)),
+    dates,
+  );
+  const restingKcalByDate = new Map();
+  if (haveRestingProfile) {
+    dates.forEach((d) => {
+      const massKg = bodyMassForDate.get(d);
+      if (massKg === undefined || massKg === null) return;
+      const age = ageFromBirthDate(birthDateStr, dateFromIso(d));
+      if (age === null && bmrNeedsAge()) return;
+      restingKcalByDate.set(d, bmrKcal(massKg, heightCm, age, sex));
+    });
+  }
+
   // Re-evaluated per day, so there's no single figure to draw: each bar carries its own
   // and is scored against that one alone.
   const targetByDay = calorieTargetSeries(entries, dates);
@@ -798,7 +892,11 @@ function renderWellnessCaloriesChart(entries) {
     if (withinCalorieTarget(avg, dayTarget(i))) barColors[i] = CALORIE_NEAR_TARGET_COLOR;
   });
 
-  const axis = calorieAxisBounds(values.filter((v, i) => byDate.has(dates[i])), targetByDay.map((b) => b.kcal));
+  const restingKcalValues = [...restingKcalByDate.values()];
+  const axis = calorieAxisBounds(
+    values.filter((v, i) => byDate.has(dates[i])),
+    targetByDay.map((b) => b.kcal).concat(restingKcalValues),
+  );
 
   // A cap across each bar rather than one continuous line: a line spanning the window
   // reads as a single shared limit however it's dashed, while a mark per bar says the
@@ -828,6 +926,12 @@ function renderWellnessCaloriesChart(entries) {
           // Lowest order paints last, so the cap stays visible on a bar that overshot it.
           order: 0,
         },
+        // Resting metabolic rate, per day (see restingKcalByDate above) — the same
+        // per-day cap idiom as the Target above (and Protein/Fiber Intake's own min/max),
+        // not a separate line style: a mark per bar, same thickness, same colour.
+        ...(restingKcalValues.length === 0 ? [] : [
+          targetCapDataset('Basal Metabolic Rate', dates.map((d) => restingKcalByDate.get(d) ?? null), capHalf, { isTargetLine: true }),
+        ]),
       ],
     },
     options: {
@@ -856,6 +960,8 @@ function renderWellnessCaloriesChart(entries) {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
               const lines = [`Target ${target.word}: ${targetByDay[i].kcal} kcal`];
+              const restingKcal = restingKcalByDate.get(items[0].label);
+              if (restingKcal !== undefined) lines.push(`Basal Metabolic Rate: ${Math.round(restingKcal)} kcal`);
               if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },

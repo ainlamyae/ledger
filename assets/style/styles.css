@@ -1981,7 +1981,7 @@ td .btn {
     position: absolute;
     top: 0;
     transform: translateX(-50%);
-    background: color-mix(in srgb, var(--color-income) var(--fill-pct, 0%), var(--color-primary));
+    background: color-mix(in srgb, var(--color-income) calc(var(--fill-pct, 0) * 1%), var(--color-expense));
     color: #fff;
     font-size: .72rem;
     font-weight: 700;
@@ -2000,7 +2000,7 @@ td .btn {
     left: 50%;
     transform: translateX(-50%);
     border: 4px solid transparent;
-    border-top-color: color-mix(in srgb, var(--color-income) var(--fill-pct, 0%), var(--color-primary));
+    border-top-color: color-mix(in srgb, var(--color-income) calc(var(--fill-pct, 0) * 1%), var(--color-expense));
 }
 
 .body-mass-progress-meter-callout.danger {
@@ -2011,11 +2011,18 @@ td .btn {
     border-top-color: var(--color-expense);
 }
 
+/* One continuous red-to-green gradient, sized to the TRACK's own full width
+   (not the fill's, which is only pct% of it) via the 100/pct scale-up below —
+   so the fill's box always crops the same fixed gradient at the same points,
+   and growing the bar reveals more of it rather than re-stretching a fresh
+   red-to-green run into whatever sliver is currently filled. */
 .body-mass-progress-meter-fill {
     height: 100%;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--color-income) var(--fill-pct, 0%), var(--color-primary));
-    transition: width .4s ease, background .4s ease;
+    background-image: linear-gradient(to right, var(--color-expense), var(--color-income));
+    background-size: calc(10000% / var(--fill-pct, 100)) 100%;
+    background-position: left;
+    transition: width .4s ease;
 }
 
 .body-mass-progress-meter-fill.danger {
@@ -2491,11 +2498,15 @@ td .btn {
     }
 
     .nav {
-        gap: .4rem;
+        gap: 0;
+        justify-content: space-between;
     }
 
     .nav a {
-        font-size: .75rem;
+        flex: 1;
+        text-align: center;
+        font-size: 1rem;
+        padding: .5rem .25rem;
     }
 
     #accounts,

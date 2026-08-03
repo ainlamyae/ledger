@@ -187,7 +187,7 @@
             <div class="card">
                 <h3>Intake Macros</h3>
                 <div class="widget-row"><span>Intake</span><span id="today-macros-intake-value">—</span></div>
-                <div class="widget-row"><span>Digestion</span><span id="today-macros-digestion-value">—</span></div>
+                <div class="widget-row"><span>TEF</span><span id="today-macros-digestion-value">—</span></div>
                 <div class="widget-row"><span>Protein</span><span id="today-protein-value">—</span></div>
                 <div class="widget-row"><span>Fiber</span><span id="today-fiber-value">—</span></div>
                 <div class="widget-row"><span>Fat</span><span id="today-fat-value">—</span></div>
@@ -216,6 +216,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Health Indicator</h2>
+                <button type="button" id="formula-playground-btn" class="btn btn-primary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
             </div>
 
             <div class="body-mass-projection-wrap">
@@ -452,9 +453,6 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Physique</h2>
-                <!-- Primary, not plain: this one writes back to Settings rather than
-                     just showing a formula. -->
-                <button type="button" id="formula-playground-btn" class="btn btn-primary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
                 <button id="add-physique-btn" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
                 <button id="today-physique-btn" class="btn panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
             </div>
@@ -478,8 +476,9 @@
                     <tr>
                         <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
                         <th class="sortable" data-sort="date">Date</th>
-                        <th title="Hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">Sleep</th>
                         <th class="sortable" data-sort="bodyMass" title="Body Mass">Mass</th>
+                        <th title="Hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">Sleep</th>
+                        <th title="Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">Depr</th>
                         <th class="sortable" data-sort="caloriesIn" title="Calories In">Cal↓</th>
                         <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
                         <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
@@ -1379,7 +1378,7 @@
                     <input type="time" id="physique-wake-time">
                 </label>
             </div>
-            <p>Sleep Duration: <span id="physique-sleep-duration">—</span></p>
+            <p>Sleep Duration: <span id="physique-sleep-duration">—</span> · Sleep Deprivation: <span id="physique-sleep-deprivation" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">—</span></p>
             <label>Consumption
                 <div class="autocomplete-anchor">
                     <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>

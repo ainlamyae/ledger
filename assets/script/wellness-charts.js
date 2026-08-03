@@ -168,7 +168,7 @@ function renderTodayGlanceCards(entries) {
     if (!matches.length) return '0 min (0 kcal)';
     const mins = Math.round(matches.reduce((sum, e) => sum + toActivityMinutes(e.amount, e.unit), 0));
     const kcal = Math.round(matches.reduce((sum, e) => sum + activityEntryKcal(e, bodyMassKg), 0));
-    return `${mins} min (${kcal} kcal)`;
+    return `${mins} min (${kcal > 0 ? '-' : ''}${kcal} kcal)`;
   };
   ['cardio', 'neat', 'strength'].forEach((prefix) => {
     const text = activityCategoryLine(prefix);
@@ -219,7 +219,7 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
   // Intake — computed for the Intake Macros card mirror; no Status row.
   const calTarget = getCalorieTarget(entries);
   const intakeText = caloriesToday !== null
-    ? `${withExplicitSign(Math.round(caloriesToday))} < ${calTarget.kcal} kcal`
+    ? `${Math.round(caloriesToday)} / ${calTarget.kcal} kcal`
     : '—';
   const macrosIntakeEl = document.getElementById('today-macros-intake-value');
   macrosIntakeEl.classList.remove('income', 'expense');
@@ -227,14 +227,16 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
   if (caloriesToday !== null) macrosIntakeEl.classList.add(withinCalorieTarget(caloriesToday, calTarget) ? 'income' : 'expense');
 
   // Activity — computed for the Physical Activity card mirror; no Status row.
+  // No activity logged today reads as 0, same as the Cardio/NEAT/Strength lines
+  // just below it, rather than a dash — a day with nothing logged yet is 0 kcal
+  // burned so far, not "unknown".
   const actTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
-  const actText = activityKcalToday !== null
-    ? `${withExplicitSign(-activityKcalToday)} / ${actTargetKcal} kcal`
-    : '—';
+  const activityKcalSoFar = activityKcalToday ?? 0;
+  const actText = `${activityKcalSoFar > 0 ? '-' : ''}${activityKcalSoFar} / -${actTargetKcal} kcal`;
   const macrosActivityEl = document.getElementById('today-macros-activity-value');
   macrosActivityEl.classList.remove('income', 'expense');
   macrosActivityEl.textContent = privacyMode ? maskDigits(actText) : actText;
-  if (activityKcalToday !== null) macrosActivityEl.classList.add(activityKcalToday >= actTargetKcal ? 'income' : 'expense');
+  macrosActivityEl.classList.add(activityKcalSoFar >= actTargetKcal ? 'income' : 'expense');
 
   // Digestion — computed for the Intake Macros card mirror; no Status row.
   const digKcal = tefKcalToday !== null
@@ -279,7 +281,7 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
   if (maintenanceEl) maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
 
   // Deprivation — computed for the Sleep card mirror; no Status row.
-  const deprivationText = deprivationKcal !== null ? `${withExplicitSign(deprivationKcal)} / 0 kcal` : '—';
+  const deprivationText = deprivationKcal !== null ? `${deprivationKcal} / 0 kcal` : '—';
   const sleepDeprivationCardEl = document.getElementById('today-sleep-deprivation-card-value');
   if (sleepDeprivationCardEl) {
     sleepDeprivationCardEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
@@ -963,11 +965,24 @@ function renderWellnessCaloriesChart(entries) {
   // invisible at zero height anyway rather than the worst day on the chart under a floor.
   const CALORIE_NEAR_TARGET_COLOR = '#9ca3af';
   const values = dates.map((d) => byDate.get(d) || 0);
+  // On a "Max" target, red beyond it isn't flat — green at the target itself sliding
+  // to red at that day's own Basal Metabolic Rate (restingKcalByDate, above), since
+  // eating up to BMR alone already erases the deficit before activity or TEF even
+  // factor in: the real ceiling the target sits a step under. Solid red at or past
+  // BMR itself. A "Min" target (a bulk) has no such ceiling to gradient toward, so
+  // it keeps the old flat near/missed split, as does a Max day BMR can't be priced
+  // for yet (no profile, or no body mass logged).
   const barColors = dates.map((d, i) => {
     if (!byDate.has(d)) return '#16a34a';
-    const score = calorieTargetScore(values[i], dayTarget(i));
-    if (score === 'met') return '#16a34a';
-    return score === 'near' ? CALORIE_NEAR_TARGET_COLOR : '#dc2626';
+    const value = values[i];
+    const dt = dayTarget(i);
+    if (withinCalorieTarget(value, dt)) return '#16a34a';
+    const bmr = target.isMax ? restingKcalByDate.get(d) : undefined;
+    if (bmr === undefined || bmr === null || bmr <= dt.kcal) {
+      return calorieTargetScore(value, dt) === 'near' ? CALORIE_NEAR_TARGET_COLOR : '#dc2626';
+    }
+    if (value >= bmr) return '#dc2626';
+    return lerpHex('#16a34a', '#dc2626', (value - dt.kcal) / (bmr - dt.kcal));
   });
 
   // Averaged off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins
@@ -2202,7 +2217,7 @@ function renderWellnessProjectionChart(entries) {
     meterWrap.hidden = false;
     meterFill.style.width = `${pct}%`;
     meterFill.classList.toggle('danger', isWrongDirection);
-    if (!isWrongDirection) meterWrap.style.setProperty('--fill-pct', `${Math.round(pct)}%`);
+    if (!isWrongDirection) meterWrap.style.setProperty('--fill-pct', `${Math.round(pct)}`);
 
     // Same edge the fill stops at, so the bubble reads as "you are here" rather
     // than a second, disagreeing marker.
@@ -2267,7 +2282,7 @@ function renderWellnessProjectionChart(entries) {
       const timePct = Math.max(0, Math.min(100, (daysElapsed / totalDays) * 100));
       timeWrap.hidden = false;
       timeFill.style.width = `${timePct}%`;
-      timeWrap.style.setProperty('--fill-pct', `${Math.round(timePct)}%`);
+      timeWrap.style.setProperty('--fill-pct', `${Math.round(timePct)}`);
 
       const elapsedText = `${daysElapsed} ${daysElapsed === 1 ? 'day' : 'days'}`;
       timeElapsed.textContent = privacyMode ? maskDigits(elapsedText) : elapsedText;

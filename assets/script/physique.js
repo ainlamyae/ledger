@@ -71,8 +71,40 @@ function sleepDurationHours(bedMin, wakeMin) {
 function updatePhysiqueSleepDuration() {
   const bed = parseClockTime(physiqueField('bedtime').value);
   const wake = parseClockTime(physiqueField('wake-time').value);
-  document.getElementById('physique-sleep-duration').textContent =
-    (bed !== null && wake !== null) ? `${sleepDurationHours(bed, wake)} hr` : '—';
+  const sleepHours = (bed !== null && wake !== null) ? sleepDurationHours(bed, wake) : null;
+  document.getElementById('physique-sleep-duration').textContent = sleepHours !== null ? `${sleepHours} hr` : '—';
+  updatePhysiqueSleepDeprivation(sleepHours);
+}
+
+// Same dailyEnergyBalanceKcal the Status card's own Sleep Deprivation tile runs
+// (wellness-charts.js), just off the form's own typed fields rather than a
+// saved entry — so what's about to be saved already shows what a short night
+// is costing (or adding to) this day's balance. Falls back to '—' whenever a
+// piece it needs (profile, body mass, calories in) isn't there yet.
+function updatePhysiqueSleepDeprivation(sleepHours) {
+  const el = document.getElementById('physique-sleep-deprivation');
+  if (!el) return;
+
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const bodyMassKg = evaluateNumberExpression(physiqueField('body-mass').value.trim());
+  const intake = evaluateNumberExpression(physiqueField('calories-in').value.trim());
+  const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
+
+  if (!haveProfile || !bodyMassKg || !intake || sleepHours === null) {
+    el.textContent = '—';
+    return;
+  }
+
+  const maintenance = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
+  const activity = evaluateNumberExpression(physiqueField('calories-out').value.trim()) || 0;
+  const typedTef = evaluateNumberExpression(physiqueField('tef').value.trim());
+  const tef = typedTef || Math.round(intake * (1 - tefDivisor()));
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+
+  const { deprivationKcal } = dailyEnergyBalanceKcal(Math.round(intake), maintenance, activity, tef, sleepHours, sleepTarget);
+  el.textContent = deprivationKcal !== null ? `${deprivationKcal} kcal` : '—';
 }
 
 // The two activity categories physiqueAsWellnessEntries emits and every
@@ -417,7 +449,7 @@ function renderPhysiqueList() {
     const message = allPhysiqueEntries.length === 0
       ? 'No days logged yet — click "Log" in the panel heading to get started.'
       : 'No days match this filter.';
-    tbody.appendChild(renderEmptyRow(13, message));
+    tbody.appendChild(renderEmptyRow(14, message));
   }
 
   // Same tint the Activity Plan uses for a row already logged today (.today-row and
@@ -425,6 +457,15 @@ function renderPhysiqueList() {
   // day's logging lands on. Recomputed per render rather than cached, so a tab left
   // open across midnight moves the mark on its next redraw.
   const todayIso = isoFromDate(new Date());
+
+  // Read once per render rather than per row — same profile every row's
+  // Depr figure would read anyway, off the same settings the Status card's
+  // own Sleep Deprivation tile uses.
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
   pageEntries.forEach((p) => {
     const tr = document.createElement('tr');
@@ -445,6 +486,27 @@ function renderPhysiqueList() {
       : '';
     const maskedSleepTitle = privacyMode ? maskDigits(sleepTitle) : sleepTitle;
 
+    // Same dailyEnergyBalanceKcal the Status card's own Sleep Deprivation tile
+    // and every chart run — off this day's own Body Mass, Calories In,
+    // Calories Out and TEF, so it can't disagree with what those already show
+    // for the same day. Null (shown as —) without a profile, body mass or
+    // Calories In to work from.
+    const deprivationKcal = (haveProfile && p.bodyMass !== null && p.caloriesIn !== null && sleepHours !== null)
+      ? dailyEnergyBalanceKcal(
+        p.caloriesIn,
+        Math.round(bmrKcal(p.bodyMass, heightCm, age, sex)),
+        p.caloriesOut ?? 0,
+        p.tef !== null ? p.tef : Math.round(p.caloriesIn * (1 - tefDivisor())),
+        sleepHours,
+        sleepTarget,
+      ).deprivationKcal
+      : null;
+    const deprivationText = deprivationKcal !== null ? String(deprivationKcal) : '—';
+    const deprivationTitle = deprivationKcal !== null
+      ? `Sleep Deprivation Effect: ${deprivationKcal} kcal`
+      : 'Not calculable — needs a profile (Settings), this day\'s Body Mass and Calories In';
+    const maskedDeprivationTitle = privacyMode ? maskDigits(deprivationTitle) : deprivationTitle;
+
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -461,8 +523,9 @@ function renderPhysiqueList() {
     tr.append(
       checkboxCell,
       makeCell(p.date || '🔁 Pattern'),
-      makeCell(num(sleepHours), maskedSleepTitle),
       makeCell(num(p.bodyMass)),
+      makeCell(num(sleepHours), maskedSleepTitle),
+      makeCell(privacyMode ? maskDigits(deprivationText) : deprivationText, maskedDeprivationTitle),
       makeCell(num(p.caloriesIn)),
       makeCell(num(p.proteinIn)),
       makeCell(num(p.fiber)),

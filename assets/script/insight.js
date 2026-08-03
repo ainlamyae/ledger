@@ -345,8 +345,8 @@ function formatInsightPrompt(m) {
   })();
 
   // Ordered to match the Wellness charts below it (State Trend & Forecast,
-  // Body Mass [in the profile block above], Physical Activity, Caloric
-  // Intake, Protein Intake, Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep —
+  // Body Mass [in the profile block above], Caloric Intake, Protein Intake,
+  // Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Physical Activity, Sleep —
   // index.html) so the report reads in the same sequence as the data it's
   // summarizing. "Calorie Balance" has no line of its own here: it's the
   // same intake and activity-burn figures below it, just plotted net rather
@@ -354,13 +354,13 @@ function formatInsightPrompt(m) {
   const lines = [
     ...formatProfileLines(m.profile, m.bodyMassTargetKg),
     formatTrajectoryLine(m.projection),
-    activityTotalLine,
-    ...formatActivityBreakdownLines(m),
     line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieTarget.kind),
     line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
     line('Avg dietary fiber intake', m.avgFiber, ' g/day', m.fiberTarget, m.fiberDaysLogged, m.prevAvgFiber),
     line('Avg fat intake', m.avgFat, ' g/day', m.fatTarget, m.fatDaysLogged, m.prevAvgFat, 'reference'),
     line('Avg carbohydrate intake', m.avgCarb, ' g/day', m.carbTarget, m.carbDaysLogged, m.prevAvgCarb, 'reference'),
+    activityTotalLine,
+    ...formatActivityBreakdownLines(m),
     line('Avg sleep', m.avgSleepHours, ' hr/day', m.sleepTarget, m.sleepDaysLogged, m.prevAvgSleepHours),
   ];
 

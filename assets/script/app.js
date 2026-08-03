@@ -106,7 +106,7 @@ function parseTypeBreakdown(insightRows) {
   return breakdown;
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'wellness-bulk-edit-modal', 'nutrition-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'wellness-bulk-edit-modal', 'nutrition-modal', 'formula-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -406,7 +406,7 @@ let lastLoadedSettings = null;
 // A read failure is NOT the same as "there are no settings", though, and
 // conflating the two was a real bug: returning {} here — and caching it for
 // the full 5-minute TTL — silently wiped every setting in memory on one
-// transient read error. Targets reverted to their defaults and Wellness Insight
+// transient read error. Targets reverted to their defaults and Health Insight
 // reported age and height as "not set" — all while the spreadsheet itself was
 // perfectly intact, which is exactly why it looked like a dozen unrelated bugs.
 // So: keep the
@@ -451,6 +451,17 @@ function getSetting(key, fallback) {
 function getSettingString(key, fallback) {
   const raw = currentSettings[key];
   return raw !== undefined && raw !== '' ? raw : fallback;
+}
+
+// First of `keys` that's actually set — for a setting that's been renamed:
+// the current name leads, older names follow, so a row written before the
+// rename keeps working until something writes the new name over it.
+function getSettingStringAny(keys, fallback) {
+  for (const key of keys) {
+    const value = getSettingString(key, null);
+    if (value !== null) return value;
+  }
+  return fallback;
 }
 
 function renderSummaryCards(data) {
@@ -533,8 +544,6 @@ async function loadDashboard(forceRefresh = false) {
   const settingsPromise = loadSettings(forceRefresh).then((settings) => {
     currentSettings = settings;
     applySettingsToWidgets();
-    renderSavedFoodInsight();
-    renderSavedWellnessInsight();
   });
 
   const wellnessPromise = settingsPromise.then(() => initWellness(forceRefresh));
@@ -560,16 +569,10 @@ async function loadDashboard(forceRefresh = false) {
     initTransactions(forceRefresh),
     initAccountManager(forceRefresh),
     initTimeSheet(forceRefresh),
-    wellnessPromise.then(() => {
-      // The three AI-read panels' local (free) previews depend on wellness
-      // entries that just finished loading above — refresh them now rather
-      // than leaving whatever initFoodInsightPanel/initInsightPanel/
-      // initActivityInsightPanel rendered at window 'load' time, before any
-      // data existed.
-      renderFoodInsightPreview(getFoodInsightDateRange());
-      renderInsightDataPreview(getInsightDateRange());
-      renderActivityInsightDataPreview(getActivityInsightDateRange());
-    }),
+    // Health Insight deliberately isn't refreshed here: it computes nothing
+    // until one of its mode buttons is clicked, which is what keeps this load
+    // free of the aggregation those three panels used to run on every visit.
+    wellnessPromise,
     nutritionPromise,
     // Protein Source Rotation needs wellness (actual servings eaten),
     // Nutrition Facts (live per-serving calories/protein), and settings
@@ -785,8 +788,7 @@ window.addEventListener('load', () => {
   setupAccountMenu();
   initCsvControls();
   initInsightPanel();
-  initFoodInsightPanel();
-  initActivityInsightPanel();
+  initFormulaPlayground();
   initProteinRotationPanel();
   initWorkoutPlan();
   setupScrollSpy();

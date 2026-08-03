@@ -9,7 +9,11 @@
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from the Health Log's own Calculate breakdown,
 // independent of whatever Nutrition Facts' Amount/Calories happen to say
-// today. Wired up by initProteinRotationPanel(), called from app.js.
+// today. Beside the bars, a two-ring donut splits the same sources by share
+// of protein actually eaten — outer ring the 4 weeks ending on the To date,
+// inner ring the last week of it — so a source's short-term share can be read
+// against its medium-term one. Wired up by initProteinRotationPanel(), called
+// from app.js.
 
 // Default span of the From/To date pickers on first load — otherwise
 // identical in meaning to the old fixed 7-day lookback.
@@ -80,13 +84,85 @@ function computeProteinRotationRows(from, to) {
     .sort((a, b) => (b.targetProteinG - b.actualProteinG) - (a.targetProteinG - a.actualProteinG));
 }
 
-// Enough px per row that every tracked ingredient's label fits on screen at
-// once (no autoSkip-dropped labels) rather than being squeezed into a fixed
-// box sized for a handful of rows.
-const PROTEIN_ROTATION_ROW_HEIGHT = 32;
-const PROTEIN_ROTATION_MIN_HEIGHT = 200;
+// Rings of the rotation donut beside the bars, outermost first — Chart.js
+// draws datasets[0] as the outer ring. Both end on the To date the bars use,
+// so the outer ring is the medium-term rotation and the inner one is the
+// most recent week inside it.
+const PROTEIN_ROTATION_DONUT_RINGS = [
+  { label: 'Last 4 weeks', days: 28 },
+  { label: 'Last week', days: 7 },
+];
+
+// The `days` days ending on toIso inclusive.
+function proteinRotationWindow(toIso, days) {
+  const to = dateFromIso(toIso);
+  if (!toIso || Number.isNaN(to.getTime())) return { from: null, to: null };
+  const from = new Date(to);
+  from.setDate(to.getDate() - (days - 1));
+  return { from: isoFromDate(from), to: toIso };
+}
 
 let proteinRotationChart = null;
+let proteinRotationDonut = null;
+
+// Same source order and colors as the bar chart — one source is one color
+// everywhere in the panel, in both rings and in its bar, which is what makes
+// the donut readable without a legend of its own. The rings are told apart by
+// position (outer = 4 weeks, inner = last week), never by shade.
+function renderProteinRotationDonut(rows, barColors, toIso) {
+  const ctx = document.getElementById('protein-rotation-donut');
+  const labels = rows.map((r) => r.name);
+
+  const rings = PROTEIN_ROTATION_DONUT_RINGS.map((ring) => {
+    const { from, to } = proteinRotationWindow(toIso, ring.days);
+    const eaten = from ? actualProteinEatenBySource(from, to) : new Map();
+    const data = rows.map((r) => Math.round((eaten.get(r.name.trim().toLowerCase()) || 0) * 10) / 10);
+    return { ...ring, data, total: data.reduce((sum, v) => sum + v, 0) };
+  });
+
+  const hasData = rings.some((ring) => ring.total > 0);
+
+  proteinRotationDonut = upsertChart(proteinRotationDonut, ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: rings.map((ring) => ({ data: ring.data, backgroundColor: barColors })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      // Without this, hovering one ring also matches the same dataIndex in
+      // the other, giving two tooltip lines for a single hover.
+      interaction: { mode: 'point' },
+      plugins: {
+        legend: { display: false },
+        title: {
+          // Only worth saying when there are sources to log against — with
+          // none tracked, the bar chart's own title already explains why.
+          display: rows.length > 0 && !hasData,
+          text: ['No protein logged from a tracked', 'source in these 4 weeks'],
+          color: Chart.defaults.color,
+          font: { size: 12 },
+          padding: { top: 40 },
+        },
+        tooltip: {
+          callbacks: {
+            // The default title looks up data.labels by dataIndex, which is
+            // right for both rings — but the label line below already names
+            // the source, so it would just repeat it.
+            title: () => '',
+            label: (item) => {
+              const ring = rings[item.datasetIndex];
+              const pct = ring.total ? Math.round((item.raw / ring.total) * 1000) / 10 : 0;
+              const value = `${item.formattedValue}g protein (${pct}% of the window)`;
+              return `${labels[item.dataIndex]} — ${ring.label}: ${privacyMode ? maskDigits(value) : value}`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
 
 function renderProteinRotationChart({ from, to }) {
   const ctx = document.getElementById('protein-rotation-chart');
@@ -98,7 +174,6 @@ function renderProteinRotationChart({ from, to }) {
   const barColors = labels.map((_, i) => `hsl(${Math.round((i * 360) / labels.length)}, 65%, 55%)`);
 
   const hasData = labels.length > 0;
-  ctx.parentElement.style.height = `${Math.max(PROTEIN_ROTATION_MIN_HEIGHT, rows.length * PROTEIN_ROTATION_ROW_HEIGHT + 60)}px`;
 
   // Chart.js's own "nice number" auto-max often rounds well past the actual
   // data (e.g. real max 8 -> axis max 12) — fit the axis to the real max
@@ -151,11 +226,21 @@ function renderProteinRotationChart({ from, to }) {
         },
       },
       scales: {
-        x: { beginAtZero: true, max: maxValue, ticks: { callback: maskedUnitTick('g protein', 1) } },
+        // Ticks are grams; the panel's whole subject is protein, so the axis
+        // says "g" and leaves "protein" to the tooltip. Tilted a fixed 45°
+        // rather than left to Chart.js, which only rotates once labels
+        // actually collide — so the axis doesn't change angle as the range does.
+        x: {
+          beginAtZero: true,
+          max: maxValue,
+          ticks: { callback: maskedUnitTick('g', 1), maxRotation: 45, minRotation: 45 },
+        },
         y: { afterFit: fixTrendYAxisWidth, ticks: { autoSkip: false } },
       },
     },
   });
+
+  renderProteinRotationDonut(rows, barColors, to);
 }
 
 // Set by initProteinRotationPanel() to the getter initDateRangeControl()
@@ -165,7 +250,7 @@ let getProteinRotationDateRange = () => ({ from: null, to: null });
 
 function initProteinRotationPanel() {
   // Shared From/To wiring (charts.js) — same one insight.js uses for the
-  // Wellness Insight panel.
+  // Health Insight panel.
   getProteinRotationDateRange = initDateRangeControl('protein-rotation-date-from', 'protein-rotation-date-to', PROTEIN_ROTATION_LOOKBACK_DEFAULT_DAYS, () => {
     renderProteinRotationChart(getProteinRotationDateRange());
   });

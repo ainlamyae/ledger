@@ -1,20 +1,11 @@
-// "🥗 Food Insight" panel: aggregates every ingredient logged (via the
-// Health Log's 🧮 Calculate breakdown) over a lookback window into one
-// per-ingredient total, then sends that list plus an optional free-text
-// question to Groq for a nutrient-gap read. Separate feature/panel from
-// insight.js by design — no vitamin/mineral data exists anywhere in this
-// app (usda.js only extracts kcal/protein), so this leans entirely on the
-// model's own general food-composition knowledge, same trust level the app
-// already extends it via item.kcalPer100gFallback in calorie-estimator.js.
-// Unlike insight.js, its last result IS persisted — to the Settings tab, as
-// FOOD_INSIGHT_LAST_RESULT/FOOD_INSIGHT_LAST_GENERATED_AT — so the panel
-// still shows something on a fresh page load instead of going blank.
-// Wired up by initFoodInsightPanel(), called from app.js.
-
-// Default span of the From/To date pickers on first load — otherwise
-// identical in meaning to the old fixed 7-day lookback.
-const FOOD_INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
-const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missing from this diet?';
+// The Health Insight panel's Food mode: aggregates every ingredient logged (via
+// the Health Log's 🧮 Calculate breakdown) over the picked range into one
+// per-ingredient total, and phrases it for a nutrient-gap read. No vitamin or
+// mineral data exists anywhere in this app (usda.js only extracts kcal/protein),
+// so this leans entirely on the model's own food-composition knowledge — the
+// same trust level item.kcalPer100gFallback already extends it in
+// calorie-estimator.js. insight-panel.js drives it; the shared profile block and
+// the report renderer come from insight.js.
 
 // Sums each Calculate-derived breakdown item across every Calories; Protein
 // entry in the window, grouped by lowercase-trimmed ingredient name. Exact
@@ -114,19 +105,20 @@ function formatAggregatedAmount(grams, count) {
 }
 
 // Renders the (locally computed, not AI) ingredient table, plus the profile
-// line that now rides along with it in the prompt — the panel shows everything
-// it sends, the same rule Wellness/Activity Insight's data previews follow, so
-// the profile can't be silently attached to the request.
-function renderFoodInsightPreview({ from, to }) {
-  // Unmasked, like the other two panels' data previews: this is the request
-  // being shown to the person whose data it is, not a dashboard figure the
-  // privacy toggle hides from someone glancing over at the charts.
-  const profileEl = document.getElementById('food-insight-profile');
-  profileEl.textContent = `Sent with your food: ${formatProfileLines(gatherProfileSnapshot()).join(' · ')}`;
+// line that rides along with it in the prompt — the panel shows everything it
+// sends, the same rule the other two modes' previews follow, so the profile
+// can't be silently attached to the request. Takes the rows the panel already
+// gathered rather than re-aggregating them.
+function renderFoodInsightPreview(rows, from, to) {
+  // Unmasked, like the other modes' previews: this is the request being shown
+  // to the person whose data it is, not a dashboard figure the privacy toggle
+  // hides from someone glancing over at the charts. Rendered one line per fact
+  // by the panel's shared renderer, so the profile block reads the same here as
+  // it does inside the Wellness/Activity prompt previews.
+  renderInsightLines(document.getElementById('insight-food-profile'), formatProfileLines(gatherProfileSnapshot()));
 
-  const tbody = document.getElementById('food-insight-ingredients-body');
+  const tbody = document.getElementById('insight-food-body');
   tbody.innerHTML = '';
-  const rows = aggregateFoodIntake(from, to);
 
   if (rows.length === 0) {
     tbody.appendChild(renderEmptyRow(4, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
@@ -145,9 +137,13 @@ function renderFoodInsightPreview({ from, to }) {
   });
 }
 
+// Asked when the question box is left blank — this mode is the only one that
+// inlines the question in its prompt, so it needs something to inline.
+const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missing from this diet?';
+
 // Who's eating it (the shared profile block from insight.js) + the plain-text
 // ingredient list + the user's question (or the default). Still no day-by-day
-// breakdown — that's what Wellness Insight is for. The profile leads, because
+// breakdown — that's what the Wellness mode is for. The profile leads, because
 // nutrient adequacy is a per-body judgement: iron and calcium needs differ by
 // sex and age, and "is this enough food" can't be read off an ingredient list
 // without knowing the body it's feeding.
@@ -176,137 +172,3 @@ Suggestions: 2-4 concrete, specific food-based ways to close the likely gaps, ea
 Answer: directly answers the question included below.
 
 Keep the whole report under 250 words.`;
-
-async function generateFoodInsight(from, to, question) {
-  const apiKey = getSettingString('GROQ_API_KEY', null);
-  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
-
-  const rows = aggregateFoodIntake(from, to);
-  const userMessage = formatFoodInsightPrompt(rows, from, to, question);
-
-  const res = await fetch(GROQ_API, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0.4,
-      messages: [
-        { role: 'system', content: FOOD_INSIGHT_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `Groq API error ${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.choices[0].message.content;
-}
-
-async function runFoodInsightGeneration(from, to, question) {
-  const body = document.getElementById('food-insight-body');
-  const btn = document.getElementById('food-insight-generate-btn');
-  const fromEl = document.getElementById('food-insight-date-from');
-  const toEl = document.getElementById('food-insight-date-to');
-  const textarea = document.getElementById('food-insight-question');
-
-  body.innerHTML = '';
-  clearFieldError('food-insight-status');
-
-  const loading = document.createElement('p');
-  loading.className = 'hint';
-  loading.textContent = `Analyzing ${from} to ${to}…`;
-  body.appendChild(loading);
-
-  btn.disabled = true;
-  fromEl.disabled = true;
-  toEl.disabled = true;
-  textarea.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Generating…';
-
-  try {
-    const text = await generateFoodInsight(from, to, question);
-    body.innerHTML = '';
-    renderInsightText(body, text);
-
-    // Persisted so a fresh page load still shows the last read instead of
-    // going blank — unlike insight.js's Wellness Insight, this is the one
-    // feature the user asked to survive a reload. Generation is still never
-    // automatic; this only fires from an explicit Send to AI click.
-    const generatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
-    try {
-      await saveSettingValues({
-        FOOD_INSIGHT_LAST_RESULT: text,
-        FOOD_INSIGHT_LAST_GENERATED_AT: generatedAt,
-      });
-      renderFoodInsightGeneratedAt(generatedAt);
-    } catch (saveErr) {
-      showFieldError('food-insight-status', `Generated, but couldn't save it: ${saveErr.message}`);
-    }
-  } catch (err) {
-    body.innerHTML = '';
-    showFieldError('food-insight-status', err.message);
-  } finally {
-    btn.disabled = false;
-    fromEl.disabled = false;
-    toEl.disabled = false;
-    textarea.disabled = false;
-    btn.textContent = originalLabel;
-  }
-}
-
-function renderFoodInsightGeneratedAt(timestamp) {
-  const el = document.getElementById('food-insight-generated-at');
-  if (!timestamp) {
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  el.textContent = `Last generated ${timestamp}`;
-}
-
-// Restores the last AI result (if any) from the Settings tab on page load,
-// so the panel shows the previous read instead of an empty placeholder.
-function renderSavedFoodInsight() {
-  const body = document.getElementById('food-insight-body');
-  const text = getSettingString('FOOD_INSIGHT_LAST_RESULT', null);
-
-  body.innerHTML = '';
-  if (!text) {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'hint';
-    placeholder.textContent = 'Review the ingredients above, optionally ask a question, then click "Send to AI".';
-    body.appendChild(placeholder);
-    renderFoodInsightGeneratedAt(null);
-    return;
-  }
-
-  renderInsightText(body, text);
-  renderFoodInsightGeneratedAt(getSettingString('FOOD_INSIGHT_LAST_GENERATED_AT', null));
-}
-
-// Set by initFoodInsightPanel() to the getter initDateRangeControl()
-// (charts.js) returns — same shared From/To wiring insight.js and
-// protein-rotation.js use.
-let getFoodInsightDateRange = () => ({ from: null, to: null });
-
-function initFoodInsightPanel() {
-  clearFieldError('food-insight-status');
-  getFoodInsightDateRange = initDateRangeControl('food-insight-date-from', 'food-insight-date-to', FOOD_INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
-    renderFoodInsightPreview(getFoodInsightDateRange());
-  });
-  renderFoodInsightPreview(getFoodInsightDateRange());
-  renderSavedFoodInsight();
-
-  document.getElementById('food-insight-generate-btn').addEventListener('click', () => {
-    const { from, to } = getFoodInsightDateRange();
-    runFoodInsightGeneration(from, to, document.getElementById('food-insight-question').value);
-  });
-}

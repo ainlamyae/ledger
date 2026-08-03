@@ -6,6 +6,39 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SEED = 42;
 
+// The free-text chat call every Health Insight mode makes: same model, key
+// guard and error shape all three used to hand-roll separately. Returns the
+// assistant's raw text — callers own any parsing, which is why the JSON-response
+// extraction path below stays its own function.
+async function groqChatText(systemPrompt, userMessage, temperature = 0.4) {
+  const apiKey = getSettingString('GROQ_API_KEY', null);
+  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
+
+  const res = await fetch(GROQ_API, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message || `Groq API error ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
 // Deliberately does NOT ask the model to rewrite/standardize the user's
 // ingredient text (an earlier version had a "notes" field for that) — it
 // would silently change names (e.g. "egg" -> "egg, whole") which then got

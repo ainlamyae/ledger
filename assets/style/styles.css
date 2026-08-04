@@ -944,9 +944,11 @@ kbd {
     animation: panel-enter .45s ease both;
 }
 
+/* Bottom-LEFT, not right: the modals' own buttons sit bottom-right, and on a
+   phone a right-hand stack overlaps them. */
 .fab-stack {
     position: fixed;
-    right: 1.25rem;
+    left: 1.25rem;
     bottom: 1.25rem;
     display: flex;
     flex-direction: column;
@@ -1283,10 +1285,9 @@ th.sortable:hover {
 }
 
 /* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
-   exactly — these 5 tiles sit in the same Health Trends & Forecast panel as the
-   Weight Trend & Forecast / Calorie Balance & Body Change / Body Composition
-   Change h4s above, so all 8 headings share one consistent style instead of
-   each chart picking its own size/color/alignment. */
+   exactly — these tiles sit in the same Health Indicators panel as the
+   State Trend & Forecast / Calorie Balance h4s above, so every heading in
+   it shares one style instead of each chart picking its own size/color/alignment. */
 .wellness-metrics-grid.donut-grid .donut-item h4 {
     text-align: left;
     color: var(--color-text);
@@ -1453,13 +1454,21 @@ td .btn {
     border-radius: var(--radius-lg);
     padding: 1.25rem;
     width: 100%;
-    max-width: 504px; /* 420px + 20% */
+    max-width: 855px; /* 10% under .container's 950px */
     max-height: calc(100vh - 4rem);
     overflow-y: auto;
 }
 
 .modal-card h2 {
     margin-bottom: 1rem;
+}
+
+/* Floated rather than absolutely positioned: .modal-card scrolls, so an
+   absolute corner would drift over the fields on a long form. Sits in source
+   before the <h2> so it shares that line. */
+.modal-close {
+    float: right;
+    margin-left: .75rem;
 }
 
 .app-form label {
@@ -1532,10 +1541,9 @@ td .btn {
 }
 
 /* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
-   — same style as the donut-item h4s above, so every Health Trends & Forecast chart
-   heading (Weight Trend & Forecast, Body Composition Change, Body Weight,
-   Caloric Intake, Protein Intake, Physical Activity, Rest & Recovery) is
-   visually one set. */
+   — same style as the donut-item h4s above, so every Health Indicators chart
+   heading (State Trend & Forecast, Calorie Balance, Body Mass, Caloric
+   Intake, Physical Activity, Protein Intake, Rest & Recovery) is visually one set. */
 .weight-projection-wrap h4 {
     margin: 0 0 .25rem;
     font-size: 1rem;
@@ -1565,12 +1573,14 @@ td .btn {
     margin-top: .75rem;
 }
 
-/* The meters and the ETA line sit BETWEEN the heading and the chart — where are
-   you now and when do you arrive, read before the plot rather than as a footnote
-   under it — so the block needs clearance below as well as above. Scoped to the
-   outer meter: the nested time meter must keep its bottom flush, since a gap
-   there would only push the ETA line away from the bars it explains. */
+/* The meters and the ETA line lead the block, ABOVE the heading — where are you now
+   and when do you arrive, read first of all. So the outer meter needs clearance from
+   the heading below it, and none above: .weight-projection-wrap's own top margin
+   already separates it from the previous chart. Scoped to the outer meter, because
+   the nested time meter still wants the shared .75rem top gap to sit clear of the
+   distance bar, and its bottom flush so the ETA line stays with the bars. */
 .weight-projection-wrap > .weight-progress-meter {
+    margin-top: 0;
     margin-bottom: .75rem;
 }
 
@@ -1808,10 +1818,6 @@ td .btn {
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: .5rem;
-}
-
-.modal-card-xwide {
-    max-width: 960px;
 }
 
 .insight-data-preview {
@@ -2180,7 +2186,7 @@ td .btn {
     }
 
     .fab-stack {
-        right: 1rem;
+        left: 1rem;
         bottom: 1rem;
     }
 
@@ -2233,6 +2239,12 @@ td .btn {
     overflow-x: auto;
 }
 
+.formula-where {
+    margin: 0 0 .5rem;
+    font-size: .78rem;
+    color: var(--color-text-muted);
+}
+
 .formula-inputs {
     margin-bottom: 1rem;
 }
@@ -2267,11 +2279,6 @@ td .btn {
     font-size: .72rem;
     color: var(--color-text-muted);
     overflow-wrap: anywhere;
-}
-
-.formula-note {
-    font-family: system-ui, sans-serif;
-    opacity: .75;
 }
 
 .formula-unit {
@@ -2315,10 +2322,7 @@ td .btn {
     align-items: baseline;
     justify-content: space-between;
     gap: 1rem;
-    padding: .75rem;
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-md);
-    margin-bottom: 1rem;
+    margin-bottom: .5rem;
 }
 
 .formula-result-label {

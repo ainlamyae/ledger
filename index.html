@@ -92,15 +92,15 @@
                 <div class="node-graph-spokes">
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🩺 Health Tracker</span>
-                        <span class="node-graph-tooltip">Track Body Weight, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus your daily figures — calories against a shaded out-of-bounds zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's weigh-in colored green or red by whether the scale moved toward your goal or away from it.</span>
+                        <span class="node-graph-tooltip">Track Body Mass, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus your daily figures — calories against a shaded out-of-bounds zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's reading colored green or red by whether the scale moved toward your goal or away from it.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🎯 Personalized Daily Targets</span>
-                        <span class="node-graph-tooltip">Set your target weight and pace, and your daily calorie figure is calculated for you from three things you can each check yourself: your Mifflin-St Jeor BMR, plus the calories your own daily activity target actually burns at your current weight, minus the deficit that delivers your goal pace. There's no lifestyle "activity multiplier" guess anywhere in it — and because it's the same BMR-plus-activity basis the Calorie Balance and Weight Forecast charts use, none of the three can disagree about what maintenance is. It's never presented as a "target" to hit dead-on, because it isn't one: if your goal weight is below today's it's a maximum to stay at or under, and if you're gaining it's a minimum to stay at or above. The Calories tile, the Caloric Intake chart and Wellness Insight all say which of the two it is, so eating 400 under a bulk's minimum is never scored as a good day. Your Protein target follows the way nutrition guidance actually states it — a range of grams per kg of your TARGET weight, not a single number pinned to today's weight. Enter the range once (e.g. 1.6~2 g/kg) and you get a live band in grams: it's shaded on the Protein Intake chart so you can see which days landed inside it, and the Protein tile reads as a range and only turns green while you're within it. Because it's built on your goal weight, it feeds you for the body you're heading for instead of shrinking with every kg you lose.</span>
+                        <span class="node-graph-tooltip">Set your target body mass and pace, and your daily calorie figure is calculated for you from three things you can each check yourself: your Mifflin-St Jeor BMR, plus the calories your own daily activity target actually burns at your current body mass, minus the deficit that delivers your goal pace. There's no lifestyle "activity multiplier" guess anywhere in it — and because it's the same BMR-plus-activity basis the Calorie Balance and Body Mass Forecast charts use, none of the three can disagree about what maintenance is. It's never presented as a "target" to hit dead-on, because it isn't one: if your goal body mass is below today's it's a maximum to stay at or under, and if you're gaining it's a minimum to stay at or above. The Calories tile, the Caloric Intake chart and Wellness Insight all say which of the two it is, so eating 400 under a bulk's minimum is never scored as a good day. Your Protein target follows the way nutrition guidance actually states it — a range of grams per kg of your TARGET body mass, not a single number pinned to today's body mass. Enter the range once (e.g. 1.6~2 g/kg) and you get a live band in grams: it's shaded on the Protein Intake chart so you can see which days landed inside it, and the Protein tile reads as a range and only turns green while you're within it. Because it's built on your goal body mass, it feeds you for the body you're heading for instead of shrinking with every kg you lose.</span>
                     </button>
                     <button type="button" class="node-graph-node">
-                        <span class="node-graph-node-title">📉 Weight Forecast</span>
-                        <span class="node-graph-tooltip">A Weight Forecast chart projects your goal arrival date from your logged intake, activity and sleep — as a curve, not a straight line: every kg lost lowers your BMR, so the deficit shrinks and progress decelerates, which the projection solves for exactly instead of extending last week&#39;s rate forever. If your current habits level off before the goal, it says so and names the weight they settle at rather than inventing a date. Progress meters show the kg covered and the kg left, in days too, and a plateau alert flags a trend held flat for about 10 days.</span>
+                        <span class="node-graph-node-title">📉 Body Mass Forecast</span>
+                        <span class="node-graph-tooltip">A Body Mass Forecast chart projects your goal arrival date from your logged intake, activity and sleep — as a curve, not a straight line: every kg lost lowers your BMR, so the deficit shrinks and progress decelerates, which the projection solves for exactly instead of extending last week&#39;s rate forever. If your current habits level off before the goal, it says so and names the body mass they settle at rather than inventing a date. Progress meters show the kg covered and the kg left, in days too, and a plateau alert flags a trend held flat for about 10 days.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🍽️ AI Calorie &amp; Protein Estimator</span>
@@ -111,12 +111,8 @@
                         <span class="node-graph-tooltip">The estimator remembers what it learns: every ingredient it looks up is saved to your own Nutrition Facts table, so the next mention is calculated instantly from a trusted value instead of re-estimated from scratch. Fine-tune any entry to match the exact brand you buy, and merge near-duplicates the AI phrased differently.</span>
                     </button>
                     <button type="button" class="node-graph-node">
-                        <span class="node-graph-node-title">🔥 Calorie Balance &amp; Body Change</span>
-                        <span class="node-graph-tooltip">See each day's real energy balance as a bar: what you ate, minus the cost of simply being alive (Mifflin-St Jeor from your height, birth date, sex, and that day's weight), minus the activity you actually logged. Below the line is a deficit, above it a surplus — which of the two you're aiming for depends on whether your goal weight is below or above today's — and a twin right-hand axis reads off the body change that balance implies, so you can compare what your eating predicts against what your weigh-ins actually show.</span>
-                    </button>
-                    <button type="button" class="node-graph-node">
-                        <span class="node-graph-node-title">📊 Body Composition Split</span>
-                        <span class="node-graph-tooltip">See how much of your day-to-day weight change is fat, muscle, or water — estimated from established body-composition formulas (Forbes, Deurenberg), not a guess. Each part is colored by what it means for you rather than by which tissue it is: fat is green while it's moving the way your goal points and red against it, muscle is green when you gain it and red when you lose it — because shedding lean mass is never the goal, even on a cut — and water is always blue, since it's neither progress nor a setback.</span>
+                        <span class="node-graph-node-title">🔥 Calorie Balance</span>
+                        <span class="node-graph-tooltip">See each day's real energy balance as a bar: what you ate, minus the cost of simply being alive (Mifflin-St Jeor from your height, birth date, sex, and that day's body mass), minus the activity you actually logged. Below the line is a deficit, above it a surplus — which of the two you're aiming for depends on whether your goal body mass is below or above today's — and a twin right-hand axis reads off the body change that balance implies, so you can compare what your eating predicts against what your body mass readings actually show.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">💡 AI Health Insight</span>
@@ -124,7 +120,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🧪 Formula Playground</span>
-                        <span class="node-graph-tooltip">See exactly how your daily calorie figure is built — resting metabolic rate, activity burn, and the deficit your weekly fat-loss goal implies — each as its own formula with your own numbers substituted in. Change any input (weight, height, age, sex, activity target, fat-loss rate) and both the calorie figure and the predicted date you hit your goal weight update as you type. Save the ones you like straight back to your settings.</span>
+                        <span class="node-graph-tooltip">See exactly how your daily calorie figure is built — resting metabolic rate, activity burn, and the deficit your weekly fat-loss goal implies — each as its own formula with your own numbers substituted in. Change any input (body mass, height, age, sex, activity target, fat-loss rate) and both the calorie figure and the predicted date you hit your goal body mass update as you type. Save the ones you like straight back to your settings.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🔄 Protein Source Rotation</span>
@@ -217,7 +213,7 @@
                     <button type="button" id="widget-clock-location-btn" class="location-picker-btn"></button>
 
                     <div class="location-picker-dropdown" id="location-picker-dropdown" hidden>
-                        <button type="button" id="location-auto-btn" class="account-menu-item">📍 Use my location (auto-detect)</button>
+                        <button type="button" id="location-auto-btn" class="account-menu-item">Use my location (auto-detect)</button>
 
                         <div class="location-picker-manual">
                             <input type="text" id="location-manual-input" placeholder="Enter a city…">
@@ -293,14 +289,11 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Health Trends &amp; Forecast</h2>
-                <button type="button" id="formula-playground-btn" class="btn panel-header-btn" title="Open the calorie formula playground">🧪 Formula</button>
+                <h2>Health Indicators</h2>
+                <button type="button" id="formula-playground-btn" class="btn panel-header-btn" title="Open the health formula playground">Formula</button>
             </div>
 
             <div class="weight-projection-wrap">
-                <div class="weight-projection-header">
-                    <h4>Weight Trend</h4>
-                </div>
                 <div class="weight-progress-meter" id="weight-progress-meter" hidden>
                     <div class="weight-progress-meter-track">
                         <div class="weight-progress-meter-fill" id="weight-progress-meter-fill"></div>
@@ -334,6 +327,9 @@
 
                     <p id="weight-projection-eta" class="weight-eta"></p>
                 </div>
+                <div class="weight-projection-header">
+                    <h4>State Trend &amp; Forecast</h4>
+                </div>
                 <div class="chart-box">
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
@@ -342,30 +338,23 @@
 
             <div class="weight-projection-wrap">
                 <div class="weight-projection-header">
-                    <h4>Calorie Balance &amp; Body Change</h4>
+                    <h4>Body Mass</h4>
+                </div>
+                <div class="chart-box chart-box-donut">
+                    <canvas id="wellness-weight-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="weight-projection-wrap">
+                <div class="weight-projection-header">
+                    <h4>Calorie Balance</h4>
                 </div>
                 <div class="chart-box">
                     <canvas id="wellness-energy-balance-chart"></canvas>
                 </div>
             </div>
 
-            <div class="weight-projection-wrap">
-                <div class="weight-projection-header">
-                    <h4>Body Composition Change</h4>
-                </div>
-                <div class="chart-box">
-                    <canvas id="wellness-composition-chart"></canvas>
-                </div>
-            </div>
-
             <div class="donut-grid wellness-metrics-grid">
-                <div class="donut-item">
-                    <h4>Body Weight</h4>
-                    <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-weight-chart"></canvas>
-                    </div>
-                </div>
-
                 <div class="donut-item">
                     <h4 id="wellness-calories-label">Caloric Intake</h4>
                     <div class="chart-box chart-box-donut">
@@ -374,16 +363,16 @@
                 </div>
 
                 <div class="donut-item">
-                    <h4>Protein Intake</h4>
+                    <h4>Physical Activity</h4>
                     <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-protein-chart"></canvas>
+                        <canvas id="wellness-activity-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="donut-item">
-                    <h4>Physical Activity</h4>
+                    <h4>Protein Intake</h4>
                     <div class="chart-box chart-box-donut">
-                        <canvas id="wellness-activity-chart"></canvas>
+                        <canvas id="wellness-protein-chart"></canvas>
                     </div>
                 </div>
 
@@ -441,7 +430,7 @@
             </label>
 
             <div class="panel-actions">
-                <button type="button" id="insight-generate-btn" class="btn btn-primary" disabled title="Load a data set first">🚀 Send to AI</button>
+                <button type="button" id="insight-generate-btn" class="btn btn-primary" disabled title="Load a data set first">Send to AI</button>
             </div>
 
             <p id="insight-generated-at" class="hint" hidden></p>
@@ -820,7 +809,7 @@
             </div>
 
             <div class="panel-actions">
-                <button type="button" id="log-workout-btn" class="btn btn-primary">Log Workout</button>
+                <button type="button" id="log-workout-btn" class="btn btn-primary">Log a Workout</button>
             </div>
         </div>
 
@@ -828,7 +817,7 @@
             <h2>Health Log</h2>
 
             <div class="panel-actions">
-                <button id="add-wellness-btn" class="btn btn-primary">+ Log Entry</button>
+                <button id="add-wellness-btn" class="btn btn-primary">Log an Entry</button>
             </div>
 
             <div class="filters">
@@ -836,7 +825,7 @@
                 <select id="wellness-category-filter">
                     <option value="">All Categories</option>
                     <option>Sleep</option>
-                    <option>Weight</option>
+                    <option value="Weight">Body Mass</option>
                     <option>Calories; Protein</option>
                     <option>Activity; Calories</option>
                 </select>
@@ -872,9 +861,9 @@
 
             <div class="panel-actions" id="wellness-bulk-actions" hidden>
                 <span id="wellness-bulk-summary"></span>
-                <button id="wellness-bulk-edit-btn" class="btn" title="Edit Selected">✏️ Edit Selected</button>
-                <button id="wellness-bulk-recalc-btn" class="btn" title="Recalculate Selected">🧮 Recalculate Selected</button>
-                <button id="wellness-bulk-merge-btn" class="btn" title="Merge Selected">🔗 Merge Selected</button>
+                <button id="wellness-bulk-edit-btn" class="btn" title="Edit Selected" aria-label="Edit Selected">✏️</button>
+                <button id="wellness-bulk-recalc-btn" class="btn" title="Recalculate Selected" aria-label="Recalculate Selected">🧮</button>
+                <button id="wellness-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
             </div>
 
             <div class="pagination" id="wellness-pagination"></div>
@@ -884,7 +873,7 @@
             <h2>Nutrition Facts</h2>
 
             <div class="panel-actions">
-                <button id="add-nutrition-btn" class="btn btn-primary">+ Add Ingredient</button>
+                <button id="add-nutrition-btn" class="btn btn-primary">Add Ingredient</button>
             </div>
 
             <div class="filters">
@@ -912,7 +901,7 @@
 
             <div class="panel-actions" id="nutrition-bulk-actions" hidden>
                 <span id="nutrition-bulk-summary"></span>
-                <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected">🔗 Merge Selected</button>
+                <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
             </div>
 
             <div class="pagination" id="nutrition-pagination"></div>
@@ -1032,7 +1021,7 @@
                 <input type="file" id="import-csv-input" accept=".csv" hidden>
                 <button id="tx-advanced-filters-toggle" class="btn">Advanced Filters</button>
                 <button id="export-csv-btn" class="btn">Export CSV</button>
-                <button id="add-transaction-btn" class="btn btn-primary">+ Add Transaction</button>
+                <button id="add-transaction-btn" class="btn btn-primary">Log a Transaction</button>
             </div>
 
             <div class="filters">
@@ -1054,7 +1043,7 @@
                     <div id="export-filters"></div>
                     <datalist id="export-account-options"></datalist>
 
-                    <button type="button" id="export-add-filter-btn" class="btn">+ Add Filter</button>
+                    <button type="button" id="export-add-filter-btn" class="btn">Add Filter</button>
                 </form>
             </div>
 
@@ -1102,7 +1091,7 @@
 
             <div class="panel-actions">
                 <span id="reconciliation-status" class="reconciliation-status"></span>
-                <button id="add-account-btn" class="btn btn-primary">+ Add Account</button>
+                <button id="add-account-btn" class="btn btn-primary">Add Account</button>
             </div>
 
             <div class="table-responsive">
@@ -1130,8 +1119,8 @@
 
         <div id="timesheet-reminder-banner" class="info-banner" hidden>
             <span>You haven't logged today's hours yet.</span>
-            <button id="timesheet-reminder-log-btn" class="btn">Log a Day</button>
-            <button id="timesheet-reminder-enable-btn" class="btn" hidden>🔔 Enable reminders</button>
+            <button id="timesheet-reminder-log-btn" class="btn btn-primary">Log a Day</button>
+            <button id="timesheet-reminder-enable-btn" class="btn" hidden>Enable reminders</button>
         </div>
 
         <div class="panel">
@@ -1231,7 +1220,7 @@
             <h2>Travel Log</h2>
 
             <div class="panel-actions">
-                <button id="add-travel-btn" class="btn btn-primary">+ Add Travel Entry</button>
+                <button id="add-travel-btn" class="btn btn-primary">Log a Travel</button>
             </div>
 
             <div class="filters">
@@ -1263,7 +1252,7 @@
             <h2>Application Log</h2>
 
             <div class="panel-actions">
-                <button id="add-application-btn" class="btn btn-primary">+ Add Application</button>
+                <button id="add-application-btn" class="btn btn-primary">Log an Application</button>
             </div>
 
             <div class="filters">
@@ -1277,7 +1266,7 @@
             <h2>Contact List</h2>
 
             <div class="panel-actions">
-                <button id="add-contact-btn" class="btn btn-primary">+ Add Contact</button>
+                <button id="add-contact-btn" class="btn btn-primary">Add Contact</button>
                 <button id="export-contacts-google-btn" class="btn">Export for Google/Phone</button>
                 <button id="export-contacts-outlook-btn" class="btn">Export for Outlook</button>
             </div>
@@ -1305,10 +1294,10 @@
 
             <div class="panel-actions" id="contacts-bulk-actions" hidden>
                 <span id="contacts-bulk-summary"></span>
-                <button id="contacts-bulk-export-google-btn" class="btn" title="Export Selected for Google/Phone">Export Selected (Google)</button>
-                <button id="contacts-bulk-export-outlook-btn" class="btn" title="Export Selected for Outlook">Export Selected (Outlook)</button>
-                <button id="contacts-bulk-merge-btn" class="btn" title="Merge Selected">🔗 Merge Selected</button>
-                <button id="contacts-bulk-delete-btn" class="btn" title="Delete Selected">🗑️ Delete Selected</button>
+                <button id="contacts-bulk-export-google-btn" class="btn" title="Export Selected for Google/Phone" aria-label="Export Selected for Google/Phone">📱</button>
+                <button id="contacts-bulk-export-outlook-btn" class="btn" title="Export Selected for Outlook" aria-label="Export Selected for Outlook">📧</button>
+                <button id="contacts-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
+                <button id="contacts-bulk-delete-btn" class="btn" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
             </div>
 
             <div class="pagination" id="contacts-pagination"></div>
@@ -1318,7 +1307,7 @@
             <h2>Settings</h2>
 
             <div class="panel-actions">
-                <button id="add-setting-btn" class="btn btn-primary">+ Add</button>
+                <button id="add-setting-btn" class="btn btn-primary">Add Setting</button>
             </div>
 
             <div class="table-responsive">
@@ -1346,7 +1335,7 @@
 
 <div id="undo-toast" class="toast" hidden>
     <span id="undo-toast-message"></span>
-    <button id="undo-toast-btn" class="btn">Undo</button>
+    <button id="undo-toast-btn" class="btn" title="Undo" aria-label="Undo">↩️</button>
 </div>
 
 <footer class="site-footer">
@@ -1362,7 +1351,8 @@
 
 <div id="tx-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-modal-title" hidden>
     <div class="modal-card">
-        <h2 id="tx-modal-title">Add Transaction</h2>
+        <button type="button" id="tx-cancel-btn" class="btn modal-close">Close</button>
+        <h2 id="tx-modal-title">Log a Transaction</h2>
 
         <form id="tx-form" class="app-form">
             <label>Date
@@ -1391,7 +1381,6 @@
             <p id="tx-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="tx-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" id="tx-save-add-btn" class="btn">Save &amp; Add Another</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
@@ -1401,6 +1390,7 @@
 
 <div id="tx-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-bulk-edit-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="tx-bulk-edit-cancel-btn" class="btn modal-close">Close</button>
         <h2 id="tx-bulk-edit-modal-title">Edit Selected Transactions</h2>
 
         <form id="tx-bulk-edit-form" class="app-form">
@@ -1429,7 +1419,6 @@
             <p id="tx-bulk-edit-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="tx-bulk-edit-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1438,6 +1427,7 @@
 
 <div id="account-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="account-cancel-btn" class="btn modal-close">Close</button>
         <h2 id="account-modal-title">Add Account</h2>
 
         <form id="account-form" class="app-form">
@@ -1470,7 +1460,6 @@
             <p id="account-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="account-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1479,6 +1468,7 @@
 
 <div id="setting-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="setting-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="setting-cancel-btn" class="btn modal-close">Close</button>
         <h2 id="setting-modal-title">Add Setting</h2>
 
         <form id="setting-form" class="app-form">
@@ -1514,7 +1504,6 @@
             <p id="setting-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="setting-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1523,6 +1512,7 @@
 
 <div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="timesheet-cancel-btn" class="btn modal-close">Close</button>
         <h2 id="timesheet-modal-title">Log Time</h2>
 
         <form id="timesheet-form" class="app-form">
@@ -1554,7 +1544,6 @@
             <p id="timesheet-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="timesheet-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1562,8 +1551,9 @@
 </div>
 
 <div id="wellness-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-modal-title" hidden>
-    <div class="modal-card modal-card-xwide">
-        <h2 id="wellness-modal-title">Log Entry</h2>
+    <div class="modal-card">
+        <button type="button" id="wellness-cancel-btn" class="btn modal-close">Close</button>
+        <h2 id="wellness-modal-title">Log an Entry</h2>
 
         <form id="wellness-form" class="app-form">
             <label class="checkbox-inline-label" title="Reusable pattern: no date — always listed at the top, excluded from charts">
@@ -1579,7 +1569,7 @@
             <label>Category
                 <select id="wellness-category" required>
                     <option value="">— Select —</option>
-                    <option>Weight</option>
+                    <option value="Weight">Body Mass</option>
                     <option>Sleep</option>
                     <option>Calories; Protein</option>
                     <option>Activity; Calories</option>
@@ -1619,8 +1609,7 @@
             <p id="wellness-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="wellness-calc-btn" class="btn">🧮 Calculate</button>
-                <button type="button" id="wellness-cancel-btn" class="btn">Cancel</button>
+                <button type="button" id="wellness-calc-btn" class="btn">Calculate</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1629,6 +1618,7 @@
 
 <div id="wellness-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-bulk-edit-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn modal-close">Close</button>
         <h2 id="wellness-bulk-edit-modal-title">Edit Selected Entries</h2>
 
         <form id="wellness-bulk-edit-form" class="app-form">
@@ -1636,7 +1626,7 @@
                 <select id="wellness-bulk-category">
                     <option value="">— Leave unchanged —</option>
                     <option>Sleep</option>
-                    <option>Weight</option>
+                    <option value="Weight">Body Mass</option>
                     <option>Calories; Protein</option>
                     <option>Activity; Calories</option>
                 </select>
@@ -1652,7 +1642,6 @@
             <p id="wellness-bulk-edit-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1661,38 +1650,41 @@
 
 <div id="formula-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formula-modal-title" hidden>
     <div class="modal-card">
-        <h2 id="formula-modal-title">Calorie Formula Playground</h2>
+        <button type="button" id="formula-close-btn" class="btn modal-close">Close</button>
+        <h2 id="formula-modal-title">Health Formula Playground</h2>
 
         <pre id="formula-expression" class="formula-expression"></pre>
+
+        <p class="formula-where">where,</p>
 
         <div class="formula-inputs">
             <label class="formula-row">
                 <span class="formula-sym">m</span>
-                <span class="formula-name">body mass <span class="formula-note">(not saved)</span></span>
+                <span class="formula-name">body mass</span>
                 <input type="text" id="formula-weight" inputmode="decimal">
                 <span class="formula-unit">kg</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">m_g</span>
-                <span class="formula-name">WEIGHT_GOAL_KG</span>
+                <span class="formula-name">goal body mass</span>
                 <input type="text" id="formula-goal" inputmode="decimal">
-                <span class="formula-unit">kg — target mass</span>
+                <span class="formula-unit">kg</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">h</span>
-                <span class="formula-name">HEIGHT_CM</span>
+                <span class="formula-name">height</span>
                 <input type="text" id="formula-height" inputmode="decimal">
                 <span class="formula-unit">cm</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">a</span>
-                <span class="formula-name">BIRTH_DATE</span>
+                <span class="formula-name">age</span>
                 <input type="text" id="formula-age" inputmode="decimal">
-                <span class="formula-unit">years of age</span>
+                <span class="formula-unit">years</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">σ</span>
-                <span class="formula-name">SEX</span>
+                <span class="formula-name">sex</span>
                 <select id="formula-sex">
                     <option value="male">male</option>
                     <option value="female">female</option>
@@ -1701,25 +1693,25 @@
             </label>
             <label class="formula-row">
                 <span class="formula-sym">MET</span>
-                <span class="formula-name">ACTIVITY_MET</span>
+                <span class="formula-name">activity intensity</span>
                 <input type="text" id="formula-met" inputmode="decimal">
                 <span class="formula-unit">metabolic equivalents</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">τ</span>
-                <span class="formula-name">ACTIVITY_TARGET_MIN</span>
+                <span class="formula-name">activity target</span>
                 <input type="text" id="formula-activity-min" inputmode="decimal">
                 <span class="formula-unit">min/day</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">κ</span>
-                <span class="formula-name">KCAL_PER_MET_KG_MIN</span>
+                <span class="formula-name">oxygen uptake per MET</span>
                 <input type="text" id="formula-met-o2" inputmode="decimal">
                 <span class="formula-unit">mL O₂/kg/min</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">Δm</span>
-                <span class="formula-name">WEEKLY_FAT_LOSS_KG</span>
+                <span class="formula-name">weekly fat loss</span>
                 <input type="text" id="formula-weekly-loss" inputmode="decimal">
                 <span class="formula-unit">kg/week</span>
             </label>
@@ -1727,13 +1719,13 @@
                 <span class="formula-sym">ρ</span>
                 <span class="formula-name">fat energy density</span>
                 <span class="formula-fixed">7700</span>
-                <span class="formula-unit">kcal/kg — fixed</span>
+                <span class="formula-unit">kcal/kg</span>
             </div>
             <div class="formula-row formula-row-fixed">
-                <span class="formula-sym"></span>
+                <span class="formula-sym">ε</span>
                 <span class="formula-name">oxygen energy yield</span>
                 <span class="formula-fixed">200</span>
-                <span class="formula-unit">mL O₂/kcal — fixed</span>
+                <span class="formula-unit">mL O₂/kcal</span>
             </div>
         </div>
 
@@ -1754,14 +1746,14 @@
 
         <div class="modal-actions">
             <button type="button" id="formula-reset-btn" class="btn">Reset</button>
-            <button type="button" id="formula-close-btn" class="btn">Close</button>
-            <button type="button" id="formula-save-btn" class="btn btn-primary">Save to Settings</button>
+            <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
         </div>
     </div>
 </div>
 
 <div id="nutrition-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="nutrition-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="nutrition-cancel-btn" class="btn modal-close">Close</button>
         <h2 id="nutrition-modal-title">Add Ingredient</h2>
 
         <form id="nutrition-form" class="app-form">
@@ -1785,12 +1777,11 @@
                 <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
             </label>
 
-            <p class="hint">Amount needs either a weight in grams somewhere in it (e.g. "100g" or "1 scoop (32g)") or, for a food that's naturally counted in whole pieces, a leading count (e.g. "1 rice cake", "2 eggs") — either way Calculate can scale it to whatever quantity you actually logged.</p>
-            <p class="hint">Protein % sets what share of your protein target should come from this ingredient (e.g. 10 for "10% of my protein target") — since that target already updates live with your weight/activity, this ingredient's actual gram target moves with it automatically.</p>
+            <p class="hint">Amount needs either a mass in grams somewhere in it (e.g. "100g" or "1 scoop (32g)") or, for a food that's naturally counted in whole pieces, a leading count (e.g. "1 rice cake", "2 eggs") — either way Calculate can scale it to whatever quantity you actually logged.</p>
+            <p class="hint">Protein % sets what share of your protein target should come from this ingredient (e.g. 10 for "10% of my protein target") — since that target already updates live with your body mass/activity, this ingredient's actual gram target moves with it automatically.</p>
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="nutrition-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1799,6 +1790,7 @@
 
 <div id="contact-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="contact-cancel-btn" class="btn modal-close">Close</button>
         <h2 id="contact-modal-title">Add Contact</h2>
 
         <form id="contact-form" class="app-form">
@@ -1869,7 +1861,6 @@
             <p id="contact-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="contact-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1878,7 +1869,8 @@
 
 <div id="travel-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="travel-modal-title" hidden>
     <div class="modal-card">
-        <h2 id="travel-modal-title">Add Travel Entry</h2>
+        <button type="button" id="travel-cancel-btn" class="btn modal-close">Close</button>
+        <h2 id="travel-modal-title">Log a Travel</h2>
 
         <form id="travel-form" class="app-form">
             <label>Country, City
@@ -1913,7 +1905,6 @@
             <p id="travel-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="travel-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1922,7 +1913,8 @@
 
 <div id="application-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="application-modal-title" hidden>
     <div class="modal-card">
-        <h2 id="application-modal-title">Add Application</h2>
+        <button type="button" id="application-cancel-btn" class="btn modal-close">Close</button>
+        <h2 id="application-modal-title">Log an Application</h2>
 
         <form id="application-form" class="app-form">
             <label>Type
@@ -1942,7 +1934,6 @@
             <p id="application-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="application-cancel-btn" class="btn">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1951,6 +1942,7 @@
 
 <div id="shortcuts-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" hidden>
     <div class="modal-card">
+        <button type="button" id="shortcuts-close-btn" class="btn modal-close">Close</button>
         <h2 id="shortcuts-modal-title">Keyboard Shortcuts</h2>
         <ul class="shortcuts-list">
             <li><kbd>/</kbd> Focus transaction search</li>
@@ -1958,9 +1950,6 @@
             <li><kbd>Esc</kbd> Close open modal/menu</li>
             <li><kbd>?</kbd> Toggle this help</li>
         </ul>
-        <div class="modal-actions">
-            <button type="button" id="shortcuts-close-btn" class="btn">Close</button>
-        </div>
     </div>
 </div>
 

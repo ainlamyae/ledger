@@ -94,7 +94,7 @@ function renderTravelList() {
 
   if (pageItems.length === 0) {
     const message = allTravel.length === 0
-      ? 'No travel entries yet — click "+ Add Travel Entry" to get started.'
+      ? 'No travel entries yet — click "Log a Travel" to get started.'
       : 'No travel entries match your search.';
     tbody.appendChild(renderEmptyRow(8, message));
   }
@@ -140,7 +140,7 @@ const TRAVEL_FIELD_IDS = ['country-city', 'port', 'type', 'via', 'date', 'time',
 function openTravelForm(travel) {
   editingTravelRow = travel ? travel.row : null;
 
-  document.getElementById('travel-modal-title').textContent = travel ? 'Edit Travel Entry' : 'Add Travel Entry';
+  document.getElementById('travel-modal-title').textContent = travel ? 'Edit Travel Entry' : 'Log a Travel';
 
   const values = travel
     ? [travel.countryCity, travel.port, travel.type, travel.via, travel.date, travel.time, travel.reason, travel.detail]

@@ -151,7 +151,7 @@ function parseWorkoutNoteLines(notes) {
 function estimateWorkoutActivity(notes, weightKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
-    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log Workout button, or write one \"Nx  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
+    throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log a Workout button, or write one \"Nx  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
   }
 
   let totalSeconds = 0;
@@ -211,7 +211,7 @@ function calculateWellnessActivity() {
 
   const weightKg = getLatestWeightKg();
   if (weightKg === null) {
-    showFieldError('wellness-form-error', 'Log your weight first (Health Log → Weight) — the calorie formula needs it.');
+    showFieldError('wellness-form-error', 'Log your body mass first (Health Log → Body Mass) — the calorie formula needs it.');
     return;
   }
 

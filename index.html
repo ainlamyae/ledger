@@ -216,7 +216,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Health Indicator</h2>
-                <button type="button" id="formula-playground-btn" class="btn btn-primary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
+                <button type="button" id="formula-playground-btn" class="btn btn-secondary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
             </div>
 
             <div class="body-mass-projection-wrap">
@@ -453,8 +453,8 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Physique</h2>
+                <button id="today-physique-btn" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
                 <button id="add-physique-btn" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
-                <button id="today-physique-btn" class="btn panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
             </div>
 
             <div class="filters">
@@ -508,9 +508,9 @@
                 <h2>Activity</h2>
                 <!-- Three buttons on one phone heading line, so each label is cut to a
                      word and carries the full wording in its tooltip. -->
+                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
                 <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
                 <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
-                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
             </div>
 
             <!-- Rebuilt from the Activity sheet tab by activities.js -->
@@ -802,6 +802,7 @@
             <div class="panel-header">
                 <h2>Account</h2>
                 <span id="account-reconciliation-flag" class="panel-header-flag" hidden aria-hidden="true"></span>
+                <button id="transfer-funds-btn" class="btn btn-secondary panel-header-btn" title="Move money between two of your own accounts">Transfer</button>
                 <button id="add-account-btn" class="btn btn-primary panel-header-btn" title="Add an account">Add</button>
             </div>
 
@@ -1254,6 +1255,36 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="transfer-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="transfer-modal-title" hidden>
+    <div class="modal-card">
+        <button type="button" id="transfer-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        <h2 id="transfer-modal-title">Transfer Funds</h2>
+
+        <form id="transfer-form" class="app-form">
+            <label>From
+                <select id="transfer-from" required></select>
+            </label>
+            <label>To
+                <select id="transfer-to" required></select>
+            </label>
+            <label>Amount
+                <input type="text" id="transfer-amount" placeholder="e.g. 500 or =1234.56-34.56" required>
+            </label>
+
+            <label class="checkbox-inline-label" id="transfer-payoff-label" title="Sets Amount to whatever brings the To account's balance to zero">
+                <input type="checkbox" id="transfer-payoff">
+                Pay off To account's full balance
+            </label>
+
+            <p id="transfer-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Transfer</button>
             </div>
         </form>
     </div>

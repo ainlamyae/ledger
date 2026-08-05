@@ -143,11 +143,25 @@ function parseWorkoutNoteLines(notes) {
     .filter(Boolean);
 }
 
-// Sums duration and calorie burn across every parsed line — mirrors
-// strength-plan.js's estimateWorkoutMinutes exactly (same per-row active-time
-// math) so Calculate's minutes match what Log Workout itself would have
-// estimated for the same ticked rows. Each line's own MET is applied only to
-// its own active seconds.
+// A parsed line's active seconds, net of rest — the one place the plan's
+// duration math lives, read by both Log Workout's prefill and Calculate so the
+// two can't drift apart on the same exercises. Steps convert via the same
+// steps↔minutes ratio the Activity chart uses (toActivityMinutes, charts.js).
+function activeSecondsForNoteLine(line) {
+  if (line.type === 'reps') return line.reps * WORKOUT_REP_SEC;
+  if (line.type === 'steps') return toActivityMinutes(line.steps, 'steps') * 60;
+  // Already the total active time — the note carries seconds directly.
+  if (line.type === 'hold') return line.seconds;
+  return line.minutes * 60;
+}
+
+function workoutNoteMinutes(notes) {
+  const seconds = parseWorkoutNoteLines(notes).reduce((sum, line) => sum + activeSecondsForNoteLine(line), 0);
+  return Math.max(1, Math.round(seconds / 60));
+}
+
+// Sums duration and calorie burn across every parsed line. Each line's own MET
+// is applied only to its own active seconds.
 function estimateWorkoutActivity(notes, weightKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
@@ -161,14 +175,7 @@ function estimateWorkoutActivity(notes, weightKg) {
   lines.forEach((line) => {
     if (!(line.name in EXERCISE_MET)) unmatchedNames.push(line.name);
     const met = EXERCISE_MET[line.name] ?? EXERCISE_MET_DEFAULT;
-    let activeSeconds;
-    if (line.type === 'reps') activeSeconds = line.reps * WORKOUT_REP_SEC;
-    else if (line.type === 'steps') activeSeconds = toActivityMinutes(line.steps, 'steps') * 60;
-    // Already the total active time for a hold row — the note carries seconds
-    // directly (see strength-plan.js's activeSecondsForBox), no tempo or pace
-    // conversion to apply.
-    else if (line.type === 'hold') activeSeconds = line.seconds;
-    else activeSeconds = line.minutes * 60;
+    const activeSeconds = activeSecondsForNoteLine(line);
 
     totalSeconds += activeSeconds;
     calories += metKcal(met, weightKg, activeSeconds / 60);

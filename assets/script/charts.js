@@ -1026,7 +1026,7 @@ function renderTodayGlanceCards(entries) {
   // on a cut, "Min Calories" on a bulk. Digit-free, so privacy mode has nothing
   // to hide here. The four tiles are all today's figures (last night's, for
   // Sleep) — the panel they sit in says so, so the headings don't repeat it.
-  document.getElementById('today-calories-label').textContent = `${calorieBound.word} Calories`;
+  document.getElementById('today-calories-label').textContent = `${calorieBound.word} Calory Intake`;
 
   // Which direction is "good" differs per metric: for Calories it's whichever
   // side of the bound the goal points to (at/under a max, at/over a min);
@@ -1034,20 +1034,30 @@ function renderTodayGlanceCards(entries) {
   // RANGE (withinProteinBand above) — inside the band only.
   const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
 
+  // What hitting the minutes target would burn — the same figure the calorie
+  // bound is built from (activityTargetKcal), so the tile and the bound can't
+  // quote different numbers for the same plan. Needs a weigh-in; without one
+  // the tile just reads as it did before.
+  const weightKg = latestWeightKg(entries);
+  const plannedBurn = weightKg !== null ? `${Math.round(activityTargetKcal(weightKg))} kcal` : null;
+
   setTodayGlanceTile('today-calories', calories, calorieBound.kcal, 'kcal', calories !== null && withinCalorieBound(calories, calorieBound));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand);
-  setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
+  setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, plannedBurn);
   setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
 }
 
 // `target` is a number for the single-figure metrics and a preformatted
 // string ("131~164") for Protein's band — both interpolate identically, and
 // maskDigits masks either the same way.
-function setTodayGlanceTile(idPrefix, value, target, unit, isGood) {
+// `note` restates the target in a second unit ("= 394 kcal"). Part of the same
+// string rather than its own styled element, so the whole line reads at one
+// size and masks as one thing.
+function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null) {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'expense');
 
-  const text = `${value !== null ? value : '—'} / ${target} ${unit}`;
+  const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` = ${note}` : ''}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
   if (value !== null) el.classList.add(isGood ? 'income' : 'expense');
 }

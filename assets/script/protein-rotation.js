@@ -21,10 +21,16 @@ const PROTEIN_ROTATION_LOOKBACK_DEFAULT_DAYS = 7;
 
 // Every Nutrition Facts row with a Protein % set — that field is the sole
 // "is this tracked" switch (nutrition.js's refreshNutrition/openNutritionForm).
+const PROTEIN_UNCLASSIFIED_LABEL = 'Unclassified';
+
 function trackedProteinSources() {
   return allNutritionEntries
     .filter((n) => n.proteinPercent !== null && n.proteinPercent > 0)
-    .map((n) => ({ name: n.name, proteinPercent: n.proteinPercent }));
+    .map((n) => ({
+      name: n.name,
+      classification: n.classification || PROTEIN_UNCLASSIFIED_LABEL,
+      proteinPercent: n.proteinPercent,
+    }));
 }
 
 // Protein actually eaten per tracked ingredient over the lookback window,
@@ -69,19 +75,63 @@ function computeProteinRotationRows(from, to) {
   // ingredient's actual consumption cover this window."
   const totalTargetForWindow = dailyProteinTarget * lookbackDays;
 
-  return sources
-    .map((s) => {
-      const actualProteinG = proteinByName.get(s.name.trim().toLowerCase()) || 0;
-      const targetProteinG = (s.proteinPercent / 100) * weeklyProteinTarget * (lookbackDays / 7);
-      return {
-        name: s.name,
-        actualProteinG: Math.round(actualProteinG * 10) / 10,
-        targetProteinG: Math.round(targetProteinG * 10) / 10,
-        proteinPercent: s.proteinPercent,
-        actualPercentOfTotalTarget: totalTargetForWindow > 0 ? Math.round((actualProteinG / totalTargetForWindow) * 1000) / 10 : 0,
-      };
-    })
-    .sort((a, b) => (b.targetProteinG - b.actualProteinG) - (a.targetProteinG - a.actualProteinG));
+  const rows = sources.map((s) => {
+    const actualProteinG = proteinByName.get(s.name.trim().toLowerCase()) || 0;
+    const targetProteinG = (s.proteinPercent / 100) * weeklyProteinTarget * (lookbackDays / 7);
+    return {
+      name: s.name,
+      classification: s.classification,
+      actualProteinG: Math.round(actualProteinG * 10) / 10,
+      targetProteinG: Math.round(targetProteinG * 10) / 10,
+      proteinPercent: s.proteinPercent,
+      actualPercentOfTotalTarget: totalTargetForWindow > 0 ? Math.round((actualProteinG / totalTargetForWindow) * 1000) / 10 : 0,
+    };
+  });
+
+  return sortByClassificationThenGap(rows);
+}
+
+// Sources cluster under their classification, so a whole group reads as one
+// block in the bars and one arc in the donut. The old flat "most left to eat
+// first" ordering is kept inside each group, and the groups themselves lead
+// with whichever has the largest combined gap — so the to-do-list read survives
+// grouping instead of being traded away for it. Unclassified sinks to the
+// bottom: it's a gap in the catalog, not a food group.
+function sortByClassificationThenGap(rows) {
+  const gap = (r) => r.targetProteinG - r.actualProteinG;
+
+  const groupGap = new Map();
+  rows.forEach((r) => groupGap.set(r.classification, (groupGap.get(r.classification) || 0) + gap(r)));
+
+  return [...rows].sort((a, b) => {
+    if (a.classification === b.classification) return gap(b) - gap(a);
+    const aUnknown = a.classification === PROTEIN_UNCLASSIFIED_LABEL;
+    const bUnknown = b.classification === PROTEIN_UNCLASSIFIED_LABEL;
+    if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
+    return groupGap.get(b.classification) - groupGap.get(a.classification);
+  });
+}
+
+// One hue per classification, lightness stepped within it — the group reads as
+// a block while two sources inside it stay distinguishable. Shared by the bars
+// and the donut, so a source keeps one colour everywhere in the panel.
+function proteinRotationPalette(rows) {
+  const classifications = [...new Set(rows.map((r) => r.classification))];
+  const hueFor = (c) => Math.round((classifications.indexOf(c) * 360) / classifications.length);
+  const seen = new Map();
+
+  const barColors = rows.map((r) => {
+    const n = seen.get(r.classification) || 0;
+    seen.set(r.classification, n + 1);
+    // Wraps every 4 so a large group never fades out or drifts into the next
+    // classification's shade.
+    return `hsl(${hueFor(r.classification)}, 65%, ${62 - (n % 4) * 9}%)`;
+  });
+
+  return {
+    barColors,
+    legend: classifications.map((name) => ({ name, color: `hsl(${hueFor(name)}, 65%, 62%)` })),
+  };
 }
 
 // Rings of the rotation donut beside the bars, outermost first — Chart.js
@@ -148,9 +198,9 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
         tooltip: {
           callbacks: {
             // The default title looks up data.labels by dataIndex, which is
-            // right for both rings — but the label line below already names
-            // the source, so it would just repeat it.
-            title: () => '',
+            // right for both rings — but the label line below already names the
+            // source, so the slice's classification goes here instead.
+            title: (items) => rows[items[0].dataIndex].classification,
             label: (item) => {
               const ring = rings[item.datasetIndex];
               const pct = ring.total ? Math.round((item.raw / ring.total) * 1000) / 10 : 0;
@@ -171,7 +221,11 @@ function renderProteinRotationChart({ from, to }) {
   const labels = rows.map((r) => r.name);
   const actualData = rows.map((r) => r.actualProteinG);
   const targetData = rows.map((r) => r.targetProteinG);
-  const barColors = labels.map((_, i) => `hsl(${Math.round((i * 360) / labels.length)}, 65%, 55%)`);
+  const { barColors, legend } = proteinRotationPalette(rows);
+
+  // One swatch per classification rather than per source — the shades within a
+  // group would only add noise, and the group is what the legend explains.
+  renderCategoryLegend('protein-rotation-legend', legend);
 
   const hasData = labels.length > 0;
 
@@ -215,6 +269,12 @@ function renderProteinRotationChart({ from, to }) {
         },
         tooltip: {
           callbacks: {
+            // The default title is the bare source name; naming its group there
+            // is what makes a block of same-hue bars self-explanatory.
+            title: (items) => {
+              const row = rows[items[0].dataIndex];
+              return `${row.name} — ${row.classification}`;
+            },
             label: (item) => {
               const row = rows[item.dataIndex];
               const pct = item.dataset.label === 'Eaten' ? row.actualPercentOfTotalTarget : row.proteinPercent;

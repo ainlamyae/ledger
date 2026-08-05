@@ -19,7 +19,7 @@ async function initTravel(forceRefresh = false) {
 
     document.getElementById('add-travel-btn').addEventListener('click', () => openTravelForm(null));
     document.getElementById('travel-cancel-btn').addEventListener('click', closeTravelForm);
-    document.getElementById('travel-form').addEventListener('submit', submitTravelForm);
+    onFormSubmit('travel-form', submitTravelForm);
 
     document.getElementById('travel-search').addEventListener('input', () => {
       travelCurrentPage = 1;
@@ -115,7 +115,7 @@ function renderTravelList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTravelForm(t) }),
-      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTravelEntry(t) }),
+      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteTravelEntry(t) }),
     );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);

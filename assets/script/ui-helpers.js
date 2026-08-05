@@ -41,13 +41,66 @@ function clearFieldError(elId) {
 
 // Builds a small icon-only action button (Edit/Delete/Duplicate/prev-next,
 // etc.) with the title/aria-label pair every row action and pager control uses.
-function makeRowActionButton({ emoji, title, onClick }) {
+// Marks a button busy for the length of an async action: an ellipsis joins its
+// label and it disables until the action settles. A save to Sheets or an API
+// round trip is slow enough to look like nothing happened, so without this the
+// natural response is to click again. Restores the original label even when the
+// action throws, and tolerates a null button so callers needn't check.
+// Marks busy with aria-busy rather than `disabled`: several of these buttons
+// (the bulk-action bar's especially) have their own disabled rule driven by the
+// selection, and an action that changes the selection would have it overwritten
+// on the way out. CSS takes the clicks away; the data-busy guard covers
+// keyboard activation and implicit form submits, which pointer-events can't.
+async function withButtonBusy(btn, run) {
+  if (!btn) return run();
+  if (btn.dataset.busy) return undefined;
+
+  const label = btn.textContent;
+  btn.dataset.busy = '1';
+  btn.setAttribute('aria-busy', 'true');
+  btn.textContent = `${label}…`;
+  try {
+    return await run();
+  } finally {
+    delete btn.dataset.busy;
+    btn.removeAttribute('aria-busy');
+    btn.textContent = label;
+  }
+}
+
+// Click wiring for an async action, with the same busy treatment.
+function onAsyncClick(buttonId, handler) {
+  const btn = document.getElementById(buttonId);
+  btn.addEventListener('click', () => withButtonBusy(btn, handler));
+}
+
+// Wires a form's submit to an async handler and marks the button that actually
+// submitted busy for its duration — `submitter` rather than a lookup, so
+// "Save & Add Another" shows its own progress instead of Save's.
+function onFormSubmit(formId, handler) {
+  const form = document.getElementById(formId);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const btn = event.submitter || form.querySelector('button[type="submit"]');
+    return withButtonBusy(btn, () => handler(event));
+  });
+}
+
+// `variant` adds a role class ('btn-danger' for the destructive ones). An
+// onClick that returns a promise (every delete does; the edit/duplicate ones
+// just open a form and don't) gets the busy treatment automatically, so a row
+// delete can't be double-fired while the sheet write is in flight.
+function makeRowActionButton({ emoji, title, onClick, variant }) {
   const btn = document.createElement('button');
-  btn.className = 'btn';
+  btn.className = variant ? `btn ${variant}` : 'btn';
   btn.textContent = emoji;
   btn.title = title;
   btn.setAttribute('aria-label', title);
-  btn.addEventListener('click', onClick);
+  btn.addEventListener('click', (event) => {
+    const result = onClick(event);
+    if (result && typeof result.then === 'function') return withButtonBusy(btn, () => result);
+    return result;
+  });
   return btn;
 }
 

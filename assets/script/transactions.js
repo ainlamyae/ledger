@@ -42,7 +42,7 @@ async function initTransactions(forceRefresh = false) {
     listenersAttached = true;
     document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionForm());
     document.getElementById('tx-cancel-btn').addEventListener('click', closeTransactionForm);
-    document.getElementById('tx-form').addEventListener('submit', submitTransactionForm);
+    onFormSubmit('tx-form', submitTransactionForm);
 
     // Deferred full refresh when the modal closes after a keepOpen add sequence.
     // Covers all close paths: Cancel button, Escape key, and normal Save.
@@ -75,10 +75,10 @@ function setupBulkActions() {
     renderTransactions();
   });
 
-  document.getElementById('tx-bulk-delete-btn').addEventListener('click', bulkDeleteTransactions);
+  onAsyncClick('tx-bulk-delete-btn', bulkDeleteTransactions);
   document.getElementById('tx-bulk-edit-btn').addEventListener('click', openBulkEditForm);
   document.getElementById('tx-bulk-edit-cancel-btn').addEventListener('click', closeBulkEditForm);
-  document.getElementById('tx-bulk-edit-form').addEventListener('submit', submitBulkEditForm);
+  onFormSubmit('tx-bulk-edit-form', submitBulkEditForm);
 }
 
 function updateBulkActionsUI() {
@@ -289,7 +289,7 @@ function renderTransactions() {
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTransactionForm(t) }),
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openTransactionForm(t, true) }),
-      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTransaction(t.row) }),
+      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteTransaction(t.row) }),
     );
 
     tr.append(checkboxCell, dateCell, accountCell, payeeCell, categoryCell, descCell, amountCell, actionsCell);

@@ -177,7 +177,7 @@ function addExportFilterRow() {
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'btn export-filter-remove';
+  removeBtn.className = 'btn btn-danger export-filter-remove';
   removeBtn.textContent = '×';
   removeBtn.title = 'Remove filter';
   removeBtn.setAttribute('aria-label', 'Remove filter');

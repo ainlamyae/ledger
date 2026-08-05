@@ -129,7 +129,7 @@ async function initWellness(forceRefresh = false) {
 
     document.getElementById('add-wellness-btn').addEventListener('click', () => openWellnessForm(null));
     document.getElementById('wellness-cancel-btn').addEventListener('click', closeWellnessForm);
-    document.getElementById('wellness-form').addEventListener('submit', submitWellnessForm);
+    onFormSubmit('wellness-form', submitWellnessForm);
     document.getElementById('wellness-category').addEventListener('change', onCategoryChange);
     document.getElementById('wellness-is-pattern').addEventListener('change', syncWellnessPatternMode);
     document.getElementById('wellness-calc-btn').addEventListener('click', handleCalculateClick);
@@ -175,9 +175,9 @@ function setupWellnessBulkActions() {
 
   document.getElementById('wellness-bulk-edit-btn').addEventListener('click', openWellnessBulkEditForm);
   document.getElementById('wellness-bulk-edit-cancel-btn').addEventListener('click', closeWellnessBulkEditForm);
-  document.getElementById('wellness-bulk-edit-form').addEventListener('submit', submitWellnessBulkEditForm);
+  onFormSubmit('wellness-bulk-edit-form', submitWellnessBulkEditForm);
   document.getElementById('wellness-bulk-recalc-btn').addEventListener('click', bulkRecalculateWellness);
-  document.getElementById('wellness-bulk-merge-btn').addEventListener('click', mergeSelectedWellnessEntries);
+  onAsyncClick('wellness-bulk-merge-btn', mergeSelectedWellnessEntries);
 }
 
 function setupWellnessSorting() {
@@ -402,7 +402,7 @@ function renderWellnessList() {
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openWellnessForm(e) }),
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openWellnessForm(e, true) }),
-      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteWellnessEntry(e) }),
+      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteWellnessEntry(e) }),
     );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);

@@ -17,7 +17,7 @@ async function initApplications(forceRefresh = false) {
 
     document.getElementById('add-application-btn').addEventListener('click', () => openApplicationForm(null));
     document.getElementById('application-cancel-btn').addEventListener('click', closeApplicationForm);
-    document.getElementById('application-form').addEventListener('submit', submitApplicationForm);
+    onFormSubmit('application-form', submitApplicationForm);
 
     document.getElementById('applications-search').addEventListener('input', renderApplicationsList);
   }
@@ -186,7 +186,7 @@ function buildApplicationCard(app) {
 
   actions.append(
     makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (e) => { e.stopPropagation(); openApplicationForm(app); } }),
-    makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: (e) => { e.stopPropagation(); deleteApplication(app); } }),
+    makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: (e) => { e.stopPropagation(); return deleteApplication(app); } }),
   );
   header.append(icon, title, actions);
 

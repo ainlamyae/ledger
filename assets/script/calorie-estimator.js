@@ -474,7 +474,7 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
 
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'btn';
+  btn.className = 'btn btn-primary';
   btn.textContent = '💾';
   btn.title = `Not in your Nutrition Facts table yet — save "${row.name}" (${row.newRow.amount}, ${row.newRow.calories} kcal, ${row.newRow.protein}g protein) so it's a trusted lookup next time instead of a fresh guess`;
   btn.setAttribute('aria-label', `Save ${row.name} to Nutrition Facts`);

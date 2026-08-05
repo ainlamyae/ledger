@@ -23,28 +23,24 @@ const FORMULA_FIELDS = [
   { key: 'WEIGHT_GOAL_KG', inputId: 'formula-goal', fallback: () => WEIGHT_GOAL_KG_DEFAULT },
 ];
 
-// Broken into its three named terms rather than shown as one long line: each is a
+// Broken into its named terms rather than shown as one long line: each is a
 // separate published formula with its own source, and the substituted figures
-// below are labelled with the same symbols so the two read together.
+// below are labelled with the same symbols so the two read together. No blank
+// lines between the blocks — the four-space indent on every formula line is
+// what separates it from the heading above it, so the spacers only added height.
 const FORMULA_EXPRESSION = `Resting metabolic rate — Mifflin-St Jeor (1990)
     BMR  =  10×m  +  6.25×h  −  5×a  +  σ
-
 Activity burn at the daily target — ACSM metabolic equation
     Eₐ   =  MET × m × τ × κ / ε
-
 Daily energy deficit implied by the weekly fat-loss goal
     D    =  (Δm × ρ) / 7
-
 Proposed daily intake
     Eᵢₙ  =  BMR  +  Eₐ  −  D
-
 Maintenance is affine in body mass — M(m) = A + B×m
     A    =  6.25×h  −  5×a  +  σ
     B    =  10  +  MET × τ × κ / ε
-
 Body mass at which Eᵢₙ becomes maintenance
     m∞   =  (Eᵢₙ  −  A) / B
-
 Exponential decay toward m∞, not linear loss
     m(t) =  m∞  +  (m − m∞) × e^(−B×t/ρ)
     t    =  (ρ / B) × ln[ (m − m∞) / (m_g − m∞) ]`;

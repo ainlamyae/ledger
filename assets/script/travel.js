@@ -115,7 +115,7 @@ function renderTravelList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTravelForm(t) }),
-      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteTravelEntry(t) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTravelEntry(t) }),
     );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);

@@ -376,6 +376,7 @@ async function loadReport(forceRefresh) {
     income: current[1] || 0,
     expenses: current[2] || 0,
     saved: current[savedIndex] || 0,
+    quarterAverage: quarterAverages(monthlyRows, activeIndex, savedIndex),
     incomeExpenseTrend,
     savingsTrend,
     categoryTrend,
@@ -464,15 +465,51 @@ function getSettingStringAny(keys, fallback) {
   return fallback;
 }
 
+// Monthly average of the three months BEFORE the active one — a baseline this
+// month is read against, so the current (usually part-way through) month isn't
+// averaged into its own benchmark. Taken from Monthly Summary rather than
+// Insight's Last Quarter column so it shares the current month's exact
+// definition of income and expenses. Falls back to however many prior months
+// exist, and to null in the first month, when there's nothing to compare to.
+//
+// Income and Expenses only — Monthly Cash Flow shows its own figure alone.
+function quarterAverages(monthlyRows, activeIndex) {
+  const prior = monthlyRows.slice(Math.max(0, activeIndex - 3), activeIndex);
+  if (prior.length === 0) return null;
+
+  const mean = (col) => prior.reduce((sum, row) => sum + (Number(row[col]) || 0), 0) / prior.length;
+  return { income: mean(1), expenses: mean(2), months: prior.length };
+}
+
+// "this month / recent average", the same actual-vs-benchmark shape the Health
+// tiles use. Just the figure on its own when there's no prior month yet.
+function withQuarterAverage(value, average) {
+  return average === null || average === undefined
+    ? formatCurrency(value)
+    : `${formatCurrency(value)} / ${formatCurrency(average)}`;
+}
+
 function renderSummaryCards(data) {
+  const avg = data.quarterAverage;
+  // Says what the second figure is, since the card heading can't carry it and
+  // the month count varies early on.
+  const avgTitle = avg
+    ? `This month / average of the previous ${avg.months} month${avg.months === 1 ? '' : 's'}`
+    : 'This month — no earlier months to average yet';
+
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
+
   document.getElementById('income-label').textContent = 'Monthly Income';
-  document.getElementById('income-value').textContent = formatCurrency(data.income);
+  const incomeEl = document.getElementById('income-value');
+  incomeEl.textContent = withQuarterAverage(data.income, avg?.income);
+  incomeEl.title = avgTitle;
+
   document.getElementById('expenses-label').textContent = 'Monthly Expenditure';
-  document.getElementById('expenses-value').textContent = formatCurrency(data.expenses);
+  const expensesEl = document.getElementById('expenses-value');
+  expensesEl.textContent = withQuarterAverage(data.expenses, avg?.expenses);
+  expensesEl.title = avgTitle;
 
   document.getElementById('cashflow-label').textContent = 'Monthly Cash Flow';
-
   const savingsEl = document.getElementById('savings-value');
   savingsEl.textContent = formatCurrency(data.saved);
   savingsEl.classList.toggle('income', data.saved >= 0);

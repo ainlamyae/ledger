@@ -86,13 +86,14 @@ function onFormSubmit(formId, handler) {
   });
 }
 
-// `variant` adds a role class ('btn-danger' for the destructive ones). An
-// onClick that returns a promise (every delete does; the edit/duplicate ones
-// just open a form and don't) gets the busy treatment automatically, so a row
-// delete can't be double-fired while the sheet write is in flight.
-function makeRowActionButton({ emoji, title, onClick, variant }) {
+// Stays the default surface button whatever it does — these are all emoji, and
+// an emoji on a filled colour is hard to read. An onClick that returns a
+// promise (every delete does; the edit/duplicate ones just open a form and
+// don't) gets the busy treatment automatically, so a row delete can't be
+// double-fired while the sheet write is in flight.
+function makeRowActionButton({ emoji, title, onClick }) {
   const btn = document.createElement('button');
-  btn.className = variant ? `btn ${variant}` : 'btn';
+  btn.className = 'btn';
   btn.textContent = emoji;
   btn.title = title;
   btn.setAttribute('aria-label', title);

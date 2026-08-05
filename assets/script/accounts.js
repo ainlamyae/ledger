@@ -85,7 +85,7 @@ function renderAccountsList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openAccountForm(account) }),
-      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteAccount(account.row) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteAccount(account.row) }),
     );
 
     tr.append(nameCell, institutionCell, typeCell, balanceCell, actionsCell);

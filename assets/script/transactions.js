@@ -289,7 +289,7 @@ function renderTransactions() {
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTransactionForm(t) }),
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openTransactionForm(t, true) }),
-      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteTransaction(t.row) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTransaction(t.row) }),
     );
 
     tr.append(checkboxCell, dateCell, accountCell, payeeCell, categoryCell, descCell, amountCell, actionsCell);

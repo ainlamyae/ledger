@@ -922,6 +922,11 @@
             </div>
 
             <div class="card">
+                <h3 id="cashflow-label">Monthly Cash Flow</h3>
+                <div class="value" id="savings-value">—</div>
+            </div>
+
+            <div class="card">
                 <h3 id="income-label">Monthly Income</h3>
                 <div class="value income" id="income-value">—</div>
             </div>
@@ -929,11 +934,6 @@
             <div class="card">
                 <h3 id="expenses-label">Monthly Expenditure</h3>
                 <div class="value expense" id="expenses-value">—</div>
-            </div>
-
-            <div class="card">
-                <h3 id="cashflow-label">Monthly Cash Flow</h3>
-                <div class="value" id="savings-value">—</div>
             </div>
         </div>
 
@@ -1073,7 +1073,7 @@
             <div class="panel-actions" id="tx-bulk-actions" hidden>
                 <span id="tx-bulk-summary"></span>
                 <button id="tx-bulk-edit-btn" class="btn" title="Edit Selected" aria-label="Edit Selected">✏️</button>
-                <button id="tx-bulk-delete-btn" class="btn btn-danger" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
+                <button id="tx-bulk-delete-btn" class="btn" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
             </div>
 
             <div class="pagination" id="tx-pagination"></div>
@@ -1299,7 +1299,7 @@
                 <button id="contacts-bulk-export-google-btn" class="btn" title="Export Selected for Google/Phone" aria-label="Export Selected for Google/Phone">📱</button>
                 <button id="contacts-bulk-export-outlook-btn" class="btn" title="Export Selected for Outlook" aria-label="Export Selected for Outlook">📧</button>
                 <button id="contacts-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
-                <button id="contacts-bulk-delete-btn" class="btn btn-danger" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
+                <button id="contacts-bulk-delete-btn" class="btn" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
             </div>
 
             <div class="pagination" id="contacts-pagination"></div>
@@ -1353,7 +1353,7 @@
 
 <div id="tx-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="tx-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="tx-modal-title">Log a Transaction</h2>
 
         <form id="tx-form" class="app-form">
@@ -1392,7 +1392,7 @@
 
 <div id="tx-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-bulk-edit-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="tx-bulk-edit-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="tx-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="tx-bulk-edit-modal-title">Edit Selected Transactions</h2>
 
         <form id="tx-bulk-edit-form" class="app-form">
@@ -1429,7 +1429,7 @@
 
 <div id="account-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="account-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="account-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="account-modal-title">Add Account</h2>
 
         <form id="account-form" class="app-form">
@@ -1470,7 +1470,7 @@
 
 <div id="setting-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="setting-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="setting-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="setting-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="setting-modal-title">Add Setting</h2>
 
         <form id="setting-form" class="app-form">
@@ -1514,7 +1514,7 @@
 
 <div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="timesheet-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="timesheet-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="timesheet-modal-title">Log Time</h2>
 
         <form id="timesheet-form" class="app-form">
@@ -1554,7 +1554,7 @@
 
 <div id="wellness-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="wellness-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="wellness-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="wellness-modal-title">Log an Entry</h2>
 
         <form id="wellness-form" class="app-form">
@@ -1620,7 +1620,7 @@
 
 <div id="wellness-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-bulk-edit-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="wellness-bulk-edit-modal-title">Edit Selected Entries</h2>
 
         <form id="wellness-bulk-edit-form" class="app-form">
@@ -1652,7 +1652,7 @@
 
 <div id="formula-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formula-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="formula-close-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="formula-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="formula-modal-title">Health Formula Playground</h2>
 
         <pre id="formula-expression" class="formula-expression"></pre>
@@ -1755,7 +1755,7 @@
 
 <div id="nutrition-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="nutrition-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="nutrition-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="nutrition-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="nutrition-modal-title">Add Ingredient</h2>
 
         <form id="nutrition-form" class="app-form">
@@ -1799,7 +1799,7 @@
 
 <div id="contact-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="contact-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="contact-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="contact-modal-title">Add Contact</h2>
 
         <form id="contact-form" class="app-form">
@@ -1878,7 +1878,7 @@
 
 <div id="travel-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="travel-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="travel-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="travel-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="travel-modal-title">Log a Travel</h2>
 
         <form id="travel-form" class="app-form">
@@ -1922,7 +1922,7 @@
 
 <div id="application-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="application-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="application-cancel-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="application-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="application-modal-title">Log an Application</h2>
 
         <form id="application-form" class="app-form">
@@ -1951,7 +1951,7 @@
 
 <div id="shortcuts-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="shortcuts-close-btn" class="btn btn-danger modal-close" title="Close" aria-label="Close">❌</button>
+        <button type="button" id="shortcuts-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="shortcuts-modal-title">Keyboard Shortcuts</h2>
         <ul class="shortcuts-list">
             <li><kbd>/</kbd> Focus transaction search</li>

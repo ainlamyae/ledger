@@ -402,7 +402,7 @@ function renderWellnessList() {
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openWellnessForm(e) }),
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openWellnessForm(e, true) }),
-      makeRowActionButton({ emoji: '🗑️', variant: 'btn-danger', title: 'Delete', onClick: () => deleteWellnessEntry(e) }),
+      makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteWellnessEntry(e) }),
     );
     tr.appendChild(actionsCell);
     tbody.appendChild(tr);

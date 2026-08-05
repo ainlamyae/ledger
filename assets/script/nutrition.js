@@ -4,7 +4,8 @@
 // the specific brand/product actually bought) is recorded here, it's reused
 // instead of being re-guessed every time.
 
-const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:F`;
+// A2:G — Classification, Name, Amount, Calories, Protein, Verification, Percent.
+const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:G`;
 const N_PAGE_SIZE = 25;
 
 // Amount is freeform serving-size text so it can read like a real nutrition
@@ -65,6 +66,7 @@ async function initNutrition(forceRefresh = false) {
     document.getElementById('add-nutrition-btn').addEventListener('click', () => openNutritionForm(null));
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
     document.getElementById('nutrition-form').addEventListener('submit', submitNutritionForm);
+    document.getElementById('nutrition-usda-btn').addEventListener('click', lookupNutritionFromUsda);
 
     document.getElementById('nutrition-search').addEventListener('input', () => {
       nCurrentPage = 1;
@@ -108,19 +110,23 @@ async function refreshNutrition(forceRefresh = false) {
   allNutritionEntries = values
     .map((row, i) => ({
       row: i + 2,
-      name: (row[0] || '').trim(),
-      amount: row[1] || '',
-      calories: (row[2] !== undefined && row[2] !== '') ? Number(row[2]) : null,
-      protein: (row[3] !== undefined && row[3] !== '') ? Number(row[3]) : null,
-      // Column E: blank means computed by the USDA/AI fallback, "1" means
+      // Column A: free-text grouping for the ingredient (e.g. "Dairy",
+      // "Poultry"). Never written by the app's own fallback — a row it banks
+      // is left blank for you to classify.
+      classification: (row[0] || '').trim(),
+      name: (row[1] || '').trim(),
+      amount: row[2] || '',
+      calories: (row[3] !== undefined && row[3] !== '') ? Number(row[3]) : null,
+      protein: (row[4] !== undefined && row[4] !== '') ? Number(row[4]) : null,
+      // Column F: blank means computed by the USDA/AI fallback, "1" means
       // you've checked it against the label on your own purchased
       // ingredient — never written by the app itself, only by hand here.
-      verified: String(row[4] || '').trim() === '1',
-      // Column F: blank means "not tracked" — protein-rotation.js's Protein
+      verified: String(row[5] || '').trim() === '1',
+      // Column G: blank means "not tracked" — protein-rotation.js's Protein
       // Source Rotation chart only includes rows with a number here: what
       // % of your (live, weight/activity-driven) protein target this
       // ingredient should cover, e.g. 10 for "turkey = 10% of my protein".
-      proteinPercent: (row[5] !== undefined && row[5] !== '') ? Number(row[5]) : null,
+      proteinPercent: (row[6] !== undefined && row[6] !== '') ? Number(row[6]) : null,
     }))
     .filter((n) => n.name);
 
@@ -138,7 +144,11 @@ function proteinDensity(n) {
 
 function getFilteredNutritionEntries() {
   const search = document.getElementById('nutrition-search').value.trim().toLowerCase();
-  const filtered = allNutritionEntries.filter((n) => !search || n.name.toLowerCase().includes(search));
+  const filtered = allNutritionEntries.filter((n) => !search
+    || n.name.toLowerCase().includes(search)
+    // Classification too, so a group can be pulled up as a set ("dairy")
+    // the same way a single ingredient can.
+    || n.classification.toLowerCase().includes(search));
 
   const { key, dir } = nSort;
   return [...filtered].sort((a, b) => {
@@ -164,7 +174,7 @@ function renderNutritionList() {
     const message = allNutritionEntries.length === 0
       ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add Ingredient" to add one yourself.'
       : 'No ingredients match your search.';
-    tbody.appendChild(renderEmptyRow(9, message));
+    tbody.appendChild(renderEmptyRow(10, message));
   }
 
   pageItems.forEach((n) => {
@@ -193,6 +203,7 @@ function renderNutritionList() {
 
     tr.append(
       checkboxCell,
+      makeCell(n.classification || '—'),
       makeCell(n.name),
       amountCell,
       makeCell(n.calories !== null ? String(n.calories) : '—'),
@@ -247,6 +258,8 @@ function openNutritionForm(entry) {
   editingNutritionRow = entry ? entry.row : null;
 
   document.getElementById('nutrition-modal-title').textContent = entry ? 'Edit Ingredient' : 'Add Ingredient';
+  document.getElementById('nutrition-classification').value = entry ? entry.classification : '';
+  renderNutritionClassificationOptions();
   document.getElementById('nutrition-name').value = entry ? entry.name : '';
   document.getElementById('nutrition-amount').value = entry ? entry.amount : '';
   document.getElementById('nutrition-calories').value = (entry && entry.calories !== null) ? entry.calories : '';
@@ -255,17 +268,140 @@ function openNutritionForm(entry) {
   document.getElementById('nutrition-protein-percent').value = (entry && entry.proteinPercent !== null) ? entry.proteinPercent : '';
 
   clearFieldError('nutrition-form-error');
+  clearUsdaResults();
   document.getElementById('nutrition-modal').hidden = false;
+}
+
+// Classifications already in use, most-used first — same idea as the Health
+// Log's description suggestions, so a free-text column doesn't fragment into
+// "Dairy"/"dairy"/"Diary" over time.
+function renderNutritionClassificationOptions() {
+  const counts = new Map();
+  allNutritionEntries
+    .filter((n) => n.classification)
+    .forEach((n) => counts.set(n.classification, (counts.get(n.classification) || 0) + 1));
+
+  const dl = document.getElementById('nutrition-classification-options');
+  dl.innerHTML = '';
+  [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([value]) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      dl.appendChild(opt);
+    });
 }
 
 function closeNutritionForm() {
   document.getElementById('nutrition-modal').hidden = true;
   editingNutritionRow = null;
+  clearUsdaResults();
+}
+
+function clearUsdaResults() {
+  const results = document.getElementById('nutrition-usda-results');
+  results.innerHTML = '';
+  results.hidden = true;
+}
+
+// Fills Amount/Calories/Protein from the typed Name via USDA FoodData Central
+// (the same database and search helper calorie-estimator.js already uses).
+//
+// Unlike Calculate, there's no AI estimate here to sanity-check a result
+// against — so pickPlausibleMacros's trust test can't run, and USDA's relevance
+// ranking is genuinely capable of putting "Oil, soybean" (884 kcal) above the
+// bean (~140) for "soybeans". Every candidate is therefore listed for the user
+// to judge, with the top one applied so the common case is still one click.
+async function lookupNutritionFromUsda() {
+  const btn = document.getElementById('nutrition-usda-btn');
+  const name = document.getElementById('nutrition-name').value.trim();
+
+  if (!name) {
+    showFieldError('nutrition-form-error', 'Type an ingredient name first — that name is what gets looked up.');
+    return;
+  }
+
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Looking up…';
+  clearFieldError('nutrition-form-error');
+  clearUsdaResults();
+
+  try {
+    const candidates = await usdaLookupKcalCandidates(name);
+    if (candidates.length === 0) {
+      showFieldError('nutrition-form-error', `No USDA match for "${name}" — try a plainer, more generic name (not a brand), or fill the figures in by hand.`);
+      return;
+    }
+    renderUsdaCandidates(candidates);
+    applyUsdaCandidate(candidates[0]);
+  } catch (err) {
+    showFieldError('nutrition-form-error', err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
+function renderUsdaCandidates(candidates) {
+  const results = document.getElementById('nutrition-usda-results');
+
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent = candidates.length === 1
+    ? 'USDA FoodData Central match, per 100 g — applied below.'
+    : 'USDA FoodData Central matches, per 100 g. The first is applied below; pick another if it describes your ingredient better.';
+  results.appendChild(hint);
+
+  candidates.forEach((candidate) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn usda-candidate';
+    btn.dataset.description = candidate.description;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = `${candidate.description} — ${Math.round(candidate.kcalPer100g)} kcal, ${formatUsdaProtein(candidate)}`;
+    btn.addEventListener('click', () => applyUsdaCandidate(candidate));
+    results.appendChild(btn);
+  });
+
+  results.hidden = false;
+}
+
+function formatUsdaProtein(candidate) {
+  return candidate.proteinPer100g !== null
+    ? `${Math.round(candidate.proteinPer100g * 10) / 10} g protein`
+    : 'no protein figure';
+}
+
+// USDA reports per 100 g, so Amount is set to match — it's the quantity the
+// Calories/Protein actually describe, and the same shape Calculate banks its
+// own USDA-derived rows in, which keeps every auto-filled row scalable.
+//
+// Name is left as typed and Verified is left alone: a database figure is not a
+// label checked against your own purchased product, which is the only thing
+// that tick is supposed to mean.
+function applyUsdaCandidate(candidate) {
+  document.getElementById('nutrition-amount').value = '100g';
+  document.getElementById('nutrition-calories').value = String(Math.round(candidate.kcalPer100g));
+  document.getElementById('nutrition-protein').value = candidate.proteinPer100g !== null
+    ? String(Math.round(candidate.proteinPer100g * 10) / 10)
+    : '';
+
+  document.querySelectorAll('#nutrition-usda-results .usda-candidate').forEach((btn) => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.description === candidate.description));
+  });
+
+  if (candidate.proteinPer100g === null) {
+    showFieldError('nutrition-form-error', `"${candidate.description}" has no protein figure in USDA — fill Protein in yourself before saving.`);
+  } else {
+    clearFieldError('nutrition-form-error');
+  }
 }
 
 async function submitNutritionForm(event) {
   event.preventDefault();
 
+  const classification = document.getElementById('nutrition-classification').value.trim();
   const name = document.getElementById('nutrition-name').value.trim();
   const amount = document.getElementById('nutrition-amount').value.trim();
   const calories = evaluateNumberExpression(document.getElementById('nutrition-calories').value);
@@ -287,11 +423,11 @@ async function submitNutritionForm(event) {
     return;
   }
 
-  const values = [[name, amount, calories, protein, verified ? '1' : '', proteinPercent !== null ? proteinPercent : '']];
+  const values = [[classification, name, amount, calories, protein, verified ? '1' : '', proteinPercent !== null ? proteinPercent : '']];
 
   try {
     if (editingNutritionRow) {
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:F${editingNutritionRow}`, values);
+      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:G${editingNutritionRow}`, values);
     } else {
       await appendValues(NUTRITION_RANGE, values);
     }
@@ -328,6 +464,7 @@ async function mergeSelectedNutritionEntries() {
   const target = selected[0];
   const others = selected.slice(1);
   const merged = { ...target };
+  if (!merged.classification) merged.classification = (others.find((o) => o.classification) || {}).classification || '';
   if (!merged.amount) merged.amount = (others.find((o) => o.amount) || {}).amount || '';
   if (merged.calories === null) merged.calories = (others.find((o) => o.calories !== null) || {}).calories ?? null;
   if (merged.protein === null) merged.protein = (others.find((o) => o.protein !== null) || {}).protein ?? null;
@@ -343,8 +480,8 @@ async function mergeSelectedNutritionEntries() {
     async () => {
       if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
 
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${target.row}:F${target.row}`,
-        [[merged.name, merged.amount, merged.calories, merged.protein, merged.verified ? '1' : '', merged.proteinPercent !== null ? merged.proteinPercent : '']]);
+      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${target.row}:G${target.row}`,
+        [[merged.classification, merged.name, merged.amount, merged.calories, merged.protein, merged.verified ? '1' : '', merged.proteinPercent !== null ? merged.proteinPercent : '']]);
 
       const deleteRequests = others
         .map((o) => o.row)
@@ -388,6 +525,8 @@ function findNutritionEntry(name) {
 // Appends a fallback-computed ingredient so it's a trusted lookup hit next
 // time. Doesn't refresh allNutritionEntries itself — a Calculate call may
 // add several ingredients in one go, so the caller refreshes once at the end.
+// Classification (column A) is left blank: the app has no basis for guessing
+// one, and a blank is honest about that where a wrong label wouldn't be.
 async function addNutritionEntry({ name, amount, calories, protein }) {
-  await appendValues(NUTRITION_RANGE, [[name, amount, calories, protein]]);
+  await appendValues(NUTRITION_RANGE, [['', name, amount, calories, protein]]);
 }

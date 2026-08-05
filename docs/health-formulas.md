@@ -87,8 +87,8 @@ target = round( (BMR + activityTargetKcal − D) / (1 − f) )
 - `f` is `TEF_PERCENT_OF_INTAKE / 100`, default **0**, in which case this is exactly the sum it has always been. See the [Formula Playground](features.md#health--formula-playground) for why digestion divides rather than adds.
 - **Today's** figure is evaluated at the 7-day rolling average body mass (`planBodyMassKg`), not the last single reading — so a water-heavy morning doesn't move the day's ceiling. The per-day chart line still re-evaluates from that day's carried-forward body mass.
 - Moves ≈ 15.8 kcal per kg, so a 6 kg loss shifts it by roughly 95 kcal.
-- **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Formula Playground's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's Eᵢₙ — instead of being recalculated from each weigh-in. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
-- The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant Eᵢₙ — so pinning is also what makes the target you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
+- **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Formula Playground's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's E_in — instead of being recalculated from each weigh-in. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
+- The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant E_in — so pinning is also what makes the target you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
 - Max when target < current, min when target > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
 - **Nothing clamps `WEEKLY_FAT_LOSS_KG`**, but it is judged: `weeklyFatLossPct` expresses it as `100 × Δm / m`, and both the Formula Playground's `Δm%` box and the Health Plan prompt hold it against the `WEEKLY_FAT_LOSS_PCT_FLOOR`/`_CEILING` pair (0.5 and 1% of body mass per week). Above the ceiling the playground colours the verdict; it still computes and still saves.
 - **`WEEKLY_FAT_LOSS_PCT` replaces the rate rather than scaling it.** Set (via the playground's **Pin target fat-loss %**, or by hand) and `weeklyFatLossKgAt` recomputes the kilograms from whichever body mass the target is being evaluated at — so the figure above becomes `(p·m/100 × 7700) / 7` and moves with every weigh-in, per day on the chart. Blank means the flat `WEEKLY_FAT_LOSS_KG` behaviour, unchanged. It's mutually exclusive with `CALORIE_TARGET_FIXED_KCAL`: pinning either blanks the other.
@@ -149,16 +149,16 @@ m_gly  = g_musc × m_musc + g_liver                  per-kg-muscle and liver con
 **Target-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the target being *followed*.
 
 ```
-Eᵢₙ    = BMR + Eₐ(target) − D                    calculated target at m̄
+E_in    = BMR + E_act(target) − D                    calculated target at m̄
 A      = 6.25·cm − 5·age + (male ? +5 : −161)    mass-independent part of maintenance
 B      = 10 + MET·τ·κ/ε                          per-kg part, kcal/day/kg
-m∞     = (Eᵢₙ − A) / B                           where that intake IS maintenance
+m∞     = (E_in − A) / B                           where that intake IS maintenance
 m(t)   = m∞ + (m̄ − m∞)·e^(−B·t/ρ)                every 7 days, capped at 365
 t      = (ρ / B) · ln[ (m̄ − m∞) / (target∓ΔM_gly − m∞) ]
 ```
 
-- `D` here is `calorieTargetDetail`'s own sleep-adjusted deficit (see the Calorie target formula above) — `Eᵢₙ` already reflects `PLAN_SLEEP_HOURS`, so a plan that assumes chronic short sleep forecasts a slower arrival than the same `WEEKLY_FAT_LOSS_KG` would without it, at the default `PLAN_SLEEP_HOURS = SLEEP_TARGET_HOURS` this is exactly the pre-existing figure.
-- `t` is the exact closed-form solution of `dm/dt = (Eᵢₙ − A − B·m) / ρ`, verified against numeric integration.
+- `D` here is `calorieTargetDetail`'s own sleep-adjusted deficit (see the Calorie target formula above) — `E_in` already reflects `PLAN_SLEEP_HOURS`, so a plan that assumes chronic short sleep forecasts a slower arrival than the same `WEEKLY_FAT_LOSS_KG` would without it, at the default `PLAN_SLEEP_HOURS = SLEEP_TARGET_HOURS` this is exactly the pre-existing figure.
+- `t` is the exact closed-form solution of `dm/dt = (E_in − A − B·m) / ρ`, verified against numeric integration.
 - Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
 - **`m̄` (`planBodyMassKg`), not the last raw weigh-in** — the same smoothed mass the Formula Playground's own boxes run on, so the two start the curve from the same point.
 - `calcProjection` (`wellness-math.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Formula Playground makes — rather than a second copy of this formula. The chart and the playground read one function, so they cannot print two different day counts for the same profile.
@@ -166,14 +166,14 @@ t      = (ρ / B) · ln[ (m̄ − m∞) / (target∓ΔM_gly − m∞) ]
 
 ```
 m(t) = m · (1 − p/100)^(t/7)      no plateau — m∞ = 0
-t    = 7 · ln(m / m_g) / −ln(1 − p/100)
+t    = 7 · ln(m / m_des) / −ln(1 − p/100)
 ```
 
   - Returned in `projectTargetDays`' own shape with `equilibriumKg: 0`, because both journeys are the same exponential with different coefficients — one curve-drawing routine serves both. The coefficient it hands back is `decayPerKg` (`k·ρ` here, `B` there): the chart reads that rather than `B`, since `B` is only the right rate for the constant-intake journey.
   - **The only plan with no plateau to fall short of** — a constant fraction of a falling mass crosses any positive target eventually, so this journey has no `asymptote` case. Its `unreachable` means the target isn't below the current mass, and it carries a `reason` string rather than an equilibrium figure to describe.
-  - `targetJourneyProjection` picks between the two from the pins, and the chart, the Health Plan prompt and the playground's forward `t` all go through it (`pct > 0` only — a pinned zero or negative rate falls back to the constant-Eᵢₙ form, which reports a hold or a gain properly).
+  - `targetJourneyProjection` picks between the two from the pins, and the chart, the Health Plan prompt and the playground's forward `t` all go through it (`pct > 0` only — a pinned zero or negative rate falls back to the constant-E_in form, which reports a hold or a gain properly).
   - Verified: 86.9 → 82 kg at 1%/week is 40 days, the chart's own day count agrees to the day, and its weekly curve points step down by exactly 1% of the running mass.
-- Worked example (87.5 → 72 kg, 170 cm, 35 y, male, κ=3, τ=100, 0.84 kg/wk): `BMR 1768`, `Eₐ 459`, `D 924`, `Eᵢₙ 1303`, `A 893`, `B 15.25`, `m∞ 26.9 kg`, `t 149 days`.
+- Worked example (87.5 → 72 kg, 170 cm, 35 y, male, κ=3, τ=100, 0.84 kg/wk): `BMR 1768`, `E_act 459`, `D 924`, `E_in 1303`, `A 893`, `B 15.25`, `m∞ 26.9 kg`, `t 149 days`.
 
 > **What this forecast is not:**
 > - It states the target, not recent behaviour.

@@ -80,12 +80,22 @@ function renderFormulaSubstituted(rows, plan = null) {
   } catch (err) {
     console.error('Correction terms failed to render', err);
   }
+  // Independent of the correction block above — reads plan.bmr/plan.intakeKcal directly
+  // rather than the adaptation figures — but guarded separately for the same reason.
+  let deficitBmrRows = [];
+  try {
+    deficitBmrRows = renderDeficitVsBmrField(plan);
+  } catch (err) {
+    console.error('Deficit vs. BMR failed to render', err);
+  }
 
   // LBM leads (it sits with the profile, ahead of everything `rows` itself starts with),
   // then `rows` — which now carries Δm%, TEF and BMI_g inline, at the legend's own
-  // positions — then the adaptation pair, then glycogen, protein, fiber, fat and carb: the
-  // same order the legend lists them in, and the same order the eye travels down the sheet.
-  [...lbmRows, ...(rows ?? []), ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows].forEach(([label, value]) => {
+  // positions — then D_bmr% (the one box that compares E_in against BMR, so it sits right
+  // after the rows that produce both), then the adaptation pair, then glycogen, protein,
+  // fiber, fat and carb: the same order the legend lists them in, and the same order the
+  // eye travels down the sheet.
+  [...lbmRows, ...(rows ?? []), ...deficitBmrRows, ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows].forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
@@ -492,7 +502,7 @@ function renderTargetBmiField() {
   if (!typed) setComputedField('formula-target-bmi', String(bmi));
   const verdict = bmiVerdict(bmi);
   el.classList.toggle('formula-out-of-band', verdict.outside);
-  return [['BMI_g', `${targetKg} / (${heightCm / 100})²  =  ${bmi} kg/m² — ${verdict.text}`]];
+  return [['BMI_des', `${targetKg} / (${heightCm / 100})²  =  ${bmi} kg/m² — ${verdict.text}`]];
 }
 
 function syncWeeklyLossFromPct() {
@@ -632,8 +642,8 @@ function formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }
 function formulaEinRows(coefficients, { bmr, activityKcal, deficit, einKcal }) {
   const divisor = coefficients.tefDivisor;
   const sum = `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(deficit)}`;
-  if (divisor === 1) return [['Eᵢₙ', `${sum}  =  ${Math.round(einKcal)} kcal/day`]];
-  return [['Eᵢₙ', `(${sum}) / ${Math.round(divisor * 1000) / 1000}  =  ${Math.round(einKcal)} kcal/day`]];
+  if (divisor === 1) return [['E_in', `${sum}  =  ${Math.round(einKcal)} kcal/day`]];
+  return [['E_in', `(${sum}) / ${Math.round(divisor * 1000) / 1000}  =  ${Math.round(einKcal)} kcal/day`]];
 }
 
 // The same identity read the other way, for the mode that solves for Δm: D is what's left of
@@ -733,6 +743,35 @@ function formulaDeficitTraceLine(sleepInfo) {
   return `(${raw}) / ${factorRounded}  =  ${Math.round(sleepInfo.deficit)} kcal/day`;
 }
 
+// Past this share of BMR, more of what a deficit costs tends to come from lean
+// mass rather than fat — the box turns red as a warning against too harsh a cut,
+// not a hard limit (nothing here blocks the value or the save).
+const DEFICIT_VS_BMR_PCT_CEILING = 20;
+
+// The D_bmr% box and its trace row — how far E_in sits below BMR, as a percentage
+// of BMR. Reads plan.bmr/plan.intakeKcal rather than the formula-bmr/formula-ein
+// boxes directly: those two are set at different points across the five modes (the
+// correction block above sets formula-bmr itself, later in this same render pass),
+// while plan already carries both figures this render actually used, however they
+// were derived. Not part of the calorie algebra — nothing downstream reads this
+// box — it exists only to flag the cut, so a failed calorie solve (plan === null)
+// just dashes it rather than blocking anything.
+function renderDeficitVsBmrField(plan) {
+  const el = document.getElementById('formula-deficit-bmr-pct');
+  if (plan === null || !Number.isFinite(plan.bmr) || plan.bmr === 0) {
+    setComputedField('formula-deficit-bmr-pct', '—');
+    el.classList.remove('formula-pct-over');
+    return [];
+  }
+
+  const { bmr, intakeKcal } = plan;
+  const pct = Math.round(((bmr - intakeKcal) / bmr) * 1000) / 10;
+  setComputedField('formula-deficit-bmr-pct', String(pct));
+  el.classList.toggle('formula-pct-over', pct > DEFICIT_VS_BMR_PCT_CEILING);
+
+  return [['D_bmr%', `(${Math.round(bmr)} − ${Math.round(intakeKcal)}) / ${Math.round(bmr)} × 100  =  ${pct} %`]];
+}
+
 function renderCorrectionFields(plan) {
   const bmrEl = 'formula-bmr-adapt';
   const plateauEl = 'formula-plateau-adapt';
@@ -769,14 +808,14 @@ function renderCorrectionFields(plan) {
   const adaptedBmr = bmr * (1 - fraction);
   const lostPct = Math.round(fraction * 1000) / 10;
   setComputedField(bmrEl, String(Math.round(adaptedBmr)));
-  rows.push(['BMR_a', `${Math.round(bmr)} × (1 − ${lostPct}/100)  =  ${Math.round(adaptedBmr)} kcal/day — ${atCap ? `at the ${pctCap}% ceiling` : `by day ${Math.round(days)}`}`]);
+  rows.push(['BMR_adp', `${Math.round(bmr)} × (1 − ${lostPct}/100)  =  ${Math.round(adaptedBmr)} kcal/day — ${atCap ? `at the ${pctCap}% ceiling` : `by day ${Math.round(days)}`}`]);
 
   // A proportional journey has no plateau to move, so there is no overshoot to report —
   // the same reason the m∞ rows are dropped in that journey (see renderFormulaPreview). The
   // reason goes in the trace, never in the unit column, which reads `kg` and stops.
   if (journey === 'pct') {
     setComputedField(plateauEl, '—');
-    rows.push(['m∞_a', 'no plateau on a proportional journey, so no overshoot to report']);
+    rows.push(['m∞_adp', 'no plateau on a proportional journey, so no overshoot to report']);
     return rows;
   }
 
@@ -790,7 +829,7 @@ function renderCorrectionFields(plan) {
   const plateauRounded = Math.round(plateauKg * 10) / 10;
   const overshootKg = Math.round((plateauKg - plainPlateauKg) * 10) / 10;
   setComputedField(plateauEl, String(plateauRounded));
-  rows.push(['m∞_a', `(${Math.round(intakeKcal)} − ${Math.round(coefficients.aBmr * (1 - fraction) / coefficients.tefDivisor)}) / ${Math.round(((1 - fraction) * coefficients.bBmr + coefficients.activityPerKg) / coefficients.tefDivisor * 100) / 100}  =  ${plateauRounded} kg${overshootKg > 0 ? ` — ${overshootKg} kg above m∞, which is the usual overshoot` : ''}`]);
+  rows.push(['m∞_adp', `(${Math.round(intakeKcal)} − ${Math.round(coefficients.aBmr * (1 - fraction) / coefficients.tefDivisor)}) / ${Math.round(((1 - fraction) * coefficients.bBmr + coefficients.activityPerKg) / coefficients.tefDivisor * 100) / 100}  =  ${plateauRounded} kg${overshootKg > 0 ? ` — ${overshootKg} kg above m∞, which is the usual overshoot` : ''}`]);
   return rows;
 }
 
@@ -880,7 +919,7 @@ function renderFormulaPreview() {
     const eqRounded = Math.round(((detail.kcal - a) / b) * 10) / 10;
     const rows = [
       bmrRow,
-      ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
+      ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
       ...renderSleepDeprivationField(detail),
       ...renderWeeklyLossPctField(),
       ['D', formulaDeficitTraceLine(detail)],
@@ -1007,7 +1046,7 @@ function renderFormulaPreview() {
     }
     rows.push(
       bmrRow,
-      ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
+      ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ...renderSleepDeprivationField(sleepInfo),
       ...renderWeeklyLossPctField(),
       ['D', formulaDeficitTraceLine(sleepInfo)],
@@ -1066,7 +1105,7 @@ function renderFormulaPreview() {
       ...renderTefField(),
       ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
       ['m∞', `(${Math.round(einKcal)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
-      ['m_g', `${eqRounded} + (${bodyMassKg} − ${eqRounded}) × e^(−${bRounded}×${days}/7700)  =  ${mGRounded} kg`],
+      ['m_des', `${eqRounded} + (${bodyMassKg} − ${eqRounded}) × e^(−${bRounded}×${days}/7700)  =  ${mGRounded} kg`],
       ...renderTargetBmiField(),
       ...renderWeeklyLossPctField(),
     ], (() => {
@@ -1148,7 +1187,7 @@ function renderFormulaPreview() {
 
     renderFormulaSubstituted([
       bmrRow,
-      ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
+      ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
       ...renderTefField(),
       ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
@@ -1181,10 +1220,10 @@ function renderFormulaPreview() {
   renderFormulaSubstituted([
     ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
     ['m∞', `(${targetKg} − ${bodyMassKg}×${decayRounded}) / (1 − ${decayRounded})  =  ${eqRounded} kg`],
-    ['Eᵢₙ', `${Math.round(a)} + ${bRounded} × ${eqRounded}  =  ${Math.round(einForDisplay)} kcal/day`],
+    ['E_in', `${Math.round(a)} + ${bRounded} × ${eqRounded}  =  ${Math.round(einForDisplay)} kcal/day`],
     ...renderTefField(),
     bmrRow,
-    ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
+    ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
     ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
     ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
     ...renderTargetBmiField(),

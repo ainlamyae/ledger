@@ -33,7 +33,6 @@ function loadFormulaInputsFromSettings() {
 
 function openFormulaPlayground() {
   clearFieldError('formula-status');
-  document.getElementById('formula-expression').textContent = FORMULA_EXPRESSION;
   document.querySelector('input[name="formula-solve-for"][value="EIN"]').checked = true;
   // A fresh look at TAU/DELTA_M's original single-direction behavior each
   // time the modal opens, rather than carrying over whichever side of either
@@ -91,7 +90,7 @@ async function saveFormulaSettings() {
   const pctPinned = pinMode === 'pct';
   const einKcal = formulaEinKcal();
   if (pinned && einKcal === null) {
-    showFieldError('formula-status', "Can't pin a daily intake while Eᵢₙ has no value — fill the other inputs in first, or pin the deficit instead.");
+    showFieldError('formula-status', "Can't pin a daily intake while E_in has no value — fill the other inputs in first, or pin the deficit instead.");
     return;
   }
   // Off the box, like the intake pin reads Eᵢₙ off its own: what gets pinned is the figure

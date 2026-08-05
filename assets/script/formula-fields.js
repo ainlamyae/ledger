@@ -230,53 +230,56 @@ function applySolveForMode(mode) {
   });
 }
 
-// Broken into its named terms rather than shown as one long line: each is a
-// separate published formula with its own source, and the substituted figures
-// below are labelled with the same symbols so the two read together. Stays fixed
-// regardless of "Solve for" — every mode is a rearrangement of this same set of
-// identities, and the substituted trace below is what shows which rearrangement
-// actually ran. No blank lines between the blocks — the four-space indent on
-// every formula line is what separates it from the heading above it, so the
-// spacers only added height.
+// No longer rendered in the Formula Playground itself (`openFormulaPlayground`
+// used to set `#formula-expression`'s textContent from this) — the substituted
+// trace below already shows the live arithmetic, and this plain-symbol version
+// sat above it saying the same thing a second way. Kept as a live string, not a
+// comment, because `formatPlanInsightPrompt` (plan-insight.js) still sends it to
+// the AI verbatim as "one definition of the model" — a paraphrase there could
+// drift from what the app actually computes. Broken into named terms rather
+// than one long line for that reader's sake: each is a separate published
+// formula with its own source. No blank lines between the blocks — the
+// four-space indent on every formula line is what separates it from the
+// heading above it, so the spacers only added height.
 const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass
-    m̄    =  (1/7) × Σ m(t−i),  i = 0…6
+    m̄     =  (1/7) × Σ m(t−i),  i = 0…6
 Lean body mass — Boer (1984)
-    LBM  =  0.407×m  +  0.267×h  −  19.2      (♂)
-    LBM  =  0.252×m  +  0.473×h  −  48.3      (♀)
+    LBM   =  0.407×m  +  0.267×h  −  19.2      (♂)
+    LBM   =  0.252×m  +  0.473×h  −  48.3      (♀)
 Resting metabolic rate — Katch-McArdle (1996), from lean mass instead of age/sex
-    BMR  =  370  +  21.6×LBM
+    BMR   =  370  +  21.6×LBM
 Resting metabolic rate — Mifflin-St Jeor (1990)
-    BMR  =  10×m  +  6.25×h  −  5×a  +  σ
+    BMR   =  10×m  +  6.25×h  −  5×a  +  σ
 Activity burn at the daily target — ACSM metabolic equation
-    Eₐ   =  MET × m × τ × κ / ε
+    E_act =  MET × m × τ × κ / ε
 Sleep Efficiency Factor — reduction in fat-loss efficiency per hour of sleep debt
-    η    =  1 − (γ/100) × max(0, s_target − s)
+    η     =  1 − (γ/100) × max(0, s_target − s)
 Weekly fat loss as a share of body mass — 0.5–1%/week band
-    Δm%  =  100 × Δm / m
+    Δm%   =  100 × Δm / m
 Daily energy deficit implied by the weekly fat-loss target, short sleep needs more of it
-    D    =  (Δm × ρ / 7) / η
+    D     =  (Δm × ρ / 7) / η
 Thermic effect of food — a share of the very intake being solved for
-    TEF  =  f × Eᵢₙ
-Target daily intake — TEF folded in by solving, not by adding
-    Eᵢₙ  =  BMR  +  Eₐ  +  TEF  −  D    =    (BMR  +  Eₐ  −  D) / (1 − f)
-The target body mass as a BMI — 18.5–24.9 healthy band
-    BMI_g =  m_g / (h/100)²
+    TEF   =  f × E_in
+Desired daily intake — TEF folded in by solving, not by adding
+    E_in  =  BMR  +  E_act  +  TEF  −  D    =    (BMR  +  E_act  −  D) / (1 − f)
+The healthy body mass as a BMI — 18.5–24.9 healthy band
+    BMI_des =  m_des / (h/100)²
 Maintenance is affine in body mass — M(m) = A + B×m
-    A    =  (6.25×h  −  5×a  +  σ) / (1 − f)           under Mifflin
-    B    =  (10  +  MET × τ × κ / ε) / (1 − f)         under Mifflin
-    A    =  (370  +  21.6×(c_h×h + c_0)) / (1 − f)     under Katch
-    B    =  (21.6×c_m  +  MET × τ × κ / ε) / (1 − f)   under Katch
-Body mass at which Eᵢₙ becomes maintenance
-    m∞   =  (Eᵢₙ  −  A) / B
+    A     =  (6.25×h  −  5×a  +  σ) / (1 − f)           under Mifflin
+    B     =  (10  +  MET × τ × κ / ε) / (1 − f)         under Mifflin
+    A     =  (370  +  21.6×(c_h×h + c_0)) / (1 − f)     under Katch
+    B     =  (21.6×c_m  +  MET × τ × κ / ε) / (1 − f)   under Katch
+Body mass at which E_in becomes maintenance
+    m∞    =  (E_in  −  A) / B
 Exponential decay toward m∞, not linear loss
-    m(t) =  m∞  +  (m − m∞) × e^(−B×t/ρ)
-    t    =  (ρ / B) × ln[ (m − m∞) / (m_g − m∞) ]
+    m(t)  =  m∞  +  (m − m∞) × e^(−B×t/ρ)
+    t     =  (ρ / B) × ln[ (m − m∞) / (m_des − m∞) ]
 Proportional journey instead, when Δm% is what's held — no plateau, so no m∞
-    m(t) =  m × (1 − Δm%/100)^(t/7)
-    t    =  7 × ln(m / m_g) / −ln(1 − Δm%/100)
+    m(t)  =  m × (1 − Δm%/100)^(t/7)
+    t     =  7 × ln(m / m_des) / −ln(1 − Δm%/100)
 Metabolic adaptation — BMR sags faster than the lost mass alone predicts
-    BMR_a(t) = BMR × (1 − λt),  λt capped at λt_max ≈ 10–15% by week 10–12
-    m∞_a =  (Eᵢₙ − A_a) / B_a,  the BMR half of A and B scaled by (1 − λt)
+    BMR_adp(t) = BMR × (1 − λt),  λt capped at λt_max ≈ 10–15% by week 10–12
+    m∞_adp =  (E_in − A_adp) / B_adp,  the BMR half of A and B scaled by (1 − λt)
 Skeletal muscle mass — the fraction of LBM that actually stores glycogen
     m_musc =  s × LBM
 Glycogen store, from muscle mass
@@ -287,14 +290,14 @@ Daily protein band, scaled to lean mass
     P_min =  p_min × LBM
     P_max =  p_max × LBM
 Fiber band — a floor from daily intake, a ceiling from body weight
-    F_min =  f_min × (Eᵢₙ / 1000)
-    F_max =  f_max × m
+    F_min =  b_min × (E_in / 1000)
+    F_max =  b_max × m
 Fat band — both ends a share of intake, 20-35% AMDR
-    G_min =  (k_min/100 × Eᵢₙ) / 9
-    G_max =  (k_max/100 × Eᵢₙ) / 9
+    G_min =  (k_min/100 × E_in) / 9
+    G_max =  (k_max/100 × E_in) / 9
 Carb band — both ends a share of intake, 45-65% AMDR
-    C_min =  (q_min/100 × Eᵢₙ) / 4
-    C_max =  (q_max/100 × Eᵢₙ) / 4`;
+    C_min =  (q_min/100 × E_in) / 4
+    C_max =  (q_max/100 × E_in) / 4`;
 
 function formulaFieldValue(field) {
   // `value` skips Settings entirely — for fields (like Activity Intensity) whose
@@ -419,7 +422,7 @@ function readFormulaInputs() {
   const daysIsTyped = !computed.includes('formula-days');
 
   const einKcal = einIsTyped ? formulaNumber('formula-ein') : null;
-  if (einIsTyped && einKcal === null) invalid.push('Eᵢₙ (target daily intake)');
+  if (einIsTyped && einKcal === null) invalid.push('E_in (desired daily intake)');
 
   const days = daysIsTyped ? formulaNumber('formula-days') : null;
   if (daysIsTyped && days === null) invalid.push('t (days)');

@@ -325,17 +325,18 @@ function localIngredientCalories(quantity, unit, name) {
   return tableGrams ? (entry.calories / tableGrams) * (quantity * gramsPerUnit) : null;
 }
 
-// Local-only tidy-up for a Consumption block: combines lines that are really
-// the same entry typed twice (e.g. two separate "38g onion" additions through
-// the day) and orders the rest by calories, the same "highest first" order
-// Calculate itself settles on. Two lines only combine when their extracted
+// Local-only tidy-up for a Consumption block — the Tidy button's whole job:
+// combines lines that are really the same entry typed twice (e.g. two
+// separate "38g onion" additions through the day), orders the rest by
+// calories (the same "highest first" order Calculate itself settles on), and
+// title-cases every line's name. Two lines only combine when their extracted
 // name AND unit both match exactly — no unit conversion is attempted, so
 // "100g rice" and "1cup rice" stay separate rather than guessing a conversion
 // between them. A line with no parseable quantity (rare — Consumption is
-// meant to always lead with an amount) is left exactly as typed and never
-// merged with anything. Pure text in, text out — no DOM, so both the modal's
-// own Combine & Sort button (below) and the bulk one further down share the
-// exact same logic instead of two copies that could drift apart.
+// meant to always lead with an amount) is left exactly as typed — never
+// merged, never recased. Pure text in, text out — no DOM, so both the modal's
+// own Tidy button (below) and the bulk one further down share the exact same
+// logic instead of two copies that could drift apart.
 function combineAndSortConsumptionText(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return { text, combinedCount: 0 };
@@ -355,7 +356,10 @@ function combineAndSortConsumptionText(text) {
   const rebuilt = [...groups.values()].map((g) => {
     if (g.quantity === null) return g.raw;
     const unitText = g.unit ? (UNIT_CANONICAL[g.unit] || g.unit) : '';
-    return `${Math.round(g.quantity * 100) / 100}${unitText} ${g.name}`.trim();
+    // Capitalized here too (titleCaseIngredientName, nutrition.js) — Tidy
+    // folds what used to be a separate Capitalize Names button into this
+    // same rebuild, so one click combines, sorts, AND fixes casing.
+    return `${Math.round(g.quantity * 100) / 100}${unitText} ${titleCaseIngredientName(g.name)}`.trim();
   });
 
   const scored = rebuilt.map((line) => {
@@ -370,9 +374,9 @@ function combineAndSortConsumptionText(text) {
   return { text: scored.map((s) => s.line).join('\n'), combinedCount };
 }
 
-// Hidden whenever running Combine & Sort would be a no-op — the box already
-// reads exactly the way combineAndSortConsumptionText would rewrite it, same
-// lines in the same order — so the button only ever appears when clicking it
+// Hidden whenever running Tidy would be a no-op — the box already reads
+// exactly the way combineAndSortConsumptionText would rewrite it (same lines,
+// same order, same casing) — so the button only ever appears when clicking it
 // would actually change something.
 function syncPhysiqueCombineButtonVisibility() {
   const field = physiqueField('consumption');
@@ -543,9 +547,9 @@ function applyConsumptionSuggestion(name) {
   syncPhysiqueCombineButtonVisibility();
 }
 
-// The modal's own Combine & Sort button — same tidy-up as the bulk action
-// below, run on just the one Consumption box being edited right now, so it
-// can be cleaned up before Calculate ever runs rather than only after saving.
+// The modal's own Tidy button — same tidy-up as the bulk action below, run
+// on just the one Consumption box being edited right now, so it can be
+// cleaned up before Calculate ever runs rather than only after saving.
 function combineAndSortPhysiqueConsumptionField() {
   const field = physiqueField('consumption');
   if (!field.value.trim()) {
@@ -577,15 +581,16 @@ function openPhysiqueMicronutrientsFromForm() {
   openPhysiqueMicronutrients(entry);
 }
 
-// --- Bulk Combine & Sort --------------------------------------------------
+// --- Bulk Tidy ---------------------------------------------------------
 //
 // Sits beside 🧮 Calculate in the same bulk actions bar, but never touches
-// Groq/USDA: for each selected day, combineAndSortConsumptionText tidies just
-// that day's Consumption column locally and writes it straight back, the same
-// per-row read/write bulkCalculatePhysique uses. Calories In/Protein In are
-// untouched — combining/reordering lines doesn't change the day's totals,
-// only their arrangement, so there's nothing for Calculate's actual estimate
-// to redo here.
+// Groq/USDA: for each selected day, combineAndSortConsumptionText combines
+// duplicate lines, sorts by calories, AND title-cases every name (folding in
+// what used to be a separate Capitalize Names button), then writes the
+// result straight back — the same per-row read/write bulkCalculatePhysique
+// uses. Calories In/Protein In are untouched — none of this changes the
+// day's totals, only how its Consumption text reads, so there's nothing for
+// Calculate's actual estimate to redo here.
 function eligibleForBulkCombine(p) {
   return Boolean(p.consumption.trim());
 }
@@ -596,7 +601,7 @@ async function bulkCombineAndSortPhysique() {
   const skipped = selected.length - eligible.length;
 
   if (!eligible.length) {
-    alert('None of the selected days have a Consumption to combine/sort.');
+    alert('None of the selected days have a Consumption to tidy.');
     return;
   }
 
@@ -620,7 +625,7 @@ async function bulkCombineAndSortPhysique() {
       }
     } finally {
       done += 1;
-      summaryEl.textContent = `Combining ${done}/${eligible.length}…`;
+      summaryEl.textContent = `Tidying ${done}/${eligible.length}…`;
     }
   }));
 
@@ -629,7 +634,7 @@ async function bulkCombineAndSortPhysique() {
 
   const failed = results.filter((r) => r.status === 'rejected').length;
   const parts = [`${changedCount} day${changedCount === 1 ? '' : 's'} tidied (${combinedTotal} duplicate line${combinedTotal === 1 ? '' : 's'} combined)`];
-  if (skipped) parts.push(`${skipped} skipped (nothing to combine)`);
+  if (skipped) parts.push(`${skipped} skipped (nothing to tidy)`);
   if (failed) parts.push(`${failed} failed`);
 
   showUndoToast(`${parts.join(', ')}.`, () => restorePhysiqueSnapshots(succeeded));

@@ -9,6 +9,29 @@
 const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:L`;
 const N_PAGE_SIZE = 25;
 
+// Left lowercase by titleCaseIngredientName unless one leads the name —
+// "Peanut Butter and Jelly", not "Peanut Butter And Jelly".
+const NUTRITION_TITLE_CASE_MINOR_WORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'in',
+  'nor', 'of', 'on', 'or', 'so', 'the', 'to', 'with', 'yet',
+]);
+
+// Shared by the Nutrition form's own Normalize button and Physique's bulk
+// Capitalize Names — collapses stray whitespace and capitalizes each word,
+// except a minor joining word (NUTRITION_TITLE_CASE_MINOR_WORDS) unless it
+// leads the name, so a name typed/logged in any casing settles on one
+// consistent form instead of fragmenting the catalog by casing alone.
+function titleCaseIngredientName(text) {
+  return String(text || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .map((word, i) => (i > 0 && NUTRITION_TITLE_CASE_MINOR_WORDS.has(word.toLowerCase()))
+      ? word.toLowerCase()
+      : word.replace(/\b\p{L}/u, (ch) => ch.toUpperCase()))
+    .join(' ');
+}
+
 // Amount is freeform serving-size text so it can read like a real nutrition
 // label, and Calculate scales Calories/Protein to whatever quantity was
 // actually logged one of two ways:
@@ -53,6 +76,11 @@ let nSort = { key: 'name', dir: 1 };
 let nCurrentPage = 1;
 let nutritionSheetId = null;
 let editingNutritionRow = null;
+// The entry Normalize needs beyond what's already sitting in the form's own
+// fields: a saved-but-not-yet-repulled Micronutrients panel (entry.micronutrients)
+// lives only on the entry, never in an input, so there'd be nothing to scale
+// without holding onto it. null in Add mode (nothing saved yet to fall back on).
+let nutritionFormEntry = null;
 let selectedNutritionRows = new Set();
 // Holds the micronutrient panel bundled with whichever USDA candidate 🔍 Look
 // Up last applied — the search response already carries every candidate's
@@ -94,6 +122,7 @@ async function initNutrition(forceRefresh = false) {
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
     onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-pull-micros-single-btn').addEventListener('click', pullMicronutrientsForForm);
+    document.getElementById('nutrition-normalize-btn').addEventListener('click', normalizeIngredientForm);
 
     document.getElementById('nutrition-search').addEventListener('input', () => {
       nCurrentPage = 1;
@@ -117,6 +146,7 @@ function setupNutritionBulkActions() {
   });
 
   onAsyncClick('nutrition-bulk-merge-btn', mergeSelectedNutritionEntries);
+  onAsyncClick('nutrition-bulk-capitalize-btn', capitalizeSelectedNutritionNames);
   onAsyncClick('nutrition-pull-micros-btn', pullMicronutrientsForSelected);
   document.getElementById('log-nutrition-btn').addEventListener('click', logSelectedNutrition);
 }
@@ -468,6 +498,7 @@ function openNutritionForm(entry, onSaved = null) {
   editingNutritionRow = entry ? entry.row : null;
   pendingIngredientMicronutrients = null;
   nutritionFormSaveCallback = onSaved;
+  nutritionFormEntry = entry || null;
 
   // entry.row is what actually decides Add vs Edit above — a synthetic
   // entry with no row (calorie-estimator.js's ✏️ button, prefilling a
@@ -556,6 +587,7 @@ function closeNutritionForm() {
   editingNutritionRow = null;
   pendingIngredientMicronutrients = null;
   nutritionFormSaveCallback = null;
+  nutritionFormEntry = null;
 }
 
 // The Add/Edit Ingredient form's own 🧬 Pull Micronutrients button — same
@@ -613,6 +645,82 @@ async function pullMicronutrientsForForm() {
 
   if (result.protein === null) {
     showFieldError('nutrition-form-error', `"${result.description}" has no protein figure in USDA — fill Protein in yourself before saving.`);
+  }
+}
+
+// Rescales the form in place to a 100g Amount — same "scale everything to
+// match a new gram figure" idea pullNutritionFromUsda already does against
+// USDA's per-100g panel, just applied to whatever's currently typed instead
+// of a USDA candidate. Requires a real gram figure to scale from (same
+// parseGramsFromAmount Calculate and Pull Micronutrients both depend on);
+// there's no sane 100g equivalent for a count-only Amount like "2 eggs".
+function normalizeIngredientForm() {
+  clearFieldError('nutrition-form-error');
+
+  // Name gets standardized regardless of whether Amount has a gram figure —
+  // "chicken and rice" / " Chicken  AND  rice " -> "Chicken and Rice",
+  // collapsing stray whitespace, capitalizing each word, and lowercasing
+  // minor joining words (unless one leads the name) the same way every
+  // time, so near-duplicate casing doesn't fragment the catalog the way
+  // mergeNutritionDuplicates already guards against for near-duplicate text.
+  const nameField = document.getElementById('nutrition-name');
+  nameField.value = titleCaseIngredientName(nameField.value);
+
+  const amountField = document.getElementById('nutrition-amount');
+  const grams = parseGramsFromAmount(amountField.value);
+  if (!grams) {
+    showFieldError('nutrition-form-error', 'Amount needs a gram figure (e.g. "33g") before it can be normalized to 100g.');
+    return;
+  }
+  // A leading count (e.g. the "2" in "2x (68g)") describes how many of the
+  // thing add up to that gram figure — its count-per-gram density has to stay
+  // fixed too, or "2x (68g)" -> "2x (100g)" would silently read as more food
+  // than the (unscaled) Calories/Protein actually correspond to. Kept to 2
+  // decimals (not rounded to a whole unit) so the count stays exact rather
+  // than quietly drifting the density it's meant to preserve.
+  const count = parseCountFromAmount(amountField.value);
+
+  const factor = 100 / grams;
+  amountField.value = amountField.value.replace(NUTRITION_GRAMS_PATTERN, (full, num) => full.replace(num, '100'));
+  if (count !== null) {
+    const newCount = Math.round(count * factor * 100) / 100;
+    amountField.value = amountField.value.replace(NUTRITION_LEADING_COUNT_PATTERN, (full, num) => full.replace(num, String(newCount)));
+  }
+
+  // Calories/TEF as whole kcal, everything else to 1 decimal — same
+  // precision pullNutritionFromUsda already writes these fields at.
+  const scaleField = (id, decimals) => {
+    const field = document.getElementById(id);
+    const raw = field.value.trim();
+    if (!raw) return;
+    const value = evaluateNumberExpression(raw);
+    if (value === null) return;
+    const rounded = Math.round(value * factor * 10 ** decimals) / 10 ** decimals;
+    field.value = String(rounded);
+  };
+  scaleField('nutrition-calories', 0);
+  scaleField('nutrition-protein', 1);
+  scaleField('nutrition-fiber', 1);
+  scaleField('nutrition-fat', 1);
+  scaleField('nutrition-carb', 1);
+  scaleField('nutrition-tef', 0);
+  // Protein % is a share of total protein intake, not a per-Amount figure —
+  // it doesn't move when Amount does.
+
+  // Micronutrients: whatever's already pending from a 🧬 Pull Micronutrients
+  // this session, else the entry's own saved panel (if editing one) — either
+  // way scaled and pushed into pendingIngredientMicronutrients so Save
+  // actually writes the normalized panel instead of leaving the un-normalized
+  // one on the sheet.
+  const currentPanel = pendingIngredientMicronutrients
+    ?? (nutritionFormEntry ? parseMicronutrients(nutritionFormEntry.micronutrients) : null);
+  if (currentPanel) {
+    const scaled = {};
+    Object.entries(currentPanel).forEach(([name, info]) => {
+      scaled[name] = { amount: Math.round(info.amount * factor * 10000) / 10000, unit: info.unit };
+    });
+    pendingIngredientMicronutrients = scaled;
+    renderMicronutrientsList(scaled);
   }
 }
 
@@ -766,6 +874,40 @@ async function mergeSelectedNutritionEntries() {
     },
     "Couldn't merge ingredients",
   );
+}
+
+// Beside 🔗 Merge Selected: title-cases every selected row's Name
+// (titleCaseIngredientName — same casing the Add/Edit form's own Normalize
+// button applies) and writes back only the rows that actually change,
+// leaving every other field untouched. Local only, no AI, no lookup.
+async function capitalizeSelectedNutritionNames() {
+  const btn = document.getElementById('nutrition-bulk-capitalize-btn');
+  const statusEl = document.getElementById('nutrition-pull-status');
+  const rows = allNutritionEntries.filter((n) => selectedNutritionRows.has(n.row)).sort((a, b) => a.row - b.row);
+  if (rows.length === 0) return;
+
+  const changed = rows
+    .map((n) => ({ n, newName: titleCaseIngredientName(n.name) }))
+    .filter(({ n, newName }) => newName !== n.name);
+
+  statusEl.hidden = false;
+  statusEl.classList.add('status-ok');
+  if (!changed.length) {
+    statusEl.textContent = `Already capitalized — no changes across ${rows.length} selected.`;
+    return;
+  }
+
+  const originalLabel = btn.textContent;
+  for (let i = 0; i < changed.length; i++) {
+    const { n, newName } = changed[i];
+    btn.textContent = `Capitalizing ${i + 1} of ${changed.length}…`;
+    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!B${n.row}:B${n.row}`, [[newName]]);
+  }
+  btn.textContent = originalLabel;
+
+  statusEl.textContent = `Capitalized ${changed.length} of ${rows.length} selected ingredient name${changed.length === 1 ? '' : 's'}.`;
+  selectedNutritionRows.clear();
+  await refreshNutrition(true);
 }
 
 // A sheet created before Fiber/Fat/Carbohydrate/TEF existed has a grid only

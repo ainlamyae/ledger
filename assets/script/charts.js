@@ -89,6 +89,110 @@ function boundCapHalf(axisSpan) {
   return Math.abs(axisSpan) * 0.006;
 }
 
+// Violet — the app's existing "not a score" colour (the unscored burn dot). The
+// section's neutral gray was tried first and disappeared: it's a mid-tone against
+// both themes and it already means "unscored bar", so the dash read as noise.
+const WEEKLY_AVG_COLOR = '#7c3aed';
+
+// Counted back from the LAST column, which is always today (trailingDatesForCategory
+// clips the start of the window, never the end) — so the most recent seven days are
+// one whole bucket and only the oldest one can come up short.
+function weeklyBucketIndex(i, count) {
+  return Math.floor((count - 1 - i) / 7);
+}
+
+// Per column, the mean of the 7-day bucket it falls in. Nulls are days with nothing
+// logged and are left out of the mean — the logged-days-only rule avg() already uses,
+// so a missing log can't drag the average under a bound it was never measured against.
+// A bucket with no logged day at all stays null.
+function weeklyAverageSeries(values) {
+  const buckets = new Map();
+  values.forEach((v, i) => {
+    if (v === null || v === undefined) return;
+    const b = weeklyBucketIndex(i, values.length);
+    const acc = buckets.get(b) ?? { total: 0, n: 0 };
+    buckets.set(b, { total: acc.total + v, n: acc.n + 1 });
+  });
+  return values.map((_, i) => {
+    const acc = buckets.get(weeklyBucketIndex(i, values.length));
+    return acc ? acc.total / acc.n : null;
+  });
+}
+
+// Sibling of weeklyAverageSeries for a chart whose bars are an absolute LEVEL rather
+// than a per-day quantity (Body Mass): a flat mean there says almost nothing, so each
+// week gets the least-squares fit through its own readings instead, evaluated across
+// all seven columns. Columns are consecutive calendar days, so the slope is per day.
+//
+// A week with one reading gets that reading and nothing else — a flat dash would claim
+// the week didn't move, which isn't measured. A week with none gets nothing.
+function weeklyTrendSeries(values) {
+  const points = new Map();
+  values.forEach((v, i) => {
+    if (v === null || v === undefined) return;
+    const b = weeklyBucketIndex(i, values.length);
+    if (!points.has(b)) points.set(b, { xs: [], ys: [] });
+    points.get(b).xs.push(i);
+    points.get(b).ys.push(v);
+  });
+
+  const fits = new Map();
+  points.forEach((p, b) => {
+    if (p.xs.length >= 2) fits.set(b, linearRegression(p.xs, p.ys));
+  });
+
+  const series = values.map((v, i) => {
+    const fit = fits.get(weeklyBucketIndex(i, values.length));
+    if (fit) return fit.slope * i + fit.intercept;
+    return v === null || v === undefined ? null : v;
+  });
+  // Per column, so the tooltip can quote it without re-deriving the bucket. Stated per
+  // WEEK, which is the figure worth acting on.
+  const slopePerWeek = values.map((_, i) => {
+    const fit = fits.get(weeklyBucketIndex(i, values.length));
+    return fit ? fit.slope * 7 : null;
+  });
+  return { series, slopePerWeek };
+}
+
+// That series drawn as one dashed segment per week — flat for an average, sloped for a
+// trend. The segment CROSSING a bucket boundary is painted transparent, so the weeks
+// read as separate dashes instead of one line joined by vertical risers.
+function weeklyAverageDataset(label, series, extra = {}) {
+  // Off-the-end neighbours are never the same bucket — an out-of-range index can
+  // otherwise land back on a real bucket number and hide a one-column week.
+  const sameBucket = (a, b) => a >= 0 && b >= 0 && a < series.length && b < series.length
+    && weeklyBucketIndex(a, series.length) === weeklyBucketIndex(b, series.length);
+  const hasValue = (i) => series[i] !== null && series[i] !== undefined;
+  const joined = (a, b) => sameBucket(a, b) && hasValue(a) && hasValue(b);
+  return {
+    type: 'line',
+    label,
+    data: series,
+    borderColor: WEEKLY_AVG_COLOR,
+    // Matched to the goal caps, which come out around 2px: their half-thickness is
+    // a fraction of the axis span (0.004-0.006) against a 200-240px plot area.
+    borderWidth: 2,
+    borderDash: [6, 4],
+    tension: 0,
+    segment: {
+      borderColor: (c) => (sameBucket(c.p0DataIndex, c.p1DataIndex) ? WEEKLY_AVG_COLOR : 'transparent'),
+    },
+    // A value with no drawable segment either side shows as a dot instead of
+    // vanishing — the clipped one-column oldest bucket, or a Body Mass week holding a
+    // single weigh-in. A neighbour is only drawable if it's in this bucket AND has a
+    // value; same-bucket-but-null leaves nothing to draw a line to.
+    pointRadius: (c) => (hasValue(c.dataIndex)
+      && !joined(c.dataIndex, c.dataIndex - 1) && !joined(c.dataIndex, c.dataIndex + 1) ? 2 : 0),
+    pointBackgroundColor: WEEKLY_AVG_COLOR,
+    pointHitRadius: 0,
+    isWeeklyAverage: true,
+    // Between the bars (2) and the bound caps (0), so the cap stays the top mark.
+    order: 1,
+    ...extra,
+  };
+}
+
 // Rounds a computed axis max up to the nearest "nice" number (1/2/5 times a
 // power of ten, e.g. 4327 -> 5000) so explicit y-axis caps don't show an
 // arbitrary value with no clean gridlines.
@@ -1357,9 +1461,15 @@ function renderWellnessWeightChart(entries) {
     previousKg = kg;
   });
 
+  // Sloped, not flat: a bar here is an absolute level, so the week's mean says little
+  // and its direction says everything.
+  const { series: trendSeries, slopePerWeek } = weeklyTrendSeries(values);
+
   // Explicit kg bounds instead of `grace`, because the fat-energy twin axis has to
   // be derived from them and Chart.js resolves `grace` too late to read here.
-  const logged = values.filter((v) => v !== null);
+  // The trend is folded in as well — a fit extended to the week's edges can reach past
+  // every reading in it, and a bound that ignored that would clip the dash.
+  const logged = [...values, ...trendSeries].filter((v) => v !== null);
   const kgLo = logged.length ? Math.min(...logged) : 0;
   const kgHi = logged.length ? Math.max(...logged) : 0;
   const kgPad = Math.max((kgHi - kgLo) * WEIGHT_AXIS_PAD_FRACTION, WEIGHT_AXIS_MIN_PAD_KG);
@@ -1387,12 +1497,17 @@ function renderWellnessWeightChart(entries) {
           label: 'Body Mass',
           data: values,
           backgroundColor: barColors,
+          order: 2,
         },
+        weeklyAverageDataset('7-Day Trend', trendSeries),
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // Matching the other charts in the section — without it the cursor lands on the
+      // trend line instead of the day's bar, and that row is filtered out.
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         title: {
@@ -1403,6 +1518,9 @@ function renderWellnessWeightChart(entries) {
           padding: { top: 40 },
         },
         tooltip: {
+          // Days with no weigh-in plot as a gap; index mode would otherwise hand them
+          // over as an empty row.
+          filter: (item) => item.raw !== null && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
@@ -1432,6 +1550,15 @@ function renderWellnessWeightChart(entries) {
                 lines.push(`Fat Energy Change: ${withExplicitSign(Math.round(d.fatDeltaKcal))} kcal`);
               }
               return privacyMode ? lines.map(maskDigits) : lines;
+            },
+            // The dash's own figure, flush left and last — the placement every chart in
+            // the section gives its reference figures. Rate only; the rows above already
+            // run to seven. Absent on a week with under two readings, which has no slope.
+            afterBody: (items) => {
+              const i = items[0]?.dataIndex;
+              if (i === undefined || slopePerWeek[i] === null) return '';
+              const text = `7-Day Trend: ${withExplicitSign(Math.round(slopePerWeek[i] * 100) / 100)} kg/week`;
+              return privacyMode ? maskDigits(text) : text;
             },
           },
         },
@@ -1585,6 +1712,10 @@ function renderWellnessCaloriesChart(entries) {
   const capHalf = (axis.max - axis.min) * 0.004;
   const capData = boundByDay.map((b) => [b.kcal - capHalf, b.kcal + capHalf]);
 
+  // Averaged off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins
+  // don't count as days of fasting.
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+
   wellnessCaloriesChart = upsertChart(wellnessCaloriesChart, ctx, {
     data: {
       labels: dates,
@@ -1596,6 +1727,7 @@ function renderWellnessCaloriesChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
+        weeklyAverageDataset('7-Day Average', weeklyAvg),
         {
           type: 'bar',
           label: `${bound.word} for the day`,
@@ -1629,7 +1761,7 @@ function renderWellnessCaloriesChart(entries) {
           // is stated properly in the lines below instead: as a bound, compared to
           // the day, and attributed to the weight it was calculated from, since
           // that weight is the reason it differs from the next day's.
-          filter: (item) => !item.dataset.isBoundMarker,
+          filter: (item) => !item.dataset.isBoundMarker && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             // One labelled field per line, in the same form the Calorie Balance
@@ -1652,8 +1784,9 @@ function renderWellnessCaloriesChart(entries) {
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
-              const text = `Planned ${bound.word}: ${boundByDay[i].kcal} kcal`;
-              return privacyMode ? maskDigits(text) : text;
+              const lines = [`Planned ${bound.word}: ${boundByDay[i].kcal} kcal`];
+              if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
+              return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
         },
@@ -1699,9 +1832,13 @@ function sleepAxisValue(clockMin) {
 // are multiples of 60 minutes), so the real clock time is always derivable
 // from the axis math directly via the same formatClockTime24 helper the
 // tooltip uses (wellness.js) — no fixed label lookup table needed.
+// Inverse of sleepAxisValue — shared by the ticks and the weekly-average tooltip.
+function sleepAxisClockMin(v) {
+  return Math.round((SLEEP_AXIS_ANCHOR_MIN + v * 60) % (24 * 60));
+}
+
 function sleepAxisTickLabel(v) {
-  const clockMin = Math.round((SLEEP_AXIS_ANCHOR_MIN + v * 60) % (24 * 60));
-  return formatClockTime24(clockMin);
+  return formatClockTime24(sleepAxisClockMin(v));
 }
 
 // Rounds the actual earliest-bedtime/latest-waketime span (in axis units,
@@ -1788,6 +1925,12 @@ function renderWellnessSleepChart(entries) {
     return [start, end];
   });
 
+  // Averaged in noon-anchored AXIS units rather than raw clock minutes: the shift has
+  // already unwrapped midnight, so a plain mean works where a mean of clock times
+  // would average 23:30 and 00:30 into midday.
+  const bedAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null));
+  const wakeAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null));
+
   wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
     data: {
       labels: dates,
@@ -1797,15 +1940,24 @@ function renderWellnessSleepChart(entries) {
           label: 'Sleep',
           data: sleepData,
           backgroundColor: barColors,
+          order: 2,
         },
+        weeklyAverageDataset('7-Day Avg Bed', bedAvg),
+        weeklyAverageDataset('7-Day Avg Wake', wakeAvg),
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // Matching the other charts in the section — without it the cursor lands on
+      // whichever average line happens to be nearest instead of the day's bar.
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         tooltip: {
+          // Nights with no bed/wake pair plot as a gap; index mode would otherwise
+          // hand them over as an empty row.
+          filter: (item) => item.raw !== null && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             // One labelled field per line, like every other chart in this section,
@@ -1817,6 +1969,17 @@ function renderWellnessSleepChart(entries) {
                 `Bed: ${formatClockTime24(r.bedMin)}`,
                 `Wake: ${formatClockTime24(r.wakeMin)}`,
                 `Duration: ${r.durationHr} hr`,
+              ];
+              return privacyMode ? lines.map(maskDigits) : lines;
+            },
+            // Flush-left and last, the same placement every other chart in the
+            // section gives its reference figures.
+            afterBody: (items) => {
+              const i = items[0]?.dataIndex;
+              if (i === undefined || bedAvg[i] === null) return '';
+              const lines = [
+                `7-Day Avg Bed: ${formatClockTime24(sleepAxisClockMin(bedAvg[i]))}`,
+                `7-Day Avg Wake: ${formatClockTime24(sleepAxisClockMin(wakeAvg[i]))}`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -2028,17 +2191,27 @@ function renderWellnessActivityChart(entries) {
     yAxisID: 'y1',
     backgroundColor: boundMarkColor(),
     grouped: false,
-    // Chart.js draws highest order first, so the lowest paints last and sits on
-    // top. Three layers here: bars (2), then this cap (1) so it stays visible on a
-    // day that overshot it, then the dots (0) on top of both.
+    // Chart.js draws highest order first, so the lowest paints last and sits on top:
+    // bars (2), then the weekly average and this cap (both 1, the cap listed second
+    // so it wins the tie), then the dots (0) above everything.
     order: 1,
     isTargetLine: true,
   };
 
+  // Averaged on the kcal axis, not the minutes one: Planned Burn is the figure the
+  // week is being compared against, and it lives there. Negated like the dots it
+  // averages.
+  const weeklyBurnAvg = weeklyAverageSeries(caloriesData);
+  const weeklyBurnDataset = weeklyAverageDataset(
+    '7-Day Average Burn',
+    weeklyBurnAvg.map((v) => (v === null ? null : -v)),
+    { yAxisID: 'y1' },
+  );
+
   wellnessActivityChart = upsertChart(wellnessActivityChart, ctx, {
     data: {
       labels: dates,
-      datasets: [...activityDatasets, targetLineDataset, caloriesDataset],
+      datasets: [...activityDatasets, weeklyBurnDataset, targetLineDataset, caloriesDataset],
     },
     options: {
       responsive: true,
@@ -2057,7 +2230,7 @@ function renderWellnessActivityChart(entries) {
           // Empty slots, and the cap — a floating bar would report itself as a
           // `[from, to]` pair, so its figure is stated properly in afterBody
           // instead, the same way Caloric Intake handles its own cap.
-          filter: (item) => item.raw !== null && !item.dataset.isTargetLine,
+          filter: (item) => item.raw !== null && !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
           // Rows in dataset order. Without this Chart.js hands them over sorted by
           // the `order` property that controls DRAW order, which put the dots
           // (order: 0) above the bars, away from the Planned Burn figure below
@@ -2088,9 +2261,11 @@ function renderWellnessActivityChart(entries) {
             // placement Caloric Intake gives its bound, so the two read alike.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
-              if (i === undefined || plannedBurnKcal[i] === null) return '';
-              const text = `Planned Burn: ${-Math.round(plannedBurnKcal[i])} kcal`;
-              return privacyMode ? maskDigits(text) : text;
+              if (i === undefined) return '';
+              const lines = [];
+              if (plannedBurnKcal[i] !== null) lines.push(`Planned Burn: ${-Math.round(plannedBurnKcal[i])} kcal`);
+              if (weeklyBurnAvg[i] !== null) lines.push(`7-Day Average Burn: ${-Math.round(weeklyBurnAvg[i])} kcal`);
+              return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
         },
@@ -2189,6 +2364,10 @@ function renderWellnessProteinChart(entries) {
     ]
     : [capFor(band.min, `${band.min} g target`)];
 
+  // Logged days only, so `values`' zero-for-nothing-logged stand-ins don't pull the
+  // week under the band's floor.
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
     data: {
       labels: dates,
@@ -2200,19 +2379,23 @@ function renderWellnessProteinChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
+        weeklyAverageDataset('7-Day Average', weeklyAvg),
         ...targetDatasets,
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      // Matching the other charts in the section — without it the cursor lands on
+      // the average line instead of the day's bar, and that row is filtered out.
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         tooltip: {
           // The band's two lines are the same constant on every day, so as datasets
           // they'd repeat as identical rows on every hover. They're filtered out here
           // and stated once by afterBody below instead.
-          filter: (item) => !item.dataset.isTargetLine,
+          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
@@ -2223,10 +2406,12 @@ function renderWellnessProteinChart(entries) {
             // shape Caloric Intake and Calorie Balance use. A flat PROTEIN_TARGET_G
             // with no per-kg range collapses the band to one figure, so it reads as a
             // single target rather than a Min and Max that happen to be equal.
-            afterBody: () => {
+            afterBody: (items) => {
               const lines = band.max > band.min
                 ? [`Planned Min: ${band.min} g`, `Planned Max: ${band.max} g`]
                 : [`Planned Target: ${band.min} g`];
+              const i = items[0]?.dataIndex;
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -2245,14 +2430,21 @@ function renderWellnessProteinChart(entries) {
   });
 }
 
-function linearRegressionSlope(xs, ys) {
+// Least-squares fit. The intercept is only needed by the Body Mass weekly trend,
+// which has to EVALUATE the fitted line rather than just report how steep it is.
+function linearRegression(xs, ys) {
   const n = xs.length;
   const sumX = xs.reduce((a, b) => a + b, 0);
   const sumY = ys.reduce((a, b) => a + b, 0);
   const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0);
   const sumX2 = xs.reduce((s, x) => s + x * x, 0);
   const denom = n * sumX2 - sumX * sumX;
-  return denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+  const slope = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+  return { slope, intercept: (sumY - slope * sumX) / n };
+}
+
+function linearRegressionSlope(xs, ys) {
+  return linearRegression(xs, ys).slope;
 }
 
 // Average of a Map's values (e.g. calories/activity/sleep summed per logged
@@ -3092,6 +3284,10 @@ function renderWellnessEnergyBalanceChart(entries) {
   // stays a hairline whatever range the axis covers.
   const plannedHalf = (yMax - yMin) * 0.004;
 
+  // balanceData already carries null for days with nothing logged, so those days sit
+  // out of the mean rather than counting as a day of eating nothing.
+  const weeklyAvg = weeklyAverageSeries(balanceData);
+
   wellnessEnergyBalanceChart = upsertChart(wellnessEnergyBalanceChart, ctx, {
     data: {
       labels,
@@ -3103,6 +3299,7 @@ function renderWellnessEnergyBalanceChart(entries) {
           backgroundColor: balanceData.map((v) => energyBalanceColor(v, isCut, planned)),
           order: 2,
         },
+        weeklyAverageDataset('7-Day Average', weeklyAvg),
         // One dash per day rather than a line spanning the window — the same idiom
         // the Caloric Intake chart uses for its bound, and for the same reason: a
         // continuous line reads as one shared limit, while a mark sitting on each
@@ -3144,7 +3341,7 @@ function renderWellnessEnergyBalanceChart(entries) {
           // bar would report itself as a `[from, to]` pair — so hovering a day
           // reports that day's balance and nothing else, exactly as it did before
           // the dashes existed.
-          filter: (item) => !item.dataset.isBoundMarker,
+          filter: (item) => !item.dataset.isBoundMarker && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             // The whole point of the chart is the subtraction, so every term
@@ -3174,11 +3371,15 @@ function renderWellnessEnergyBalanceChart(entries) {
             // Caloric Intake states its own bound. Signed like every other figure
             // here, so it reads off the axis where its dash is drawn: a deficit is
             // negative, a planned gain positive.
-            afterBody: () => {
-              if (planned === null) return '';
-              const word = planned < 0 ? 'Deficit' : 'Surplus';
-              const text = `Planned ${word}: ${withExplicitSign(planned)} kcal/day`;
-              return privacyMode ? maskDigits(text) : text;
+            afterBody: (items) => {
+              const lines = [];
+              if (planned !== null) {
+                const word = planned < 0 ? 'Deficit' : 'Surplus';
+                lines.push(`Planned ${word}: ${withExplicitSign(planned)} kcal/day`);
+              }
+              const i = items[0]?.dataIndex;
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${withExplicitSign(Math.round(weeklyAvg[i]))} kcal`);
+              return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
         },

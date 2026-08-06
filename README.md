@@ -117,6 +117,13 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Physical Activity** — stacked minutes per Description, plus a calories-burned dot series.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
+- All six carry a **violet dashed segment per week**, so a week that quietly drifted past its bound is visible next to the per-day mark.
+  - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a goal cap.
+  - Buckets are counted **back from today**, so the most recent seven days are always one whole week and only the oldest bucket can come up short.
+  - Built from days that were actually **logged**; a week with nothing logged draws nothing.
+  - **Flat** on five of them — the week's average. Rest & Recovery carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Planned Burn lives on.
+  - **Sloped** on Body Mass alone: a bar there is an absolute level, not a per-day quantity, so a flat mean says nothing. Each week is a least-squares fit through its own readings, extended to both week edges so slopes compare directly. A week with one weigh-in shows a dot — no slope is measurable from it.
+  - Every one of these charts adds the figure to its tooltip as well; Body Mass quotes the slope as `kg/week`.
 
 ### Health — Health Insight (AI)
 
@@ -599,6 +606,20 @@ expected g  = (balance / 7700) × 1000
 ```
 
 - A day with no food logged is a gap, not a day of eating nothing.
+
+### 7-day dash (all six Health Indicators charts)
+
+```
+bucket(i)  = floor((columnCount − 1 − i) / 7)      counted back from today
+
+flat       = mean of that bucket's LOGGED days     unlogged days sit out
+sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
+             evaluated at all 7 columns            Body Mass only, ≥2 readings
+```
+
+- Drawn as a line whose bucket-crossing segments are transparent, so each week is one dash rather than a stepped line with risers.
+- Body Mass folds the fitted endpoints into its kg bounds before padding — a fit extended to the week edges can reach past every reading in it, and the fat-energy twin axis is derived from those same bounds.
+- Rest & Recovery averages bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 average to midnight rather than midday.
 
 ### State Trend & Forecast
 

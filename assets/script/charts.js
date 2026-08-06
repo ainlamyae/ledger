@@ -1,50 +1,34 @@
-// Chart.js reads these global defaults when each chart is constructed, so
-// charts created after a theme switch automatically get legible axis/legend/
-// grid colors without per-chart options.
+// Read when each chart is constructed, so a theme switch needs no per-chart options.
 function applyChartTheme() {
   const dark = document.documentElement.dataset.theme === 'dark';
   Chart.defaults.color = dark ? '#94a3b8' : '#6b7280';
   Chart.defaults.borderColor = dark ? '#334155' : '#e5e7eb';
 
-  // Masks numeric axis labels (e.g. dollar amounts) when privacy mode is
-  // on. Reads privacyMode at call time, so toggling it later just requires
-  // recreating the charts (loadDashboard already destroys/rebuilds them).
+  // privacyMode is read at call time; loadDashboard rebuilds the charts on toggle.
   Chart.defaults.scales.linear.ticks.callback = function (value) {
     const label = this.getLabelForValue(value);
     return privacyMode ? maskDigits(label) : label;
   };
 }
 
-// The colour every reference mark in Health Indicators is drawn in — the
-// per-column caps and the State Trend goal line.
-//
-// Deliberately NOT red. Red is this app's "missed" score on bars and dots, so a
-// limit drawn in the same red read as a failure rather than as the thing being
-// measured against. Near-black on light, near-white on dark (matching
-// --color-text), so it stays the strongest line on the chart either way.
-// Called at render time, and every chart is destroyed and rebuilt on a theme
-// switch (loadDashboard), so it always picks up the current theme.
+// Every reference mark in Health Indicators — the per-column caps, State Trend's goal
+// line. Deliberately not red: red is this app's "missed" score, so a limit drawn in it
+// read as a failure rather than as the thing being measured against.
 function boundMarkColor() {
   return document.documentElement.dataset.theme === 'dark' ? '#e2e8f0' : '#1f2937';
 }
 
-// Fixed width for the y-axis label column on the three Trend charts, so
-// their plot areas (and thus their y-axes) line up vertically even though
-// each chart's values have a different number of digits.
+// Fixed y-axis label width, so plot areas line up down the section however many
+// digits each chart's values run to.
 const TREND_Y_AXIS_WIDTH = 64;
 
 function fixTrendYAxisWidth(scale) {
   if (scale.width < TREND_Y_AXIS_WIDTH) scale.width = TREND_Y_AXIS_WIDTH;
 }
 
-// An invisible right-hand axis reserving the exact same TREND_Y_AXIS_WIDTH
-// as a real right axis (State Trend & Forecast's BMI line, Body Mass's fat
-// energy, Physical Activity's kcal) — so a chart with no real right axis
-// still gets the same plot-area width and x-axis tick spacing as the two
-// that do, instead of stretching further right and misaligning the date
-// labels across the Health Indicators section. A fresh object per call since
-// Chart.js's afterFit mutates the live scale instance it's handed, not this
-// config object, but a factory avoids relying on that being safe forever.
+// Invisible spacer reserving the same width as a real right axis, so a chart without
+// one doesn't stretch further right and misalign the section's date labels. A factory,
+// since afterFit mutates the scale it's handed.
 function ghostRightAxis() {
   return {
     position: 'right',
@@ -55,19 +39,14 @@ function ghostRightAxis() {
   };
 }
 
-// Mirror of the above, for a chart whose real axis sits on the RIGHT (Body Mass's
-// kg scale). Without a left spacer its plot area would start further left than
-// its neighbours' and misalign the date labels down the section.
+// Mirror, for a chart whose real axis sits on the right (Body Mass's kg scale).
 function ghostLeftAxis() {
   return { ...ghostRightAxis(), position: 'left' };
 }
 
-// The Health Indicators section's one mark for "the figure that applies here" —
-// a solid red hairline drawn as a floating bar (`[from, to]`) with
-// `grouped: false`, so it overlays its own column rather than being placed
-// beside it. Every chart in the section that has such a figure uses this, so the
-// mark means the same thing and looks the same wherever it appears.
-// `values` is one entry per column; null leaves that column unmarked.
+// The section's one mark for "the figure that applies here": a hairline floating bar
+// (`[from, to]`, `grouped: false`) overlaying its own column. Shared so the mark means
+// the same thing everywhere. One `values` entry per column; null leaves it unmarked.
 function boundCapDataset(label, values, capHalf, extra = {}) {
   return {
     type: 'bar',
@@ -75,36 +54,31 @@ function boundCapDataset(label, values, capHalf, extra = {}) {
     data: values.map((v) => (v === null || v === undefined ? null : [v - capHalf, v + capHalf])),
     backgroundColor: boundMarkColor(),
     grouped: false,
-    // Chart.js draws highest order first, so the lowest paints last and sits on
-    // top — a cap is only useful if it's still visible on a column that overshot it.
+    // Lowest order paints last, so the cap stays visible on a column that overshot it.
     order: 0,
     ...extra,
   };
 }
 
-// Half-thickness for those caps: a fraction of the axis span rather than a fixed
-// amount in the data's own units, so the mark stays a hairline whatever range the
-// chart ends up covering.
+// A fraction of the axis span, not a fixed amount in the data's units, so the cap
+// stays a hairline at any range.
 function boundCapHalf(axisSpan) {
   return Math.abs(axisSpan) * 0.006;
 }
 
-// Violet — the app's existing "not a score" colour (the unscored burn dot). The
-// section's neutral gray was tried first and disappeared: it's a mid-tone against
-// both themes and it already means "unscored bar", so the dash read as noise.
+// Violet, the app's existing "not a score" colour. Grey was tried first and vanished:
+// a mid-tone in both themes, and it already means "unscored bar" on the same chart.
 const WEEKLY_AVG_COLOR = '#7c3aed';
 
-// Counted back from the LAST column, which is always today (trailingDatesForCategory
-// clips the start of the window, never the end) — so the most recent seven days are
-// one whole bucket and only the oldest one can come up short.
+// Counted back from the last column, which is always today — so the most recent seven
+// days are one whole bucket and only the oldest can come up short.
 function weeklyBucketIndex(i, count) {
   return Math.floor((count - 1 - i) / 7);
 }
 
-// Per column, the mean of the 7-day bucket it falls in. Nulls are days with nothing
-// logged and are left out of the mean — the logged-days-only rule avg() already uses,
-// so a missing log can't drag the average under a bound it was never measured against.
-// A bucket with no logged day at all stays null.
+// Per column, the mean of its 7-day bucket. Nulls are unlogged days and sit out (avg()'s
+// rule), so a missing log can't drag the week under a bound it was never measured
+// against. A bucket with nothing logged stays null.
 function weeklyAverageSeries(values) {
   const buckets = new Map();
   values.forEach((v, i) => {
@@ -119,13 +93,11 @@ function weeklyAverageSeries(values) {
   });
 }
 
-// Sibling of weeklyAverageSeries for a chart whose bars are an absolute LEVEL rather
-// than a per-day quantity (Body Mass): a flat mean there says almost nothing, so each
-// week gets the least-squares fit through its own readings instead, evaluated across
-// all seven columns. Columns are consecutive calendar days, so the slope is per day.
-//
-// A week with one reading gets that reading and nothing else — a flat dash would claim
-// the week didn't move, which isn't measured. A week with none gets nothing.
+// For bars that are an absolute LEVEL, not a per-day quantity (Body Mass): a flat mean
+// says almost nothing there, so each week gets the least-squares fit through its own
+// readings, evaluated across all seven columns. Columns are consecutive days, so the
+// slope is per day. One reading yields just that reading — a flat dash would claim the
+// week didn't move, which isn't measured. None yields nothing.
 function weeklyTrendSeries(values) {
   const points = new Map();
   values.forEach((v, i) => {
@@ -146,8 +118,8 @@ function weeklyTrendSeries(values) {
     if (fit) return fit.slope * i + fit.intercept;
     return v === null || v === undefined ? null : v;
   });
-  // Per column, so the tooltip can quote it without re-deriving the bucket. Stated per
-  // WEEK, which is the figure worth acting on.
+  // Per column so the tooltip needn't re-derive the bucket; per week because that's the
+  // figure worth acting on.
   const slopePerWeek = values.map((_, i) => {
     const fit = fits.get(weeklyBucketIndex(i, values.length));
     return fit ? fit.slope * 7 : null;
@@ -155,12 +127,12 @@ function weeklyTrendSeries(values) {
   return { series, slopePerWeek };
 }
 
-// That series drawn as one dashed segment per week — flat for an average, sloped for a
-// trend. The segment CROSSING a bucket boundary is painted transparent, so the weeks
-// read as separate dashes instead of one line joined by vertical risers.
+// One dashed segment per week — flat for an average, sloped for a trend. The segment
+// crossing a bucket boundary is painted transparent, so the weeks read as separate
+// dashes rather than one line joined by vertical risers.
 function weeklyAverageDataset(label, series, extra = {}) {
-  // Off-the-end neighbours are never the same bucket — an out-of-range index can
-  // otherwise land back on a real bucket number and hide a one-column week.
+  // Bounds-checked: an out-of-range index can otherwise land back on a real bucket
+  // number and hide a one-column week.
   const sameBucket = (a, b) => a >= 0 && b >= 0 && a < series.length && b < series.length
     && weeklyBucketIndex(a, series.length) === weeklyBucketIndex(b, series.length);
   const hasValue = (i) => series[i] !== null && series[i] !== undefined;
@@ -170,18 +142,15 @@ function weeklyAverageDataset(label, series, extra = {}) {
     label,
     data: series,
     borderColor: WEEKLY_AVG_COLOR,
-    // Matched to the goal caps, which come out around 2px: their half-thickness is
-    // a fraction of the axis span (0.004-0.006) against a 200-240px plot area.
+    // Matched to the goal caps, which land near 2px on a 200-240px plot area.
     borderWidth: 2,
     borderDash: [6, 4],
     tension: 0,
     segment: {
       borderColor: (c) => (sameBucket(c.p0DataIndex, c.p1DataIndex) ? WEEKLY_AVG_COLOR : 'transparent'),
     },
-    // A value with no drawable segment either side shows as a dot instead of
-    // vanishing — the clipped one-column oldest bucket, or a Body Mass week holding a
-    // single weigh-in. A neighbour is only drawable if it's in this bucket AND has a
-    // value; same-bucket-but-null leaves nothing to draw a line to.
+    // With no drawable segment either side, show a dot rather than nothing — the
+    // clipped oldest bucket, or a Body Mass week holding one weigh-in.
     pointRadius: (c) => (hasValue(c.dataIndex)
       && !joined(c.dataIndex, c.dataIndex - 1) && !joined(c.dataIndex, c.dataIndex + 1) ? 2 : 0),
     pointBackgroundColor: WEEKLY_AVG_COLOR,
@@ -193,9 +162,8 @@ function weeklyAverageDataset(label, series, extra = {}) {
   };
 }
 
-// Rounds a computed axis max up to the nearest "nice" number (1/2/5 times a
-// power of ten, e.g. 4327 -> 5000) so explicit y-axis caps don't show an
-// arbitrary value with no clean gridlines.
+// Rounds up to 1/2/5 x a power of ten (4327 -> 5000), so an explicit axis cap still
+// gets clean gridlines.
 function niceAxisMax(value) {
   if (value <= 0) return 0;
   const magnitude = 10 ** Math.floor(Math.log10(value));
@@ -204,8 +172,7 @@ function niceAxisMax(value) {
   return niceResidual * magnitude;
 }
 
-// Finer-grained niceAxisMax, for axes where its 1/2/5/10 ladder rounds up far
-// enough to waste most of the plot area.
+// Finer ladder, where niceAxisMax's 1/2/5/10 would waste most of the plot area.
 const NICE_AXIS_STEPS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 
 function niceAxisBound(value) {
@@ -215,10 +182,8 @@ function niceAxisBound(value) {
   return (NICE_AXIS_STEPS.find((step) => residual <= step) ?? 10) * magnitude;
 }
 
-// Destroys `existingChart` if present, then constructs and returns a new
-// Chart.js instance from `config` — only used where destroy and construct are
-// unconditionally adjacent; render functions that skip construction on empty
-// data (to still clear a stale chart) keep their own manual destroy instead.
+// Destroy-then-construct. Only for the unconditional case; a render that skips
+// construction on empty data keeps its own manual destroy.
 function upsertChart(existingChart, ctx, config) {
   if (existingChart) existingChart.destroy();
   return new Chart(ctx, config);
@@ -263,8 +228,7 @@ function renderExpenseBreakdownTrendChart(months) {
 
   renderCategoryLegend('expense-breakdown-trend-legend', categories);
 
-  // Cap the y-axis at 1.2x the second-highest monthly total so a single
-  // outlier month doesn't squash every other month's bars into a sliver.
+  // 1.2x the SECOND-highest total, so one outlier month doesn't squash the rest.
   const totals = months.map((m) => m.categories.reduce((sum, c) => sum + c.value, 0));
   const sortedTotals = [...totals].sort((a, b) => b - a);
   const yMax = niceAxisMax((sortedTotals[1] ?? sortedTotals[0]) * 1.2);
@@ -293,17 +257,14 @@ function renderExpenseBreakdownTrendChart(months) {
 
 let spendingTrendChart = null;
 
-// Applies an opacity to an hsl(...) color string, e.g. so each of the 4
-// period bars for a category shares its hue, distinguished by opacity (most
-// recent = most opaque).
+// A category's four period bars share one hue, told apart by opacity (most recent =
+// most opaque).
 function hslWithAlpha(hsl, alpha) {
   return hsl.replace('hsl(', 'hsla(').replace(')', `, ${alpha})`);
 }
 
-// Divisors that turn each period's total into a monthly average. Lifelong
-// has no fixed divisor here — it's divided by the actual number of months
-// of data (passed into renderSpendingTrendChart) since the dashboard went
-// live.
+// Divisors turning each period's total into a monthly average. Lifelong has none —
+// renderSpendingTrendChart passes the real month count instead.
 const SPENDING_TREND_PERIODS = [
   { key: 'lastMonth', label: 'Last Month', alpha: 1, months: 1 },
   { key: 'quarterAvg', label: 'Last Quarter', alpha: 0.7, months: 3 },
@@ -311,8 +272,7 @@ const SPENDING_TREND_PERIODS = [
   { key: 'lifelongAvg', label: 'Lifelong', alpha: 0.25, months: null },
 ];
 
-// Renders a category-color swatch legend, shared by several panels (e.g. the
-// Spending by Category bar chart + donuts).
+// Category-colour swatch legend, shared by several panels.
 function renderCategoryLegend(containerId, categories) {
   const legend = document.getElementById(containerId);
   legend.innerHTML = '';
@@ -350,8 +310,7 @@ function renderSpendingTrendChart(categories, totalMonths) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        // Clicking a legend entry normally toggles that dataset's visibility —
-        // keep all 4 period bars always visible and ignore legend clicks.
+        // All four period bars stay visible; ignore the default toggle-on-click.
         legend: { onClick: () => {} },
         tooltip: {
           callbacks: {
@@ -421,9 +380,8 @@ const TYPE_BREAKDOWN_OTHER_COLOR = '#9ca3af';
 
 const typeBreakdownCharts = {};
 
-// Builds the DOM for one category's panel (heading + 4 period donuts +
-// legend) from scratch, so the set of panels reflects whatever categories
-// the Insight tab actually defines rather than a hardcoded list.
+// Heading + 4 period donuts + legend, built from scratch so the panels follow whatever
+// categories Insight defines rather than a hardcoded list.
 function buildTypeBreakdownSection(category) {
   const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
@@ -466,16 +424,11 @@ function buildTypeBreakdownSection(category) {
   return section;
 }
 
-// One donut per category per period, each showing that category's Types as
-// a share of its overall total for that period. Only categories with at
-// least one named Type get a panel — categories Insight tracks as a single
-// total (no Type breakdown) wouldn't have anything to show. The gap between
-// the category total (Insight's blank-Type row) and the sum of its named
-// Types becomes an "Untyped" slice.
+// One donut per category per period: that category's Types as a share of its total.
+// Only categories with a named Type get a panel. The gap between the category total and
+// the sum of its named Types becomes an "Untyped" slice.
 function renderTypeBreakdownCharts(typeBreakdown) {
-  // Order panels by absolute lifelong spend (highest first) so the
-  // biggest-impact categories surface at the top of the section, regardless
-  // of sign.
+  // By absolute lifelong spend, so the biggest movers surface first whatever their sign.
   const orderedCategories = Object.keys(typeBreakdown)
     .filter((category) => typeBreakdown[category].types.length > 0)
     .sort((a, b) => {
@@ -492,9 +445,7 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
     container.appendChild(buildTypeBreakdownSection(category));
 
-    // Sort once by absolute lifelong spend (largest first) so the legend and
-    // every period's donut share the same slice order and colors, regardless
-    // of sign (e.g. a type that nets to refunds still ranks by its size).
+    // Sorted once, so the legend and all four donuts share slice order and colours.
     const types = [...data.types].sort((a, b) => Math.abs(b.lifelong) - Math.abs(a.lifelong));
     const colors = types.map((_, i) => `hsl(${Math.round((i * 360) / types.length)}, 65%, 55%)`);
 
@@ -543,12 +494,9 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
 let accountCompositionChart = null;
 
-// Nested doughnut: inner ring = totals per account type (shaded by type),
-// middle ring = totals per institution (each institution has one fixed
-// color, even if its accounts span multiple types), outer ring = each
-// individual account (shaded by its institution's color). Slice sizes use
-// the absolute balance so debt accounts (negative balances) still render as
-// a normal positive-size slice rather than breaking the chart.
+// Nested doughnut: account type (inner), institution (middle, one fixed colour each),
+// individual account (outer, shaded by institution). Slices size on the ABSOLUTE
+// balance, so a debt account renders normally instead of breaking the chart.
 function renderAccountCompositionChart(accounts) {
   const ctx = document.getElementById('account-composition-chart');
   if (accountCompositionChart) accountCompositionChart.destroy();
@@ -566,26 +514,19 @@ function renderAccountCompositionChart(accounts) {
     typeAbsTotals.set(type, group.reduce((sum, acc) => sum + Math.abs(acc.balance), 0));
   });
 
-  // Largest absolute balance first, so the inner ring (and its legend) ranks
-  // account types by overall size regardless of sign — debt accounts with a
-  // large negative balance still rank near the top. Types with a zero
-  // absolute total (e.g. accounts that net to zero) are dropped so they
-  // don't show up as an empty legend entry.
+  // Largest absolute balance first, so a big debt still ranks near the top. Types
+  // netting to zero are dropped rather than left as an empty legend entry.
   const types = [...byType.keys()]
     .filter((type) => typeAbsTotals.get(type) > 0)
     .sort((a, b) => typeAbsTotals.get(b) - typeAbsTotals.get(a));
 
-  // Evenly-spaced hues around the color wheel so every entry gets a distinct
-  // color no matter how many there are, instead of cycling through (and
-  // repeating) a fixed-size palette once the count exceeds it.
+  // Evenly-spaced hues, so no count repeats a colour the way a fixed palette would.
   const distinctColors = (count) => Array.from({ length: count }, (_, i) => `hsl(${Math.round((i * 360) / count)}, 65%, 55%)`);
 
   const typeColors = {};
   distinctColors(types.length).forEach((color, i) => { typeColors[types[i]] = color; });
 
-  // One fixed color per institution (regardless of which type(s) its
-  // accounts fall under), so every slice for that institution — and its
-  // legend entry — always shows the same color instead of a per-type shade.
+  // One fixed colour per institution, whatever types its accounts span.
   const institutionAbsTotals = new Map();
   accounts.forEach((a) => {
     const institution = a.institution || 'Other';
@@ -613,8 +554,7 @@ function renderAccountCompositionChart(accounts) {
     typeValues.push(typeAbsTotals.get(type));
     typeColorList.push(typeColors[type]);
 
-    // Group this type's accounts by institution, largest institution first,
-    // so the middle ring's slices line up with the outer ring's accounts.
+    // Largest institution first, so the middle ring lines up with the outer one.
     const byInstitution = new Map();
     group.forEach((a) => {
       const institution = a.institution || 'Other';
@@ -646,14 +586,10 @@ function renderAccountCompositionChart(accounts) {
 
   renderCategoryLegend('account-composition-legend', types.map((t) => ({ name: t, color: typeColors[t] })));
 
-  // Second legend line for the middle ring: one entry per institution, using
-  // its single fixed color (same color for that institution everywhere in
-  // the chart, even if its accounts span multiple types), largest first.
+  // Second legend line for the middle ring, largest institution first.
   renderCategoryLegend('account-composition-institution-legend', institutionNames.map((name) => ({ name, color: institutionColorMap[name] })));
 
-  // Indexed by datasetIndex (outer to inner: account, institution, type) so
-  // the tooltip can look up the right name for whichever ring is hovered,
-  // independent of how Chart.js handles the dataset config objects.
+  // By datasetIndex (outer to inner), so the tooltip names whichever ring is hovered.
   const ringLabels = [accountLabels, institutionLabels, typeLabels];
 
   accountCompositionChart = new Chart(ctx, {
@@ -669,18 +605,15 @@ function renderAccountCompositionChart(accounts) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      // Without this, hovering one ring's segment also matches the elements
-      // at the same dataIndex in the other two rings, producing 3 tooltip
-      // lines for a single hover. 'point' mode limits it to the arc actually
-      // under the cursor.
+      // Otherwise one hover matches the same dataIndex in all three rings and
+      // produces three tooltip lines.
       interaction: { mode: 'point' },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            // Suppress the default title, which otherwise looks up
-            // `data.labels` (the outer/account-ring names) by dataIndex —
-            // a meaningless value for middle/inner-ring items.
+            // The default title looks up account-ring names by dataIndex, which is
+            // meaningless for the inner two rings.
             title: () => '',
             label: (item) => {
               const name = ringLabels[item.datasetIndex][item.dataIndex];
@@ -694,22 +627,19 @@ function renderAccountCompositionChart(accounts) {
   });
 }
 
-// Fallback defaults used until the user adds a 'Settings' tab — identical
-// to today's hardcoded values, so nothing changes for anyone who hasn't.
+// Used until a 'Settings' tab exists, so nothing changes for anyone without one.
 const WEIGHT_GOAL_KG_DEFAULT = 82;
 const CALORIE_TARGET_KCAL_DEFAULT = 2000;
 const SLEEP_TARGET_HOURS_DEFAULT = 8;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 const PROTEIN_TARGET_G_DEFAULT = 100;
 
-// Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 3.5 general resistance
-// work, 5.0 compound lifting, 6.0 swimming, 7.0 jogging). Same value as
-// activity-estimator.js's EXERCISE_MET_DEFAULT, but written out: charts.js loads
-// first, so referencing that const here would throw on its temporal dead zone.
+// Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 5.0 compound lifting, 7.0
+// jogging). Duplicates activity-estimator.js's EXERCISE_MET_DEFAULT rather than
+// referencing it: charts.js loads first, so that const is still in its dead zone.
 const ACTIVITY_MET_FALLBACK = 3.5;
 
-// Either key works — ACTIVITY_MET_DEFAULT is what's on the sheet in practice, so
-// an already-filled row isn't ignored over a naming preference.
+// Either key works, so an already-filled row isn't ignored over a naming preference.
 const ACTIVITY_MET_SETTING_KEYS = ['ACTIVITY_MET', 'ACTIVITY_MET_DEFAULT'];
 
 function activityMet() {
@@ -720,13 +650,11 @@ function activityMet() {
   return ACTIVITY_MET_FALLBACK;
 }
 
-// Standard estimate for 1kg of body fat — the energy density the projection
-// formula, getCalorieBoundKcal() below and the Calorie Balance chart all work
-// from. A population constant, not a personal parameter.
+// Energy density of body fat, shared by the projection, the calorie bound and Calorie
+// Balance. A population constant, not a personal parameter.
 const GENERIC_KCAL_PER_KG_FAT = 7700;
 
-// Last-resort flat per-minute burn, used only when no weight is on file at all
-// and the MET formula therefore can't be evaluated.
+// Last resort, for when no weight is on file and the MET formula can't be evaluated.
 const GENERIC_KCAL_PER_ACTIVE_MIN = 5;
 
 // ACSM form: 1 MET = 3.5 mL O₂/kg/min and a litre of O₂ releases ~5 kcal (200 mL
@@ -735,9 +663,8 @@ const GENERIC_KCAL_PER_ACTIVE_MIN = 5;
 const MET_ML_O2_PER_KG_MIN_DEFAULT = 3.5;
 const ML_O2_PER_KCAL = 200;
 
-// Only the mL-O₂ numerator is overridable (KCAL_PER_MET_KG_MIN in Settings, so
-// the Formula Playground can save a different one); the /200 is fixed, since it's
-// oxygen's energy yield rather than anything personal.
+// Only the mL-O₂ numerator is overridable (KCAL_PER_MET_KG_MIN). The /200 is oxygen's
+// energy yield, not a personal parameter.
 function kcalPerMetKgMin() {
   return getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT) / ML_O2_PER_KCAL;
 }
@@ -755,13 +682,10 @@ function latestWeightKg(entries) {
   return weightEntries.length ? weightEntries[weightEntries.length - 1].amount : null;
 }
 
-// Accepted ways of writing the g/kg band in one Settings cell: `1.6-2`,
-// `1.6~2`, `1.6 – 2`, `1.6 to 2`. A bare `1.6` is still valid and simply
-// means a band with the same figure at both ends.
+// `1.6-2`, `1.6~2`, `1.6 – 2`, `1.6 to 2` all parse. A bare `1.6` is a zero-width band.
 const G_PER_KG_BAND_SEPARATOR = /\s*(?:~|-|–|—|to)\s*/i;
 
-// The `1.6-2`-style single cell, parsed to {low, high} — null if it's absent
-// or holds nothing numeric. A bare `1.6` yields low === high.
+// That single cell as {low, high} — null if absent or holding nothing numeric.
 function parseGPerKgRangeCell() {
   const raw = getSettingString('PROTEIN_TARGET_G_PER_KG', null);
   if (raw === null) return null;
@@ -774,15 +698,9 @@ function parseGPerKgRangeCell() {
   return { low: parts[0], high: parts[parts.length - 1] };
 }
 
-// The protein target's g-per-kg band as {low, high} — null if none of the
-// three keys yields a usable figure, which sends getProteinTargetBandG() to
-// the flat PROTEIN_TARGET_G fallback. Either style of entry works, whichever
-// reads better in the Settings tab: the band in one cell
-// (PROTEIN_TARGET_G_PER_KG = `1.6-2`), or one end per row
-// (PROTEIN_TARGET_G_PER_KG_MIN = `1.6`, PROTEIN_TARGET_G_PER_KG_MAX = `2`).
-// The explicit _MIN/_MAX rows win per-end over the range cell, so either can
-// be overridden on its own. Whatever survives is sorted, so a band entered
-// backwards is still read as a band rather than an empty one.
+// The g/kg band as {low, high}; null sends getProteinTargetBandG to its flat fallback.
+// Either entry style works — one cell (`1.6-2`) or one end per row — with the explicit
+// _MIN/_MAX rows winning per end. Sorted, so a band entered backwards still reads.
 function getProteinGPerKgBand() {
   const cell = parseGPerKgRangeCell();
   const ends = [
@@ -794,15 +712,10 @@ function getProteinGPerKgBand() {
   return { low: Math.min(...ends), high: Math.max(...ends) };
 }
 
-// Protein's target is a BAND of grams per day rather than a single number,
-// because the evidence behind it is a range (e.g. 1.6–2.0 g/kg), not a point.
-// The band is that g/kg range applied to your GOAL weight (WEIGHT_GOAL_KG) —
-// not today's weight — since the point of the protein floor is to support the
-// body you're heading for; scaling it off current weight would quietly shrink
-// the target with every kg lost, exactly when protein matters most. Falls back
-// to the most recently logged weight if no goal is set, and finally to the flat
-// PROTEIN_TARGET_G (as a zero-width band) if no per-kg band is set at all, so
-// an existing flat-gram setup keeps behaving exactly as before.
+// A band, not a point, because the evidence behind it is a range (1.6-2.0 g/kg).
+// Applied to GOAL weight, not today's: scaling off current weight would shrink the
+// target with every kg lost, exactly when protein matters most. Falls back to the
+// latest weigh-in, then to a zero-width band at the flat PROTEIN_TARGET_G.
 function getProteinTargetBandG(entries) {
   const band = getProteinGPerKgBand();
   const basisWeightKg = band !== null
@@ -817,49 +730,35 @@ function getProteinTargetBandG(entries) {
   return { min: flat, max: flat };
 }
 
-// Midpoint of the band, for the places that structurally need ONE number
-// rather than a range — Protein Source Rotation's per-ingredient share of the
-// daily target.
+// Midpoint, for callers that structurally need one number — Protein Source Rotation.
 function getProteinTargetG(entries) {
   const { min, max } = getProteinTargetBandG(entries);
   return Math.round((min + max) / 2);
 }
 
-// "131" for a zero-width band, "131~164" otherwise — the one place the band's
-// display form is decided, so the glance tile and the Insight prompt can't
-// drift apart. The separator is a parameter because the two callers want
-// different ones: '~' reads as "to" on the tile, while the Insight prompt
-// passes a plain '-' rather than sending an unusual character to the AI.
+// "131" or "131~164" — one place, so the glance tile and the Insight prompt can't
+// drift. The separator is a parameter: the prompt passes '-' rather than send the AI
+// an unusual character.
 function formatProteinTargetBand(band, separator = '~') {
   return band.max > band.min ? `${band.min}${separator}${band.max}` : `${band.min}`;
 }
 
-// Did a day's protein land INSIDE the band? Under the floor and over the top
-// end are both misses, since the band's upper end is a real ceiling rather than
-// headroom. A zero-width band (flat PROTEIN_TARGET_G, no per-kg range set) has
-// no inside to land in, so it keeps the plain at-or-over rule it always had.
-// Shared by the glance tile and the Protein Intake chart's bar colors so the
-// two can't score the same day differently.
+// Inside the band? The upper end is a real ceiling, not headroom, so over it is a miss
+// too. A zero-width band has no inside and keeps the plain at-or-over rule. Shared by
+// the glance tile and the chart's bar colours.
 function withinProteinBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
 
-// Mifflin-St Jeor resting/basal metabolic rate (kcal/day) — the cost of staying
-// alive before any movement. All three maintenance figures here are BMR plus an
-// activity burn, no lifestyle multiplier: the calorie bound adds what
-// ACTIVITY_TARGET_MIN implies, the forecast and the Calorie Balance chart add
-// logged burn. One formula, so they can't measure deficits against different
-// baselines.
+// Mifflin-St Jeor BMR (kcal/day) — staying alive before any movement. Every
+// maintenance figure in the app is this plus an activity burn, never a lifestyle
+// multiplier, so no two of them measure a deficit against different baselines.
 function mifflinStJeorBmr(weightKg, heightCm, age, sex) {
   return 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
 }
 
-// Resting maintenance (kcal/day) from the profile settings and the most
-// recently logged weight — null if any input is missing. Deliberately the same
-// Mifflin-St Jeor basis the Calorie Balance chart applies per-day,
-// so calcProjection and that chart measure a deficit against the SAME baseline
-// instead of two different ones. Excludes activity: callers add whatever
-// activity figure is appropriate for their own window (see both call sites).
+// Resting maintenance from the profile and the latest weigh-in; null if anything is
+// missing. Excludes activity — each caller adds the figure right for its own window.
 function restingMaintenanceKcal(entries) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
@@ -870,44 +769,33 @@ function restingMaintenanceKcal(entries) {
   return mifflinStJeorBmr(weightKg, heightCm, age, sex);
 }
 
-// How far under the day's implied burn still reads as "basically on target" — the
-// Physical Activity dot goes gray rather than red inside this margin. Same 5% the
-// Caloric Intake bars use (CALORIE_BOUND_NEAR_FRACTION), kept separate because the
-// two score different things.
+// Inside this margin the Physical Activity dot goes gray rather than red. Same 5% as
+// CALORIE_BOUND_NEAR_FRACTION, kept separate because the two score different things.
 const ACTIVITY_NEAR_TARGET_FRACTION = 0.05;
 
-// The kcal/day ACTIVITY_TARGET_MIN implies at `weightKg`. Gross, not net of
-// resting — matching the Calorie Balance chart, which also adds gross activity
-// kcal to plain BMR, so both maintenance figures stay the same number.
+// What ACTIVITY_TARGET_MIN implies at `weightKg`. Gross, not net of resting — Calorie
+// Balance also adds gross activity to plain BMR, so both maintenance figures agree.
 function activityTargetKcal(weightKg) {
   return metKcal(activityMet(), weightKg, getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT));
 }
 
-// One Activity entry's calorie burn — the single rule every activity kcal figure
-// in the app goes through. Its own Calculate-derived amount2 wins when present
-// (that used the real per-exercise MET); otherwise the entry's minutes are costed
-// at ACTIVITY_MET and the given weight.
+// The single rule every activity kcal figure goes through. A Calculate-derived amount2
+// wins (it used the real per-exercise MET); otherwise minutes at ACTIVITY_MET.
 function activityEntryKcal(entry, weightKg) {
   if (entry.amount2 !== null) return entry.amount2;
   const mins = toActivityMinutes(entry.amount, entry.unit);
   return weightKg != null ? metKcal(activityMet(), weightKg, mins) : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
 }
 
-// The calculated bound for ONE weight (kcal/day): Mifflin-St Jeor BMR + the burn
-// ACTIVITY_TARGET_MIN implies − the deficit that hits WEEKLY_FAT_LOSS_KG at 7,700
-// kcal/kg. No lifestyle multiplier: this used to scale BMR by ACTIVITY_MULTIPLIER
-// while the forecast and Calorie Balance chart used BMR + activity, so the app
-// held two different maintenance figures.
+// The bound for ONE weight: BMR + the burn ACTIVITY_TARGET_MIN implies − the deficit
+// that hits WEEKLY_FAT_LOSS_KG. No lifestyle multiplier, so it agrees with the forecast
+// and Calorie Balance. The trade, since no label carries it: BMR + target activity
+// omits food's thermic effect and incidental NEAT, landing near 1.29 x BMR — so a
+// former 1.55-multiplier user loses ~475 kcal/day of ceiling, and WEEKLY_FAT_LOSS_KG
+// is the dial for it.
 //
-// The trade, since no label carries it: BMR + target activity omits food's thermic
-// effect and incidental NEAT, landing near 1.29 × BMR, so a former 1.55-multiplier
-// user loses ~475 kcal/day of ceiling. WEEKLY_FAT_LOSS_KG is the dial for that.
-//
-// Weight is an argument, not the latest weigh-in, because both terms scale with it
-// and the Caloric Intake chart evaluates per day (calorieBoundSeries). Returns
-// null when an input is missing — the caller falls back to CALORIE_TARGET_KCAL.
-// ACTIVITY_MET/ACTIVITY_TARGET_MIN have defaults, so unlike the multiplier they
-// replaced, neither absence can cause that fallback.
+// Weight is an argument because both terms scale with it and Caloric Intake evaluates
+// per day. Null when an input is missing; the caller falls back to CALORIE_TARGET_KCAL.
 function calorieBoundDetail(weightKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
@@ -921,15 +809,9 @@ function calorieBoundDetail(weightKg) {
   const bmr = mifflinStJeorBmr(weightKg, heightCm, age, sex);
   const activityKcal = activityTargetKcal(weightKg);
 
-  // The setting being converted is WEEKLY_FAT_LOSS_KG — a fat goal — so turning
-  // it into a daily deficit needs adipose tissue's energy density, which is a
-  // population constant rather than anything measurable off a scale. A negative
-  // value (a lean bulk) makes this a surplus and lifts the bound above
-  // maintenance, which is what flips it from a ceiling to a floor.
-  //
-  // No plausibility guard on the result: a bound that looks aggressive means
-  // WEEKLY_FAT_LOSS_KG itself is aggressive — the user's own setting to make,
-  // and there would be nothing to substitute anyway.
+  // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the bound
+  // above maintenance, flipping it from a ceiling to a floor. No plausibility guard: an
+  // aggressive bound means an aggressive setting, which is the user's call.
   const kcal = Math.round(bmr + activityKcal - (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7);
 
   return { kcal, bmr, activityKcal, weeklyFatLossKg };
@@ -944,33 +826,18 @@ function flatCalorieBoundKcal() {
   return getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
 }
 
-// TODAY's bound in kcal — the calculated figure at the most recent weigh-in, or
-// the flat CALORIE_TARGET_KCAL setting when the profile can't produce one. This
-// is the single-figure form, for the places that need one number for right now
-// (the Calories glance tile, the Insight prompt).
-//
-// This is only the FIGURE. Which side of it to be on is getCalorieBoundKind()
-// below — every label goes through getCalorieBound() so the two travel
-// together.
+// TODAY's bound: the calculated figure at the latest weigh-in, else flat
+// CALORIE_TARGET_KCAL. Only the FIGURE — which side to be on is getCalorieBoundKind,
+// and getCalorieBound pairs them so no label can carry one without the other.
 function getCalorieBoundKcal(entries) {
   return calculatedCalorieBoundKcal(latestWeightKg(entries)) ?? flatCalorieBoundKcal();
 }
 
-// The bound evaluated for every day on the Caloric Intake chart's x-axis, each
-// from the weight in effect THAT day (most recent weigh-in on or before it,
-// carried forward — the same read the Calorie Balance chart uses
-// for its per-day BMR) rather than from today's weight applied backwards across
-// the whole window.
-//
-// The bound is a function of weight through both its terms — ~10 kcal/kg from the
-// BMR and ~5.8 kcal/kg from the activity burn at default MET and target, so a 6 kg
-// loss moves a calculated maximum by roughly 95 kcal — so a single flat line
-// judged the first day of a 12-week window against the body you have now, marking
-// days red that were comfortably inside the maximum that actually applied when you
-// ate them. Each entry carries
-// the weight it came from so the tooltip can show why the figure moved; weightKg
-// is null on the flat-setting fallback, which has no weight basis at all and
-// stays a genuinely flat line.
+// The bound per day, each from the weight in effect THAT day rather than today's
+// applied backwards. It moves ~15.8 kcal/kg across both terms, so a 6 kg loss shifts it
+// ~95 kcal — enough that one flat line marked days red that were comfortably inside the
+// maximum actually applying when they were eaten. Each entry carries its weight so the
+// tooltip can say why the figure moved; null on the flat fallback, which has no basis.
 function calorieBoundSeries(entries, dates) {
   const weightEntries = entries.filter((e) => e.category === 'Weight' && e.amount !== null);
   const weightForDate = carryForwardWeightByDate(weightByDateMap(weightEntries), dates);
@@ -983,19 +850,13 @@ function calorieBoundSeries(entries, dates) {
   });
 }
 
-// There is no "target" daily intake in this app — the figure above is a BOUND,
-// and which bound it is follows the direction of the goal. Someone heading DOWN
-// in weight has to eat at MOST that many calories (a ceiling); someone heading
-// UP has to eat at LEAST that many (a floor). Eating 400 kcal under a bulk's
-// figure is not a good day, and neither is eating 400 over a cut's, so calling
-// both of them "target" told half the users the exact opposite of the truth.
+// There is no "target" intake here, only a BOUND — a ceiling heading down, a floor
+// heading up. Eating 400 under a bulk's figure is no better than 400 over a cut's, so
+// calling both "target" told half the users the opposite of the truth.
 //
-// Direction comes from goal weight vs. the latest weigh-in, which is the user's
-// intent in its plainest form. With no goal, no weigh-in, or a goal already
-// reached (same 0.1 kg tolerance calcProjection() treats as "there"), the sign
-// of WEEKLY_FAT_LOSS_KG decides instead — negative is a lean bulk, so a floor.
-// Neither available keeps the ceiling, matching the at-or-under rule the
-// Calories tile has always applied.
+// Direction is goal weight vs. latest weigh-in. With neither, or a goal already reached
+// (0.1 kg tolerance), the sign of WEEKLY_FAT_LOSS_KG decides — negative is a bulk, so a
+// floor. Nothing at all keeps the ceiling.
 function getCalorieBoundKind(entries) {
   const goalKg = getSetting('WEIGHT_GOAL_KG', null);
   const currentKg = latestWeightKg(entries);
@@ -1008,10 +869,8 @@ function getCalorieBoundKind(entries) {
   return (weeklyFatLossKg !== null && weeklyFatLossKg < 0) ? 'min' : 'max';
 }
 
-// The bound as one object — the kcal figure, which bound it is, and the display
-// forms the labels need ('max' inline, 'Max' leading a heading, 'Maximum' as a
-// tooltip field name) — so the glance tile, the Caloric Intake chart and the
-// Insight prompt can't drift into describing the same number two different ways.
+// Figure, kind and every display form in one object, so the tile, the chart and the
+// Insight prompt can't describe the same number two different ways.
 function getCalorieBound(entries) {
   const kind = getCalorieBoundKind(entries);
   return {
@@ -1029,36 +888,28 @@ function withinCalorieBound(kcal, bound) {
   return bound.isMax ? kcal <= bound.kcal : kcal >= bound.kcal;
 }
 
-// How far past the bound still reads as "basically on target". Inside this margin
-// the day is neither scored nor condemned — a few percent is within the noise of
-// the estimate and of the log itself.
+// Inside this margin a day is neither scored nor condemned — a few percent is within
+// the noise of the estimate and of the log itself.
 const CALORIE_BOUND_NEAR_FRACTION = 0.05;
 
-// Three-way score for a day's intake: 'met' on the right side of the bound, 'near'
-// when it's past it by no more than CALORIE_BOUND_NEAR_FRACTION, 'missed' beyond
-// that. The wrong-side distance is measured the same way for a ceiling and a floor,
-// so a bulk's under-eating grades exactly like a cut's over-eating.
+// 'met' on the right side, 'near' within CALORIE_BOUND_NEAR_FRACTION past it, 'missed'
+// beyond. Distance is measured alike for a ceiling and a floor, so a bulk's
+// under-eating grades exactly like a cut's over-eating.
 function calorieBoundScore(kcal, bound) {
   if (withinCalorieBound(kcal, bound)) return 'met';
   return Math.abs(kcal - bound.kcal) <= bound.kcal * CALORIE_BOUND_NEAR_FRACTION ? 'near' : 'missed';
 }
 
-// A day's signed distance from its bound (kcal), for the Caloric Intake tooltip's
-// Variance line — positive above the figure, negative below it, whichever of
-// those two the goal happens to want.
+// Signed distance from the bound, for the Variance row — positive above, negative
+// below, whichever of the two the goal happens to want.
 function calorieBoundVariance(kcal, boundKcal) {
   return Math.round(kcal - boundKcal);
 }
 
-// Number of trailing days shown in each Health Indicators chart (Body Mass,
-// Caloric Intake, Protein Intake, Physical Activity, Rest & Recovery). Body
-// Mass appears here as well as in the State Trend & Forecast chart above
-// without duplicating it: that one is the trajectory (trend, goal, forecast),
-// this one scores each individual day's move as toward or away from the goal.
-// These charts are full-width (one per row)
-// rather than 4-across, so 84 days (12 weeks) fits comfortably; each render
-// function's x-axis already thins tick labels (autoSkip/maxTicksLimit), so
-// no other change is needed to keep them readable at this range.
+// Trailing days in every Health Indicators chart. They're full-width, and the x-axes
+// already thin their tick labels, so 12 weeks fits comfortably. Body Mass appears here
+// as well as in State Trend & Forecast without duplicating it: that one is the
+// trajectory, this one scores each day's move toward the goal or away from it.
 const WELLNESS_METRICS_DAYS = 84;
 
 let wellnessCaloriesChart = null;
@@ -1077,9 +928,8 @@ function lastNDates(n) {
   });
 }
 
-// Every ISO date from fromIso to toIso inclusive, ascending. Empty if either
-// date is missing/unparseable or fromIso is after toIso — callers treat that
-// the same as "no data in range" rather than special-casing it.
+// Every ISO date from fromIso to toIso inclusive. Empty on a missing, unparseable or
+// inverted range — callers read that as "no data" rather than special-casing it.
 function datesInRange(fromIso, toIso) {
   if (!fromIso || !toIso) return [];
   const from = dateFromIso(fromIso);
@@ -1095,13 +945,9 @@ function datesInRange(fromIso, toIso) {
   return dates;
 }
 
-// Wires up a From/To date-range picker (two <input type="date">) shared by
-// any panel that lets the user pick an arbitrary custom range instead of a
-// fixed N-day lookback (Health Insight, Protein Source Rotation, ...) —
-// one implementation instead of each panel re-deriving its own defaulting
-// and listener wiring. Defaults both inputs to the last defaultDays days
-// (today inclusive) the first time they're empty, fires onChange on every
-// edit, and returns a getter for the current {from, to} value.
+// The shared From/To picker: one implementation instead of each panel re-deriving its
+// own defaulting and wiring. Seeds both inputs to the last defaultDays when empty,
+// fires onChange on every edit, and returns a getter for the current {from, to}.
 function initDateRangeControl(fromId, toId, defaultDays, onChange) {
   const fromEl = document.getElementById(fromId);
   const toEl = document.getElementById(toId);
@@ -1129,11 +975,8 @@ function renderWellnessCharts(entries) {
   renderWellnessEnergyBalanceChart(entries);
 }
 
-// "Today at a glance" stat tiles above the 4 trend charts — the charts are
-// good for a 14-day trend but bad for "am I on track right now," so this
-// gives today's actual-vs-target for all four metrics in one glance instead
-// of reading the rightmost bar of four separate charts. Reuses the same
-// .card/.value/.income/.expense styling as the main dashboard's summary cards.
+// The charts answer "how's the trend", not "am I on track right now" — these tiles give
+// today's actual-vs-target for all four metrics without reading four rightmost bars.
 function renderTodayGlanceCards(entries) {
   const todayIso = isoFromDate(new Date());
 
@@ -1165,23 +1008,15 @@ function renderTodayGlanceCards(entries) {
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
-  // The Calories tile's own heading carries which bound its figure is, because
-  // the number alone can't say it and the value line has no room: "Max Calories"
-  // on a cut, "Min Calories" on a bulk. Digit-free, so privacy mode has nothing
-  // to hide here. The four tiles are all today's figures (last night's, for
-  // Sleep) — the panel they sit in says so, so the headings don't repeat it.
+  // The heading carries which bound it is, since the number can't and the value line
+  // has no room. Digit-free, so privacy mode has nothing to hide.
   document.getElementById('today-calories-label').textContent = `${calorieBound.word} Calory Intake`;
 
-  // Which direction is "good" differs per metric: for Calories it's whichever
-  // side of the bound the goal points to (at/under a max, at/over a min);
-  // at/over target is the win for Activity/Sleep. Protein is judged against a
-  // RANGE (withinProteinBand above) — inside the band only.
+  // Protein is the one metric judged against a RANGE — inside the band only.
   const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
 
-  // What hitting the minutes target would burn — the same figure the calorie
-  // bound is built from (activityTargetKcal), so the tile and the bound can't
-  // quote different numbers for the same plan. Needs a weigh-in; without one
-  // the tile just reads as it did before.
+  // What hitting the minutes target would burn, via the same activityTargetKcal the
+  // bound is built from, so the two can't quote different numbers for one plan.
   const weightKg = latestWeightKg(entries);
   const plannedBurn = weightKg !== null ? `${Math.round(activityTargetKcal(weightKg))} kcal` : null;
 
@@ -1191,12 +1026,9 @@ function renderTodayGlanceCards(entries) {
   setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
 }
 
-// `target` is a number for the single-figure metrics and a preformatted
-// string ("131~164") for Protein's band — both interpolate identically, and
-// maskDigits masks either the same way.
-// `note` restates the target in a second unit ("= 394 kcal"). Part of the same
-// string rather than its own styled element, so the whole line reads at one
-// size and masks as one thing.
+// `target` is a number, or a preformatted string for Protein's band — both interpolate
+// and mask alike. `note` restates it in a second unit ("= 394 kcal"), inside the same
+// string rather than its own element, so the line reads at one size and masks as one.
 function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null) {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'expense');
@@ -1206,21 +1038,14 @@ function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null) 
   if (value !== null) el.classList.add(isGood ? 'income' : 'expense');
 }
 
-// Health Tracker charts show plain physical units (kcal/hr/min/kg), not
-// dollars, so they never pass through formatCurrency's masking — but
-// they're still personal health data the privacy toggle should hide just
-// the same. These wrap a plain "${value} unit" tick/tooltip formatter so
-// both the axis and the tooltip (which would otherwise leak the exact
-// number on hover even with masked ticks) get masked identically.
-// decimals: null (default) just strips float noise without forcing trailing
-// zeros — right for the whole-number-ish charts (kcal/min/g). Pass a number
-// (e.g. 2 for BMI) to always show exactly that many decimal places instead.
+// Health units never pass through formatCurrency's masking, but they're still personal
+// data the privacy toggle should hide — and a tooltip would leak the exact figure even
+// with masked ticks. `decimals: null` strips float noise without forcing trailing zeros;
+// pass a number (2 for BMI) to fix the places instead.
 function maskedUnitTick(unit, decimals = null) {
   return (v) => {
-    // Chart.js generates its own evenly-spaced tick values by repeated
-    // addition of a step size, which drifts into float noise (e.g.
-    // 32.400000000000006) on fractional-step axes like BMI — round before
-    // display so that noise never reaches the label.
+    // Chart.js builds ticks by repeated addition, which drifts into float noise
+    // (32.400000000000006) on a fractional step. Round before it reaches the label.
     const rounded = decimals !== null ? v.toFixed(decimals) : Math.round(v * 100) / 100;
     const label = `${rounded} ${unit}`;
     return privacyMode ? maskDigits(label) : label;
@@ -1233,12 +1058,8 @@ function maskedValueTooltipLabel(item) {
   return `${prefix}${privacyMode ? maskDigits(value) : value}`;
 }
 
-// Clipped version of lastNDates(maxDays) — starts at the earliest matching
-// entry instead of always padding out to a fixed trailing window, so a
-// shorter logging history isn't visually pushed to the right with empty
-// days on the left. Mirrors how the Weight Trend & Forecast chart's x-axis
-// above already starts at its own first logged entry (weightEntries[0].date)
-// rather than a fixed lookback.
+// lastNDates clipped to the earliest matching entry, so a short logging history isn't
+// pushed to the right behind a run of empty days.
 function trailingDatesForCategory(matchingEntries, maxDays) {
   const capped = lastNDates(maxDays);
   if (matchingEntries.length === 0) return capped;
@@ -1247,16 +1068,14 @@ function trailingDatesForCategory(matchingEntries, maxDays) {
   return capped.filter((d) => d >= from);
 }
 
-// Formats an ISO 'YYYY-MM-DD' label as e.g. "Jun 29" — the same short style
-// the Weight Trend & Forecast chart's x-axis already uses (offsetToDateLabel
-// below), instead of the raw ISO string a category-scale axis shows by
-// default.
+// "Jun 29", matching offsetToDateLabel below, rather than the raw ISO string a
+// category axis shows by default.
 function formatIsoDateShort(iso) {
   return new Date(parseIsoDateUTC(iso)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-// Category-scale tick callback: `value` is the tick's index, not the label
-// itself, so getLabelForValue() resolves it back to the ISO string first.
+// On a category scale `value` is the tick's index, so it resolves back to the ISO
+// string first.
 function shortDateTickCallback(value) {
   return formatIsoDateShort(this.getLabelForValue(value));
 }
@@ -1266,42 +1085,31 @@ function calorieLogEntries(entries) {
   return entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
 }
 
-// The x-axis the Caloric Intake chart and the Body Weight chart directly above
-// it BOTH plot on — the trailing window clipped to the first day calories were
-// logged. The weight chart deliberately does NOT run trailingDatesForCategory
-// over the weight log the way every other metric chart does over its own
-// category: the two are read as a stacked pair (was the scale moving the right
-// way on the days I stayed inside my bound?), and a weight log that starts on a
-// different day than the calorie log would slide one chart's dates out of line
-// with the other's.
+// The x-axis Caloric Intake and Body Mass BOTH plot on. Body Mass deliberately doesn't
+// clip to its own log the way every other metric chart does: the two are read as a
+// stacked pair, and different start days would slide their dates out of line.
 function wellnessCalorieChartDates(entries) {
   return trailingDatesForCategory(calorieLogEntries(entries), WELLNESS_METRICS_DAYS);
 }
 
 let wellnessWeightChart = null;
 
-// Neutral gray for a bar that can't be scored: the first reading shown, with
-// nothing before it to compare against, or a stall too short to call yet. Green
-// would claim progress that isn't measured; red, a setback that isn't either.
+// For a bar that can't be scored — the first reading, or a stall too short to call.
+// Green would claim progress that isn't measured; red, a setback that isn't either.
 const WEIGHT_UNSCORED_COLOR = '#9ca3af';
 
-// A stall only reads as a setback once it has held this many days. Under it the
-// bar stays gray — one flat reading is scale noise, not a plateau.
+// One flat reading is scale noise, not a plateau.
 const WEIGHT_STALL_RED_AFTER_DAYS = 2;
 
-// Which way the scale has to move to count as progress — down on a cut, up on a
-// bulk. Derived from getCalorieBoundKind rather than re-reading WEIGHT_GOAL_KG
-// here, so this chart's green and the max/min bound of the Caloric Intake chart
-// below it always come from one read of the goal, fallbacks included (an
-// at-goal weight defers to the sign of WEEKLY_FAT_LOSS_KG, and downward when
-// neither is set).
+// Down on a cut, up on a bulk. Via getCalorieBoundKind rather than re-reading
+// WEIGHT_GOAL_KG, so this chart's green and Caloric Intake's max/min come from one read
+// of the goal, fallbacks included.
 function weightGoalIsDownward(entries) {
   return getCalorieBoundKind(entries) === 'max';
 }
 
-// Is that day's weight already the goal weight? Same 0.1 kg tolerance
-// getCalorieBoundKind and calcProjection treat as "there" — a scale reading is
-// not going to land on the goal to the gram, and a figure that close is at it.
+// The tolerance getCalorieBoundKind and calcProjection also treat as "there" — no scale
+// reading lands on a goal to the gram.
 const WEIGHT_AT_GOAL_TOLERANCE_KG = 0.1;
 
 function weightIsAtGoal(weightKg) {
@@ -1309,15 +1117,10 @@ function weightIsAtGoal(weightKg) {
   return goalKg !== null && weightKg !== null && Math.abs(goalKg - weightKg) < WEIGHT_AT_GOAL_TOLERANCE_KG;
 }
 
-// Is a day's change from the previous reading progress? null means unscored (gray):
-// either nothing to compare against, or a stall that hasn't lasted long enough to
-// judge.
-//
-// A day the scale held exactly still is judged by WHERE and for HOW LONG it held.
-// Holding at the goal is what success looks like once you're there, so that stays
-// green however long it lasts. Holding short of the goal is only called a miss once
-// it has persisted WEIGHT_STALL_RED_AFTER_DAYS — a single flat reading is as likely
-// to be scale noise as a real plateau, so it goes gray rather than red.
+// Progress since the previous reading; null is unscored (gray). A day the scale held
+// still is judged by WHERE and HOW LONG: holding at the goal is what success looks like,
+// so it stays green; holding short of it only reads as a miss after
+// WEIGHT_STALL_RED_AFTER_DAYS, since one flat reading is as likely to be noise.
 function weightChangeIsProgress(deltaKg, weightKg, goalIsDownward, stallDays) {
   if (deltaKg === null) return null;
   if (deltaKg === 0) {
@@ -1327,19 +1130,17 @@ function weightChangeIsProgress(deltaKg, weightKg, goalIsDownward, stallDays) {
   return (deltaKg < 0) === goalIsDownward;
 }
 
-// Deurenberg et al. 1991 (Br J Nutr) age/sex-specific body fat % from BMI alone —
-// the app has no direct body-fat measurement (scale, calipers, DEXA) anywhere, so
-// this is a population-average estimate at the same trust level as the USDA/AI
-// calorie lookups.
+// Deurenberg et al. 1991 (Br J Nutr): body fat % from BMI alone. The app has no direct
+// measurement anywhere, so this is a population estimate at the same trust level as the
+// USDA/AI calorie lookups.
 function estimateBodyFatPercent(weightKg, heightCm, age, sex) {
   const bmi = weightKg / (heightCm / 100) ** 2;
   const sexTerm = sex === 'male' ? 1 : 0;
   return 1.20 * bmi + 0.23 * age - 10.8 * sexTerm - 5.4;
 }
 
-// Deurenberg's estimate held to a plausible range, so a nonsense BMI can't produce a
-// nonsense figure downstream. Everything fat-related on this chart goes through it,
-// so the percentage shown and the axis derived from it can't disagree.
+// Held to a plausible range, so a nonsense BMI can't produce a nonsense figure. Every
+// fat-related value on this chart goes through it, so none of them can disagree.
 function clampedBodyFatPercent(weightKg, heightCm, age, sex) {
   return Math.max(3, Math.min(60, estimateBodyFatPercent(weightKg, heightCm, age, sex)));
 }
@@ -1354,19 +1155,17 @@ function fatEnergyKcal(weightKg, heightCm, age, sex) {
   return estimatedFatMassKg(weightKg, heightCm, age, sex) * GENERIC_KCAL_PER_KG_FAT;
 }
 
-// Headroom above and below the plotted kg range, mirroring the `grace: '15%'` this
-// axis used before it needed explicit bounds. The floor keeps a window of nearly
-// identical readings from sitting flush against the top and bottom.
+// Headroom around the plotted range. The floor keeps a window of nearly identical
+// readings off the top and bottom edges.
 const WEIGHT_AXIS_PAD_FRACTION = 0.15;
 const WEIGHT_AXIS_MIN_PAD_KG = 0.5;
 
-// Gridline spacing for the kg scale, smallest first — the first one that keeps the
-// count at or under WEIGHT_MAX_GRIDLINES wins, so every line lands on a round kg.
+// Smallest first; the first step keeping the count under WEIGHT_MAX_GRIDLINES wins, so
+// every line lands on a round kg.
 const WEIGHT_TICK_STEPS_KG = [0.5, 1, 2, 5, 10];
 const WEIGHT_MAX_GRIDLINES = 8;
 
-// Fat energy runs to six figures and the axis width is capped, so ticks read
-// "175k kcal" rather than "175255 kcal".
+// Fat energy runs to six figures against a capped axis width, so "175k kcal".
 function maskedThousandsTick(unit) {
   return (v) => {
     const label = `${Math.round(v / 1000)}k ${unit}`;
@@ -1374,20 +1173,15 @@ function maskedThousandsTick(unit) {
   };
 }
 
-// Each day's reading as a bar, scored green/red by whether it moved toward the
-// goal or away from it — the same pass/fail read the Caloric Intake chart below
-// applies to a day's eating, on the same dates, so the two can be compared bar
-// for bar. It shows no goal line of its own: State Trend & Forecast above
-// already draws the goal, the trend, and the projection, and a goal several kg
-// away would flatten the y-axis here into exactly the flat line that chart
-// exists to smooth — this one is only about the day-to-day direction.
+// One bar per reading, scored by direction of travel on the same dates Caloric Intake
+// uses, so the two compare bar for bar. No goal line of its own: State Trend above
+// already draws one, and a goal several kg away would flatten this axis into exactly
+// the flat line that chart exists to smooth.
 //
-// The right axis restates the same bars as the energy stored in the fat mass each
-// one implies (fatEnergyKcal), so a drop in kg can be read as the kcal of fat it
-// represents. Because body fat % itself moves with BMI, that mapping is quadratic
-// in mass while a Chart.js twin axis can only be linear — it's anchored at the two
-// ends of the kg range, which over a typical window costs under 0.5% of the axis
-// span (~9 g of fat) and about 2.8% across an unusually wide 13 kg one.
+// The twin axis restates each bar as the energy stored in the fat mass it implies.
+// Body fat % moves with BMI, so that mapping is quadratic while a Chart.js twin axis
+// can only be linear — anchoring at the ends of the kg range costs under 0.5% of the
+// span on a typical window, 2.8% across an unusually wide 13 kg one.
 function renderWellnessWeightChart(entries) {
   const ctx = document.getElementById('wellness-weight-chart');
 
@@ -1397,13 +1191,11 @@ function renderWellnessWeightChart(entries) {
   const byDate = weightByDateMap(weightEntries);
   const dates = wellnessCalorieChartDates(entries);
 
-  // Scored against the previous READING, not the previous calendar day, so
-  // logging every third day still leaves every bar with something to be
-  // compared against. That includes the leftmost bar, seeded from the most recent
-  // weigh-in BEFORE the window rather than left unscored just because its
-  // predecessor is off the left edge of the chart.
-  // stallStartDate is the date the current run of identical readings began, so a
-  // plateau that started before the window still counts its full length here.
+  // Scored against the previous READING, not the previous day, so logging every third
+  // day still leaves every bar something to compare against — the leftmost included,
+  // seeded from the last weigh-in before the window. stallStartDate is where the
+  // current run of identical readings began, so a plateau predating the window still
+  // counts its full length.
   let previousKg = null;
   let stallStartDate = null;
   [...byDate.keys()].sort().forEach((d) => {
@@ -1413,8 +1205,7 @@ function renderWellnessWeightChart(entries) {
     previousKg = kg;
   });
 
-  // Read before the loop so each day's stored fat energy can be worked out as it
-  // goes, for the tooltip.
+  // Read before the loop, so each day's fat energy can be worked out as it goes.
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
@@ -1426,9 +1217,7 @@ function renderWellnessWeightChart(entries) {
 
   dates.forEach((d) => {
     if (!byDate.has(d)) {
-      // No weigh-in: an empty slot, not a zero. Caloric Intake can plot a
-      // missing log as a harmless zero-height bar, but 0 kg is an impossible
-      // weight that would drag this chart's whole y-axis down to it.
+      // An empty slot, not a zero: 0 kg is impossible and would drag the axis to it.
       values.push(null);
       barColors.push(WEIGHT_UNSCORED_COLOR);
       return;
@@ -1442,17 +1231,15 @@ function renderWellnessWeightChart(entries) {
       : 0;
     const progress = weightChangeIsProgress(delta, kg, goalIsDownward, stallDays);
 
-    // The change in STORED FAT ENERGY between the two readings, not the reading
-    // costed at a flat 7,700 — the fat share of a kg moves with BMI, so the two
-    // ends of the change are each converted at their own body mass.
+    // The change BETWEEN the two readings, each converted at its own body mass — the
+    // fat share of a kg moves with BMI, so a flat 7,700 would be wrong.
     const fatKcal = haveProfile ? fatEnergyKcal(kg, heightCm, age, sex) : null;
     const fatDeltaKcal = (haveProfile && delta !== null)
       ? fatKcal - fatEnergyKcal(previousKg, heightCm, age, sex)
       : null;
     const bodyFatPct = haveProfile ? clampedBodyFatPercent(kg, heightCm, age, sex) : null;
     const fatMassKg = haveProfile ? estimatedFatMassKg(kg, heightCm, age, sex) : null;
-    // BMI needs only height, so it survives a profile missing birth date or sex —
-    // gating it on the full profile would hide a figure that is computable.
+    // BMI needs only height, so it survives a profile missing birth date or sex.
     const bmi = heightCm !== null ? computeBmi(kg, heightCm) : null;
     detailByDate.set(d, { delta, fatKcal, fatDeltaKcal, bodyFatPct, fatMassKg, bmi });
 
@@ -1465,27 +1252,23 @@ function renderWellnessWeightChart(entries) {
   // and its direction says everything.
   const { series: trendSeries, slopePerWeek } = weeklyTrendSeries(values);
 
-  // Explicit kg bounds instead of `grace`, because the fat-energy twin axis has to
-  // be derived from them and Chart.js resolves `grace` too late to read here.
-  // The trend is folded in as well — a fit extended to the week's edges can reach past
-  // every reading in it, and a bound that ignored that would clip the dash.
+  // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
+  // `grace` too late to read here. The trend folds in too — a fit extended to the week's
+  // edges can reach past every reading in it, and would otherwise clip.
   const logged = [...values, ...trendSeries].filter((v) => v !== null);
   const kgLo = logged.length ? Math.min(...logged) : 0;
   const kgHi = logged.length ? Math.max(...logged) : 0;
   const kgPad = Math.max((kgHi - kgLo) * WEIGHT_AXIS_PAD_FRACTION, WEIGHT_AXIS_MIN_PAD_KG);
 
-  // Gridlines belong to the kg scale here, so both bounds are rounded out to a whole
-  // step of it — otherwise the lines fall wherever the padded range happens to land
-  // and you get labels like 86.5 with no line at 94. The step grows with the range so
-  // a 15 kg window doesn't draw sixteen lines.
+  // kg owns the gridlines, so both bounds round out to a whole step of it — otherwise
+  // the lines land wherever the padding left them. The step grows with the range.
   const kgStep = WEIGHT_TICK_STEPS_KG.find((s) => (kgHi - kgLo + 2 * kgPad) / s <= WEIGHT_MAX_GRIDLINES)
     ?? WEIGHT_TICK_STEPS_KG[WEIGHT_TICK_STEPS_KG.length - 1];
   const yMin = Math.max(0, Math.floor((kgLo - kgPad) / kgStep) * kgStep);
   const yMax = Math.ceil((kgHi + kgPad) / kgStep) * kgStep;
 
-  // The fat-energy axis needs the whole Mifflin/Deurenberg profile; without it (or
-  // with nothing logged) the right side falls back to the invisible spacer so this
-  // chart's plot area still lines up with its neighbours.
+  // Without the full profile the axis falls back to the invisible spacer, so the plot
+  // area still lines up with its neighbours.
   const canShowFatEnergy = logged.length > 0 && haveProfile;
 
   wellnessWeightChart = upsertChart(wellnessWeightChart, ctx, {
@@ -1526,19 +1309,16 @@ function renderWellnessWeightChart(entries) {
             label: (item) => {
               const d = detailByDate.get(item.label) ?? {};
               const lines = [`Body Mass: ${item.parsed.y} kg`];
-              // Measured against the previous READING, not "yesterday" — on an
-              // every-third-day logging habit those aren't the same thing. Omitted on
-              // the first bar, which has nothing before it to compare against.
+              // Against the previous READING, not "yesterday" — on an every-third-day
+              // habit those differ. Omitted on the first bar.
               if (d.delta !== null && d.delta !== undefined) {
                 lines.push(`Changed Mass: ${withExplicitSign(d.delta)} kg`);
               }
-              // BMI first of the derived figures — it's a plain mass/height ratio, and
-              // the body-fat estimate below is computed FROM it, so it reads in that
-              // order. Unitless by definition, hence no unit on the row.
+              // BMI leads the derived rows because the rest are computed from it.
+              // Unitless by definition, so no unit.
               if (d.bmi !== null && d.bmi !== undefined) lines.push(`BMI: ${d.bmi}`);
-              // Composition before energy, since the energy figures are derived from
-              // it. All three are estimates from BMI (Deurenberg) rather than anything
-              // measured, and all three vanish together without the full profile.
+              // Composition before energy, which derives from it. All Deurenberg
+              // estimates, so all three vanish together without the full profile.
               if (d.bodyFatPct !== null && d.bodyFatPct !== undefined) {
                 lines.push(`Body Fat: ${Math.round(d.bodyFatPct * 10) / 10} %`);
                 lines.push(`Fat Mass: ${Math.round(d.fatMassKg * 10) / 10} kg`);
@@ -1551,9 +1331,8 @@ function renderWellnessWeightChart(entries) {
               }
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // The dash's own figure, flush left and last — the placement every chart in
-            // the section gives its reference figures. Rate only; the rows above already
-            // run to seven. Absent on a week with under two readings, which has no slope.
+            // Flush left and last, like every reference figure in the section. Rate
+            // only; the rows above already run to seven. Absent on a week with no slope.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined || slopePerWeek[i] === null) return '';
@@ -1565,17 +1344,12 @@ function renderWellnessWeightChart(entries) {
       },
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
-        // Fat energy on the LEFT, kg on the RIGHT. kg still owns the gridlines
-        // though — it's the scale the bars are actually read against, and the only
-        // one that can put every line on a round number, since fat energy is a
-        // non-linear restatement of it. The bars stay on `y` (their default axis),
-        // so only the sides move.
+        // Fat energy left, kg right — but kg keeps the gridlines: it's what the bars
+        // are read against, and the only one that lands on round numbers. Only the
+        // sides move; the bars stay on `y`.
         y: {
-          // The one metric chart here that must NOT begin at zero: a 0 kg
-          // baseline puts every bar within a pixel or two of the same height and
-          // hides the day-to-day movement this chart is entirely about. The padded
-          // real range is used instead, so the lowest bar still has visible height
-          // without the axis pretending to start at zero.
+          // The one chart here that must NOT begin at zero — a 0 kg baseline puts every
+          // bar within a pixel of the same height and hides the movement it exists for.
           beginAtZero: false,
           position: 'right',
           min: yMin,
@@ -1586,15 +1360,13 @@ function renderWellnessWeightChart(entries) {
         },
         y1: canShowFatEnergy
           ? {
-            // Twin of y, restated as stored fat energy — see the note above the
-            // function for why this mapping is anchored at the ends rather than exact.
+            // Twin of y as stored fat energy; see above for why it anchors at the ends.
             position: 'left',
             min: fatEnergyKcal(yMin, heightCm, age, sex),
             max: fatEnergyKcal(yMax, heightCm, age, sex),
             afterFit: fixTrendYAxisWidth,
-            // No lines of its own — kg draws them. Its own step is the kg step's
-            // equivalent so each kcal label still sits on one of those lines, even
-            // though the figures themselves can't also be round.
+            // No lines of its own; its step is kg's equivalent, so each kcal label still
+            // sits on one of kg's lines even though the figures can't also be round.
             grid: { drawOnChartArea: false },
             ticks: {
               stepSize: (fatEnergyKcal(yMax, heightCm, age, sex) - fatEnergyKcal(yMin, heightCm, age, sex))
@@ -1609,10 +1381,8 @@ function renderWellnessWeightChart(entries) {
   });
 }
 
-// Headroom left above and below the plotted range on the Caloric Intake y-axis,
-// as a fraction of that range — with a floor, since a window whose days are all
-// within a few kcal of each other would otherwise be padded by almost nothing and
-// sit flush against the top and bottom of the plot area.
+// Headroom around the plotted range, with a floor — a window of near-identical days
+// would otherwise be padded by almost nothing and sit flush against both edges.
 const CALORIE_AXIS_PAD_FRACTION = 0.15;
 const CALORIE_AXIS_MIN_PAD_KCAL = 120;
 
@@ -1620,31 +1390,21 @@ const CALORIE_AXIS_MIN_PAD_KCAL = 120;
 // figures (1,650 rather than 1,663).
 const CALORIE_AXIS_STEP_KCAL = 50;
 
-// Coarser rounding for the one case where the BOUND still has to widen the axis
-// (a bound sitting beyond everything logged in the window). A coarse step means
-// the frame holds still across several hundred kcal of bound movement, so
-// switching formulas moves the caps within a fixed frame for as long as possible
-// instead of dragging the frame along with them.
+// Coarser, for the one case where the bound still has to widen the axis. A coarse step
+// holds the frame still across several hundred kcal of bound movement.
 const CALORIE_AXIS_BOUND_STEP_KCAL = 250;
 
-// Bounds for the Caloric Intake y-axis, framed on what was LOGGED — every day
-// with intake on it, padded out. Only logged days count: the zeros standing in for
-// days with nothing logged would drag the floor back to zero and undo the zoom
-// this exists for. Clamped at zero, so a window of genuinely small intakes just
-// becomes the zero-based axis it always was rather than showing negative calories.
+// Framed on what was LOGGED, padded out. The zeros standing in for unlogged days would
+// drag the floor back down and undo the zoom; clamped at zero so small intakes give the
+// zero-based axis rather than negative calories.
 //
-// The bound is deliberately NOT part of that frame. Padding the axis around the
-// bound made the ruler move with the thing it measures: the bound shifts as
-// weight (and the settings behind it) change, and an axis that re-padded itself
-// around the new figure put the caps back in almost exactly the same pixels — a
-// 278 kcal change landing 2 px from where it started, with the intake bars
-// changing height instead. Framing on logged intake keeps the frame fixed while
-// the bound moves across it, since what was eaten doesn't depend on the bound.
+// The bound is deliberately NOT part of the frame. Padding around it made the ruler move
+// with the thing it measures: a 278 kcal change landed the caps 2 px from where they
+// started, with the bars changing height instead. What was eaten doesn't depend on the
+// bound, so framing on it holds still while the bound moves across it.
 //
-// The caps still can't be allowed off-plot, so the frame is WIDENED (never
-// re-padded) to reach a cap that would otherwise fall outside it — that's the one
-// case where the bound can still move the axis, and it only arises when the bound
-// sits beyond everything logged in the window.
+// The caps still can't fall off-plot, so the frame is WIDENED — never re-padded — to
+// reach one. That only arises when the bound sits beyond everything logged.
 function calorieAxisBounds(loggedValues, boundValues) {
   const framing = loggedValues.length ? loggedValues : boundValues;
   const lo = Math.min(...framing);
@@ -1670,26 +1430,18 @@ function renderWellnessCaloriesChart(entries) {
   const byDate = new Map();
   calorieEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
-  // The bound is re-evaluated for every day from the weight in effect that day
-  // (calorieBoundSeries), so there is no single figure for this chart to draw:
-  // each day has its own, marked on its own bar, and each day's bar is scored
-  // against that one and no other.
+  // Re-evaluated per day, so there's no single figure to draw: each bar carries its own
+  // and is scored against that one alone.
   const boundByDay = calorieBoundSeries(entries, dates);
   const dayBound = (i) => ({ ...bound, kcal: boundByDay[i].kcal });
 
-  // Bars are scored against their OWN day's figure in the app's own
-  // income/expense colors rather than a flat amber — green on the right side of
-  // the bound (at-or-under a max, at-or-over a min), gray when past it by under
-  // CALORIE_BOUND_NEAR_FRACTION, red beyond that — so the color IS the read, with
-  // a near-miss called neither a win nor a failure. There is deliberately no shaded
-  // out-of-bounds region any more: the bound moves by tens of kcal across a
-  // window, which is far too little for a filled zone to visibly follow, so all
-  // that a big flat wash of red communicated was a fixed limit the chart doesn't
-  // have. A day with nothing logged is scored as neither: it plots as 0, which is
-  // a missing log rather than a day of fasting, so it takes the green (and is
-  // invisible at zero height anyway) instead of being counted as the worst day on
-  // the chart under a floor.
-  // Same gray the Body Mass chart uses for a bar it won't score either way.
+  // Each bar against its OWN day's figure: green on the right side, gray within
+  // CALORIE_BOUND_NEAR_FRACTION past it, red beyond — so the colour IS the read, and a
+  // near-miss is called neither a win nor a failure. No shaded out-of-bounds region:
+  // the bound moves by tens of kcal across a window, far too little for a filled zone
+  // to follow, so the wash only ever communicated a fixed limit the chart doesn't have.
+  // An unlogged day plots as 0 and takes the green — a missing log, not a fast, and
+  // invisible at zero height anyway rather than the worst day on the chart under a floor.
   const CALORIE_NEAR_BOUND_COLOR = '#9ca3af';
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
@@ -1701,14 +1453,9 @@ function renderWellnessCaloriesChart(entries) {
 
   const axis = calorieAxisBounds(values.filter((v, i) => byDate.has(dates[i])), boundByDay.map((b) => b.kcal));
 
-  // Each day's own figure is marked as a cap across its bar — a floating bar
-  // (`[from, to]`) the same width as the bar it sits on, with `grouped: false` so
-  // it overlays that bar instead of being placed beside it. This replaces the
-  // single continuous line the chart used to draw: one line spanning the whole
-  // window reads as one shared limit no matter how it's dashed or stepped, while a
-  // mark per bar says the limit belongs to that day and to no other. Thickness is
-  // a fraction of the axis span rather than a fixed kcal amount, so it stays a
-  // hairline whatever range the axis ends up covering.
+  // A cap across each bar rather than one continuous line: a line spanning the window
+  // reads as a single shared limit however it's dashed, while a mark per bar says the
+  // limit belongs to that day alone. Thickness scales with the axis span.
   const capHalf = (axis.max - axis.min) * 0.004;
   const capData = boundByDay.map((b) => [b.kcal - capHalf, b.kcal + capHalf]);
 
@@ -1735,10 +1482,7 @@ function renderWellnessCaloriesChart(entries) {
           backgroundColor: boundMarkColor(),
           grouped: false,
           isBoundMarker: true,
-          // Chart.js draws datasets from the HIGHEST order to the lowest, so the
-          // lowest order paints last and ends up on top. The caps go above the
-          // bars: a cap is only useful if it's still visible on a day whose bar
-          // overshoots it.
+          // Lowest order paints last, so the cap stays visible on a bar that overshot it.
           order: 0,
         },
       ],
@@ -1746,41 +1490,31 @@ function renderWellnessCaloriesChart(entries) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      // Hovering anywhere in a day's column reports that day, rather than
-      // requiring the cursor to land on the bar itself. Without this, the cap
-      // sitting on top of the bar is often the nearest element to the pointer —
-      // and since the cap is filtered out of the tooltip below, hovering near the
-      // top of a bar could produce an empty tooltip instead of the day's figures.
+      // Hovering anywhere in a column reports that day. Without it the cap is often the
+      // nearest element to the pointer, and since it's filtered out below, hovering near
+      // the top of a bar would produce an empty tooltip.
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         tooltip: {
-          // The caps are filtered out as their own tooltip row (the Protein and
-          // Activity charts do the same with their target lines) — a floating bar
-          // would report itself as a `[from, to]` pair — and the figure they mark
-          // is stated properly in the lines below instead: as a bound, compared to
-          // the day, and attributed to the weight it was calculated from, since
-          // that weight is the reason it differs from the next day's.
+          // The cap is filtered out — a floating bar would report itself as a
+          // `[from, to]` pair — and stated properly in afterBody instead.
           filter: (item) => !item.dataset.isBoundMarker && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
-            // One labelled field per line, in the same form the Calorie Balance
-            // tooltip already uses for its terms.
             label: (item) => {
               const day = boundByDay[item.dataIndex];
-              // Actual last so it sits directly above the planned bound it's scored
-              // against, the same Actual/Planned pairing Calorie Balance uses.
+              // Actual last, so it sits directly above the planned bound it's scored
+              // against — the same pairing Calorie Balance uses.
               const lines = [
                 `Variance: ${withExplicitSign(calorieBoundVariance(item.parsed.y, day.kcal))} kcal`,
                 `Actual Intake: ${item.parsed.y} kcal`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // The bound goes last, and via afterBody rather than the label array:
-            // Chart.js indents body lines to clear the colour swatch, while afterBody
-            // text sits flush with the tooltip's own left padding. bound.word, not
-            // bound.full, so it reads "Planned Max" / "Planned Min" rather than
-            // "Planned Maximum".
+            // afterBody rather than a label row: Chart.js indents body lines to clear the
+            // colour swatch, while this sits flush left. bound.word, so it reads
+            // "Planned Max" rather than "Planned Maximum".
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
@@ -1794,15 +1528,11 @@ function renderWellnessCaloriesChart(entries) {
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
-          // Deliberately NOT zero-based, unlike the other intake charts here: the
-          // bound moves by roughly 16 kcal per kg of body weight (its BMR and
-          // activity terms are both weight-scaled — see calorieBoundDetail), so
-          // across a 12-week window it drifts a few tens of kcal — on a 0-2,500 axis that
-          // is a handful of pixels end to end and a fraction of one between
-          // adjacent days, which is why a per-day figure still read as one fixed
-          // line. Bars here are read as a position against their own cap rather
-          // than as a quantity of food, so the axis covers the region the
-          // comparison actually happens in (see calorieAxisBounds).
+          // NOT zero-based, unlike the other intake charts. The bound drifts only a few
+          // tens of kcal across a 12-week window — on a 0-2,500 axis that's a handful of
+          // pixels, which is why the per-day figures still read as one fixed line. Bars
+          // here are a position against their own cap, not a quantity of food, so the
+          // axis covers the region the comparison actually happens in.
           min: axis.min,
           max: axis.max,
           afterFit: fixTrendYAxisWidth,
@@ -1814,25 +1544,17 @@ function renderWellnessCaloriesChart(entries) {
   });
 }
 
-// Maps a clock time (minutes since midnight) onto a noon-anchored axis, so a
-// bedtime/waketime pair that crosses midnight (the normal case) renders as
-// one contiguous span instead of wrapping/splitting at a raw 0:00 boundary.
-// Anchored at noon rather than a specific assumed bedtime — an earlier fixed
-// 18:00 anchor baked in an "everyone goes to bed in the evening" assumption
-// that doesn't generalize (e.g. to a night-shift sleep schedule) — noon is
-// the one instant of the day virtually guaranteed to fall in the middle of
-// anyone's *awake* period, so the same wrap-avoidance trick works regardless
-// of actual schedule.
+// Clock minutes onto a noon-anchored axis, so a bed/wake pair crossing midnight renders
+// as one contiguous span instead of splitting at 0:00. Noon, not an assumed bedtime: a
+// fixed 18:00 anchor baked in "everyone sleeps at night" and broke on a night shift,
+// while noon falls mid-waking-period for virtually any schedule.
 const SLEEP_AXIS_ANCHOR_MIN = 12 * 60;
 function sleepAxisValue(clockMin) {
   return (((clockMin - SLEEP_AXIS_ANCHOR_MIN) + 24 * 60) % (24 * 60)) / 60;
 }
 
-// Ticks are always whole-hour-aligned (both the anchor and the 3h step below
-// are multiples of 60 minutes), so the real clock time is always derivable
-// from the axis math directly via the same formatClockTime24 helper the
-// tooltip uses (wellness.js) — no fixed label lookup table needed.
-// Inverse of sleepAxisValue — shared by the ticks and the weekly-average tooltip.
+// Inverse of sleepAxisValue, shared by the ticks and the weekly-average tooltip. Both
+// the anchor and the 3h step are whole hours, so no label lookup table is needed.
 function sleepAxisClockMin(v) {
   return Math.round((SLEEP_AXIS_ANCHOR_MIN + v * 60) % (24 * 60));
 }
@@ -1841,12 +1563,8 @@ function sleepAxisTickLabel(v) {
   return formatClockTime24(sleepAxisClockMin(v));
 }
 
-// Rounds the actual earliest-bedtime/latest-waketime span (in axis units,
-// across the pairs actually being charted) out to the nearest 3-hour tick
-// with a little padding, instead of always reserving a fixed 18-hour window —
-// so the chart tightly fits real bed/wake times instead of wasting space on
-// hours nobody actually sleeps through. Falls back to the old 0-18 default
-// only when there's no valid data to compute a range from.
+// The real bed-to-wake span rounded out to a 3-hour tick, rather than a fixed 18-hour
+// window that wastes space on hours nobody sleeps through. 0-18 only with no data.
 function computeSleepAxisRange(shiftedPairs) {
   if (shiftedPairs.length === 0) return { axisMin: 0, axisMax: 18 };
   const min = Math.min(...shiftedPairs.map((p) => p.start));
@@ -1864,10 +1582,8 @@ function lerpHex(hexA, hexB, t) {
   return `rgb(${rgb.join(',')})`;
 }
 
-// Red -> amber -> green as duration goes from "minimum" (half the target) up
-// to the target itself, reusing the app's own existing expense/calories/
-// income colors rather than inventing new ones. Duration at or below the
-// minimum is solid red; at or above target is solid green.
+// Red -> amber -> green from half the target up to the target, in the app's own
+// expense/calories/income colours. Solid at either end.
 function sleepStatusColor(durationHr, targetHr) {
   const minHr = targetHr / 2;
   const ratio = Math.min(1, Math.max(0, (durationHr - minHr) / (targetHr - minHr)));
@@ -1884,10 +1600,8 @@ function renderWellnessSleepChart(entries) {
   const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
   const dates = trailingDatesForCategory(sleepEntries, WELLNESS_METRICS_DAYS);
 
-  // Per date, only the single longest bed/wake-bearing entry is drawn (e.g.
-  // a nap logged separately from the night's sleep) — dates where no entry
-  // has bed/wake data (only ever a plain duration number) are left as a gap
-  // rather than falling back to the old bottom-anchored bar style.
+  // Only the longest bed/wake-bearing entry per date, so a nap logged separately
+  // doesn't compete with the night. A date with only a duration is left as a gap.
   const bestByDate = new Map();
   sleepEntries.forEach((e) => {
     if (e.sleepBedMin === null || e.sleepWakeMin === null) return;
@@ -1895,11 +1609,8 @@ function renderWellnessSleepChart(entries) {
     if (!current || e.amount > current.amount) bestByDate.set(e.date, e);
   });
 
-  // Shift every shown date's bed/wake pair onto the noon-anchored axis once,
-  // up front — both to derive the axis's own min/max range below and to
-  // reuse when building the chart data, so the shift math and the "is this
-  // pair valid" check (wake must land after bed once shifted) happen in
-  // exactly one place.
+  // Shifted once up front, feeding both the axis range and the chart data, so the shift
+  // and the validity check (wake must land after bed) live in one place.
   const shiftedByDate = new Map();
   const validShiftedPairs = [];
   dates.forEach((d) => {
@@ -1925,9 +1636,9 @@ function renderWellnessSleepChart(entries) {
     return [start, end];
   });
 
-  // Averaged in noon-anchored AXIS units rather than raw clock minutes: the shift has
-  // already unwrapped midnight, so a plain mean works where a mean of clock times
-  // would average 23:30 and 00:30 into midday.
+  // Averaged in AXIS units, not clock minutes: the shift has already unwrapped
+  // midnight, so a plain mean works where clock times would average 23:30 and 00:30
+  // into midday.
   const bedAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null));
   const wakeAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null));
 
@@ -1949,19 +1660,15 @@ function renderWellnessSleepChart(entries) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      // Matching the other charts in the section — without it the cursor lands on
-      // whichever average line happens to be nearest instead of the day's bar.
+      // Without it the cursor lands on whichever average line is nearest, not the bar.
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         tooltip: {
-          // Nights with no bed/wake pair plot as a gap; index mode would otherwise
-          // hand them over as an empty row.
+          // Nights with no pair plot as a gap; index mode would hand them over empty.
           filter: (item) => item.raw !== null && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
-            // One labelled field per line, like every other chart in this section,
-            // rather than the three packed into a single run-on row.
             label: (item) => {
               const r = rangeByDate.get(item.label);
               if (!r) return '';
@@ -1972,8 +1679,7 @@ function renderWellnessSleepChart(entries) {
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // Flush-left and last, the same placement every other chart in the
-            // section gives its reference figures.
+            // Flush left and last, like every reference figure in the section.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined || bedAvg[i] === null) return '';
@@ -2000,8 +1706,7 @@ function renderWellnessSleepChart(entries) {
   });
 }
 
-// Convert any activity amount to minutes so steps and timed entries
-// are comparable on the same chart. ~100 steps/min is a typical walking pace.
+// Steps and timed entries onto one comparable scale. ~100 steps/min is walking pace.
 function toActivityMinutes(amount, unit) {
   const u = (unit || '').toLowerCase().trim();
   if (u === 'steps' || u === 'step') return Math.round(amount / 100);
@@ -2009,37 +1714,31 @@ function toActivityMinutes(amount, unit) {
   return amount; // 'min' or unknown — use as-is
 }
 
-// weightKg / heightM² — computed here (not asked of any LLM) since it's shared by
-// the State Trend & Forecast chart's BMI line, the Body Mass tooltip and insight.js's
-// report data.
+// weightKg / heightM². Computed, never asked of an LLM, and shared by the BMI line, the
+// Body Mass tooltip and insight.js.
 function computeBmi(weightKg, heightCm) {
   const heightM = heightCm / 100;
   return Math.round((weightKg / (heightM * heightM)) * 10) / 10;
 }
 
-// Descriptions like "NEAT (Non-Exercise Activity Thermogenesis)" get
-// truncated to just "NEAT" for display — the parenthetical explanation
-// doesn't fit the legend/tooltip and isn't needed once you know the term.
+// "NEAT (Non-Exercise Activity Thermogenesis)" -> "NEAT"; the parenthetical doesn't fit
+// a legend and isn't needed once you know the term.
 function shortActivityLabel(description) {
   return description.split(' (')[0].trim();
 }
 
-// NEAT and Strength training get the app's blue and green rather than whichever
-// hue their alphabetical position happens to land on — they're the two segments
-// read most often, and a generated hue slides out from under them the moment a
-// new activity description is logged. Keyed on the SHORTENED label, so
-// "NEAT (Non-Exercise Activity Thermogenesis)" matches as well.
+// The two segments read most often, pinned rather than left to whatever hue their
+// alphabetical position lands on — a generated one slides out from under them the
+// moment a new description is logged. Keyed on the SHORTENED label.
 const PINNED_ACTIVITY_COLORS = new Map([
   ['neat', '#3b82f6'],
   ['strength training', '#16a34a'],
 ]);
 
-// Every other description still gets an evenly-spaced generated hue, but drawn
-// from the color circle MINUS a band around each pinned hue — otherwise a third
-// activity can land on a near-identical blue or green and the pinning buys
-// nothing. The surviving arcs are measured end to end and the remaining hues
-// spaced evenly along that total, so they stay as far from each other as the
-// reduced range allows instead of bunching at one edge.
+// Everything else gets a generated hue from the colour circle MINUS a band around each
+// pinned one, otherwise a third activity lands on a near-identical blue and the pinning
+// buys nothing. The surviving arcs are measured end to end and the hues spread evenly
+// along that total, so they stay as far apart as the reduced range allows.
 const RESERVED_ACTIVITY_HUES = [142, 217]; // the two pinned colors above
 const RESERVED_ACTIVITY_HUE_MARGIN = 25;
 
@@ -2073,10 +1772,8 @@ function renderWellnessActivityChart(entries) {
   const activityEntries = entries.filter((e) => (e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null);
   const dates = trailingDatesForCategory(activityEntries, WELLNESS_METRICS_DAYS);
 
-  // One stacked segment per description (e.g. NEAT / Resistance / Cardio)
-  // instead of a single summed bar, so each day's activity composition is
-  // visible at a glance, not just its total — evenly-spaced hues the same
-  // way renderAccountCompositionChart colors an arbitrary-length category list.
+  // One stacked segment per description rather than a summed bar, so each day's
+  // composition shows and not just its total.
   const descriptions = [...new Set(activityEntries.map((e) => e.description || 'Other'))].sort();
   const byDescription = new Map(descriptions.map((d) => [d, new Map()]));
   activityEntries.forEach((e) => {
@@ -2086,11 +1783,9 @@ function renderWellnessActivityChart(entries) {
     byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
   });
 
-  // Calories burned per day, on its own left-hand axis (minutes and kcal are
-  // different scales, so this is a deliberate dual-axis chart). Every entry gets a
-  // figure via activityEntryKcal — its own Calculate-derived amount2, else its
-  // minutes costed at ACTIVITY_MET and that day's weight. Entries without amount2
-  // used to be skipped outright, which left a logged activity day with no kcal dot.
+  // Burn per day on its own axis — minutes and kcal are different scales, so this is a
+  // deliberate dual-axis chart. Every entry gets a figure via activityEntryKcal, so an
+  // entry without amount2 no longer leaves a logged day with no dot.
   const activityWeightForDate = carryForwardWeightByDate(weightByDateMap(entries.filter((e) => e.category === 'Weight' && e.amount !== null)), dates);
   const caloriesByDate = new Map();
   activityEntries.forEach((e) => {
@@ -2104,10 +1799,9 @@ function renderWellnessActivityChart(entries) {
   const descriptionColors = descriptions.map((d) => pinnedColorFor(d)
     ?? `hsl(${generatedHues[nextGeneratedHue++]}, 65%, 55%)`);
 
-  // Everything on this chart is plotted NEGATIVE so the whole thing hangs below the
-  // x-axis: minutes and calories are both what a day spent, not what it accumulated,
-  // and the mirrored form says that at a glance. The magnitudes are what's reported
-  // in ticks and tooltips — only the geometry is flipped.
+  // Everything plots NEGATIVE so the chart hangs below the axis: minutes and calories
+  // are both what a day spent, not what it accumulated. Only the geometry is flipped —
+  // ticks and tooltips report the magnitudes.
   const activityDatasets = descriptions.map((d, i) => ({
     type: 'bar',
     label: shortActivityLabel(d),
@@ -2119,14 +1813,10 @@ function renderWellnessActivityChart(entries) {
 
   const hasData = activityDatasets.some((ds) => ds.data.some((v) => v !== 0));
 
-  // Each dot is scored against the kcal that day's own body mass would burn at
-  // ACTIVITY_TARGET_MIN (activityTargetKcal — the same figure the calorie bound's
-  // activity term uses, so the two can't disagree). Met or beaten is green, short by
-  // up to ACTIVITY_NEAR_TARGET_FRACTION is gray, further short is red. The dashed
-  // line itself is in MINUTES on the other axis, so it can't be the comparison: a
-  // day can clear the minutes target on a walk and still burn far less than a day
-  // that lifted, which is exactly what these colors surface. Without a body mass for
-  // that day there's no target to score against, so the dot stays neutral purple.
+  // Scored against what that day's own body mass would burn at ACTIVITY_TARGET_MIN —
+  // the same activityTargetKcal the calorie bound uses, so the two can't disagree. Met
+  // is green, short by up to ACTIVITY_NEAR_TARGET_FRACTION gray, further short red.
+  // Without a body mass there's no target, so the dot stays neutral violet.
   const dotColor = (date, kcal) => {
     const weightKg = activityWeightForDate.get(date) ?? null;
     if (kcal === null || weightKg === null) return '#7c3aed';
@@ -2135,10 +1825,8 @@ function renderWellnessActivityChart(entries) {
     return target - kcal <= target * ACTIVITY_NEAR_TARGET_FRACTION ? '#9ca3af' : '#dc2626';
   };
 
-  // Dot-per-day series rather than a connected line — each day's calorie
-  // burn is its own independent figure (some days have none logged at all,
-  // which a connected line would misleadingly bridge over as a trend).
-  // Scored on the positive figures, plotted negated — same mirror as the bars.
+  // Dots, not a connected line: each day's burn is independent, and a line would bridge
+  // the unlogged days as though they were a trend.
   const caloriesData = dates.map((date) => (caloriesByDate.has(date) ? caloriesByDate.get(date) : null));
   const caloriesDataset = {
     type: 'line',
@@ -2154,31 +1842,19 @@ function renderWellnessActivityChart(entries) {
     order: 0,
   };
 
-  // The reference line is the PLANNED BURN, on the kcal axis — not the flat
-  // minutes target it used to be. That line sat on the other axis from the dots
-  // it appeared to judge, so a day could clear it on a walk while burning far
-  // less than a day that lifted; the dots were already scored against this
-  // figure instead, and the visible line now matches what scores them.
-  //
-  // It moves day to day because activityTargetKcal is MET x that day's own
-  // carried-forward body mass x ACTIVITY_TARGET_MIN — so it falls as body mass
-  // does. Stepped, since the weight is carried forward between weigh-ins and the
-  // figure genuinely holds flat until the next one; a sloped line would imply an
-  // interpolation that isn't happening. A day with no body mass on file has no
-  // figure, so the line breaks there rather than inventing one.
+  // PLANNED BURN on the kcal axis, not the flat minutes target it used to be — that sat
+  // on the other axis from the dots it appeared to judge, so a day could clear it on a
+  // walk while burning less than a day that lifted. It moves day to day because
+  // activityTargetKcal scales with body mass. No body mass, no figure, so it breaks
+  // there rather than inventing one.
   const plannedBurnKcal = dates.map((date) => {
     const weightKg = activityWeightForDate.get(date) ?? null;
     return weightKg === null ? null : activityTargetKcal(weightKg);
   });
 
-  // Marked as a cap across each day's own column — a floating bar (`[from, to]`)
-  // with `grouped: false` so it overlays rather than sits beside, exactly as the
-  // Caloric Intake and Calorie Balance charts mark their own per-day figures.
-  // It used to be a dashed line, which was right while the target was a flat
-  // number of minutes; now that it moves with each day's body mass, a line
-  // spanning the window would read as one shared limit no matter how it's dashed,
-  // while a mark per column says the figure belongs to that day and no other.
-  // Thickness is a fraction of the kcal range so it stays a hairline at any scale.
+  // A cap per column, the same mark Caloric Intake and Calorie Balance use. It was a
+  // dashed line while the target was flat; now that it moves with body mass, a line
+  // spanning the window would read as one shared limit however it's dashed.
   const burnMagnitudes = [
     ...caloriesData.filter((v) => v !== null),
     ...plannedBurnKcal.filter((v) => v !== null),
@@ -2191,16 +1867,14 @@ function renderWellnessActivityChart(entries) {
     yAxisID: 'y1',
     backgroundColor: boundMarkColor(),
     grouped: false,
-    // Chart.js draws highest order first, so the lowest paints last and sits on top:
-    // bars (2), then the weekly average and this cap (both 1, the cap listed second
-    // so it wins the tie), then the dots (0) above everything.
+    // Lowest order paints last: bars (2), the weekly average and this cap (both 1, the
+    // cap second so it wins the tie), then the dots (0) above everything.
     order: 1,
     isTargetLine: true,
   };
 
-  // Averaged on the kcal axis, not the minutes one: Planned Burn is the figure the
-  // week is being compared against, and it lives there. Negated like the dots it
-  // averages.
+  // On the kcal axis, not the minutes one — Planned Burn lives there, and it's what the
+  // week is compared against. Negated like the dots it averages.
   const weeklyBurnAvg = weeklyAverageSeries(caloriesData);
   const weeklyBurnDataset = weeklyAverageDataset(
     '7-Day Average Burn',
@@ -2227,19 +1901,15 @@ function renderWellnessActivityChart(entries) {
           padding: { top: 40 },
         },
         tooltip: {
-          // Empty slots, and the cap — a floating bar would report itself as a
-          // `[from, to]` pair, so its figure is stated properly in afterBody
-          // instead, the same way Caloric Intake handles its own cap.
+          // Empty slots and the cap, whose `[from, to]` pair goes to afterBody instead.
           filter: (item) => item.raw !== null && !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
-          // Rows in dataset order. Without this Chart.js hands them over sorted by
-          // the `order` property that controls DRAW order, which put the dots
-          // (order: 0) above the bars, away from the Planned Burn figure below
-          // that they should be read against.
+          // Dataset order. Without it Chart.js sorts by `order`, which controls DRAW
+          // order, and put the dots above the bars — away from the Planned Burn figure
+          // they should be read against.
           itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
-            // Each dot's swatch is the scored colour it was actually drawn in,
-            // rather than the dataset's single default.
+            // Each dot's swatch takes the scored colour it was drawn in.
             labelColors: (item) => {
               const ds = item.dataset;
               const fill = Array.isArray(ds.pointBackgroundColor)
@@ -2247,18 +1917,15 @@ function renderWellnessActivityChart(entries) {
                 : (ds.pointBackgroundColor ?? ds.backgroundColor);
               return { borderColor: fill, backgroundColor: fill };
             },
-            // Signed the same way the two axes are: calories keep the minus (energy
-            // spent), minutes report the magnitude they actually were.
+            // Signed like the axes: calories keep the minus, minutes report magnitude.
+            // y1 is kcal, everything else minutes, so the unit follows the row's axis.
             label: (item) => {
-              // y1 is the kcal scale, everything else on this chart is minutes — so
-              // the unit follows the axis the row belongs to.
               const isKcal = item.dataset.yAxisID === 'y1';
               const v = Math.round(item.parsed.y);
               const text = `${item.dataset.label}: ${isKcal ? v : Math.abs(v)} ${isKcal ? 'kcal' : 'min'}`;
               return privacyMode ? maskDigits(text) : text;
             },
-            // The cap's own figure, last and flush-left via afterBody — the same
-            // placement Caloric Intake gives its bound, so the two read alike.
+            // Flush left and last, the placement Caloric Intake gives its own bound.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
@@ -2272,17 +1939,12 @@ function renderWellnessActivityChart(entries) {
       },
       scales: {
         x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
-        // kcal on the LEFT owning the gridlines, minutes on the right drawing none.
-        // The exception to this panel's left-axis-is-the-primary rule, and it earns
-        // it: the comparison this chart exists to make — Actual Burn against Planned
-        // Burn — happens entirely on the kcal scale, so the horizontal lines have to
-        // be spaced in kcal for that pair to be readable against them. The axis ids
-        // are untouched (bars default to `y`, the dots and the planned line name
-        // `y1`); only the sides move.
-        // Both scales run from 0 at the top down into the negative, since every
-        // series is plotted negated — but they label differently on purpose. Calories
-        // keep the minus sign: that energy left the body. Minutes drop it, because
-        // negative time spent is meaningless; their direction carries the meaning.
+        // kcal left with the gridlines, minutes right with none: the comparison this
+        // chart exists for — Actual against Planned Burn — happens on the kcal scale,
+        // so the lines have to be spaced in kcal. Only the sides move; the axis ids are
+        // untouched. Both run from 0 downward, since everything is negated, but they
+        // label differently: calories keep the minus because that energy left the body,
+        // minutes drop it because negative time is meaningless.
         y: {
           stacked: true,
           position: 'right',
@@ -2312,19 +1974,14 @@ function renderWellnessProteinChart(entries) {
   const byDate = new Map();
   proteinEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
 
-  // Each end of the band is marked with the section's own per-column cap rather
-  // than a dashed line spanning the window, so this chart's red mark reads as the
-  // same thing as every other chart's. The band is still a shaded region: the two
-  // line datasets survive purely to carry `fill: '+1'` (which shades from the
-  // upper line down to the NEXT dataset, so the pair must stay adjacent and in
-  // this order) with their own stroke turned off, and the caps are drawn over the
-  // top. A zero-width band (flat PROTEIN_TARGET_G, no per-kg range) collapses to
-  // a single row of caps with nothing to shade between.
+  // Both ends take the section's per-column cap, so this chart's mark means what every
+  // other chart's does. The band stays shaded: these two line datasets exist only to
+  // carry `fill: '+1'` (which shades down to the NEXT dataset, so the pair must stay
+  // adjacent and in this order) with their stroke off, and the caps draw over them. A
+  // zero-width band collapses to one row of caps with nothing to shade.
   //
-  // Shaded green, not red: unlike the Caloric Intake chart — where the shading
-  // marks the half you must stay OUT of — the region between these two lines is
-  // the one you're aiming to land in, and it sits behind bars scored in the same
-  // green.
+  // Green, not red: unlike Caloric Intake's shading, this region is the one you're
+  // aiming to land IN, and it sits behind bars scored in the same green.
   const bandFill = (value, extra = {}) => ({
     type: 'line',
     label: `${value} g band edge`,
@@ -2337,12 +1994,9 @@ function renderWellnessProteinChart(entries) {
     ...extra,
   });
 
-  // Green inside the band; the two ways of leaving it are NOT equivalent. Falling
-  // short of the floor is the miss that costs you muscle on a deficit, so it stays
-  // red. Going over the top end isn't a failure — just past the point where more
-  // protein buys anything — so it goes gray rather than being scored either way. A
-  // day with nothing logged takes the green, since 0 g is a missing log rather than
-  // a day without protein (and a zero-height bar is invisible regardless).
+  // The two ways of leaving the band are NOT equivalent. Under the floor is the miss
+  // that costs muscle on a deficit, so red. Over the top isn't a failure, just past the
+  // point where more protein buys anything, so gray. An unlogged day takes the green.
   const PROTEIN_OVER_BAND_COLOR = '#9ca3af';
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
@@ -2350,8 +2004,7 @@ function renderWellnessProteinChart(entries) {
     return values[i] > band.max ? PROTEIN_OVER_BAND_COLOR : '#dc2626';
   });
 
-  // This axis is zero-based and auto-topped, so its span is whatever the tallest
-  // thing on it is — a bar or the band's own top end.
+  // Zero-based and auto-topped, so the span is whatever is tallest — a bar or the band.
   const capHalf = boundCapHalf(Math.max(band.max, ...values, 1));
   const capFor = (value, label) => boundCapDataset(label, new Array(dates.length).fill(value), capHalf, { isTargetLine: true });
 
@@ -2364,8 +2017,7 @@ function renderWellnessProteinChart(entries) {
     ]
     : [capFor(band.min, `${band.min} g target`)];
 
-  // Logged days only, so `values`' zero-for-nothing-logged stand-ins don't pull the
-  // week under the band's floor.
+  // Logged days only, so the zero stand-ins don't pull the week under the band's floor.
   const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
@@ -2386,15 +2038,13 @@ function renderWellnessProteinChart(entries) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      // Matching the other charts in the section — without it the cursor lands on
-      // the average line instead of the day's bar, and that row is filtered out.
+      // Without it the cursor lands on the average line, not the bar.
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         tooltip: {
-          // The band's two lines are the same constant on every day, so as datasets
-          // they'd repeat as identical rows on every hover. They're filtered out here
-          // and stated once by afterBody below instead.
+          // The band's lines are the same constant every day, so as rows they'd repeat
+          // identically on every hover. Stated once by afterBody instead.
           filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
@@ -2402,10 +2052,8 @@ function renderWellnessProteinChart(entries) {
               const text = `Actual Intake: ${item.parsed.y} g`;
               return privacyMode ? maskDigits(text) : text;
             },
-            // Both ends of the band, flush left and last — the same Actual/Planned
-            // shape Caloric Intake and Calorie Balance use. A flat PROTEIN_TARGET_G
-            // with no per-kg range collapses the band to one figure, so it reads as a
-            // single target rather than a Min and Max that happen to be equal.
+            // Both ends, flush left and last — the Actual/Planned shape the other charts
+            // use. A zero-width band reads as one target, not an equal Min and Max.
             afterBody: (items) => {
               const lines = band.max > band.min
                 ? [`Planned Min: ${band.min} g`, `Planned Max: ${band.max} g`]
@@ -2447,34 +2095,26 @@ function linearRegressionSlope(xs, ys) {
   return linearRegression(xs, ys).slope;
 }
 
-// Average of a Map's values (e.g. calories/activity/sleep summed per logged
-// date) — averaged over days that actually HAVE a log, not the calendar
-// length of the window.
+// Over days that actually HAVE a log, not the calendar length of the window.
 function avg(map) {
   return [...map.values()].reduce((a, b) => a + b, 0) / map.size;
 }
 
-// Parse/format in UTC throughout: `new Date("YYYY-MM-DD")` parses as UTC
-// midnight, and formatting that back with the LOCAL timezone can roll it
-// back a day in any negative-UTC-offset zone — staying in UTC end-to-end
-// avoids that mismatch.
+// UTC end to end: `new Date("YYYY-MM-DD")` parses as UTC midnight, and formatting that
+// back in local time rolls it back a day in any negative-offset zone.
 function parseIsoDateUTC(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return Date.UTC(y, m - 1, d);
 }
 
-// Window size (in LOGGED POINTS, not calendar days) for the Weight Trend &
-// Forecast chart's "State Trend & Forecast" line.
+// In LOGGED POINTS, not calendar days.
 const WEIGHT_TREND_WINDOW_SIZE = 5;
 
-// Centered simple moving average over the sorted per-day weight series:
-// each point is averaged together with its nearest neighbors on both sides,
-// so one noisy reading gets diluted by its surroundings instead of showing
-// up as a spike (or, with a trailing-only average, dragging the line up to
-// meet it and lagging behind afterwards). Windowing by logged points rather
-// than elapsed days means it smooths the same way whether entries are daily
-// or sporadic — unlike a time-decayed average, whose smoothing effectively
-// vanishes once gaps between weigh-ins approach the decay window.
+// Centered moving average: each point is diluted by its neighbours on both sides, so a
+// noisy reading doesn't spike — or, with a trailing-only average, drag the line up and
+// lag behind afterwards. Windowing by logged points rather than elapsed days smooths
+// the same whether entries are daily or sporadic, where a time-decayed average would
+// stop smoothing once the gaps approach its decay window.
 function computeWeightTrend(weightByDate, windowSize = WEIGHT_TREND_WINDOW_SIZE) {
   const dates = [...weightByDate.keys()].sort();
   const values = dates.map((d) => weightByDate.get(d));
@@ -2489,17 +2129,14 @@ function computeWeightTrend(weightByDate, windowSize = WEIGHT_TREND_WINDOW_SIZE)
   return trend;
 }
 
-// A net change this small in kg over ~10 days reads as a genuine stall
-// rather than normal day-to-day fluctuation (water, sodium, cycle) — checked
-// against the already-smoothed Weight Trend line, not raw weigh-ins, which
-// are noisy enough day-to-day to trip a naive threshold on their own.
+// A net change this small over ~10 days is a genuine stall rather than water, sodium or
+// cycle. Checked against the SMOOTHED line — raw weigh-ins trip a naive threshold.
 const PLATEAU_WINDOW_DAYS = 10;
 const PLATEAU_THRESHOLD_KG = 0.3;
 
-// Returns how many days the trend has actually held flat, or null if
-// there's not enough logged history spanning the full window to tell (a
-// couple of sparse entries can't confirm 10 days of flatness, only fail to
-// disprove it) or the trend has moved enough to not count as a plateau.
+// How many days the trend has held flat, or null — either the trend moved, or there
+// isn't enough history spanning the window to tell (sparse entries can't confirm 10
+// flat days, only fail to disprove them).
 function detectPlateau(trendMap) {
   const dates = [...trendMap.keys()].sort();
   if (dates.length < 3) return null;
@@ -2516,19 +2153,16 @@ function detectPlateau(trendMap) {
   return Math.round((lastMs - parseIsoDateUTC(windowStartDate)) / 86400000);
 }
 
-// The PLANNED trajectory — eating exactly the calculated bound Eᵢₙ and hitting
-// ACTIVITY_TARGET_MIN every day. Shared with the Health Formula Playground so its
-// printed A / B / m∞ / t and the State Trend & Forecast forecast are one piece of arithmetic
-// rather than two copies that can disagree.
+// The PLANNED trajectory — eating exactly Eᵢₙ and hitting ACTIVITY_TARGET_MIN every
+// day. Shared with the Formula Playground, so its printed A / B / m∞ / t and the chart's
+// forecast are one piece of arithmetic rather than two that can disagree.
 //
-// Closed-form solution of dm/dt = (Eᵢₙ − A − B·m)/ρ at fixed intake, rather than a
-// day-by-day loop: it's an ordinary linear ODE, so the exact answer is one log.
-// Verified against numeric integration (agrees to the discrete step's rounding).
+// Closed form of dm/dt = (Eᵢₙ − A − B·m)/ρ, not a day-by-day loop: it's a linear ODE, so
+// the exact answer is one log. Verified against numeric integration.
 //
-// Works in both directions — a surplus makes m∞ heavier than m and the same log
-// gives the days to gain — but it can only reach targets that lie between m and
-// m∞. A target past the asymptote is genuinely unreachable at that intake, which
-// is reported rather than extrapolated.
+// Works both directions — a surplus puts m∞ above m and the same log gives days to gain
+// — but only reaches targets BETWEEN m and m∞. Past the asymptote is genuinely
+// unreachable at that intake, and is reported rather than extrapolated.
 function projectPlanDays({ intakeKcal, weightKg, heightCm, age, sex, met, tau, kappa, goalKg }) {
   const a = 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
   const b = 10 + (met * tau * kappa) / ML_O2_PER_KCAL;
@@ -2549,9 +2183,8 @@ function projectPlanDays({ intakeKcal, weightKg, heightCm, age, sex, met, tau, k
   return { a, b, equilibriumKg, days, etaIso: isoFromDate(eta), status: 'ok' };
 }
 
-// The same plan, fed from saved Settings rather than the playground's live inputs —
-// so the chart and the playground agree whenever the playground's boxes still hold
-// what's on the sheet. Null without the profile the BMR needs.
+// The same plan from saved Settings rather than the playground's live inputs, so the
+// two agree whenever its boxes still hold what's on the sheet. Null without a profile.
 function planProjectionFromSettings(entries, weightKg, goalKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
@@ -2559,8 +2192,7 @@ function planProjectionFromSettings(entries, weightKg, goalKg) {
   if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female')) return null;
 
   return projectPlanDays({
-    // Eᵢₙ itself — the calculated bound is BMR + activity-at-target − the deficit
-    // WEEKLY_FAT_LOSS_KG implies, which is exactly what the playground computes.
+    // Eᵢₙ itself: the calculated bound is exactly what the playground computes.
     intakeKcal: getCalorieBoundKcal(entries),
     weightKg,
     heightCm,
@@ -2575,9 +2207,8 @@ function planProjectionFromSettings(entries, weightKg, goalKg) {
 
 function calcProjection(entries) {
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
-  // The bound's figure only — which side of it the user should be on doesn't
-  // enter the arithmetic here, so only the number is read. Used as the stand-in
-  // intake level when nothing has been logged.
+  // The figure only; which side to be on doesn't enter this arithmetic. Stands in as
+  // the intake level when nothing has been logged.
   const calorieTarget = getCalorieBoundKcal(entries);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
@@ -2616,26 +2247,24 @@ function calcProjection(entries) {
 
   let slope;
   let method;
-  // Set only by the habit branch below, and only with a profile on file: the
-  // exponential model's three coefficients. Null means project as a straight line.
+  // The exponential model's coefficients; null means project as a straight line.
   let decay = null;
 
-  // The PLAN wins whenever the profile allows it, so this chart's arrival date is the
-  // same one the Health Formula Playground prints. That makes the forecast a statement
-  // of the plan rather than of recent behaviour: eat over the bound for a fortnight
-  // and this date does NOT slip. The Calorie Balance chart below is where actual
-  // intake vs. plan is visible day by day.
+  // The PLAN wins whenever the profile allows it, so this arrival date is the one the
+  // Formula Playground prints. That makes the forecast a statement of the plan, not of
+  // recent behaviour: eat over the bound for a fortnight and it does NOT slip. Calorie
+  // Balance is where actual-vs-plan shows day by day.
   const plan = planProjectionFromSettings(entries, lastWeight, weightGoal);
   if (plan !== null && plan.status !== 'reached') {
     decay = {
       perKg: plan.b,
-      // No sleep factor: the plan doesn't model sleep, and dividing ρ here would
-      // change the arrival date away from the playground's t.
+      // No sleep factor: the plan doesn't model sleep, and dividing ρ would move the
+      // arrival date away from the playground's t.
       kcalPerKg: GENERIC_KCAL_PER_KG_FAT,
       equilibriumKg: plan.equilibriumKg,
     };
-    // Rate at today's mass, for the ETA line's "~x kg/week" note. The trajectory
-    // itself decelerates, which the decay coefficients above carry.
+    // Rate at today's mass, for the ETA line's note. The trajectory itself decelerates,
+    // which the coefficients above carry.
     slope = (getCalorieBoundKcal(entries) - (plan.a + plan.b * lastWeight)) / GENERIC_KCAL_PER_KG_FAT;
     method = 'plan';
   } else if (caloriesByDate.size > 0 || activityKcalByDate.size > 0) {
@@ -2643,27 +2272,16 @@ function calcProjection(entries) {
     const avgActivityKcal = activityKcalByDate.size > 0 ? avg(activityKcalByDate) : 0;
     const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
 
-    // Negative balance = caloric deficit = weight loss. avgActivityKcal
-    // already folds in the *5-per-minute estimate for any entry lacking
-    // a real kcal figure, so it's added here directly rather than
-    // re-deriving it from minutes.
-    //
-    // Measured against MAINTENANCE, not calorieTarget: the target is already
-    // maintenance minus the planned deficit, so eating exactly it once produced a
-    // ~zero balance and a "no net change" forecast — precisely when the planned
-    // WEEKLY_FAT_LOSS_KG should have been delivered.
-    //
-    // Same shape as the bound's own basis (BMR + activity, no multiplier — see
-    // calorieBoundDetail), differing only in which activity figure: the window's
-    // actual logged burn here, the ACTIVITY_TARGET_MIN one there.
+    // Negative balance = deficit = loss. Against MAINTENANCE, not calorieTarget: the
+    // target is already maintenance minus the planned deficit, so eating exactly it
+    // produced a ~zero balance and a "no net change" forecast — precisely when the
+    // planned loss should have been delivered. Same shape as the bound's own basis,
+    // differing only in the activity figure: logged burn here, target burn there.
     const resting = restingMaintenanceKcal(entries);
     const maintenance = resting !== null
       ? resting + avgActivityKcal
-      // No profile on file, so there's no BMR to work from and no calculated
-      // bound either — getCalorieBoundKcal fell back to the flat
-      // CALORIE_TARGET_KCAL setting, a number the user chose directly with no
-      // deficit arithmetic inside it. Treating that as the reference is the
-      // best available baseline in that case.
+      // No profile, so no BMR and no calculated bound — the flat CALORIE_TARGET_KCAL
+      // the user chose directly is the best baseline available.
       : calorieTarget + avgActivityKcal;
 
     const balance = avgCalories - maintenance;
@@ -2671,29 +2289,24 @@ function calcProjection(entries) {
     const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
     slope = baseSlope * sleepRatio;
 
-    // Maintenance isn't a constant as weight changes — it's affine in body mass,
-    // so holding intake fixed makes the trajectory an exponential decay toward
-    // the weight where that intake IS maintenance, not a straight line. Both
-    // terms scale with mass: BMR by its 10·m coefficient, and the logged activity
-    // burn because metKcal is proportional to weight (the same kg of walking
-    // costs less at a lighter body). Only available with a profile — without a
-    // BMR there's no A/B to split maintenance into, so `decay` stays null and the
-    // straight-line projection below is used unchanged.
+    // Maintenance is affine in body mass, not constant, so a fixed intake decays
+    // exponentially toward the weight where that intake IS maintenance. Both terms
+    // scale with mass: BMR by its 10·m coefficient, logged burn because metKcal is
+    // proportional to weight. Needs a profile — without a BMR there's no A/B to split
+    // maintenance into, so `decay` stays null and the straight line is used.
     if (resting !== null && lastWeight > 0) {
       const perKg = 10 + avgActivityKcal / lastWeight;
       const weightIndependent = maintenance - perKg * lastWeight;
       decay = {
         perKg,
-        // Sleep scales the whole rate, so it divides the energy density rather
-        // than entering the equilibrium — the destination is the same either way,
-        // only the speed of arrival changes.
+        // Sleep scales the rate, so it divides the energy density rather than entering
+        // the equilibrium — same destination, different speed of arrival.
         kcalPerKg: GENERIC_KCAL_PER_KG_FAT / sleepRatio,
         equilibriumKg: (avgCalories - weightIndependent) / perKg,
       };
     }
 
-    // The formula scales by sleep, so a missing sleep log genuinely leaves it
-    // working with partial habit data.
+    // The formula scales by sleep, so a missing sleep log really is partial data.
     const allPresent = caloriesByDate.size > 0 && activityKcalByDate.size > 0 && sleepByDate.size > 0;
     method = allPresent ? 'full' : 'partial';
   } else {
@@ -2703,17 +2316,16 @@ function calcProjection(entries) {
     method = 'weight-only';
   }
 
-  // The slope is reported even when no forecast can be drawn, so the ETA line
-  // can show the rate instead of a bare "projection unavailable".
+  // Reported even with no forecast, so the ETA line can show the rate instead of a bare
+  // "projection unavailable".
   if (slope === 0) return { status: 'no-change', method, slope };
 
   const goingDown = weightGoal < lastWeight;
   if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method, slope };
 
-  // A fixed intake can only ever carry you to its own equilibrium weight, so a
-  // goal on the far side of it is never reached however long you hold the habit.
-  // The straight line couldn't express that — it always produced an arrival date
-  // — which is exactly the case this status exists to report.
+  // A fixed intake only ever carries you to its own equilibrium, so a goal on the far
+  // side is never reached. The straight line always produced a date regardless, which
+  // is what this status exists to report.
   if (decay !== null) {
     const gapNow = lastWeight - decay.equilibriumKg;
     const gapGoal = weightGoal - decay.equilibriumKg;
@@ -2722,9 +2334,7 @@ function calcProjection(entries) {
     }
   }
 
-  // Time to the goal: the straight line's own division, or the exponential
-  // model's closed form — t = (ρ/B)·ln[(m − m∞)/(m_g − m∞)], the exact solution
-  // of dm/dt = (E − A − B·m)/ρ rather than a day-by-day simulation of it.
+  // The straight line's division, or the closed form t = (ρ/B)·ln[(m − m∞)/(m_g − m∞)].
   const daysToGoal = decay !== null
     ? Math.round((decay.kcalPerKg / decay.perKg)
       * Math.log((lastWeight - decay.equilibriumKg) / (weightGoal - decay.equilibriumKg)))
@@ -2797,13 +2407,9 @@ function renderWellnessProjectionChart(entries) {
   const proj = calcProjection(entries);
   if (!proj) return;
 
-  // Progress meter: how far from the first logged weight to the goal —
-  // shown whenever there's a real start point and a distinct goal,
-  // regardless of trajectory status (even "wrong direction" is worth
-  // seeing visually, just in the danger color instead of the accent).
-  // Both readouts are kg — how far you've come and how far is left, in the same
-  // unit, so the pair can be compared directly. The percentage still drives the
-  // bar's width; it just isn't spelled out beside a kg figure any more.
+  // First logged weight to goal, shown whatever the trajectory status — "wrong
+  // direction" is worth seeing, just in the danger colour. Both readouts are kg so the
+  // pair compares directly; the percentage still drives the bar's width.
   const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
   const totalDelta = startWeight - weightGoal;
   if (Math.abs(totalDelta) >= 0.1) {
@@ -2824,15 +2430,10 @@ function renderWellnessProjectionChart(entries) {
     meterRemaining.classList.toggle('danger', isWrongDirection);
   }
 
-  // A projection that can't be drawn (already at goal, flat trend, or
-  // trending away from it) used to `return` here — but the chart was already
-  // destroyed at the top of this function, so the panel went fully blank and
-  // took the weight history, the smoothed trend line, and the goal line with
-  // it. None of those three depend on a projection existing. Now only the
-  // projected segment itself is dropped: the status line says why, and
-  // everything actually MEASURED stays on screen.
-  // The rate is included on the two "can't forecast" statuses so the line says
-  // something concrete rather than a bare "projection unavailable".
+  // An undrawable projection drops only the projected SEGMENT. It used to `return`
+  // here, but the chart is destroyed at the top of this function, so the panel went
+  // blank and took the history, trend and goal lines with it — none of which depend on
+  // a projection. The status line says why, and the rate keeps it concrete.
   const rateNote = () => {
     const kgPerWeek = Math.abs(proj.slope * 7).toFixed(2);
     const direction = proj.slope > 0 ? 'gaining' : 'losing';
@@ -2842,8 +2443,8 @@ function renderWellnessProjectionChart(entries) {
     reached: () => 'Goal reached! 🎉',
     'no-change': () => 'No net change at current habits',
     'wrong-direction': () => `Current habits trend away from goal — ${rateNote()}, so no arrival date can be projected`,
-    // The rate is real and pointed the right way, but it decays to zero before
-    // the goal: the intake these habits average IS maintenance at that weight.
+    // Right direction, but it decays to zero before the goal: the intake these habits
+    // average IS maintenance at that weight.
     asymptote: () => `Currently ${rateNote()}, but these habits level off around ${Math.round(proj.equilibriumKg * 10) / 10} kg — the goal isn't reachable without changing them`,
   }[proj.status];
   if (statusNote) {
@@ -2851,32 +2452,14 @@ function renderWellnessProjectionChart(entries) {
     etaEl.textContent = privacyMode ? maskDigits(note) : note;
   }
 
-  // Which model drew the forecast, said out loud. It decides the SHAPE of the
-  // projected line, and until now nothing on screen revealed it: the plan and
-  // habit paths both integrate maintenance as it falls with body mass, so their
-  // line is an exponential that visibly eases off; the body-mass-only fallback
-  // is a least-squares slope and is dead straight by construction. A line that
-  // looks straighter than expected is answered here rather than left a mystery.
-  const PROJECTION_METHOD_NOTE = {
-    plan: 'from your plan — the curve eases as body mass falls',
-    full: 'from recent habits — the curve eases as body mass falls',
-    partial: 'from recent habits (partial data) — the curve eases as body mass falls',
-    'weight-only': 'from the body-mass trend alone — a straight line, with no profile to model the slowdown',
-  };
-
   const hasProjection = proj.status === 'ok';
   const projPoints = hasProjection ? proj.projectedPoints : [];
 
-  // Companion to the weight meter above: the same journey measured in time
-  // rather than in kg. "Elapsed" is days since the first weigh-in (how long
-  // you've been at this), "to go" is the forecast's own remaining days — so the
-  // two bars together answer "how far along am I" on both axes at once, and a
-  // long time bar beside a short weight bar is itself the signal that progress
-  // is slower than the effort. Needs an actual arrival date, so it's hidden for
-  // any status that can't produce one.
+  // The same journey in time rather than kg: elapsed since the first weigh-in against
+  // the forecast's remaining days. A long time bar beside a short weight bar is itself
+  // the signal that progress is slower than the effort. Needs an arrival date.
   if (hasProjection) {
-    // Today's own Y-M-D re-parsed as UTC, so it's on the same footing as every
-    // other date here (see parseIsoDateUTC) rather than mixing zones.
+    // Re-parsed as UTC, so today sits on the same footing as every other date here.
     const todayMs = parseIsoDateUTC(isoFromDate(new Date()));
     const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(weightEntries[0].date)) / 86400000));
     const daysToGo = Math.max(0, proj.daysToGoal);
@@ -2893,12 +2476,6 @@ function renderWellnessProjectionChart(entries) {
       const toGoText = `${daysToGo} ${daysToGo === 1 ? 'day' : 'days'}`;
       timeRemaining.textContent = privacyMode ? maskDigits(toGoText) : toGoText;
     }
-
-    // The 'ok' status left this line blank, so a forecast that WAS drawn said
-    // nothing about itself. It now states its current rate and which model
-    // produced it, the same line the can't-forecast statuses already use.
-    const okNote = `Currently ${rateNote()} — projected ${PROJECTION_METHOD_NOTE[proj.method] ?? ''}`;
-    etaEl.textContent = privacyMode ? maskDigits(okNote) : okNote;
   }
 
   const histLabels = weightEntries.map((e) => e.date);
@@ -2908,8 +2485,8 @@ function renderWellnessProjectionChart(entries) {
   const projMap = new Map(projPoints.map((p) => [p.date, p.weight]));
   const lastDate = histLabels[histLabels.length - 1];
 
-  // Same-day duplicate weigh-ins (e.g. morning + evening) are averaged before
-  // smoothing, rather than letting whichever entry comes last silently win.
+  // Same-day weigh-ins are averaged before smoothing, rather than letting whichever
+  // came last silently win.
   const weightSumsByDate = new Map();
   weightEntries.forEach((e) => {
     const cur = weightSumsByDate.get(e.date) || { sum: 0, count: 0 };
@@ -2927,18 +2504,15 @@ function renderWellnessProjectionChart(entries) {
     plateauNote.classList.add('warning');
   }
 
-  // Daily history followed by weekly (then a single distant ETA) projected
-  // points must NOT be spaced as equal category ticks — that visually
-  // implies every gap is the same length. Plot on a true linear axis (day
-  // offset from the first date) instead, so a week gap actually takes up
-  // 7x the width of a one-day gap.
+  // Daily history then weekly projected points must NOT sit on equal category ticks,
+  // which would imply every gap is the same length. A true linear day-offset axis makes
+  // a week gap 7x the width of a one-day gap.
   const firstDateMs = parseIsoDateUTC(allLabels[0]);
   const dayOffset = (dateStr) => Math.round((parseIsoDateUTC(dateStr) - firstDateMs) / 86400000);
   const offsetToDateLabel = (offset) =>
     new Date(firstDateMs + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
-  // No raw per-reading series here — the Body Mass chart above already plots
-  // every reading, and this chart is the trend.
+  // No raw per-reading series: Body Mass already plots every reading, this is the trend.
   const datasets = [
     {
       label: 'State Trend & Forecast',
@@ -2951,8 +2525,8 @@ function renderWellnessProjectionChart(entries) {
       spanGaps: false,
       order: 4,
     },
-    // Omitted entirely rather than plotted empty when there's no drawable
-    // projection, so it doesn't sit in the legend claiming a forecast exists.
+    // Omitted rather than plotted empty, so it can't sit in the legend claiming a
+    // forecast exists.
     ...(hasProjection ? [{
       label: 'Projected',
       data: allLabels.map((d) => {
@@ -2962,15 +2536,13 @@ function renderWellnessProjectionChart(entries) {
         return { x: dayOffset(d), y };
       }),
       borderColor: '#6366f1',
-      // The one dash pattern used everywhere in the app, and the same width as
-      // the trend line this continues — it was [6, 4] at Chart.js's default
-      // width 3, which made the forecast the heaviest, longest-dashed line on a
-      // chart where it's the least certain thing shown, and left the red goal
-      // line beside it looking like a different kind of dash.
+      // The app's one dash pattern, at the width of the trend line it continues. At
+      // Chart.js's default width 3 the forecast was the heaviest line on the chart
+      // despite being the least certain thing on it.
       borderDash: [4, 4],
       borderWidth: 2,
-      // Line only — the shaded area under it read as a quantity, when all the
-      // forecast actually asserts is where the trend line goes.
+      // Line only — a shaded area read as a quantity, when all this asserts is where
+      // the trend goes.
       fill: false,
       tension: 0,
       pointRadius: 0,
@@ -2978,16 +2550,13 @@ function renderWellnessProjectionChart(entries) {
       order: 2,
     }] : []),
     {
-      // weightGoal, not proj.weightGoal — the latter is only set on an 'ok'
-      // projection, but the goal line is drawn either way.
+      // weightGoal, not proj.weightGoal — that's only set on an 'ok' projection, but
+      // the goal line is drawn either way.
       label: `${weightGoal} kg Goal`,
       data: allLabels.map((d) => ({ x: dayOffset(d), y: weightGoal })),
-      // Solid, matching the hairline caps the rest of the section marks its
-      // figures with — this used to be dashed, which made it the odd one out.
-      // It stays a continuous line rather than becoming caps like the others
-      // because this chart has no columns to cap: its x-axis is a true linear
-      // time scale carrying irregularly spaced history and a distant projected
-      // point, so there is nothing per-column for a mark to belong to.
+      // Solid, like the section's hairline caps. It stays a continuous LINE rather than
+      // caps because this chart has no columns: its x-axis is a linear time scale, so
+      // there's nothing per-column for a mark to belong to.
       borderColor: boundMarkColor(),
       borderWidth: 1.5,
       pointRadius: 0,
@@ -2997,48 +2566,31 @@ function renderWellnessProjectionChart(entries) {
     },
   ];
 
-  // Only set up when a height is on file — without it BMI can't be computed,
-  // and an axis with no correspondence to compute would just be a confusing
-  // empty scale, so the whole axis is skipped rather than shown broken.
-  // There's no separate BMI *line*: BMI is a fixed linear rescale of weight
-  // (see below), so a plotted BMI line would just exactly retrace the
-  // weight line pixel-for-pixel — the right-hand y1 axis alone already lets
-  // BMI be read straight off the existing weight line.
+  // Skipped without a height: BMI can't be computed, and an empty scale is worse than
+  // none. There's no BMI LINE either — BMI is a fixed linear rescale of weight, so it
+  // would retrace the weight line pixel for pixel, and the y1 axis alone lets it be
+  // read off that line.
   const heightCm = getSetting('HEIGHT_CM', null);
 
-  // BMI = weight × (1 / heightM²) — a fixed linear rescale of weight, not an
-  // independent quantity, which is exactly why there's no separate BMI line
-  // above: it would just retrace the weight line exactly. Left to auto-range
-  // on its own, Chart.js can pick a BMI axis span that doesn't correspond to
-  // the weight axis's span, so a given height on the chart would read as the
-  // wrong BMI off the right-hand axis even though the weight line there is
-  // correct. Deriving y1's min/max from the exact same weight range as y
-  // (via computeBmi) keeps the two axes true parallel twins — same shape,
-  // consistent correspondence, whatever ruler you read.
-  // Rounded to whole kg (not just padded) — a fractional min/max (e.g.
-  // 81.8–94.3) breaks Chart.js's own "nice round numbers" tick algorithm,
-  // which is what produced clean 1kg-apart gridlines (94, 93, 92, …) before
-  // any explicit min/max was set. Flooring/ceiling to whole numbers keeps
-  // that same clean stepping while still fixing the axis bounds so y1 can
-  // be derived from them.
-  // Raw weigh-ins are excluded — no longer plotted, so framing on them would
-  // reserve space for a line that isn't there. lastWeight stays: the projection
-  // starts from it.
+  // Left to auto-range, Chart.js can pick a BMI span that doesn't correspond to the
+  // weight span, so a point on the chart would read as the wrong BMI off the right axis.
+  // Deriving y1's bounds from the same weight range keeps the two true parallel twins.
+  //
+  // Rounded to whole kg, not just padded: a fractional min/max breaks Chart.js's own
+  // round-number tick algorithm, which is what produced the clean 1 kg gridlines.
+  //
+  // Raw weigh-ins are excluded since they're no longer plotted. lastWeight stays — the
+  // projection starts from it.
   const weightValues = [...trendMap.values(), ...projMap.values(), lastWeight, weightGoal]
     .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
   const weightMin = Math.min(...weightValues);
   const weightMax = Math.max(...weightValues);
   const weightPad = Math.max(0.5, (weightMax - weightMin) * 0.08);
 
-  // The goal end gets no padding: the projection stops there and nothing is ever
-  // plotted past it, so padding reserved a band of chart with nothing in it — a
-  // 70 kg goal was floored to 68, two empty kg below the lowest thing drawn. The
-  // axis now ends on the goal itself, which is the line everything is read
-  // against. Still floor/ceil'd to whole kg: the ticks below step by exactly 1
-  // from these bounds, so a fractional goal would otherwise put every gridline
-  // on a fractional number.
-  // Only when the goal really is the extreme — a reading that overshoots it pads
-  // normally, since then there IS something drawn beyond the goal to make room for.
+  // The goal end gets no padding: nothing is ever plotted past it, so padding reserved
+  // an empty band — a 70 kg goal floored to 68. Still floor/ceil'd to whole kg, since
+  // the ticks step by 1 from these bounds. Only when the goal really is the extreme; a
+  // reading that overshoots it pads normally, because then something IS drawn beyond.
   const yMin = weightMin < weightGoal
     ? Math.floor(weightMin - weightPad)
     : Math.floor(weightGoal);
@@ -3049,31 +2601,23 @@ function renderWellnessProjectionChart(entries) {
   const scales = {
     x: {
       type: 'linear',
-      // minRotation matches maxRotation so the labels sit at a fixed 45°, the
-      // same as every other Health chart's date axis, instead of Chart.js
-      // straightening them to horizontal whenever they happen to fit — which
-      // made this one chart's axis read differently from the ones stacked
-      // right below it, and flip angle as the window resized.
+      // min = max, so the labels hold a fixed 45° like the rest of the section instead
+      // of Chart.js straightening them whenever they happen to fit — which made this
+      // axis flip angle on resize.
       ticks: { maxTicksLimit: 24, maxRotation: 45, minRotation: 45, autoSkip: true, callback: offsetToDateLabel },
     },
     y: {
       min: yMin,
       max: yMax,
       afterFit: fixTrendYAxisWidth,
-      // Forced rather than left to Chart.js's auto step-size algorithm —
-      // once min/max are explicit (needed to lock the BMI axis to this same
-      // range), that algorithm stopped producing the clean constant 1kg
-      // steps it used to; pinning it directly guarantees 94, 93, 92, 91, …
-      // every time, independent of whatever heuristic picked the step before.
+      // Pinned: once min/max are explicit (needed to lock the BMI axis to this range),
+      // Chart.js's auto step-size stopped producing the clean 1 kg steps.
       ticks: { stepSize: 1, callback: maskedUnitTick('kg') },
     },
   };
   if (heightCm !== null) {
     scales.y1 = {
-      // Left as the exact (non-rounded) BMI equivalent of yMin/yMax — this
-      // is what keeps the axis a true twin of the weight axis, pixel for
-      // pixel. Rounding these would reintroduce the earlier bug where a
-      // given height on the chart read as the wrong BMI off this axis.
+      // Exact, not rounded — that's what keeps this a true pixel-for-pixel twin.
       min: computeBmi(yMin, heightCm),
       max: computeBmi(yMax, heightCm),
       position: 'right',
@@ -3081,10 +2625,8 @@ function renderWellnessProjectionChart(entries) {
       grid: { drawOnChartArea: false },
       ticks: {
         stepSize: 1,
-        // Chart.js's default ticks.includeBounds forces the exact min/max
-        // onto the axis as extra labels even when they land off the clean
-        // step grid (here: 25.3/33.2 alongside the evenly-stepped 27,28,29…)
-        // — turned off so only the evenly-spaced ticks are shown.
+        // Otherwise Chart.js forces the exact min/max on as extra labels off the step
+        // grid — 25.3/33.2 alongside an evenly-stepped 27, 28, 29.
         includeBounds: false,
         callback: maskedUnitTick('BMI', 1),
       },
@@ -3098,9 +2640,8 @@ function renderWellnessProjectionChart(entries) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        // Off, like every other Health Indicators chart. Chart.js draws the legend
-        // inside the canvas, so a legend here left this chart's plot area ~30px
-        // shorter than the rest of the section. Series are named in the tooltip.
+        // Off, like the rest of the section: Chart.js draws it inside the canvas, so a
+        // legend here left this plot area ~30px shorter. Series are named in the tooltip.
         legend: { display: false },
         tooltip: {
           callbacks: {
@@ -3113,16 +2654,11 @@ function renderWellnessProjectionChart(entries) {
     },
   });
 
-  // No line for a drawable projection: the arrival date and days remaining are
-  // already on the time meter, and the dashed segment shows the trajectory. etaEl
-  // is left to the statuses above, which explain why there's no forecast at all.
 }
 
-// Weight (kg) in effect on each of `dates`: the most recent weigh-in on or
-// before that day, carried forward. A BMR has to be computed for every day in
-// the window, not only the days a weigh-in happens to land on. Days before the
-// very first weigh-in fall back to that first reading — the closest thing on
-// file — rather than dropping off the chart entirely.
+// The most recent weigh-in on or before each date, carried forward — a BMR is needed
+// for every day in the window, not just the days a weigh-in lands on. Days before the
+// first reading fall back to it rather than dropping off the chart.
 function carryForwardWeightByDate(weightByDate, dates) {
   const weighInDates = [...weightByDate.keys()].sort();
   if (weighInDates.length === 0) return new Map();
@@ -3140,33 +2676,26 @@ function carryForwardWeightByDate(weightByDate, dates) {
   return carried;
 }
 
-// Smallest half-span (kcal) the energy-balance y-axis is ever scaled to, so a
-// stretch of days that are all deficits still leaves a visible band above the
-// zero line to read them against, instead of pinning zero flush to the top of
-// the plot area.
+// Smallest half-span the axis scales to, so a run of all-deficit days still leaves a
+// band above zero to read them against instead of pinning zero to the top.
 const ENERGY_BALANCE_AXIS_MIN_KCAL = 200;
 
-// Fixed gridline spacing for that axis. Both bounds get rounded out to a multiple of
-// it, so every label sits on a gridline and the two halves step identically.
-// niceAxisBound was doing this before and its 1/1.2/1.5/2/2.5/3/4/5/6/8/10 ladder
-// could land on e.g. 800, leaving one odd final tick among a run of 500s.
+// Both bounds round out to a multiple of this, so every label sits on a gridline and
+// the halves step identically. niceAxisBound's ladder could land on 800 and leave one
+// odd tick among a run of 500s.
 const ENERGY_BALANCE_TICK_KCAL = 250;
 
-// "+320" / "-450" — the sign carries the entire meaning on this chart (a
-// deficit vs a surplus), so a positive figure is shown with an explicit + in
-// the tooltip rather than bare.
+// The sign carries the whole meaning here — deficit vs surplus — so a positive figure
+// shows its + rather than going bare.
 function withExplicitSign(value) {
   return value > 0 ? `+${value}` : String(value);
 }
 
 let wellnessEnergyBalanceChart = null;
 
-// A day's bar color, scored against the plan line rather than just the sign of the
-// balance: at or beyond the line is green, short of it but still on the goal's side
-// of zero is gray — real progress, only less than planned — and the wrong side of
-// zero is red. Hitting the line exactly counts as met, the same way withinCalorieBound
-// treats its bound. With no plan set there's no middle band, so it falls back to the
-// sign alone and behaves as it did before.
+// Against the plan line, not just the sign: at or beyond it green, short of it but
+// still on the goal's side of zero gray (real progress, only less than planned), wrong
+// side of zero red. No plan means no middle band, so it falls back to the sign.
 function energyBalanceColor(balance, isCut, planned) {
   const towardGoal = isCut ? balance < 0 : balance > 0;
   if (!towardGoal) return '#dc2626';
@@ -3174,47 +2703,30 @@ function energyBalanceColor(balance, isCut, planned) {
   return (isCut ? balance <= planned : balance >= planned) ? '#16a34a' : '#9ca3af';
 }
 
-// The daily deficit WEEKLY_FAT_LOSS_KG implies — the same D the Health Formula
-// Playground spells out as (Δm × ρ) / 7, from the one shared fat-density constant
-// so the two can't quote different figures. Returned already signed to THIS
-// chart's convention: a planned loss is a deficit and sits below zero, a planned
-// gain flips above it. null when the setting is unset or zero (maintenance), since
-// a line drawn on zero would just retrace the axis.
+// The daily deficit WEEKLY_FAT_LOSS_KG implies — the playground's D, from the same
+// fat-density constant so the two can't disagree. Already signed to this chart's
+// convention. Null at zero or unset, since a line on zero would retrace the axis.
 function plannedBalanceKcal() {
   const weeklyKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
   if (weeklyKg === null || weeklyKg === 0) return null;
   return -Math.round((weeklyKg * GENERIC_KCAL_PER_KG_FAT) / 7);
 }
 
-// Per-day energy balance — what was eaten minus what was spent — with the
-// body-fat change that balance implies on a twin right-hand axis.
+// Eaten minus spent per day, with the fat change that balance implies on a twin axis.
 //
-// Spend is Mifflin-St Jeor BMR (Height/Birth Date/Sex plus that day's
-// carried-forward weight) PLUS that day's own logged activity burn. No lifestyle
-// multiplier on top — logged activity is already real kcal, NEAT included, so
-// scaling BMR too would count the same movement twice. getCalorieBoundKcal is
-// built the same way, so the two agree on any day activity hits the target.
+// Spend is Mifflin-St Jeor BMR at that day's carried-forward weight PLUS its logged
+// activity burn — no lifestyle multiplier, since logged activity is already real kcal
+// and scaling BMR too would count the same movement twice. The calorie bound is built
+// the same way, so the two agree on any day activity hits the target.
 //
-// Negative is loss: a bar below zero is a deficit and reads as grams of fat lost
-// off the right axis, above zero is a surplus and grams gained. This is the fat
-// change your energy balance PREDICTS, which the Body Mass chart's own readings can
-// be compared against.
+// The COLOURS follow the goal, not the sign — a deficit is only progress for someone
+// heading down, so the app's green and red keep meaning "toward" and "away" rather than
+// congratulating a bulker for undereating. Which side is progress comes from
+// getCalorieBoundKind, the same read Caloric Intake uses. Within that side the plan
+// splits green from gray, so falling behind reads differently from going backwards.
 //
-// The COLORS follow the goal rather than the sign, which is why this chart is
-// no longer titled "Calorie Deficit & Fat Loss": a deficit is only progress for
-// someone heading down. Which side of zero the goal points to comes from
-// getCalorieBoundKind — the same read the Caloric Intake bound uses — so the app's
-// income/expense colors keep meaning "toward the goal" / "away from it" for both
-// kinds of user instead of congratulating a bulker for undereating. Within the
-// goal's side, the plan line splits green from gray (see energyBalanceColor): a day
-// that met the planned deficit is green, one that moved the right way but fell short
-// of it is gray, so falling behind the plan reads differently from going backwards.
-//
-// Maintenance is plain Mifflin-St Jeor and the density is fat's ~7,700 kcal/kg
-// — both population constants rather than personal parameters — so the right
-// axis reads "g fat" and the tooltip says "Expected fat". Grams is simply
-// balance ÷ kcal-per-kg, a fixed linear rescale, which is exactly what makes
-// the right axis a true twin of the left one.
+// Grams is balance ÷ kcal-per-kg, a fixed linear rescale off two population constants,
+// which is what makes the right axis a true twin of the left.
 function renderWellnessEnergyBalanceChart(entries) {
   const ctx = document.getElementById('wellness-energy-balance-chart');
 
@@ -3226,9 +2738,8 @@ function renderWellnessEnergyBalanceChart(entries) {
   const weightEntries = entries.filter((e) => e.category === 'Weight' && e.amount !== null);
   const intakeEntries = entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
 
-  // Without a profile there's no maintenance figure, and without any weigh-in
-  // there's no weight to feed it — either way the chart renders as its
-  // explanatory empty state rather than a misleading partial one.
+  // No profile means no maintenance figure, no weigh-in means no weight to feed it.
+  // Either way the chart shows its explanatory empty state, not a misleading partial.
   const canCompute = haveProfile && weightEntries.length > 0;
   const labels = canCompute ? trailingDatesForCategory(intakeEntries, WELLNESS_METRICS_DAYS) : [];
   const weightForDate = carryForwardWeightByDate(weightByDateMap(weightEntries), labels);
@@ -3236,8 +2747,7 @@ function renderWellnessEnergyBalanceChart(entries) {
   const intakeByDate = new Map();
   intakeEntries.forEach((e) => intakeByDate.set(e.date, (intakeByDate.get(e.date) || 0) + e.amount));
 
-  // Per-day burn through the one shared rule, at that day's own carried-forward
-  // weight — the same weight this chart's BMR term uses.
+  // Through the one shared rule, at the same carried-forward weight the BMR term uses.
   const activityKcalByDate = new Map();
   entries.forEach((e) => {
     if ((e.category !== 'Activity' && e.category !== 'Activity; Calories') || e.amount === null) return;
@@ -3245,16 +2755,15 @@ function renderWellnessEnergyBalanceChart(entries) {
     activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
   });
 
-  // Which side of zero is progress — a cut wants the bars below it, a gain
-  // wants them above. Same read the Caloric Intake bound is built on, so the
-  // two charts can't disagree about which direction the user is headed.
+  // Which side of zero is progress. Same read Caloric Intake's bound is built on, so
+  // the two charts can't disagree about which way the user is headed.
   const isCut = getCalorieBoundKind(entries) === 'max';
 
   const detailByDate = new Map();
 
   const balanceData = labels.map((date) => {
-    // A day with no food logged isn't a day of eating nothing — it's a day
-    // with no data, so it's an empty slot rather than a huge fake deficit.
+    // No food logged is no data, not a day of eating nothing — an empty slot rather
+    // than a huge fake deficit.
     if (!intakeByDate.has(date)) return null;
 
     const intake = Math.round(intakeByDate.get(date));
@@ -3269,8 +2778,8 @@ function renderWellnessEnergyBalanceChart(entries) {
   const values = balanceData.filter((v) => v !== null);
   const hasData = values.length > 0;
 
-  // Folded into the axis range as well as drawn, so the plan dashes can't fall
-  // outside the plot area on a stretch of days that all undershot them.
+  // Folded into the axis range too, so the dashes can't fall off-plot on a stretch of
+  // days that all undershot them.
   const planned = hasData ? plannedBalanceKcal() : null;
 
   const maxDeficit = Math.max(0, ...values.map((v) => -v), planned === null ? 0 : -planned);
@@ -3280,12 +2789,10 @@ function renderWellnessEnergyBalanceChart(entries) {
   const yMin = -upToTick(maxDeficit);
   const yMax = upToTick(maxSurplus);
 
-  // Half-thickness of each day's plan dash, as a fraction of the axis span so it
-  // stays a hairline whatever range the axis covers.
+  // A fraction of the axis span, so the dash stays a hairline at any range.
   const plannedHalf = (yMax - yMin) * 0.004;
 
-  // balanceData already carries null for days with nothing logged, so those days sit
-  // out of the mean rather than counting as a day of eating nothing.
+  // balanceData already nulls the unlogged days, so they sit out of the mean.
   const weeklyAvg = weeklyAverageSeries(balanceData);
 
   wellnessEnergyBalanceChart = upsertChart(wellnessEnergyBalanceChart, ctx, {
@@ -3300,23 +2807,17 @@ function renderWellnessEnergyBalanceChart(entries) {
           order: 2,
         },
         weeklyAverageDataset('7-Day Average', weeklyAvg),
-        // One dash per day rather than a line spanning the window — the same idiom
-        // the Caloric Intake chart uses for its bound, and for the same reason: a
-        // continuous line reads as one shared limit, while a mark sitting on each
-        // bar says the target belongs to that day. Built as a floating bar
-        // (`[from, to]`) with `grouped: false` so it overlays its bar instead of
-        // being placed beside it, and a hairline thickness scaled to the axis span.
-        // Red like every other target mark here, not a colour of its own.
+        // A dash per day, the idiom Caloric Intake uses for its own bound: a continuous
+        // line reads as one shared limit, a mark on each bar says the target belongs to
+        // that day.
         ...(planned === null ? [] : [{
           type: 'bar',
           label: 'Planned for the day',
           data: labels.map(() => [planned - plannedHalf, planned + plannedHalf]),
-          // boundMarkColor, like every other reference mark in the section.
           backgroundColor: boundMarkColor(),
           grouped: false,
           isBoundMarker: true,
-          // Lowest order paints last, so the dash stays visible on a day whose bar
-          // overshoots it.
+          // Lowest order paints last, so it stays visible on a bar that overshot it.
           order: 0,
         }]),
       ],
@@ -3337,23 +2838,18 @@ function renderWellnessEnergyBalanceChart(entries) {
           padding: { top: 40 },
         },
         tooltip: {
-          // The plan dashes are filtered out as their own tooltip row — a floating
-          // bar would report itself as a `[from, to]` pair — so hovering a day
-          // reports that day's balance and nothing else, exactly as it did before
-          // the dashes existed.
+          // The dashes are filtered out — a floating bar would report itself as a
+          // `[from, to]` pair — and stated in afterBody instead.
           filter: (item) => !item.dataset.isBoundMarker && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
-            // The whole point of the chart is the subtraction, so every term
-            // of it is spelled out on hover — a bare "-450" wouldn't show
-            // which of eating less or moving more produced it.
+            // The chart IS the subtraction, so every term is spelled out — a bare
+            // "-450" wouldn't show whether eating less or moving more produced it.
             label: (item) => {
               const d = detailByDate.get(item.label);
               if (!d) return '';
-              // Named to pair with the "Planned deficit" row directly below it, and
-              // last of the body rows for the same reason — the two figures the bar's
-              // colour compares should sit together. Follows the sign the way that row
-              // does: a day that ate over maintenance reports an actual SURPLUS, since
+              // Last of the body rows, to sit beside the Planned row its colour is
+              // compared against. A day over maintenance reports a SURPLUS, since
               // calling it a deficit would contradict the + in front of it.
               const actualWord = d.balance > 0 ? 'Surplus' : 'Deficit';
               const lines = [
@@ -3365,12 +2861,8 @@ function renderWellnessEnergyBalanceChart(entries) {
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // D from the Health Formula Playground — the daily energy deficit the
-            // weekly fat-loss goal implies. Last, and via afterBody so it sits flush
-            // with the date rather than indented behind the swatch, matching how
-            // Caloric Intake states its own bound. Signed like every other figure
-            // here, so it reads off the axis where its dash is drawn: a deficit is
-            // negative, a planned gain positive.
+            // The playground's D. Flush left via afterBody, and signed like everything
+            // else here so it reads off the axis its dash is drawn on.
             afterBody: (items) => {
               const lines = [];
               if (planned !== null) {
@@ -3390,19 +2882,17 @@ function renderWellnessEnergyBalanceChart(entries) {
           min: yMin,
           max: yMax,
           afterFit: fixTrendYAxisWidth,
-          // Zero is the line the whole chart is read against — deficit below
-          // it, surplus above — so it's drawn in the (theme-aware) tick-label
-          // color instead of receding into the ordinary gridlines. Evaluated
-          // at draw time, so a theme switch recolors it correctly.
+          // Zero is the line the chart is read against, so it takes the tick-label
+          // colour instead of receding into the gridlines. Evaluated at draw time, so a
+          // theme switch recolours it.
           grid: { color: (ctx) => (ctx.tick.value === 0 ? Chart.defaults.color : Chart.defaults.borderColor) },
-          // autoSkip off so every 250 really is drawn — with it on, Chart.js drops
-          // ticks when it thinks they're crowded, which reintroduces uneven spacing.
+          // autoSkip off, or Chart.js drops ticks it thinks are crowded and the spacing
+          // goes uneven again.
           ticks: { stepSize: ENERGY_BALANCE_TICK_KCAL, autoSkip: false, callback: maskedUnitTick('kcal') },
         },
         y1: {
-          // The gram equivalent of y's own bounds — a true twin axis, so zero
-          // lines up with the kcal axis's zero and every bar can be read off
-          // either side.
+          // The gram equivalent of y's own bounds, so zero lines up and every bar reads
+          // off either side.
           min: (yMin / GENERIC_KCAL_PER_KG_FAT) * 1000,
           max: (yMax / GENERIC_KCAL_PER_KG_FAT) * 1000,
           position: 'right',
@@ -3415,8 +2905,7 @@ function renderWellnessEnergyBalanceChart(entries) {
   });
 }
 
-// Same-day duplicate weigh-ins averaged together, same as
-// renderWellnessProjectionChart's weightByDate — one weight per logged date.
+// One weight per logged date, same averaging as renderWellnessProjectionChart's.
 function weightByDateMap(weightEntries) {
   const sums = new Map();
   weightEntries.forEach((e) => {
@@ -3442,11 +2931,9 @@ function minutesToClock(mins) {
   return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
 }
 
-// Chart.js has no built-in distribution plot, so this buckets `values` into
-// `binCount` equal-width bins spanning their own min/max, then fits a normal
-// curve to the same mean/stdev and scales it so its peak matches the
-// histogram's tallest bar (the curve is a shape overlay, not a second count
-// axis).
+// Chart.js has no distribution plot, so: equal-width bins across the values' own range,
+// plus a normal curve at the same mean/stdev scaled to the tallest bar. The curve is a
+// shape overlay, not a second count axis.
 function buildDistribution(values, binCount, formatLabel) {
   if (values.length === 0) return null;
 
@@ -3464,8 +2951,7 @@ function buildDistribution(values, binCount, formatLabel) {
 
   const labels = counts.map((_, i) => formatLabel(min + binWidth * (i + 0.5)));
 
-  // Bars are shown as a % of all days rather than raw counts, so the curve
-  // overlay is scaled to the same peak percentage to keep its shape lined up.
+  // Bars are a % of all days, not raw counts, so the curve scales to the same peak.
   const percentages = counts.map((c) => (c / values.length) * 100);
 
   const peakPercentage = Math.max(...percentages);
@@ -3526,16 +3012,11 @@ function renderDistributionChart(canvasId, dist) {
 
 const STANDARD_WORKDAY_MINUTES = 8 * 60;
 
-// Net/signed tally of (actual shift − 8h) across "qualifying" entries: has a
-// real Start/End (a missed weekday is excluded, not counted as -8h — no data
-// isn't the same as leaving early), isn't today's still-possibly-in-progress
-// shift, isn't a weekend (this app's Work Analytics already treats weekends
-// as non-representative of an 8h/day baseline — a logged weekend shift simply
-// doesn't count toward this tally either way, rather than partially counting
-// against a baseline that was never expected on a weekend), and has a
-// non-negative computed duration (guards a mis-keyed entry, same as the
-// duration histogram above). `days` is a trailing window (or lifelong if
-// falsy) — not calendar-aligned, matching averageDailyHours' periods.
+// Signed tally of (shift − 8h) over qualifying entries: a real Start/End, not today's
+// possibly-unfinished shift, not a weekend, and a non-negative duration. A missed
+// weekday is excluded rather than counted as −8h — no data isn't leaving early — and a
+// weekend shift doesn't count either way, since no 8h baseline was expected there.
+// `days` is a trailing window (lifelong if falsy), matching averageDailyHours.
 function computeOvertimeMinutes(entries, days) {
   const todayIso = isoFromDate(new Date());
   const windowStartIso = days
@@ -3584,10 +3065,8 @@ function renderTimesheetDistributionCharts(entries) {
   renderDistributionChart('timesheet-start-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.start)), 10, minutesToClock));
   renderDistributionChart('timesheet-end-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.end)), 10, minutesToClock));
 
-  // Weekends and holidays/off days aren't representative work shifts, and a
-  // negative duration (end-before-start, or a break longer than the shift)
-  // is a mis-keyed entry — exclude all of them so they can't skew the
-  // histogram into bins that don't reflect a normal workday.
+  // Weekends aren't representative shifts, and a negative duration (end before start,
+  // or a break longer than the shift) is mis-keyed. Both would skew the bins.
   const durations = worked
     .filter((e) => !isWeekend(e.date))
     .map((e) => computeDurationMinutes(e.start, e.end, e.breakMinutes) / 60)
@@ -3599,12 +3078,10 @@ function isHolidayEntry(entry) {
   return !!entry && !entry.start && !entry.end && !!entry.task;
 }
 
-// Total worked hours within the trailing `days` (or, for the lifelong
-// period, since the first logged entry) divided by the working days that
-// have elapsed in that window — weekends and marked holidays/days off are
-// excluded from both the numerator and the denominator, so they don't pull
-// the average down. A weekday with no entry at all still counts as a
-// working day with 0 hours (it's a missed log, not time off).
+// Hours in the trailing window (or since the first entry) over the working days elapsed
+// in it. Weekends and marked holidays leave both numerator and denominator, so they
+// can't pull the average down; a weekday with no entry still counts as 0 hours, since
+// that's a missed log rather than time off.
 function averageDailyHours(entries, days) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -3708,13 +3185,9 @@ function travelCountryName(countryCity) {
   return (countryCity || '').split(',')[0].trim();
 }
 
-// Combines a Travel row's Date + Time columns into a single instant (ms),
-// so a same-day round trip (e.g. a border town visited for a few hours)
-// nets a real sub-day duration instead of rounding down to exactly 0 just
-// because both events share a calendar date. Falls back to midnight when
-// Time is blank. timeToMinutes() is defined in timesheet.js — safe to call
-// here since this only runs once the whole page (all script tags) has
-// loaded, regardless of file order.
+// Date + Time as one instant, so a same-day round trip nets a real sub-day duration
+// instead of rounding to 0 just because both events share a date. Midnight if Time is
+// blank. timeToMinutes lives in timesheet.js — fine, since this only runs post-load.
 function travelInstant(t) {
   const date = new Date(t.date);
   if (Number.isNaN(date.getTime())) return null;
@@ -3722,18 +3195,14 @@ function travelInstant(t) {
   return date.getTime() + minutes * 60000;
 }
 
-// Travel!A2:H is a chronological log of Arrival/Departure events, not
-// pre-computed stays. An Arrival opens a stay in that country; the next
-// Departure (regardless of its own country/city, since it's always wherever
-// that stay was) closes it and its date difference is credited to the
-// country the stay opened in. A trailing Arrival with no following Departure
-// (the most recent entry) is still an ongoing stay, credited up to today.
+// Travel is a log of Arrival/Departure events, not pre-computed stays. An Arrival opens
+// a stay; the next Departure closes it — whatever country IT names, since a departure is
+// always from wherever the stay was — and the difference is credited to the opening
+// country. A trailing Arrival is an ongoing stay, credited up to today.
 //
-// The log only starts at the first trip ever taken, so the years lived in
-// the home country before that first Departure would otherwise be dropped
-// entirely. If a birthDate is supplied (Settings!BIRTH_DATE) and the very
-// first row is a Departure, that's treated as if an Arrival had opened a stay
-// in that same country on the birth date.
+// The log starts at the first trip ever taken, so the years lived at home before it
+// would be dropped. Given a birthDate, a leading Departure is treated as though an
+// Arrival had opened a stay in that same country at birth.
 function computeCountryDays(travelEntries, birthDate) {
   const totals = new Map();
   let openCountry = null;

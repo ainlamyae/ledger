@@ -36,8 +36,6 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - All aggregation, charting, filtering, sorting and CRUD runs client-side in vanilla JS.
 - No build step, no server component to deploy or maintain.
 
-![Ledger dashboard screenshot](assets/images/dashboard-screenshot.png)
-
 ---
 
 ## Features

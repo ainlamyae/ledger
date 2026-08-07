@@ -64,7 +64,6 @@ function renderTodayGlanceCards(entries) {
   const todayIso = isoFromDate(new Date());
   const todayEntries = entries.filter((e) => e.date === todayIso);
 
-  let bodyMassKgToday = null;
   let calories = null;
   let protein = null;
   let fiber = null;
@@ -77,9 +76,6 @@ function renderTodayGlanceCards(entries) {
   let tefKcalToday = null;
 
   todayEntries.forEach((e) => {
-    if (e.category === 'Body Mass' && e.amount !== null) {
-      bodyMassKgToday = Math.round(e.amount * 100) / 100;
-    }
     if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
       calories = (calories ?? 0) + e.amount;
     }
@@ -108,8 +104,6 @@ function renderTodayGlanceCards(entries) {
     }
   });
 
-  const bodyMassTarget = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
-  const targetIsDownward = bodyMassTargetIsDownward(entries);
   const calorieTarget = getCalorieTarget(entries);
   const proteinBand = getProteinTargetBandG(entries);
   const fiberBand = getFiberTargetBandG(entries);
@@ -120,11 +114,6 @@ function renderTodayGlanceCards(entries) {
   // Minutes when time is what's pinned; rises with a lighter body mass when calorie burn
   // is pinned instead — see getActivityTargetMin.
   const activityTarget = Math.round(getActivityTargetMin(bodyMassKg));
-
-
-  // Down on a cut, up on a bulk — same read as the Body Mass chart's bar colours.
-  const bodyMassGood = bodyMassKgToday !== null
-    && (targetIsDownward ? bodyMassKgToday <= bodyMassTarget : bodyMassKgToday >= bodyMassTarget);
 
   // Protein is the one metric judged against a RANGE, and the one where overshooting
   // still counts as a hit — see withinProteinBand and the chart's PROTEIN_OVER_BAND_COLOR.
@@ -175,11 +164,14 @@ function renderTodayGlanceCards(entries) {
     document.getElementById(`today-activity-${prefix}-value`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
-  setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries, calories, activityKcal, tefKcalToday, sleepHours);
-  setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
-  setTodayGlanceTile('today-fiber', fiber, formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
-  setTodayGlanceTile('today-fat', fat, formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand, null, fatOverBand);
-  setTodayGlanceTile('today-carb', carb, formatProteinTargetBand(carbBand), 'g', carbInBand, null, false, carbUnderBand ? BODY_MASS_UNSCORED_COLOR : null);
+  setStatusEnergyTile(entries, calories, activityKcal, tefKcalToday, sleepHours);
+  // The macro tiles show a whole-gram figure — floored, not rounded, so the readout never
+  // claims a gram that isn't fully there. Band colouring above stays on the true value.
+  const floorG = (g) => (g !== null ? Math.floor(g) : null);
+  setTodayGlanceTile('today-protein', floorG(protein), formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
+  setTodayGlanceTile('today-fiber', floorG(fiber), formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
+  setTodayGlanceTile('today-fat', floorG(fat), formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand, null, fatOverBand);
+  setTodayGlanceTile('today-carb', floorG(carb), formatProteinTargetBand(carbBand), 'g', carbInBand, null, false, carbUnderBand ? BODY_MASS_UNSCORED_COLOR : null);
   setTodayGlanceTile('today-sleep-duration', sleepHours, sleepTarget, 'hr', null, null, false, sleepHours !== null ? sleepStatusColor(sleepHours, sleepTarget) : null);
   const windowText = sleepBedMin !== null && sleepWakeMin !== null
     ? `${formatClockTime24(sleepBedMin)}-${formatClockTime24(sleepWakeMin)}`
@@ -187,73 +179,64 @@ function renderTodayGlanceCards(entries) {
   document.getElementById('today-sleep-window-value').textContent = privacyMode ? maskDigits(windowText) : windowText;
 }
 
-// Body Mass gets its own two-row layout (Today/Target combined, then Estimate) instead
-// of the generic value-over-target line — Estimate reads calcProjection's own day count
-// and ETA, the same figures State Trend & Forecast's time-progress meter shows, so the
-// two can't disagree.
-function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries, caloriesToday, activityKcalToday, tefKcalToday, sleepHoursToday) {
-  const todayEl = document.getElementById('today-bodymass-value');
-  todayEl.classList.remove('income', 'income-high', 'expense');
-
-  const todayPart = bodyMassKgToday !== null ? `${bodyMassKgToday}` : '—';
-  const combinedText = `${todayPart} / ${bodyMassTarget} kg`;
-  todayEl.textContent = privacyMode ? maskDigits(combinedText) : combinedText;
-  if (bodyMassKgToday !== null) todayEl.classList.add(isGood ? 'income' : 'expense');
-
+// The Status card is a single energy-budget ledger for today, read top to bottom:
+// Maintenance and the Sleep Deprivation Effect on one side, Intake on the other,
+// Digestion and Activity the two expenditures between them, all summing to Balance
+// — the same dailyEnergyBalanceKcal the Calorie Balance chart plots, just for today
+// alone so the two can't disagree. Each row lives ONLY here: the Intake Macros /
+// Physical Activity / Sleep cards no longer carry mirror copies.
+function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalToday, sleepHoursToday) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const bodyMassKg = latestBodyMassKg(entries);
+  const isCut = getCalorieTargetKind(entries) === 'max';
 
-  // BMI row — today's reading and the target, both in kg/m².
-  const bmiEl = document.getElementById('today-bodymass-bmi-value');
-  bmiEl.classList.remove('income', 'expense');
-  if (bodyMassKgToday !== null && heightCm !== null) {
-    const bmiToday = computeBmi(bodyMassKgToday, heightCm);
-    const bmiTarget = computeBmi(bodyMassTarget, heightCm);
-    const bmiText = `${bmiToday} / ${bmiTarget} kg/m²`;
-    bmiEl.textContent = privacyMode ? maskDigits(bmiText) : bmiText;
-    bmiEl.classList.add(isGood ? 'income' : 'expense');
-  } else {
-    bmiEl.textContent = '—';
+  // m̄ — the 7-day rolling average body mass (planBodyMassKg / smoothedBodyMassKg), the
+  // same smoothed mass every plan identity runs on, shown against the plan's healthy body
+  // mass (BODY_MASS_TARGET_KG). A water-heavy morning doesn't move it the way the raw
+  // weigh-in would.
+  const mBar = planBodyMassKg(entries);
+  const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const mBarEl = document.getElementById('today-status-mbar-value');
+  mBarEl.classList.remove('income', 'expense');
+  const mBarText = mBar !== null ? `${mBar} / ${healthyMassKg} kg` : '—';
+  mBarEl.textContent = privacyMode ? maskDigits(mBarText) : mBarText;
+  if (mBar !== null) {
+    const mBarGood = bodyMassTargetIsDownward(entries) ? mBar <= healthyMassKg : mBar >= healthyMassKg;
+    mBarEl.classList.add(mBarGood ? 'income' : 'expense');
   }
 
-  // Intake — computed for the Intake Macros card mirror; no Status row.
+  // Intake — the one positive contribution to Balance, shown against its target
+  // with the </> sense the target kind carries (a cut wants intake under the cap,
+  // a bulk over the floor).
   const calTarget = getCalorieTarget(entries);
+  const intakeEl = document.getElementById('today-status-intake-value');
+  intakeEl.classList.remove('income', 'expense');
   const intakeText = caloriesToday !== null
-    ? `${Math.round(caloriesToday)} / ${calTarget.kcal} kcal`
+    ? `${withExplicitSign(Math.round(caloriesToday))} ${isCut ? '<' : '>'} ${calTarget.kcal} kcal`
     : '—';
-  const macrosIntakeEl = document.getElementById('today-macros-intake-value');
-  macrosIntakeEl.classList.remove('income', 'expense');
-  macrosIntakeEl.textContent = privacyMode ? maskDigits(intakeText) : intakeText;
-  if (caloriesToday !== null) macrosIntakeEl.classList.add(withinCalorieTarget(caloriesToday, calTarget) ? 'income' : 'expense');
+  intakeEl.textContent = privacyMode ? maskDigits(intakeText) : intakeText;
+  if (caloriesToday !== null) intakeEl.classList.add(withinCalorieTarget(caloriesToday, calTarget) ? 'income' : 'expense');
 
-  // Activity — computed for the Physical Activity card mirror; no Status row.
-  // No activity logged today reads as 0, same as the Cardio/NEAT/Strength lines
-  // just below it, rather than a dash — a day with nothing logged yet is 0 kcal
-  // burned so far, not "unknown".
+  // Activity — a burn, signed negative. No activity logged today reads as 0 (the
+  // same "0 kcal burned so far, not unknown" rule the Cardio/NEAT/Strength lines
+  // use), not a dash.
   const actTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
   const activityKcalSoFar = activityKcalToday ?? 0;
   const actText = `${activityKcalSoFar > 0 ? '-' : ''}${activityKcalSoFar} / -${actTargetKcal} kcal`;
-  const macrosActivityEl = document.getElementById('today-macros-activity-value');
-  macrosActivityEl.classList.remove('income', 'expense');
-  macrosActivityEl.textContent = privacyMode ? maskDigits(actText) : actText;
-  macrosActivityEl.classList.add(activityKcalSoFar >= actTargetKcal ? 'income' : 'expense');
+  const activityEl = document.getElementById('today-status-activity-value');
+  activityEl.classList.remove('income', 'expense');
+  activityEl.textContent = privacyMode ? maskDigits(actText) : actText;
+  activityEl.classList.add(activityKcalSoFar >= actTargetKcal ? 'income' : 'expense');
 
-  // Digestion — computed for the Intake Macros card mirror; no Status row.
+  // Digestion (TEF) — the other expenditure, measured if we have a figure else the
+  // non-TEF share of intake, shown against its own target.
   const digKcal = tefKcalToday !== null
     ? Math.round(tefKcalToday)
     : (caloriesToday !== null ? Math.round(caloriesToday * (1 - tefDivisor())) : null);
   const digTarget = Math.round(calTarget.kcal * (1 - tefDivisor()));
   const digText = digKcal !== null ? `${withExplicitSign(-digKcal)} / ${withExplicitSign(-digTarget)} kcal` : '—';
-  const macrosDigestionEl = document.getElementById('today-macros-digestion-value');
-  if (macrosDigestionEl) macrosDigestionEl.textContent = privacyMode ? maskDigits(digText) : digText;
+  document.getElementById('today-status-digestion-value').textContent = privacyMode ? maskDigits(digText) : digText;
 
-  const balanceEl = document.getElementById('today-bodymass-balance-value');
-  balanceEl.classList.remove('income', 'income-high', 'expense');
-
-  // Same formula the Calorie Balance chart plots (intake minus BMR minus activity minus
-  // TEF, then the Sleep Deprivation Effect added — dailyEnergyBalanceKcal, which pushes a
-  // deficit toward zero and a surplus further past it) — just for today alone, so this
-  // can't disagree with what that chart's rightmost bar would show.
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
   const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
@@ -278,19 +261,18 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
   // Calorie Balance tooltip's own Maintenance line.
   const maintenanceEl = document.getElementById('today-status-maintenance-value');
   const maintenanceText = maintenanceKcal !== null ? `${withExplicitSign(-maintenanceKcal)} kcal` : '—';
-  if (maintenanceEl) maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
+  maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
 
-  // Deprivation — computed for the Sleep card mirror; no Status row.
-  const deprivationText = deprivationKcal !== null ? `${deprivationKcal} / 0 kcal` : '—';
-  const sleepDeprivationCardEl = document.getElementById('today-sleep-deprivation-card-value');
-  if (sleepDeprivationCardEl) {
-    sleepDeprivationCardEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
-    sleepDeprivationCardEl.style.color = deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : '';
-  }
+  // Deprivation — the Sleep Deprivation Effect as a signed addition to Balance,
+  // against a target of 0 (a full night costs nothing).
+  const deprivationEl = document.getElementById('today-status-deprivation-value');
+  const deprivationText = deprivationKcal !== null ? `${withExplicitSign(deprivationKcal)} / 0 kcal` : '—';
+  deprivationEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
+  deprivationEl.style.color = deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : '';
 
-  const isCut = getCalorieTargetKind(entries) === 'max';
+  const balanceEl = document.getElementById('today-status-balance-value');
+  balanceEl.classList.remove('income', 'income-high', 'expense');
   const balanceTargetKcal = targetBalanceKcal(planBodyMassKg(entries));
-
   const balanceText = balanceKcal !== null
     ? `${withExplicitSign(balanceKcal)}${balanceTargetKcal !== null ? ` / ${withExplicitSign(balanceTargetKcal)}` : ''} kcal`
     : '—';
@@ -302,11 +284,30 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
     balanceEl.classList.add(balanceGood ? 'income' : 'expense');
   }
 
-  const proj = calcProjection(entries);
-  const etaText = proj?.status === 'reached' ? 'Reached'
-    : (proj?.status === 'ok' && proj.etaDate) ? `${proj.daysToTarget} (${isoFromDate(proj.etaDate)})`
+  // Δm — the daily body-mass change today's Balance implies (Balance ÷ ~7700 kcal/kg, the
+  // fat-equivalent GENERIC_KCAL_PER_KG_FAT), shown against the plan's own expected fat-loss
+  // rate (WEEKLY_FAT_LOSS_KG spread over 7 days). Actual is a signed mass change (negative
+  // = losing); the target keeps the plan's stored sign (positive for a cut).
+  const dmActual = balanceKcal !== null ? Math.round((balanceKcal / GENERIC_KCAL_PER_KG_FAT) * 1000) : null;
+  const weeklyFatLossKg = weeklyFatLossKgAt(planBodyMassKg(entries));
+  const dmTarget = weeklyFatLossKg !== null ? Math.round((weeklyFatLossKg / 7) * 1000) : null;
+  const dmText = dmActual !== null
+    ? `${withExplicitSign(dmActual)}${dmTarget !== null ? ` / ${dmTarget}` : ''} g`
     : '—';
-  document.getElementById('today-bodymass-eta-value').textContent = privacyMode ? maskDigits(etaText) : etaText;
+  document.getElementById('today-status-deltam-value').textContent = privacyMode ? maskDigits(dmText) : dmText;
+
+  // Goal — the projected arrival at the healthy body mass: calcProjection's own day count
+  // and ETA (the same figures State Trend & Forecast's time-progress meter shows), the
+  // date written D-M-YYYY.
+  const proj = calcProjection(entries);
+  let goalText = '—';
+  if (proj?.status === 'reached') {
+    goalText = 'Reached';
+  } else if (proj?.status === 'ok' && proj.etaDate) {
+    const d = proj.etaDate;
+    goalText = `${proj.daysToTarget} days (${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()})`;
+  }
+  document.getElementById('today-status-goal-value').textContent = privacyMode ? maskDigits(goalText) : goalText;
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate

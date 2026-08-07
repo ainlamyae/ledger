@@ -309,7 +309,7 @@ If an additional question from the user is included after the data, also answer 
 
 Keep the whole report under 250 words.`;
 
-const INSIGHT_SECTION_LABELS = ['Overview', 'Going well', 'Needs attention', 'Suggestions', 'Answer'];
+const INSIGHT_SECTION_LABELS = ['Overview', 'Going well', 'Needs attention', 'Investment outlook', 'Suggestions', 'Answer'];
 
 // One <p> per line (blank lines dropped) rather than per blank-line-separated
 // block — the prompt asks for each of the 4 sections, and each numbered

@@ -10,10 +10,9 @@ const CONFIG = {
   SHEETS: {
     TRANSACTIONS: 'Transactions',
     REPORT: 'Monthly Summary',
-    BALANCE: 'Account Balance',
-    ACCOUNTS: 'Account Balance',
+    BALANCE: 'Accounts',
+    ACCOUNTS: 'Accounts',
     INSIGHT: 'Insight',
-    RECONCILIATION: 'Reconciliation',
     TIMESHEET: 'eTimeSheet',
     WELLNESS: 'Wellness Log',
     NUTRITION: 'Nutrition Facts',

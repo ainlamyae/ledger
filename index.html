@@ -158,6 +158,10 @@
                         <span class="node-graph-node-title">🔍 Expenditure Insights</span>
                         <span class="node-graph-tooltip">Compare this month's expenditure to quarterly and yearly averages, category by category — with type-level breakdowns.</span>
                     </button>
+                    <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">💡 AI Financial Insight</span>
+                        <span class="node-graph-tooltip">One click builds a snapshot of your net worth, cash flow, spending by category over four periods, and every account's Balance vs. Market Value — then ask a free-text question and send it to AI for a plain-text read, including a short-term/long-term investment outlook. Nothing is computed until you press the button, and every report is saved and waiting next visit instead of vanishing when you navigate away.</span>
+                    </button>
                 </div>
             </div>
 
@@ -306,6 +310,7 @@
                         <span class="weight-progress-meter-stat">
                             <span id="weight-progress-meter-remaining" class="weight-progress-meter-pct"></span>
                             <span class="weight-progress-meter-stat-label">to go</span>
+                            <span id="weight-progress-meter-goal" class="weight-progress-meter-goal"></span>
                         </span>
                     </div>
 
@@ -321,6 +326,7 @@
                             <span class="weight-progress-meter-stat">
                                 <span id="time-progress-meter-remaining" class="weight-progress-meter-pct"></span>
                                 <span class="weight-progress-meter-stat-label">to go</span>
+                                <span id="time-progress-meter-eta" class="weight-progress-meter-goal"></span>
                             </span>
                         </div>
                     </div>
@@ -938,34 +944,30 @@
         </div>
 
         <div class="panel">
-            <h2>Historical Trends</h2>
+        <h2>Financial Indicators</h2>
 
-            <div class="panel-section">
-                <h3>Category Expenditure Trend</h3>
-                <div class="chart-box">
-                    <canvas id="expense-breakdown-trend-chart"></canvas>
-                </div>
-                <div class="donut-legend" id="expense-breakdown-trend-legend"></div>
-            </div>
-
-            <div class="panel-section">
-                <h3>Revenue vs. Expenditure</h3>
-                <div class="chart-box">
-                    <canvas id="income-expense-chart"></canvas>
-                </div>
-                <div class="donut-legend" id="income-expense-legend"></div>
-            </div>
-
-            <div class="panel-section">
-                <h3>Cumulative Net Worth</h3>
-                <div class="chart-box">
-                    <canvas id="savings-trend-chart"></canvas>
-                </div>
+        <div class="panel-section">
+            <h3>Cumulative Net Worth</h3>
+            <div class="chart-box">
+                <canvas id="savings-trend-chart"></canvas>
             </div>
         </div>
 
-        <div class="panel">
-        <h2>Spending Breakdown</h2>
+        <div class="panel-section">
+            <h3>Revenue vs. Expenditure</h3>
+            <div class="chart-box">
+                <canvas id="income-expense-chart"></canvas>
+            </div>
+            <div class="donut-legend" id="income-expense-legend"></div>
+        </div>
+
+        <div class="panel-section">
+            <h3>Category Expenditure Trend</h3>
+            <div class="chart-box">
+                <canvas id="expense-breakdown-trend-chart"></canvas>
+            </div>
+            <div class="donut-legend" id="expense-breakdown-trend-legend"></div>
+        </div>
 
         <div class="panel-section">
             <h3>Average Monthly Spending by Category</h3>
@@ -1014,6 +1016,63 @@
             <div id="type-breakdown-container"></div>
         </div>
     </div>
+
+        <div class="panel" id="financial-insight-panel">
+            <h2>Financial Insight</h2>
+
+            <div class="insight-mode-actions">
+                <button type="button" id="financial-insight-load-btn" class="btn">Financial Snapshot</button>
+            </div>
+
+            <p class="hint" id="financial-insight-status"></p>
+
+            <div id="financial-insight-preview" class="insight-data-preview" hidden></div>
+
+            <div id="financial-insight-category-preview" hidden>
+                <div class="table-responsive">
+                    <table id="financial-insight-category-table">
+                        <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Previous Month</th>
+                            <th>Quarter avg</th>
+                            <th>Year avg</th>
+                            <th>Lifelong avg</th>
+                        </tr>
+                        </thead>
+                        <tbody id="financial-insight-category-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="financial-insight-accounts-preview" hidden>
+                <div class="table-responsive">
+                    <table id="financial-insight-accounts-table">
+                        <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Type</th>
+                            <th>Balance</th>
+                            <th>Market Value</th>
+                        </tr>
+                        </thead>
+                        <tbody id="financial-insight-accounts-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
+                <textarea id="financial-insight-question" rows="2" placeholder="e.g. Should I move cash into investments?"></textarea>
+            </label>
+
+            <div class="panel-actions">
+                <button type="button" id="financial-insight-generate-btn" class="btn btn-ai" disabled title="Load your financial data first">Send to AI</button>
+            </div>
+
+            <p id="financial-insight-generated-at" class="hint" hidden></p>
+            <div id="financial-insight-body" class="insight-body"></div>
+            <p id="financial-insight-form-error" class="status" hidden></p>
+        </div>
 
         <div class="panel">
             <h2>Transaction Log</h2>
@@ -1104,11 +1163,20 @@
                         <th class="sortable" data-sort="institution">Institution</th>
                         <th class="sortable" data-sort="type">Type</th>
                         <th class="sortable" data-sort="balance">Balance</th>
+                        <th class="sortable" data-sort="currentValue">Market Value</th>
                         <th></th>
                     </tr>
                     </thead>
 
                     <tbody id="accounts-list-body"></tbody>
+                    <tfoot>
+                        <tr id="accounts-total-row" class="accounts-total-row" hidden>
+                            <td colspan="3">Total</td>
+                            <td id="accounts-total-balance"></td>
+                            <td id="accounts-total-current-value"></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
@@ -1457,6 +1525,9 @@
             </label>
             <label>Balance
                 <input type="text" id="account-balance" placeholder="e.g. 1234.56 or =5000-1234.56" required>
+            </label>
+            <label>Market Value
+                <input type="text" id="account-current-value" placeholder="optional — today's cash-out value, if different from Balance">
             </label>
 
             <p id="account-form-error" class="status" hidden></p>
@@ -1996,6 +2067,7 @@
 <script src="assets/script/insight-panel.js"></script>
 <script src="assets/script/formula-playground.js"></script>
 <script src="assets/script/protein-rotation.js"></script>
+<script src="assets/script/financial-insight.js"></script>
 <script src="assets/script/landing-graph.js"></script>
 <script src="assets/script/gate.js"></script>
 <script src="assets/script/app.js"></script>

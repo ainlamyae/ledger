@@ -918,20 +918,46 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
     const fiberBand = getFiberTargetBandG(wellnessEntries);
     const dailyTargets = nutrientDailyTargets();
 
+    const desireCalories = Math.round(calorieTarget.kcal);
+    const desireFat = dailyTargets['Total lipid (fat)'].amount;
+    const desireCarb = dailyTargets['Carbohydrate, by difference'].amount;
+    // TEF the calorie target itself would produce at the current thermic rate — the same
+    // `calTarget.kcal × (1 − tefDivisor())` the Playground's "energy spent digesting" field
+    // and the Status TEF row show. Blank when TEF isn't being counted (rate 0, the default),
+    // matching the Playground, which hides a zero TEF.
+    const desireTef = Math.round(calorieTarget.kcal * (1 - tefDivisor()));
     const targetRow = document.createElement('tr');
     targetRow.className = 'calc-breakdown-target';
     targetRow.append(
-      makeCell('Target', `${calorieTarget.full} calorie target, current protein/fiber band floors (${formatProteinTargetBand(proteinBand)} / ${formatProteinTargetBand(fiberBand)} full range) and Fat/Carbohydrate FDA Daily Values — from the Health Formula Playground and Settings, not today's Consumption`),
+      makeCell('Desire', `${calorieTarget.full} calorie target, current protein/fiber band floors (${formatProteinTargetBand(proteinBand)} / ${formatProteinTargetBand(fiberBand)} full range), Fat/Carbohydrate FDA Daily Values and the TEF that target's own digestion costs — from the Health Formula Playground and Settings, not today's Consumption`),
       makeCell(''),
-      makeCell(String(Math.round(calorieTarget.kcal))),
+      makeCell(String(desireCalories)),
       makeCell(String(proteinBand.min)),
       makeCell(String(fiberBand.min)),
-      makeCell(String(dailyTargets['Total lipid (fat)'].amount)),
-      makeCell(String(dailyTargets['Carbohydrate, by difference'].amount)),
-      makeCell('—'),
+      makeCell(String(desireFat)),
+      makeCell(String(desireCarb)),
+      makeCell(desireTef > 0 ? String(desireTef) : '—'),
       makeCell(''),
     );
     tbody.appendChild(targetRow);
+
+    // Remain — Desire minus Total for each column that has a target (Source has none),
+    // i.e. how much of each is still left to hit the day's goal. Unclamped, so a column
+    // already past its target reads as a negative surplus rather than a flat zero.
+    const remainingRow = document.createElement('tr');
+    remainingRow.className = 'calc-breakdown-remaining';
+    remainingRow.append(
+      makeCell('Remain', 'Desire − Total — how much of each column is still left to reach the day\'s goal (negative once you\'ve passed it)'),
+      makeCell(''),
+      makeCell(String(desireCalories - totalCalories)),
+      makeCell((proteinBand.min - totalProtein).toFixed(1)),
+      makeCell((fiberBand.min - (totalFiber || 0)).toFixed(1)),
+      makeCell((desireFat - (totalFat || 0)).toFixed(1)),
+      makeCell((desireCarb - (totalCarbohydrate || 0)).toFixed(1)),
+      makeCell(desireTef > 0 ? String(Math.round(desireTef - (totalTef || 0))) : '—'),
+      makeCell(''),
+    );
+    tbody.appendChild(remainingRow);
   }
 
   // Physique stores the same JSON in a visible field rather than a hidden

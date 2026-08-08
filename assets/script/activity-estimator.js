@@ -1,4 +1,4 @@
-// Duration + calorie-burn estimation behind Physique's 🧮 Calculate, for the
+﻿// Duration + calorie-burn estimation behind Physique's 🧮 Calculate, for the
 // Workout side — the Activity counterpart to
 // calorie-estimator.js. Understands the Activity Plan's standardized workout
 // note (see strength-plan.js's logWorkout): one line per ticked row —
@@ -87,7 +87,7 @@ function workoutNoteMinutes(notes) {
 
 // Sums duration and calorie burn across every parsed line. Each line's own MET
 // is applied only to its own active seconds.
-function estimateWorkoutActivity(notes, weightKg) {
+function estimateWorkoutActivity(notes, bodyMassKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
     throw new Error("Couldn't find any exercises in Notes — log via the Activity Plan's Log a Workout button, or write one \"Nx  Exercise Name\" / \"Nsec  Exercise Name\" / \"Nmin  Activity Name\" / \"Nstep  Activity Name\" line per row.");
@@ -105,7 +105,7 @@ function estimateWorkoutActivity(notes, weightKg) {
     if (!activityByName(line.name)) unmatchedNames.push(line.name);
     const met = exerciseMet(line.name);
     const activeSeconds = activeSecondsForNoteLine(line);
-    const lineKcal = metKcal(met, weightKg, activeSeconds / 60);
+    const lineKcal = metKcal(met, bodyMassKg, activeSeconds / 60);
 
     totalSeconds += activeSeconds;
     calories += lineKcal;
@@ -126,10 +126,10 @@ function estimateWorkoutActivity(notes, weightKg) {
 }
 
 // Latest logged body mass (kg), read off the Physique tab — same lookup
-// insight.js's currentWeightKg uses. Null if none has ever been logged.
-function getLatestWeightKg() {
-  const weightEntries = physiqueAsWellnessEntries()
-    .filter((e) => e.category === 'Weight' && e.amount !== null)
+// insight.js's gatherProfileSnapshot uses. Null if none has ever been logged.
+function getLatestBodyMassKg() {
+  const bodyMassEntries = physiqueAsWellnessEntries()
+    .filter((e) => e.category === 'Body Mass' && e.amount !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
-  return weightEntries.length ? weightEntries[weightEntries.length - 1].amount : null;
+  return bodyMassEntries.length ? bodyMassEntries[bodyMassEntries.length - 1].amount : null;
 }

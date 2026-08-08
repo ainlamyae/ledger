@@ -1,4 +1,4 @@
-const SETTINGS_PANEL_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
+﻿const SETTINGS_PANEL_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
 
 let allSettingRows = [];
 let settingsSheetId = null;
@@ -87,7 +87,7 @@ function renderSettingsList() {
 
     // Full-masked (not just digits) since values include API keys and city
     // names — letters carry just as much sensitive content as digits do
-    // here, unlike a plain number. The Key column (e.g. WEIGHT_GOAL_KG)
+    // here, unlike a plain number. The Key column (e.g. BODY_MASS_TARGET_KG)
     // isn't sensitive on its own and stays visible.
     // No hover-reveal of a masked value — that would defeat the privacy toggle.
     const shown = truncateSettingValue(privacyMode ? maskText(setting.value) : setting.value);

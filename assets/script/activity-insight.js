@@ -1,4 +1,4 @@
-// The Health Insight panel's Activity mode: a plain-language workout-performance
+﻿// The Health Insight panel's Activity mode: a plain-language workout-performance
 // snapshot (consistency, activity-type breakdown, total resistance volume, and a
 // per-muscle-group last-trained/volume breakdown). The muscle-group detail is
 // this mode's own contribution — the Wellness mode's activity section only
@@ -100,7 +100,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
 // so that filter can tell them apart by content.
 function computeActivitySessionDays(fromIso, toIso) {
   const byDate = new Map();
-  const weightKg = latestWeightKg(physiqueAsWellnessEntries());
+  const bodyMassKg = latestBodyMassKg(physiqueAsWellnessEntries());
 
   physiqueAsWellnessEntries()
     .filter((e) => isActivityCategory(e.category) && e.amount !== null && e.date >= fromIso && e.date <= toIso)
@@ -108,7 +108,7 @@ function computeActivitySessionDays(fromIso, toIso) {
       if (!byDate.has(e.date)) byDate.set(e.date, { date: e.date, sessions: [], mins: 0, kcal: 0 });
       const day = byDate.get(e.date);
       const mins = toActivityMinutes(e.amount, e.unit);
-      const kcal = Math.round(activityEntryKcal(e, weightKg));
+      const kcal = Math.round(activityEntryKcal(e, bodyMassKg));
       day.sessions.push({
         description: e.description || 'Other',
         mins,
@@ -136,7 +136,7 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
 
   return {
     lookbackDays,
-    // Same age/sex/height/weight/BMI block the Wellness and Food modes send
+    // Same age/sex/height/body-mass/BMI block the Wellness and Food modes send
     // (insight.js) — training volume, rest needs and what counts as a heavy session
     // all depend on the body doing the lifting, so the coach shouldn't be
     // reasoning about this log without knowing whose it is.

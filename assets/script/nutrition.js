@@ -124,7 +124,7 @@ async function refreshNutrition(forceRefresh = false) {
       verified: String(row[5] || '').trim() === '1',
       // Column G: blank means "not tracked" — protein-rotation.js's Protein
       // Source Rotation chart only includes rows with a number here: what
-      // % of your (live, weight/activity-driven) protein target this
+      // % of your (live, body-mass/activity-driven) protein target this
       // ingredient should cover, e.g. 10 for "turkey = 10% of my protein".
       proteinPercent: (row[6] !== undefined && row[6] !== '') ? Number(row[6]) : null,
     }))

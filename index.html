@@ -92,7 +92,7 @@
                 <div class="node-graph-spokes">
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🩺 Health Tracker</span>
-                        <span class="node-graph-tooltip">Track Body Mass, Caloric Intake, Protein Intake, Physical Activity, and Rest & Recovery in a searchable Health Log. Charts show your last 84 days versus your daily figures — calories against a shaded out-of-bounds zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's reading colored green or red by whether the scale moved toward your goal or away from it.</span>
+                        <span class="node-graph-tooltip">Track Body Mass, Caloric Intake, Protein Intake, Physical Activity, and Rest &amp; Recovery, one row per day in a searchable Physique log. Charts show your last 84 days versus your daily figures — calories against a shaded out-of-bounds zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's reading colored green or red by whether the scale moved toward your goal or away from it.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🎯 Personalized Daily Targets</span>
@@ -128,7 +128,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🏋️ Strength Training Plan</span>
-                        <span class="node-graph-tooltip">A Push/Pull/Legs gym plan with the machine, sets, reps, and rest for every exercise. Tick off what you actually did — even mixed across days — and log it straight to your Health Log, with the duration estimated automatically from what you ticked.</span>
+                        <span class="node-graph-tooltip">A Push/Pull/Legs gym plan with the machine, sets, reps, and rest for every exercise. Tick off what you actually did — even mixed across days — and log it straight to today's Physique row, with the duration estimated automatically from what you ticked.</span>
                     </button>
                 </div>
             </div>
@@ -474,349 +474,8 @@
                 <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Instruction</button>
             </div>
 
-            <h3>Strength Training</h3>
-            <div class="workout-day">
-                <h4>Day 1 — Legs</h4>
-                <div class="table-responsive">
-                    <table id="workout-table-legs" class="workout-table-strength" data-day="Leg Day">
-                        <thead>
-                        <tr>
-                            <th>Exercise/Machine</th>
-                            <th>Sets x Reps</th>
-                            <th>Rest</th>
-                            <th class="workout-check-col">Done</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Leg Press</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Leg Extension (quads)</td>
-                            <td>3 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Leg Curl (hamstrings)</td>
-                            <td>3 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Hip Abduction machine</td>
-                            <td>2 x 15</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="15" data-rest="53"></td>
-                        </tr>
-                        <tr>
-                            <td>Hip Adduction machine</td>
-                            <td>2 x 15</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="15" data-rest="53"></td>
-                        </tr>
-                        <tr>
-                            <td>Calf Raise machine</td>
-                            <td>3 x 15</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="18" data-rest="53"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="workout-day">
-                <h4>Day 2 — Push (chest, shoulders, triceps)</h4>
-                <div class="table-responsive">
-                    <table id="workout-table-push" class="workout-table-strength" data-day="Push Day">
-                        <thead>
-                        <tr>
-                            <th>Exercise/Machine</th>
-                            <th>Sets x Reps</th>
-                            <th>Rest</th>
-                            <th class="workout-check-col">Done</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Chest Press machine</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Shoulder Press machine</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Pec Deck / Chest Fly machine</td>
-                            <td>2 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Left Lateral Raise machine (or cable)</td>
-                            <td>2 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Right Lateral Raise machine (or cable)</td>
-                            <td>2 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Cable Tricep Pushdown</td>
-                            <td>3 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="workout-day">
-                <h4>Day 3 — Pull (back, biceps)</h4>
-                <div class="table-responsive">
-                    <table id="workout-table-pull" class="workout-table-strength" data-day="Pull Day">
-                        <thead>
-                        <tr>
-                            <th>Exercise/Machine</th>
-                            <th>Sets x Reps</th>
-                            <th>Rest</th>
-                            <th class="workout-check-col">Done</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Lat Pulldown</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Seated Row machine</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Rear Delt Fly machine (or cable)</td>
-                            <td>2 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Cable Bicep Curl</td>
-                            <td>3 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="workout-day">
-                <h4>Day 4 — Full Body (dumbbell)</h4>
-                <div class="table-responsive">
-                    <table id="workout-table-dumbbell" class="workout-table-strength" data-day="Dumbbell Day">
-                        <thead>
-                        <tr>
-                            <th>Exercise/Machine</th>
-                            <th>Sets x Reps</th>
-                            <th>Rest</th>
-                            <th class="workout-check-col">Done</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Dumbbell Goblet Squat</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Dumbbell Bench Press</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Dumbbell Row</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Dumbbell Shoulder Press</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Dumbbell Romanian Deadlift</td>
-                            <td>3 x 10</td>
-                            <td>90 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="11" data-rest="90"></td>
-                        </tr>
-                        <tr>
-                            <td>Dumbbell Lateral Raise</td>
-                            <td>2 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="2" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Dumbbell Bicep Curl</td>
-                            <td>3 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Dumbbell Tricep Extension</td>
-                            <td>3 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="14" data-rest="60"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="workout-day">
-                <h4>Day 5 — Core &amp; Bodyweight (no equipment)</h4>
-                <div class="table-responsive">
-                    <table id="workout-table-bodyweight" class="workout-table-strength" data-day="Bodyweight Day">
-                        <thead>
-                        <tr>
-                            <th>Exercise/Machine</th>
-                            <th>Sets x Reps</th>
-                            <th>Rest</th>
-                            <th class="workout-check-col">Done</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Crunch</td>
-                            <td>3 x 20</td>
-                            <td>45 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="20" data-rest="45"></td>
-                        </tr>
-                        <tr>
-                            <td>Plank</td>
-                            <td>3 x 45 sec</td>
-                            <td>45 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-hold="45" data-rest="45"></td>
-                        </tr>
-                        <tr>
-                            <td>Side Plank (both sides)</td>
-                            <td>4 x 30 sec</td>
-                            <td>30 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="4" data-hold="30" data-rest="30"></td>
-                        </tr>
-                        <tr>
-                            <td>Leg Raise</td>
-                            <td>3 x 15</td>
-                            <td>45 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="45"></td>
-                        </tr>
-                        <tr>
-                            <td>Glute Bridge</td>
-                            <td>3 x 15</td>
-                            <td>45 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="45"></td>
-                        </tr>
-                        <tr>
-                            <td>Bird Dog (both sides)</td>
-                            <td>6 x 12</td>
-                            <td>45 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="6" data-reps="12" data-rest="45"></td>
-                        </tr>
-                        <tr>
-                            <td>Superman</td>
-                            <td>3 x 15</td>
-                            <td>45 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="45"></td>
-                        </tr>
-                        <tr>
-                            <td>Push-up</td>
-                            <td>3 x 12</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="12" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Bodyweight Squat</td>
-                            <td>3 x 15</td>
-                            <td>60 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="15" data-rest="60"></td>
-                        </tr>
-                        <tr>
-                            <td>Mountain Climber</td>
-                            <td>3 x 20</td>
-                            <td>45 sec</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-sets="3" data-reps="20" data-rest="45"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <h3>NEAT</h3>
-            <div class="workout-day">
-                <div class="table-responsive">
-                    <table id="neat-table" class="workout-table-neat" data-day="NEAT">
-                        <thead>
-                        <tr>
-                            <th>Activity</th>
-                            <th>Amount</th>
-                            <th class="workout-check-col">Done</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Walk</td>
-                            <td>6000 step</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-steps="6000"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <h3>Cardio</h3>
-            <div class="workout-day">
-                <div class="table-responsive">
-                    <table id="cardio-table" class="workout-table-neat" data-day="Cardio">
-                        <thead>
-                        <tr>
-                            <th>Activity</th>
-                            <th>Amount</th>
-                            <th class="workout-check-col">Done</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Swim</td>
-                            <td>30 min</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-minutes="30"></td>
-                        </tr>
-                        <tr>
-                            <td>Running</td>
-                            <td>30 min</td>
-                            <td class="workout-check-cell"><input type="checkbox" class="workout-check" data-minutes="30"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <!-- Rebuilt from the Activities sheet tab by activities.js -->
+            <div id="activity-plan-tables"></div>
 
             <div class="panel-actions">
                 <button type="button" id="log-workout-btn" class="btn btn-primary">Log a Workout</button>
@@ -824,59 +483,54 @@
         </div>
 
         <div class="panel">
-            <h2>Health Log</h2>
+            <h2>Physique</h2>
 
             <div class="panel-actions">
-                <button id="add-wellness-btn" class="btn btn-primary">Log an Entry</button>
+                <button id="add-physique-btn" class="btn btn-primary">Log a Day</button>
             </div>
 
             <div class="filters">
-                <input type="text" id="wellness-search" placeholder="Search description, notes, unit...">
-                <select id="wellness-category-filter">
-                    <option value="">All Categories</option>
-                    <option>Sleep</option>
-                    <option value="Weight">Body Mass</option>
-                    <option>Calories; Protein</option>
-                    <option>Activity; Calories</option>
-                </select>
+                <input type="text" id="physique-search" placeholder="Search date, consumption, breakdown, workout...">
             </div>
 
             <div class="export-date-range">
                 <label>From
-                    <input type="date" id="wellness-date-from">
+                    <input type="date" id="physique-date-from">
                 </label>
                 <label>To
-                    <input type="date" id="wellness-date-to">
+                    <input type="date" id="physique-date-to">
                 </label>
             </div>
 
             <div class="table-responsive">
-                <table id="wellness-table">
+                <table id="physique-table">
                     <thead>
                     <tr>
-                        <th><input type="checkbox" id="wellness-select-all" aria-label="Select all entries on this page"></th>
+                        <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
                         <th class="sortable" data-sort="date">Date</th>
-                        <th>Time</th>
-                        <th>Category</th>
-                        <th>Description</th>
-                        <th>Amount</th>
-                        <th>Unit</th>
-                        <th>Notes</th>
+                        <th>Bedtime</th>
+                        <th>Wake-up Time</th>
+                        <th class="sortable" data-sort="bodyMass">Body Mass</th>
+                        <th>Consumption</th>
+                        <th>Breakdown</th>
+                        <th class="sortable" data-sort="caloriesIn">Calories In</th>
+                        <th class="sortable" data-sort="proteinIn">Protein In</th>
+                        <th>Workout</th>
+                        <th class="sortable" data-sort="duration">Activity Duration</th>
+                        <th class="sortable" data-sort="caloriesOut">Calories Out</th>
                         <th></th>
                     </tr>
                     </thead>
-                    <tbody id="wellness-body"></tbody>
+                    <tbody id="physique-body"></tbody>
                 </table>
             </div>
 
-            <div class="panel-actions" id="wellness-bulk-actions" hidden>
-                <span id="wellness-bulk-summary"></span>
-                <button id="wellness-bulk-edit-btn" class="btn" title="Edit Selected" aria-label="Edit Selected">✏️</button>
-                <button id="wellness-bulk-recalc-btn" class="btn btn-ai" title="Recalculate Selected" aria-label="Recalculate Selected">🧮</button>
-                <button id="wellness-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
+            <div class="panel-actions" id="physique-bulk-actions" hidden>
+                <span id="physique-bulk-summary"></span>
+                <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
             </div>
 
-            <div class="pagination" id="wellness-pagination"></div>
+            <div class="pagination" id="physique-pagination"></div>
         </div>
 
         <div class="panel">
@@ -1626,46 +1280,36 @@
     </div>
 </div>
 
-<div id="wellness-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-modal-title" hidden>
+<div id="physique-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="physique-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="wellness-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
-        <h2 id="wellness-modal-title">Log an Entry</h2>
+        <button type="button" id="physique-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        <h2 id="physique-modal-title">Log a Day</h2>
 
-        <form id="wellness-form" class="app-form">
-            <label class="checkbox-inline-label" title="Reusable pattern: no date — always listed at the top, excluded from charts">
-                <input type="checkbox" id="wellness-is-pattern">
+        <form id="physique-form" class="app-form">
+            <label class="checkbox-inline-label" title="Reusable pattern: no date — always listed at the top, excluded from every chart and Insight mode">
+                <input type="checkbox" id="physique-is-pattern">
                 Pattern
             </label>
             <label>Date
-                <input type="date" id="wellness-entry-date" required>
+                <input type="date" id="physique-date" required>
             </label>
-            <label>Time
-                <input type="time" id="wellness-entry-time">
+            <label>Bedtime
+                <input type="time" id="physique-bedtime">
             </label>
-            <label>Category
-                <select id="wellness-category" required>
-                    <option value="">— Select —</option>
-                    <option value="Weight">Body Mass</option>
-                    <option>Sleep</option>
-                    <option>Calories; Protein</option>
-                    <option>Activity; Calories</option>
-                </select>
+            <label>Wake-up Time
+                <input type="time" id="physique-wake-time">
             </label>
-            <label>Description
-                <input type="text" id="wellness-description" list="wellness-description-options" required>
-                <datalist id="wellness-description-options"></datalist>
+            <label>Body Mass
+                <input type="text" id="physique-body-mass" placeholder="e.g. 94 (kg)">
             </label>
-            <label>Amount
-                <input type="text" id="wellness-amount" required>
+            <label>Consumption
+                <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
             </label>
-            <label>Unit
-                <input type="text" id="wellness-unit">
-            </label>
-            <label>Notes
-                <textarea id="wellness-notes" rows="5"></textarea>
+            <label>Breakdown
+                <textarea id="physique-breakdown" rows="3" placeholder="JSON — filled by Calculate, shown as the table below"></textarea>
             </label>
 
-            <div id="wellness-calc-breakdown" class="table-responsive" hidden>
+            <div id="physique-calc-breakdown" class="table-responsive" hidden>
                 <table>
                     <thead>
                     <tr>
@@ -1678,46 +1322,29 @@
                         <th>Save</th>
                     </tr>
                     </thead>
-                    <tbody id="wellness-calc-breakdown-body"></tbody>
+                    <tbody id="physique-calc-breakdown-body"></tbody>
                 </table>
             </div>
+            <label>Calories In
+                <input type="text" id="physique-calories-in" placeholder="e.g. 2100 (kcal)">
+            </label>
+            <label>Protein In
+                <input type="text" id="physique-protein-in" placeholder="e.g. 140 (g)">
+            </label>
+            <label>Workout
+                <textarea id="physique-workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
+            </label>
+            <label>Activity Duration
+                <input type="text" id="physique-activity-duration" placeholder="e.g. 45 (min)">
+            </label>
+            <label>Calories Out
+                <input type="text" id="physique-calories-out" placeholder="e.g. 520 (kcal)">
+            </label>
 
-            <p id="wellness-form-error" class="status" hidden></p>
+            <p id="physique-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="wellness-calc-btn" class="btn btn-ai">Calculate</button>
-                <button type="submit" class="btn btn-primary">Save</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div id="wellness-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="wellness-bulk-edit-modal-title" hidden>
-    <div class="modal-card">
-        <button type="button" id="wellness-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
-        <h2 id="wellness-bulk-edit-modal-title">Edit Selected Entries</h2>
-
-        <form id="wellness-bulk-edit-form" class="app-form">
-            <label>Category
-                <select id="wellness-bulk-category">
-                    <option value="">— Leave unchanged —</option>
-                    <option>Sleep</option>
-                    <option value="Weight">Body Mass</option>
-                    <option>Calories; Protein</option>
-                    <option>Activity; Calories</option>
-                </select>
-            </label>
-            <label>Description
-                <input type="text" id="wellness-bulk-description">
-            </label>
-            <label>Notes
-                <textarea id="wellness-bulk-notes" rows="2"></textarea>
-            </label>
-
-            <p class="hint">Leave a field blank to keep each entry's existing value.</p>
-            <p id="wellness-bulk-edit-form-error" class="status" hidden></p>
-
-            <div class="modal-actions">
+                <button type="button" id="physique-calc-btn" class="btn btn-ai">Calculate</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -1834,57 +1461,7 @@
 
         <p class="hint instruction-key">Each guide shows the start and the finish, with the muscle worked picked out in red.</p>
 
-        <div class="instruction-body">
-            <h3>Legs</h3>
-            <ul class="instruction-activities">
-                <li>Leg Press</li>
-                <li>Leg Extension (quads)</li>
-                <li>Leg Curl (hamstrings)</li>
-                <li>Hip Abduction machine</li>
-                <li>Hip Adduction machine</li>
-                <li>Calf Raise machine</li>
-            </ul>
-            <h3>Push (chest, shoulders, triceps)</h3>
-            <ul class="instruction-activities">
-                <li>Chest Press machine</li>
-                <li>Shoulder Press machine</li>
-                <li>Pec Deck / Chest Fly machine</li>
-                <li>Left Lateral Raise machine (or cable)</li>
-                <li>Right Lateral Raise machine (or cable)</li>
-                <li>Cable Tricep Pushdown</li>
-            </ul>
-            <h3>Pull (back, biceps)</h3>
-            <ul class="instruction-activities">
-                <li>Lat Pulldown</li>
-                <li>Seated Row machine</li>
-                <li>Rear Delt Fly machine (or cable)</li>
-                <li>Cable Bicep Curl</li>
-            </ul>
-            <h3>Full Body (dumbbell)</h3>
-            <ul class="instruction-activities">
-                <li>Dumbbell Goblet Squat</li>
-                <li>Dumbbell Bench Press</li>
-                <li>Dumbbell Row</li>
-                <li>Dumbbell Shoulder Press</li>
-                <li>Dumbbell Romanian Deadlift</li>
-                <li>Dumbbell Lateral Raise</li>
-                <li>Dumbbell Bicep Curl</li>
-                <li>Dumbbell Tricep Extension</li>
-            </ul>
-            <h3>Core &amp; Bodyweight (no equipment)</h3>
-            <ul class="instruction-activities">
-                <li>Crunch</li>
-                <li>Plank</li>
-                <li>Side Plank (both sides)</li>
-                <li>Leg Raise</li>
-                <li>Glute Bridge</li>
-                <li>Bird Dog (both sides)</li>
-                <li>Superman</li>
-                <li>Push-up</li>
-                <li>Bodyweight Squat</li>
-                <li>Mountain Climber</li>
-            </ul>
-        </div>
+        <div class="instruction-body" id="instruction-body"></div>
     </div>
 </div>
 
@@ -2117,7 +1694,8 @@
 <script src="assets/script/accounts.js"></script>
 <script src="assets/script/timesheet.js"></script>
 <script src="assets/script/csv.js"></script>
-<script src="assets/script/wellness.js"></script>
+<script src="assets/script/activities.js"></script>
+<script src="assets/script/physique.js"></script>
 <script src="assets/script/strength-plan.js"></script>
 <script src="assets/script/activity-estimator.js"></script>
 <script src="assets/script/contacts.js"></script>

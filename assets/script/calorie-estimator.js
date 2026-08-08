@@ -1,27 +1,14 @@
-// AI-powered calorie estimation for the Health Log's 🧮 Calculate button:
+// AI-powered calorie estimation behind Physique's 🧮 Calculate:
 // parses a freeform ingredient description (Groq), checks each item against
 // the personal Nutrition Facts table (nutrition.js) first, and only for a
 // miss there cross-checks calorie density against real nutrition data (USDA
 // FoodData Central) — banking that result back into the table for next time
-// — before filling the Log Entry form in with the result. Wired up by
-// wellness.js — see its 'wellness-calc-btn' click listener in initWellness().
+// — before handing the result back. Wired up by physique.js, which runs it
+// over the Consumption field one day at a time.
 
-// Generous ceiling for a single logged entry (well above a realistic single
-// meal/snack) — a backstop that flags any extraction bug producing an
-// implausible number, whether or not we've seen that specific failure mode yet.
-const WELLNESS_CALORIE_SANITY_CEILING = 3000;
-
-// The breakdown for whatever's currently in the Log Entry form — set by a
-// fresh 🧮 Calculate, or by wellness.js's openWellnessForm restoring a
-// previously-saved one when editing an existing entry (Wellness Log column
-// H — see refreshWellness). Read by submitWellnessForm at Save time so the
-// breakdown persists without needing to re-run Calculate. Cleared by
-// hideCalcBreakdown whenever it would no longer match what's in the form.
-let currentCalcBreakdown = [];
-
-// JSON-encodes a breakdown array for the Wellness Log's Breakdown column,
-// or '' for "nothing to save" (an empty cell reads back as [] either way —
-// see refreshWellness — so there's no ambiguity, just a tidier sheet).
+// JSON-encodes a breakdown array for the Physique tab's Breakdown column, or
+// '' for "nothing to save" (an empty cell reads back as [] either way, so
+// there's no ambiguity, just a tidier sheet).
 function breakdownToJson(breakdown) {
   return (breakdown && breakdown.length) ? JSON.stringify(breakdown) : '';
 }
@@ -172,19 +159,19 @@ const UNIT_CANONICAL = {
 };
 
 // Pure calorie/protein estimation core — no DOM reads or writes — shared by
-// the single-entry Calculate button (below) and the Health Log table's bulk
+// the single-day Calculate button and the Physique table's bulk
 // Recalculate action (wellness.js). Returns {calories, protein, breakdown,
 // usdaUnreachable} or throws (bad/empty input, Groq failure, etc.). Never
 // touches the Notes text itself — the caller's notes are the ones saved,
 // verbatim, no matter what the AI extraction below returns.
 // autoBank: whether a miss (USDA/AI-only estimate) gets saved to the
 // Nutrition Facts table immediately. The interactive Calculate button (see
-// calculateWellnessCalories) sets this false and instead surfaces an "Add"
+// physique.js's Calculate) sets this false and instead surfaces an "Add"
 // button per row in the breakdown, so a typo'd/misphrased name (e.g. "oilve
 // oil" not matching an existing "olive oil" row) is caught and fixed by hand
 // — recalculate after editing Notes — rather than silently banking a
-// same-food duplicate row under the wrong name. Bulk recalculate (wellness.js
-// bulkRecalculateWellness) has no per-row review UI, so it leaves this true.
+// same-food duplicate row under the wrong name. Bulk Calculate (physique.js's
+// bulkCalculatePhysique) has no per-row review UI, so it leaves this true.
 async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   const notes = notesText.trim();
   if (!notes) throw new Error('No ingredients to calculate from.');
@@ -435,6 +422,12 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     protein: Math.round(m.itemProtein * 10) / 10,
     density: m.density,
     source: SOURCE_LABELS[m.source] || m.source,
+    // The standardized Notes line this item produced. Stored so a later
+    // Calculate can tell which lines are untouched and reuse their numbers
+    // instead of re-extracting the lot (physique.js's incremental path). A
+    // breakdown saved before this field existed simply never matches, so it
+    // re-estimates in full — the old behaviour, not a failure.
+    noteLine: m.noteLine,
     // Already banked (autoBank) or never eligible (a table hit) — only a
     // still-pending miss carries a newRow, which is what renderCalcBreakdown
     // uses to decide whether to show an "Add" button for this row.
@@ -468,7 +461,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 // user reviews it here: either click 💾 to bank it as-is, or leave it
 // and fix/retype the ingredient in Notes then Calculate again if the name
 // was wrong (e.g. a typo not matching an existing row).
-function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
+function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, target) {
   const cell = document.createElement('td');
   if (!row.newRow) return cell;
 
@@ -488,11 +481,11 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
       // across two Notes lines) — clear all matching rows' newRow so a
       // second click can't bank the same name twice in one go.
       breakdown.forEach((r) => { if (r.newRow && r.newRow.name === row.newRow.name) r.newRow = null; });
-      renderCalcBreakdown(breakdown, totalCalories, totalProtein);
+      renderCalcBreakdown(breakdown, totalCalories, totalProtein, target);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '💾';
-      showFieldError('wellness-form-error', err.message);
+      showFieldError(`${target}-form-error`, err.message);
     }
   });
   cell.appendChild(btn);
@@ -503,8 +496,11 @@ function makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein) {
 // can be checked by eye/pure arithmetic before saving — the Total row uses
 // the exact same rounded totals written into the Amount field, not a
 // re-sum of the (individually rounded, so slightly lossy) per-item rows.
-function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
-  const tbody = document.getElementById('wellness-calc-breakdown-body');
+// `target` names the form whose table to draw into — currently only Physique's
+// (physique.js), which keeps the same JSON in a field of its own and so gets it
+// rewritten here too.
+function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'physique') {
+  const tbody = document.getElementById(`${target}-calc-breakdown-body`);
   tbody.innerHTML = '';
 
   breakdown.forEach((row) => {
@@ -516,7 +512,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
       makeCell(String(row.protein)),
       makeCell(row.density),
       makeCell(row.source),
-      makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein),
+      makeAddToNutritionCell(row, breakdown, totalCalories, totalProtein, target),
     );
     tbody.appendChild(tr);
   });
@@ -534,59 +530,20 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein) {
   );
   tbody.appendChild(totalRow);
 
-  document.getElementById('wellness-calc-breakdown').hidden = false;
-}
-
-// Stale once Notes changes by hand (it no longer reflects what's in the
-// field) — called on every real Notes edit and whenever the Log Entry
-// modal opens fresh for a different entry (see wellness.js).
-function hideCalcBreakdown() {
-  document.getElementById('wellness-calc-breakdown').hidden = true;
-  document.getElementById('wellness-calc-breakdown-body').innerHTML = '';
-  currentCalcBreakdown = [];
-}
-
-async function calculateWellnessCalories() {
-  const notes = document.getElementById('wellness-notes').value.trim();
-  const btn = document.getElementById('wellness-calc-btn');
-
-  if (!notes) {
-    showFieldError('wellness-form-error', 'Type ingredients and amounts in Notes first.');
-    return;
+  // Physique stores the same JSON in a visible field rather than a hidden
+  // column, so every re-render (including 💾 clearing a row's newRow) keeps
+  // that field in step with the table above it.
+  if (target === 'physique') {
+    document.getElementById('physique-breakdown').value = breakdownToJson(breakdown);
   }
 
-  btn.disabled = true;
-  const originalLabel = btn.textContent;
-  btn.textContent = 'Calculating…';
-  clearFieldError('wellness-form-error');
+  document.getElementById(`${target}-calc-breakdown`).hidden = false;
+}
 
-  try {
-    const { calories, protein, breakdown, standardizedNotes, usdaUnreachable } = await estimateCaloriesAndProtein(notes, { autoBank: false });
-
-    const description = document.getElementById('wellness-description').value;
-    document.getElementById('wellness-category').value = 'Calories; Protein';
-    onCategoryChange();
-    document.getElementById('wellness-description').value = description;
-    document.getElementById('wellness-amount').value = `${calories}; ${protein}`;
-    document.getElementById('wellness-unit').value = 'kcal; g';
-    document.getElementById('wellness-notes').value = standardizedNotes;
-    currentCalcBreakdown = breakdown;
-    renderCalcBreakdown(breakdown, calories, protein);
-
-    const warnings = [];
-    if (usdaUnreachable) {
-      warnings.push("⚠️ Couldn't reach the nutrition database (network/DNS issue) — this estimate is AI-only and may be less accurate.");
-    }
-    if (calories > WELLNESS_CALORIE_SANITY_CEILING) {
-      warnings.push(`⚠️ This estimate (${calories} kcal) looks unusually high — double-check before saving.`);
-    }
-    if (warnings.length) {
-      showFieldError('wellness-form-error', warnings.join(' '));
-    }
-  } catch (err) {
-    showFieldError('wellness-form-error', err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-  }
+// Tears the table down when there's nothing parseable to show. Only the table:
+// Physique's Breakdown field is the user's to edit, so physique.js clears that
+// explicitly where it's actually meant.
+function hideCalcBreakdown(target = 'physique') {
+  document.getElementById(`${target}-calc-breakdown`).hidden = true;
+  document.getElementById(`${target}-calc-breakdown-body`).innerHTML = '';
 }

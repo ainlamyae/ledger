@@ -79,7 +79,7 @@ function birthDateForAge(age) {
   return isoFromDate(new Date(today.getFullYear() - age, month, day));
 }
 
-// Every box maps to a Settings key except current weight, which is a Health Log
+// Every box maps to a Settings key except current weight, which is a Physique
 // measurement — it belongs here because both terms of the formula scale with it,
 // but there is no setting to write it to.
 //
@@ -233,7 +233,7 @@ function loadFormulaInputsFromSettings() {
   });
   // Seeded from the same places the charts read, so the figure shown on open
   // matches the one on the Caloric Intake line before anything is touched.
-  document.getElementById('formula-weight').value = latestWeightKg(getDatedWellnessEntries()) ?? '';
+  document.getElementById('formula-weight').value = latestWeightKg(physiqueAsWellnessEntries()) ?? '';
   document.getElementById('formula-height').value = getSetting('HEIGHT_CM', null) ?? '';
   document.getElementById('formula-age').value = ageFromBirthDate(getSettingString('BIRTH_DATE', null)) ?? '';
   // Falls back to male only because the formula needs one of the two — an unset
@@ -268,7 +268,7 @@ async function saveFormulaSettings() {
     // saveSettingValues has already refreshed currentSettings, so re-rendering
     // here is what makes the charts behind the modal agree with it immediately.
     applySettingsToWidgets();
-    renderWellnessCharts(getDatedWellnessEntries());
+    renderWellnessCharts(physiqueAsWellnessEntries());
     loadFormulaInputsFromSettings();
     renderFormulaPreview();
     statusEl.classList.add('status-ok');

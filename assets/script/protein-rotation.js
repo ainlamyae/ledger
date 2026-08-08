@@ -7,7 +7,7 @@
 // (charts.js's getProteinTargetG) already updates live with weight/height/
 // activity, each ingredient's gram target moves with it automatically —
 // no separate serving-size or ratio-scaling math needed. Actual protein
-// eaten is summed straight from the Health Log's own Calculate breakdown,
+// eaten is summed straight from Physique's own Calculate breakdown,
 // independent of whatever Nutrition Facts' Amount/Calories happen to say
 // today. Beside the bars, a two-ring donut splits the same sources by share
 // of protein actually eaten — outer ring the 4 weeks ending on the To date,
@@ -40,7 +40,7 @@ function trackedProteinSources() {
 // needed, only the protein grams each breakdown item already carries.
 function actualProteinEatenBySource(from, to) {
   const proteinByName = new Map();
-  getDatedWellnessEntries()
+  physiqueAsWellnessEntries()
     .filter((e) => e.category === 'Calories; Protein' && e.date >= from && e.date <= to)
     .forEach((e) => {
       (e.breakdown || []).forEach((item) => {
@@ -68,7 +68,7 @@ function computeProteinRotationRows(from, to) {
   // denominator, and the middle of the band is the fairest one to divide up
   // (a floor-based split would under-target every source, a top-end one would
   // over-target every source).
-  const dailyProteinTarget = getProteinTargetG(getDatedWellnessEntries());
+  const dailyProteinTarget = getProteinTargetG(physiqueAsWellnessEntries());
   const weeklyProteinTarget = dailyProteinTarget * 7;
   // Total protein target across the whole lookback window (not per
   // ingredient) — the denominator for "what % of my total target did this

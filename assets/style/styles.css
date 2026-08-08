@@ -178,8 +178,7 @@ header h1 {
 
 #accounts,
 #transactions,
-#timesheet,
-#wellness {
+#timesheet {
     scroll-margin-top: 65px;
 }
 
@@ -1086,18 +1085,10 @@ td {
     border-bottom: 1px solid var(--color-border);
 }
 
-/* Marks a day boundary in the Health Log table (assigned in wellness.js's
-   renderWellnessList whenever a row's date differs from the row above it),
-   so a scan down the table can spot where one day's entries end and the
-   next begin without reading every date cell. */
-#wellness-table tbody tr.wellness-day-boundary td {
-    border-top: 2px solid var(--color-text-muted);
-}
-
 /* The 🧮 Calculate breakdown's summed last row (assets/script/calorie-estimator.js's
    renderCalcBreakdown) — bold and a top border set it apart from the
    per-item rows above it. */
-#wellness-calc-breakdown tr.calc-breakdown-total td {
+#physique-calc-breakdown tr.calc-breakdown-total td {
     font-weight: 600;
     border-top: 2px solid var(--color-text-muted);
 }
@@ -1148,8 +1139,7 @@ td {
 #transactions-table th:nth-child(7),
 #accounts-table th:nth-child(4),
 #accounts-table th:nth-child(5),
-#accounts-table td:nth-child(5),
-#wellness-table th:nth-child(5) {
+#accounts-table td:nth-child(5) {
     text-align: right;
 }
 
@@ -2264,8 +2254,7 @@ td .btn {
 
     #accounts,
     #transactions,
-    #timesheet,
-    #wellness {
+    #timesheet {
         scroll-margin-top: 50px;
     }
 

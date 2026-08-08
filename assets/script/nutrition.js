@@ -1,4 +1,4 @@
-// Nutrition Facts: a personal, editable ingredient database the Health Log's
+// Nutrition Facts: a personal, editable ingredient database Physique's
 // 🧮 Calculate button (calorie-estimator.js) checks before falling back to
 // the AI/USDA estimate — once an ingredient's real calories/protein (from
 // the specific brand/product actually bought) is recorded here, it's reused
@@ -43,7 +43,7 @@ function parseCountFromAmount(amount) {
 }
 
 let allNutritionEntries = [];
-// Same purpose as wellness.js's wellnessDataLoaded: lets a click that races the
+// Same purpose as physique.js's physiqueDataLoaded: lets a click that races the
 // initial fetch say "still loading" instead of treating the empty array as the
 // real answer (an untracked ingredient and an unloaded table look identical).
 let nutritionDataLoaded = false;
@@ -455,7 +455,7 @@ async function deleteNutritionEntry(entry) {
 // once by the app's own fallback and again by hand with slightly different
 // text) into one row — target is whichever selected row is lowest, blanks
 // on it are filled in from the others, nothing is summed (unlike the
-// Health Log's numeric-reading merge, these are catalog entries, not
+// Physique's numeric-reading rollup, these are catalog entries, not
 // measurements).
 async function mergeSelectedNutritionEntries() {
   const selected = allNutritionEntries.filter((n) => selectedNutritionRows.has(n.row)).sort((a, b) => a.row - b.row);

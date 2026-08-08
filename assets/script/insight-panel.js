@@ -7,7 +7,7 @@
 //
 // Nothing is computed until a mode button is clicked. The old panels each
 // rendered their preview on page load and again when wellness data arrived,
-// which meant dozens of passes over the Health Log — including the expensive
+// which meant dozens of passes over the day log — including the expensive
 // muscle-group note re-parse — before anyone had opened them. Now a load that
 // never touches this panel does no aggregation at all.
 
@@ -74,7 +74,7 @@ let getInsightDateRange = () => ({ from: null, to: null });
 function initInsightPanel() {
   clearFieldError('insight-status');
   // Starts blank — the element still carries the real status messages below
-  // ("Still loading your Health Log…"), it just no longer opens with a prompt.
+  // ("Still loading your Physique data…"), it just no longer opens with a prompt.
   document.getElementById('insight-mode-status').textContent = '';
 
   // Wires the From/To pair and defaults it to the last 7 days, but renders
@@ -108,8 +108,8 @@ function loadInsightMode(modeKey) {
 
   // An empty in-memory array isn't the same answer as "nothing logged" — say so
   // rather than gathering a preview full of zeros from data that's still in flight.
-  if (!wellnessDataLoaded || (mode.needsNutrition && !nutritionDataLoaded)) {
-    statusEl.textContent = 'Still loading your Health Log — try again in a moment.';
+  if (!physiqueDataLoaded || (mode.needsNutrition && !nutritionDataLoaded)) {
+    statusEl.textContent = 'Still loading your Physique data — try again in a moment.';
     return;
   }
 

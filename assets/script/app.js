@@ -16,8 +16,8 @@ function maskDigits(str) {
   return String(str).replace(/[0-9]/g, '*');
 }
 
-// Same idea as maskDigits, but for arbitrary free text (e.g. Health Log
-// Notes) rather than a formatted number — digits alone would leave every
+// Same idea as maskDigits, but for arbitrary free text (e.g. a Physique
+// Consumption cell) rather than a formatted number — digits alone would leave every
 // word fully readable, so every non-whitespace character is replaced
 // instead, keeping only the word/line shape visible.
 function maskText(str) {
@@ -105,7 +105,7 @@ function parseTypeBreakdown(insightRows) {
   return breakdown;
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'wellness-modal', 'wellness-bulk-edit-modal', 'nutrition-modal', 'formula-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'nutrition-modal', 'formula-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -577,14 +577,26 @@ async function loadDashboard(forceRefresh = false) {
 
   // Never throws (see loadSettings). Settings fetches concurrently with
   // every other module below instead of blocking them first — only
-  // initWellness (target-line charts) and initTravel (BIRTH_DATE credit)
+  // initPhysique (target-line charts) and initTravel (BIRTH_DATE credit)
   // actually read currentSettings, so just those two wait on it.
   const settingsPromise = loadSettings(forceRefresh).then((settings) => {
     currentSettings = settings;
     applySettingsToWidgets();
   });
 
-  const wellnessPromise = settingsPromise.then(() => initWellness(forceRefresh));
+  // Physique is what the Health Indicators charts, the today tiles, the
+  // Activity Plan ticks and every Insight mode read (physiqueAsWellnessEntries,
+  // physique.js).
+  //
+  // Activities has to land BEFORE Physique: the adapter splits each day's
+  // workout by the category that tab assigns, and it memoizes the result — a
+  // Physique load that won the race would cache every activity as 'Other'.
+  // allSettled, not all: a missing or unreadable Activities tab should cost the
+  // category split (everything lands under 'Other') and the plan tables, not
+  // every chart on the page. The rejection still surfaces via the list below.
+  const activitiesPromise = initActivities(forceRefresh);
+  const physiquePromise = Promise.allSettled([settingsPromise, activitiesPromise])
+    .then(() => initPhysique(forceRefresh));
   const nutritionPromise = initNutrition(forceRefresh);
 
   // Every module below is an independent API call — fetch them all
@@ -616,13 +628,14 @@ async function loadDashboard(forceRefresh = false) {
     // button, or Financial Snapshot) is clicked, which is what keeps
     // this load free of the aggregation those panels used to run on every
     // visit.
-    wellnessPromise,
     nutritionPromise,
-    // Protein Source Rotation needs wellness (actual servings eaten),
+    activitiesPromise,
+    physiquePromise,
+    // Protein Source Rotation needs Physique (actual servings eaten),
     // Nutrition Facts (live per-serving calories/protein), and settings
     // (protein target) all loaded — refresh only once all three are in,
     // rather than off just one of them like the two panels above.
-    Promise.all([wellnessPromise, nutritionPromise]).then(() => {
+    Promise.all([physiquePromise, nutritionPromise]).then(() => {
       renderProteinRotationChart(getProteinRotationDateRange());
     }),
     initContacts(forceRefresh),

@@ -259,47 +259,50 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
 
   let balanceKcal = null;
   let deprivationKcal = null;
-  // The BMR row IS this figure — plain BMR or BMR_adp, whichever the Formula
-  // Playground's "Basal metabolic rate basis" fieldset has selected (applyBmrBasis,
-  // wellness-math.js). One row rather than two: switching that setting changes what's
-  // shown here, and what Balance/Δm below are measured against, at the same time.
+  // BMR — always plain, regardless of the Formula Playground's "Basal metabolic rate
+  // basis" setting. λt and BMR_adp below are the reference discount and its result;
+  // Balance/Δm are measured against whichever the setting actually selected
+  // (applyBmrBasis, wellness-math.js), not necessarily this plain figure.
   let maintenanceKcal = null;
   if (haveProfile && caloriesToday !== null && bodyMassKg !== null) {
-    maintenanceKcal = Math.round(applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex)));
+    maintenanceKcal = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
+    const effectiveMaintenanceKcal = Math.round(applyBmrBasis(maintenanceKcal));
     const activity = activityKcalToday ?? 0;
     const tef = tefKcalToday !== null
       ? Math.round(tefKcalToday)
       : Math.round(caloriesToday * (1 - tefDivisor()));
     ({ deprivationKcal, balance: balanceKcal } = dailyEnergyBalanceKcal(
-      Math.round(caloriesToday), maintenanceKcal, activity, tef, sleepHoursToday, sleepTarget,
+      Math.round(caloriesToday), effectiveMaintenanceKcal, activity, tef, sleepHoursToday, sleepTarget,
     ));
   }
 
-  // BMR row — the effective figure above as a signed expenditure, same sign convention
-  // as the Calorie Balance tooltip's own Maintenance line.
+  // BMR row — the plain figure above as a signed expenditure, same sign convention as
+  // the Calorie Balance tooltip's own BMR line.
   const maintenanceEl = document.getElementById('today-status-maintenance-value');
   const maintenanceText = maintenanceKcal !== null ? `${-maintenanceKcal} kcal` : '—';
   maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
 
-  // λt row — how much of the BMR above is actually the adaptation discount, so the
-  // figure reads as "BMR minus λt" instead of an unexplained number. 0% under the plain
-  // 'bmr' basis (no discount applied); under 'bmr_adp', days actually elapsed since the
-  // first logged weigh-in — the same basis applyBmrBasis (wellness-math.js) itself uses.
+  // λt and BMR_adp — always shown regardless of which basis Balance/Δm actually run on,
+  // so BMR_adp reads as a plain derivation (BMR × (1 − λt)) rather than an unexplained
+  // number. Days actually elapsed since the first logged weigh-in
+  // (daysSinceFirstWeighIn, wellness-math.js) — the same basis applyBmrBasis itself uses.
   const adaptFracEl = document.getElementById('today-status-adapt-frac-value');
-  let adaptFracText = '0 %';
-  if (bmrBasis() === 'bmr_adp') {
+  const bmrAdaptEl = document.getElementById('today-status-bmr-adapt-value');
+  let adaptFracText = '—';
+  let bmrAdaptText = '—';
+  if (maintenanceKcal !== null) {
     const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
     const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries);
     if (daysOnDiet !== null) {
       const adaptPctPerWeek = getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT);
       const adaptPctCap = getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT);
-      const pct = Math.round(adaptationFraction(daysOnDiet, adaptPctPerWeek, adaptPctCap) * 1000) / 10;
-      adaptFracText = `${pct} %`;
-    } else {
-      adaptFracText = '—';
+      const fraction = adaptationFraction(daysOnDiet, adaptPctPerWeek, adaptPctCap);
+      adaptFracText = `${Math.round(fraction * 1000) / 10} %`;
+      bmrAdaptText = `${-Math.round(maintenanceKcal * (1 - fraction))} kcal`;
     }
   }
   adaptFracEl.textContent = privacyMode ? maskDigits(adaptFracText) : adaptFracText;
+  bmrAdaptEl.textContent = privacyMode ? maskDigits(bmrAdaptText) : bmrAdaptText;
 
   // Deprivation — the Sleep Deprivation Effect as a signed addition to Balance,
   // against a desired figure of 0 (a full night costs nothing).

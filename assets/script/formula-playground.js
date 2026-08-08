@@ -1,11 +1,11 @@
-// "Formula" in the Health Indicators heading: shows the daily calorie
-// bound as a formula with its three tunable inputs editable, recomputes the
+﻿// "Formula" in the Health Indicators heading: shows the daily calorie
+// target as a formula with its three tunable inputs editable, recomputes the
 // figure as you type, and can write the values back to the Settings tab.
 //
-// The point is that the bound is the one number in the app derived from settings
+// The point is that the target is the one number in the app derived from settings
 // you can't see the effect of until you save them — this makes the arithmetic and
 // the sensitivity visible first. It computes with the SAME functions the charts
-// use (calorieBoundDetail via a temporary settings overlay), so the preview can't
+// use (calorieTargetDetail via a temporary settings overlay), so the preview can't
 // drift from what saving would actually produce.
 
 // Editable rows: the Settings key, its input, and the fallback shown when the key
@@ -16,11 +16,11 @@ const FORMULA_FIELDS = [
   // ACTIVITY_MET_DEFAULT spelling an existing sheet may use instead.
   { key: 'ACTIVITY_MET', inputId: 'formula-met', fallback: () => activityMet() },
   { key: 'ACTIVITY_TARGET_MIN', inputId: 'formula-activity-min', fallback: () => ACTIVITY_TARGET_MIN_DEFAULT },
-  // No default: an unset WEEKLY_FAT_LOSS_KG is exactly what makes the bound
+  // No default: an unset WEEKLY_FAT_LOSS_KG is exactly what makes the target
   // uncomputable and sends the charts to the flat CALORIE_TARGET_KCAL, so the
   // playground opens on 0 (maintenance) rather than inventing a deficit.
   { key: 'WEEKLY_FAT_LOSS_KG', inputId: 'formula-weekly-loss', fallback: () => 0 },
-  { key: 'WEIGHT_GOAL_KG', inputId: 'formula-goal', fallback: () => WEIGHT_GOAL_KG_DEFAULT },
+  { key: 'BODY_MASS_TARGET_KG', inputId: 'formula-target', fallback: () => BODY_MASS_TARGET_KG_DEFAULT },
 ];
 
 // Broken into its named terms rather than shown as one long line: each is a
@@ -32,9 +32,9 @@ const FORMULA_EXPRESSION = `Resting metabolic rate — Mifflin-St Jeor (1990)
     BMR  =  10×m  +  6.25×h  −  5×a  +  σ
 Activity burn at the daily target — ACSM metabolic equation
     Eₐ   =  MET × m × τ × κ / ε
-Daily energy deficit implied by the weekly fat-loss goal
+Daily energy deficit implied by the weekly fat-loss target
     D    =  (Δm × ρ) / 7
-Proposed daily intake
+Target daily intake
     Eᵢₙ  =  BMR  +  Eₐ  −  D
 Maintenance is affine in body mass — M(m) = A + B×m
     A    =  6.25×h  −  5×a  +  σ
@@ -50,7 +50,7 @@ function formulaFieldValue(field) {
 }
 
 // Runs fn with `currentSettings` overlaid by the playground's edits, so the
-// preview goes through the real calorieBoundDetail/metKcal path instead of a
+// preview goes through the real calorieTargetDetail/metKcal path instead of a
 // second copy of the arithmetic that could disagree with it.
 function withFormulaOverrides(overrides, fn) {
   const saved = currentSettings;
@@ -79,7 +79,7 @@ function birthDateForAge(age) {
   return isoFromDate(new Date(today.getFullYear() - age, month, day));
 }
 
-// Every box maps to a Settings key except current weight, which is a Physique
+// Every box maps to a Settings key except current body mass, which is a Physique
 // measurement — it belongs here because both terms of the formula scale with it,
 // but there is no setting to write it to.
 //
@@ -97,11 +97,11 @@ function readFormulaInputs() {
     else overrides[field.key] = num;
   });
 
-  const weightKg = formulaNumber('formula-weight');
+  const bodyMassKg = formulaNumber('formula-body-mass');
   const heightCm = formulaNumber('formula-height');
   const age = formulaNumber('formula-age');
   const sex = document.getElementById('formula-sex').value;
-  if (weightKg === null) invalid.push('current body mass');
+  if (bodyMassKg === null) invalid.push('current body mass');
   if (heightCm === null) invalid.push('HEIGHT_CM');
   if (age === null) invalid.push('BIRTH_DATE (age)');
 
@@ -116,16 +116,16 @@ function readFormulaInputs() {
     }
   }
 
-  return { overrides, preview, weightKg, heightCm, age, sex, invalid };
+  return { overrides, preview, bodyMassKg, heightCm, age, sex, invalid };
 }
 
-// The projection itself lives in charts.js as projectPlanDays, shared with the Body
+// The projection itself lives in charts.js as projectTargetDays, shared with the Body
 // Mass Trend forecast so the date shown here and the one on that chart are the same
 // arithmetic. This module only supplies the live inputs.
 
 // The formula with every symbol replaced by the figure actually used, so a
 // surprising total can be traced to whichever input produced it.
-function renderFormulaSubstituted(detail, proj, { preview, weightKg, heightCm, age, sex }) {
+function renderFormulaSubstituted(detail, proj, { preview, bodyMassKg, heightCm, age, sex }) {
   const el = document.getElementById('formula-substituted');
   el.innerHTML = '';
   if (detail === null) return;
@@ -136,20 +136,20 @@ function renderFormulaSubstituted(detail, proj, { preview, weightKg, heightCm, a
   // sign rather than being joined with a fixed '+'.
   const sigma = sex === 'male' ? '+ 5' : '− 161';
   const rows = [
-    ['BMR', `10 × ${weightKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(detail.bmr)} kcal/day`],
-    ['Eₐ', `${met} × ${weightKg} × ${preview.ACTIVITY_TARGET_MIN} × ${preview.KCAL_PER_MET_KG_MIN} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
+    ['BMR', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(detail.bmr)} kcal/day`],
+    ['Eₐ', `${met} × ${bodyMassKg} × ${preview.ACTIVITY_TARGET_MIN} × ${preview.KCAL_PER_MET_KG_MIN} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
     ['D', `${preview.WEEKLY_FAT_LOSS_KG} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
     ['Eᵢₙ', `${Math.round(detail.bmr)} + ${Math.round(detail.activityKcal)} − ${Math.round(deficit)}  =  ${detail.kcal} kcal/day`],
   ];
 
-  const goalKg = preview.WEIGHT_GOAL_KG;
+  const targetKg = preview.BODY_MASS_TARGET_KG;
   rows.push(
     ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(proj.a)} kcal/day`],
     ['B', `10 + ${met} × ${preview.ACTIVITY_TARGET_MIN} × ${preview.KCAL_PER_MET_KG_MIN} / 200  =  ${Math.round(proj.b * 100) / 100} kcal/day per kg`],
     ['m∞', `(${detail.kcal} − ${Math.round(proj.a)}) / ${Math.round(proj.b * 100) / 100}  =  ${Math.round(proj.equilibriumKg * 10) / 10} kg`],
   );
   if (proj.status === 'ok') {
-    rows.push(['t', `(7700 / ${Math.round(proj.b * 100) / 100}) × ln[(${weightKg} − ${Math.round(proj.equilibriumKg * 10) / 10}) / (${goalKg} − ${Math.round(proj.equilibriumKg * 10) / 10})]  =  ${Math.round(proj.days)} days`]);
+    rows.push(['t', `(7700 / ${Math.round(proj.b * 100) / 100}) × ln[(${bodyMassKg} − ${Math.round(proj.equilibriumKg * 10) / 10}) / (${targetKg} − ${Math.round(proj.equilibriumKg * 10) / 10})]  =  ${Math.round(proj.days)} days`]);
   }
 
   rows.forEach(([label, value]) => {
@@ -185,7 +185,7 @@ function renderFormulaPreview() {
   const resultEl = document.getElementById('formula-result-value');
   const noteEl = document.getElementById('formula-profile-note');
   const saveBtn = document.getElementById('formula-save-btn');
-  const { preview, weightKg, heightCm, age, sex, invalid } = readFormulaInputs();
+  const { preview, bodyMassKg, heightCm, age, sex, invalid } = readFormulaInputs();
 
   if (invalid.length) {
     resultEl.textContent = '—';
@@ -197,7 +197,7 @@ function renderFormulaPreview() {
   }
   saveBtn.disabled = false;
 
-  const detail = withFormulaOverrides(preview, () => calorieBoundDetail(weightKg));
+  const detail = withFormulaOverrides(preview, () => calorieTargetDetail(bodyMassKg));
   if (detail === null) {
     resultEl.textContent = '—';
     renderFormulaDays(null);
@@ -212,19 +212,19 @@ function renderFormulaPreview() {
   // Clear any earlier invalid-input message.
   noteEl.textContent = '';
 
-  const proj = projectPlanDays({
+  const proj = projectTargetDays({
     intakeKcal: detail.kcal,
-    weightKg,
+    bodyMassKg,
     heightCm,
     age,
     sex,
     met: withFormulaOverrides(preview, activityMet),
     tau: preview.ACTIVITY_TARGET_MIN,
     kappa: preview.KCAL_PER_MET_KG_MIN,
-    goalKg: preview.WEIGHT_GOAL_KG,
+    targetKg: preview.BODY_MASS_TARGET_KG,
   });
   renderFormulaDays(proj);
-  renderFormulaSubstituted(detail, proj, { preview, weightKg, heightCm, age, sex });
+  renderFormulaSubstituted(detail, proj, { preview, bodyMassKg, heightCm, age, sex });
 }
 
 function loadFormulaInputsFromSettings() {
@@ -233,7 +233,7 @@ function loadFormulaInputsFromSettings() {
   });
   // Seeded from the same places the charts read, so the figure shown on open
   // matches the one on the Caloric Intake line before anything is touched.
-  document.getElementById('formula-weight').value = latestWeightKg(physiqueAsWellnessEntries()) ?? '';
+  document.getElementById('formula-body-mass').value = latestBodyMassKg(physiqueAsWellnessEntries()) ?? '';
   document.getElementById('formula-height').value = getSetting('HEIGHT_CM', null) ?? '';
   document.getElementById('formula-age').value = ageFromBirthDate(getSettingString('BIRTH_DATE', null)) ?? '';
   // Falls back to male only because the formula needs one of the two — an unset
@@ -286,7 +286,7 @@ function initFormulaPlayground() {
   // a button inside it would close the panel on the way to opening the modal.
   document.getElementById('formula-playground-btn').addEventListener('click', openFormulaPlayground);
 
-  [...FORMULA_FIELDS.map((f) => f.inputId), 'formula-weight', 'formula-height', 'formula-age'].forEach((id) => {
+  [...FORMULA_FIELDS.map((f) => f.inputId), 'formula-body-mass', 'formula-height', 'formula-age'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderFormulaPreview);
   });
   document.getElementById('formula-sex').addEventListener('change', renderFormulaPreview);

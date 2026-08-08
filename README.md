@@ -1,4 +1,4 @@
-# Ledger
+﻿# Ledger
 
 A private, serverless personal life dashboard — health, finances, time tracking, travel, applications, and contacts in one place.
 
@@ -99,8 +99,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 - Four tiles: **Max/Min Calory Intake**, **Activity**, **Protein**, **Sleep**.
 - Each reads `actual / target unit`, green on the right side of the figure, red otherwise, grey when nothing's logged.
-- Activity also restates its target in kcal — `— / 100 min = 394 kcal` — from the same `activityTargetKcal` the calorie bound uses.
-- The Calories heading carries which bound it is, since the number alone can't say it.
+- Activity also restates its target in kcal — `— / 100 min = 394 kcal` — from the same `activityTargetKcal` the calorie target uses.
+- The Calories heading carries which side of the target it is (max or min), since the number alone can't say it.
 - Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
 
 ### Health — Health Indicators
@@ -108,21 +108,21 @@ A private, serverless personal life dashboard — health, finances, time trackin
 Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
-- **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward goal; optional BMI twin axis.
-  - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (goal body mass, or the projected arrival date).
+- **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward target; optional BMI twin axis.
+  - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (target body mass, or the projected arrival date).
   - Plateau alert when the smoothed trend has held flat.
-  - The status line under the chart speaks only when there is **no** forecast to draw — goal reached, no net change, trending away, or levelling off short of goal. A forecast that renders says nothing, since the meters and the curve already do.
+  - The status line under the chart speaks only when there is **no** forecast to draw — target reached, no net change, trending away, or levelling off short of target. A forecast that renders says nothing, since the meters and the curve already do.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
-- **Calorie Balance** — intake minus BMR minus activity, scored against the *planned* deficit; grams-of-fat twin axis.
-- **Caloric Intake** — per-day bars with a per-day bound drawn as a cap on each bar, not one shared line.
-- **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout the Activity Plan can't parse groups under "Other".
+- **Calorie Balance** — intake minus BMR minus activity, scored against the *target* deficit; grams-of-fat twin axis.
+- **Caloric Intake** — per-day bars with a per-day target drawn as a cap on each bar, not one shared line.
+- **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
-- All six carry a **violet dashed segment per week**, so a week that quietly drifted past its bound is visible next to the per-day mark.
-  - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a goal cap.
+- All six carry a **violet dashed segment per week**, so a week that quietly drifted past its target is visible next to the per-day mark.
+  - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a target cap.
   - Buckets are counted **back from today**, so the most recent seven days are always one whole week and only the oldest bucket can come up short.
   - Built from days that were actually **logged**; a week with nothing logged draws nothing.
-  - **Flat** on five of them — the week's average. Rest & Recovery carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Planned Burn lives on.
+  - **Flat** on five of them — the week's average. Rest & Recovery carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Target Burn lives on.
   - **Sloped** on Body Mass alone: a bar there is an absolute level, not a per-day quantity, so a flat mean says nothing. Each week is a least-squares fit through its own readings, extended to both week edges so slopes compare directly. A week with one weigh-in shows a dot — no slope is measurable from it.
   - Every one of these charts adds the figure to its tooltip as well; Body Mass quotes the slope as `kg/week`.
 
@@ -175,7 +175,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Log a Day** opens the form; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
 - **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout.
 - **Select rows, then Calculate in the bulk bar** to recalculate whole days at once. Same two estimators, same incremental reuse — a line whose `noteLine` still matches that day's saved breakdown keeps its numbers, so re-running a stretch of days only pays for what changed.
-  - Each day's burn uses **its own** Body Mass where it has one, falling back to the most recent day that recorded one — so a historical row is priced with the weight it was actually logged at.
+  - Each day's burn uses **its own** Body Mass where it has one, falling back to the most recent day that recorded one — so a historical row is priced with the body mass it was actually logged at.
   - Days with neither a Consumption nor a Workout are skipped and counted; per-day failures don't stop the rest.
   - Progress shows in the selection summary, and the whole run is one undo.
 
@@ -328,9 +328,9 @@ flowchart TD
     Bank --> Sum
     Sum --> Idle
 
-    CalcCategory -- Activity --> ActWeight{"getLatestWeightKg():<br/>a Weight entry logged?"}
-    ActWeight -- no --> ActBlocked["Blocked — Calculate<br/>needs a weight to size the burn"] --> Idle
-    ActWeight -- yes --> ActParse["parseWorkoutNoteLines()<br/>Nx / Nsec / Nmin / Nstep forms"]
+    CalcCategory -- Activity --> ActBodyMass{"getLatestBodyMassKg():<br/>a Body Mass entry logged?"}
+    ActBodyMass -- no --> ActBlocked["Blocked — Calculate<br/>needs a body mass to size the burn"] --> Idle
+    ActBodyMass -- yes --> ActParse["parseWorkoutNoteLines()<br/>Nx / Nsec / Nmin / Nstep forms"]
     ActParse --> ActMET["Per line: EXERCISE_MET table<br/>(fallback EXERCISE_MET_DEFAULT)<br/>+ activeSecondsForNoteLine()"]
     ActMET --> ActSum["metKcal() per line, summed →<br/>breakdown table + Amount field.<br/>No AI, no cache — pure parse+lookup."] --> Idle
 
@@ -588,23 +588,23 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | `WORKOUT_REP_SEC` | `3` s per rep | `strength-plan.js` |
 | steps → minutes | `100` steps/min | `charts.js` |
 | `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `charts.js`, `activity-estimator.js` |
-| `WEIGHT_TREND_WINDOW_SIZE` | `5` logged points | `charts.js` |
+| `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `charts.js` |
 | `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `charts.js` |
 
 ### Scoring thresholds
 
 | Threshold | Value | Effect |
 |---|---|---|
-| `CALORIE_BOUND_NEAR_FRACTION` | `5 %` | Past the bound by ≤5 % is grey, beyond is red |
+| `CALORIE_TARGET_NEAR_FRACTION` | `5 %` | Past the target by ≤5 % is grey, beyond is red |
 | `ACTIVITY_NEAR_TARGET_FRACTION` | `5 %` | Short of the implied burn by ≤5 % is grey |
-| `WEIGHT_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* goal stays green |
+| `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* target stays green |
 | Protein over-band | — | Above the top end is grey, not red. Below the floor stays red |
-| Calorie Balance vs. plan | — | At/beyond plan green, short but right side of zero grey, wrong side red |
+| Calorie Balance vs. target | — | At/beyond target green, short but right side of zero grey, wrong side red |
 
 ### Body
 
 ```
-BMI                = weightKg / (heightCm/100)²
+BMI                = bodyMassKg / (heightCm/100)²
 age                = years since BIRTH_DATE (−1 before this year's birthday)
 bodyFat%           = 1.20·BMI + 0.23·age − 10.8·(sex==male ? 1 : 0) − 5.4
                      clamped to [3, 60]                       (Deurenberg 1991)
@@ -620,29 +620,29 @@ metKcal(met, kg, min)     = met × kg × min × KCAL_PER_MET_KG_MIN/200
 activityMinutes(amt,unit) = steps/100 | hours×60 | min as-is
 
 activityEntryKcal(entry)  = entry.amount2                    if logged
-                          = metKcal(ACTIVITY_MET, kg, mins)  else, with a weight on file
+                          = metKcal(ACTIVITY_MET, kg, mins)  else, with a body mass on file
                           = mins × 5                         else
 
 BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)
 activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)
 ```
 
-**Calorie bound** — one number per day, deliberately not called a "target":
+**Calorie target** — one number per day, directional rather than a point to land on (a ceiling heading down, a floor heading up):
 
 ```
-bound = round( BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7 )
+target = round( BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7 )
 ```
 
 - Falls back to flat `CALORIE_TARGET_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing.
 - Re-evaluated **per day** from that day's carried-forward body mass.
 - Moves ≈ 15.8 kcal per kg, so a 6 kg loss shifts it by roughly 95 kcal.
-- Max when goal < current, min when goal > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
+- Max when target < current, min when target > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
 - `activityTargetKcal` is also what the Activity glance tile shows after its `=`.
 
 ### Calorie Balance (per day)
 
 ```
-maintenance = BMR(that day's carried-forward weight, height, age, sex)
+maintenance = BMR(that day's carried-forward body mass, height, age, sex)
 balance     = intake − maintenance − activityKcal(that day)
 expected g  = (balance / 7700) × 1000
 ```
@@ -665,32 +665,32 @@ sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
 
 ### State Trend & Forecast
 
-**Plan-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the plan being *followed*.
+**Target-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the target being *followed*.
 
 ```
-Eᵢₙ    = BMR + Eₐ(target) − D                    calculated bound at the latest reading
+Eᵢₙ    = BMR + Eₐ(target) − D                    calculated target at the latest reading
 A      = 6.25·cm − 5·age + (male ? +5 : −161)    mass-independent part of maintenance
 B      = 10 + MET·τ·κ/ε                          per-kg part, kcal/day/kg
 m∞     = (Eᵢₙ − A) / B                           where that intake IS maintenance
 m(t)   = m∞ + (m − m∞)·e^(−B·t/ρ)                every 7 days, capped at 365
-t      = (ρ / B) · ln[ (m − m∞) / (goal − m∞) ]
+t      = (ρ / B) · ln[ (m − m∞) / (target − m∞) ]
 ```
 
 - `t` is the exact closed-form solution of `dm/dt = (Eᵢₙ − A − B·m) / ρ`, verified against numeric integration.
 - Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
-- `projectPlanDays` is shared with the Formula Playground, so the chart and the playground can't disagree.
+- `projectTargetDays` is shared with the Formula Playground, so the chart and the playground can't disagree.
 - Worked example (87.5 → 72 kg, 170 cm, 35 y, male, κ=3, τ=100, 0.84 kg/wk): `BMR 1768`, `Eₐ 459`, `D 924`, `Eᵢₙ 1303`, `A 893`, `B 15.25`, `m∞ 26.9 kg`, `t 149 days`.
 
 > **What this forecast is not:**
-> - It states the plan, not recent behaviour.
-> - Eating over the bound does **not** slip the date — only body mass, the goal, or the plan's own settings move it.
+> - It states the target, not recent behaviour.
+> - Eating over the target does **not** slip the date — only body mass, the target, or the target's own settings move it.
 > - Sleep doesn't enter it at all.
-> - Actual-vs-plan lives on the Calorie Balance chart instead.
+> - Actual-vs-target lives on the Calorie Balance chart instead.
 
 **Habit-based fallback** — only when the profile is incomplete and something is logged in the last 14 days:
 
 ```
-maintenance = flatBound + avgActivityKcal
+maintenance = flat calorie target + avgActivityKcal
 balance     = avgCalories − maintenance
 baseSlope   = balance / 7700
 sleepRatio  = clamp(avgSleep / SLEEP_TARGET_HOURS, 0.7, 1.0)
@@ -699,21 +699,21 @@ slope       = baseSlope × sleepRatio
 
 **Body-mass-only fallback** — nothing logged at all; ordinary least-squares slope.
 
-- Statuses: `reached`, `no-change`, `wrong-direction`, and `asymptote` (goal lies past `m∞`).
+- Statuses: `reached`, `no-change`, `wrong-direction`, and `asymptote` (target lies past `m∞`).
 - The slope is reported for all four, so the status line quotes a rate rather than "unavailable".
 
 > **Known inconsistency**, confined to this fallback:
 > - The regression is fitted against the *index* of each reading, so its units are kg per logged entry.
 > - Its consumers treat it as kg per day. They agree only if you log daily.
-> - Unreachable on the plan-based path, which never uses it.
+> - Unreachable on the target-based path, which never uses it.
 
 **Progress meters** (rendered above the chart heading):
 
 ```
-bar %       = clamp( (startWeight − lastWeight) / (startWeight − goal) × 100, 0, 100 )
-done kg     = |startWeight − lastWeight|
-to-go kg    = |lastWeight − goal|
-time bar %  = daysElapsed / (daysElapsed + daysToGoal) × 100
+bar %       = clamp( (startBodyMass − lastBodyMass) / (startBodyMass − target) × 100, 0, 100 )
+done kg     = |startBodyMass − lastBodyMass|
+to-go kg    = |lastBodyMass − target|
+time bar %  = daysElapsed / (daysElapsed + daysToTarget) × 100
 ```
 
 ### Fat energy — the Body Mass chart's second axis
@@ -733,7 +733,7 @@ fatEnergy  = fatMass × 7700
 
 ```
 band (g/day) = { round(basisKg × gPerKg.low), round(basisKg × gPerKg.high) }
-   basisKg    = WEIGHT_GOAL_KG, else the latest logged weight
+   basisKg    = BODY_MASS_TARGET_KG, else the latest logged body mass
    fallback   = flat PROTEIN_TARGET_G as a zero-width band
 midpoint     = round((min + max) / 2)
 in band?     = g ≥ min AND (max == min OR g ≤ max)
@@ -755,8 +755,8 @@ sort key  = classification group gap, then targetG − actualG within it, both d
 ### Today at a Glance
 
 - Sums today's entries per category.
-- Green/red by `withinCalorieBound`, `withinProteinBand`, `mins ≥ ACTIVITY_TARGET_MIN`, `hrs ≥ SLEEP_TARGET_HOURS`.
-- The Activity tile appends `= activityTargetKcal(latest weight)` rounded to whole kcal.
+- Green/red by `withinCalorieTarget`, `withinProteinBand`, `mins ≥ ACTIVITY_TARGET_MIN`, `hrs ≥ SLEEP_TARGET_HOURS`.
+- The Activity tile appends `= activityTargetKcal(latest body mass)` rounded to whole kcal.
 
 ### Sleep
 
@@ -777,7 +777,7 @@ NEAT steps    activeSec = (steps / 100) × 60
 cardio min    activeSec = minutes × 60
 
 minutes  = max(1, round(Σ activeSec / 60))
-calories = Σ metKcal( MET(exercise) ?? 3.5, weightKg, activeSecᵢ / 60 )
+calories = Σ metKcal( MET(exercise) ?? 3.5, bodyMassKg, activeSecᵢ / 60 )
 ```
 
 - `activeSecondsForNoteLine` (`activity-estimator.js`) is the single place this is decided — Log a Workout's prefill and Calculate both read it.
@@ -1015,7 +1015,7 @@ Then open `http://localhost:8000`. No build step.
 - **Groq / USDA are opt-in** and only run once you set the keys:
   - Calculate sends the typed ingredient text only.
   - The USDA lookup sends the ingredient name only.
-  - Wellness Insight sends age, height, BMI, body mass/goal and aggregated averages.
+  - Wellness Insight sends age, height, BMI, body mass/target and aggregated averages.
   - Food Insight sends the classification-grouped ingredient list plus your question. No vitamin/mineral data exists in this app, so none is ever sent.
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
   - Nothing is sent until that panel's Send to AI is clicked.

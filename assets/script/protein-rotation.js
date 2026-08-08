@@ -4,7 +4,7 @@
 // target — so a low/empty bar flags "you haven't had this one, eat it."
 // Protein % is the share of your protein target this ingredient should
 // cover (e.g. 10 for "turkey = 10% of my protein"); since that target
-// (charts.js's getProteinTargetG) already updates live with weight/height/
+// (charts.js's getProteinTargetG) already updates live with body mass/height/
 // activity, each ingredient's gram target moves with it automatically —
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from Physique's own Calculate breakdown,

@@ -1,4 +1,4 @@
-// Read when each chart is constructed, so a theme switch needs no per-chart options.
+﻿// Read when each chart is constructed, so a theme switch needs no per-chart options.
 function applyChartTheme() {
   const dark = document.documentElement.dataset.theme === 'dark';
   Chart.defaults.color = dark ? '#94a3b8' : '#6b7280';
@@ -11,10 +11,10 @@ function applyChartTheme() {
   };
 }
 
-// Every reference mark in Health Indicators — the per-column caps, State Trend's goal
+// Every reference mark in Health Indicators — the per-column caps, State Trend's target
 // line. Deliberately not red: red is this app's "missed" score, so a limit drawn in it
 // read as a failure rather than as the thing being measured against.
-function boundMarkColor() {
+function targetMarkColor() {
   return document.documentElement.dataset.theme === 'dark' ? '#e2e8f0' : '#1f2937';
 }
 
@@ -47,12 +47,12 @@ function ghostLeftAxis() {
 // The section's one mark for "the figure that applies here": a hairline floating bar
 // (`[from, to]`, `grouped: false`) overlaying its own column. Shared so the mark means
 // the same thing everywhere. One `values` entry per column; null leaves it unmarked.
-function boundCapDataset(label, values, capHalf, extra = {}) {
+function targetCapDataset(label, values, capHalf, extra = {}) {
   return {
     type: 'bar',
     label,
     data: values.map((v) => (v === null || v === undefined ? null : [v - capHalf, v + capHalf])),
-    backgroundColor: boundMarkColor(),
+    backgroundColor: targetMarkColor(),
     grouped: false,
     // Lowest order paints last, so the cap stays visible on a column that overshot it.
     order: 0,
@@ -62,7 +62,7 @@ function boundCapDataset(label, values, capHalf, extra = {}) {
 
 // A fraction of the axis span, not a fixed amount in the data's units, so the cap
 // stays a hairline at any range.
-function boundCapHalf(axisSpan) {
+function targetCapHalf(axisSpan) {
   return Math.abs(axisSpan) * 0.006;
 }
 
@@ -77,7 +77,7 @@ function weeklyBucketIndex(i, count) {
 }
 
 // Per column, the mean of its 7-day bucket. Nulls are unlogged days and sit out (avg()'s
-// rule), so a missing log can't drag the week under a bound it was never measured
+// rule), so a missing log can't drag the week under a target it was never measured
 // against. A bucket with nothing logged stays null.
 function weeklyAverageSeries(values) {
   const buckets = new Map();
@@ -142,7 +142,7 @@ function weeklyAverageDataset(label, series, extra = {}) {
     label,
     data: series,
     borderColor: WEEKLY_AVG_COLOR,
-    // Matched to the goal caps, which land near 2px on a 200-240px plot area.
+    // Matched to the target caps, which land near 2px on a 200-240px plot area.
     borderWidth: 2,
     borderDash: [6, 4],
     tension: 0,
@@ -156,7 +156,7 @@ function weeklyAverageDataset(label, series, extra = {}) {
     pointBackgroundColor: WEEKLY_AVG_COLOR,
     pointHitRadius: 0,
     isWeeklyAverage: true,
-    // Between the bars (2) and the bound caps (0), so the cap stays the top mark.
+    // Between the bars (2) and the target caps (0), so the cap stays the top mark.
     order: 1,
     ...extra,
   };
@@ -628,7 +628,7 @@ function renderAccountCompositionChart(accounts) {
 }
 
 // Used until a 'Settings' tab exists, so nothing changes for anyone without one.
-const WEIGHT_GOAL_KG_DEFAULT = 82;
+const BODY_MASS_TARGET_KG_DEFAULT = 82;
 const CALORIE_TARGET_KCAL_DEFAULT = 2000;
 const SLEEP_TARGET_HOURS_DEFAULT = 8;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
@@ -650,11 +650,11 @@ function activityMet() {
   return ACTIVITY_MET_FALLBACK;
 }
 
-// Energy density of body fat, shared by the projection, the calorie bound and Calorie
+// Energy density of body fat, shared by the projection, the calorie target and Calorie
 // Balance. A population constant, not a personal parameter.
 const GENERIC_KCAL_PER_KG_FAT = 7700;
 
-// Last resort, for when no weight is on file and the MET formula can't be evaluated.
+// Last resort, for when no body mass is on file and the MET formula can't be evaluated.
 const GENERIC_KCAL_PER_ACTIVE_MIN = 5;
 
 // ACSM form: 1 MET = 3.5 mL O₂/kg/min and a litre of O₂ releases ~5 kcal (200 mL
@@ -669,17 +669,17 @@ function kcalPerMetKgMin() {
   return getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT) / ML_O2_PER_KCAL;
 }
 
-// The app's only MET→kcal conversion, so the bound's assumed activity burn and
+// The app's only MET→kcal conversion, so the target's assumed activity burn and
 // Calculate's measured one (activity-estimator.js) can't disagree.
-function metKcal(met, weightKg, minutes) {
-  return met * weightKg * minutes * kcalPerMetKgMin();
+function metKcal(met, bodyMassKg, minutes) {
+  return met * bodyMassKg * minutes * kcalPerMetKgMin();
 }
 
-function latestWeightKg(entries) {
-  const weightEntries = entries
-    .filter((e) => e.category === 'Weight' && e.amount !== null)
+function latestBodyMassKg(entries) {
+  const bodyMassEntries = entries
+    .filter((e) => e.category === 'Body Mass' && e.amount !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
-  return weightEntries.length ? weightEntries[weightEntries.length - 1].amount : null;
+  return bodyMassEntries.length ? bodyMassEntries[bodyMassEntries.length - 1].amount : null;
 }
 
 // `1.6-2`, `1.6~2`, `1.6 – 2`, `1.6 to 2` all parse. A bare `1.6` is a zero-width band.
@@ -713,17 +713,17 @@ function getProteinGPerKgBand() {
 }
 
 // A band, not a point, because the evidence behind it is a range (1.6-2.0 g/kg).
-// Applied to GOAL weight, not today's: scaling off current weight would shrink the
+// Applied to TARGET body mass, not today's: scaling off current body mass would shrink the
 // target with every kg lost, exactly when protein matters most. Falls back to the
 // latest weigh-in, then to a zero-width band at the flat PROTEIN_TARGET_G.
 function getProteinTargetBandG(entries) {
   const band = getProteinGPerKgBand();
-  const basisWeightKg = band !== null
-    ? (getSetting('WEIGHT_GOAL_KG', null) ?? latestWeightKg(entries))
+  const basisBodyMassKg = band !== null
+    ? (getSetting('BODY_MASS_TARGET_KG', null) ?? latestBodyMassKg(entries))
     : null;
 
-  if (basisWeightKg !== null) {
-    return { min: Math.round(basisWeightKg * band.low), max: Math.round(basisWeightKg * band.high) };
+  if (basisBodyMassKg !== null) {
+    return { min: Math.round(basisBodyMassKg * band.low), max: Math.round(basisBodyMassKg * band.high) };
   }
 
   const flat = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
@@ -753,8 +753,8 @@ function withinProteinBand(g, band) {
 // Mifflin-St Jeor BMR (kcal/day) — staying alive before any movement. Every
 // maintenance figure in the app is this plus an activity burn, never a lifestyle
 // multiplier, so no two of them measure a deficit against different baselines.
-function mifflinStJeorBmr(weightKg, heightCm, age, sex) {
-  return 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
+function mifflinStJeorBmr(bodyMassKg, heightCm, age, sex) {
+  return 10 * bodyMassKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
 }
 
 // Resting maintenance from the profile and the latest weigh-in; null if anything is
@@ -763,106 +763,106 @@ function restingMaintenanceKcal(entries) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
-  const weightKg = latestWeightKg(entries);
+  const bodyMassKg = latestBodyMassKg(entries);
 
-  if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female') || weightKg === null) return null;
-  return mifflinStJeorBmr(weightKg, heightCm, age, sex);
+  if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female') || bodyMassKg === null) return null;
+  return mifflinStJeorBmr(bodyMassKg, heightCm, age, sex);
 }
 
 // Inside this margin the Physical Activity dot goes gray rather than red. Same 5% as
-// CALORIE_BOUND_NEAR_FRACTION, kept separate because the two score different things.
+// CALORIE_TARGET_NEAR_FRACTION, kept separate because the two score different things.
 const ACTIVITY_NEAR_TARGET_FRACTION = 0.05;
 
-// What ACTIVITY_TARGET_MIN implies at `weightKg`. Gross, not net of resting — Calorie
+// What ACTIVITY_TARGET_MIN implies at `bodyMassKg`. Gross, not net of resting — Calorie
 // Balance also adds gross activity to plain BMR, so both maintenance figures agree.
-function activityTargetKcal(weightKg) {
-  return metKcal(activityMet(), weightKg, getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT));
+function activityTargetKcal(bodyMassKg) {
+  return metKcal(activityMet(), bodyMassKg, getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT));
 }
 
 // The single rule every activity kcal figure goes through. A Calculate-derived amount2
 // wins (it used the real per-exercise MET); otherwise minutes at ACTIVITY_MET.
-function activityEntryKcal(entry, weightKg) {
+function activityEntryKcal(entry, bodyMassKg) {
   if (entry.amount2 !== null) return entry.amount2;
   const mins = toActivityMinutes(entry.amount, entry.unit);
-  return weightKg != null ? metKcal(activityMet(), weightKg, mins) : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
+  return bodyMassKg != null ? metKcal(activityMet(), bodyMassKg, mins) : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
 }
 
-// The bound for ONE weight: BMR + the burn ACTIVITY_TARGET_MIN implies − the deficit
+// The target for ONE body mass: BMR + the burn ACTIVITY_TARGET_MIN implies − the deficit
 // that hits WEEKLY_FAT_LOSS_KG. No lifestyle multiplier, so it agrees with the forecast
 // and Calorie Balance. The trade, since no label carries it: BMR + target activity
 // omits food's thermic effect and incidental NEAT, landing near 1.29 x BMR — so a
 // former 1.55-multiplier user loses ~475 kcal/day of ceiling, and WEEKLY_FAT_LOSS_KG
 // is the dial for it.
 //
-// Weight is an argument because both terms scale with it and Caloric Intake evaluates
+// Body mass is an argument because both terms scale with it and Caloric Intake evaluates
 // per day. Null when an input is missing; the caller falls back to CALORIE_TARGET_KCAL.
-function calorieBoundDetail(weightKg) {
+function calorieTargetDetail(bodyMassKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
   const weeklyFatLossKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
 
-  const haveAllInputs = weightKg !== null && heightCm !== null && age !== null
+  const haveAllInputs = bodyMassKg !== null && heightCm !== null && age !== null
     && (sex === 'male' || sex === 'female') && weeklyFatLossKg !== null;
   if (!haveAllInputs) return null;
 
-  const bmr = mifflinStJeorBmr(weightKg, heightCm, age, sex);
-  const activityKcal = activityTargetKcal(weightKg);
+  const bmr = mifflinStJeorBmr(bodyMassKg, heightCm, age, sex);
+  const activityKcal = activityTargetKcal(bodyMassKg);
 
-  // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the bound
+  // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the target
   // above maintenance, flipping it from a ceiling to a floor. No plausibility guard: an
-  // aggressive bound means an aggressive setting, which is the user's call.
+  // aggressive target means an aggressive setting, which is the user's call.
   const kcal = Math.round(bmr + activityKcal - (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7);
 
   return { kcal, bmr, activityKcal, weeklyFatLossKg };
 }
 
-function calculatedCalorieBoundKcal(weightKg) {
-  const detail = calorieBoundDetail(weightKg);
+function calculatedCalorieTargetKcal(bodyMassKg) {
+  const detail = calorieTargetDetail(bodyMassKg);
   return detail === null ? null : detail.kcal;
 }
 
-function flatCalorieBoundKcal() {
+function flatCalorieTargetKcal() {
   return getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
 }
 
-// TODAY's bound: the calculated figure at the latest weigh-in, else flat
-// CALORIE_TARGET_KCAL. Only the FIGURE — which side to be on is getCalorieBoundKind,
-// and getCalorieBound pairs them so no label can carry one without the other.
-function getCalorieBoundKcal(entries) {
-  return calculatedCalorieBoundKcal(latestWeightKg(entries)) ?? flatCalorieBoundKcal();
+// TODAY's target: the calculated figure at the latest weigh-in, else flat
+// CALORIE_TARGET_KCAL. Only the FIGURE — which side to be on is getCalorieTargetKind,
+// and getCalorieTarget pairs them so no label can carry one without the other.
+function getCalorieTargetKcal(entries) {
+  return calculatedCalorieTargetKcal(latestBodyMassKg(entries)) ?? flatCalorieTargetKcal();
 }
 
-// The bound per day, each from the weight in effect THAT day rather than today's
+// The target per day, each from the body mass in effect THAT day rather than today's
 // applied backwards. It moves ~15.8 kcal/kg across both terms, so a 6 kg loss shifts it
 // ~95 kcal — enough that one flat line marked days red that were comfortably inside the
-// maximum actually applying when they were eaten. Each entry carries its weight so the
+// maximum actually applying when they were eaten. Each entry carries its body mass so the
 // tooltip can say why the figure moved; null on the flat fallback, which has no basis.
-function calorieBoundSeries(entries, dates) {
-  const weightEntries = entries.filter((e) => e.category === 'Weight' && e.amount !== null);
-  const weightForDate = carryForwardWeightByDate(weightByDateMap(weightEntries), dates);
-  const flat = flatCalorieBoundKcal();
+function calorieTargetSeries(entries, dates) {
+  const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
+  const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(bodyMassEntries), dates);
+  const flat = flatCalorieTargetKcal();
 
   return dates.map((date) => {
-    const weightKg = weightForDate.get(date) ?? null;
-    const kcal = calculatedCalorieBoundKcal(weightKg);
-    return kcal === null ? { kcal: flat, weightKg: null } : { kcal, weightKg };
+    const bodyMassKg = bodyMassForDate.get(date) ?? null;
+    const kcal = calculatedCalorieTargetKcal(bodyMassKg);
+    return kcal === null ? { kcal: flat, bodyMassKg: null } : { kcal, bodyMassKg };
   });
 }
 
-// There is no "target" intake here, only a BOUND — a ceiling heading down, a floor
+// This target is directional, not a point to land on — a ceiling heading down, a floor
 // heading up. Eating 400 under a bulk's figure is no better than 400 over a cut's, so
-// calling both "target" told half the users the opposite of the truth.
+// scoring both sides the same way would tell half the users the opposite of the truth.
 //
-// Direction is goal weight vs. latest weigh-in. With neither, or a goal already reached
+// Direction is target body mass vs. latest weigh-in. With neither, or a target already reached
 // (0.1 kg tolerance), the sign of WEEKLY_FAT_LOSS_KG decides — negative is a bulk, so a
 // floor. Nothing at all keeps the ceiling.
-function getCalorieBoundKind(entries) {
-  const goalKg = getSetting('WEIGHT_GOAL_KG', null);
-  const currentKg = latestWeightKg(entries);
+function getCalorieTargetKind(entries) {
+  const targetKg = getSetting('BODY_MASS_TARGET_KG', null);
+  const currentKg = latestBodyMassKg(entries);
 
-  if (goalKg !== null && currentKg !== null && Math.abs(goalKg - currentKg) >= 0.1) {
-    return goalKg < currentKg ? 'max' : 'min';
+  if (targetKg !== null && currentKg !== null && Math.abs(targetKg - currentKg) >= 0.1) {
+    return targetKg < currentKg ? 'max' : 'min';
   }
 
   const weeklyFatLossKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
@@ -871,10 +871,10 @@ function getCalorieBoundKind(entries) {
 
 // Figure, kind and every display form in one object, so the tile, the chart and the
 // Insight prompt can't describe the same number two different ways.
-function getCalorieBound(entries) {
-  const kind = getCalorieBoundKind(entries);
+function getCalorieTarget(entries) {
+  const kind = getCalorieTargetKind(entries);
   return {
-    kcal: getCalorieBoundKcal(entries),
+    kcal: getCalorieTargetKcal(entries),
     kind,
     isMax: kind === 'max',
     word: kind === 'max' ? 'Max' : 'Min',
@@ -882,34 +882,28 @@ function getCalorieBound(entries) {
   };
 }
 
-// Is a day's intake on the right side of the bound? At-or-under a ceiling,
+// Is a day's intake on the right side of the target? At-or-under a ceiling,
 // at-or-over a floor — hitting it exactly counts as met either way.
-function withinCalorieBound(kcal, bound) {
-  return bound.isMax ? kcal <= bound.kcal : kcal >= bound.kcal;
+function withinCalorieTarget(kcal, target) {
+  return target.isMax ? kcal <= target.kcal : kcal >= target.kcal;
 }
 
 // Inside this margin a day is neither scored nor condemned — a few percent is within
 // the noise of the estimate and of the log itself.
-const CALORIE_BOUND_NEAR_FRACTION = 0.05;
+const CALORIE_TARGET_NEAR_FRACTION = 0.05;
 
-// 'met' on the right side, 'near' within CALORIE_BOUND_NEAR_FRACTION past it, 'missed'
+// 'met' on the right side, 'near' within CALORIE_TARGET_NEAR_FRACTION past it, 'missed'
 // beyond. Distance is measured alike for a ceiling and a floor, so a bulk's
 // under-eating grades exactly like a cut's over-eating.
-function calorieBoundScore(kcal, bound) {
-  if (withinCalorieBound(kcal, bound)) return 'met';
-  return Math.abs(kcal - bound.kcal) <= bound.kcal * CALORIE_BOUND_NEAR_FRACTION ? 'near' : 'missed';
-}
-
-// Signed distance from the bound, for the Variance row — positive above, negative
-// below, whichever of the two the goal happens to want.
-function calorieBoundVariance(kcal, boundKcal) {
-  return Math.round(kcal - boundKcal);
+function calorieTargetScore(kcal, target) {
+  if (withinCalorieTarget(kcal, target)) return 'met';
+  return Math.abs(kcal - target.kcal) <= target.kcal * CALORIE_TARGET_NEAR_FRACTION ? 'near' : 'missed';
 }
 
 // Trailing days in every Health Indicators chart. They're full-width, and the x-axes
 // already thin their tick labels, so 12 weeks fits comfortably. Body Mass appears here
 // as well as in State Trend & Forecast without duplicating it: that one is the
-// trajectory, this one scores each day's move toward the goal or away from it.
+// trajectory, this one scores each day's move toward the target or away from it.
 const WELLNESS_METRICS_DAYS = 84;
 
 let wellnessCaloriesChart = null;
@@ -966,7 +960,7 @@ function initDateRangeControl(fromId, toId, defaultDays, onChange) {
 
 function renderWellnessCharts(entries) {
   renderTodayGlanceCards(entries);
-  renderWellnessWeightChart(entries);
+  renderWellnessBodyMassChart(entries);
   renderWellnessCaloriesChart(entries);
   renderWellnessSleepChart(entries);
   renderWellnessActivityChart(entries);
@@ -1003,26 +997,26 @@ function renderTodayGlanceCards(entries) {
     });
   if (sleepHours !== null) sleepHours = Math.round(sleepHours * 10) / 10;
 
-  const calorieBound = getCalorieBound(entries);
+  const calorieTarget = getCalorieTarget(entries);
   const proteinBand = getProteinTargetBandG(entries);
   const activityTarget = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
-  // The heading carries which bound it is, since the number can't and the value line
+  // The heading carries which target it is, since the number can't and the value line
   // has no room. Digit-free, so privacy mode has nothing to hide.
-  document.getElementById('today-calories-label').textContent = `${calorieBound.word} Calory Intake`;
+  document.getElementById('today-calories-label').textContent = `${calorieTarget.word} Calory Intake`;
 
   // Protein is the one metric judged against a RANGE — inside the band only.
   const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
 
   // What hitting the minutes target would burn, via the same activityTargetKcal the
-  // bound is built from, so the two can't quote different numbers for one plan.
-  const weightKg = latestWeightKg(entries);
-  const plannedBurn = weightKg !== null ? `${Math.round(activityTargetKcal(weightKg))} kcal` : null;
+  // calorie target is built from, so the two can't quote different numbers for one day.
+  const bodyMassKg = latestBodyMassKg(entries);
+  const targetBurn = bodyMassKg !== null ? `${Math.round(activityTargetKcal(bodyMassKg))} kcal` : null;
 
-  setTodayGlanceTile('today-calories', calories, calorieBound.kcal, 'kcal', calories !== null && withinCalorieBound(calories, calorieBound));
+  setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand);
-  setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, plannedBurn);
+  setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, targetBurn);
   setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
 }
 
@@ -1092,78 +1086,78 @@ function wellnessCalorieChartDates(entries) {
   return trailingDatesForCategory(calorieLogEntries(entries), WELLNESS_METRICS_DAYS);
 }
 
-let wellnessWeightChart = null;
+let wellnessBodyMassChart = null;
 
 // For a bar that can't be scored — the first reading, or a stall too short to call.
 // Green would claim progress that isn't measured; red, a setback that isn't either.
-const WEIGHT_UNSCORED_COLOR = '#9ca3af';
+const BODY_MASS_UNSCORED_COLOR = '#9ca3af';
 
 // One flat reading is scale noise, not a plateau.
-const WEIGHT_STALL_RED_AFTER_DAYS = 2;
+const BODY_MASS_STALL_RED_AFTER_DAYS = 2;
 
-// Down on a cut, up on a bulk. Via getCalorieBoundKind rather than re-reading
-// WEIGHT_GOAL_KG, so this chart's green and Caloric Intake's max/min come from one read
-// of the goal, fallbacks included.
-function weightGoalIsDownward(entries) {
-  return getCalorieBoundKind(entries) === 'max';
+// Down on a cut, up on a bulk. Via getCalorieTargetKind rather than re-reading
+// BODY_MASS_TARGET_KG, so this chart's green and Caloric Intake's max/min come from one read
+// of the target, fallbacks included.
+function bodyMassTargetIsDownward(entries) {
+  return getCalorieTargetKind(entries) === 'max';
 }
 
-// The tolerance getCalorieBoundKind and calcProjection also treat as "there" — no scale
-// reading lands on a goal to the gram.
-const WEIGHT_AT_GOAL_TOLERANCE_KG = 0.1;
+// The tolerance getCalorieTargetKind and calcProjection also treat as "there" — no scale
+// reading lands on a target to the gram.
+const BODY_MASS_AT_TARGET_TOLERANCE_KG = 0.1;
 
-function weightIsAtGoal(weightKg) {
-  const goalKg = getSetting('WEIGHT_GOAL_KG', null);
-  return goalKg !== null && weightKg !== null && Math.abs(goalKg - weightKg) < WEIGHT_AT_GOAL_TOLERANCE_KG;
+function bodyMassIsAtTarget(bodyMassKg) {
+  const targetKg = getSetting('BODY_MASS_TARGET_KG', null);
+  return targetKg !== null && bodyMassKg !== null && Math.abs(targetKg - bodyMassKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG;
 }
 
 // Progress since the previous reading; null is unscored (gray). A day the scale held
-// still is judged by WHERE and HOW LONG: holding at the goal is what success looks like,
+// still is judged by WHERE and HOW LONG: holding at the target is what success looks like,
 // so it stays green; holding short of it only reads as a miss after
-// WEIGHT_STALL_RED_AFTER_DAYS, since one flat reading is as likely to be noise.
-function weightChangeIsProgress(deltaKg, weightKg, goalIsDownward, stallDays) {
+// BODY_MASS_STALL_RED_AFTER_DAYS, since one flat reading is as likely to be noise.
+function bodyMassChangeIsProgress(deltaKg, bodyMassKg, targetIsDownward, stallDays) {
   if (deltaKg === null) return null;
   if (deltaKg === 0) {
-    if (weightIsAtGoal(weightKg)) return true;
-    return stallDays >= WEIGHT_STALL_RED_AFTER_DAYS ? false : null;
+    if (bodyMassIsAtTarget(bodyMassKg)) return true;
+    return stallDays >= BODY_MASS_STALL_RED_AFTER_DAYS ? false : null;
   }
-  return (deltaKg < 0) === goalIsDownward;
+  return (deltaKg < 0) === targetIsDownward;
 }
 
 // Deurenberg et al. 1991 (Br J Nutr): body fat % from BMI alone. The app has no direct
 // measurement anywhere, so this is a population estimate at the same trust level as the
 // USDA/AI calorie lookups.
-function estimateBodyFatPercent(weightKg, heightCm, age, sex) {
-  const bmi = weightKg / (heightCm / 100) ** 2;
+function estimateBodyFatPercent(bodyMassKg, heightCm, age, sex) {
+  const bmi = bodyMassKg / (heightCm / 100) ** 2;
   const sexTerm = sex === 'male' ? 1 : 0;
   return 1.20 * bmi + 0.23 * age - 10.8 * sexTerm - 5.4;
 }
 
 // Held to a plausible range, so a nonsense BMI can't produce a nonsense figure. Every
 // fat-related value on this chart goes through it, so none of them can disagree.
-function clampedBodyFatPercent(weightKg, heightCm, age, sex) {
-  return Math.max(3, Math.min(60, estimateBodyFatPercent(weightKg, heightCm, age, sex)));
+function clampedBodyFatPercent(bodyMassKg, heightCm, age, sex) {
+  return Math.max(3, Math.min(60, estimateBodyFatPercent(bodyMassKg, heightCm, age, sex)));
 }
 
-// Estimated fat mass (kg) at `weightKg` — that clamped share of it.
-function estimatedFatMassKg(weightKg, heightCm, age, sex) {
-  return weightKg * (clampedBodyFatPercent(weightKg, heightCm, age, sex) / 100);
+// Estimated fat mass (kg) at `bodyMassKg` — that clamped share of it.
+function estimatedFatMassKg(bodyMassKg, heightCm, age, sex) {
+  return bodyMassKg * (clampedBodyFatPercent(bodyMassKg, heightCm, age, sex) / 100);
 }
 
 // Energy stored in that fat mass, costed at fat's ~7,700 kcal/kg.
-function fatEnergyKcal(weightKg, heightCm, age, sex) {
-  return estimatedFatMassKg(weightKg, heightCm, age, sex) * GENERIC_KCAL_PER_KG_FAT;
+function fatEnergyKcal(bodyMassKg, heightCm, age, sex) {
+  return estimatedFatMassKg(bodyMassKg, heightCm, age, sex) * GENERIC_KCAL_PER_KG_FAT;
 }
 
 // Headroom around the plotted range. The floor keeps a window of nearly identical
 // readings off the top and bottom edges.
-const WEIGHT_AXIS_PAD_FRACTION = 0.15;
-const WEIGHT_AXIS_MIN_PAD_KG = 0.5;
+const BODY_MASS_AXIS_PAD_FRACTION = 0.15;
+const BODY_MASS_AXIS_MIN_PAD_KG = 0.5;
 
-// Smallest first; the first step keeping the count under WEIGHT_MAX_GRIDLINES wins, so
+// Smallest first; the first step keeping the count under BODY_MASS_MAX_GRIDLINES wins, so
 // every line lands on a round kg.
-const WEIGHT_TICK_STEPS_KG = [0.5, 1, 2, 5, 10];
-const WEIGHT_MAX_GRIDLINES = 8;
+const BODY_MASS_TICK_STEPS_KG = [0.5, 1, 2, 5, 10];
+const BODY_MASS_MAX_GRIDLINES = 8;
 
 // Fat energy runs to six figures against a capped axis width, so "175k kcal".
 function maskedThousandsTick(unit) {
@@ -1174,21 +1168,21 @@ function maskedThousandsTick(unit) {
 }
 
 // One bar per reading, scored by direction of travel on the same dates Caloric Intake
-// uses, so the two compare bar for bar. No goal line of its own: State Trend above
-// already draws one, and a goal several kg away would flatten this axis into exactly
+// uses, so the two compare bar for bar. No target line of its own: State Trend above
+// already draws one, and a target several kg away would flatten this axis into exactly
 // the flat line that chart exists to smooth.
 //
 // The twin axis restates each bar as the energy stored in the fat mass it implies.
 // Body fat % moves with BMI, so that mapping is quadratic while a Chart.js twin axis
 // can only be linear — anchoring at the ends of the kg range costs under 0.5% of the
 // span on a typical window, 2.8% across an unusually wide 13 kg one.
-function renderWellnessWeightChart(entries) {
-  const ctx = document.getElementById('wellness-weight-chart');
+function renderWellnessBodyMassChart(entries) {
+  const ctx = document.getElementById('wellness-body-mass-chart');
 
-  const goalIsDownward = weightGoalIsDownward(entries);
+  const targetIsDownward = bodyMassTargetIsDownward(entries);
 
-  const weightEntries = entries.filter((e) => e.category === 'Weight' && e.amount !== null);
-  const byDate = weightByDateMap(weightEntries);
+  const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
+  const byDate = bodyMassByDateMap(bodyMassEntries);
   const dates = wellnessCalorieChartDates(entries);
 
   // Scored against the previous READING, not the previous day, so logging every third
@@ -1219,7 +1213,7 @@ function renderWellnessWeightChart(entries) {
     if (!byDate.has(d)) {
       // An empty slot, not a zero: 0 kg is impossible and would drag the axis to it.
       values.push(null);
-      barColors.push(WEIGHT_UNSCORED_COLOR);
+      barColors.push(BODY_MASS_UNSCORED_COLOR);
       return;
     }
 
@@ -1229,7 +1223,7 @@ function renderWellnessWeightChart(entries) {
     const stallDays = delta === 0
       ? Math.round((parseIsoDateUTC(d) - parseIsoDateUTC(stallStartDate)) / 86400000)
       : 0;
-    const progress = weightChangeIsProgress(delta, kg, goalIsDownward, stallDays);
+    const progress = bodyMassChangeIsProgress(delta, kg, targetIsDownward, stallDays);
 
     // The change BETWEEN the two readings, each converted at its own body mass — the
     // fat share of a kg moves with BMI, so a flat 7,700 would be wrong.
@@ -1244,7 +1238,7 @@ function renderWellnessWeightChart(entries) {
     detailByDate.set(d, { delta, fatKcal, fatDeltaKcal, bodyFatPct, fatMassKg, bmi });
 
     values.push(kg);
-    barColors.push(progress === null ? WEIGHT_UNSCORED_COLOR : (progress ? '#16a34a' : '#dc2626'));
+    barColors.push(progress === null ? BODY_MASS_UNSCORED_COLOR : (progress ? '#16a34a' : '#dc2626'));
     previousKg = kg;
   });
 
@@ -1258,12 +1252,12 @@ function renderWellnessWeightChart(entries) {
   const logged = [...values, ...trendSeries].filter((v) => v !== null);
   const kgLo = logged.length ? Math.min(...logged) : 0;
   const kgHi = logged.length ? Math.max(...logged) : 0;
-  const kgPad = Math.max((kgHi - kgLo) * WEIGHT_AXIS_PAD_FRACTION, WEIGHT_AXIS_MIN_PAD_KG);
+  const kgPad = Math.max((kgHi - kgLo) * BODY_MASS_AXIS_PAD_FRACTION, BODY_MASS_AXIS_MIN_PAD_KG);
 
   // kg owns the gridlines, so both bounds round out to a whole step of it — otherwise
   // the lines land wherever the padding left them. The step grows with the range.
-  const kgStep = WEIGHT_TICK_STEPS_KG.find((s) => (kgHi - kgLo + 2 * kgPad) / s <= WEIGHT_MAX_GRIDLINES)
-    ?? WEIGHT_TICK_STEPS_KG[WEIGHT_TICK_STEPS_KG.length - 1];
+  const kgStep = BODY_MASS_TICK_STEPS_KG.find((s) => (kgHi - kgLo + 2 * kgPad) / s <= BODY_MASS_MAX_GRIDLINES)
+    ?? BODY_MASS_TICK_STEPS_KG[BODY_MASS_TICK_STEPS_KG.length - 1];
   const yMin = Math.max(0, Math.floor((kgLo - kgPad) / kgStep) * kgStep);
   const yMax = Math.ceil((kgHi + kgPad) / kgStep) * kgStep;
 
@@ -1271,7 +1265,7 @@ function renderWellnessWeightChart(entries) {
   // area still lines up with its neighbours.
   const canShowFatEnergy = logged.length > 0 && haveProfile;
 
-  wellnessWeightChart = upsertChart(wellnessWeightChart, ctx, {
+  wellnessBodyMassChart = upsertChart(wellnessBodyMassChart, ctx, {
     data: {
       labels: dates,
       datasets: [
@@ -1390,23 +1384,23 @@ const CALORIE_AXIS_MIN_PAD_KCAL = 120;
 // figures (1,650 rather than 1,663).
 const CALORIE_AXIS_STEP_KCAL = 50;
 
-// Coarser, for the one case where the bound still has to widen the axis. A coarse step
-// holds the frame still across several hundred kcal of bound movement.
-const CALORIE_AXIS_BOUND_STEP_KCAL = 250;
+// Coarser, for the one case where the target still has to widen the axis. A coarse step
+// holds the frame still across several hundred kcal of target movement.
+const CALORIE_AXIS_TARGET_STEP_KCAL = 250;
 
 // Framed on what was LOGGED, padded out. The zeros standing in for unlogged days would
 // drag the floor back down and undo the zoom; clamped at zero so small intakes give the
 // zero-based axis rather than negative calories.
 //
-// The bound is deliberately NOT part of the frame. Padding around it made the ruler move
+// The target is deliberately NOT part of the frame. Padding around it made the ruler move
 // with the thing it measures: a 278 kcal change landed the caps 2 px from where they
 // started, with the bars changing height instead. What was eaten doesn't depend on the
-// bound, so framing on it holds still while the bound moves across it.
+// target, so framing on it holds still while the target moves across it.
 //
 // The caps still can't fall off-plot, so the frame is WIDENED — never re-padded — to
-// reach one. That only arises when the bound sits beyond everything logged.
-function calorieAxisBounds(loggedValues, boundValues) {
-  const framing = loggedValues.length ? loggedValues : boundValues;
+// reach one. That only arises when the target sits beyond everything logged.
+function calorieAxisBounds(loggedValues, targetValues) {
+  const framing = loggedValues.length ? loggedValues : targetValues;
   const lo = Math.min(...framing);
   const hi = Math.max(...framing);
   const pad = Math.max(CALORIE_AXIS_MIN_PAD_KCAL, (hi - lo) * CALORIE_AXIS_PAD_FRACTION);
@@ -1415,15 +1409,15 @@ function calorieAxisBounds(loggedValues, boundValues) {
   const roundUp = (v, step) => Math.ceil(v / step) * step;
 
   return {
-    min: Math.min(roundDown(lo - pad, CALORIE_AXIS_STEP_KCAL), roundDown(Math.min(...boundValues), CALORIE_AXIS_BOUND_STEP_KCAL)),
-    max: Math.max(roundUp(hi + pad, CALORIE_AXIS_STEP_KCAL), roundUp(Math.max(...boundValues), CALORIE_AXIS_BOUND_STEP_KCAL)),
+    min: Math.min(roundDown(lo - pad, CALORIE_AXIS_STEP_KCAL), roundDown(Math.min(...targetValues), CALORIE_AXIS_TARGET_STEP_KCAL)),
+    max: Math.max(roundUp(hi + pad, CALORIE_AXIS_STEP_KCAL), roundUp(Math.max(...targetValues), CALORIE_AXIS_TARGET_STEP_KCAL)),
   };
 }
 
 function renderWellnessCaloriesChart(entries) {
   const ctx = document.getElementById('wellness-calories-chart');
 
-  const bound = getCalorieBound(entries);
+  const target = getCalorieTarget(entries);
 
   const calorieEntries = calorieLogEntries(entries);
   const dates = wellnessCalorieChartDates(entries);
@@ -1432,32 +1426,32 @@ function renderWellnessCaloriesChart(entries) {
 
   // Re-evaluated per day, so there's no single figure to draw: each bar carries its own
   // and is scored against that one alone.
-  const boundByDay = calorieBoundSeries(entries, dates);
-  const dayBound = (i) => ({ ...bound, kcal: boundByDay[i].kcal });
+  const targetByDay = calorieTargetSeries(entries, dates);
+  const dayTarget = (i) => ({ ...target, kcal: targetByDay[i].kcal });
 
   // Each bar against its OWN day's figure: green on the right side, gray within
-  // CALORIE_BOUND_NEAR_FRACTION past it, red beyond — so the colour IS the read, and a
+  // CALORIE_TARGET_NEAR_FRACTION past it, red beyond — so the colour IS the read, and a
   // near-miss is called neither a win nor a failure. No shaded out-of-bounds region:
-  // the bound moves by tens of kcal across a window, far too little for a filled zone
+  // the target moves by tens of kcal across a window, far too little for a filled zone
   // to follow, so the wash only ever communicated a fixed limit the chart doesn't have.
   // An unlogged day plots as 0 and takes the green — a missing log, not a fast, and
   // invisible at zero height anyway rather than the worst day on the chart under a floor.
-  const CALORIE_NEAR_BOUND_COLOR = '#9ca3af';
+  const CALORIE_NEAR_TARGET_COLOR = '#9ca3af';
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
     if (!byDate.has(d)) return '#16a34a';
-    const score = calorieBoundScore(values[i], dayBound(i));
+    const score = calorieTargetScore(values[i], dayTarget(i));
     if (score === 'met') return '#16a34a';
-    return score === 'near' ? CALORIE_NEAR_BOUND_COLOR : '#dc2626';
+    return score === 'near' ? CALORIE_NEAR_TARGET_COLOR : '#dc2626';
   });
 
-  const axis = calorieAxisBounds(values.filter((v, i) => byDate.has(dates[i])), boundByDay.map((b) => b.kcal));
+  const axis = calorieAxisBounds(values.filter((v, i) => byDate.has(dates[i])), targetByDay.map((b) => b.kcal));
 
   // A cap across each bar rather than one continuous line: a line spanning the window
   // reads as a single shared limit however it's dashed, while a mark per bar says the
   // limit belongs to that day alone. Thickness scales with the axis span.
   const capHalf = (axis.max - axis.min) * 0.004;
-  const capData = boundByDay.map((b) => [b.kcal - capHalf, b.kcal + capHalf]);
+  const capData = targetByDay.map((b) => [b.kcal - capHalf, b.kcal + capHalf]);
 
   // Averaged off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins
   // don't count as days of fasting.
@@ -1477,11 +1471,11 @@ function renderWellnessCaloriesChart(entries) {
         weeklyAverageDataset('7-Day Average', weeklyAvg),
         {
           type: 'bar',
-          label: `${bound.word} for the day`,
+          label: `${target.word} for the day`,
           data: capData,
-          backgroundColor: boundMarkColor(),
+          backgroundColor: targetMarkColor(),
           grouped: false,
-          isBoundMarker: true,
+          isTargetLine: true,
           // Lowest order paints last, so the cap stays visible on a bar that overshot it.
           order: 0,
         },
@@ -1499,26 +1493,20 @@ function renderWellnessCaloriesChart(entries) {
         tooltip: {
           // The cap is filtered out — a floating bar would report itself as a
           // `[from, to]` pair — and stated properly in afterBody instead.
-          filter: (item) => !item.dataset.isBoundMarker && !item.dataset.isWeeklyAverage,
+          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
-              const day = boundByDay[item.dataIndex];
-              // Actual last, so it sits directly above the planned bound it's scored
-              // against — the same pairing Calorie Balance uses.
-              const lines = [
-                `Variance: ${withExplicitSign(calorieBoundVariance(item.parsed.y, day.kcal))} kcal`,
-                `Actual Intake: ${item.parsed.y} kcal`,
-              ];
+              const lines = [`Actual Intake: ${item.parsed.y} kcal`];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
             // afterBody rather than a label row: Chart.js indents body lines to clear the
-            // colour swatch, while this sits flush left. bound.word, so it reads
-            // "Planned Max" rather than "Planned Maximum".
+            // colour swatch, while this sits flush left. target.word, so it reads
+            // "Target Max" rather than "Target Maximum".
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
-              const lines = [`Planned ${bound.word}: ${boundByDay[i].kcal} kcal`];
+              const lines = [`Target ${target.word}: ${targetByDay[i].kcal} kcal`];
               if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -1528,7 +1516,7 @@ function renderWellnessCaloriesChart(entries) {
       scales: {
         x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         y: {
-          // NOT zero-based, unlike the other intake charts. The bound drifts only a few
+          // NOT zero-based, unlike the other intake charts. The target drifts only a few
           // tens of kcal across a 12-week window — on a 0-2,500 axis that's a handful of
           // pixels, which is why the per-day figures still read as one fixed line. Bars
           // here are a position against their own cap, not a quantity of food, so the
@@ -1714,11 +1702,11 @@ function toActivityMinutes(amount, unit) {
   return amount; // 'min' or unknown — use as-is
 }
 
-// weightKg / heightM². Computed, never asked of an LLM, and shared by the BMI line, the
+// bodyMassKg / heightM². Computed, never asked of an LLM, and shared by the BMI line, the
 // Body Mass tooltip and insight.js.
-function computeBmi(weightKg, heightCm) {
+function computeBmi(bodyMassKg, heightCm) {
   const heightM = heightCm / 100;
-  return Math.round((weightKg / (heightM * heightM)) * 10) / 10;
+  return Math.round((bodyMassKg / (heightM * heightM)) * 10) / 10;
 }
 
 // "NEAT (Non-Exercise Activity Thermogenesis)" -> "NEAT"; the parenthetical doesn't fit
@@ -1773,23 +1761,25 @@ function renderWellnessActivityChart(entries) {
   const dates = trailingDatesForCategory(activityEntries, WELLNESS_METRICS_DAYS);
 
   // One stacked segment per description rather than a summed bar, so each day's
-  // composition shows and not just its total.
-  const descriptions = [...new Set(activityEntries.map((e) => e.description || 'Other'))].sort();
+  // composition shows and not just its total. Entries with no recognized
+  // category (an exercise name missing from the Activities tab) are dropped
+  // rather than pooled into an 'Other' segment the sheet doesn't define.
+  const categorizedEntries = activityEntries.filter((e) => e.description && e.description !== 'Other');
+  const descriptions = [...new Set(categorizedEntries.map((e) => e.description))].sort();
   const byDescription = new Map(descriptions.map((d) => [d, new Map()]));
-  activityEntries.forEach((e) => {
-    const description = e.description || 'Other';
+  categorizedEntries.forEach((e) => {
     const mins = toActivityMinutes(e.amount, e.unit);
-    const byDate = byDescription.get(description);
+    const byDate = byDescription.get(e.description);
     byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
   });
 
   // Burn per day on its own axis — minutes and kcal are different scales, so this is a
   // deliberate dual-axis chart. Every entry gets a figure via activityEntryKcal, so an
   // entry without amount2 no longer leaves a logged day with no dot.
-  const activityWeightForDate = carryForwardWeightByDate(weightByDateMap(entries.filter((e) => e.category === 'Weight' && e.amount !== null)), dates);
+  const activityBodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(entries.filter((e) => e.category === 'Body Mass' && e.amount !== null)), dates);
   const caloriesByDate = new Map();
   activityEntries.forEach((e) => {
-    const kcal = activityEntryKcal(e, activityWeightForDate.get(e.date) ?? null);
+    const kcal = activityEntryKcal(e, activityBodyMassForDate.get(e.date) ?? null);
     caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + kcal);
   });
 
@@ -1814,13 +1804,13 @@ function renderWellnessActivityChart(entries) {
   const hasData = activityDatasets.some((ds) => ds.data.some((v) => v !== 0));
 
   // Scored against what that day's own body mass would burn at ACTIVITY_TARGET_MIN —
-  // the same activityTargetKcal the calorie bound uses, so the two can't disagree. Met
+  // the same activityTargetKcal the calorie target uses, so the two can't disagree. Met
   // is green, short by up to ACTIVITY_NEAR_TARGET_FRACTION gray, further short red.
   // Without a body mass there's no target, so the dot stays neutral violet.
   const dotColor = (date, kcal) => {
-    const weightKg = activityWeightForDate.get(date) ?? null;
-    if (kcal === null || weightKg === null) return '#7c3aed';
-    const target = activityTargetKcal(weightKg);
+    const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
+    if (kcal === null || bodyMassKg === null) return '#7c3aed';
+    const target = activityTargetKcal(bodyMassKg);
     if (kcal >= target) return '#16a34a';
     return target - kcal <= target * ACTIVITY_NEAR_TARGET_FRACTION ? '#9ca3af' : '#dc2626';
   };
@@ -1842,14 +1832,14 @@ function renderWellnessActivityChart(entries) {
     order: 0,
   };
 
-  // PLANNED BURN on the kcal axis, not the flat minutes target it used to be — that sat
+  // TARGET BURN on the kcal axis, not the flat minutes target it used to be — that sat
   // on the other axis from the dots it appeared to judge, so a day could clear it on a
   // walk while burning less than a day that lifted. It moves day to day because
   // activityTargetKcal scales with body mass. No body mass, no figure, so it breaks
   // there rather than inventing one.
-  const plannedBurnKcal = dates.map((date) => {
-    const weightKg = activityWeightForDate.get(date) ?? null;
-    return weightKg === null ? null : activityTargetKcal(weightKg);
+  const targetBurnKcal = dates.map((date) => {
+    const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
+    return bodyMassKg === null ? null : activityTargetKcal(bodyMassKg);
   });
 
   // A cap per column, the same mark Caloric Intake and Calorie Balance use. It was a
@@ -1857,15 +1847,15 @@ function renderWellnessActivityChart(entries) {
   // spanning the window would read as one shared limit however it's dashed.
   const burnMagnitudes = [
     ...caloriesData.filter((v) => v !== null),
-    ...plannedBurnKcal.filter((v) => v !== null),
+    ...targetBurnKcal.filter((v) => v !== null),
   ];
   const capHalf = (burnMagnitudes.length ? Math.max(...burnMagnitudes) : 1) * 0.006;
   const targetLineDataset = {
     type: 'bar',
-    label: 'Planned Burn',
-    data: plannedBurnKcal.map((v) => (v === null ? null : [-v - capHalf, -v + capHalf])),
+    label: 'Target Burn',
+    data: targetBurnKcal.map((v) => (v === null ? null : [-v - capHalf, -v + capHalf])),
     yAxisID: 'y1',
-    backgroundColor: boundMarkColor(),
+    backgroundColor: targetMarkColor(),
     grouped: false,
     // Lowest order paints last: bars (2), the weekly average and this cap (both 1, the
     // cap second so it wins the tie), then the dots (0) above everything.
@@ -1873,7 +1863,7 @@ function renderWellnessActivityChart(entries) {
     isTargetLine: true,
   };
 
-  // On the kcal axis, not the minutes one — Planned Burn lives there, and it's what the
+  // On the kcal axis, not the minutes one — Target Burn lives there, and it's what the
   // week is compared against. Negated like the dots it averages.
   const weeklyBurnAvg = weeklyAverageSeries(caloriesData);
   const weeklyBurnDataset = weeklyAverageDataset(
@@ -1904,7 +1894,7 @@ function renderWellnessActivityChart(entries) {
           // Empty slots and the cap, whose `[from, to]` pair goes to afterBody instead.
           filter: (item) => item.raw !== null && !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
           // Dataset order. Without it Chart.js sorts by `order`, which controls DRAW
-          // order, and put the dots above the bars — away from the Planned Burn figure
+          // order, and put the dots above the bars — away from the Target Burn figure
           // they should be read against.
           itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
           callbacks: {
@@ -1925,12 +1915,12 @@ function renderWellnessActivityChart(entries) {
               const text = `${item.dataset.label}: ${isKcal ? v : Math.abs(v)} ${isKcal ? 'kcal' : 'min'}`;
               return privacyMode ? maskDigits(text) : text;
             },
-            // Flush left and last, the placement Caloric Intake gives its own bound.
+            // Flush left and last, the placement Caloric Intake gives its own target.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
               const lines = [];
-              if (plannedBurnKcal[i] !== null) lines.push(`Planned Burn: ${-Math.round(plannedBurnKcal[i])} kcal`);
+              if (targetBurnKcal[i] !== null) lines.push(`Target Burn: ${-Math.round(targetBurnKcal[i])} kcal`);
               if (weeklyBurnAvg[i] !== null) lines.push(`7-Day Average Burn: ${-Math.round(weeklyBurnAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -1940,7 +1930,7 @@ function renderWellnessActivityChart(entries) {
       scales: {
         x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
         // kcal left with the gridlines, minutes right with none: the comparison this
-        // chart exists for — Actual against Planned Burn — happens on the kcal scale,
+        // chart exists for — Actual against Target Burn — happens on the kcal scale,
         // so the lines have to be spaced in kcal. Only the sides move; the axis ids are
         // untouched. Both run from 0 downward, since everything is negated, but they
         // label differently: calories keep the minus because that energy left the body,
@@ -2005,8 +1995,8 @@ function renderWellnessProteinChart(entries) {
   });
 
   // Zero-based and auto-topped, so the span is whatever is tallest — a bar or the band.
-  const capHalf = boundCapHalf(Math.max(band.max, ...values, 1));
-  const capFor = (value, label) => boundCapDataset(label, new Array(dates.length).fill(value), capHalf, { isTargetLine: true });
+  const capHalf = targetCapHalf(Math.max(band.max, ...values, 1));
+  const capFor = (value, label) => targetCapDataset(label, new Array(dates.length).fill(value), capHalf, { isTargetLine: true });
 
   const targetDatasets = band.max > band.min
     ? [
@@ -2052,12 +2042,12 @@ function renderWellnessProteinChart(entries) {
               const text = `Actual Intake: ${item.parsed.y} g`;
               return privacyMode ? maskDigits(text) : text;
             },
-            // Both ends, flush left and last — the Actual/Planned shape the other charts
+            // Both ends, flush left and last — the Actual/Target shape the other charts
             // use. A zero-width band reads as one target, not an equal Min and Max.
             afterBody: (items) => {
               const lines = band.max > band.min
-                ? [`Planned Min: ${band.min} g`, `Planned Max: ${band.max} g`]
-                : [`Planned Target: ${band.min} g`];
+                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
+                : [`Target: ${band.min} g`];
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -2108,16 +2098,16 @@ function parseIsoDateUTC(dateStr) {
 }
 
 // In LOGGED POINTS, not calendar days.
-const WEIGHT_TREND_WINDOW_SIZE = 5;
+const BODY_MASS_TREND_WINDOW_SIZE = 5;
 
 // Centered moving average: each point is diluted by its neighbours on both sides, so a
 // noisy reading doesn't spike — or, with a trailing-only average, drag the line up and
 // lag behind afterwards. Windowing by logged points rather than elapsed days smooths
 // the same whether entries are daily or sporadic, where a time-decayed average would
 // stop smoothing once the gaps approach its decay window.
-function computeWeightTrend(weightByDate, windowSize = WEIGHT_TREND_WINDOW_SIZE) {
-  const dates = [...weightByDate.keys()].sort();
-  const values = dates.map((d) => weightByDate.get(d));
+function computeBodyMassTrend(bodyMassByDate, windowSize = BODY_MASS_TREND_WINDOW_SIZE) {
+  const dates = [...bodyMassByDate.keys()].sort();
+  const values = dates.map((d) => bodyMassByDate.get(d));
   const radius = Math.floor((windowSize - 1) / 2);
 
   const trend = new Map();
@@ -2153,7 +2143,7 @@ function detectPlateau(trendMap) {
   return Math.round((lastMs - parseIsoDateUTC(windowStartDate)) / 86400000);
 }
 
-// The PLANNED trajectory — eating exactly Eᵢₙ and hitting ACTIVITY_TARGET_MIN every
+// The TARGET trajectory — eating exactly Eᵢₙ and hitting ACTIVITY_TARGET_MIN every
 // day. Shared with the Formula Playground, so its printed A / B / m∞ / t and the chart's
 // forecast are one piece of arithmetic rather than two that can disagree.
 //
@@ -2163,16 +2153,16 @@ function detectPlateau(trendMap) {
 // Works both directions — a surplus puts m∞ above m and the same log gives days to gain
 // — but only reaches targets BETWEEN m and m∞. Past the asymptote is genuinely
 // unreachable at that intake, and is reported rather than extrapolated.
-function projectPlanDays({ intakeKcal, weightKg, heightCm, age, sex, met, tau, kappa, goalKg }) {
+function projectTargetDays({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg }) {
   const a = 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
   const b = 10 + (met * tau * kappa) / ML_O2_PER_KCAL;
   const equilibriumKg = (intakeKcal - a) / b;
 
-  if (Math.abs(weightKg - goalKg) < WEIGHT_AT_GOAL_TOLERANCE_KG) {
+  if (Math.abs(bodyMassKg - targetKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG) {
     return { a, b, equilibriumKg, status: 'reached' };
   }
 
-  const ratio = (weightKg - equilibriumKg) / (goalKg - equilibriumKg);
+  const ratio = (bodyMassKg - equilibriumKg) / (targetKg - equilibriumKg);
   if (!Number.isFinite(ratio) || ratio <= 1) {
     return { a, b, equilibriumKg, status: 'unreachable' };
   }
@@ -2183,33 +2173,33 @@ function projectPlanDays({ intakeKcal, weightKg, heightCm, age, sex, met, tau, k
   return { a, b, equilibriumKg, days, etaIso: isoFromDate(eta), status: 'ok' };
 }
 
-// The same plan from saved Settings rather than the playground's live inputs, so the
-// two agree whenever its boxes still hold what's on the sheet. Null without a profile.
-function planProjectionFromSettings(entries, weightKg, goalKg) {
+// The same target trajectory from saved Settings rather than the playground's live inputs,
+// so the two agree whenever its boxes still hold what's on the sheet. Null without a profile.
+function targetProjectionFromSettings(entries, bodyMassKg, targetKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
   if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female')) return null;
 
-  return projectPlanDays({
-    // Eᵢₙ itself: the calculated bound is exactly what the playground computes.
-    intakeKcal: getCalorieBoundKcal(entries),
-    weightKg,
+  return projectTargetDays({
+    // Eᵢₙ itself: the calculated target is exactly what the playground computes.
+    intakeKcal: getCalorieTargetKcal(entries),
+    bodyMassKg,
     heightCm,
     age,
     sex,
     met: activityMet(),
     tau: getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT),
     kappa: getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT),
-    goalKg,
+    targetKg,
   });
 }
 
 function calcProjection(entries) {
-  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
+  const bodyMassTarget = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
   // The figure only; which side to be on doesn't enter this arithmetic. Stands in as
   // the intake level when nothing has been logged.
-  const calorieTarget = getCalorieBoundKcal(entries);
+  const calorieTarget = getCalorieTargetKcal(entries);
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
   const today = new Date();
@@ -2219,14 +2209,14 @@ function calcProjection(entries) {
   cutoff.setDate(today.getDate() - 14);
   const cutoffIso = isoFromDate(cutoff);
 
-  const weightEntries = entries
-    .filter((e) => e.category === 'Weight' && e.amount !== null)
+  const bodyMassEntries = entries
+    .filter((e) => e.category === 'Body Mass' && e.amount !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (weightEntries.length < 2) return null;
+  if (bodyMassEntries.length < 2) return null;
 
-  const lastWeight = weightEntries[weightEntries.length - 1].amount;
-  if (Math.abs(lastWeight - weightGoal) < 0.1) return { status: 'reached' };
+  const lastBodyMass = bodyMassEntries[bodyMassEntries.length - 1].amount;
+  if (Math.abs(lastBodyMass - bodyMassTarget) < 0.1) return { status: 'reached' };
 
   const recentEntries = entries.filter((e) => e.date >= cutoffIso && e.date <= todayIso);
 
@@ -2238,7 +2228,7 @@ function calcProjection(entries) {
     if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
       caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + e.amount);
     } else if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
-      const kcal = activityEntryKcal(e, latestWeightKg(entries));
+      const kcal = activityEntryKcal(e, latestBodyMassKg(entries));
       activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
     } else if (e.category === 'Sleep' && e.amount !== null) {
       sleepByDate.set(e.date, (sleepByDate.get(e.date) || 0) + e.amount);
@@ -2250,37 +2240,37 @@ function calcProjection(entries) {
   // The exponential model's coefficients; null means project as a straight line.
   let decay = null;
 
-  // The PLAN wins whenever the profile allows it, so this arrival date is the one the
-  // Formula Playground prints. That makes the forecast a statement of the plan, not of
-  // recent behaviour: eat over the bound for a fortnight and it does NOT slip. Calorie
-  // Balance is where actual-vs-plan shows day by day.
-  const plan = planProjectionFromSettings(entries, lastWeight, weightGoal);
-  if (plan !== null && plan.status !== 'reached') {
+  // The TARGET wins whenever the profile allows it, so this arrival date is the one the
+  // Formula Playground prints. That makes the forecast a statement of the target, not of
+  // recent behaviour: eat over the target for a fortnight and it does NOT slip. Calorie
+  // Balance is where actual-vs-target shows day by day.
+  const targetProjection = targetProjectionFromSettings(entries, lastBodyMass, bodyMassTarget);
+  if (targetProjection !== null && targetProjection.status !== 'reached') {
     decay = {
-      perKg: plan.b,
-      // No sleep factor: the plan doesn't model sleep, and dividing ρ would move the
+      perKg: targetProjection.b,
+      // No sleep factor: the target doesn't model sleep, and dividing ρ would move the
       // arrival date away from the playground's t.
       kcalPerKg: GENERIC_KCAL_PER_KG_FAT,
-      equilibriumKg: plan.equilibriumKg,
+      equilibriumKg: targetProjection.equilibriumKg,
     };
     // Rate at today's mass, for the ETA line's note. The trajectory itself decelerates,
     // which the coefficients above carry.
-    slope = (getCalorieBoundKcal(entries) - (plan.a + plan.b * lastWeight)) / GENERIC_KCAL_PER_KG_FAT;
-    method = 'plan';
+    slope = (getCalorieTargetKcal(entries) - (targetProjection.a + targetProjection.b * lastBodyMass)) / GENERIC_KCAL_PER_KG_FAT;
+    method = 'target';
   } else if (caloriesByDate.size > 0 || activityKcalByDate.size > 0) {
     const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
     const avgActivityKcal = activityKcalByDate.size > 0 ? avg(activityKcalByDate) : 0;
     const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
 
     // Negative balance = deficit = loss. Against MAINTENANCE, not calorieTarget: the
-    // target is already maintenance minus the planned deficit, so eating exactly it
+    // target is already maintenance minus the target deficit, so eating exactly it
     // produced a ~zero balance and a "no net change" forecast — precisely when the
-    // planned loss should have been delivered. Same shape as the bound's own basis,
+    // target loss should have been delivered. Same shape as the target's own basis,
     // differing only in the activity figure: logged burn here, target burn there.
     const resting = restingMaintenanceKcal(entries);
     const maintenance = resting !== null
       ? resting + avgActivityKcal
-      // No profile, so no BMR and no calculated bound — the flat CALORIE_TARGET_KCAL
+      // No profile, so no BMR and no calculated target — the flat CALORIE_TARGET_KCAL
       // the user chose directly is the best baseline available.
       : calorieTarget + avgActivityKcal;
 
@@ -2290,19 +2280,19 @@ function calcProjection(entries) {
     slope = baseSlope * sleepRatio;
 
     // Maintenance is affine in body mass, not constant, so a fixed intake decays
-    // exponentially toward the weight where that intake IS maintenance. Both terms
+    // exponentially toward the body mass where that intake IS maintenance. Both terms
     // scale with mass: BMR by its 10·m coefficient, logged burn because metKcal is
-    // proportional to weight. Needs a profile — without a BMR there's no A/B to split
+    // proportional to body mass. Needs a profile — without a BMR there's no A/B to split
     // maintenance into, so `decay` stays null and the straight line is used.
-    if (resting !== null && lastWeight > 0) {
-      const perKg = 10 + avgActivityKcal / lastWeight;
-      const weightIndependent = maintenance - perKg * lastWeight;
+    if (resting !== null && lastBodyMass > 0) {
+      const perKg = 10 + avgActivityKcal / lastBodyMass;
+      const bodyMassIndependent = maintenance - perKg * lastBodyMass;
       decay = {
         perKg,
         // Sleep scales the rate, so it divides the energy density rather than entering
         // the equilibrium — same destination, different speed of arrival.
         kcalPerKg: GENERIC_KCAL_PER_KG_FAT / sleepRatio,
-        equilibriumKg: (avgCalories - weightIndependent) / perKg,
+        equilibriumKg: (avgCalories - bodyMassIndependent) / perKg,
       };
     }
 
@@ -2310,62 +2300,62 @@ function calcProjection(entries) {
     const allPresent = caloriesByDate.size > 0 && activityKcalByDate.size > 0 && sleepByDate.size > 0;
     method = allPresent ? 'full' : 'partial';
   } else {
-    const src = weightEntries.filter((e) => e.date >= cutoffIso);
-    const data = src.length >= 2 ? src : weightEntries;
+    const src = bodyMassEntries.filter((e) => e.date >= cutoffIso);
+    const data = src.length >= 2 ? src : bodyMassEntries;
     slope = linearRegressionSlope(data.map((_, i) => i), data.map((e) => e.amount));
-    method = 'weight-only';
+    method = 'body-mass-only';
   }
 
   // Reported even with no forecast, so the ETA line can show the rate instead of a bare
   // "projection unavailable".
   if (slope === 0) return { status: 'no-change', method, slope };
 
-  const goingDown = weightGoal < lastWeight;
+  const goingDown = bodyMassTarget < lastBodyMass;
   if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method, slope };
 
-  // A fixed intake only ever carries you to its own equilibrium, so a goal on the far
+  // A fixed intake only ever carries you to its own equilibrium, so a target on the far
   // side is never reached. The straight line always produced a date regardless, which
   // is what this status exists to report.
   if (decay !== null) {
-    const gapNow = lastWeight - decay.equilibriumKg;
-    const gapGoal = weightGoal - decay.equilibriumKg;
-    if (gapGoal / gapNow <= 0) {
+    const gapNow = lastBodyMass - decay.equilibriumKg;
+    const gapTarget = bodyMassTarget - decay.equilibriumKg;
+    if (gapTarget / gapNow <= 0) {
       return { status: 'asymptote', method, slope, equilibriumKg: decay.equilibriumKg };
     }
   }
 
   // The straight line's division, or the closed form t = (ρ/B)·ln[(m − m∞)/(m_g − m∞)].
-  const daysToGoal = decay !== null
+  const daysToTarget = decay !== null
     ? Math.round((decay.kcalPerKg / decay.perKg)
-      * Math.log((lastWeight - decay.equilibriumKg) / (weightGoal - decay.equilibriumKg)))
-    : Math.round((weightGoal - lastWeight) / slope);
+      * Math.log((lastBodyMass - decay.equilibriumKg) / (bodyMassTarget - decay.equilibriumKg)))
+    : Math.round((bodyMassTarget - lastBodyMass) / slope);
   const etaDate = new Date(today);
-  etaDate.setDate(today.getDate() + daysToGoal);
+  etaDate.setDate(today.getDate() + daysToTarget);
 
   // m(t) = m∞ + (m − m∞)·e^(−B·t/ρ) for the curve, m + slope·t for the line.
-  const weightAtDay = (d) => (decay !== null
-    ? decay.equilibriumKg + (lastWeight - decay.equilibriumKg) * Math.exp(-(decay.perKg * d) / decay.kcalPerKg)
-    : lastWeight + slope * d);
+  const bodyMassAtDay = (d) => (decay !== null
+    ? decay.equilibriumKg + (lastBodyMass - decay.equilibriumKg) * Math.exp(-(decay.perKg * d) / decay.kcalPerKg)
+    : lastBodyMass + slope * d);
 
-  const cappedDays = Math.min(daysToGoal, 365);
+  const cappedDays = Math.min(daysToTarget, 365);
   const projectedPoints = [];
   for (let d = 0; d <= cappedDays; d += 7) {
     const pd = new Date(today);
     pd.setDate(today.getDate() + d);
-    projectedPoints.push({ date: isoFromDate(pd), weight: Math.round(weightAtDay(d) * 10) / 10 });
+    projectedPoints.push({ date: isoFromDate(pd), bodyMass: Math.round(bodyMassAtDay(d) * 10) / 10 });
   }
-  if (daysToGoal <= 365) {
-    projectedPoints.push({ date: isoFromDate(etaDate), weight: weightGoal });
+  if (daysToTarget <= 365) {
+    projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: bodyMassTarget });
   }
 
   return {
     status: 'ok',
     slope,
-    daysToGoal,
+    daysToTarget,
     etaDate,
     projectedPoints,
     method,
-    weightGoal,
+    bodyMassTarget,
     equilibriumKg: decay !== null ? decay.equilibriumKg : null,
   };
 }
@@ -2374,22 +2364,22 @@ function renderWellnessProjectionChart(entries) {
   const ctx = document.getElementById('wellness-projection-chart');
   if (wellnessProjectionChart) wellnessProjectionChart.destroy();
 
-  const meterWrap = document.getElementById('weight-progress-meter');
-  const meterFill = document.getElementById('weight-progress-meter-fill');
-  const meterDone = document.getElementById('weight-progress-meter-done');
-  const meterRemaining = document.getElementById('weight-progress-meter-remaining');
-  const meterGoal = document.getElementById('weight-progress-meter-goal');
+  const meterWrap = document.getElementById('body-mass-progress-meter');
+  const meterFill = document.getElementById('body-mass-progress-meter-fill');
+  const meterDone = document.getElementById('body-mass-progress-meter-done');
+  const meterRemaining = document.getElementById('body-mass-progress-meter-remaining');
+  const meterTarget = document.getElementById('body-mass-progress-meter-target');
   const timeWrap = document.getElementById('time-progress-meter');
   const timeFill = document.getElementById('time-progress-meter-fill');
   const timeElapsed = document.getElementById('time-progress-meter-elapsed');
   const timeRemaining = document.getElementById('time-progress-meter-remaining');
   const timeEta = document.getElementById('time-progress-meter-eta');
-  const etaEl = document.getElementById('weight-projection-eta');
-  const plateauNote = document.getElementById('weight-plateau-note');
+  const etaEl = document.getElementById('body-mass-projection-eta');
+  const plateauNote = document.getElementById('body-mass-plateau-note');
   meterWrap.hidden = true;
   meterDone.textContent = '';
   meterRemaining.textContent = '';
-  meterGoal.textContent = '';
+  meterTarget.textContent = '';
   meterRemaining.classList.remove('danger');
   timeWrap.hidden = true;
   timeElapsed.textContent = '';
@@ -2399,27 +2389,27 @@ function renderWellnessProjectionChart(entries) {
   plateauNote.textContent = '';
   plateauNote.classList.remove('warning');
 
-  const weightEntries = entries
-    .filter((e) => e.category === 'Weight' && e.amount !== null)
+  const bodyMassEntries = entries
+    .filter((e) => e.category === 'Body Mass' && e.amount !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (weightEntries.length < 2) return;
+  if (bodyMassEntries.length < 2) return;
 
-  const startWeight = weightEntries[0].amount;
-  const lastWeight = weightEntries[weightEntries.length - 1].amount;
+  const startBodyMass = bodyMassEntries[0].amount;
+  const lastBodyMass = bodyMassEntries[bodyMassEntries.length - 1].amount;
 
   const proj = calcProjection(entries);
   if (!proj) return;
 
-  // First logged weight to goal, shown whatever the trajectory status — "wrong
+  // First logged body mass to target, shown whatever the trajectory status — "wrong
   // direction" is worth seeing, just in the danger colour. Both readouts are kg so the
   // pair compares directly; the percentage still drives the bar's width.
-  const weightGoal = getSetting('WEIGHT_GOAL_KG', WEIGHT_GOAL_KG_DEFAULT);
-  const totalDelta = startWeight - weightGoal;
+  const bodyMassTarget = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const totalDelta = startBodyMass - bodyMassTarget;
   if (Math.abs(totalDelta) >= 0.1) {
-    const pct = Math.max(0, Math.min(100, ((startWeight - lastWeight) / totalDelta) * 100));
-    const doneKg = Math.round(Math.abs(startWeight - lastWeight) * 10) / 10;
-    const remainingKg = Math.round(Math.abs(lastWeight - weightGoal) * 10) / 10;
+    const pct = Math.max(0, Math.min(100, ((startBodyMass - lastBodyMass) / totalDelta) * 100));
+    const doneKg = Math.round(Math.abs(startBodyMass - lastBodyMass) * 10) / 10;
+    const remainingKg = Math.round(Math.abs(lastBodyMass - bodyMassTarget) * 10) / 10;
     const isWrongDirection = proj.status === 'wrong-direction';
 
     meterWrap.hidden = false;
@@ -2433,13 +2423,13 @@ function renderWellnessProjectionChart(entries) {
     meterRemaining.textContent = privacyMode ? maskDigits(remainingText) : remainingText;
     meterRemaining.classList.toggle('danger', isWrongDirection);
 
-    const goalText = `→ ${weightGoal} kg`;
-    meterGoal.textContent = privacyMode ? maskDigits(goalText) : goalText;
+    const targetText = `→ ${bodyMassTarget} kg`;
+    meterTarget.textContent = privacyMode ? maskDigits(targetText) : targetText;
   }
 
   // An undrawable projection drops only the projected SEGMENT. It used to `return`
   // here, but the chart is destroyed at the top of this function, so the panel went
-  // blank and took the history, trend and goal lines with it — none of which depend on
+  // blank and took the history, trend and target lines with it — none of which depend on
   // a projection. The status line says why, and the rate keeps it concrete.
   const rateNote = () => {
     const kgPerWeek = Math.abs(proj.slope * 7).toFixed(2);
@@ -2447,12 +2437,12 @@ function renderWellnessProjectionChart(entries) {
     return `${direction} ~${kgPerWeek} kg/week`;
   };
   const statusNote = {
-    reached: () => 'Goal reached! 🎉',
+    reached: () => 'Target reached! 🎉',
     'no-change': () => 'No net change at current habits',
-    'wrong-direction': () => `Current habits trend away from goal — ${rateNote()}, so no arrival date can be projected`,
-    // Right direction, but it decays to zero before the goal: the intake these habits
-    // average IS maintenance at that weight.
-    asymptote: () => `Currently ${rateNote()}, but these habits level off around ${Math.round(proj.equilibriumKg * 10) / 10} kg — the goal isn't reachable without changing them`,
+    'wrong-direction': () => `Current habits trend away from target — ${rateNote()}, so no arrival date can be projected`,
+    // Right direction, but it decays to zero before the target: the intake these habits
+    // average IS maintenance at that body mass.
+    asymptote: () => `Currently ${rateNote()}, but these habits level off around ${Math.round(proj.equilibriumKg * 10) / 10} kg — the target isn't reachable without changing them`,
   }[proj.status];
   if (statusNote) {
     const note = statusNote();
@@ -2463,13 +2453,13 @@ function renderWellnessProjectionChart(entries) {
   const projPoints = hasProjection ? proj.projectedPoints : [];
 
   // The same journey in time rather than kg: elapsed since the first weigh-in against
-  // the forecast's remaining days. A long time bar beside a short weight bar is itself
+  // the forecast's remaining days. A long time bar beside a short body-mass bar is itself
   // the signal that progress is slower than the effort. Needs an arrival date.
   if (hasProjection) {
     // Re-parsed as UTC, so today sits on the same footing as every other date here.
     const todayMs = parseIsoDateUTC(isoFromDate(new Date()));
-    const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(weightEntries[0].date)) / 86400000));
-    const daysToGo = Math.max(0, proj.daysToGoal);
+    const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(bodyMassEntries[0].date)) / 86400000));
+    const daysToGo = Math.max(0, proj.daysToTarget);
     const totalDays = daysElapsed + daysToGo;
 
     if (totalDays > 0) {
@@ -2488,24 +2478,24 @@ function renderWellnessProjectionChart(entries) {
     }
   }
 
-  const histLabels = weightEntries.map((e) => e.date);
+  const histLabels = bodyMassEntries.map((e) => e.date);
   const projLabels = projPoints.map((p) => p.date);
   const allLabels = [...new Set([...histLabels, ...projLabels])].sort();
 
-  const projMap = new Map(projPoints.map((p) => [p.date, p.weight]));
+  const projMap = new Map(projPoints.map((p) => [p.date, p.bodyMass]));
   const lastDate = histLabels[histLabels.length - 1];
 
   // Same-day weigh-ins are averaged before smoothing, rather than letting whichever
   // came last silently win.
-  const weightSumsByDate = new Map();
-  weightEntries.forEach((e) => {
-    const cur = weightSumsByDate.get(e.date) || { sum: 0, count: 0 };
+  const bodyMassSumsByDate = new Map();
+  bodyMassEntries.forEach((e) => {
+    const cur = bodyMassSumsByDate.get(e.date) || { sum: 0, count: 0 };
     cur.sum += e.amount;
     cur.count += 1;
-    weightSumsByDate.set(e.date, cur);
+    bodyMassSumsByDate.set(e.date, cur);
   });
-  const weightByDate = new Map([...weightSumsByDate].map(([d, { sum, count }]) => [d, sum / count]));
-  const trendMap = computeWeightTrend(weightByDate);
+  const bodyMassByDate = new Map([...bodyMassSumsByDate].map(([d, { sum, count }]) => [d, sum / count]));
+  const trendMap = computeBodyMassTrend(bodyMassByDate);
 
   const plateauDays = detectPlateau(trendMap);
   if (plateauDays) {
@@ -2541,7 +2531,7 @@ function renderWellnessProjectionChart(entries) {
       label: 'Projected',
       data: allLabels.map((d) => {
         let y = null;
-        if (d === lastDate) y = lastWeight;
+        if (d === lastDate) y = lastBodyMass;
         else if (d > lastDate) y = projMap.get(d) ?? null;
         return { x: dayOffset(d), y };
       }),
@@ -2560,14 +2550,14 @@ function renderWellnessProjectionChart(entries) {
       order: 2,
     }] : []),
     {
-      // weightGoal, not proj.weightGoal — that's only set on an 'ok' projection, but
-      // the goal line is drawn either way.
-      label: `${weightGoal} kg Goal`,
-      data: allLabels.map((d) => ({ x: dayOffset(d), y: weightGoal })),
+      // bodyMassTarget, not proj.bodyMassTarget — that's only set on an 'ok' projection, but
+      // the target line is drawn either way.
+      label: `${bodyMassTarget} kg Target`,
+      data: allLabels.map((d) => ({ x: dayOffset(d), y: bodyMassTarget })),
       // Solid, like the section's hairline caps. It stays a continuous LINE rather than
       // caps because this chart has no columns: its x-axis is a linear time scale, so
       // there's nothing per-column for a mark to belong to.
-      borderColor: boundMarkColor(),
+      borderColor: targetMarkColor(),
       borderWidth: 1.5,
       pointRadius: 0,
       tension: 0,
@@ -2577,36 +2567,36 @@ function renderWellnessProjectionChart(entries) {
   ];
 
   // Skipped without a height: BMI can't be computed, and an empty scale is worse than
-  // none. There's no BMI LINE either — BMI is a fixed linear rescale of weight, so it
-  // would retrace the weight line pixel for pixel, and the y1 axis alone lets it be
+  // none. There's no BMI LINE either — BMI is a fixed linear rescale of body mass, so it
+  // would retrace the body-mass line pixel for pixel, and the y1 axis alone lets it be
   // read off that line.
   const heightCm = getSetting('HEIGHT_CM', null);
 
   // Left to auto-range, Chart.js can pick a BMI span that doesn't correspond to the
-  // weight span, so a point on the chart would read as the wrong BMI off the right axis.
-  // Deriving y1's bounds from the same weight range keeps the two true parallel twins.
+  // body-mass span, so a point on the chart would read as the wrong BMI off the right axis.
+  // Deriving y1's bounds from the same body-mass range keeps the two true parallel twins.
   //
   // Rounded to whole kg, not just padded: a fractional min/max breaks Chart.js's own
   // round-number tick algorithm, which is what produced the clean 1 kg gridlines.
   //
-  // Raw weigh-ins are excluded since they're no longer plotted. lastWeight stays — the
+  // Raw weigh-ins are excluded since they're no longer plotted. lastBodyMass stays — the
   // projection starts from it.
-  const weightValues = [...trendMap.values(), ...projMap.values(), lastWeight, weightGoal]
+  const bodyMassValues = [...trendMap.values(), ...projMap.values(), lastBodyMass, bodyMassTarget]
     .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
-  const weightMin = Math.min(...weightValues);
-  const weightMax = Math.max(...weightValues);
-  const weightPad = Math.max(0.5, (weightMax - weightMin) * 0.08);
+  const bodyMassMin = Math.min(...bodyMassValues);
+  const bodyMassMax = Math.max(...bodyMassValues);
+  const bodyMassPad = Math.max(0.5, (bodyMassMax - bodyMassMin) * 0.08);
 
-  // The goal end gets no padding: nothing is ever plotted past it, so padding reserved
-  // an empty band — a 70 kg goal floored to 68. Still floor/ceil'd to whole kg, since
-  // the ticks step by 1 from these bounds. Only when the goal really is the extreme; a
+  // The target end gets no padding: nothing is ever plotted past it, so padding reserved
+  // an empty band — a 70 kg target floored to 68. Still floor/ceil'd to whole kg, since
+  // the ticks step by 1 from these bounds. Only when the target really is the extreme; a
   // reading that overshoots it pads normally, because then something IS drawn beyond.
-  const yMin = weightMin < weightGoal
-    ? Math.floor(weightMin - weightPad)
-    : Math.floor(weightGoal);
-  const yMax = weightMax > weightGoal
-    ? Math.ceil(weightMax + weightPad)
-    : Math.ceil(weightGoal);
+  const yMin = bodyMassMin < bodyMassTarget
+    ? Math.floor(bodyMassMin - bodyMassPad)
+    : Math.floor(bodyMassTarget);
+  const yMax = bodyMassMax > bodyMassTarget
+    ? Math.ceil(bodyMassMax + bodyMassPad)
+    : Math.ceil(bodyMassTarget);
 
   const scales = {
     x: {
@@ -2669,16 +2659,16 @@ function renderWellnessProjectionChart(entries) {
 // The most recent weigh-in on or before each date, carried forward — a BMR is needed
 // for every day in the window, not just the days a weigh-in lands on. Days before the
 // first reading fall back to it rather than dropping off the chart.
-function carryForwardWeightByDate(weightByDate, dates) {
-  const weighInDates = [...weightByDate.keys()].sort();
+function carryForwardBodyMassByDate(bodyMassByDate, dates) {
+  const weighInDates = [...bodyMassByDate.keys()].sort();
   if (weighInDates.length === 0) return new Map();
 
   const carried = new Map();
   let next = 0;
-  let current = weightByDate.get(weighInDates[0]);
+  let current = bodyMassByDate.get(weighInDates[0]);
   dates.forEach((date) => {
     while (next < weighInDates.length && weighInDates[next] <= date) {
-      current = weightByDate.get(weighInDates[next]);
+      current = bodyMassByDate.get(weighInDates[next]);
       next += 1;
     }
     carried.set(date, current);
@@ -2703,20 +2693,20 @@ function withExplicitSign(value) {
 
 let wellnessEnergyBalanceChart = null;
 
-// Against the plan line, not just the sign: at or beyond it green, short of it but
-// still on the goal's side of zero gray (real progress, only less than planned), wrong
-// side of zero red. No plan means no middle band, so it falls back to the sign.
-function energyBalanceColor(balance, isCut, planned) {
-  const towardGoal = isCut ? balance < 0 : balance > 0;
-  if (!towardGoal) return '#dc2626';
-  if (planned === null) return '#16a34a';
-  return (isCut ? balance <= planned : balance >= planned) ? '#16a34a' : '#9ca3af';
+// Against the target line, not just the sign: at or beyond it green, short of it but
+// still on the target's side of zero gray (real progress, only less than target), wrong
+// side of zero red. No target means no middle band, so it falls back to the sign.
+function energyBalanceColor(balance, isCut, target) {
+  const towardTarget = isCut ? balance < 0 : balance > 0;
+  if (!towardTarget) return '#dc2626';
+  if (target === null) return '#16a34a';
+  return (isCut ? balance <= target : balance >= target) ? '#16a34a' : '#9ca3af';
 }
 
 // The daily deficit WEEKLY_FAT_LOSS_KG implies — the playground's D, from the same
 // fat-density constant so the two can't disagree. Already signed to this chart's
 // convention. Null at zero or unset, since a line on zero would retrace the axis.
-function plannedBalanceKcal() {
+function targetBalanceKcal() {
   const weeklyKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
   if (weeklyKg === null || weeklyKg === 0) return null;
   return -Math.round((weeklyKg * GENERIC_KCAL_PER_KG_FAT) / 7);
@@ -2724,15 +2714,15 @@ function plannedBalanceKcal() {
 
 // Eaten minus spent per day, with the fat change that balance implies on a twin axis.
 //
-// Spend is Mifflin-St Jeor BMR at that day's carried-forward weight PLUS its logged
+// Spend is Mifflin-St Jeor BMR at that day's carried-forward body mass PLUS its logged
 // activity burn — no lifestyle multiplier, since logged activity is already real kcal
-// and scaling BMR too would count the same movement twice. The calorie bound is built
+// and scaling BMR too would count the same movement twice. The calorie target is built
 // the same way, so the two agree on any day activity hits the target.
 //
-// The COLOURS follow the goal, not the sign — a deficit is only progress for someone
+// The COLOURS follow the target, not the sign — a deficit is only progress for someone
 // heading down, so the app's green and red keep meaning "toward" and "away" rather than
 // congratulating a bulker for undereating. Which side is progress comes from
-// getCalorieBoundKind, the same read Caloric Intake uses. Within that side the plan
+// getCalorieTargetKind, the same read Caloric Intake uses. Within that side the target
 // splits green from gray, so falling behind reads differently from going backwards.
 //
 // Grams is balance ÷ kcal-per-kg, a fixed linear rescale off two population constants,
@@ -2745,29 +2735,29 @@ function renderWellnessEnergyBalanceChart(entries) {
   const sex = getSettingString('SEX', null);
   const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
 
-  const weightEntries = entries.filter((e) => e.category === 'Weight' && e.amount !== null);
+  const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
   const intakeEntries = entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
 
-  // No profile means no maintenance figure, no weigh-in means no weight to feed it.
+  // No profile means no maintenance figure, no weigh-in means no body mass to feed it.
   // Either way the chart shows its explanatory empty state, not a misleading partial.
-  const canCompute = haveProfile && weightEntries.length > 0;
+  const canCompute = haveProfile && bodyMassEntries.length > 0;
   const labels = canCompute ? trailingDatesForCategory(intakeEntries, WELLNESS_METRICS_DAYS) : [];
-  const weightForDate = carryForwardWeightByDate(weightByDateMap(weightEntries), labels);
+  const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(bodyMassEntries), labels);
 
   const intakeByDate = new Map();
   intakeEntries.forEach((e) => intakeByDate.set(e.date, (intakeByDate.get(e.date) || 0) + e.amount));
 
-  // Through the one shared rule, at the same carried-forward weight the BMR term uses.
+  // Through the one shared rule, at the same carried-forward body mass the BMR term uses.
   const activityKcalByDate = new Map();
   entries.forEach((e) => {
     if ((e.category !== 'Activity' && e.category !== 'Activity; Calories') || e.amount === null) return;
-    const kcal = activityEntryKcal(e, weightForDate.get(e.date) ?? null);
+    const kcal = activityEntryKcal(e, bodyMassForDate.get(e.date) ?? null);
     activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
   });
 
-  // Which side of zero is progress. Same read Caloric Intake's bound is built on, so
+  // Which side of zero is progress. Same read Caloric Intake's target is built on, so
   // the two charts can't disagree about which way the user is headed.
-  const isCut = getCalorieBoundKind(entries) === 'max';
+  const isCut = getCalorieTargetKind(entries) === 'max';
 
   const detailByDate = new Map();
 
@@ -2777,7 +2767,7 @@ function renderWellnessEnergyBalanceChart(entries) {
     if (!intakeByDate.has(date)) return null;
 
     const intake = Math.round(intakeByDate.get(date));
-    const maintenance = Math.round(mifflinStJeorBmr(weightForDate.get(date), heightCm, age, sex));
+    const maintenance = Math.round(mifflinStJeorBmr(bodyMassForDate.get(date), heightCm, age, sex));
     const activity = Math.round(activityKcalByDate.get(date) || 0);
     const balance = intake - maintenance - activity;
 
@@ -2790,17 +2780,17 @@ function renderWellnessEnergyBalanceChart(entries) {
 
   // Folded into the axis range too, so the dashes can't fall off-plot on a stretch of
   // days that all undershot them.
-  const planned = hasData ? plannedBalanceKcal() : null;
+  const target = hasData ? targetBalanceKcal() : null;
 
-  const maxDeficit = Math.max(0, ...values.map((v) => -v), planned === null ? 0 : -planned);
-  const maxSurplus = Math.max(0, ...values, planned === null ? 0 : planned);
+  const maxDeficit = Math.max(0, ...values.map((v) => -v), target === null ? 0 : -target);
+  const maxSurplus = Math.max(0, ...values, target === null ? 0 : target);
   const upToTick = (v) => Math.ceil(Math.max(v * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL) / ENERGY_BALANCE_TICK_KCAL)
     * ENERGY_BALANCE_TICK_KCAL;
   const yMin = -upToTick(maxDeficit);
   const yMax = upToTick(maxSurplus);
 
   // A fraction of the axis span, so the dash stays a hairline at any range.
-  const plannedHalf = (yMax - yMin) * 0.004;
+  const targetHalf = (yMax - yMin) * 0.004;
 
   // balanceData already nulls the unlogged days, so they sit out of the mean.
   const weeklyAvg = weeklyAverageSeries(balanceData);
@@ -2813,20 +2803,20 @@ function renderWellnessEnergyBalanceChart(entries) {
           type: 'bar',
           label: 'Calorie balance',
           data: balanceData,
-          backgroundColor: balanceData.map((v) => energyBalanceColor(v, isCut, planned)),
+          backgroundColor: balanceData.map((v) => energyBalanceColor(v, isCut, target)),
           order: 2,
         },
         weeklyAverageDataset('7-Day Average', weeklyAvg),
-        // A dash per day, the idiom Caloric Intake uses for its own bound: a continuous
+        // A dash per day, the idiom Caloric Intake uses for its own target: a continuous
         // line reads as one shared limit, a mark on each bar says the target belongs to
         // that day.
-        ...(planned === null ? [] : [{
+        ...(target === null ? [] : [{
           type: 'bar',
-          label: 'Planned for the day',
-          data: labels.map(() => [planned - plannedHalf, planned + plannedHalf]),
-          backgroundColor: boundMarkColor(),
+          label: 'Target for the day',
+          data: labels.map(() => [target - targetHalf, target + targetHalf]),
+          backgroundColor: targetMarkColor(),
           grouped: false,
-          isBoundMarker: true,
+          isTargetLine: true,
           // Lowest order paints last, so it stays visible on a bar that overshot it.
           order: 0,
         }]),
@@ -2850,7 +2840,7 @@ function renderWellnessEnergyBalanceChart(entries) {
         tooltip: {
           // The dashes are filtered out — a floating bar would report itself as a
           // `[from, to]` pair — and stated in afterBody instead.
-          filter: (item) => !item.dataset.isBoundMarker && !item.dataset.isWeeklyAverage,
+          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             // The chart IS the subtraction, so every term is spelled out — a bare
@@ -2858,7 +2848,7 @@ function renderWellnessEnergyBalanceChart(entries) {
             label: (item) => {
               const d = detailByDate.get(item.label);
               if (!d) return '';
-              // Last of the body rows, to sit beside the Planned row its colour is
+              // Last of the body rows, to sit beside the Target row its colour is
               // compared against. A day over maintenance reports a SURPLUS, since
               // calling it a deficit would contradict the + in front of it.
               const actualWord = d.balance > 0 ? 'Surplus' : 'Deficit';
@@ -2875,9 +2865,9 @@ function renderWellnessEnergyBalanceChart(entries) {
             // else here so it reads off the axis its dash is drawn on.
             afterBody: (items) => {
               const lines = [];
-              if (planned !== null) {
-                const word = planned < 0 ? 'Deficit' : 'Surplus';
-                lines.push(`Planned ${word}: ${withExplicitSign(planned)} kcal/day`);
+              if (target !== null) {
+                const word = target < 0 ? 'Deficit' : 'Surplus';
+                lines.push(`Target ${word}: ${withExplicitSign(target)} kcal/day`);
               }
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${withExplicitSign(Math.round(weeklyAvg[i]))} kcal`);
@@ -2915,10 +2905,10 @@ function renderWellnessEnergyBalanceChart(entries) {
   });
 }
 
-// One weight per logged date, same averaging as renderWellnessProjectionChart's.
-function weightByDateMap(weightEntries) {
+// One body mass per logged date, same averaging as renderWellnessProjectionChart's.
+function bodyMassByDateMap(bodyMassEntries) {
   const sums = new Map();
-  weightEntries.forEach((e) => {
+  bodyMassEntries.forEach((e) => {
     const cur = sums.get(e.date) || { sum: 0, count: 0 };
     cur.sum += e.amount;
     cur.count += 1;
@@ -3053,7 +3043,7 @@ function renderTimesheetOvertimeSummary(entries) {
   el.classList.remove('warning');
 
   const total = computeOvertimeMinutes(entries, null);
-  if (total.count === 0) return; // not enough logged full days yet — stay blank, same convention as .weight-eta
+  if (total.count === 0) return; // not enough logged full days yet — stay blank, same convention as .body-mass-eta
 
   const year = computeOvertimeMinutes(entries, 365);
   const month = computeOvertimeMinutes(entries, 30);

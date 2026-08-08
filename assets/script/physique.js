@@ -1,4 +1,4 @@
-// One row per day: sleep window, body mass, what was eaten and what was
+﻿// One row per day: sleep window, body mass, what was eaten and what was
 // burned. The tab every chart, today-tile, Insight mode and Activity Plan tick
 // reads, via the physiqueAsWellnessEntries() adapter below.
 
@@ -215,7 +215,7 @@ function physiqueAsWellnessEntries() {
     }
 
     if (p.bodyMass !== null) {
-      entries.push({ ...base, category: 'Weight', description: 'Body Mass', amount: p.bodyMass, unit: 'kg' });
+      entries.push({ ...base, category: 'Body Mass', description: 'Body Mass', amount: p.bodyMass, unit: 'kg' });
     }
 
     if (p.caloriesIn !== null || p.proteinIn !== null) {
@@ -310,16 +310,6 @@ function getFilteredPhysiqueEntries() {
   });
 }
 
-// [text, tooltip] for the Breakdown column: how many items the stored JSON
-// holds, and their names on hover. A cell that doesn't parse shows as-is, so a
-// hand-mangled one is visible rather than silently reading as empty.
-function breakdownCell(raw) {
-  if (!raw) return ['—'];
-  const items = parsePhysiqueBreakdown(raw);
-  if (!items.length) return ['⚠️ unreadable', raw];
-  return [`${items.length} item${items.length === 1 ? '' : 's'}`, items.map((b) => b.name).join(', ')];
-}
-
 // A day's sleep length from its two clock times.
 function physiqueSleepHours(p) {
   const bed = parseClockTime(p.bedtime);
@@ -343,7 +333,7 @@ function renderPhysiqueList() {
     const message = allPhysiqueEntries.length === 0
       ? 'No days logged yet — click "Log a Day" to get started.'
       : 'No days match this filter.';
-    tbody.appendChild(renderEmptyRow(13, message));
+    tbody.appendChild(renderEmptyRow(10, message));
   }
 
   pageEntries.forEach((p) => {
@@ -353,16 +343,9 @@ function renderPhysiqueList() {
       if (value === null) return '—';
       return privacyMode ? maskDigits(String(value)) : String(value);
     };
-    // Consumption and Workout are multi-line lists — flattened to one line for
-    // the cell, with the full text kept in the tooltip.
-    const truncate = (text) => {
-      const flat = text.replace(/\s*\n+\s*/g, ' · ').trim();
-      return flat.length > 24 ? `${flat.slice(0, 24)}…` : flat;
-    };
 
     const sleepHours = physiqueSleepHours(p);
     const sleepTitle = sleepHours !== null ? `${sleepHours} hr of sleep` : '';
-    const [breakdownText, breakdownTitle] = breakdownCell(p.breakdown);
 
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
@@ -383,14 +366,8 @@ function renderPhysiqueList() {
       makeCell(p.bedtime || '—', sleepTitle),
       makeCell(p.wakeTime || '—', sleepTitle),
       makeCell(num(p.bodyMass)),
-      makeCell(privacyMode ? maskText(truncate(p.consumption)) : truncate(p.consumption),
-        privacyMode ? maskText(p.consumption) : p.consumption),
-      // Raw JSON would be noise in a cell — the item count is the useful
-      // summary, with the ingredient names on hover.
-      makeCell(breakdownText, privacyMode && breakdownTitle ? maskText(breakdownTitle) : breakdownTitle),
       makeCell(num(p.caloriesIn)),
       makeCell(num(p.proteinIn)),
-      makeCell(truncate(p.workout), p.workout),
       makeCell(num(p.duration)),
       makeCell(num(p.caloriesOut)),
     );
@@ -513,13 +490,13 @@ const PHYSIQUE_DAY_CALORIE_CEILING = 6000;
 
 // Body mass for the burn formula: this day's own field first, else the most
 // recent day that recorded one.
-function physiqueWeightKg() {
+function physiqueBodyMassKg() {
   const typed = evaluateNumberExpression(physiqueField('body-mass').value.trim());
-  return typed || physiqueWeightKgFromLog();
+  return typed || physiqueBodyMassKgFromLog();
 }
 
 // The most recent day that recorded a body mass. Null if none ever has.
-function physiqueWeightKgFromLog() {
+function physiqueBodyMassKgFromLog() {
   const lastLogged = allPhysiqueEntries
     .filter((p) => p.date && p.bodyMass !== null)
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -547,10 +524,16 @@ function parsePhysiqueBreakdown(raw) {
 }
 
 // Draws the shared breakdown table (calorie-estimator.js) under the Breakdown
-// field, or hides it when there's nothing parseable to show.
+// field, or hides it when there's nothing parseable to show. renderCalcBreakdown
+// itself merges same-name rows and sorts highest calories first for display,
+// so an entry saved before that existed (or hand-edited out of order) still
+// shows correctly without touching the stored JSON's own order.
 function renderPhysiqueBreakdown(breakdown, calories, protein) {
-  if (breakdown.length) renderCalcBreakdown(breakdown, calories || 0, protein || 0, 'physique');
-  else hideCalcBreakdown('physique');
+  if (breakdown.length) {
+    renderCalcBreakdown(breakdown, calories || 0, protein || 0, 'physique');
+  } else {
+    hideCalcBreakdown('physique');
+  }
 }
 
 // Re-estimates only the Consumption lines that actually changed.
@@ -619,8 +602,8 @@ function runPhysiqueWorkoutCalc() {
   const workout = physiqueField('workout').value.trim();
   if (!workout) return messages;
 
-  const weightKg = physiqueWeightKg();
-  if (weightKg === null) {
+  const bodyMassKg = physiqueBodyMassKg();
+  if (bodyMassKg === null) {
     messages.push(physiqueDataLoaded
       ? '⚠️ Workout skipped — fill in Body Mass first, the calorie formula needs it.'
       : '⚠️ Workout skipped — still loading your data, try Calculate again in a moment.');
@@ -628,7 +611,7 @@ function runPhysiqueWorkoutCalc() {
   }
 
   try {
-    const { minutes, calories, unmatchedNames } = estimateWorkoutActivity(workout, weightKg);
+    const { minutes, calories, unmatchedNames } = estimateWorkoutActivity(workout, bodyMassKg);
     physiqueField('activity-duration').value = minutes;
     physiqueField('calories-out').value = calories;
     if (unmatchedNames.length) {
@@ -750,7 +733,7 @@ async function submitPhysiqueForm(event) {
 // what actually changed.
 
 // A day's recalculated A–K cells, or null if nothing about it changed.
-async function recalculatePhysiqueDay(p, weightKg) {
+async function recalculatePhysiqueDay(p, bodyMassKg) {
   const values = physiqueRowValues(p);
 
   if (p.consumption.trim()) {
@@ -762,8 +745,8 @@ async function recalculatePhysiqueDay(p, weightKg) {
     values[7] = protein;
   }
 
-  if (p.workout.trim() && weightKg !== null) {
-    const { minutes, calories } = estimateWorkoutActivity(p.workout, weightKg);
+  if (p.workout.trim() && bodyMassKg !== null) {
+    const { minutes, calories } = estimateWorkoutActivity(p.workout, bodyMassKg);
     values[9] = minutes;
     values[10] = calories;
   }
@@ -782,9 +765,9 @@ async function bulkCalculatePhysique() {
   }
 
   // One lookup for the whole run rather than per row: it's the same "right
-  // now" bodyweight either way, and a day of its own is preferred where it has
+  // now" body mass either way, and a day of its own is preferred where it has
   // one (below) so a historical row still uses what it actually recorded.
-  const latestWeightKg = physiqueWeightKgFromLog();
+  const latestBodyMassKg = physiqueBodyMassKgFromLog();
   const summaryEl = document.getElementById('physique-bulk-summary');
 
   const snapshots = eligible.map((p) => ({ row: p.row, values: physiqueRowValues(p) }));
@@ -793,7 +776,7 @@ async function bulkCalculatePhysique() {
   const succeeded = [];
   const results = await Promise.allSettled(eligible.map(async (p, i) => {
     try {
-      const values = await recalculatePhysiqueDay(p, p.bodyMass ?? latestWeightKg);
+      const values = await recalculatePhysiqueDay(p, p.bodyMass ?? latestBodyMassKg);
       await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${p.row}:K${p.row}`, [values]);
       succeeded.push(snapshots[i]);
     } finally {

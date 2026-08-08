@@ -1,4 +1,4 @@
-* {
+﻿* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -1128,6 +1128,22 @@ td {
     text-align: right;
 }
 
+/* Every remaining Physique column is a short date/time/number now that
+   Consumption/Workout/Breakdown are gone, so none of them need to wrap —
+   letting one (usually Date) wrap mid-value was what starved the actions
+   column of width and forced its 3 buttons onto separate lines. */
+#physique-table th,
+#physique-table td {
+    white-space: nowrap;
+}
+
+#physique-table th:first-child,
+#physique-table td:first-child,
+#physique-table th:last-child,
+#physique-table td:last-child {
+    width: 1%;
+}
+
 #transactions-table td:nth-child(4),
 #transactions-table td:nth-child(5) {
     max-width: 0;
@@ -1588,7 +1604,7 @@ td .btn {
 .instruction-activities {
     list-style: none;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     align-items: start;
     gap: .5rem;
 }
@@ -1623,6 +1639,12 @@ td .btn {
     font-weight: 600;
 }
 
+@media (max-width: 820px) {
+    .instruction-activities {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 
 /* Tight by design. The gaps between a label, its box and the next field are cut
    hardest — they cost height without buying anything — while the box's own
@@ -1634,6 +1656,10 @@ td .btn {
     margin-bottom: .35rem;
     font-size: .85rem;
     color: var(--color-text-muted);
+}
+
+.app-form label[hidden] {
+    display: none;
 }
 
 .app-form input,
@@ -1694,7 +1720,7 @@ td .btn {
     color: var(--color-text-muted);
 }
 
-.weight-projection-wrap {
+.body-mass-projection-wrap {
     margin-top: 1.25rem;
 }
 
@@ -1702,24 +1728,24 @@ td .btn {
    — same style as the donut-item h4s above, so every Health Indicators chart
    heading (State Trend & Forecast, Calorie Balance, Body Mass, Caloric
    Intake, Physical Activity, Protein Intake, Rest & Recovery) is visually one set. */
-.weight-projection-wrap h4 {
+.body-mass-projection-wrap h4 {
     margin: 0 0 .25rem;
     font-size: 1rem;
     color: var(--color-text);
 }
 
-.weight-projection-header {
+.body-mass-projection-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: .5rem;
 }
 
-.weight-projection-header h4 {
+.body-mass-projection-header h4 {
     margin: 0;
 }
 
-.weight-eta {
+.body-mass-eta {
     font-size: 0.78rem;
     color: var(--color-text-muted);
     text-align: center;
@@ -1727,47 +1753,47 @@ td .btn {
     min-height: 1.2em;
 }
 
-.weight-progress-meter {
+.body-mass-progress-meter {
     margin-top: .75rem;
 }
 
 /* The meters and the ETA line lead the block, ABOVE the heading — where are you now
    and when do you arrive, read first of all. So the outer meter needs clearance from
-   the heading below it, and none above: .weight-projection-wrap's own top margin
+   the heading below it, and none above: .body-mass-projection-wrap's own top margin
    already separates it from the previous chart. Scoped to the outer meter, because
    the nested time meter still wants the shared .75rem top gap to sit clear of the
    distance bar, and its bottom flush so the ETA line stays with the bars. */
-.weight-projection-wrap > .weight-progress-meter {
+.body-mass-projection-wrap > .body-mass-progress-meter {
     margin-top: 0;
     margin-bottom: .75rem;
 }
 
-/* The time meter is a second, nested .weight-progress-meter directly under the
-   weight one. Its track is drawn a touch lighter so the pair reads as
+/* The time meter is a second, nested .body-mass-progress-meter directly under the
+   body-mass one. Its track is drawn a touch lighter so the pair reads as
    "distance (primary) / time (secondary)" rather than two competing bars. */
-.time-progress-meter .weight-progress-meter-fill {
+.time-progress-meter .body-mass-progress-meter-fill {
     opacity: .55;
 }
 
-.weight-progress-meter-track {
+.body-mass-progress-meter-track {
     height: 8px;
     border-radius: 999px;
     background: var(--color-border);
     overflow: hidden;
 }
 
-.weight-progress-meter-fill {
+.body-mass-progress-meter-fill {
     height: 100%;
     border-radius: 999px;
     background: var(--color-primary);
     transition: width .4s ease;
 }
 
-.weight-progress-meter-fill.danger {
+.body-mass-progress-meter-fill.danger {
     background: var(--color-expense);
 }
 
-.weight-progress-meter-stats {
+.body-mass-progress-meter-stats {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
@@ -1779,36 +1805,36 @@ td .btn {
 /* Each stat is a single line, number then label — "23% there" / "16.9 kg to
    go" — shown with equal visual weight side by side, instead of one
    abstract percentage standing alone. */
-.weight-progress-meter-stat {
+.body-mass-progress-meter-stat {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
     gap: .3rem;
 }
 
-.weight-progress-meter-stat-label {
+.body-mass-progress-meter-stat-label {
     font-size: 1.1rem;
     color: var(--color-text-muted);
 }
 
 /* The "→ 70 kg" / "→ 2027-01-27" target trailing "to go". */
-.weight-progress-meter-goal {
+.body-mass-progress-meter-target {
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--color-text);
 }
 
-.weight-progress-meter-pct {
+.body-mass-progress-meter-pct {
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--color-text);
 }
 
-.weight-progress-meter-pct.danger {
+.body-mass-progress-meter-pct.danger {
     color: var(--color-expense);
 }
 
-.weight-plateau-note {
+.body-mass-plateau-note {
     font-size: .78rem;
     color: var(--color-text-muted);
     text-align: center;
@@ -1816,7 +1842,7 @@ td .btn {
     min-height: 1.2em;
 }
 
-.weight-plateau-note.warning {
+.body-mass-plateau-note.warning {
     color: var(--color-expense);
     font-weight: 600;
 }

@@ -59,6 +59,7 @@ function openFormulaPlayground() {
   // saved decision, and opening the modal on the other one would misdescribe every figure
   // behind it until something was touched.
   document.querySelector(`input[name="formula-bmr-formula"][value="${bmrFormula()}"]`).checked = true;
+  document.querySelector(`input[name="formula-bmr-basis"][value="${bmrBasis()}"]`).checked = true;
   loadFormulaInputsFromSettings();
   applySolveForMode('EIN');
   renderFormulaPreview();
@@ -90,7 +91,7 @@ async function saveFormulaSettings() {
   const pctPinned = pinMode === 'pct';
   const einKcal = formulaEinKcal();
   if (pinned && einKcal === null) {
-    showFieldError('formula-status', "Can't pin a daily intake while E_in has no value — fill the other inputs in first, or pin the deficit instead.");
+    showFieldError('formula-status', "Can't pin a daily intake while TEI has no value — fill the other inputs in first, or pin the deficit instead.");
     return;
   }
   // Off the box, like the intake pin reads Eᵢₙ off its own: what gets pinned is the figure
@@ -280,6 +281,15 @@ function initFormulaPlayground() {
   // arrival date, and (under Katch) whether a blank age is even a problem — so it goes
   // through the same full render a typed input does, not a cosmetic swap of one line.
   document.querySelectorAll('input[name="formula-bmr-formula"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      clearFieldError('formula-status');
+      renderFormulaPreview();
+    });
+  });
+
+  // Same shape: switching the basis re-derives Eᵢₙ, D and every figure built from BMR, so
+  // it goes through the same full render a typed input does.
+  document.querySelectorAll('input[name="formula-bmr-basis"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       clearFieldError('formula-status');
       renderFormulaPreview();

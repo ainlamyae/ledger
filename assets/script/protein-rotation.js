@@ -169,7 +169,7 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
   // against. No `days`, which the tooltip callback below uses to tell it
   // apart from an eaten-window ring.
   const referenceRing = {
-    label: 'Reference target',
+    label: 'Reference desired',
     data: rows.map((r) => r.proteinPercent),
     total: rows.reduce((sum, r) => sum + r.proteinPercent, 0),
   };
@@ -221,7 +221,7 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
               // The reference ring's own numbers ARE percentages already —
               // no share-of-window arithmetic to redo on top of them.
               if (ring.days === undefined) {
-                const value = `${item.formattedValue}% of protein target`;
+                const value = `${item.formattedValue}% of desired protein`;
                 return `${labels[item.dataIndex]} — ${ring.label}: ${privacyMode ? maskDigits(value) : value}`;
               }
               const pct = ring.total ? Math.round((item.raw / ring.total) * 1000) / 10 : 0;
@@ -262,7 +262,7 @@ function renderProteinRotationChart({ from, to }) {
         { type: 'bar', label: 'Eaten', data: actualData, backgroundColor: barColors, order: 2 },
         {
           type: 'line',
-          label: 'Target',
+          label: 'Desired',
           data: targetData,
           showLine: false,
           pointStyle: 'line',
@@ -299,7 +299,7 @@ function renderProteinRotationChart({ from, to }) {
             label: (item) => {
               const row = rows[item.dataIndex];
               const pct = item.dataset.label === 'Eaten' ? row.actualPercentOfTotalTarget : row.proteinPercent;
-              const pctLabel = item.dataset.label === 'Eaten' ? 'of total target' : 'target';
+              const pctLabel = item.dataset.label === 'Eaten' ? 'of total desired' : 'desired';
               const value = `${item.formattedValue}g protein (${pct}% ${pctLabel})`;
               return `${item.dataset.label}: ${privacyMode ? maskDigits(value) : value}`;
             },

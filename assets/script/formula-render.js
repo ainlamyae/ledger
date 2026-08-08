@@ -642,8 +642,8 @@ function formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }
 function formulaEinRows(coefficients, { bmr, activityKcal, deficit, einKcal }) {
   const divisor = coefficients.tefDivisor;
   const sum = `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(deficit)}`;
-  if (divisor === 1) return [['E_in', `${sum}  =  ${Math.round(einKcal)} kcal/day`]];
-  return [['E_in', `(${sum}) / ${Math.round(divisor * 1000) / 1000}  =  ${Math.round(einKcal)} kcal/day`]];
+  if (divisor === 1) return [['TEI', `${sum}  =  ${Math.round(einKcal)} kcal/day`]];
+  return [['TEI', `(${sum}) / ${Math.round(divisor * 1000) / 1000}  =  ${Math.round(einKcal)} kcal/day`]];
 }
 
 // The same identity read the other way, for the mode that solves for Δm: D is what's left of
@@ -729,7 +729,7 @@ function renderSleepDeprivationField(sleepInfo) {
   const factorRounded = Math.round(factor * 1000) / 1000;
   return [
     ['η', `1 − (${pctPerHour}/100) × max(0, ${sleepTargetHours} − ${planSleepHours})  =  ${factorRounded}`],
-    ['δ', `${Math.round(rawDeficit)} / ${factorRounded} − ${Math.round(rawDeficit)}  =  ${sleepDeprivationEffectKcal} kcal/day`],
+    ['SD', `${Math.round(rawDeficit)} / ${factorRounded} − ${Math.round(rawDeficit)}  =  ${sleepDeprivationEffectKcal} kcal/day`],
   ];
 }
 
@@ -919,7 +919,7 @@ function renderFormulaPreview() {
     const eqRounded = Math.round(((detail.kcal - a) / b) * 10) / 10;
     const rows = [
       bmrRow,
-      ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
+      ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
       ...renderSleepDeprivationField(detail),
       ...renderWeeklyLossPctField(),
       ['D', formulaDeficitTraceLine(detail)],
@@ -1046,7 +1046,7 @@ function renderFormulaPreview() {
     }
     rows.push(
       bmrRow,
-      ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
+      ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ...renderSleepDeprivationField(sleepInfo),
       ...renderWeeklyLossPctField(),
       ['D', formulaDeficitTraceLine(sleepInfo)],
@@ -1187,7 +1187,7 @@ function renderFormulaPreview() {
 
     renderFormulaSubstituted([
       bmrRow,
-      ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
+      ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
       ...renderTefField(),
       ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
@@ -1220,10 +1220,10 @@ function renderFormulaPreview() {
   renderFormulaSubstituted([
     ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
     ['m∞', `(${targetKg} − ${bodyMassKg}×${decayRounded}) / (1 − ${decayRounded})  =  ${eqRounded} kg`],
-    ['E_in', `${Math.round(a)} + ${bRounded} × ${eqRounded}  =  ${Math.round(einForDisplay)} kcal/day`],
+    ['TEI', `${Math.round(a)} + ${bRounded} × ${eqRounded}  =  ${Math.round(einForDisplay)} kcal/day`],
     ...renderTefField(),
     bmrRow,
-    ['E_act', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
+    ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
     ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
     ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
     ...renderTargetBmiField(),

@@ -168,6 +168,13 @@ function currentBmrFormula() {
   return document.querySelector('input[name="formula-bmr-formula"]:checked').value;
 }
 
+// Which basis (applyBmrBasis, wellness-math.js) every deficit and desired calorie figure
+// in the app runs on. Read the same way currentBmrFormula() is, into the overlay this
+// preview runs under.
+function currentBmrBasis() {
+  return document.querySelector('input[name="formula-bmr-basis"]:checked').value;
+}
+
 // The mass every identity on this sheet is evaluated at — the smoothed box, never the raw
 // weigh-in above it. One accessor rather than a dozen getElementById calls so there is
 // exactly one place that decides which of the two rows the formulas read.
@@ -401,6 +408,7 @@ function readFormulaInputs() {
   if (heightCm !== null) overrides.HEIGHT_CM = heightCm;
   overrides.SEX = sex;
   overrides[BMR_FORMULA_KEY] = formula;
+  overrides[BMR_BASIS_KEY] = currentBmrBasis();
 
   // The Δm box is the preview's only source of truth for the rate, so the pin key is
   // blanked out of the overlay: a WEEKLY_FAT_LOSS_PCT already on the sheet would otherwise
@@ -422,7 +430,7 @@ function readFormulaInputs() {
   const daysIsTyped = !computed.includes('formula-days');
 
   const einKcal = einIsTyped ? formulaNumber('formula-ein') : null;
-  if (einIsTyped && einKcal === null) invalid.push('E_in (desired daily intake)');
+  if (einIsTyped && einKcal === null) invalid.push('TEI (desired daily intake)');
 
   const days = daysIsTyped ? formulaNumber('formula-days') : null;
   if (daysIsTyped && days === null) invalid.push('t (days)');

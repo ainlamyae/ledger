@@ -51,7 +51,7 @@ function gatherProfileSnapshot() {
 // quietly assuming a default. bodyMassTargetKg is passed only by the Wellness mode,
 // the one panel whose subject is the journey rather than today's body.
 function formatProfileLines(p, bodyMassTargetKg = null) {
-  const targetSuffix = bodyMassTargetKg !== null ? ` (target: ${bodyMassTargetKg} kg)` : '';
+  const targetSuffix = bodyMassTargetKg !== null ? ` (desired: ${bodyMassTargetKg} kg)` : '';
   return [
     `Age: ${p.age !== null ? p.age : 'not set'}`,
     `Sex: ${p.sex !== null ? p.sex : 'not set'}`,
@@ -278,13 +278,13 @@ function gatherInsightMetrics(fromIso, toIso) {
 // into the prompt.
 function formatTrajectoryLine(projection) {
   if (!projection) return 'Body mass trajectory: not enough reading history yet to estimate a trend.';
-  if (projection.status === 'reached') return 'Body mass trajectory: already at target body mass.';
+  if (projection.status === 'reached') return 'Body mass trajectory: already at desired body mass.';
   if (projection.status === 'no-change') return 'Body mass trajectory: current habits project no meaningful body mass change.';
-  if (projection.status === 'wrong-direction') return 'Body mass trajectory: current trend is moving away from the target, not toward it.';
-  // Moving the right way but toward a plateau short of the target — the intake these
+  if (projection.status === 'wrong-direction') return 'Body mass trajectory: current trend is moving away from the desired mass, not toward it.';
+  // Moving the right way but toward a plateau short of the desired mass — the intake these
   // habits average is maintenance at that body mass, so it never arrives.
   if (projection.status === 'asymptote') {
-    return `Body mass trajectory: current habits move toward the target but level off around ${Math.round(projection.equilibriumKg * 10) / 10} kg, short of it — reaching the target needs a change in intake or activity.`;
+    return `Body mass trajectory: current habits move toward the desired mass but level off around ${Math.round(projection.equilibriumKg * 10) / 10} kg, short of it — reaching it needs a change in intake or activity.`;
   }
   if (projection.status !== 'ok') return 'Body mass trajectory: not enough data to estimate a trend.';
 
@@ -292,8 +292,8 @@ function formatTrajectoryLine(projection) {
   const direction = projection.slope < 0 ? 'losing' : 'gaining';
   // "currently" because the rate isn't constant: the arrival date comes from an
   // exponential model in which the rate decays as BMR falls with body mass, so
-  // quoting the present rate as if it held to the target would overstate progress.
-  return `Body mass trajectory: currently ${direction} ~${kgPerWeek} kg/week (slowing as body mass drops), estimated to reach the ${projection.bodyMassTarget} kg target around ${isoFromDate(projection.etaDate)} (~${projection.daysToTarget} days) — generic population-average estimate.`;
+  // quoting the present rate as if it held to the desired mass would overstate progress.
+  return `Body mass trajectory: currently ${direction} ~${kgPerWeek} kg/week (slowing as body mass drops), estimated to reach the ${projection.bodyMassTarget} kg desired mass around ${isoFromDate(projection.etaDate)} (~${projection.daysToTarget} days) — generic population-average estimate.`;
 }
 
 // One line per activity description (e.g. NEAT / Resistance / Cardio),
@@ -318,13 +318,13 @@ function formatActivityBreakdownLines(m) {
 }
 
 function formatInsightPrompt(m) {
-  // `word` is what the figure in brackets is called: 'target' for the metrics
-  // that are a point to land on, but 'max'/'min' for calories, whose target is
+  // `word` is what the figure in brackets is called: 'desired' for the metrics
+  // that are a point to land on, but 'max'/'min' for calories, whose desired figure is
   // directional — a side to stay on rather than a number to land on.
   // No range on the line: every figure here covers the same one, so repeating it
   // eight times cost more than the data did. The [N/M days logged] marker carries
   // the window length where coverage is partial.
-  const line = (label, value, unit, target, daysLogged, prevValue, word = 'target') => {
+  const line = (label, value, unit, target, daysLogged, prevValue, word = 'desired') => {
     if (value === null) return `${label}: not logged this period`;
     const coverage = daysLogged < m.lookbackDays ? ` [only ${daysLogged}/${m.lookbackDays} days logged]` : '';
     const trend = prevValue !== null ? ` — previous period: ${prevValue}${unit}` : '';
@@ -332,16 +332,16 @@ function formatInsightPrompt(m) {
   };
 
   // Bespoke rather than built from the generic line() helper above, since
-  // this is the one metric with a second, target-less figure (kcal burned)
+  // this is the one metric with a second, desired-less figure (kcal burned)
   // riding alongside its primary one (minutes) — line() only has room for
-  // one value + one target.
+  // one value + one desired figure.
   const activityTotalLine = (() => {
     if (m.avgActivityMins === null) return 'Avg activity total: not logged this period';
     const coverage = m.activityDaysLogged < m.lookbackDays ? ` [only ${m.activityDaysLogged}/${m.lookbackDays} days logged]` : '';
     const kcalNow = m.avgActivityKcal !== null ? `, ${m.avgActivityKcal} kcal/day burned` : '';
     const kcalPrev = m.prevAvgActivityKcal !== null ? `, ${m.prevAvgActivityKcal} kcal/day burned` : '';
     const trend = m.prevAvgActivityMins !== null ? ` — previous period: ${m.prevAvgActivityMins} min/day${kcalPrev}` : '';
-    return `Avg activity total: ${m.avgActivityMins} min/day${kcalNow} (target: ${m.activityTarget} min/day)${trend}${coverage}`;
+    return `Avg activity total: ${m.avgActivityMins} min/day${kcalNow} (desired: ${m.activityTarget} min/day)${trend}${coverage}`;
   })();
 
   // Ordered to match the Wellness charts below it (State Trend & Forecast,
@@ -369,17 +369,17 @@ function formatInsightPrompt(m) {
 
 const INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing someone's own self-tracked data. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given their age, sex, height, BMI, current body mass vs. target, their average calorie/protein/dietary fiber/fat/carbohydrate intake, activity, and sleep for a recent period compared to both their own personal figure and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a body-mass-trajectory line (their actual estimated rate of progress toward their target). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
+You'll be given their age, sex, height, BMI, current body mass vs. desired, their average calorie/protein/dietary fiber/fat/carbohydrate intake, activity, and sleep for a recent period compared to both their own personal figure and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a body-mass-trajectory line (their actual estimated rate of progress toward their desired mass). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein desired figure may be given as a range (e.g. "desired: 131-164 g/day"): anywhere inside that range meets it, and both falling below its low end and exceeding its top end miss it.
 
-Dietary fiber, fat and carbohydrate are labeled differently from the other targets. Dietary fiber's "(target: 28 g/day)" is a floor: at or above it is on track, below it is a real gap worth naming, especially alongside a calorie deficit. Fat's and carbohydrate's are both "(reference: X g/day)", a general adult reference figure to mention only in passing, not a pass/fail line — don't score someone against it the way you would protein or dietary fiber. A carbohydrate average that's running well past its reference figure is worth a brief mention of bloating/water retention from the glycogen it gets stored as (which shows up as scale weight, not fat) — but only as a passing physiological note, not as a diet mistake to fix, since there's no ADA/IOM ceiling being violated the way going over a calorie "max" would be. All three figures come from actually-logged, ingredient-priced meals, which can lag behind what's logged for calories/protein — "not logged this period" here may just mean those meals haven't been priced for fiber/fat/carbohydrate yet, not that nothing was eaten, so don't state a confident zero.
+Dietary fiber, fat and carbohydrate are labeled differently from the other desired figures. Dietary fiber's "(desired: 28 g/day)" is a floor: at or above it is on track, below it is a real gap worth naming, especially alongside a calorie deficit. Fat's and carbohydrate's are both "(reference: X g/day)", a general adult reference figure to mention only in passing, not a pass/fail line — don't score someone against it the way you would protein or dietary fiber. A carbohydrate average that's running well past its reference figure is worth a brief mention of bloating/water retention from the glycogen it gets stored as (which shows up as scale weight, not fat) — but only as a passing physiological note, not as a diet mistake to fix, since there's no ADA/IOM ceiling being violated the way going over a calorie "max" would be. All three figures come from actually-logged, ingredient-priced meals, which can lag behind what's logged for calories/protein — "not logged this period" here may just mean those meals haven't been priced for fiber/fat/carbohydrate yet, not that nothing was eaten, so don't state a confident zero.
 
-Calorie intake's target is DIRECTIONAL, not a point to land on, and the label says which side: "(max: 1388 kcal/day)" is a ceiling: they are aiming to lose body mass, so at or under it is on track and over it is off track. "(min: 2600 kcal/day)" is a floor: they are aiming to gain body mass, so at or over it is on track and under it is off track. Never treat a day under a "min" as a win or read it as a deficit worth praising, and never describe being under a "max" as falling short. If the average sits far on the good side of a max, that is a deeper deficit than the target called for, not a failure — comment on whether the pace looks sustainable (especially alongside protein and sleep) rather than scoring it as a miss.
+Calorie intake's desired figure is DIRECTIONAL, not a point to land on, and the label says which side: "(max: 1388 kcal/day)" is a ceiling: they are aiming to lose body mass, so at or under it is on track and over it is off track. "(min: 2600 kcal/day)" is a floor: they are aiming to gain body mass, so at or over it is on track and under it is off track. Never treat a day under a "min" as a win or read it as a deficit worth praising, and never describe being under a "max" as falling short. If the average sits far on the good side of a max, that is a deeper deficit than the desired pace called for, not a failure — comment on whether the pace looks sustainable (especially alongside protein and sleep) rather than scoring it as a miss.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point (several things going well, several things needing attention), put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Overview: one or two sentences on the overall picture, grounded in the body mass trajectory line, not just the current period's numbers in isolation.
 Going well: what's on track, including any improvement vs. the previous period.
-Needs attention: what's off track, including any decline vs. the previous period. Specifically check whether calories are in a deficit while protein is below target — if so, call out that this risks losing muscle instead of fat, which slows real (fat) progress even when the scale moves.
+Needs attention: what's off track, including any decline vs. the previous period. Specifically check whether calories are in a deficit while protein is below desired — if so, call out that this risks losing muscle instead of fat, which slows real (fat) progress even when the scale moves.
 Suggestions: 2-4 concrete, specific next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — do not run them together in one line.
 
 If an additional question from the user is included after the data, also answer it directly in a fifth section, "Answer: text".

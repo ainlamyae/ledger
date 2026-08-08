@@ -2599,11 +2599,26 @@ td .btn {
         font-size: 1.5rem;
     }
 
+    /* Below 820px the general breakpoint (see .today-glance-cards there) drops
+       to one column because two narrow columns squeeze Status's longer rows
+       too tight — but on an actual phone that leaves Status, Macros, Activity
+       and Sleep stacked as four full-width cards in a row, which reads worse
+       than two tighter columns. Restore two columns here and shrink the rows
+       further so the longer Status figures still fit. */
+    .today-glance-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+
     /* Two across a phone leaves each glance tile ~160px inside, and the
        Activity line needs most of it — the side padding is trimmed here rather
-       than shrinking the figures further. */
+       than shrinking the figures further. Top/bottom is trimmed too since these
+       tiles are all rows, no title art, so vertical padding is pure dead space. */
     .today-glance-cards .card {
-        padding: .6rem .35rem;
+        padding: .35rem .35rem;
+    }
+
+    .today-glance-cards .widget-row {
+        font-size: .8rem;
     }
 
     .today-glance-cards .value {

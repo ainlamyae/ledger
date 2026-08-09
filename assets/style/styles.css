@@ -2496,6 +2496,44 @@ td .btn {
     color: var(--color-text-muted);
 }
 
+.formula-solve-for {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem .9rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    border: 0;
+}
+
+.formula-solve-for legend {
+    width: 100%;
+    margin-bottom: .3rem;
+    padding: 0;
+    font-size: .78rem;
+    color: var(--color-text-muted);
+}
+
+.formula-solve-for label {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .8rem;
+}
+
+/* The one row whose input is the current answer rather than a knob to turn:
+   readonly like ρ/ε above it, but still primary-colored like the old result
+   strip it replaces, so it keeps reading as "the answer" among its siblings.
+   .formula-field-computed gets the same look for Eᵢₙ/t/date in TAU and
+   DELTA_M — there the "answer" field stays genuinely editable (see
+   applySolveForMode), so it can't rely on :read-only alone. */
+.formula-row input:read-only,
+.formula-row input.formula-field-computed {
+    border-style: dashed;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
 .formula-inputs {
     margin-bottom: 1rem;
 }
@@ -2509,7 +2547,7 @@ td .btn {
        (it used to be minmax(0, 9rem)) dumped every spare pixel into the name,
        which on a full-width modal left a several-hundred-pixel gap between a
        label like "body mass" and its own box. */
-    grid-template-columns: 2.5rem minmax(0, 1fr) 6.5rem minmax(0, 1fr);
+    grid-template-columns: 2.5rem minmax(0, 1fr) 8.45rem minmax(0, 1fr);
     align-items: center;
     gap: .6rem;
     /* No divider between rows: the boxed inputs already mark where one variable
@@ -2581,7 +2619,7 @@ td .btn {
            app-wide 16px field size — that size is what keeps iOS from zooming
            the page on focus, so the column gives way to it rather than the
            field shrinking. */
-        grid-template-columns: 1.6rem minmax(0, 1fr) 5.6rem minmax(0, 1fr);
+        grid-template-columns: 1.6rem minmax(0, 1fr) 7.3rem minmax(0, 1fr);
         gap: .3rem;
         font-size: .7rem;
     }
@@ -2609,35 +2647,14 @@ td .btn {
         text-align: right;
     }
 
-    .formula-result-label {
-        font-size: .75rem;
+    .formula-solve-for {
+        gap: .2rem .6rem;
+        font-size: .72rem;
     }
 
-    .formula-result-value {
-        font-size: .95rem;
+    .formula-solve-for label {
+        font-size: .72rem;
     }
-}
-
-.formula-result {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: .5rem;
-}
-
-.formula-result-label {
-    font-size: .85rem;
-    color: var(--color-text-muted);
-}
-
-/* Sized against the longer of the two ("165 days → 2027-01-17"), which at the
-   old 1.4rem crowded its own label on a narrow card. */
-.formula-result-value {
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--color-primary);
-    text-align: right;
 }
 
 .formula-substituted p {

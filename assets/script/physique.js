@@ -75,6 +75,7 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('add-physique-btn').addEventListener('click', () => openPhysiqueForm(null));
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
+    document.getElementById('physique-combine-btn').addEventListener('click', combineAndSortPhysiqueConsumptionField);
     document.getElementById('physique-is-pattern').addEventListener('change', syncPhysiquePatternMode);
     onFormSubmit('physique-form', submitPhysiqueForm);
 
@@ -98,6 +99,7 @@ async function initPhysique(forceRefresh = false) {
       renderPhysiqueList();
     });
     onAsyncClick('physique-bulk-calc-btn', bulkCalculatePhysique);
+    onAsyncClick('physique-bulk-combine-btn', bulkCombineAndSortPhysique);
   }
 
   await refreshPhysique(forceRefresh);
@@ -416,6 +418,7 @@ function updatePhysiqueBulkActionsUI() {
   document.getElementById('physique-bulk-summary').textContent =
     selected.length ? `${selected.length} selected` : '';
   document.getElementById('physique-bulk-calc-btn').disabled = !selected.some(eligibleForBulkCalc);
+  document.getElementById('physique-bulk-combine-btn').disabled = !selected.some(eligibleForBulkCombine);
 }
 
 // Form field id suffix → entry property, in column order (A–K).
@@ -621,6 +624,157 @@ function runPhysiqueWorkoutCalc() {
     messages.push(`⚠️ Workout: ${err.message}`);
   }
   return messages;
+}
+
+// Grams-per-unit for mass units only — a fixed unit-to-unit conversion, not
+// an ingredient-specific one, so it's safe to apply without knowing what the
+// ingredient even is. Deliberately excludes volume units (cup, tbsp, ml, ...):
+// converting those to grams needs the ingredient's density, which is exactly
+// the kind of lookup that requires Groq/USDA, i.e. what this button exists to
+// avoid. A line in one of those units just won't get a local calorie figure.
+const PHYSIQUE_MASS_UNIT_TO_GRAMS = { g: 1, kg: 1000, mg: 0.001, oz: 28.3495, lb: 453.592 };
+
+// Best-effort calorie figure for one Consumption line, straight off the
+// Nutrition Facts table — the same two lookup paths calorie-estimator.js's
+// Calculate uses for an exact table hit (by weight or by unit count), minus
+// its USDA/AI fallback for a miss. Returns null (not 0) when there's nothing
+// local to go on, so a genuinely unknown ingredient doesn't masquerade as a
+// 0-calorie one and sort to the bottom for the wrong reason.
+function localIngredientCalories(quantity, unit, name) {
+  if (quantity === null) return null;
+  const entry = findNutritionEntry(name);
+  if (!entry || !entry.calories) return null;
+
+  if (unit && COUNT_LIKE_UNITS.has(unit)) {
+    const tableCount = parseCountFromAmount(entry.amount);
+    return tableCount ? (entry.calories / tableCount) * quantity : null;
+  }
+
+  const gramsPerUnit = PHYSIQUE_MASS_UNIT_TO_GRAMS[unit];
+  if (gramsPerUnit === undefined) return null;
+  const tableGrams = parseGramsFromAmount(entry.amount);
+  return tableGrams ? (entry.calories / tableGrams) * (quantity * gramsPerUnit) : null;
+}
+
+// Local-only tidy-up for a Consumption block: combines lines that are really
+// the same entry typed twice (e.g. two separate "38g onion" additions through
+// the day) and orders the rest by calories, the same "highest first" order
+// Calculate itself settles on. Two lines only combine when their extracted
+// name AND unit both match exactly — no unit conversion is attempted, so
+// "100g rice" and "1cup rice" stay separate rather than guessing a conversion
+// between them. A line with no parseable quantity (rare — Consumption is
+// meant to always lead with an amount) is left exactly as typed and never
+// merged with anything. Pure text in, text out — no DOM, so both the modal's
+// own Combine & Sort button (below) and the bulk one further down share the
+// exact same logic instead of two copies that could drift apart.
+function combineAndSortConsumptionText(text) {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return { text, combinedCount: 0 };
+
+  const groups = new Map();
+  let unmergeable = 0;
+  lines.forEach((line) => {
+    const { quantity, unit } = extractIngredientQuantity(line);
+    const name = extractIngredientName(line);
+    const key = quantity === null ? `unmergeable-${unmergeable++}` : `${name.toLowerCase()}|${unit || ''}`;
+    const existing = groups.get(key);
+    if (existing) existing.quantity += quantity;
+    else groups.set(key, { quantity, unit, name, raw: line });
+  });
+  const combinedCount = lines.length - groups.size;
+
+  const rebuilt = [...groups.values()].map((g) => {
+    if (g.quantity === null) return g.raw;
+    const unitText = g.unit ? (UNIT_CANONICAL[g.unit] || g.unit) : '';
+    return `${Math.round(g.quantity * 100) / 100}${unitText} ${g.name}`.trim();
+  });
+
+  const scored = rebuilt.map((line) => {
+    const { quantity, unit } = extractIngredientQuantity(line);
+    return { line, calories: localIngredientCalories(quantity, unit, extractIngredientName(line)) };
+  });
+  // Unranked (no local match) lines sort after every ranked one, keeping
+  // their relative order among themselves — Array#sort is stable, and
+  // there's nothing here to break a tie between two nulls.
+  scored.sort((a, b) => (b.calories ?? -Infinity) - (a.calories ?? -Infinity));
+
+  return { text: scored.map((s) => s.line).join('\n'), combinedCount };
+}
+
+// The modal's own Combine & Sort button — same tidy-up as the bulk action
+// below, run on just the one Consumption box being edited right now, so it
+// can be cleaned up before Calculate ever runs rather than only after saving.
+function combineAndSortPhysiqueConsumptionField() {
+  const field = physiqueField('consumption');
+  if (!field.value.trim()) {
+    showFieldError('physique-form-error', 'Fill in Consumption first.');
+    return;
+  }
+
+  const { text, combinedCount } = combineAndSortConsumptionText(field.value);
+  field.value = text;
+  clearFieldError('physique-form-error');
+  if (combinedCount > 0) {
+    showFieldError('physique-form-error', `🔗 Combined ${combinedCount} duplicate line${combinedCount === 1 ? '' : 's'}, sorted by calories.`);
+  }
+}
+
+// --- Bulk Combine & Sort --------------------------------------------------
+//
+// Sits beside 🧮 Calculate in the same bulk actions bar, but never touches
+// Groq/USDA: for each selected day, combineAndSortConsumptionText tidies just
+// that day's Consumption column locally and writes it straight back, the same
+// per-row read/write bulkCalculatePhysique uses. Calories In/Protein In are
+// untouched — combining/reordering lines doesn't change the day's totals,
+// only their arrangement, so there's nothing for Calculate's actual estimate
+// to redo here.
+function eligibleForBulkCombine(p) {
+  return Boolean(p.consumption.trim());
+}
+
+async function bulkCombineAndSortPhysique() {
+  const selected = allPhysiqueEntries.filter((p) => selectedPhysiqueRows.has(p.row));
+  const eligible = selected.filter(eligibleForBulkCombine);
+  const skipped = selected.length - eligible.length;
+
+  if (!eligible.length) {
+    alert('None of the selected days have a Consumption to combine/sort.');
+    return;
+  }
+
+  const summaryEl = document.getElementById('physique-bulk-summary');
+  const snapshots = eligible.map((p) => ({ row: p.row, values: physiqueRowValues(p) }));
+
+  let done = 0;
+  let combinedTotal = 0;
+  let changedCount = 0;
+  const succeeded = [];
+  const results = await Promise.allSettled(eligible.map(async (p, i) => {
+    try {
+      const { text, combinedCount } = combineAndSortConsumptionText(p.consumption);
+      if (text !== p.consumption) {
+        const values = physiqueRowValues(p);
+        values[4] = text;
+        await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${p.row}:K${p.row}`, [values]);
+        changedCount += 1;
+        combinedTotal += combinedCount;
+        succeeded.push(snapshots[i]);
+      }
+    } finally {
+      done += 1;
+      summaryEl.textContent = `Combining ${done}/${eligible.length}…`;
+    }
+  }));
+
+  selectedPhysiqueRows.clear();
+  await refreshPhysique(true);
+
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  const parts = [`${changedCount} day${changedCount === 1 ? '' : 's'} tidied (${combinedTotal} duplicate line${combinedTotal === 1 ? '' : 's'} combined)`];
+  if (skipped) parts.push(`${skipped} skipped (nothing to combine)`);
+  if (failed) parts.push(`${failed} failed`);
+
+  showUndoToast(`${parts.join(', ')}.`, () => restorePhysiqueSnapshots(succeeded));
 }
 
 // Both estimators run together:

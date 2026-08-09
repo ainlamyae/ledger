@@ -75,13 +75,14 @@ The exercise catalogue — one row per movement, and the single source for what 
 | G — MET | Number | Metabolic equivalent for the burn formula |
 | H — Muscle Group | Text | Drives the neglected-muscle Insight, and shown under each Instruction modal figure's name. The reported groups are whatever this column names, so a new one needs no code change |
 | I — Weight | Text | Freeform, e.g. `45 lbs` or `20kg`. Shown in the Instruction modal, leading the Sets x Reps/Rest line (`45 lbs · 3 x 15 · 60 sec rest`) rather than trailing it, and as its own column in the plan table when any row in the group has one |
+| J — Weekly Target | Number | Blank excludes the Group from Activity Rotation; a number is the desired sessions/week for this row's Group. Shared by every row in the Group (typed once, copied down); when rows disagree, the max wins |
 
 - Both the displayed cell and the checkbox's quantity attributes are built from column E, so they can no longer disagree — they had, on 24 of 34 rows, which made Log a Workout and a later Recalculate differ by up to ~15% on the same exercise.
 - A missing or unreadable tab costs the plan tables and the category split (everything lands under `Other`); the charts still render.
 
 ## `Physique`
 
-One row per **day**, rather than one row per logged event. **This is the tab every chart, today-tile, Insight mode, Protein Source Rotation and Activity Plan tick reads.** Not in the template by default; add the tab and header row.
+One row per **day**, rather than one row per logged event. **This is the tab every chart, today-tile, Insight mode, Protein Source Rotation, Activity Rotation and Activity Plan tick reads.** Not in the template by default; add the tab and header row.
 
 | Column | Type | Notes |
 |---|---|---|

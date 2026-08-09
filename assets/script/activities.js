@@ -8,7 +8,7 @@
 // MET · Muscle Group · Weight. Name is the join key everything else matches
 // on — it has to be exactly what the workout note lines carry.
 
-const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:I`;
+const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:J`;
 
 // Compendium 02054 general value, for a name the sheet doesn't price.
 // Distinct from charts.js's ACTIVITY_MET_FALLBACK, which is the assumed
@@ -99,6 +99,12 @@ async function initActivities(forceRefresh = false) {
         met: (row[6] !== undefined && row[6] !== '') ? Number(row[6]) : null,
         muscleGroup: String(row[7] || '').trim(),
         weight: String(row[8] || '').trim(),
+        // Desired sessions/week for this row's Group — read by the Activity
+        // Rotation chart (activity-rotation.js). Shared by every row in a
+        // Group (Leg Day's five exercises all carry the same figure), so a
+        // Group counts as tracked once ANY of its rows sets it; see
+        // trackedActivityGroups for how the duplicates are reconciled.
+        weeklyTarget: (row[9] !== undefined && row[9] !== '') ? Number(row[9]) : null,
       };
     })
     .filter((a) => a.name);
@@ -339,7 +345,7 @@ function renderActivityPlanTables() {
   if (!allActivities.length) {
     const empty = document.createElement('p');
     empty.className = 'hint';
-    empty.textContent = `No activities yet — click "Add Activity" above, or add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab directly (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group, Weight).`;
+    empty.textContent = `No activities yet — click "Add Activity" above, or add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab directly (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group, Weight, Weekly Target).`;
     container.appendChild(empty);
     return;
   }
@@ -407,6 +413,7 @@ function openActivityForm(activity, duplicate = false) {
   setActivityField('image', activity?.image);
   setActivityField('muscle-group', activity?.muscleGroup);
   setActivityField('weight', activity?.weight);
+  setActivityField('weekly-target', activity?.weeklyTarget);
   renderActivityImagePreview();
 
   renderActivityDatalist('activity-category-options', 'category');
@@ -495,6 +502,13 @@ async function submitActivityForm(event) {
     return;
   }
 
+  const weeklyTargetRaw = activityFieldValue('weekly-target');
+  const weeklyTarget = weeklyTargetRaw ? evaluateNumberExpression(weeklyTargetRaw) : null;
+  if (weeklyTargetRaw && weeklyTarget === null) {
+    showFieldError('activity-form-error', 'Weekly Target must be a number (e.g. 7), or blank to leave this Group out of Activity Rotation.');
+    return;
+  }
+
   // Column E is one cell holding both halves, split on its LAST comma — so the
   // rest half is joined back on the same way, and a hold's own "3 x 45 sec"
   // amount keeps its internal spacing intact.
@@ -512,11 +526,12 @@ async function submitActivityForm(event) {
     met !== null ? met : '',
     activityFieldValue('muscle-group'),
     activityFieldValue('weight'),
+    weeklyTarget !== null ? weeklyTarget : '',
   ]];
 
   try {
     if (editingActivityRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:I${editingActivityRow}`, values);
+      await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:J${editingActivityRow}`, values);
     } else {
       await appendValues(ACTIVITIES_RANGE, values);
     }

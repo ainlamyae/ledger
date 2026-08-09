@@ -2143,6 +2143,16 @@ function detectPlateau(trendMap) {
   return Math.round((lastMs - parseIsoDateUTC(windowStartDate)) / 86400000);
 }
 
+// A and B from "Maintenance is affine in body mass — M(m) = A + B×m": the body-mass-
+// independent and body-mass-scaling halves of BMR + activity burn. Shared by
+// projectTargetDays (the forward m_g → t direction) and the Formula Playground's reverse
+// t → m_g solve, so both read the same A/B rather than two copies of this algebra.
+function maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa }) {
+  const a = 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
+  const b = 10 + (met * tau * kappa) / ML_O2_PER_KCAL;
+  return { a, b };
+}
+
 // The TARGET trajectory — eating exactly Eᵢₙ and hitting ACTIVITY_TARGET_MIN every
 // day. Shared with the Formula Playground, so its printed A / B / m∞ / t and the chart's
 // forecast are one piece of arithmetic rather than two that can disagree.
@@ -2154,8 +2164,7 @@ function detectPlateau(trendMap) {
 // — but only reaches targets BETWEEN m and m∞. Past the asymptote is genuinely
 // unreachable at that intake, and is reported rather than extrapolated.
 function projectTargetDays({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg }) {
-  const a = 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
-  const b = 10 + (met * tau * kappa) / ML_O2_PER_KCAL;
+  const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
   const equilibriumKg = (intakeKcal - a) / b;
 
   if (Math.abs(bodyMassKg - targetKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG) {

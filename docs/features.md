@@ -37,6 +37,7 @@
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
 - **Dark mode** — floating toggle, persisted.
 - **Privacy mode** — floating toggle masks amounts, health figures, contact details and Settings values.
+- **Widget visibility** — the account menu's **Hide widgets** / **Show widgets** item toggles the bulb row on the home page, persisted to a `SHOW_WIDGETS` Setting (same 0/1 convention as Privacy mode's `SHOW_AMOUNTS`) so it survives a refresh. Deliberately left alone on the three section pages — they already hide the row unconditionally (`section-page.js`'s `showOnly`), so this toggle only has an effect on `/`.
 - **Offline app shell** — a service worker (`sw.js`, registered from `index.html`'s own head) caches the static HTML/CSS/JS so the page itself loads instantly and works with no connection at all; live Google Sheets/Drive/Groq/USDA/weather data is deliberately never cached, so numbers shown offline can't be mistaken for current ones — same-origin requests get the cache immediately with a background refresh (stale-while-revalidate), everything cross-origin passes straight through untouched. `cache.js`'s `hardRefresh()` already unregisters it and clears its cache as part of a full reset.
 
 ## Button roles
@@ -127,7 +128,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Tune**, opening the Formula Playground, sits in this panel's own heading — the panel whose charts and tiles read every one of its settings.
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
-- **One From/To pair, between the progress meters and the State Trend & Forecast heading, is the panel's window** — State Trend & Forecast, Body Mass, Calorie Balance, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Physical Activity, Sleep and Protein Source Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
+- **One From/To pair, between the progress meters and the State Trend & Forecast heading, is the panel's window** — State Trend & Forecast, Body Mass, Calorie Balance, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Physical Activity, Sleep, Protein Source Rotation and Activity Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
   - **State Trend & Forecast follows it on both ends, forecast included** — nothing plots outside From/To, the same as every other chart here never draws a "tomorrow" bar. With the default To (today), that means the projected segment is invisible until To is pushed into the future; there's nothing chart-specific about that, it's the same rule the rest of the panel already lives by.
   - `wellnessDateRange()` reads the two inputs straight from the DOM, falling back to the default when either is blank — so it can't matter whether a chart renders before or after the control is wired.
   - **Every chart reads the exact same date list** (`wellnessCalorieChartDates`, clipped forward to the earliest **calorie** entry ever logged) rather than each clipping to its own metric's own earliest log — a Sleep chart clipped to its own first entry could pick a different-length list than Body Mass, and two charts running the identical tick-selection algorithm over two different-length lists land on different calendar dates even though both look "evenly spaced". One shared list is what lets every chart's gridlines agree.
@@ -162,7 +163,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Sleep** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence, on a **right-side** clock-time axis now that the left one carries the Deprivation Effect dot below.
   - **Deprivation Effect dot** — one point per night, plotted on the left axis against `Target Deficit × (1 − Sleep Efficiency Factor)` (the plan's own flat target deficit, `targetBalanceKcal`, discounted for that one night — not the day's actual eaten-vs-burned balance, which is Calorie Balance's job instead). Zero — green — at a full night against the `SLEEP_TARGET_HOURS` setting; red and rising the further that night fell short, the colour scaled to the kcal value itself (`sleepDeprivationDotColor`, full red at 60 kcal/day) rather than to hours short, so the colour can't tell a different story than the number beside it. The tooltip adds its own line, `Deprivation Effect: N kcal`, alongside the night's own Bed/Wake/Duration.
   - **Sleep Efficiency Factor** (η) is `1 − (γ/100) × max(0, SLEEP_TARGET_HOURS − sleepHours)` — see the Formula Playground's `s`/`γ`/`δ` fields below, which set the plan-level assumption this dot's target deficit is itself built from.
-- **Protein Source Rotation** last — see its section below.
+- **Protein Source Rotation** and **Activity Rotation** last — see their sections below.
 - All nine of the scored charts carry a **violet dashed segment per week**, so a week that quietly drifted past its target is visible next to the per-day mark.
   - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a target cap.
   - Buckets are counted **back from today**, so the most recent seven days are always one whole week and only the oldest bucket can come up short.
@@ -287,6 +288,16 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - Groups ordered by combined remaining gap; within a group, most-left-to-eat first. `Unclassified` last.
 - A legend below shows one swatch per classification.
 - Beside the bars, a two-ring donut splits the same sources by share eaten: outer 4 weeks, inner last week.
+
+## Health — Activity Rotation
+
+- Same shape as Protein Source Rotation directly above it — one horizontal bar chart and one rotational donut — and shares its panel and From/To window.
+- One bar per Activity **Group** (Leg Day, Push Day, NEAT, Cardio, …) carrying a Weekly Target — a new column on the `Activity` sheet tab, shared by every exercise row in that Group.
+- A "session" is any day whose logged Workout notes include at least one exercise from that Group — a mixed day (a lift plus a walk) counts as a session for every Group it touches, not just the dominant one.
+- Bar is sessions actually logged in range; a red tick marks the Weekly Target scaled to the window's length.
+- **Grouped by Category** (the sheet's Strength/Cardio/NEAT column) — one hue per category, lightness stepped within it, same legend/coloring convention as Protein Source Rotation's Classification grouping.
+- Groups ordered by combined remaining gap (target minus actual); within a group, most sessions still owed first.
+- Beside the bars, a three-ring donut: outer ring each Group's own Weekly Target (the reference split), middle ring the last 4 weeks, inner ring the last week.
 
 ## Health — Physique
 

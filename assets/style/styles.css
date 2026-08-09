@@ -1969,9 +1969,9 @@ td .btn {
    — same style as the donut-item h4s above, so every Health Indicators chart
    heading (State Trend & Forecast, Calorie Balance, Body Mass, Physical
    Activity, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake,
-   Carbohydrate Intake, Sleep, Protein Source Rotation) is visually one set. Wrapping a block in .body-mass-projection-wrap
-   is how a chart joins that set — which is what moving Protein Source Rotation
-   in from its own panel needed. */
+   Carbohydrate Intake, Sleep, Protein Source Rotation, Activity Rotation) is visually one
+   set. Wrapping a block in .body-mass-projection-wrap is how a chart joins that set —
+   which is what moving Protein Source Rotation in from its own panel needed. */
 .body-mass-projection-wrap h4 {
     margin: 0 0 .25rem;
     font-size: 1rem;

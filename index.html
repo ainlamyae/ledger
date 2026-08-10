@@ -92,7 +92,7 @@
                 <div class="node-graph-spokes">
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🩺 Health Tracker</span>
-                        <span class="node-graph-tooltip">Track Body Mass, Caloric Intake, Protein Intake, Physical Activity, and Rest &amp; Recovery, one row per day in a searchable Physique log. Charts show your last 84 days versus your daily figures — calories against a shaded excess zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's reading colored green or red by whether the scale moved toward your target or away from it.</span>
+                        <span class="node-graph-tooltip">Track Body Mass, Caloric Intake, Protein Intake, Physical Activity, and Rest &amp; Recovery, one row per day in a searchable Physique log. Charts show your last 84 days versus your daily figures — calories against a shaded excess zone above your maximum (or below your minimum, if you're gaining), protein against a shaded target band, since the recommended intake is a range rather than one number, and each day's reading colored green or red by whether the scale moved toward your target or away from it. A day is logged as you live it rather than in one sitting: log breakfast now and dinner later onto the same date and the two are merged into that one day — food and exercise lines added together, totals re-added — with the combined day shown for you to check before anything is written.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🎯 Personalized Daily Targets</span>
@@ -104,7 +104,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🍽️ AI Calorie &amp; Protein Estimator</span>
-                        <span class="node-graph-tooltip">Type what you ate in plain language and let AI do the math — ingredients are extracted automatically, and both calories and protein are grounded against the USDA nutrition database for an accurate estimate.</span>
+                        <span class="node-graph-tooltip">Type what you ate in plain language and let AI do the math — ingredients are extracted automatically, and both calories and protein are grounded against the USDA nutrition database for an accurate estimate. Nothing is a black box: every estimate breaks out ingredient by ingredient with the amount, calories, protein and the exact calorie density applied, summed to a total you can check by eye, and a ✅ marks each item that came from your own saved nutrition data rather than an estimate.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🧠 Nutrition Facts Memory</span>
@@ -128,7 +128,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🏋️ Strength Training Plan</span>
-                        <span class="node-graph-tooltip">A Push/Pull/Legs gym plan with the machine, sets, reps, and rest for every exercise. Tick off what you actually did — even mixed across days — and log it straight to today's Physique row, with the duration estimated automatically from what you ticked.</span>
+                        <span class="node-graph-tooltip">A Push/Pull/Legs gym plan with the machine, sets, reps, and rest for every exercise. Tick off what you actually did — even mixed across days — and log it straight to today's Physique row, with the duration estimated automatically from what you ticked. An illustrated guide shows every movement with the muscle worked picked out in red, most of them as animated loops, each captioned with the muscle group it trains and its sets, reps and rest. The burn is then itemised exercise by exercise — the quantity you logged, the intensity (MET) it was priced at, its active minutes and its calories — so a session total is something you can check line by line rather than take on trust. Only time under tension counts, never rest or the walk between machines, and the per-rep tempo is yours to set rather than a figure baked into the app.</span>
                     </button>
                 </div>
             </div>
@@ -483,10 +483,9 @@
         </div>
 
         <div class="panel">
-            <h2>Physique</h2>
-
-            <div class="panel-actions">
-                <button id="add-physique-btn" class="btn btn-primary">Log a Day</button>
+            <div class="panel-header">
+                <h2>Physique</h2>
+                <button id="add-physique-btn" class="btn btn-primary panel-header-btn">Log a Day</button>
             </div>
 
             <div class="filters">

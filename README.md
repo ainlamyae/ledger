@@ -160,10 +160,12 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Log a Workout sends only what's newly ticked**, and extends today's entry instead of opening a second row.
   - The button reads "Add to Today's Workout" once something is already logged.
   - Free text already in the note is preserved; the description re-derives from everything in the session.
-- Duration counts active time only — rest, warm-up and transitions are excluded.
+- Duration counts active time only — rest, warm-up and transitions are excluded. The per-rep tempo is yours to set (`WORKOUT_REP_SEC`, default 3 s — a controlled machine rep is nearer 4-5), as is the steps-per-minute ratio (`WORKOUT_STEPS_PER_MIN`, default 100).
+- After Calculate, an **activity table** under the Workout field shows the working per exercise — its quantity, the MET it was priced at, its minutes and its kcal — summed to a Total row. Nothing about it is stored; it's local arithmetic over the Workout text, recomputed whenever the day is opened.
 - Opens the Physique day form pre-filled on today's row, then runs the workout half of Calculate; nothing is written until you Save.
 - **Instruction** in the panel heading opens "Instructions on the Activities" — all 34 strength exercises, grouped by category (Legs / Push / Pull / Full Body / Core & Bodyweight) rather than by the day they fall on.
   - Every figure shows the **muscle worked picked out in red**. 23 are **animated loops**; the remaining 11 are stills carrying **the start and the finish side by side**.
+  - Under each name, at plain weight: the **muscle group** it trains and its **sets × reps · rest** — both straight from the `Activities` sheet, so the modal can't disagree with the plan table.
   - Animated and still differ by nothing but file extension — a browser loops a GIF in a plain `<img>`, so there is no `<video>` element and no fallback path. Which file a row gets is simply what its `Image` cell on the `Activities` tab points at.
   - Sizes are all over the place at source (square loops next to guides three times as wide), so a figure is given a **fixed height with `object-fit: contain`** rather than a fixed aspect ratio — one tidy band per row, nothing squashed. They sit on white in either theme, since that's what they're drawn on.
   - Committed under `assets/images/activities/<slug>.gif` or `.jpg`, 23.3 MB in total (22.8 MB animation, 0.4 MB stills). Lazy-loaded on first open of the modal, so nothing is fetched until it's asked for; a plan row with no file under its slug leaves the label standing rather than a broken-image icon.
@@ -172,8 +174,9 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 ### Health — Physique
 
 - One row per day. Filterable/sortable table (search, date range), paginated; add/edit/delete/duplicate.
-- **Log a Day** opens the form; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
-- **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout.
+- **Log a Day** sits in the panel heading (like **Instruction** on Activity Plan), so it stays reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
+- **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout — all four of which are hidden fields, read instead off the Total row of the table under each of the two text areas.
+- **Saving onto a day already logged merges into it** rather than being refused: the first Save folds that row into the form, the second commits. Details under `Physique` below.
 - **Select rows, then Calculate in the bulk bar** to recalculate whole days at once. Same two estimators, same incremental reuse — a line whose `noteLine` still matches that day's saved breakdown keeps its numbers, so re-running a stretch of days only pays for what changed.
   - Each day's burn uses **its own** Body Mass where it has one, falling back to the most recent day that recorded one — so a historical row is priced with the body mass it was actually logged at.
   - Days with neither a Consumption nor a Workout are skipped and counted; per-day failures don't stop the rest.
@@ -324,7 +327,7 @@ flowchart TD
     NutCheck -- "count or weight match" --> Trusted["Use table row directly<br/>— no USDA/Groq-name call"]
     NutCheck -- miss --> USDACall["usdaLookupKcalCandidates(query)<br/>+ pickPlausibleMacros()<br/>vs. Groq's own estimate"]
     USDACall --> Bank["Bank the result into Nutrition<br/>Facts table under the user's<br/>OWN name, not query"]
-    Trusted --> Sum["Sum client-side →<br/>breakdown table (+ density used<br/>per item) + Amount field.<br/>Notes is never rewritten."]
+    Trusted --> Sum["Sum client-side →<br/>breakdown table (per-item density<br/>and source) + the hidden Calories In<br/>/ Protein In fields.<br/>Notes is never rewritten."]
     Bank --> Sum
     Sum --> Idle
 
@@ -332,7 +335,7 @@ flowchart TD
     ActBodyMass -- no --> ActBlocked["Blocked — Calculate<br/>needs a body mass to size the burn"] --> Idle
     ActBodyMass -- yes --> ActParse["parseWorkoutNoteLines()<br/>Nx / Nsec / Nmin / Nstep forms"]
     ActParse --> ActMET["Per line: EXERCISE_MET table<br/>(fallback EXERCISE_MET_DEFAULT)<br/>+ activeSecondsForNoteLine()"]
-    ActMET --> ActSum["metKcal() per line, summed →<br/>breakdown table + Amount field.<br/>No AI, no cache — pure parse+lookup."] --> Idle
+    ActMET --> ActSum["metKcal() per line, summed →<br/>activity table (per-exercise MET,<br/>minutes, kcal) + the hidden Activity<br/>Duration / Calories Out fields.<br/>No AI, no cache — pure parse+lookup."] --> Idle
 
     Idle --> InsightPanel["Health Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
@@ -513,7 +516,7 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 
 | Column | Type | Notes |
 |---|---|---|
-| A — Date | Date | ISO. One row per date; the form refuses a second row for a date already logged. **Blank marks a reusable pattern row** — excluded from every chart and Insight mode, always sorted to the top, and exempt from the one-row-per-date rule |
+| A — Date | Date | ISO. One row per date — saving onto a date already logged **merges** into that row rather than adding a second (see below). **Blank marks a reusable pattern row** — excluded from every chart and Insight mode, always sorted to the top, and exempt from the one-row-per-date rule |
 | B — Bedtime | Time | `HH:MM` |
 | C — Wake-up Time | Time | `HH:MM`. Hovering either time cell shows the sleep length, wrapping past midnight |
 | D — Body Mass | Number | kg |
@@ -526,6 +529,7 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 | K — Calories Out | Number | kcal. Hidden on the form, same as Activity Duration |
 
 - Every numeric field accepts an arithmetic expression (`30+15`).
+- **Saving onto a date already logged merges, in two steps.** The first Save writes nothing: it folds the row already on the sheet into the open form, switches to editing that row, and leaves the combined day on screen with a note. The second Save commits it — `editingPhysiqueRow` is now set, which excludes that row from the collision lookup. How each field merges follows from what it is: Consumption, Workout and Breakdown are lists and concatenate (saved lines first, then the new ones, verbatim — a food eaten twice really is two lines, and **Combine & Sort** exists for when it isn't); Calories In / Protein In and Duration / Calories Out are totals over those lists and add up; Bedtime, Wake-up Time and Body Mass are single facts, so a typed value wins and the saved one only fills a blank. Duration and Calories Out are then repriced off the merged Workout as one session, with the sums standing if there's no body mass to price them.
 - **Pattern** on the form saves a dateless template — a meal or session you repeat — that 📋 Duplicate turns into a real day, dated today with its contents intact. Patterns never reach a chart, tile or Insight mode.
 - **Calculate** runs both estimators at once: Consumption fills Breakdown, Calories In and Protein In (`calorie-estimator.js`), Workout fills Activity Duration and Calories Out (`activity-estimator.js`). The breakdown table is `renderCalcBreakdown` (`calorie-estimator.js`), drawn into this form via its `target` argument — 💾 banks a new ingredient to `Nutrition Facts` from here too. Editing Consumption never touches the breakdown; it goes stale until you press Calculate again.
 - The breakdown table is display-shortened, never data-shortened: a `Nutrition Facts` source renders as ✅ (the common, trusted case, and the widest label in the column) and the Density column drops the repeated unit, keeping it in the header tooltip — the two bases need no marker here, since the Amount beside it already reads `×2` for a count-priced row and `120g` for a weight-priced one. Both keep the full string on hover, and the saved JSON keeps it verbatim — so an already-saved breakdown collapses too, without its stored values changing.

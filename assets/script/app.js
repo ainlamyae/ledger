@@ -825,6 +825,15 @@ function applyWidgetsVisibility() {
   document.querySelectorAll('#dashboard .widget-cards').forEach((row) => {
     row.hidden = !widgetsVisible;
   });
+  // Keeps index.html's own pre-paint guess (read from the localStorage cache
+  // before this ever runs) in sync with the real fetched setting — so a stale
+  // or missing cache's wrong guess self-corrects immediately rather than only
+  // on the next refresh, and a live toggle updates it too.
+  if (widgetsVisible) {
+    document.documentElement.removeAttribute('data-widgets-pref');
+  } else {
+    document.documentElement.setAttribute('data-widgets-pref', 'hidden');
+  }
 }
 
 function setupWidgetsToggle() {

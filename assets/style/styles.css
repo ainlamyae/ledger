@@ -1104,6 +1104,30 @@ td {
     margin-bottom: .5rem;
 }
 
+/* Column widths from what the columns actually hold, rather than the even split
+   `table { width: 100% }` produces on its own.
+   Every column but the first is bounded by its own HEADER, not its data: the word
+   "Calories" is wider than any calorie figure (integers, and the day ceiling is
+   6000), "Protein" wider than a one-decimal "140.3", "Density" wider than a
+   kcal/100g that can't exceed ~900, and "Save" wider than one 💾. Only the
+   ingredient/exercise name is genuinely variable. So nowrap pins each of the
+   others to its own content width, and the name column takes width: 100% of
+   whatever is left — which is how it stops being the one column that has to wrap
+   while the rest carry space they can't use. No fixed widths: change a header
+   word or a value's precision and the columns re-measure themselves.
+   Name itself is left wrappable, for the outlier long enough to need it. */
+#physique-calc-breakdown th:not(:first-child),
+#physique-calc-breakdown td:not(:first-child),
+#physique-activity-breakdown th:not(:first-child),
+#physique-activity-breakdown td:not(:first-child) {
+    white-space: nowrap;
+}
+
+#physique-calc-breakdown th:first-child,
+#physique-activity-breakdown th:first-child {
+    width: 100%;
+}
+
 /* Account Summary's Total row (assets/script/accounts.js) — same bold/top-border
    treatment as the other summed-last-row tables above. */
 #accounts-table tr.accounts-total-row td {

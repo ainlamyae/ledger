@@ -826,11 +826,29 @@ function flatCalorieTargetKcal() {
   return getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
 }
 
+// A PINNED target: one number that stays put instead of being recalculated from
+// each new weigh-in. Set it and the figure stops tracking body mass — which is
+// also what makes the app self-consistent, because the forecast
+// (projectTargetDays) has always solved dm/dt at a CONSTANT Eᵢₙ. A target that
+// steps down with you is a different, faster plan than the one being forecast.
+//
+// Deliberately its own key rather than reusing CALORIE_TARGET_KCAL: that one is
+// the fallback for an incomplete profile and is already sitting on existing
+// sheets, so giving it precedence would silently change the target for anyone
+// whose copy holds a stale value. Blank here means today's behaviour, unchanged.
+const CALORIE_TARGET_PIN_KEY = 'CALORIE_TARGET_FIXED_KCAL';
+
+function pinnedCalorieTargetKcal() {
+  return getSetting(CALORIE_TARGET_PIN_KEY, null);
+}
+
 // TODAY's target: the calculated figure at the latest weigh-in, else flat
 // CALORIE_TARGET_KCAL. Only the FIGURE — which side to be on is getCalorieTargetKind,
 // and getCalorieTarget pairs them so no label can carry one without the other.
 function getCalorieTargetKcal(entries) {
-  return calculatedCalorieTargetKcal(latestBodyMassKg(entries)) ?? flatCalorieTargetKcal();
+  return pinnedCalorieTargetKcal()
+    ?? calculatedCalorieTargetKcal(latestBodyMassKg(entries))
+    ?? flatCalorieTargetKcal();
 }
 
 // The target per day, each from the body mass in effect THAT day rather than today's
@@ -839,6 +857,12 @@ function getCalorieTargetKcal(entries) {
 // maximum actually applying when they were eaten. Each entry carries its body mass so the
 // tooltip can say why the figure moved; null on the flat fallback, which has no basis.
 function calorieTargetSeries(entries, dates) {
+  // A pinned target is one flat line by definition — the whole point is that it
+  // didn't move as the body mass under it did. bodyMassKg stays null so the
+  // tooltip doesn't claim a weigh-in explains a figure that ignores them.
+  const pinned = pinnedCalorieTargetKcal();
+  if (pinned !== null) return dates.map(() => ({ kcal: pinned, bodyMassKg: null }));
+
   const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
   const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(bodyMassEntries), dates);
   const flat = flatCalorieTargetKcal();
@@ -900,11 +924,12 @@ function calorieTargetScore(kcal, target) {
   return Math.abs(kcal - target.kcal) <= target.kcal * CALORIE_TARGET_NEAR_FRACTION ? 'near' : 'missed';
 }
 
-// Trailing days in every Health Indicators chart. They're full-width, and the x-axes
-// already thin their tick labels, so 12 weeks fits comfortably. Body Mass appears here
-// as well as in State Trend & Forecast without duplicating it: that one is the
-// trajectory, this one scores each day's move toward the target or away from it.
-const WELLNESS_METRICS_DAYS = 84;
+// The window every Health Indicators chart plots, when the From/To pair above Body Mass
+// hasn't been filled in yet: the last 4 weeks. Body Mass appears here as well as in
+// State Trend & Forecast without duplicating it — that one is the trajectory over the
+// whole history and ignores this window, this one scores each day's move toward the
+// target or away from it.
+const WELLNESS_METRICS_DAYS = 28;
 
 let wellnessCaloriesChart = null;
 let wellnessSleepChart = null;
@@ -1054,12 +1079,46 @@ function maskedValueTooltipLabel(item) {
 
 // lastNDates clipped to the earliest matching entry, so a short logging history isn't
 // pushed to the right behind a run of empty days.
-function trailingDatesForCategory(matchingEntries, maxDays) {
-  const capped = lastNDates(maxDays);
-  if (matchingEntries.length === 0) return capped;
+// The one window the whole Health Indicators panel plots, bar State Trend & Forecast:
+// whatever the From/To pair above Body Mass holds, else the WELLNESS_METRICS_DAYS
+// default. Protein Source Rotation reads it too — it wants the two ends rather than
+// every day between them, which is why this returns the range and not the date list.
+//
+// Read straight off the inputs rather than from state initDateRangeControl hands back,
+// so it can't matter whether a chart renders before or after that wiring runs — an
+// unfilled pair simply reads as "use the default", which is what it means.
+function wellnessDateRange() {
+  const from = document.getElementById('wellness-date-from').value;
+  const to = document.getElementById('wellness-date-to').value;
+  if (from && to) return { from, to };
+
+  const fallback = lastNDates(WELLNESS_METRICS_DAYS);
+  return { from: fallback[0], to: fallback[fallback.length - 1] };
+}
+
+// One control for the panel. Every chart under State Trend & Forecast redraws on a
+// change, Protein Source Rotation included — it used to carry a second From/To pair of
+// its own, so the panel showed two windows at once.
+function initWellnessRangeControl() {
+  initDateRangeControl('wellness-date-from', 'wellness-date-to', WELLNESS_METRICS_DAYS, () => {
+    renderWellnessCharts(physiqueAsWellnessEntries());
+    renderProteinRotationChart(wellnessDateRange());
+  });
+}
+
+// The date list built from that range, clipped to what this particular metric has
+// logged.
+function wellnessWindowDates(matchingEntries) {
+  const { from, to } = wellnessDateRange();
+  const window = datesInRange(from, to);
+
+  // Clipped forward to the first day this metric has anything logged, so a chart doesn't
+  // open on a run of empty days it never had data for. An inverted range gives no days,
+  // and every caller already reads an empty window as "nothing to draw".
+  if (!window.length || matchingEntries.length === 0) return window;
   const earliest = matchingEntries.reduce((min, e) => (e.date < min ? e.date : min), matchingEntries[0].date);
-  const from = earliest > capped[0] ? earliest : capped[0];
-  return capped.filter((d) => d >= from);
+  const start = earliest > window[0] ? earliest : window[0];
+  return window.filter((d) => d >= start);
 }
 
 // "Jun 29", matching offsetToDateLabel below, rather than the raw ISO string a
@@ -1083,7 +1142,7 @@ function calorieLogEntries(entries) {
 // clip to its own log the way every other metric chart does: the two are read as a
 // stacked pair, and different start days would slide their dates out of line.
 function wellnessCalorieChartDates(entries) {
-  return trailingDatesForCategory(calorieLogEntries(entries), WELLNESS_METRICS_DAYS);
+  return wellnessWindowDates(calorieLogEntries(entries));
 }
 
 let wellnessBodyMassChart = null;
@@ -1553,13 +1612,22 @@ function sleepAxisTickLabel(v) {
 
 // The real bed-to-wake span rounded out to a 3-hour tick, rather than a fixed 18-hour
 // window that wastes space on hours nobody sleeps through. 0-18 only with no data.
+//
+// The tick AT OR BELOW the earliest bedtime, not a whole tick below it. Flooring a 23:00
+// bedtime already lands on 21:00; subtracting a further 3h put the axis floor at 18:00
+// and left three empty hours under every bar — six with the top end padded the same way.
+// A pad is added only when an extreme falls exactly ON a tick, which is the one case
+// where the bar would otherwise sit flush against the axis edge with nothing to read it
+// against (a midnight bedtime lands on 00:00, so the axis opens at 21:00).
 function computeSleepAxisRange(shiftedPairs) {
   if (shiftedPairs.length === 0) return { axisMin: 0, axisMax: 18 };
   const min = Math.min(...shiftedPairs.map((p) => p.start));
   const max = Math.max(...shiftedPairs.map((p) => p.end));
+  const floorTick = Math.floor(min / 3) * 3;
+  const ceilTick = Math.ceil(max / 3) * 3;
   return {
-    axisMin: Math.max(0, Math.floor(min / 3) * 3 - 3),
-    axisMax: Math.min(24, Math.ceil(max / 3) * 3 + 3),
+    axisMin: Math.max(0, min === floorTick ? floorTick - 3 : floorTick),
+    axisMax: Math.min(24, max === ceilTick ? ceilTick + 3 : ceilTick),
   };
 }
 
@@ -1586,7 +1654,7 @@ function renderWellnessSleepChart(entries) {
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
   const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
-  const dates = trailingDatesForCategory(sleepEntries, WELLNESS_METRICS_DAYS);
+  const dates = wellnessWindowDates(sleepEntries);
 
   // Only the longest bed/wake-bearing entry per date, so a nap logged separately
   // doesn't compete with the night. A date with only a duration is left as a gap.
@@ -1768,7 +1836,7 @@ function renderWellnessActivityChart(entries) {
   const ctx = document.getElementById('wellness-activity-chart');
 
   const activityEntries = entries.filter((e) => (e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null);
-  const dates = trailingDatesForCategory(activityEntries, WELLNESS_METRICS_DAYS);
+  const dates = wellnessWindowDates(activityEntries);
 
   // One stacked segment per description rather than a summed bar, so each day's
   // composition shows and not just its total. Entries with no recognized
@@ -1970,7 +2038,7 @@ function renderWellnessProteinChart(entries) {
   const band = getProteinTargetBandG(entries);
 
   const proteinEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.amount2 !== null);
-  const dates = trailingDatesForCategory(proteinEntries, WELLNESS_METRICS_DAYS);
+  const dates = wellnessWindowDates(proteinEntries);
   const byDate = new Map();
   proteinEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount2));
 
@@ -2762,7 +2830,7 @@ function renderWellnessEnergyBalanceChart(entries) {
   // No profile means no maintenance figure, no weigh-in means no body mass to feed it.
   // Either way the chart shows its explanatory empty state, not a misleading partial.
   const canCompute = haveProfile && bodyMassEntries.length > 0;
-  const labels = canCompute ? trailingDatesForCategory(intakeEntries, WELLNESS_METRICS_DAYS) : [];
+  const labels = canCompute ? wellnessWindowDates(intakeEntries) : [];
   const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(bodyMassEntries), labels);
 
   const intakeByDate = new Map();

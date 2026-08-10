@@ -640,7 +640,7 @@ async function loadDashboard(forceRefresh = false) {
     // (protein target) all loaded — refresh only once all three are in,
     // rather than off just one of them like the two panels above.
     Promise.all([physiquePromise, nutritionPromise]).then(() => {
-      renderProteinRotationChart(getProteinRotationDateRange());
+      renderProteinRotationChart(wellnessDateRange());
     }),
     initContacts(forceRefresh),
     initSettingsPanel(forceRefresh),
@@ -857,6 +857,9 @@ window.addEventListener('load', () => {
   initCsvControls();
   initInsightPanel();
   initFormulaPlayground();
+  // Before the panel below it: this fills the From/To pair every Health Indicators
+  // chart reads, and its first render is one of the readers.
+  initWellnessRangeControl();
   initProteinRotationPanel();
   initFinancialInsight();
   initWorkoutPlan();

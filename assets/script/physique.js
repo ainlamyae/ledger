@@ -471,12 +471,17 @@ function openPhysiqueForm(entry, duplicate = false) {
   syncPhysiquePatternMode();
 
   // A saved breakdown is shown as its table straight away on Edit, so an
-  // existing day can be checked without re-running Calculate.
+  // existing day can be checked without re-running Calculate. The activity
+  // table has no saved form, so it's recomputed from the Workout text instead —
+  // which also reprices Activity Duration and Calories Out at current settings,
+  // so Save persists the figures on screen rather than the older ones behind
+  // them. Body Mass is filled in by the loop above, which is what prices it.
   renderPhysiqueBreakdown(
     entry ? parsePhysiqueBreakdown(entry.breakdown) : [],
     entry ? entry.caloriesIn : 0,
     entry ? entry.proteinIn : 0,
   );
+  refreshPhysiqueActivityBreakdown();
 
   clearFieldError('physique-form-error');
   document.getElementById('physique-modal').hidden = false;
@@ -485,6 +490,7 @@ function openPhysiqueForm(entry, duplicate = false) {
 function closePhysiqueForm() {
   document.getElementById('physique-modal').hidden = true;
   hideCalcBreakdown('physique');
+  hidePhysiqueActivityBreakdown();
 }
 
 // A whole day, not one meal, so a per-meal ceiling would fire
@@ -537,6 +543,72 @@ function renderPhysiqueBreakdown(breakdown, calories, protein) {
   } else {
     hideCalcBreakdown('physique');
   }
+}
+
+// The Workout counterpart to the breakdown table above: one row per parsed
+// exercise, the MET it was priced at, and the same summed Total row — which is
+// where the day's duration and burn are now read, the two fields themselves
+// being hidden.
+//
+// Nothing here is stored. Unlike Breakdown there's no JSON column behind it:
+// the whole table is local arithmetic over the Workout text
+// (activity-estimator.js), so it can be rebuilt on demand and never has to be
+// kept in step with a saved copy of itself.
+function renderPhysiqueActivityBreakdown(perLine, minutes, calories) {
+  const tbody = document.getElementById('physique-activity-breakdown-body');
+  tbody.innerHTML = '';
+
+  perLine.forEach((line) => {
+    const tr = document.createElement('tr');
+    tr.append(
+      makeCell(line.name),
+      makeCell(line.quantity),
+      makeCell(String(line.met)),
+      makeCell(activityLineMinutes(line.seconds)),
+      makeCell(String(Math.round(line.calories))),
+    );
+    tbody.appendChild(tr);
+  });
+
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'calc-breakdown-total';
+  totalRow.append(
+    makeCell('Total'),
+    makeCell(''),
+    makeCell(''),
+    makeCell(String(minutes)),
+    makeCell(String(calories)),
+  );
+  tbody.appendChild(totalRow);
+
+  document.getElementById('physique-activity-breakdown').hidden = false;
+}
+
+// One decimal rather than whole minutes: a strength line is often well under a
+// minute of active time, and rounding each row to 0 or 1 would leave the rows
+// looking nothing like the Total they add up to.
+function activityLineMinutes(seconds) {
+  return String(Math.round(seconds / 6) / 10);
+}
+
+// The same estimate 🧮 Calculate runs, run when the form opens so a saved day
+// arrives showing its table — and so what the table shows is what Save writes.
+// Repricing on open is the point, not a side effect: the estimate is pure local
+// arithmetic over the day's own Workout and Body Mass, so a day opened after
+// WORKOUT_REP_SEC (or an Activities MET) changed is worth more than the figure
+// it was saved with. A workout that can't be priced writes nothing at all, so a
+// hand-typed one keeps whatever it was saved with either way.
+//
+// Warnings are dropped rather than shown: the form has just opened, and
+// openPhysiqueForm clears the error line straight after this anyway. Pressing
+// Calculate is what surfaces them.
+function refreshPhysiqueActivityBreakdown() {
+  runPhysiqueWorkoutCalc();
+}
+
+function hidePhysiqueActivityBreakdown() {
+  document.getElementById('physique-activity-breakdown').hidden = true;
+  document.getElementById('physique-activity-breakdown-body').innerHTML = '';
 }
 
 // Re-estimates only the Consumption lines that actually changed.
@@ -595,18 +667,38 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
   };
 }
 
-// Fills Activity Duration and Calories Out from the Workout field, returning
-// any warnings rather than showing them — 🧮 Calculate merges them with the
-// food side's, Log a Workout (strength-plan.js) shows them on their own.
+// Prices the Workout field, writing both the hidden Activity Duration and
+// Calories Out fields (columns J and K on Save) and the table they're read from,
+// so the two can't disagree. Warnings are returned rather than shown — 🧮
+// Calculate merges them with the food side's, Log a Workout (strength-plan.js)
+// shows them on their own, and opening the form
+// (refreshPhysiqueActivityBreakdown) drops them.
+//
+// Nothing is written unless the estimate succeeds: a day whose Workout is free
+// text, or which has no body mass to price it, keeps the pair it was saved with.
+//
 // Synchronous: unlike the food estimator this is pure local arithmetic, no
 // Groq or USDA involved.
 function runPhysiqueWorkoutCalc() {
   const messages = [];
   const workout = physiqueField('workout').value.trim();
-  if (!workout) return messages;
+  if (!workout) {
+    hidePhysiqueActivityBreakdown();
+    return messages;
+  }
+
+  // Without the catalogue every exercise would price at EXERCISE_MET_FALLBACK,
+  // and since this runs on open and its result is what Save writes, that would
+  // quietly flatten a real day's burn to the default. Better to show nothing.
+  if (!activitiesDataLoaded) {
+    hidePhysiqueActivityBreakdown();
+    messages.push('⚠️ Workout skipped — still loading the Activities catalogue, try Calculate again in a moment.');
+    return messages;
+  }
 
   const bodyMassKg = physiqueBodyMassKg();
   if (bodyMassKg === null) {
+    hidePhysiqueActivityBreakdown();
     messages.push(physiqueDataLoaded
       ? '⚠️ Workout skipped — fill in Body Mass first, the calorie formula needs it.'
       : '⚠️ Workout skipped — still loading your data, try Calculate again in a moment.');
@@ -614,13 +706,15 @@ function runPhysiqueWorkoutCalc() {
   }
 
   try {
-    const { minutes, calories, unmatchedNames } = estimateWorkoutActivity(workout, bodyMassKg);
+    const { minutes, calories, unmatchedNames, perLine } = estimateWorkoutActivity(workout, bodyMassKg);
     physiqueField('activity-duration').value = minutes;
     physiqueField('calories-out').value = calories;
+    renderPhysiqueActivityBreakdown(perLine, minutes, calories);
     if (unmatchedNames.length) {
       messages.push(`⚠️ Couldn't find ${unmatchedNames.map((n) => `"${n}"`).join(', ')} in the Activity Plan — used a default MET.`);
     }
   } catch (err) {
+    hidePhysiqueActivityBreakdown();
     messages.push(`⚠️ Workout: ${err.message}`);
   }
   return messages;

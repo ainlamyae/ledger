@@ -5,14 +5,9 @@
 // only pre-fills that modal's fields and lets the user review/edit before
 // saving, same as any other manual entry.
 
-// Seconds per rep at a controlled lifting tempo for a strength row — a rough
-// estimate the user can freely overwrite in the modal's Amount field before
-// saving. Only time actually under tension counts toward duration/calories
-// (activeSecondsForNoteLine, activity-estimator.js, times the note lines this
-// module writes) — rest between sets, warm-up, and moving between machines are
-// real gym-visit time but aren't activity, so they're deliberately left out
-// rather than inflating the logged number.
-const WORKOUT_REP_SEC = 3;
+// Duration comes from the note lines this module writes, priced by
+// activeSecondsForNoteLine (activity-estimator.js) — including the per-rep
+// tempo, which is a Settings value (WORKOUT_REP_SEC) rather than a constant here.
 
 // Every plan row, keyed by its exercise name — the same key the Activities
 // sheet and the standardized note lines use. Lets a note already on the sheet

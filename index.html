@@ -1288,18 +1288,22 @@
                 <input type="checkbox" id="physique-is-pattern">
                 Pattern
             </label>
-            <label>Date
-                <input type="date" id="physique-date" required>
-            </label>
-            <label>Bedtime
-                <input type="time" id="physique-bedtime">
-            </label>
-            <label>Wake-up Time
-                <input type="time" id="physique-wake-time">
-            </label>
-            <label>Body Mass
-                <input type="text" id="physique-body-mass" placeholder="e.g. 94 (kg)">
-            </label>
+            <div class="form-row">
+                <label>Date
+                    <input type="date" id="physique-date" required>
+                </label>
+                <label>Body Mass
+                    <input type="text" id="physique-body-mass" placeholder="e.g. 94 (kg)">
+                </label>
+            </div>
+            <div class="form-row">
+                <label>Bedtime
+                    <input type="time" id="physique-bedtime">
+                </label>
+                <label>Wake-up Time
+                    <input type="time" id="physique-wake-time">
+                </label>
+            </div>
             <label>Consumption
                 <textarea id="physique-consumption" rows="8" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
             </label>
@@ -1323,19 +1327,39 @@
                     <tbody id="physique-calc-breakdown-body"></tbody>
                 </table>
             </div>
-            <label>Calories In
+            <!-- Both totals are read off the breakdown table's Total row above,
+                 so the fields Calculate writes them into stay hidden — they're
+                 still what Save sends to columns G and H. -->
+            <label hidden>Calories In
                 <input type="text" id="physique-calories-in" placeholder="e.g. 2100 (kcal)">
             </label>
-            <label>Protein In
+            <label hidden>Protein In
                 <input type="text" id="physique-protein-in" placeholder="e.g. 140 (g)">
             </label>
             <label>Workout
                 <textarea id="physique-workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
             </label>
-            <label>Activity Duration
+            <div id="physique-activity-breakdown" class="table-responsive" hidden>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Amount</th>
+                        <th title="Metabolic Equivalent of Task — the intensity this exercise is priced at">MET</th>
+                        <th title="Active time in minutes, net of rest">Duration</th>
+                        <th>Calories</th>
+                    </tr>
+                    </thead>
+                    <tbody id="physique-activity-breakdown-body"></tbody>
+                </table>
+            </div>
+            <!-- Read off the activity table's Total row above, same as Calories
+                 In / Protein In are read off the breakdown's. Still the fields
+                 Calculate writes and Save sends to columns J and K. -->
+            <label hidden>Activity Duration
                 <input type="text" id="physique-activity-duration" placeholder="e.g. 45 (min)">
             </label>
-            <label>Calories Out
+            <label hidden>Calories Out
                 <input type="text" id="physique-calories-out" placeholder="e.g. 520 (kcal)">
             </label>
 

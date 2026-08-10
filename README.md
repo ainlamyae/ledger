@@ -499,10 +499,10 @@ The exercise catalogue — one row per movement, and the single source for what 
 | B — Group | Text | Free text; the Activity Plan sub-table this row renders into, and its heading |
 | C — Name | Text | The join key — must match the workout note lines exactly. A name not listed here is priced at the fallback MET, gets no muscle group, and stacks under `Other` |
 | D — Unit | Text | `x` (reps), `sec` (hold), `step`, `min`. Tells `3 x 45 sec` (a hold) from `3 x 15` (reps) |
-| E — Sets x Reps, Rest | Text | `3 x 10, 90 sec` · `3 x 45 sec, 45 sec` · `6000 step` · `30 min`. Split on the **last** comma; the rest half is optional |
+| E — Sets x Reps, Rest | Text | `3 x 10, 90 sec` · `3 x 45 sec, 45 sec` · `6000 step` · `30 min`. Split on the **last** comma; the rest half is optional. Both halves show in the plan table's two columns and under the Instruction modal's figures |
 | F — Image | Text | URL or repo-relative path to the Instruction modal's figure. Blank means label-only |
 | G — MET | Number | Metabolic equivalent for the burn formula |
-| H — Muscle Group | Text | Drives the neglected-muscle Insight. The reported groups are whatever this column names, so a new one needs no code change |
+| H — Muscle Group | Text | Drives the neglected-muscle Insight, and shown under each Instruction modal figure's name. The reported groups are whatever this column names, so a new one needs no code change |
 
 - Both the displayed cell and the checkbox's quantity attributes are built from column E, so they can no longer disagree — they had, on 24 of 34 rows, which made Log a Workout and a later Recalculate differ by up to ~15% on the same exercise.
 - A missing or unreadable tab costs the plan tables and the category split (everything lands under `Other`); the charts still render.
@@ -519,15 +519,16 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 | D — Body Mass | Number | kg |
 | E — Consumption | Text | Free text, one food per line |
 | F — Breakdown | Text (JSON) | Calculate's per-item breakdown. Rendered as a table under the form; the table lists it as an item count with the names on hover |
-| G — Calories In | Number | kcal |
-| H — Protein In | Number | grams |
+| G — Calories In | Number | kcal. Hidden on the form — Calculate fills it, and the breakdown table's Total row is where you read it |
+| H — Protein In | Number | grams. Hidden on the form, same as Calories In |
 | I — Workout | Text | Free text, one activity per line |
-| J — Activity Duration | Number | minutes |
-| K — Calories Out | Number | kcal |
+| J — Activity Duration | Number | minutes. Hidden on the form — read off the activity table's Total row |
+| K — Calories Out | Number | kcal. Hidden on the form, same as Activity Duration |
 
 - Every numeric field accepts an arithmetic expression (`30+15`).
 - **Pattern** on the form saves a dateless template — a meal or session you repeat — that 📋 Duplicate turns into a real day, dated today with its contents intact. Patterns never reach a chart, tile or Insight mode.
 - **Calculate** runs both estimators at once: Consumption fills Breakdown, Calories In and Protein In (`calorie-estimator.js`), Workout fills Activity Duration and Calories Out (`activity-estimator.js`). The breakdown table is `renderCalcBreakdown` (`calorie-estimator.js`), drawn into this form via its `target` argument — 💾 banks a new ingredient to `Nutrition Facts` from here too. Editing Consumption never touches the breakdown; it goes stale until you press Calculate again.
+- **Each side gets a table, and all four totals are read off them** — the four number fields behind them are hidden. Under Consumption sits the breakdown (per ingredient, summed to Calories In / Protein In); under Workout, the activity table (per exercise: quantity, the MET it was priced at, minutes and kcal, summed to Activity Duration / Calories Out — `renderPhysiqueActivityBreakdown`, `physique.js`). The activity table is stored nowhere: it's local arithmetic over the Workout text, so opening a day recomputes it (`refreshPhysiqueActivityBreakdown`) rather than reading a saved copy — **and that recompute writes J and K**, so Save persists the figures on screen instead of the older ones behind them. Opening a day after changing `WORKOUT_REP_SEC` or an Activities MET and saving it is therefore enough to reprice it. A workout the parser can't read (or a day with no body mass to price it) writes nothing and keeps the pair it was saved with. Per-row minutes carry one decimal, since a strength line is often well under a minute of active time; rounding means the rows can add up a hair off the Total.
 - **Calculate is incremental.** Each breakdown item records the standardized line it produced (`noteLine`), and Calculate writes those lines back into Consumption — so on a re-run, any line still matching one of them reuses its numbers verbatim and only the leftovers reach Groq/USDA. Editing one ingredient in a ten-line day costs one lookup, not ten; re-running an unchanged day costs none. A breakdown saved before `noteLine` existed matches nothing and re-estimates in full, exactly as it used to. The same ingredient typed twice reuses one saved item and re-estimates the other, rather than double-counting one result. When nothing is reused the estimator's own totals pass straight through, so a first Calculate is exact; a mixed run re-sums the (already rounded) per-item figures and can differ by a fraction. Either field can be left empty — only the filled side runs, and neither side's failure stops the other. The burn formula takes body mass from this day's own field, falling back to the most recent day that recorded one.
 
 ### `Nutrition Facts`
@@ -585,8 +586,8 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `charts.js` |
 | `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `charts.js` |
 | `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort with no body mass on file | `charts.js` |
-| `WORKOUT_REP_SEC` | `3` s per rep | `strength-plan.js` |
-| steps → minutes | `100` steps/min | `charts.js` |
+| `WORKOUT_REP_SEC_DEFAULT` | `3` s per rep — a brisk tempo. Overridable via `WORKOUT_REP_SEC` | `activity-estimator.js` |
+| `WORKOUT_STEPS_PER_MIN_DEFAULT` | `100` steps/min. Overridable via `WORKOUT_STEPS_PER_MIN` | `charts.js` |
 | `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `charts.js`, `activity-estimator.js` |
 | `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `charts.js` |
 | `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `charts.js` |
@@ -598,7 +599,7 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | `CALORIE_TARGET_NEAR_FRACTION` | `5 %` | Past the target by ≤5 % is grey, beyond is red |
 | `ACTIVITY_NEAR_TARGET_FRACTION` | `5 %` | Short of the implied burn by ≤5 % is grey |
 | `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* target stays green |
-| Protein over-band | — | Above the top end is grey, not red. Below the floor stays red |
+| Protein over-band | — | Above the top end is a darker green (`#166534`), not red or grey. Below the floor stays red |
 | Calorie Balance vs. target | — | At/beyond target green, short but right side of zero grey, wrong side red |
 
 ### Body
@@ -617,7 +618,7 @@ plateau            = |trend[last] − trend[start]| < 0.3 kg over ≥10 days, �
 
 ```
 metKcal(met, kg, min)     = met × kg × min × KCAL_PER_MET_KG_MIN/200
-activityMinutes(amt,unit) = steps/100 | hours×60 | min as-is
+activityMinutes(amt,unit) = steps/WORKOUT_STEPS_PER_MIN | hours×60 | min as-is
 
 activityEntryKcal(entry)  = entry.amount2                    if logged
                           = metKcal(ACTIVITY_MET, kg, mins)  else, with a body mass on file
@@ -771,9 +772,9 @@ colour ratio          = clamp( (durationHr − target/2) / (target − target/2)
 Active time only — rest, warm-up and moving between machines are real gym time but aren't activity.
 
 ```
-strength row  activeSec = sets × reps × 3
+strength row  activeSec = sets × reps × WORKOUT_REP_SEC
 hold row      activeSec = sets × holdSec        (already seconds; no per-rep tempo)
-NEAT steps    activeSec = (steps / 100) × 60
+NEAT steps    activeSec = (steps / WORKOUT_STEPS_PER_MIN) × 60
 cardio min    activeSec = minutes × 60
 
 minutes  = max(1, round(Σ activeSec / 60))
@@ -781,6 +782,7 @@ calories = Σ metKcal( MET(exercise) ?? 3.5, bodyMassKg, activeSecᵢ / 60 )
 ```
 
 - `activeSecondsForNoteLine` (`activity-estimator.js`) is the single place this is decided — Log a Workout's prefill and Calculate both read it.
+- **Only the two converted units are tunable**, both from `Settings`: `WORKOUT_REP_SEC` (default `3`, a brisk tempo — a controlled machine rep is nearer 4-5 s) and `WORKOUT_STEPS_PER_MIN` (default `100`). A hold carries its own seconds and a cardio row its own minutes, so neither has anything to set. The tempo is global, not per exercise — the whole session moves together when you change it. `WORKOUT_STEPS_PER_MIN` also rescales the Activity chart and target, since both convert steps the same way.
 - Note parsing: `30x Name` → 30 total reps; legacy `3x10 Name` → 30; `135sec`, `30min`, `6000step`.
 - A second Log a Workout the same day appends its new lines to today's entry rather than opening a new row.
 

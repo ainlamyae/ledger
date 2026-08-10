@@ -1733,6 +1733,25 @@ td .btn {
 .app-form select {
     height: calc(1.2em + .7rem + 2px);
     line-height: 1.2;
+    /* Nothing may floor at its own content width. Every control here is
+       width: 100% of a container that's already the right size, so an intrinsic
+       minimum can only make it overflow — which is what a too-wide field
+       actually is. */
+    min-width: 0;
+}
+
+/* iOS Safari sizes a date/time input to its own native content and ignores a
+   smaller width: 100%, so beside a plain text box in a .form-row the picker
+   spilled past its half of the row and the text box next to it read as the
+   narrow one. Dropping the native appearance is what makes it honour the width;
+   the picker itself is unaffected (the indicator is a separate shadow child, so
+   Chrome keeps its calendar icon). Desktop never showed this — a ~410px column
+   is wider than the native width, so there was nothing to overflow. */
+.app-form input[type="date"],
+.app-form input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
 }
 
 .app-form select {

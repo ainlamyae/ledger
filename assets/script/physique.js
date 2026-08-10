@@ -925,6 +925,74 @@ async function calculatePhysiqueDay() {
   if (messages.length) showFieldError('physique-form-error', messages.join(' '));
 }
 
+// Folds a day already on the sheet into the open form, so what was typed is
+// added to that day rather than refused for clashing with it.
+//
+// How each field merges follows from what the field IS. Consumption, Workout and
+// Breakdown are lists, so they concatenate — the saved lines first, then what was
+// just typed, verbatim: a food genuinely eaten twice in a day is two lines, and
+// Combine & Sort is there for when it isn't. Calories In / Protein In and
+// Duration / Calories Out are totals OVER those lists, so they add up. Bedtime,
+// Wake-up Time and Body Mass are single facts about the day rather than running
+// tallies, so a value typed here wins and the saved one only fills a blank.
+//
+// Nothing is written to the sheet: the merged day sits in the form, and the
+// second Save is what commits it.
+function mergePhysiqueEntryIntoForm(saved) {
+  // Body mass first — refreshPhysiqueActivityBreakdown below prices the merged
+  // workout against whatever this field ends up holding.
+  fillPhysiqueFieldIfBlank('bedtime', saved.bedtime);
+  fillPhysiqueFieldIfBlank('wake-time', saved.wakeTime);
+  fillPhysiqueFieldIfBlank('body-mass', saved.bodyMass);
+
+  addToPhysiqueTotal('calories-in', saved.caloriesIn);
+  addToPhysiqueTotal('protein-in', saved.proteinIn);
+  addToPhysiqueTotal('activity-duration', saved.duration);
+  addToPhysiqueTotal('calories-out', saved.caloriesOut);
+
+  appendToPhysiqueLines('consumption', saved.consumption);
+  appendToPhysiqueLines('workout', saved.workout);
+
+  // Both breakdowns end up in one table, which is also what rewrites the
+  // Breakdown field's JSON — so a later Calculate can still match a saved line
+  // by noteLine and reuse its numbers instead of paying for it again.
+  renderPhysiqueBreakdown(
+    [...parsePhysiqueBreakdown(saved.breakdown), ...parsePhysiqueBreakdown(physiqueField('breakdown').value)],
+    evaluateNumberExpression(physiqueField('calories-in').value.trim()),
+    evaluateNumberExpression(physiqueField('protein-in').value.trim()),
+  );
+  // Reprices Duration and Calories Out off the merged Workout text, replacing
+  // the summed figures above with a single estimate of the combined session.
+  // Where it can't run (no body mass on file) the sums stand.
+  refreshPhysiqueActivityBreakdown();
+
+  editingPhysiqueRow = saved.row;
+  document.getElementById('physique-modal-title').textContent = 'Edit Day';
+  showFieldError('physique-form-error',
+    `↩︎ ${saved.date} was already logged, so that day has been merged in above — nothing is saved yet. Check it over and press Save again to write it.`);
+}
+
+function fillPhysiqueFieldIfBlank(id, savedValue) {
+  const field = physiqueField(id);
+  if (!field.value.trim() && savedValue !== null && savedValue !== undefined) {
+    field.value = String(savedValue);
+  }
+}
+
+// One decimal, the precision the calorie estimator itself rounds protein to.
+// Blank stays blank rather than becoming 0, so an untouched field doesn't start
+// claiming a zero the day didn't record.
+function addToPhysiqueTotal(id, savedNumber) {
+  const field = physiqueField(id);
+  const total = (savedNumber ?? 0) + (evaluateNumberExpression(field.value.trim()) ?? 0);
+  field.value = total ? String(Math.round(total * 10) / 10) : '';
+}
+
+function appendToPhysiqueLines(id, savedText) {
+  const field = physiqueField(id);
+  field.value = [String(savedText ?? '').trim(), field.value.trim()].filter(Boolean).join('\n');
+}
+
 async function submitPhysiqueForm(event) {
   event.preventDefault();
 
@@ -949,13 +1017,19 @@ async function submitPhysiqueForm(event) {
     rowData.push(evaluated === null ? '' : evaluated);
   }
 
-  // One row per day is the whole point of this tab, so a second row for a
-  // date already logged is a mistake rather than a second sample. Patterns are
-  // exempt: they're dateless templates, and you can keep as many as you like.
+  // One row per day is the whole point of this tab, so a date already logged
+  // isn't a second sample — it's more of the same day. The first Save on a
+  // collision therefore writes nothing: it folds the row already on the sheet
+  // into the form, switches to editing that row, and leaves the combined day on
+  // screen to check. Saving again writes it, because editingPhysiqueRow now
+  // excludes that row from this very lookup.
+  //
+  // Patterns are exempt: they're dateless templates, and you can keep as many
+  // as you like.
   const date = rowData[0];
   const clash = !isPattern && allPhysiqueEntries.find((p) => p.date === date && p.row !== editingPhysiqueRow);
   if (clash) {
-    showFieldError('physique-form-error', `${date} is already logged — edit that row instead.`);
+    mergePhysiqueEntryIntoForm(clash);
     return;
   }
 

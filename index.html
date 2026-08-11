@@ -148,7 +148,7 @@
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">💼 Portfolio</span>
-                        <span class="node-graph-tooltip">Track every account's balance in one Account Summary, see your allocation by type and institution in a nested donut chart, and get an instant reconciliation check against your transaction history.</span>
+                        <span class="node-graph-tooltip">Track every account's balance in one Accounts table, see your allocation by type and institution in a nested donut chart, and get an instant reconciliation check against your transaction history.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">📊 Analytics Dashboard</span>
@@ -442,6 +442,7 @@
                 <button type="button" class="btn" data-insight-mode="food" aria-pressed="false">Food</button>
                 <button type="button" class="btn" data-insight-mode="activity" aria-pressed="false">Activity</button>
                 <button type="button" class="btn" data-insight-mode="protein" aria-pressed="false">Protein Sources</button>
+                <button type="button" class="btn" data-insight-mode="plan" aria-pressed="false">Health Plan</button>
             </div>
 
             <p class="hint" id="insight-mode-status"></p>
@@ -817,7 +818,7 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Account Summary</h2>
+                <h2>Accounts</h2>
                 <button id="add-account-btn" class="btn btn-primary panel-header-btn" title="Add an account">Add</button>
             </div>
 
@@ -1885,7 +1886,8 @@
 <script src="assets/script/food-insight.js"></script>
 <script src="assets/script/activity-insight.js"></script>
 <script src="assets/script/protein-source-rotation-insight.js"></script>
-<!-- After the four above: INSIGHT_MODES reads their prompt constants by value. -->
+<script src="assets/script/plan-insight.js"></script>
+<!-- After the five above: INSIGHT_MODES reads their prompt constants by value. -->
 <script src="assets/script/insight-panel.js"></script>
 <script src="assets/script/formula-playground.js"></script>
 <script src="assets/script/protein-rotation.js"></script>

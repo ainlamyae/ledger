@@ -338,8 +338,16 @@ function renderPhysiqueList() {
     tbody.appendChild(renderEmptyRow(10, message));
   }
 
+  // Same tint the Activity Plan uses for a row already logged today (.today-row and
+  // .workout-row-logged share one declaration): in both places it marks the row the
+  // day's logging lands on. Recomputed per render rather than cached, so a tab left
+  // open across midnight moves the mark on its next redraw.
+  const todayIso = isoFromDate(new Date());
+
   pageEntries.forEach((p) => {
     const tr = document.createElement('tr');
+    // Pattern rows carry no date, so they never match.
+    if (p.date === todayIso) tr.classList.add('today-row');
 
     const num = (value) => {
       if (value === null) return '—';

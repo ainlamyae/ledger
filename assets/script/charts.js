@@ -70,25 +70,43 @@ function targetCapHalf(axisSpan) {
 // a mid-tone in both themes, and it already means "unscored bar" on the same chart.
 const WEEKLY_AVG_COLOR = '#7c3aed';
 
-// Counted back from the last column, which is always today — so the most recent seven
-// days are one whole bucket and only the oldest can come up short.
+// Counted back from the last BUCKETED column — see bucketedColumnCount: that's the
+// last column of the window, except when the window ends today, in which case it's
+// yesterday. So the most recent seven complete days are one whole bucket and only
+// the oldest can come up short.
+//
+// Returns -1 for a column past the bucketed range (today), which every caller reads
+// as "belongs to no week": buckets.get(-1) is undefined, so the column averages to
+// null and weeklyAverageDataset's sameBucket() refuses to join a dash to it.
 function weeklyBucketIndex(i, count) {
   return Math.floor((count - 1 - i) / 7);
+}
+
+// How many of `dates`' columns the weekly maths may bucket. Today is left out
+// whenever it's the last column: it's a day in progress — the food logged by
+// 10am, the steps walked so far — so averaging it in drags the current week down
+// by an amount that shrinks as the day goes on, and reports "this week" as worse
+// than it is. A window ending on a past date has no such column and keeps all of
+// them.
+function bucketedColumnCount(dates) {
+  const endsToday = dates.length > 0 && dates[dates.length - 1] === isoFromDate(new Date());
+  return endsToday ? dates.length - 1 : dates.length;
 }
 
 // Per column, the mean of its 7-day bucket. Nulls are unlogged days and sit out (avg()'s
 // rule), so a missing log can't drag the week under a target it was never measured
 // against. A bucket with nothing logged stays null.
-function weeklyAverageSeries(values) {
+function weeklyAverageSeries(values, columnsToBucket = values.length) {
   const buckets = new Map();
   values.forEach((v, i) => {
     if (v === null || v === undefined) return;
-    const b = weeklyBucketIndex(i, values.length);
+    const b = weeklyBucketIndex(i, columnsToBucket);
+    if (b < 0) return;
     const acc = buckets.get(b) ?? { total: 0, n: 0 };
     buckets.set(b, { total: acc.total + v, n: acc.n + 1 });
   });
   return values.map((_, i) => {
-    const acc = buckets.get(weeklyBucketIndex(i, values.length));
+    const acc = buckets.get(weeklyBucketIndex(i, columnsToBucket));
     return acc ? acc.total / acc.n : null;
   });
 }
@@ -98,11 +116,12 @@ function weeklyAverageSeries(values) {
 // readings, evaluated across all seven columns. Columns are consecutive days, so the
 // slope is per day. One reading yields just that reading — a flat dash would claim the
 // week didn't move, which isn't measured. None yields nothing.
-function weeklyTrendSeries(values) {
+function weeklyTrendSeries(values, columnsToBucket = values.length) {
   const points = new Map();
   values.forEach((v, i) => {
     if (v === null || v === undefined) return;
-    const b = weeklyBucketIndex(i, values.length);
+    const b = weeklyBucketIndex(i, columnsToBucket);
+    if (b < 0) return;
     if (!points.has(b)) points.set(b, { xs: [], ys: [] });
     points.get(b).xs.push(i);
     points.get(b).ys.push(v);
@@ -114,14 +133,18 @@ function weeklyTrendSeries(values) {
   });
 
   const series = values.map((v, i) => {
-    const fit = fits.get(weeklyBucketIndex(i, values.length));
+    const bucket = weeklyBucketIndex(i, columnsToBucket);
+    // Today: no fit, and no bare reading either. Falling back to `v` here would draw
+    // a lone dot on a "7-Day Trend" line from a single day of data.
+    if (bucket < 0) return null;
+    const fit = fits.get(bucket);
     if (fit) return fit.slope * i + fit.intercept;
     return v === null || v === undefined ? null : v;
   });
   // Per column so the tooltip needn't re-derive the bucket; per week because that's the
   // figure worth acting on.
   const slopePerWeek = values.map((_, i) => {
-    const fit = fits.get(weeklyBucketIndex(i, values.length));
+    const fit = fits.get(weeklyBucketIndex(i, columnsToBucket));
     return fit ? fit.slope * 7 : null;
   });
   return { series, slopePerWeek };
@@ -130,11 +153,13 @@ function weeklyTrendSeries(values) {
 // One dashed segment per week — flat for an average, sloped for a trend. The segment
 // crossing a bucket boundary is painted transparent, so the weeks read as separate
 // dashes rather than one line joined by vertical risers.
-function weeklyAverageDataset(label, series, extra = {}) {
+function weeklyAverageDataset(label, series, extra = {}, columnsToBucket = series.length) {
   // Bounds-checked: an out-of-range index can otherwise land back on a real bucket
-  // number and hide a one-column week.
+  // number and hide a one-column week. A -1 bucket (today) matches nothing, so the
+  // segment into today's column is transparent like any other week boundary.
   const sameBucket = (a, b) => a >= 0 && b >= 0 && a < series.length && b < series.length
-    && weeklyBucketIndex(a, series.length) === weeklyBucketIndex(b, series.length);
+    && weeklyBucketIndex(a, columnsToBucket) >= 0
+    && weeklyBucketIndex(a, columnsToBucket) === weeklyBucketIndex(b, columnsToBucket);
   const hasValue = (i) => series[i] !== null && series[i] !== undefined;
   const joined = (a, b) => sameBucket(a, b) && hasValue(a) && hasValue(b);
   return {
@@ -1380,7 +1405,8 @@ function renderWellnessBodyMassChart(entries) {
 
   // Sloped, not flat: a bar here is an absolute level, so the week's mean says little
   // and its direction says everything.
-  const { series: trendSeries, slopePerWeek } = weeklyTrendSeries(values);
+  const weekColumns = bucketedColumnCount(dates);
+  const { series: trendSeries, slopePerWeek } = weeklyTrendSeries(values, weekColumns);
 
   // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
   // `grace` too late to read here. The trend folds in too — a fit extended to the week's
@@ -1412,7 +1438,7 @@ function renderWellnessBodyMassChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Trend', trendSeries),
+        weeklyAverageDataset('7-Day Trend', trendSeries, {}, weekColumns),
       ],
     },
     options: {
@@ -1591,7 +1617,8 @@ function renderWellnessCaloriesChart(entries) {
 
   // Averaged off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins
   // don't count as days of fasting.
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
   wellnessCaloriesChart = upsertChart(wellnessCaloriesChart, ctx, {
     data: {
@@ -1604,7 +1631,7 @@ function renderWellnessCaloriesChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg),
+        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
         {
           type: 'bar',
           label: `${target.word} for the day`,
@@ -1772,8 +1799,9 @@ function renderWellnessSleepChart(entries) {
   // Averaged in AXIS units, not clock minutes: the shift has already unwrapped
   // midnight, so a plain mean works where clock times would average 23:30 and 00:30
   // into midday.
-  const bedAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null));
-  const wakeAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null));
+  const weekColumns = bucketedColumnCount(dates);
+  const bedAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null), weekColumns);
+  const wakeAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null), weekColumns);
 
   wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
     data: {
@@ -1786,8 +1814,8 @@ function renderWellnessSleepChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Avg Bed', bedAvg),
-        weeklyAverageDataset('7-Day Avg Wake', wakeAvg),
+        weeklyAverageDataset('7-Day Avg Bed', bedAvg, {}, weekColumns),
+        weeklyAverageDataset('7-Day Avg Wake', wakeAvg, {}, weekColumns),
       ],
     },
     options: {
@@ -2022,11 +2050,13 @@ function renderWellnessActivityChart(entries) {
 
   // On the kcal axis, not the minutes one — Target Burn lives there, and it's what the
   // week is compared against. Negated like the dots it averages.
-  const weeklyBurnAvg = weeklyAverageSeries(caloriesData);
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyBurnAvg = weeklyAverageSeries(caloriesData, weekColumns);
   const weeklyBurnDataset = weeklyAverageDataset(
     '7-Day Average Burn',
     weeklyBurnAvg.map((v) => (v === null ? null : -v)),
     { yAxisID: 'y1' },
+    weekColumns,
   );
 
   wellnessActivityChart = upsertChart(wellnessActivityChart, ctx, {
@@ -2167,7 +2197,8 @@ function renderWellnessProteinChart(entries) {
     : [capFor(band.min, `${band.min} g target`)];
 
   // Logged days only, so the zero stand-ins don't pull the week under the band's floor.
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
     data: {
@@ -2180,7 +2211,7 @@ function renderWellnessProteinChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg),
+        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
         ...targetDatasets,
       ],
     },
@@ -2961,7 +2992,8 @@ function renderWellnessEnergyBalanceChart(entries) {
   const targetHalf = (yMax - yMin) * 0.004;
 
   // balanceData already nulls the unlogged days, so they sit out of the mean.
-  const weeklyAvg = weeklyAverageSeries(balanceData);
+  const weekColumns = bucketedColumnCount(labels);
+  const weeklyAvg = weeklyAverageSeries(balanceData, weekColumns);
 
   wellnessEnergyBalanceChart = upsertChart(wellnessEnergyBalanceChart, ctx, {
     data: {
@@ -2974,7 +3006,7 @@ function renderWellnessEnergyBalanceChart(entries) {
           backgroundColor: balanceData.map((v) => energyBalanceColor(v, isCut, target)),
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg),
+        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
         // A dash per day, the idiom Caloric Intake uses for its own target: a continuous
         // line reads as one shared limit, a mark on each bar says the target belongs to
         // that day.

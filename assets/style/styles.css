@@ -624,7 +624,9 @@ header .btn:hover {
     border-radius: var(--radius-md);
     box-shadow: 0 4px 16px rgba(0,0,0,.2);
     padding: .75rem 1rem;
-    z-index: 30;
+    /* Above .modal's 100, keeping the order it had when the modal had no z-index:
+       an undo toast has a countdown, so it can't be the one thing a form covers. */
+    z-index: 110;
 }
 
 .toast[hidden] {
@@ -989,7 +991,10 @@ kbd {
 }
 
 /* Bottom-LEFT, not right: the modals' own buttons sit bottom-right, and on a
-   phone a right-hand stack overlaps them. */
+   phone a right-hand stack overlaps them — which is only a concern because this
+   stack stays above an open modal (z-index 110, over .modal's 100), the order it
+   had back when .modal had no z-index at all. Dark mode and privacy mode both
+   want to be reachable while a form is open. */
 .fab-stack {
     position: fixed;
     left: 1.25rem;
@@ -1000,7 +1005,7 @@ kbd {
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 2px 10px rgba(0,0,0,.25);
-    z-index: 20;
+    z-index: 110;
 }
 
 .fab {
@@ -1571,9 +1576,16 @@ td .btn {
     margin-right: .25rem;
 }
 
+/* Above the sticky header (z-index 10), and above every dropdown/tooltip that
+   hangs off it (20-50). Without a z-index of its own a modal loses to the header
+   on paint order — both are positioned, and the header's 10 beats the modal's
+   auto — so on a phone, where a tall wrapped nav bar meets a card centred in a
+   .5rem gutter, the header covered the top of the card. That band is exactly
+   where .modal-close sits, which made a long form uncloseable. */
 .modal {
     position: fixed;
     inset: 0;
+    z-index: 100;
     background: rgba(0,0,0,.4);
     display: flex;
     align-items: center;
@@ -2041,8 +2053,14 @@ td .btn {
 /* Already in today's log (strength-plan.js). Both a banked row and one the user
    just ticked show a checked box, so the tint is what tells them apart. Flat
    rgba of --color-income rather than the variable, so one value reads correctly
-   over both themes' row backgrounds. */
-.workout-row-logged > td {
+   over both themes' row backgrounds.
+
+   .today-row is the same tint on today's row in the Physique and Work tables —
+   one declaration for both, because they mean the same thing (this is the row
+   your logging lands on) and drifting into two greens would just look like a
+   mistake. */
+.workout-row-logged > td,
+.today-row > td {
     background: rgba(22, 163, 74, .13);
 }
 

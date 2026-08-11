@@ -186,7 +186,9 @@ function setupKeyboardShortcuts() {
       e.preventDefault();
       document.getElementById('tx-search').focus();
     } else if (e.key === 'n') {
-      openTransactionForm();
+      // Through the button rather than openTransactionForm() directly, so the
+      // shortcut passes the same auth gate a click does (setupAuthGatedActions).
+      document.getElementById('add-transaction-btn').click();
     } else if (e.key === '?') {
       toggleShortcutsHelp();
     }
@@ -843,6 +845,71 @@ function setupScrollSpy() {
   });
 }
 
+// Anything that opens a form or edits the sheet. Everything read-only is left out
+// on purpose — a token check that raises a sign-in popup to look something up
+// would be worse than the problem it solves.
+const AUTH_GATED_SELECTOR = [
+  '.panel-header-btn',            // every panel's Log / Add, plus Formula
+  '.row-action-btn',              // ✏️ / 📋 / 🗑️ on every table row
+  '#physique-bulk-combine-btn',
+  '#physique-bulk-calc-btn',
+  '#nutrition-bulk-merge-btn',
+  '#tx-bulk-edit-btn',
+  '#tx-bulk-delete-btn',
+  '#contacts-bulk-merge-btn',
+  '#contacts-bulk-delete-btn',
+  '#import-csv-btn',
+].join(', ');
+
+// Reads the sheet but never writes it, so it has no business prompting: the
+// Instruction modal is the Activities tab already in memory.
+const AUTH_GATE_EXEMPT_IDS = ['activity-instruction-btn'];
+
+// Renews the access token BEFORE a form opens, rather than letting a stale one
+// surface as a Google auth error on Save with the filled-in form still on screen.
+// GIS tokens last ~1hr and this is a tab people leave open all day, so that was a
+// routine way to lose typed data.
+//
+// One capture-phase listener on the document instead of a check inside fifteen
+// handlers: it sees the click before the button's own listener (all of which are
+// bubble-phase), stops it, awaits the token, then re-dispatches the same click.
+// A new table row gets this for free — the listener matches on the class, so
+// there's nothing to re-wire when a renderer rebuilds a table.
+function setupAuthGatedActions() {
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest(AUTH_GATED_SELECTOR);
+    if (!btn || AUTH_GATE_EXEMPT_IDS.includes(btn.id)) return;
+    // authChecked marks the re-dispatched click; authPending swallows the impatient
+    // second click while the first one's token request is still open.
+    if (btn.dataset.authChecked === '1' || btn.dataset.authPending === '1' || btn.disabled) return;
+
+    // Nothing to gate before the dashboard exists — the gate itself is showing.
+    if (!isSignedIn()) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    // Deliberately NOT wrapped in withButtonBusy: the row-action buttons wrap their
+    // own handlers in it, and it no-ops while dataset.busy is set — the re-dispatched
+    // click would land inside that window and be dropped. The wait is invisible
+    // anyway on every path except the visible sign-in, which shows its own UI.
+    btn.dataset.authPending = '1';
+    ensureAccessToken().then((token) => {
+      delete btn.dataset.authPending;
+      // No message needed on failure: every path that ends without a token has
+      // already sent handleAuthChange the sign-out, so the sign-in gate is back up
+      // with its own reason — a form opened over it would be the wrong outcome.
+      if (!token) return;
+
+      // Same click, now with a live token. The flag is what lets it through the
+      // listener above, cleared straight after so the next real click is gated.
+      btn.dataset.authChecked = '1';
+      btn.click();
+      delete btn.dataset.authChecked;
+    });
+  }, true);
+}
+
 window.addEventListener('load', () => {
   // Belt-and-suspenders alongside the head script's history.scrollRestoration
   // = 'manual' — guarantees every load starts at the top even if the browser
@@ -854,6 +921,7 @@ window.addEventListener('load', () => {
   document.getElementById('signout-btn').addEventListener('click', signOut);
 
   setupAccountMenu();
+  setupAuthGatedActions();
   initCsvControls();
   initInsightPanel();
   initFormulaPlayground();

@@ -194,7 +194,7 @@ function gatherInsightMetrics(fromIso, toIso) {
 
     avgActivityMins: current.avgActivityMins,
     prevAvgActivityMins: previous.avgActivityMins,
-    activityTarget: getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT),
+    activityTarget: Math.round(getActivityTargetMin(latestBodyMassKg(physiqueAsWellnessEntries()))),
     activityDaysLogged: current.activityDaysLogged,
     avgActivityKcal: current.avgActivityKcal,
     prevAvgActivityKcal: previous.avgActivityKcal,

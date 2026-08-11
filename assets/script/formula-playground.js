@@ -619,6 +619,8 @@ function openFormulaPlayground() {
   // state rather than defaulting to one and inviting an accidental switch.
   const pinMode = pinnedCalorieTargetKcal() !== null ? 'intake' : 'deficit';
   document.querySelector(`input[name="formula-pin-mode"][value="${pinMode}"]`).checked = true;
+  const activityPinMode = pinnedActivityTargetKcal() !== null ? 'calorie' : 'time';
+  document.querySelector(`input[name="formula-activity-pin-mode"][value="${activityPinMode}"]`).checked = true;
   loadFormulaInputsFromSettings();
   applySolveForMode('EIN');
   renderFormulaPreview();
@@ -635,7 +637,7 @@ function formulaEinKcal() {
 }
 
 async function saveFormulaSettings() {
-  const { overrides, invalid } = readFormulaInputs();
+  const { overrides, invalid, bodyMassKg } = readFormulaInputs();
   if (invalid.length) return;
 
   // Two ways to hold a plan steady, and they're mutually exclusive: pinning the
@@ -652,6 +654,19 @@ async function saveFormulaSettings() {
   }
   if (pinned || pinnedCalorieTargetKcal() !== null) {
     overrides[CALORIE_TARGET_PIN_KEY] = pinned ? einKcal : '';
+  }
+
+  // Same shape, for the activity target instead of daily intake: pinning the calorie
+  // burn writes Eₐ as the currently typed τ/MET/body-mass imply it (via activityTargetKcal,
+  // the same pin-blind calculation this preview already uses); pinning the time writes a
+  // blank, which is how ACTIVITY_TARGET_MIN — saved with the rest of these inputs — goes
+  // back to being what the burn is held at.
+  const activityPinned = document.querySelector('input[name="formula-activity-pin-mode"]:checked').value === 'calorie';
+  const activityKcalToPin = activityPinned
+    ? Math.round(withFormulaOverrides(overrides, () => activityTargetKcal(bodyMassKg)))
+    : null;
+  if (activityPinned || pinnedActivityTargetKcal() !== null) {
+    overrides[ACTIVITY_TARGET_PIN_KEY] = activityPinned ? activityKcalToPin : '';
   }
 
   const saveBtn = document.getElementById('formula-save-btn');
@@ -672,9 +687,13 @@ async function saveFormulaSettings() {
     applySolveForMode(currentSolveFor());
     renderFormulaPreview();
     statusEl.classList.add('status-ok');
-    showFieldError('formula-status', pinned
-      ? `Saved — daily intake is pinned at ${einKcal} kcal and no longer moves with your body mass.`
-      : 'Saved — the deficit is what stays fixed; the Caloric Intake chart and the forecast now use these.');
+    const intakeNote = pinned
+      ? `Daily intake is pinned at ${einKcal} kcal and no longer moves with your body mass.`
+      : 'The deficit is what stays fixed; the Caloric Intake chart and the forecast now use these.';
+    const activityNote = activityPinned
+      ? `Activity burn is pinned at ${activityKcalToPin} kcal/day — the activity tile and chart now show the minutes that takes, rising as your body mass falls.`
+      : 'Activity time (τ) is what stays fixed on the activity target; the calorie burn it implies falls as your body mass does.';
+    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {

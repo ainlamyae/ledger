@@ -552,7 +552,7 @@
                         <th>Amount</th>
                         <th class="sortable" data-sort="calories">Calories</th>
                         <th class="sortable" data-sort="protein">Protein</th>
-                        <th class="sortable" data-sort="proteinDensity" title="Grams of protein per 100 kcal — computed here, not stored — higher means a leaner protein source">Protein/100kcal</th>
+                        <th class="sortable" data-sort="proteinDensity" title="Protein density: grams of protein per 100 kcal — computed here, not stored — higher means a leaner protein source">Density</th>
                         <th class="sortable" data-sort="verified" title="Verified against the label on your own purchased ingredient">Verified</th>
                         <th class="sortable" data-sort="proteinPercent" title="Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">Protein %</th>
                         <th></th>
@@ -1402,8 +1402,6 @@
 
         <pre id="formula-expression" class="formula-expression"></pre>
 
-        <p class="formula-where">where,</p>
-
         <fieldset class="formula-solve-for">
             <legend>Solve for</legend>
             <label><input type="radio" name="formula-solve-for" value="EIN" checked> Calories</label>
@@ -1417,6 +1415,11 @@
                 <input type="radio" name="formula-solve-for" value="FIXED_PCT"> Weekly fat loss %
             </label>
         </fieldset>
+
+        <!-- Directly above the variable list it introduces, not under the formulas: it's the
+             list that's being defined, and the Solve-for radios in between made it read as
+             though it were introducing those instead. -->
+        <p class="formula-where">where,</p>
 
         <div class="formula-inputs">
             <label class="formula-row">

@@ -56,8 +56,10 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Every form field has a 16px floor so mobile browsers never auto-zoom on focus.
 - Modals are full-width on phones; cards cap at a fixed column width on wide screens.
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
+- **Stacking order is explicit**: page chrome 0-1, sticky `header` 10, dropdowns hanging off it 20, landing tooltips 50, **modals 100**, and toasts / the floating dark-mode & privacy stack 110 so they stay reachable over an open form. A modal with no `z-index` of its own lost to the header — both are positioned, so the header's 10 beat the modal's `auto` and painted over the top of a centred card, which is where `.modal-close` sits. Any long form (the card maxes at `100vh − 4rem`, so its top lands ~32px down while the header is taller than that) became uncloseable.
 - **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
-- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition Facts, Accounts, Contacts, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
+- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Accounts, Contacts, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
+- **Panel headings are one word too** where the longer form was only restating the tab it reads: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Accounts**. The sheet tabs keep their own names (`Nutrition Facts` is still the tab, and still the Source label on a matched Calculate row) — this is the heading line, not the data model.
   - Driven by **Activity**, the one panel carrying three of them (**Add**, **Guide**, **Log**): "Activity Plan" + "Add Activity" + "Instruction" + "Log a Workout" could not share a phone's heading line, and `.panel-header` wraps rather than squeezing the heading, so the labels were what had to give.
   - Modal `<h2>`s keep the long form (*Log a Transaction*, *Add Ingredient*) — a heading has the width, and it's where you land after clicking.
   - Empty-state hints quote the new label (`click "Log" in the panel heading`), so no text in the app names a button that no longer exists.
@@ -91,11 +93,11 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - Advanced Filters: date range plus an AND/OR field-filter builder; Export CSV writes exactly what's filtered.
 - **Bulk transaction ops** — select rows for Edit Selected (only filled fields applied) or Delete Selected (one `batchUpdate`, highest row first).
 - **Undo** — toast after bulk edit/delete; deletes re-append, edits write original values back in place.
-- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the Account Summary table (with a Total row summing Balance and Market Value) and reconciliation status.
+- **Portfolio** — 3-ring nested allocation donut (type → institution → account), then the **Accounts** table (with a Total row summing Balance and Market Value) and reconciliation status.
 
 ### Time Tracker
 
-- **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. (Named for its modal rather than "Log a Day", which collided with Physique's button of the same name.)
+- **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
 - Company autocompletes and defaults to the most recently logged one.
 - Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
 - One **Work** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
@@ -164,7 +166,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Health — Health Insight (AI)
 
-- One panel, four modes: **Wellness**, **Food**, **Activity**, **Protein Sources**.
+- One panel, five modes: **Wellness**, **Food**, **Activity**, **Protein Sources**, **Health Plan**.
 - **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
 - Clicking a mode shows a preview of exactly what would be sent; Send to AI sends that same data.
 - All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
@@ -180,6 +182,12 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - Minutes are **net active time**, not session wall-clock. The system prompt says so explicitly and tells the model to judge training by rep volume and muscle coverage — an 8-minute resistance session is a real one, and "spend more minutes" is never the advice.
 - **Protein Sources** — reuses `computeProteinRotationRows` (Protein Source Rotation, below) directly, so this mode's figures can never disagree with that chart: every tracked ingredient's own target share of the protein target vs. the share actually eaten in range, grouped by classification, largest shortfall first.
   - The target percentages are the user's own rotation plan, not a nutritional prescription — the system prompt tells the model to judge how well actual eating matched the mix, not to second-guess the mix itself.
+- **Health Plan** — the only mode that reads the app's **settings** rather than the day log: it sends the Formula Playground's whole plan and asks whether it's feasible.
+  - Three blocks: the published identities (the playground's own `FORMULA_EXPRESSION`, so screen and prompt can't diverge), the inputs behind them (including which figure is pinned as body mass falls), and the substituted arithmetic those produce — `BMR → Eₐ → D → Eᵢₙ → A → B → m∞ → t`, then `LBM → P_min → P_max`.
+  - Computed from `Settings` + the latest weigh-in, **not** the playground's input boxes: the modal may never have been opened, and the saved values are what the app actually runs on. Same functions as the playground and the charts (`calorieTargetDetail`, `maintenanceAffineCoefficients`, `projectTargetDays`, `boerLeanBodyMassKg`), so all three describe one plan.
+  - A fourth block carries **Wellness' own aggregation** for the selected range, unchanged — feasibility is a question about the gap between the plan and the logging, so the model gets both. A plan whose activity burn assumes daily movement that isn't being logged is arithmetic, not a plan.
+  - The system prompt names what to check: `Eᵢₙ` against BMR, the weekly rate against ~0.5-1% of body mass, whether τ is actually being done, whether protein is inside the band at that deficit, and whether `t` agrees with the measured trajectory. Sections are **Verdict / What works / Risks / Do this / Avoid this**, with the last two as numbered lines naming the input responsible.
+  - Missing profile settings produce a prompt that says so plainly and still sends the logging, rather than a plan full of nulls.
 - Reports render as plain text without `innerHTML` (untrusted model output) and persist per mode.
 
 ### Health — Protein Source Rotation
@@ -198,7 +206,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - The panel heading reads **Activity**, and its three buttons are one word each — **Add**, **Guide**, **Log** — the reason for the app-wide convention in [Layout and interaction](#layout-and-interaction). "Log More" is the one two-word label, and only when something is already logged: **Add** next to it means a catalogue row, not another set.
 - Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row a "Done" checkbox.
 - **All seven tables are one grid.** Five columns each — a NEAT row carries an empty Rest cell — with the four right-hand columns pinned to the same widths, so Sets x Reps, Rest, Done and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~526px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
-- **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover.
+- **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover. The **Physique** and **Work** tables tint today's row the same green from the same declaration (`.workout-row-logged > td, .today-row > td`): in all three places it means "this is the row today's logging lands on", and two nearly-identical greens would read as a mistake.
+  - In Work it's applied outside the weekend/holiday/no-entry chain, since today can also be a weekend or a holiday. Today's tint is on the cells and theirs is on the row, so today's green paints over while their muted text colour survives.
 - **Log sends only what's newly ticked**, and extends today's entry instead of opening a second row.
   - The button reads "Log More" once something is already logged.
   - Free text already in the note is preserved; the description re-derives from everything in the session.
@@ -417,7 +426,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 11 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
 | 13 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
-| 14 | `accounts.js` | Account Summary: balances, CRUD |
+| 14 | `accounts.js` | Accounts: balances, CRUD |
 | 15 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
 | 16 | `csv.js` | CSV import, advanced filter engine, download helper |
 | 17 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
@@ -432,13 +441,14 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 26 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
 | 27 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
 | 28 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
-| 29 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
-| 30 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 31 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the lean-mass protein band, save back to `Settings`, and the deficit/intake and time/calorie-burn pins |
-| 32 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 33 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
-| 34 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
-| 35 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 29 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
+| 30 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 31 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 32 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the lean-mass protein band, save back to `Settings`, and the deficit/intake and time/calorie-burn pins |
+| 33 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 34 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
+| 35 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
+| 36 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
 ### Data Flow
 
@@ -452,6 +462,14 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 1. `initAuth(handleAuthChange)`.
 2. Non-expired token in `localStorage` is used; else a silent `prompt: 'none'` attempt; else the consent button.
 3. On success, an already-selected spreadsheet loads the dashboard; otherwise the file gate shows.
+4. A timer renews the token ~5 min before it expires (`REFRESH_BUFFER_MS`), since the implicit GIS flow issues no refresh token and a tab left open would otherwise start 401ing.
+
+**Token freshness before a write** — GIS tokens last ~1hr and this is a tab people leave open, so the routine failure was filling in a long form and losing it to a Google auth error on Save.
+
+1. **Checked at the click, not at the save.** One capture-phase listener on `document` (`setupAuthGatedActions`) intercepts every button that opens a form or edits the sheet — `.panel-header-btn`, `.row-action-btn` (every ✏️/📋/🗑️, via `makeRowActionButton`), the bulk bars, Import CSV — stops the event before the button's own bubble-phase handler, awaits a token, then re-dispatches the identical click. A rebuilt table row inherits this for free; read-only actions (the Instruction modal) are exempt, since a sign-in popup to look something up is worse than the problem.
+2. `ensureAccessToken()` resolves three ways, cheapest first: a stored token with more than `TOKEN_MIN_REMAINING_MS` (2 min) left is returned with **no network call and no UI**; otherwise one silent renewal (invisible when it works); and only if that fails, the visible flow. Callers arriving while a request is open — including the scheduled hourly refresh — **join** it rather than racing a second one.
+3. **And a retry at the save anyway.** A 401 from `sheetsRequest` renews once in place and re-sends the identical request, so a form left open past the hour still saves instead of asking someone to re-type it. `retrying` bounds it to one extra attempt.
+4. The `n` shortcut goes through the Transaction button rather than calling `openTransactionForm()` directly, so it passes the same gate a click does.
 
 **File selection** (first run, or after sign-out)
 
@@ -730,6 +748,11 @@ sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
              evaluated at all 7 columns            Body Mass only, ≥2 readings
 ```
 
+- **Today sits out of the weekly maths entirely** (`bucketedColumnCount`). It's a day in progress — the food logged by 10am, the steps walked so far — so averaging it in drags the current week down by an amount that shrinks as the day goes on, reporting "this week" as worse than it is. Today's column gets **no dash at all** rather than one drawn from a partial day.
+  - So `count` above is the window minus that trailing column, and the buckets run back from **yesterday**. Today's bucket index is `-1`, which reads as "belongs to no week" everywhere: `buckets.get(-1)` is undefined, so the average is null, and the dash-joining test refuses to connect a segment to it.
+  - Only when the window actually **ends today**. A window ending on a past date has no partial column and keeps all of them.
+  - The arithmetic follows from that: a 28-day window ending today leaves 27 bucketed days — three full weeks plus a 6-day oldest one, since only the oldest bucket may come up short. Four full weeks plus today needs a 29-day window.
+
 - Drawn as a line whose bucket-crossing segments are transparent, so each week is one dash rather than a stepped line with risers.
 - Body Mass folds the fitted endpoints into its kg bounds before padding — a fit extended to the week edges can reach past every reading in it, and the fat-energy twin axis is derived from those same bounds.
 - Rest & Recovery averages bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 average to midnight rather than midday.
@@ -930,7 +953,7 @@ ledger/
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts.js             # Chart.js renderers + health formulas
 │       ├── transactions.js       # Transaction Log
-│       ├── accounts.js           # Account Summary
+│       ├── accounts.js           # Accounts panel
 │       ├── timesheet.js          # Work panel + analytics data
 │       ├── csv.js                # CSV import/export + filter engine
 │       ├── physique.js           # Physique (one row per day)
@@ -943,6 +966,7 @@ ledger/
 │       ├── food-insight.js       # Insight Food mode
 │       ├── activity-insight.js   # Insight Activity mode
 │       ├── protein-source-rotation-insight.js # Insight Protein Sources mode
+│       ├── plan-insight.js       # Insight Health Plan mode
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
 │       ├── formula-playground.js # Health Formula Playground
@@ -1103,6 +1127,7 @@ Then open `http://localhost:8000`. No build step.
   - Wellness Insight sends age, height, BMI, body mass/target and aggregated averages.
   - Food Insight sends the classification-grouped ingredient list plus your question. No vitamin/mineral data exists in this app, so none is ever sent.
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
+  - Health Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
   - Nothing is sent until that panel's Send to AI is clicked.
 - `GROQ_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Settings` tab and are never committed.
 - **Privacy mode** is display-only and doesn't change what's stored.

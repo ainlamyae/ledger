@@ -1,9 +1,9 @@
-// The one "Health Insight" panel, shared by all three AI reads (Wellness,
-// Food, Activity). Those used to be three separate panels running an identical
-// flow — pick a range, compute a local preview, optionally ask a question, POST
-// to Groq, render, persist — so everything except the three real differences
-// (what data to gather, how to phrase it, which system prompt to send) lives
-// here once, and the differences live in INSIGHT_MODES below.
+// The one "Health Insight" panel, shared by every AI read (Wellness, Food,
+// Activity, Protein Sources, Health Plan). The first three used to be separate
+// panels running an identical flow — pick a range, compute a local preview,
+// optionally ask a question, POST to Groq, render, persist — so everything except
+// the real per-mode differences (what data to gather, how to phrase it, which
+// system prompt to send) lives here once, and those live in INSIGHT_MODES below.
 //
 // Nothing is computed until a mode button is clicked. The old panels each
 // rendered their preview on page load and again when wellness data arrived,
@@ -75,6 +75,22 @@ const INSIGHT_MODES = {
     systemPrompt: PROTEIN_ROTATION_INSIGHT_SYSTEM_PROMPT,
     resultKeys: ['INSIGHT_PROTEIN_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_PROTEIN_LAST_GENERATED_AT'],
+  },
+  plan: {
+    label: 'Health Plan',
+    hint: 'A read on the plan itself — is the target intake, deficit, activity and protein band feasible, and does your logging show it being followed?',
+    questionPlaceholder: 'e.g. Is the deficit too aggressive for this timeline?',
+    previewId: 'insight-preview-text',
+    // The only mode whose data is the app's own SETTINGS rather than the day log —
+    // the range still matters, because the actuals it's judged against come from it.
+    gather: (from, to) => gatherPlanInsight(from, to),
+    formatPrompt: (data) => formatPlanInsightPrompt(data),
+    renderPreview: (data) => renderInsightPreviewLines(formatPlanInsightPrompt(data)),
+    appendQuestion: true,
+    needsNutrition: false,
+    systemPrompt: PLAN_INSIGHT_SYSTEM_PROMPT,
+    resultKeys: ['INSIGHT_PLAN_LAST_RESULT'],
+    generatedAtKeys: ['INSIGHT_PLAN_LAST_GENERATED_AT'],
   },
 };
 

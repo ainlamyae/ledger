@@ -592,100 +592,112 @@ function setLastUpdated() {
 async function loadDashboard(forceRefresh = false) {
   clearDashboardError();
 
-  // Never throws (see loadSettings). Settings fetches concurrently with
-  // every other module below instead of blocking them first — only
-  // initPhysique (target-line charts) and initTravel (BIRTH_DATE credit)
-  // actually read currentSettings, so just those two wait on it.
-  const settingsPromise = loadSettings(forceRefresh).then((settings) => {
-    currentSettings = settings;
-    // 0 hides amounts, 1 (or unset) shows them — kept in the Settings tab so
-    // this survives a refresh instead of always starting shown.
-    privacyMode = getSetting('SHOW_AMOUNTS', 1) === 0;
-    updatePrivacyButtonUI();
-    // Same 0/1 convention as SHOW_AMOUNTS, just for the bulb row.
-    widgetsVisible = getSetting('SHOW_WIDGETS', 1) !== 0;
-    updateWidgetsButtonUI();
-    applyWidgetsVisibility();
-    applySettingsToWidgets();
-  });
+  // Wrapped end to end rather than relying solely on the Promise.allSettled
+  // below: that only catches a rejection from one of the listed module
+  // promises. A throw in this function's own setup code (anything before the
+  // await, e.g. a stale cached script reaching for a DOM node a newer cached
+  // HTML removed) used to become an unhandled rejection instead — nothing
+  // calls loadDashboard() with a .catch(), so the dashboard just sat on its
+  // placeholder dashes forever with no visible error at all.
+  try {
+    // Never throws (see loadSettings). Settings fetches concurrently with
+    // every other module below instead of blocking them first — only
+    // initPhysique (target-line charts) and initTravel (BIRTH_DATE credit)
+    // actually read currentSettings, so just those two wait on it.
+    const settingsPromise = loadSettings(forceRefresh).then((settings) => {
+      currentSettings = settings;
+      // 0 hides amounts, 1 (or unset) shows them — kept in the Settings tab so
+      // this survives a refresh instead of always starting shown.
+      privacyMode = getSetting('SHOW_AMOUNTS', 1) === 0;
+      updatePrivacyButtonUI();
+      // Same 0/1 convention as SHOW_AMOUNTS, just for the bulb row.
+      widgetsVisible = getSetting('SHOW_WIDGETS', 1) !== 0;
+      updateWidgetsButtonUI();
+      applyWidgetsVisibility();
+      applySettingsToWidgets();
+    });
 
-  // Physique is what the Health Indicators charts, the today tiles, the
-  // Activity Plan ticks and every Insight mode read (physiqueAsWellnessEntries,
-  // physique.js).
-  //
-  // Activities has to land BEFORE Physique: the adapter splits each day's
-  // workout by the category that tab assigns, and it memoizes the result — a
-  // Physique load that won the race would cache every activity as 'Other'.
-  // allSettled, not all: a missing or unreadable Activities tab should cost the
-  // category split (everything lands under 'Other') and the plan tables, not
-  // every chart on the page. The rejection still surfaces via the list below.
-  const activitiesPromise = initActivities(forceRefresh);
-  const physiquePromise = Promise.allSettled([settingsPromise, activitiesPromise])
-    .then(() => initPhysique(forceRefresh));
-  const nutritionPromise = initNutrition(forceRefresh);
+    // Physique is what the Health Indicators charts, the today tiles, the
+    // Activity Plan ticks and every Insight mode read (physiqueAsWellnessEntries,
+    // physique.js).
+    //
+    // Activities has to land BEFORE Physique: the adapter splits each day's
+    // workout by the category that tab assigns, and it memoizes the result — a
+    // Physique load that won the race would cache every activity as 'Other'.
+    // allSettled, not all: a missing or unreadable Activities tab should cost the
+    // category split (everything lands under 'Other') and the plan tables, not
+    // every chart on the page. The rejection still surfaces via the list below.
+    const activitiesPromise = initActivities(forceRefresh);
+    const physiquePromise = Promise.allSettled([settingsPromise, activitiesPromise])
+      .then(() => initPhysique(forceRefresh));
+    const nutritionPromise = initNutrition(forceRefresh);
 
-  // Every module below is an independent API call — fetch them all
-  // concurrently so the dashboard doesn't wait on nine round trips in
-  // sequence.
-  const reportPromise = loadReport(forceRefresh).then((report) => {
-    currentReport = report;
-    renderSummaryCards(report);
-    renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
-    renderSpendingBreakdownCharts(report.categoryComparison);
-    // Off for now, with its section in index.html commented out to match — the
-    // per-category Type donuts are wanted again later, so nothing is deleted.
-    // `report.typeBreakdown` is still parsed and cached either way; this call and
-    // that section are the whole switch.
-    // renderTypeBreakdownCharts(report.typeBreakdown);
-    renderExpenseBreakdownTrendChart(report.categoryTrend);
-    renderSavingsTrendChart(report.savingsTrend);
-    renderReconciliationStatus(report.missingAmount);
-    setLastUpdated();
-  });
-  const transactionsPromise = initTransactions(forceRefresh);
-  const accountsPromise = initAccountManager(forceRefresh);
+    // Every module below is an independent API call — fetch them all
+    // concurrently so the dashboard doesn't wait on nine round trips in
+    // sequence.
+    const reportPromise = loadReport(forceRefresh).then((report) => {
+      currentReport = report;
+      renderSummaryCards(report);
+      renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
+      renderSpendingBreakdownCharts(report.categoryComparison);
+      // Off for now, with its section in index.html commented out to match — the
+      // per-category Type donuts are wanted again later, so nothing is deleted.
+      // `report.typeBreakdown` is still parsed and cached either way; this call and
+      // that section are the whole switch.
+      // renderTypeBreakdownCharts(report.typeBreakdown);
+      renderExpenseBreakdownTrendChart(report.categoryTrend);
+      renderSavingsTrendChart(report.savingsTrend);
+      renderReconciliationStatus(report.missingAmount);
+      setLastUpdated();
+    });
+    const transactionsPromise = initTransactions(forceRefresh);
+    const accountsPromise = initAccountManager(forceRefresh);
 
-  const results = await Promise.allSettled([
-    settingsPromise,
-    reportPromise,
-    transactionsPromise,
-    accountsPromise,
-    initTimeSheet(forceRefresh),
-    // Health Insight and Financial Insight deliberately aren't refreshed
-    // here: neither computes anything until its own "load" action (a mode
-    // button, or Financial Snapshot) is clicked, which is what keeps
-    // this load free of the aggregation those panels used to run on every
-    // visit.
-    nutritionPromise,
-    activitiesPromise,
-    physiquePromise,
-    // Protein Source Rotation needs Physique (actual servings eaten),
-    // Nutrition (live per-serving calories/protein), and settings
-    // (protein target) all loaded — refresh only once all three are in,
-    // rather than off just one of them like the two panels above.
-    Promise.all([physiquePromise, nutritionPromise]).then(() => {
-      renderProteinRotationChart(wellnessDateRange());
-    }),
-    // Activity Rotation needs Physique (logged Workout notes) and Activities
-    // (each exercise's Group and Weekly Target) both loaded — same
-    // refresh-once-both-are-in reasoning as Protein Source Rotation above.
-    Promise.all([physiquePromise, activitiesPromise]).then(() => {
-      renderActivityRotationChart(wellnessDateRange());
-    }),
-    initContacts(forceRefresh),
-    // Its own read of the Breakdown tab rather than a share of loadReport's: that
-    // one keeps only what the charts derived from those rows, while the panel
-    // needs each row's own sheet row number to edit it.
-    initBreakdown(forceRefresh),
-    initSettingsPanel(forceRefresh),
-    settingsPromise.then(() => initTravel(forceRefresh)),
-    initApplications(forceRefresh),
-  ]);
+    const results = await Promise.allSettled([
+      settingsPromise,
+      reportPromise,
+      transactionsPromise,
+      accountsPromise,
+      initTimeSheet(forceRefresh),
+      // Health Insight and Financial Insight deliberately aren't refreshed
+      // here: neither computes anything until its own "load" action (a mode
+      // button, or Financial Snapshot) is clicked, which is what keeps
+      // this load free of the aggregation those panels used to run on every
+      // visit.
+      nutritionPromise,
+      activitiesPromise,
+      physiquePromise,
+      // Protein Source Rotation needs Physique (actual servings eaten),
+      // Nutrition (live per-serving calories/protein), and settings
+      // (protein target) all loaded — refresh only once all three are in,
+      // rather than off just one of them like the two panels above.
+      Promise.all([physiquePromise, nutritionPromise]).then(() => {
+        renderProteinRotationChart(wellnessDateRange());
+      }),
+      // Activity Rotation needs Physique (logged Workout notes) and Activities
+      // (each exercise's Group and Weekly Target) both loaded — same
+      // refresh-once-both-are-in reasoning as Protein Source Rotation above.
+      Promise.all([physiquePromise, activitiesPromise]).then(() => {
+        renderActivityRotationChart(wellnessDateRange());
+      }),
+      initContacts(forceRefresh),
+      // Its own read of the Breakdown tab rather than a share of loadReport's: that
+      // one keeps only what the charts derived from those rows, while the panel
+      // needs each row's own sheet row number to edit it.
+      initBreakdown(forceRefresh),
+      initSettingsPanel(forceRefresh),
+      settingsPromise.then(() => initTravel(forceRefresh)),
+      initApplications(forceRefresh),
+    ]);
 
-  const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
-  if (errors.length) {
-    console.error('Failed to load dashboard data:', errors);
-    showDashboardError(errors.join('; '));
+    const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
+    if (errors.length) {
+      console.error('Failed to load dashboard data:', errors);
+      showDashboardError(errors.join('; '));
+    }
+  } catch (err) {
+    console.error('Failed to load dashboard:', err);
+    showDashboardError(err.message);
   }
 }
 

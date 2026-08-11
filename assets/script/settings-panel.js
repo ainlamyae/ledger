@@ -68,6 +68,37 @@ function truncateSettingValue(value) {
     : value;
 }
 
+// Keys holding a bearer credential (GROQ_API_KEY, USDA_FDC_API_KEY today)
+// rather than a plain preference. Masked by default independent of the
+// privacy toggle below: that toggle is for hiding amounts from someone
+// glancing at the screen, not for keeping a credential off it during
+// ordinary use, where privacy mode is normally off.
+const SECRET_SETTING_KEY_PATTERN = /(API_KEY|_TOKEN|_SECRET)$/i;
+
+function isSecretSettingKey(key) {
+  return SECRET_SETTING_KEY_PATTERN.test(key);
+}
+
+// Which secret keys the user has explicitly revealed this session. In
+// memory only — resets on refresh/reload, same as a password manager's
+// reveal-until-you-look-away.
+const revealedSettingKeys = new Set();
+
+// Not makeRowActionButton: reveal/hide never touches the sheet, so it has no
+// business behind setupAuthGatedActions' sign-in gate the way Edit/Delete do.
+function makeSecretRevealButton(key, revealed) {
+  const btn = document.createElement('button');
+  btn.className = 'btn';
+  btn.textContent = revealed ? '🙈' : '👁️';
+  btn.title = revealed ? 'Hide value' : 'Reveal value';
+  btn.setAttribute('aria-label', btn.title);
+  btn.addEventListener('click', () => {
+    if (revealed) revealedSettingKeys.delete(key); else revealedSettingKeys.add(key);
+    renderSettingsList();
+  });
+  return btn;
+}
+
 function renderSettingsList() {
   const tbody = document.getElementById('settings-body');
   tbody.innerHTML = '';
@@ -79,7 +110,11 @@ function renderSettingsList() {
   allSettingRows.forEach((setting) => {
     const tr = document.createElement('tr');
 
+    const isSecret = isSecretSettingKey(setting.key);
+    const revealed = revealedSettingKeys.has(setting.key);
+
     const actionsCell = document.createElement('td');
+    if (isSecret) actionsCell.appendChild(makeSecretRevealButton(setting.key, revealed));
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openSettingForm(setting) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteSetting(setting.row) }),
@@ -89,9 +124,11 @@ function renderSettingsList() {
     // names — letters carry just as much sensitive content as digits do
     // here, unlike a plain number. The Key column (e.g. BODY_MASS_TARGET_KG)
     // isn't sensitive on its own and stays visible.
-    // No hover-reveal of a masked value — that would defeat the privacy toggle.
-    const shown = truncateSettingValue(privacyMode ? maskText(setting.value) : setting.value);
-    const fullTitle = (!privacyMode && shown !== setting.value) ? setting.value : undefined;
+    // No hover-reveal of a masked value — that would defeat the privacy toggle
+    // (or, for a secret, the reveal click).
+    const shouldMask = privacyMode || (isSecret && !revealed);
+    const shown = truncateSettingValue(shouldMask ? maskText(setting.value) : setting.value);
+    const fullTitle = (!shouldMask && shown !== setting.value) ? setting.value : undefined;
 
     tr.append(makeCell(setting.key), makeCell(shown, fullTitle), actionsCell);
     tbody.appendChild(tr);

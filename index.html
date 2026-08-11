@@ -64,6 +64,21 @@
     // from all of them via their own <base href="../">.
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
+        // A new service worker taking control mid-session means a shell update
+        // just landed — the HTML/JS already parsed into this tab came from the
+        // OLD shell, and can be a version behind whatever the new one expects
+        // (a DOM node one script reaches for that a newer HTML already removed,
+        // or vice versa). That mismatch used to fail silently: the dashboard
+        // just sat on its placeholder dashes forever with nothing in the UI to
+        // explain why. Reloading once picks up the new shell as a consistent
+        // set instead of running the old one against it; the flag stops a
+        // second reload from firing if something about the update loops.
+        let reloadedForUpdate = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (reloadedForUpdate) return;
+            reloadedForUpdate = true;
+            window.location.reload();
+        });
     }
 </script>
 </head>
@@ -193,6 +208,7 @@
         <div class="cards today-glance-cards">
             <div class="card">
                 <h3>Status</h3>
+                <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
                 <div class="widget-row"><span>m̄</span><span id="today-status-mbar-value">—</span></div>
                 <div class="widget-row"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>t</span><span id="today-status-goal-value">—</span></div>

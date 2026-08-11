@@ -467,10 +467,25 @@ function renderPhysiqueList() {
   const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
   const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
-  pageEntries.forEach((p) => {
+  pageEntries.forEach((p, i) => {
     const tr = document.createElement('tr');
     // Pattern rows carry no date, so they never match.
     if (p.date === todayIso) tr.classList.add('today-row');
+    // One line per week, same idea as Work Time's weekend tint but a border
+    // instead. Newest-first, a Mon-Sun week reads top to bottom as Sun, Sat,
+    // ... Mon — so the line has to land on the SUNDAY row (top of the older
+    // week), not Monday: that's what puts it between this week's Monday
+    // (the row just above, oldest day of the more recent week) and the older
+    // week's Sunday, instead of slicing a week in half. T00:00:00 keeps the
+    // parse in the local timezone, same reasoning as timesheet.js's
+    // dateFromIso.
+    const isWeekBoundary = p.date && new Date(`${p.date}T00:00:00`).getDay() === 0;
+    // Same line, on the first actual day after the pattern rows: patterns
+    // always sort to the top regardless of column/direction (see the
+    // comparator above), so this is just "has a date, the row before it
+    // didn't" — no separate pass over the list needed.
+    const afterPatterns = p.date && i > 0 && !pageEntries[i - 1].date;
+    if (isWeekBoundary || afterPatterns) tr.classList.add('physique-week-start');
 
     const num = (value) => {
       if (value === null) return '—';

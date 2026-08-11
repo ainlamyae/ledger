@@ -190,12 +190,25 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const bodyMassKg = latestBodyMassKg(entries);
   const isCut = getCalorieTargetKind(entries) === 'max';
 
+  // m — the latest raw weigh-in (bodyMassKg, already computed above), against the same
+  // healthy-mass target as m̄ below. Shown for comparison only, same as the Formula
+  // Playground's read-only m row: water and glycogen move this one day to day, which is
+  // exactly why every plan figure below reads m̄ instead.
+  const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const mEl = document.getElementById('today-status-m-value');
+  mEl.classList.remove('income', 'expense');
+  const mText = bodyMassKg !== null ? `${bodyMassKg} / ${healthyMassKg} kg` : '—';
+  mEl.textContent = privacyMode ? maskDigits(mText) : mText;
+  if (bodyMassKg !== null) {
+    const mGood = bodyMassTargetIsDownward(entries) ? bodyMassKg <= healthyMassKg : bodyMassKg >= healthyMassKg;
+    mEl.classList.add(mGood ? 'income' : 'expense');
+  }
+
   // m̄ — the 7-day rolling average body mass (planBodyMassKg / smoothedBodyMassKg), the
   // same smoothed mass every plan identity runs on, shown against the plan's healthy body
   // mass (BODY_MASS_TARGET_KG). A water-heavy morning doesn't move it the way the raw
   // weigh-in would.
   const mBar = planBodyMassKg(entries);
-  const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
   const mBarEl = document.getElementById('today-status-mbar-value');
   mBarEl.classList.remove('income', 'expense');
   const mBarText = mBar !== null ? `${mBar} / ${healthyMassKg} kg` : '—';

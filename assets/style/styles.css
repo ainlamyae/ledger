@@ -1034,6 +1034,13 @@ td {
     border-top: 2px solid var(--color-text-muted);
 }
 
+/* One line per week in the Physique table (renderPhysiqueList, physique.js),
+   plus one line under the Pattern rows that always float to the top —
+   both mark "a new group of rows starts here" the same way. */
+#physique-table tr.physique-week-start td {
+    border-top: 2px solid var(--color-text);
+}
+
 /* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
    Duration/Cal workout goal (activity table), directly under the Total they're measured
    against. A target, not a measurement, so it's set off with a dashed top border instead
@@ -2733,8 +2740,12 @@ td .btn {
         font-size: .85rem;
     }
 
+    /* .25rem/.4rem used to compute to ~20px tall — under WCAG's 24px minimum
+       tap target, and tight enough that a row with several of these side by
+       side (✏️/📋/🧬/🗑️) risked a mis-tap landing on Delete. Sized to clear
+       that floor with a little room, not just barely pass it. */
     td .btn {
-        padding: .25rem .4rem;
+        padding: .5rem;
         font-size: .8rem;
         margin-right: .15rem;
     }

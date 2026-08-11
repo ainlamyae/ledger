@@ -5,9 +5,12 @@ const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 // wellness.js guarantees a consistent repeat answer regardless of the model.
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SEED = 42;
-// Llama 4 Scout is Groq's fastest vision-capable model — used only for the
-// food-photo scan path where image_url content is required.
-const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+// Groq's vision-capable model — used only for the food-photo/physique scan
+// path where image_url content is required. Llama 4 Scout (the previous
+// model here) was deprecated on Groq for free/dev-tier usage; Qwen 3.8 27B
+// is Groq's current vision model, so a scan click stopped erroring with
+// "model does not exist / no access" once this switched over.
+const GROQ_VISION_MODEL = 'qwen/qwen3.8-27b';
 
 // The free-text chat call every Health Insight mode makes: same model, key
 // guard and error shape all three used to hand-roll separately. Returns the

@@ -590,8 +590,6 @@ function setLastUpdated() {
 }
 
 async function loadDashboard(forceRefresh = false) {
-  const loading = document.getElementById('dashboard-loading');
-  loading.hidden = false;
   clearDashboardError();
 
   // Never throws (see loadSettings). Settings fetches concurrently with
@@ -689,8 +687,6 @@ async function loadDashboard(forceRefresh = false) {
     console.error('Failed to load dashboard data:', errors);
     showDashboardError(errors.join('; '));
   }
-
-  loading.hidden = true;
 }
 
 // Each panel's <h2> toggles its own content.

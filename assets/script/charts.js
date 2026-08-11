@@ -634,6 +634,15 @@ const SLEEP_TARGET_HOURS_DEFAULT = 8;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 const PROTEIN_TARGET_G_DEFAULT = 100;
 
+// Protein per kg of LEAN mass, not total mass — the band the Formula playground opens on.
+// 1.8-2.2 spans what the resistance-training literature supports for holding lean mass in
+// an energy deficit: Morton et al. 2018 (Br J Sports Med) puts the point above which
+// fat-free-mass gains stop accruing at ~1.6 g/kg total mass with a 2.2 upper confidence
+// bound, and Helms et al. 2014 recommends scaling to fat-free mass instead, which is what
+// makes 1.8-2.2 the same advice expressed against LBM.
+const PROTEIN_G_PER_KG_LBM_MIN_DEFAULT = 1.8;
+const PROTEIN_G_PER_KG_LBM_MAX_DEFAULT = 2.2;
+
 // Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 5.0 compound lifting, 7.0
 // jogging). Duplicates activity-estimator.js's EXERCISE_MET_DEFAULT rather than
 // referencing it: charts.js loads first, so that const is still in its dead zone.
@@ -712,11 +721,31 @@ function getProteinGPerKgBand() {
   return { low: Math.min(...ends), high: Math.max(...ends) };
 }
 
+// An absolute gram band, as the Formula playground's lean-mass protein rows write it.
+// Takes precedence over the g/kg band below: it is ALREADY a body mass times a per-kg
+// figure (p × LBM), so putting it back through a basis mass would double-count. Both
+// ends optional and sorted, same as the g/kg pair.
+function getProteinAbsoluteBandG() {
+  const ends = [
+    getSetting('PROTEIN_TARGET_G_MIN', null),
+    getSetting('PROTEIN_TARGET_G_MAX', null),
+  ].filter((n) => n !== null && n > 0);
+
+  if (ends.length === 0) return null;
+  return { min: Math.round(Math.min(...ends)), max: Math.round(Math.max(...ends)) };
+}
+
 // A band, not a point, because the evidence behind it is a range (1.6-2.0 g/kg).
 // Applied to TARGET body mass, not today's: scaling off current body mass would shrink the
 // target with every kg lost, exactly when protein matters most. Falls back to the
 // latest weigh-in, then to a zero-width band at the flat PROTEIN_TARGET_G.
 function getProteinTargetBandG(entries) {
+  // The lean-mass band first: it's the most specific thing on the sheet, and the only
+  // one whose grams were computed against a body-composition estimate rather than
+  // total mass.
+  const absolute = getProteinAbsoluteBandG();
+  if (absolute !== null) return absolute;
+
   const band = getProteinGPerKgBand();
   const basisBodyMassKg = band !== null
     ? (getSetting('BODY_MASS_TARGET_KG', null) ?? latestBodyMassKg(entries))
@@ -1243,6 +1272,17 @@ function estimatedFatMassKg(bodyMassKg, heightCm, age, sex) {
 // Energy stored in that fat mass, costed at fat's ~7,700 kcal/kg.
 function fatEnergyKcal(bodyMassKg, heightCm, age, sex) {
   return estimatedFatMassKg(bodyMassKg, heightCm, age, sex) * GENERIC_KCAL_PER_KG_FAT;
+}
+
+// Boer 1984 (Am J Physiol 247:F632): lean body mass (kg) from mass, height and sex —
+// the LBM equation clinical dosing uses, and the one that validates closest to DEXA in
+// a general population. Deliberately NOT m × (1 − bodyFat%) off the Deurenberg estimate
+// above: that route squares a BMI-only approximation, and Boer was regressed against
+// measured lean mass directly. Age doesn't enter it.
+function boerLeanBodyMassKg(bodyMassKg, heightCm, sex) {
+  return sex === 'male'
+    ? 0.407 * bodyMassKg + 0.267 * heightCm - 19.2
+    : 0.252 * bodyMassKg + 0.473 * heightCm - 48.3;
 }
 
 // Headroom around the plotted range. The floor keeps a window of nearly identical

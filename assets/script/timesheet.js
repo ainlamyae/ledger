@@ -293,7 +293,7 @@ function renderTimesheetList() {
 
   if (pageEntries.length === 0) {
     const message = allTimeEntries.length === 0
-      ? 'No time logged yet — click "Log a Day" above.'
+      ? 'No time logged yet — click "Log" in the panel heading above.'
       : 'No entries match this date range.';
     tbody.appendChild(renderEmptyRow(9, message));
   }

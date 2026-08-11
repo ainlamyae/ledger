@@ -888,7 +888,10 @@ function calorieTargetDetail(bodyMassKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
-  const weeklyFatLossKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
+  // Not getSetting directly: a pinned percentage makes the rate a function of the mass
+  // this is being evaluated at, which is what turns a fixed-kg plan into a proportional one
+  // everywhere at once — this tile, the per-day chart line, and the playground's preview.
+  const weeklyFatLossKg = weeklyFatLossKgAt(bodyMassKg);
 
   const haveAllInputs = bodyMassKg !== null && heightCm !== null && age !== null
     && (sex === 'male' || sex === 'female') && weeklyFatLossKg !== null;
@@ -903,6 +906,56 @@ function calorieTargetDetail(bodyMassKg) {
   const kcal = Math.round(bmr + activityKcal - (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7);
 
   return { kcal, bmr, activityKcal, weeklyFatLossKg };
+}
+
+// Δm as a share of body mass — the unit the safety literature is written in, and with
+// its inverse below the pair the playground's Δm/Δm% boxes read off each other. Here
+// rather than in the playground because the Health Plan prompt quotes the same figure.
+//
+// 0.5–1% of body mass per week is the usual sustainable range, and 1% the ceiling:
+// above it more of what comes off is lean mass, and the pace rarely holds. It's only
+// ever a verdict shown beside the box, never a limit — an aggressive target is the
+// user's call, exactly as calorieTargetDetail treats one.
+const WEEKLY_FAT_LOSS_PCT_FLOOR = 0.5;
+const WEEKLY_FAT_LOSS_PCT_CEILING = 1;
+
+function weeklyFatLossPct(weeklyFatLossKg, bodyMassKg) {
+  if (weeklyFatLossKg === null || bodyMassKg === null || bodyMassKg <= 0) return null;
+  return Math.round((weeklyFatLossKg / bodyMassKg) * 10000) / 100;
+}
+
+// The inverse. Three decimals, not two: 1% of 86.9 kg is 0.869 kg/week, and rounding
+// that to 0.87 reads back as 1.001% — the two boxes would disagree by a digit every
+// time one drove the other.
+function weeklyFatLossKgFromPct(pct, bodyMassKg) {
+  if (pct === null || bodyMassKg === null) return null;
+  return Math.round((pct / 100) * bodyMassKg * 1000) / 1000;
+}
+
+// PINNING THE PERCENTAGE: the third way to hold a plan steady, alongside
+// CALORIE_TARGET_FIXED_KCAL. Set it and the weekly kilograms are recomputed from every
+// new weigh-in as a share of THAT mass, so the pace stays proportional to the body doing
+// the losing instead of being a fixed number of kilograms.
+//
+// Its own key rather than a mode flag, and blank means unset, so both pins read the same
+// way: whichever key holds a number is the one in force. The two are mutually exclusive —
+// they answer the same question from opposite ends — which the playground enforces by
+// writing a blank into the other one whenever it sets either.
+const WEEKLY_FAT_LOSS_PCT_PIN_KEY = 'WEEKLY_FAT_LOSS_PCT';
+
+function pinnedWeeklyFatLossPct() {
+  return getSetting(WEEKLY_FAT_LOSS_PCT_PIN_KEY, null);
+}
+
+// The weekly rate in kg AT a given body mass — the one place the difference between the
+// two rate plans lives, so every reader of the rate gets the same answer. Unpinned it's
+// the flat WEEKLY_FAT_LOSS_KG this always read; pinned it's a share of that mass, so it
+// shrinks as you do. Body mass is an argument because the whole point is that the answer
+// depends on it, and Caloric Intake evaluates per day.
+function weeklyFatLossKgAt(bodyMassKg) {
+  const pct = pinnedWeeklyFatLossPct();
+  if (pct !== null && bodyMassKg !== null) return weeklyFatLossKgFromPct(pct, bodyMassKg);
+  return getSetting('WEEKLY_FAT_LOSS_KG', null);
 }
 
 function calculatedCalorieTargetKcal(bodyMassKg) {
@@ -977,7 +1030,9 @@ function getCalorieTargetKind(entries) {
     return targetKg < currentKg ? 'max' : 'min';
   }
 
-  const weeklyFatLossKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
+  // Only the sign is read, and a pinned percentage carries the same one — a negative rate
+  // is a lean bulk in either plan.
+  const weeklyFatLossKg = weeklyFatLossKgAt(currentKg);
   return (weeklyFatLossKg !== null && weeklyFatLossKg < 0) ? 'min' : 'max';
 }
 
@@ -2369,7 +2424,69 @@ function projectTargetDays({ intakeKcal, bodyMassKg, heightCm, age, sex, met, ta
   const days = (GENERIC_KCAL_PER_KG_FAT / b) * Math.log(ratio);
   const eta = new Date();
   eta.setDate(eta.getDate() + Math.round(days));
-  return { a, b, equilibriumKg, days, etaIso: isoFromDate(eta), status: 'ok' };
+  // decayPerKg is the coefficient of the exponential the chart draws, which for THIS
+  // journey is B itself. It's named separately because the proportional journey below
+  // decays at a rate that has nothing to do with maintenance, and both feed one curve.
+  return { a, b, decayPerKg: b, equilibriumKg, days, etaIso: isoFromDate(eta), status: 'ok', journey: 'intake' };
+}
+
+// The OTHER target trajectory: the one a pinned percentage describes. Δm = p·m/100 every
+// week, so the mass falls by a constant FRACTION rather than a constant number of
+// kilograms — m(t) = m × (1 − p/100)^(t/7), i.e. dm/dt = −k·m with k = −ln(1 − p/100)/7
+// per day. Returned in projectTargetDays' shape, with m∞ = 0, because the two are the same
+// exponential with different coefficients: one curve-drawing routine serves both.
+//
+// No plateau, and therefore no 'unreachable' for a real rate — a constant fraction off a
+// falling mass always crosses any positive target eventually, which is exactly what makes
+// this the one plan that can't stall short of the goal. A rate of zero or less is the only
+// thing that never arrives, and the caller keeps it out (see targetProjection).
+function projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct }) {
+  const base = { decayPerKg: 0, equilibriumKg: 0, journey: 'pct' };
+  if (Math.abs(bodyMassKg - targetKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG) {
+    return { ...base, status: 'reached' };
+  }
+
+  // Per DAY, from the per-week fraction: the weekly figure is what's set, but every
+  // consumer of this — the curve, the day count — works in days.
+  const kPerDay = -Math.log(1 - weeklyPct / 100) / 7;
+  const decayPerKg = kPerDay * GENERIC_KCAL_PER_KG_FAT;
+  const days = Math.log(bodyMassKg / targetKg) / kPerDay;
+  if (!Number.isFinite(days) || days <= 0) {
+    // There are only two ways a constant positive share never arrives, and neither is a
+    // plateau — so the reason travels with the result: the display has no equilibrium figure
+    // to describe here the way the constant-Eᵢₙ journey's 'unreachable' does.
+    return {
+      ...base,
+      status: 'unreachable',
+      reason: weeklyPct > 0
+        ? 'the target is not below your current body mass'
+        : 'a rate of 0% or less never moves the mass',
+    };
+  }
+
+  const eta = new Date();
+  eta.setDate(eta.getDate() + Math.round(days));
+  return { ...base, decayPerKg, days, etaIso: isoFromDate(eta), status: 'ok' };
+}
+
+// The target trajectory in whichever journey the pins currently describe — the single
+// entry point the chart and the Health Plan prompt both go through, so a pinned percentage
+// can't move the arrival date in one of them and not the other. A and B are merged in
+// either way: they describe maintenance, which is true regardless of which journey is
+// being walked, and the chart reads them for the rate note.
+//
+// pct > 0 only. A pinned zero or negative percentage is a hold or a bulk, and the
+// constant-Eᵢₙ form below already handles both — including reporting a target below the
+// plateau as unreachable, which the proportional form has no way to express.
+function targetJourneyProjection({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg }) {
+  const pct = pinnedWeeklyFatLossPct();
+  if (pct !== null && pct > 0) {
+    return {
+      ...maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa }),
+      ...projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct: pct }),
+    };
+  }
+  return projectTargetDays({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg });
 }
 
 // The same target trajectory from saved Settings rather than the playground's live inputs,
@@ -2380,7 +2497,7 @@ function targetProjectionFromSettings(entries, bodyMassKg, targetKg) {
   const sex = getSettingString('SEX', null);
   if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female')) return null;
 
-  return projectTargetDays({
+  return targetJourneyProjection({
     // Eᵢₙ itself: the calculated target is exactly what the playground computes.
     intakeKcal: getCalorieTargetKcal(entries),
     bodyMassKg,
@@ -2446,7 +2563,11 @@ function calcProjection(entries) {
   const targetProjection = targetProjectionFromSettings(entries, lastBodyMass, bodyMassTarget);
   if (targetProjection !== null && targetProjection.status !== 'reached') {
     decay = {
-      perKg: targetProjection.b,
+      // decayPerKg, not B: with the percentage pinned the curve decays at the rate the
+      // percentage sets, toward zero rather than toward a maintenance plateau. B is the
+      // right coefficient only for the constant-Eᵢₙ journey, which is why the projection
+      // hands back the one this curve should use rather than leaving it to be inferred.
+      perKg: targetProjection.decayPerKg,
       // No sleep factor: the target doesn't model sleep, and dividing ρ would move the
       // arrival date away from the playground's t.
       kcalPerKg: GENERIC_KCAL_PER_KG_FAT,
@@ -2902,11 +3023,14 @@ function energyBalanceColor(balance, isCut, target) {
   return (isCut ? balance <= target : balance >= target) ? '#16a34a' : '#9ca3af';
 }
 
-// The daily deficit WEEKLY_FAT_LOSS_KG implies — the playground's D, from the same
+// The daily deficit the weekly rate implies — the playground's D, from the same
 // fat-density constant so the two can't disagree. Already signed to this chart's
 // convention. Null at zero or unset, since a line on zero would retrace the axis.
-function targetBalanceKcal() {
-  const weeklyKg = getSetting('WEEKLY_FAT_LOSS_KG', null);
+//
+// Takes a body mass because a pinned percentage makes the rate depend on it; unpinned the
+// argument is ignored and this is the flat WEEKLY_FAT_LOSS_KG it always was.
+function targetBalanceKcal(bodyMassKg) {
+  const weeklyKg = weeklyFatLossKgAt(bodyMassKg);
   if (weeklyKg === null || weeklyKg === 0) return null;
   return -Math.round((weeklyKg * GENERIC_KCAL_PER_KG_FAT) / 7);
 }
@@ -2979,7 +3103,9 @@ function renderWellnessEnergyBalanceChart(entries) {
 
   // Folded into the axis range too, so the dashes can't fall off-plot on a stretch of
   // days that all undershot them.
-  const target = hasData ? targetBalanceKcal() : null;
+  // At the latest weigh-in, since a pinned percentage makes the deficit a function of body
+  // mass: one dashed line for the whole window, drawn at the rate today's mass implies.
+  const target = hasData ? targetBalanceKcal(latestBodyMassKg(entries)) : null;
 
   const maxDeficit = Math.max(0, ...values.map((v) => -v), target === null ? 0 : -target);
   const maxSurplus = Math.max(0, ...values, target === null ? 0 : target);

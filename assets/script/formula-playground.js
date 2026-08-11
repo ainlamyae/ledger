@@ -1,4 +1,4 @@
-// "Formula" in the Health Indicators heading: shows the daily calorie target as a
+// "Tune" in the Health Indicators heading: shows the daily calorie target as a
 // formula with its tunable inputs editable, recomputes as you type, and can write
 // the values back to the Settings tab.
 //
@@ -57,14 +57,22 @@ const FORMULA_SOLVE_FIELD_ID = {
 // formula-eta (the estimated-arrival date) always tracks formula-days: the two
 // are just two views of the same t, so they're always both typed or both
 // computed together — never listed separately below.
-const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-days', 'formula-eta'];
+// formula-weekly-loss-pct is on the list for the opposite reason to formula-eta: it's
+// never typed in DELTA_M mode, where Δm is the answer, so the percentage is an answer
+// too and the box has to go readonly with it.
+const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-days', 'formula-eta', 'formula-weekly-loss-pct'];
 
 // Which fields are computed in EIN and TARGET_MASS — fixed, unlike TAU and
 // DELTA_M below, which let you type either Eᵢₙ or t and compute whichever
 // you didn't touch.
+// FIXED_PCT is the one mode named for what it HOLDS rather than what it solves: Δm% is
+// the typed input and everything the rate feeds is computed from it — the kilograms, the
+// intake, and the day count. Which makes it EIN's twin, differing only in that Δm comes
+// from a share of body mass and the journey is proportional rather than constant-intake.
 const FORMULA_COMPUTED_IDS = {
   EIN: ['formula-ein', 'formula-days', 'formula-eta'],
   TARGET_MASS: ['formula-target'],
+  FIXED_PCT: ['formula-weekly-loss', 'formula-ein', 'formula-days', 'formula-eta'],
 };
 
 // For TAU and DELTA_M, either Eᵢₙ or t can be the known that drives the solve
@@ -73,6 +81,36 @@ const FORMULA_COMPUTED_IDS = {
 // match each mode's original, single-direction behavior until you type into
 // the other box: TAU opens on a typed Eᵢₙ, DELTA_M on a typed day count.
 const dualKnownField = { TAU: 'ein', DELTA_M: 'days' };
+
+// The same idea for Δm, which also has two boxes: kg/week and % of current body mass
+// per week. One quantity in two units, like t and its arrival date, so whichever you last
+// typed into is the known and the other is rewritten from it on every render.
+//
+// Two modes overrule the memory, in opposite directions: DELTA_M solves for Δm, so both
+// boxes are answers and neither is typed; FIXED_PCT is defined by holding the percentage,
+// so it's typed there whatever you last touched.
+let weeklyLossKnownField = 'kg';   // 'kg' | 'pct'
+
+function weeklyLossPctIsTyped() {
+  const mode = currentSolveFor();
+  if (mode === 'FIXED_PCT') return true;
+  if (mode === 'DELTA_M') return false;
+  return weeklyLossKnownField === 'pct';
+}
+
+function currentPinMode() {
+  return document.querySelector('input[name="formula-pin-mode"]:checked').value;
+}
+
+// The percentage in play this render: the typed one wherever the percentage is what's held,
+// otherwise the one the kilograms imply. Every consumer goes through this — the box, the
+// trace and the journey the day count is measured along — so the three can't quote
+// different rates, and none of them reads a box a keystroke behind the kilograms.
+function weeklyLossPctInPlay(weeklyLossKg, bodyMassKg) {
+  return weeklyLossPctIsTyped()
+    ? formulaNumber('formula-weekly-loss-pct')
+    : weeklyFatLossPct(weeklyLossKg, bodyMassKg);
+}
 
 // The selected radio's own field is always computed, plus exactly one of
 // {Eᵢₙ, t} — never both, never neither — for whichever this mode's OTHER
@@ -86,8 +124,8 @@ function computedIdsForMode(mode) {
   }
   if (mode === 'DELTA_M') {
     return dualKnownField.DELTA_M === 'ein'
-      ? ['formula-weekly-loss', 'formula-days', 'formula-eta']
-      : ['formula-weekly-loss', 'formula-ein'];
+      ? ['formula-weekly-loss', 'formula-weekly-loss-pct', 'formula-days', 'formula-eta']
+      : ['formula-weekly-loss', 'formula-weekly-loss-pct', 'formula-ein'];
   }
   return FORMULA_COMPUTED_IDS[mode];
 }
@@ -131,6 +169,8 @@ const FORMULA_EXPRESSION = `Resting metabolic rate — Mifflin-St Jeor (1990)
     BMR  =  10×m  +  6.25×h  −  5×a  +  σ
 Activity burn at the daily target — ACSM metabolic equation
     Eₐ   =  MET × m × τ × κ / ε
+Weekly fat loss as a share of body mass — 0.5–1%/week band
+    Δm%  =  100 × Δm / m
 Daily energy deficit implied by the weekly fat-loss target
     D    =  (Δm × ρ) / 7
 Target daily intake
@@ -143,6 +183,9 @@ Body mass at which Eᵢₙ becomes maintenance
 Exponential decay toward m∞, not linear loss
     m(t) =  m∞  +  (m − m∞) × e^(−B×t/ρ)
     t    =  (ρ / B) × ln[ (m − m∞) / (m_g − m∞) ]
+Proportional journey instead, when Δm% is what's held — no plateau, so no m∞
+    m(t) =  m × (1 − Δm%/100)^(t/7)
+    t    =  7 × ln(m / m_g) / −ln(1 − Δm%/100)
 Lean body mass — Boer (1984)
     LBM  =  0.407×m  +  0.267×h  −  19.2      (♂)
     LBM  =  0.252×m  +  0.473×h  −  48.3      (♀)
@@ -246,7 +289,12 @@ function readFormulaInputs() {
   if (heightCm !== null) overrides.HEIGHT_CM = heightCm;
   overrides.SEX = sex;
 
-  const preview = { ...overrides };
+  // The Δm box is the preview's only source of truth for the rate, so the pin key is
+  // blanked out of the overlay: a WEEKLY_FAT_LOSS_PCT already on the sheet would otherwise
+  // make calorieTargetDetail recompute the rate from the saved percentage and ignore what's
+  // typed here. Not blanked in `overrides` — what Save writes to that key is the pin
+  // fieldset's decision, not this function's.
+  const preview = { ...overrides, [WEEKLY_FAT_LOSS_PCT_PIN_KEY]: '' };
   if (age !== null) {
     preview.BIRTH_DATE = birthDateForAge(age);
     if (age !== ageFromBirthDate(getSettingString('BIRTH_DATE', null))) {
@@ -266,6 +314,14 @@ function readFormulaInputs() {
   const days = daysIsTyped ? formulaNumber('formula-days') : null;
   if (daysIsTyped && days === null) invalid.push('t (days)');
 
+  // FIXED_PCT is the only mode where the percentage is an INPUT, so it's the only one where
+  // a blank one is missing rather than merely not derived yet. Δm is reported blank by the
+  // loop above in every mode, but there it's the box you'd fill; here it's the one that
+  // can't be filled by hand, so naming the percentage is what points at the right box.
+  if (mode === 'FIXED_PCT' && formulaNumber('formula-weekly-loss-pct') === null) {
+    invalid.push('Δm% (weekly fat loss, % of body mass)');
+  }
+
   return { mode, overrides, preview, bodyMassKg, heightCm, age, sex, einKcal, days, invalid };
 }
 
@@ -277,16 +333,27 @@ function readFormulaInputs() {
 // never claims equals the typed Eᵢₙ); DELTA_M runs the TARGET_MASS half
 // backwards for m∞→Eᵢₙ, then continues on into BMR→Eₐ→D→Δm.
 // The lean-mass protein rows are appended here rather than by each mode: they're the same
-// three lines in all four, and `null` (a failed calorie solve) blanks the calorie half
+// three lines in all five, and `null` (a failed calorie solve) blanks the calorie half
 // while leaving them — nothing about LBM or the protein band depends on that solve. This
 // is also where the three protein BOXES are filled, so a shown figure and its shown
 // arithmetic always come from one read of the inputs.
 function renderFormulaSubstituted(rows) {
   const el = document.getElementById('formula-substituted');
   el.innerHTML = '';
-  // Guarded, and deliberately: this element is cleared above, so anything thrown while
-  // building the protein half would leave the whole trace — BMR, Eₐ, D, Eᵢₙ, A, B, m∞, t
-  // — blank, which is a far worse failure than three missing protein lines.
+  // Each derived half is guarded, and separately: this element is cleared above, so
+  // anything thrown while building one of them would leave the whole trace — BMR, Eₐ, D,
+  // Eᵢₙ, A, B, m∞, t — blank, which is a far worse failure than a few missing lines, and
+  // one throwing must not take the other's rows with it either.
+  //
+  // Δm% is filled here for a second reason: it's the Δm → % half of that pair, and this
+  // is the one function every mode reaches exactly once, failure paths included — so the
+  // percentage can never be left describing a previous render's kilograms.
+  let pctRows = [];
+  try {
+    pctRows = renderWeeklyLossPctField();
+  } catch (err) {
+    console.error('Weekly fat-loss percentage failed to render', err);
+  }
   let proteinRows = [];
   try {
     proteinRows = renderProteinFields();
@@ -294,7 +361,7 @@ function renderFormulaSubstituted(rows) {
     console.error('Protein band failed to render', err);
   }
 
-  [...(rows ?? []), ...proteinRows].forEach(([label, value]) => {
+  [...(rows ?? []), ...pctRows, ...proteinRows].forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
@@ -339,7 +406,10 @@ function renderFormulaDaysField(proj) {
   if (proj.status === 'unreachable') {
     setComputedField('formula-days', '');
     setEtaDate('');
-    setEtaNote(`never — plateaus at ${Math.round(proj.equilibriumKg * 10) / 10} kg`);
+    // A proportional journey has no plateau to name, so it carries its own reason instead.
+    setEtaNote(proj.journey === 'pct'
+      ? `never — ${proj.reason}`
+      : `never — plateaus at ${Math.round(proj.equilibriumKg * 10) / 10} kg`);
     return;
   }
   setComputedField('formula-days', String(Math.round(proj.days)));
@@ -378,7 +448,7 @@ function solveBForTypedDays({ deficit, massToLose, t, rho }) {
 // LBM and the protein band it implies, from whatever m, h and σ currently read — or
 // null when any of the four numbers it needs is missing. Solving for something else
 // never changes this: no calorie identity involves protein, so it's the one block here
-// that's the same in all four modes.
+// that's the same in all five modes.
 //
 // Boer takes the CURRENT body mass, not m_g, and what Save writes is the resulting
 // grams rather than a per-kg rule. That's what keeps the target from sliding down as
@@ -441,7 +511,115 @@ function renderProteinFields() {
   ];
 }
 
+// Δm% → Δm, run before anything reads the kg box so every mode below — and Save, which
+// persists WEEKLY_FAT_LOSS_KG — sees the kilograms the typed percentage implies at the
+// CURRENT body mass. That's the point of driving it from this end: 1% keeps meaning 1%
+// as m changes, instead of freezing the kilograms it happened to mean when you typed it.
+//
+// Written raw rather than through setComputedField, unlike every other derived figure
+// here: the kg box is a settings-backed input read unconditionally by readFormulaInputs,
+// and a privacy-masked placeholder in it would report WEEKLY_FAT_LOSS_KG invalid and
+// disable Save. loadFormulaInputsFromSettings fills the same box unmasked for the same
+// reason.
+function syncWeeklyLossFromPct() {
+  if (!weeklyLossPctIsTyped()) return;
+  const kg = weeklyFatLossKgFromPct(formulaNumber('formula-weekly-loss-pct'), formulaNumber('formula-body-mass'));
+  if (kg === null) return;
+  document.getElementById('formula-weekly-loss').value = String(kg);
+}
+
+// Which journey this render's day count describes. The proportional one whenever the
+// percentage is the thing being held — either because FIXED_PCT is the mode (that's its
+// premise) or because the pin fieldset says so, which is what the SAVED plan will do, so
+// the playground's t and the Body Mass chart's forecast stay one figure.
+//
+// Only the forward direction (rate + m_g → t) can follow the pin. TARGET_MASS, and
+// TAU/DELTA_M when a day count is typed, run the constant-Eᵢₙ algebra backwards to derive
+// an input from a t you asserted — a question that only exists in that model, since under
+// a proportional journey the rate is set by the percentage and neither τ nor Eᵢₙ moves the
+// date at all. Those three keep their own meaning and are left alone.
+function formulaJourneyIsProportional() {
+  return currentSolveFor() === 'FIXED_PCT' || currentPinMode() === 'pct';
+}
+
+// The forecast, in that journey. A percentage of zero or less has no proportional arrival
+// to compute — the mass never falls — so it drops back to the constant-Eᵢₙ form, which
+// reports a hold or a gain properly instead of dividing by a zero rate.
+function formulaProjection(args, weeklyPct) {
+  if (formulaJourneyIsProportional() && weeklyPct !== null && weeklyPct > 0) {
+    return projectTargetDaysAtFixedPct({
+      bodyMassKg: args.bodyMassKg, targetKg: args.targetKg, weeklyPct,
+    });
+  }
+  return projectTargetDays(args);
+}
+
+// The t line of the trace, in whichever journey produced it — one builder rather than the
+// same template string written out at each mode's end, since there are now two forms of it
+// and three places that print one.
+function formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }) {
+  if (proj.status !== 'ok') return [];
+  if (proj.journey === 'pct') {
+    // No m∞ in it anywhere: a proportional journey has no plateau, which is why this form
+    // can't report a target as unreachable and the other one can.
+    return [['t', `7 × ln(${bodyMassKg} / ${targetKg}) / −ln(1 − ${weeklyPct}/100)  =  ${Math.round(proj.days)} days`]];
+  }
+  return [['t', `(7700 / ${bRounded}) × ln[(${bodyMassKg} − ${eqRounded}) / (${targetKg} − ${eqRounded})]  =  ${Math.round(proj.days)} days`]];
+}
+
+// Where a rate sits against the 0.5–1%/week band, for the substituted trace and the box's
+// own colour — deliberately NOT the unit column, which says `%/week` and only that, the
+// same as every other row. `over` is the only state that reads as a warning: under the
+// floor is merely slow, and a negative rate is a deliberate lean bulk
+// (calorieTargetDetail supports one), not a mistake.
+function weeklyLossPctVerdict(pct) {
+  if (pct > WEEKLY_FAT_LOSS_PCT_CEILING) {
+    return { text: `above the ${WEEKLY_FAT_LOSS_PCT_CEILING}%/week ceiling`, over: true };
+  }
+  if (pct >= WEEKLY_FAT_LOSS_PCT_FLOOR) {
+    return { text: `in the ${WEEKLY_FAT_LOSS_PCT_FLOOR}–${WEEKLY_FAT_LOSS_PCT_CEILING}%/week band`, over: false };
+  }
+  if (pct > 0) return { text: `under the ${WEEKLY_FAT_LOSS_PCT_FLOOR}%/week floor`, over: false };
+  if (pct === 0) return { text: 'maintenance', over: false };
+  return { text: 'a surplus, not a deficit', over: false };
+}
+
+// The Δm% box and the trace row for the identity — always as a pair, so the percentage
+// shown and the arithmetic behind it come from a single read. Δm comes off its box rather
+// than being passed in: by the time the trace is built that box holds this render's value
+// in every mode — typed in three of them, and freshly solved in DELTA_M.
+//
+// The verdict goes in the trace line and the box's own colour, nowhere else: the unit
+// column reads `%/week` and stops there, like every other row's.
+function renderWeeklyLossPctField() {
+  const bodyMassKg = formulaNumber('formula-body-mass');
+  const weeklyLossKg = formulaNumber('formula-weekly-loss');
+  const derivedPct = weeklyFatLossPct(weeklyLossKg, bodyMassKg);
+  const pctIsTyped = weeklyLossPctIsTyped();
+  const pct = weeklyLossPctInPlay(weeklyLossKg, bodyMassKg);
+  const pctEl = document.getElementById('formula-weekly-loss-pct');
+
+  // Blank rather than a dash when there's no body mass to be a share of: which box is
+  // empty already says why, and #formula-profile-note is reporting it for the solve too.
+  if (pct === null) {
+    if (!pctIsTyped) setComputedField('formula-weekly-loss-pct', '');
+    pctEl.classList.remove('formula-pct-over');
+    return [];
+  }
+
+  if (!pctIsTyped) setComputedField('formula-weekly-loss-pct', String(pct));
+  const verdict = weeklyLossPctVerdict(pct);
+  pctEl.classList.toggle('formula-pct-over', verdict.over);
+
+  // Always the 100×Δm/m direction, whichever box was typed — the kilograms are what the
+  // rest of the arithmetic below actually used, so tracing them back is the honest line
+  // even when a percentage produced them.
+  if (derivedPct === null) return [];
+  return [['Δm%', `100 × ${weeklyLossKg} / ${bodyMassKg}  =  ${derivedPct} %/week — ${verdict.text}`]];
+}
+
 function renderFormulaPreview() {
+  syncWeeklyLossFromPct();
   const { mode, preview, bodyMassKg, heightCm, age, sex, einKcal, days, invalid } = readFormulaInputs();
   const noteEl = document.getElementById('formula-profile-note');
   const saveBtn = document.getElementById('formula-save-btn');
@@ -484,16 +662,21 @@ function renderFormulaPreview() {
   noteEl.textContent = '';
   saveBtn.disabled = false;
 
-  if (mode === 'EIN') {
-    // τ, MET, κ, Δm, m_g are all typed; Eᵢₙ and t both follow.
+  // One branch for two modes, because the arithmetic IS the same: τ, MET, κ, Δm and m_g are
+  // typed and Eᵢₙ and t both follow. FIXED_PCT differs only in where Δm came from — a share
+  // of body mass rather than a figure typed in kilograms, already converted into the kg box
+  // by syncWeeklyLossFromPct — and in the journey its t is measured along, which
+  // formulaProjection decides for both.
+  if (mode === 'EIN' || mode === 'FIXED_PCT') {
     const tau = preview.ACTIVITY_TARGET_MIN;
+    const targetKg = preview.BODY_MASS_TARGET_KG;
     const detail = withFormulaOverrides(preview, () => calorieTargetDetail(bodyMassKg));
     if (detail === null) { cantCompute(); return; }
+    const weeklyPct = weeklyLossPctInPlay(detail.weeklyFatLossKg, bodyMassKg);
     const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
-    const proj = projectTargetDays({
-      intakeKcal: detail.kcal, bodyMassKg, heightCm, age, sex, met, tau, kappa,
-      targetKg: preview.BODY_MASS_TARGET_KG,
-    });
+    const proj = formulaProjection({
+      intakeKcal: detail.kcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg,
+    }, weeklyPct);
     setComputedField('formula-ein', String(Math.round(detail.kcal)));
     renderFormulaDaysField(proj);
 
@@ -505,13 +688,18 @@ function renderFormulaPreview() {
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
       ['D', `${detail.weeklyFatLossKg} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
       ['Eᵢₙ', `${Math.round(detail.bmr)} + ${Math.round(detail.activityKcal)} − ${Math.round(deficit)}  =  ${detail.kcal} kcal/day`],
-      ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-      ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
-      ['m∞', `(${detail.kcal} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
     ];
-    if (proj.status === 'ok') {
-      rows.push(['t', `(7700 / ${bRounded}) × ln[(${bodyMassKg} − ${eqRounded}) / (${preview.BODY_MASS_TARGET_KG} − ${eqRounded})]  =  ${Math.round(proj.days)} days`]);
+    // A, B and m∞ are the constant-intake journey's plateau. On the proportional one nothing
+    // holds Eᵢₙ still and there is no plateau, so printing them would trace a journey this
+    // t was never measured along — the same reason TARGET_MASS omits BMR/Eₐ/D.
+    if (proj.journey !== 'pct') {
+      rows.push(
+        ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
+        ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+        ['m∞', `(${detail.kcal} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
+      );
     }
+    rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }));
     renderFormulaSubstituted(rows);
     return;
   }
@@ -546,9 +734,13 @@ function renderFormulaPreview() {
     // implies via the same flat equation the 'ein' direction runs forward.
     const einForDisplay = knownField === 'ein' ? einKcal : (bmr + activityKcal - deficit);
 
-    const proj = projectTargetDays({
-      intakeKcal: einForDisplay, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg,
-    });
+    // Pin-aware only in the Eᵢₙ-known direction, where t is computed forward from the rate.
+    // The other direction SOLVED τ from a typed t through the constant-Eᵢₙ decay identity
+    // (solveBForTypedDays), so its projection has to be read in that same model — a
+    // proportional t here would contradict the very day count τ was fitted to.
+    const weeklyPct = weeklyLossPctInPlay(deltaM, bodyMassKg);
+    const projArgs = { intakeKcal: einForDisplay, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg };
+    const proj = knownField === 'ein' ? formulaProjection(projArgs, weeklyPct) : projectTargetDays(projArgs);
     if (knownField === 'ein') {
       renderFormulaDaysField(proj);
     } else {
@@ -570,13 +762,15 @@ function renderFormulaPreview() {
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ['D', `${deltaM} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
       ['Eᵢₙ', `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(deficit)}  =  ${Math.round(einForDisplay)} kcal/day`],
-      ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-      ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
-      ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
     );
-    if (proj.status === 'ok') {
-      rows.push(['t', `(7700 / ${bRounded}) × ln[(${bodyMassKg} − ${eqRounded}) / (${targetKg} − ${eqRounded})]  =  ${Math.round(proj.days)} days`]);
+    if (proj.journey !== 'pct') {
+      rows.push(
+        ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
+        ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+        ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
+      );
     }
+    rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }));
     renderFormulaSubstituted(rows);
     return;
   }
@@ -645,9 +839,15 @@ function renderFormulaPreview() {
     // Eᵢₙ was given; t follows the same way it does in EIN/TAU's ein-known
     // direction — a real projection, so it can carry the "already there" /
     // "never" statuses too.
-    const proj = projectTargetDays({
+    //
+    // The percentage passed is the one the JUST-SOLVED Δm implies, not the box's: this mode
+    // computes the rate, so the box is a render behind until renderWeeklyLossPctField
+    // catches it up below. With the percentage pinned, that solved rate expressed as a share
+    // of today's mass is exactly what the pin would hold, so the journey is its own.
+    const weeklyPct = weeklyFatLossPct(deltaMSolved, bodyMassKg);
+    const proj = formulaProjection({
       intakeKcal: einForDisplay, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg,
-    });
+    }, weeklyPct);
     renderFormulaDaysField(proj);
 
     renderFormulaSubstituted([
@@ -655,10 +855,12 @@ function renderFormulaPreview() {
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ['D', `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(einForDisplay)}  =  ${Math.round(deficit)} kcal/day`],
       ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
-      ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-      ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
-      ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
-      ...(proj.status === 'ok' ? [['t', `(7700 / ${bRounded}) × ln[(${bodyMassKg} − ${eqRounded}) / (${targetKg} − ${eqRounded})]  =  ${Math.round(proj.days)} days`]] : []),
+      ...(proj.journey === 'pct' ? [] : [
+        ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
+        ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+        ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
+      ]),
+      ...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }),
     ]);
     return;
   }
@@ -698,6 +900,14 @@ function loadFormulaInputsFromSettings() {
   // Eᵢₙ and t are never seeded here — every mode either computes them itself on
   // the render that follows, or (TARGET_MASS) leaves whatever day count was
   // already typed in place.
+  //
+  // Δm% likewise: normally it's derived from the kg box on that same render. The exception
+  // is a pinned percentage, where IT is the saved authority and the kilograms are what get
+  // derived — WEEKLY_FAT_LOSS_KG on the sheet is then only the figure the last save's body
+  // mass happened to imply. Written only in that case, so a save from a session where the
+  // percentage was being typed doesn't blank the box it's typed into.
+  const pinnedPct = pinnedWeeklyFatLossPct();
+  if (pinnedPct !== null) document.getElementById('formula-weekly-loss-pct').value = pinnedPct;
 }
 
 function openFormulaPlayground() {
@@ -709,9 +919,16 @@ function openFormulaPlayground() {
   // one was last typed into in a previous session.
   dualKnownField.TAU = 'ein';
   dualKnownField.DELTA_M = 'days';
-  // Set from what's actually on the sheet, so the pair always shows the live
-  // state rather than defaulting to one and inviting an accidental switch.
-  const pinMode = pinnedCalorieTargetKcal() !== null ? 'intake' : 'deficit';
+  // Same fresh start for the Δm pair — 'kg' unless the percentage is the pinned quantity,
+  // in which case it's the one on the sheet and the kilograms are what follow from it.
+  weeklyLossKnownField = pinnedWeeklyFatLossPct() !== null ? 'pct' : 'kg';
+  // Set from what's actually on the sheet, so the trio always shows the live state rather
+  // than defaulting to one and inviting an accidental switch. The two pinnable keys are
+  // mutually exclusive (Save blanks one whenever it writes the other), so this reads them
+  // in a fixed order rather than trying to reconcile a sheet holding both.
+  const pinMode = pinnedWeeklyFatLossPct() !== null
+    ? 'pct'
+    : (pinnedCalorieTargetKcal() !== null ? 'intake' : 'deficit');
   document.querySelector(`input[name="formula-pin-mode"][value="${pinMode}"]`).checked = true;
   const activityPinMode = pinnedActivityTargetKcal() !== null ? 'calorie' : 'time';
   document.querySelector(`input[name="formula-activity-pin-mode"][value="${activityPinMode}"]`).checked = true;
@@ -734,20 +951,33 @@ async function saveFormulaSettings() {
   const { overrides, invalid, bodyMassKg } = readFormulaInputs();
   if (invalid.length) return;
 
-  // Two ways to hold a plan steady, and they're mutually exclusive: pinning the
-  // intake writes the shown Eᵢₙ, pinning the deficit writes a blank — which is
-  // how the setting gets cleared, since getSetting reads an empty cell as unset
-  // and WEEKLY_FAT_LOSS_KG (saved with the rest of these inputs) is what the
-  // deficit is then held at. Only written when it's changing, so a save from the
-  // default mode doesn't add a blank row to a sheet that never had one.
-  const pinned = document.querySelector('input[name="formula-pin-mode"]:checked').value === 'intake';
+  // THREE ways to hold a plan steady, and each excludes the other two: pinning the intake
+  // writes the shown Eᵢₙ, pinning the percentage writes the shown Δm%, and pinning the
+  // deficit writes a blank into both — which is how either setting gets cleared, since
+  // getSetting reads an empty cell as unset and WEEKLY_FAT_LOSS_KG (saved with the rest of
+  // these inputs) is what the deficit is then held at. Each key is only written when it's
+  // changing, so a save from the default mode doesn't add two blank rows to a sheet that
+  // never had either.
+  const pinMode = currentPinMode();
+  const pinned = pinMode === 'intake';
+  const pctPinned = pinMode === 'pct';
   const einKcal = formulaEinKcal();
   if (pinned && einKcal === null) {
     showFieldError('formula-status', "Can't pin a daily intake while Eᵢₙ has no value — fill the other inputs in first, or pin the deficit instead.");
     return;
   }
+  // Off the box, like the intake pin reads Eᵢₙ off its own: what gets pinned is the figure
+  // on screen, whether it was typed there or derived from the kilograms.
+  const pctToPin = formulaNumber('formula-weekly-loss-pct');
+  if (pctPinned && pctToPin === null) {
+    showFieldError('formula-status', "Can't pin a fat-loss percentage while Δm% has no value — it needs a body mass and a weekly rate, or pin the deficit instead.");
+    return;
+  }
   if (pinned || pinnedCalorieTargetKcal() !== null) {
     overrides[CALORIE_TARGET_PIN_KEY] = pinned ? einKcal : '';
+  }
+  if (pctPinned || pinnedWeeklyFatLossPct() !== null) {
+    overrides[WEEKLY_FAT_LOSS_PCT_PIN_KEY] = pctPinned ? pctToPin : '';
   }
 
   // Same shape, for the activity target instead of daily intake: pinning the calorie
@@ -793,9 +1023,12 @@ async function saveFormulaSettings() {
     applySolveForMode(currentSolveFor());
     renderFormulaPreview();
     statusEl.classList.add('status-ok');
-    const intakeNote = pinned
-      ? `Daily intake is pinned at ${einKcal} kcal and no longer moves with your body mass.`
-      : 'The deficit is what stays fixed; the Caloric Intake chart and the forecast now use these.';
+    let intakeNote = 'The deficit is what stays fixed; the Caloric Intake chart and the forecast now use these.';
+    if (pinned) {
+      intakeNote = `Daily intake is pinned at ${einKcal} kcal and no longer moves with your body mass.`;
+    } else if (pctPinned) {
+      intakeNote = `Fat loss is pinned at ${pctToPin}% of body mass a week, so the kilograms per week — and the intake that delivers them — are recalculated at every weigh-in, and the forecast now follows the proportional journey.`;
+    }
     const activityNote = activityPinned
       ? `Activity burn is pinned at ${activityKcalToPin} kcal/day — the activity tile and chart now show the minutes that takes, rising as your body mass falls.`
       : 'Activity time (τ) is what stays fixed on the activity target; the calorie burn it implies falls as your body mass does.';
@@ -816,11 +1049,25 @@ function initFormulaPlayground() {
   // a button inside it would close the panel on the way to opening the modal.
   document.getElementById('formula-playground-btn').addEventListener('click', openFormulaPlayground);
 
-  [...FORMULA_FIELDS.map((f) => f.inputId), ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
+  // Δm is left out here and wired with Δm% below: both have to record which of the pair
+  // is the known BEFORE the render, and a plain render-only listener firing first would
+  // let the previous known overwrite the box being typed into.
+  [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss'),
+    ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
     'formula-body-mass', 'formula-height', 'formula-age'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderFormulaPreview);
   });
   document.getElementById('formula-sex').addEventListener('change', renderFormulaPreview);
+
+  // Either box can be the one you fill in; typing into it makes it the known and pushes
+  // the other one. No mode check needed: in DELTA_M both are readonly, and a readonly
+  // input fires no input event.
+  [['formula-weekly-loss', 'kg'], ['formula-weekly-loss-pct', 'pct']].forEach(([id, field]) => {
+    document.getElementById(id).addEventListener('input', () => {
+      weeklyLossKnownField = field;
+      renderFormulaPreview();
+    });
+  });
 
   // Typing into Eᵢₙ or t marks it as the known driving TAU/DELTA_M's solve
   // (see dualKnownField) before reapplying which field looks computed and
@@ -857,7 +1104,25 @@ function initFormulaPlayground() {
 
   document.querySelectorAll('input[name="formula-solve-for"]').forEach((radio) => {
     radio.addEventListener('change', () => {
+      // Holding the percentage and pinning it are one decision, so picking the mode picks
+      // the pin — otherwise a plan built here would be saved as a fixed-kilogram one and
+      // the app would immediately stop doing what the modal just showed. The reverse isn't
+      // forced: the pin is about the saved plan and applies in every mode.
+      if (currentSolveFor() === 'FIXED_PCT') {
+        document.querySelector('input[name="formula-pin-mode"][value="pct"]').checked = true;
+      }
       applySolveForMode(currentSolveFor());
+      clearFieldError('formula-status');
+      renderFormulaPreview();
+    });
+  });
+
+  // The pin fieldset used to be Save-only state. It isn't any more: pinning the percentage
+  // changes which journey t is measured along, so the preview has to re-render with it —
+  // and the percentage becomes the held quantity, which is what pinning it means.
+  document.querySelectorAll('input[name="formula-pin-mode"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (currentPinMode() === 'pct') weeklyLossKnownField = 'pct';
       clearFieldError('formula-status');
       renderFormulaPreview();
     });

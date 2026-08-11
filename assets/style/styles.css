@@ -2727,6 +2727,17 @@ td .btn {
     font-weight: 600;
 }
 
+/* Δm% above the 1%/week ceiling. The colour is the whole warning — the unit column stays
+   `%/week` like every other row's, and the words are in the substituted trace. Must sit
+   after the read-only block above: same specificity, so source order is what lets an
+   over-ceiling figure stay red in Solve-for-weekly-fat-loss, where the box is also
+   readonly. Not an invalid value — nothing here is blocked, so no error background. */
+.formula-row input.formula-pct-over {
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
 .formula-inputs {
     margin-bottom: 1rem;
 }
@@ -2770,10 +2781,10 @@ td .btn {
     opacity: .85;
 }
 
-/* The list runs to 18 variables, so each row's height is paid 18 times: the boxes carry
+/* The list runs to 20 variables, so each row's height is paid 20 times: the boxes carry
    the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) but give
    up the vertical padding and the inherited line-height around it, which is where a
-   field's height actually comes from. ~9px a row, ~160px off the modal. */
+   field's height actually comes from. ~9px a row, ~180px off the modal. */
 .formula-row input,
 .formula-row select {
     width: 100%;

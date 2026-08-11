@@ -127,7 +127,7 @@ function renderApplicationsList() {
 
   if (filtered.length === 0) {
     const message = allApplications.length === 0
-      ? 'No applications yet — click "Log an Application" to get started.'
+      ? 'No applications yet — click "Log" in the panel heading to get started.'
       : 'No applications match your search.';
     const empty = document.createElement('div');
     empty.className = 'empty-state';

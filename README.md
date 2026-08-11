@@ -57,7 +57,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Modals are full-width on phones; cards cap at a fixed column width on wide screens.
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
 - **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it — Log a Day, Add Ingredient, Log a Transaction, Add Account, Log Time, Add Setting and the rest. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
-- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work Log, Travel Insights into Travel Log, Protein Source Rotation into Health Indicators.
+- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicators.
 - **Panel groups** — Health, Finances, Other; each nav link expands its whole group.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
@@ -93,7 +93,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. (Named for its modal rather than "Log a Day", which collided with Physique's button of the same name.)
 - Company autocompletes and defaults to the most recently logged one.
 - Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
-- One **Work Log** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
+- One **Work** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
   - Arrival, Departure and Hours Worked histograms with normal-curve overlays, plus Daily Hours Average by period.
   - **Overtime summary** — net time beyond an 8h/day pace, broken out Total/Year/Month/Week.
   - The table itself — date range, sortable, computed Duration, inline edit, paginated.
@@ -102,7 +102,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 - Four tiles: **Max/Min Calory Intake**, **Activity**, **Protein**, **Sleep**.
 - Each reads `actual / target unit`, green on the right side of the figure, red otherwise, grey when nothing's logged.
-- Activity also restates its target in kcal — `— / 100 min = 394 kcal` — from the same `activityTargetKcal` the calorie target uses.
+- Activity also restates its target in kcal — `— / 100 min → 394 kcal` — from `getActivityTargetKcal`, the same pin-aware figure the Physical Activity chart's target line uses.
 - The Calories heading carries which side of the target it is (max or min), since the number alone can't say it.
 - Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
 
@@ -144,10 +144,14 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - **Pin target deficit/fat loss** (default) — holds your pace. Every weigh-in recalculates the intake that delivers it, so calories fall as you lighten. A straight line to the goal.
   - **Pin target daily intake** — holds the calorie number. Maintenance falls as you lighten, so the deficit shrinks and loss decelerates. This is the constant-Eᵢₙ journey `projectTargetDays` actually solves, so pinning it is what makes the number you eat and the date you're shown the same plan.
   - They write one setting from opposite ends: intake saves Eᵢₙ to `CALORIE_TARGET_FIXED_KCAL`, deficit saves a blank (read as unset), so switching back needs no row deleted. The key is only written when the mode changes. On a 94 → 82 kg example at 0.5 kg/week the two arrive ~168 vs ~207 days apart — same goal, different journey.
+- A second, independent pin does the same thing for the **activity target** itself, not daily intake:
+  - **Pin target activity time** (default) — holds τ, the minutes. The calorie burn it implies (`Eₐ`) falls as you lighten, since the same minutes move less body mass.
+  - **Pin target calorie burn** — holds `Eₐ`. The minutes needed to reach it rise as you lighten instead.
+  - Saved to `ACTIVITY_TARGET_FIXED_KCAL`, the same opposite-ends shape as the intake pin: pinning the burn writes the `Eₐ` the currently typed τ/MET/body-mass imply, unpinning writes a blank. It only affects the activity tile, the Physical Activity chart's target line/dot colour and Activity Insight's stated target — it deliberately leaves `calorieTargetDetail`/the forecast alone, the same way the intake pin leaves those to their own dial.
 
 ### Health — Health Insight (AI)
 
-- One panel, three modes: **Wellness**, **Food**, **Activity**.
+- One panel, four modes: **Wellness**, **Food**, **Activity**, **Protein Sources**.
 - **Nothing is computed until a mode button is clicked** — page load does no aggregation at all.
 - Clicking a mode shows a preview of exactly what would be sent; Send to AI sends that same data.
 - All modes prepend the same age/sex/height/body mass/BMI profile block, shown on screen.
@@ -161,6 +165,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - Non-resistance types (a walk, a swim) are **summarised, not listed per day** — one row each with days logged and the range/average of minutes, kcal and steps. Repeating a daily walk for every date buried the sessions that differ.
   - The split is by content, not by name: a type is routine when nothing logged under it carries reps.
   - Minutes are **net active time**, not session wall-clock. The system prompt says so explicitly and tells the model to judge training by rep volume and muscle coverage — an 8-minute resistance session is a real one, and "spend more minutes" is never the advice.
+- **Protein Sources** — reuses `computeProteinRotationRows` (Protein Source Rotation, below) directly, so this mode's figures can never disagree with that chart: every tracked ingredient's own target share of the protein target vs. the share actually eaten in range, grouped by classification, largest shortfall first.
+  - The target percentages are the user's own rotation plan, not a nutritional prescription — the system prompt tells the model to judge how well actual eating matched the mix, not to second-guess the mix itself.
 - Reports render as plain text without `innerHTML` (untrusted model output) and persist per mode.
 
 ### Health — Protein Source Rotation
@@ -225,7 +231,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ### Other
 
-- **Travel** — one Travel Log panel: Time Spent by Country flag tiles and a Countries Visited choropleth above the sortable table they're derived from.
+- **Travel** — one Travel panel: Time Spent by Country flag tiles and a Countries Visited choropleth above the sortable table they're derived from.
 - **Applications** — immigration/visa applications as expandable cards, grouped Ongoing/Closed.
 - **Contacts** — searchable, paginated list; bulk export (Google/Outlook CSV), delete and merge.
 - **Settings** — Key/Value/Notes table for the `Settings` tab, applied to live widgets without a reload.
@@ -340,7 +346,7 @@ flowchart TD
     TSWrite --> TSReminder["checkTimesheetReminder() re-evaluates<br/>the banner, scoped to whichever<br/>company was last logged on/before today"]
     TSReminder --> Idle
 
-    Idle --> TravelFlow["Travel Log views<br/>(derived, no extra API call)"]
+    Idle --> TravelFlow["Travel views<br/>(derived, no extra API call)"]
     TravelFlow --> TravelDerive["Pair each Arrival with its<br/>closing Departure (open-ended<br/>final Arrival = ongoing, to today)<br/>→ Time Spent by Country tiles +<br/>Countries Visited choropleth"] --> Idle
 
     Idle --> Calc["Calculate<br/>Physique day form, or bulk over selected days"]
@@ -397,7 +403,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 12 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
 | 13 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
 | 14 | `accounts.js` | Account Summary: balances, CRUD |
-| 15 | `timesheet.js` | Work Log, holiday/missed detection, analytics data, reminder banner |
+| 15 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
 | 16 | `csv.js` | CSV import, advanced filter engine, download helper |
 | 17 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
 | 18 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
@@ -405,18 +411,19 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 20 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
 | 21 | `contacts.js` | Contact List, CRUD, bulk export/delete/merge |
 | 22 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
-| 23 | `travel.js` | Travel Log CRUD; feeds country-days and the choropleth |
+| 23 | `travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
 | 24 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
 | 25 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
 | 26 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
 | 27 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 28 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
-| 29 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 30 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, save back to `Settings`, and the deficit/intake pin |
-| 31 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 32 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
-| 33 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
-| 34 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 28 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
+| 29 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 30 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 31 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, save back to `Settings`, and the deficit/intake and time/calorie-burn pins |
+| 32 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 33 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
+| 34 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
+| 35 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
 ### Data Flow
 
@@ -661,6 +668,9 @@ activityEntryKcal(entry)  = entry.amount2                    if logged
 
 BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)
 activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)
+getActivityTargetKcal(kg) = ACTIVITY_TARGET_FIXED_KCAL, if set, else activityTargetKcal(kg)
+getActivityTargetMin(kg)  = ACTIVITY_TARGET_FIXED_KCAL / metKcal(ACTIVITY_MET, kg, 1), if set and kg known
+                          = ACTIVITY_TARGET_MIN                                        otherwise
 ```
 
 **Calorie target** — one number per day, directional rather than a point to land on (a ceiling heading down, a floor heading up):
@@ -675,7 +685,8 @@ target = round( BMR + activityTargetKcal − (WEEKLY_FAT_LOSS_KG × 7700) / 7 )
 - **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Formula Playground's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's Eᵢₙ — instead of being recalculated from each weigh-in. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
 - The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant Eᵢₙ — so pinning is also what makes the target you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
 - Max when target < current, min when target > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
-- `activityTargetKcal` is also what the Activity glance tile shows after its `=`.
+- Uses the raw, pin-blind `activityTargetKcal` — same as the Formula Playground's own live preview — so a pinned activity calorie-burn target (below) doesn't move today's calorie-intake figure; that's a deliberately separate dial.
+- **`ACTIVITY_TARGET_FIXED_KCAL` pins the activity target itself** the same way `CALORIE_TARGET_FIXED_KCAL` pins intake (via the Formula Playground's **Pin target calorie burn**, or by hand): the Activity tile, the Physical Activity chart's target line/dot colour, and Activity Insight's stated target all switch from `activityTargetKcal`/flat `ACTIVITY_TARGET_MIN` to `getActivityTargetKcal`/`getActivityTargetMin`, so the calorie burn stays put and the minutes needed rise as body mass falls, instead of the reverse.
 
 ### Calorie Balance (per day)
 
@@ -793,8 +804,8 @@ sort key  = classification group gap, then targetG − actualG within it, both d
 ### Today at a Glance
 
 - Sums today's entries per category.
-- Green/red by `withinCalorieTarget`, `withinProteinBand`, `mins ≥ ACTIVITY_TARGET_MIN`, `hrs ≥ SLEEP_TARGET_HOURS`.
-- The Activity tile appends `= activityTargetKcal(latest body mass)` rounded to whole kcal.
+- Green/red by `withinCalorieTarget`, `withinProteinBand`, `mins ≥ getActivityTargetMin(latest body mass)`, `hrs ≥ SLEEP_TARGET_HOURS`.
+- The Activity tile appends `→ getActivityTargetKcal(latest body mass)` rounded to whole kcal.
 
 ### Sleep
 
@@ -893,17 +904,18 @@ ledger/
 │       ├── charts.js             # Chart.js renderers + health formulas
 │       ├── transactions.js       # Transaction Log
 │       ├── accounts.js           # Account Summary
-│       ├── timesheet.js          # Work Log + analytics data
+│       ├── timesheet.js          # Work panel + analytics data
 │       ├── csv.js                # CSV import/export + filter engine
 │       ├── physique.js           # Physique (one row per day)
 │       ├── strength-plan.js      # Activity Plan
 │       ├── contacts.js           # Contact List
 │       ├── settings-panel.js     # Settings table
-│       ├── travel.js             # Travel Log
+│       ├── travel.js             # Travel panel
 │       ├── applications.js       # Applications cards
 │       ├── insight.js            # Insight shared helpers + Wellness mode
 │       ├── food-insight.js       # Insight Food mode
 │       ├── activity-insight.js   # Insight Activity mode
+│       ├── protein-source-rotation-insight.js # Insight Protein Sources mode
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
 │       ├── formula-playground.js # Health Formula Playground
@@ -997,7 +1009,7 @@ Then open `http://localhost:8000`. No build step.
 | `Transactions!A2:F` | `transactions.js`, `csv.js` | Transaction rows |
 | `'Accounts'!A3:E100` | `accounts.js` | Account name, institution, type, balance, market value |
 | `'Accounts'!A3:A100`, `Insight!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete |
-| `eTimeSheet!A2:H` | `timesheet.js` | Work Log rows |
+| `eTimeSheet!A2:H` | `timesheet.js` | Work rows |
 | `'Nutrition Facts'!A2:G` | `nutrition.js`, `calorie-estimator.js`, `food-insight.js`, `protein-rotation.js` | Classification / Name / Amount / Calories / Protein / Verified / Protein % |
 | `'Contacts'!A2:U` | `contacts.js` | Contact rows |
 | `'Travel'!A2:H` | `travel.js` | Travel rows |

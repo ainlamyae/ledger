@@ -44,7 +44,10 @@ function gatherPlanSnapshot() {
   const targetKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
 
   const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
-  const projection = projectTargetDays({
+  // targetJourneyProjection, not projectTargetDays: with the percentage pinned the plan walks
+  // the proportional journey, and the prompt has to be judging the same arrival date the Body
+  // Mass chart is showing.
+  const projection = targetJourneyProjection({
     intakeKcal: detail.kcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg,
   });
 
@@ -60,10 +63,12 @@ function gatherPlanSnapshot() {
     bmr: Math.round(detail.bmr),
     activityKcal: Math.round(detail.activityKcal),
     intakeKcal: detail.kcal,
-    // Whether that intake is a pinned figure or recalculated from every weigh-in is
-    // the plan's own design decision, and it changes what "following the plan"
-    // means — so the model is told which one is in force.
+    // Whether that intake is a pinned figure, a pinned percentage of body mass, or
+    // recalculated from a fixed kilogram rate is the plan's own design decision, and it
+    // changes what "following the plan" means — so the model is told which is in force.
     intakeIsPinned: pinnedCalorieTargetKcal() !== null,
+    pinnedPct: pinnedWeeklyFatLossPct(),
+    weeklyFatLossPct: weeklyFatLossPct(detail.weeklyFatLossKg, bodyMassKg),
     activityIsPinned: pinnedActivityTargetKcal() !== null,
     a: Math.round(a),
     b: Math.round(b * 100) / 100,
@@ -94,14 +99,28 @@ function planSubstitutedLines(p) {
   const lines = [
     `BMR: 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.bmr} kcal/day`,
     `Ea: ${p.met} × ${p.bodyMassKg} × ${p.tau} × ${p.kappa} / 200 = ${p.activityKcal} kcal/day`,
+    // Spelled out rather than left for the model to divide: the sustainable band it's
+    // asked to judge the plan against is written in percent, and this is the same figure
+    // the playground shows beside the Δm box.
+    `dm%: 100 × ${p.weeklyFatLossKg} / ${p.bodyMassKg} = ${p.weeklyFatLossPct} %/week`,
     `D: ${p.weeklyFatLossKg} × 7700 / 7 = ${p.deficitKcal} kcal/day`,
     `Ein: ${p.bmr} + ${p.activityKcal} − ${p.deficitKcal} = ${p.intakeKcal} kcal/day`,
     `A: 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.a} kcal/day`,
     `B: 10 + ${p.met} × ${p.tau} × ${p.kappa} / 200 = ${p.b} kcal/day per kg`,
-    `m_inf: (${p.intakeKcal} − ${p.a}) / ${p.b} = ${p.equilibriumKg} kg`,
   ];
-  if (p.projection.status === 'ok') {
+
+  // Two journeys, two arrival dates, and m_inf only exists in one of them: with the
+  // percentage pinned nothing holds Ein still, so there is no intake plateau to level off
+  // at — quoting one would invite the model to reason about a plateau this plan can't have.
+  const proportional = p.projection.journey === 'pct';
+  if (!proportional) lines.push(`m_inf: (${p.intakeKcal} − ${p.a}) / ${p.b} = ${p.equilibriumKg} kg`);
+
+  if (p.projection.status === 'ok' && proportional) {
+    lines.push(`t: 7 × ln(${p.bodyMassKg} / ${p.targetKg}) / −ln(1 − ${p.pinnedPct}/100) = ${Math.round(p.projection.days)} days, arriving ${p.projection.etaIso} (no plateau: a constant share of a falling mass always reaches the target)`);
+  } else if (p.projection.status === 'ok') {
     lines.push(`t: (7700 / ${p.b}) × ln[(${p.bodyMassKg} − ${p.equilibriumKg}) / (${p.targetKg} − ${p.equilibriumKg})] = ${Math.round(p.projection.days)} days, arriving ${p.projection.etaIso}`);
+  } else if (p.projection.status === 'unreachable' && proportional) {
+    lines.push(`t: never — ${p.projection.reason}`);
   } else if (p.projection.status === 'unreachable') {
     lines.push(`t: never — at this intake the body mass levels off at ${p.equilibriumKg} kg, short of the ${p.targetKg} kg target`);
   } else if (p.projection.status === 'reached') {
@@ -115,6 +134,18 @@ function planSubstitutedLines(p) {
   return lines;
 }
 
+// Which of the three rate plans is in force, in words — the pins are mutually exclusive, so
+// exactly one of these describes the sheet. It matters to the judgement, not just the
+// arithmetic: the same target intake is a different promise depending on whether it will be
+// recut at the next weigh-in, and how.
+function planRatePinDescription(p) {
+  if (p.intakeIsPinned) return 'the daily intake is pinned, so the deficit shrinks as body mass drops';
+  if (p.pinnedPct !== null) {
+    return `the fat-loss rate is pinned as a PERCENTAGE of body mass (${p.pinnedPct}%/week), so the kilograms per week and the intake are both recalculated at every weigh-in and the pace stays proportional`;
+  }
+  return 'the weekly fat-loss rate is pinned in kilograms, so the intake is recalculated at every weigh-in';
+}
+
 function planInputLines(p) {
   return [
     `m (current body mass): ${p.bodyMassKg} kg`,
@@ -125,11 +156,11 @@ function planInputLines(p) {
     `MET (assumed activity intensity): ${p.met}`,
     `tau (daily activity target): ${p.tau} min/day`,
     `kappa (oxygen uptake per MET): ${p.kappa} mL O2/kg/min`,
-    `dm (weekly fat loss target): ${p.weeklyFatLossKg} kg/week`,
+    `dm (weekly fat loss target): ${p.weeklyFatLossKg} kg/week, i.e. ${p.weeklyFatLossPct}% of current body mass per week`,
     `p_min - p_max (protein per kg of lean mass): ${p.proteinPerKgMin} - ${p.proteinPerKgMax} g/kg LBM/day`,
     'rho (fat energy density): 7700 kcal/kg (population constant)',
     'epsilon (oxygen energy yield): 200 mL O2/kcal (population constant)',
-    `Which figure is held fixed as body mass falls: ${p.intakeIsPinned ? 'the daily intake is pinned, so the deficit shrinks as body mass drops' : 'the weekly fat-loss rate is pinned, so the intake is recalculated at every weigh-in'}; ${p.activityIsPinned ? 'the activity calorie burn is pinned, so the minutes needed rise as body mass drops' : 'the activity minutes are pinned, so the burn they produce falls as body mass drops'}`,
+    `Which figure is held fixed as body mass falls: ${planRatePinDescription(p)}; ${p.activityIsPinned ? 'the activity calorie burn is pinned, so the minutes needed rise as body mass drops' : 'the activity minutes are pinned, so the burn they produce falls as body mass drops'}`,
   ];
 }
 

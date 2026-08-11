@@ -855,7 +855,7 @@ function setupScrollSpy() {
 // on purpose — a token check that raises a sign-in popup to look something up
 // would be worse than the problem it solves.
 const AUTH_GATED_SELECTOR = [
-  '.panel-header-btn',            // every panel's Log / Add, plus Formula
+  '.panel-header-btn',            // every panel's Log / Add, plus Tune
   '.row-action-btn',              // ✏️ / 📋 / 🗑️ on every table row
   '#physique-bulk-combine-btn',
   '#physique-bulk-calc-btn',

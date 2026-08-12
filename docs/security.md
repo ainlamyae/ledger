@@ -20,7 +20,7 @@
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
   - Health Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
   - Nothing is sent until that panel's Send to AI is clicked.
-- `GROQ_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Setting` tab and are never committed.
+- `GROQ_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Setting` tab and are never committed. The Settings panel masks any key ending `_API_KEY`/`_TOKEN`/`_SECRET` by default — independent of Privacy mode below, which is for amounts, not credentials — with a per-row reveal button that resets on reload.
 - **Privacy mode** is display-only and doesn't change what's stored.
 
 ---

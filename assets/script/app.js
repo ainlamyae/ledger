@@ -265,9 +265,19 @@ function setupAccountMenu() {
   });
 }
 
+// Versioned, because this cache holds a SHAPE, not just rows. `report` is a parsed
+// object in localStorage, which a page reload — hard reload included — does not
+// clear, so after a change to what the parse produces the charts spend the TTL
+// reading an object built by the previous version of this file: the income line
+// added to categoryTrend drew flat along zero, present but with nothing in it,
+// which looks exactly like a chart that was never wired up. Bump the suffix
+// whenever a field is added to or reshaped inside `report`; the old key simply
+// expires unread.
+const REPORT_CACHE_KEY = 'report-v2';
+
 async function loadReport(forceRefresh) {
   if (!forceRefresh) {
-    const cached = getCached('report');
+    const cached = getCached(REPORT_CACHE_KEY);
     if (cached) return cached;
   }
 
@@ -340,18 +350,19 @@ async function loadReport(forceRefresh) {
     })
     .map((c, i, arr) => ({ ...c, color: `hsl(${Math.round((i * 360) / arr.length)}, 65%, 55%)` }));
 
-  const incomeExpenseTrend = monthlyRows
-    .slice(0, activeIndex + 1)
-    .map((row) => ({ label: row[0], income: row[1] || 0, expenses: row[2] || 0 }));
-
   const savingsTrend = monthlyRows
     .slice(0, activeIndex + 1)
     .map((row) => ({ label: row[0], cumulative: row[cumulativeIndex] || 0 }));
 
+  // Income rides along with the per-category spend rather than in a series of its
+  // own: one chart draws both now (the stack, and the line across it), so it's one
+  // shape they're read off. Column B, the same figure the old Revenue vs.
+  // Expenditure chart used — that chart's other series was this stack's total.
   const categoryTrend = monthlyRows
     .slice(0, activeIndex + 1)
     .map((row) => ({
       label: row[0],
+      income: row[1] || 0,
       categories: orderedCategoryColumns.map((c) => ({
         name: c.name,
         value: Math.abs(row[c.monthlyIndex] || 0),
@@ -383,7 +394,6 @@ async function loadReport(forceRefresh) {
     expenses: current[2] || 0,
     saved: current[savedIndex] || 0,
     quarterAverage: quarterAverages(monthlyRows, activeIndex, savedIndex),
-    incomeExpenseTrend,
     savingsTrend,
     categoryTrend,
     categoryComparison,
@@ -396,7 +406,7 @@ async function loadReport(forceRefresh) {
     missingAmount,
   };
 
-  setCached('report', report);
+  setCached(REPORT_CACHE_KEY, report);
   return report;
 }
 
@@ -544,7 +554,7 @@ async function refreshNetWorth() {
 
   if (currentReport) {
     currentReport.netWorth = netWorth;
-    setCached('report', currentReport);
+    setCached(REPORT_CACHE_KEY, currentReport);
   }
 
   document.getElementById('net-worth').textContent = formatCurrency(netWorth);
@@ -624,7 +634,6 @@ async function loadDashboard(forceRefresh = false) {
     // `report.typeBreakdown` is still parsed and cached either way; this call and
     // that section are the whole switch.
     // renderTypeBreakdownCharts(report.typeBreakdown);
-    renderIncomeExpenseChart(report.incomeExpenseTrend);
     renderExpenseBreakdownTrendChart(report.categoryTrend);
     renderSavingsTrendChart(report.savingsTrend);
     renderReconciliationStatus(report.missingAmount);

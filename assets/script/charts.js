@@ -452,6 +452,10 @@ function buildTypeBreakdownSection(category) {
 // One donut per category per period: that category's Types as a share of its total.
 // Only categories with a named Type get a panel. The gap between the category total and
 // the sum of its named Types becomes an "Untyped" slice.
+//
+// CURRENTLY UNCALLED, deliberately: the call in app.js's reportPromise and the
+// "Spending Breakdown by Type" section in index.html are both commented out, and this
+// is kept whole so uncommenting those two is all it takes to bring the wall back.
 function renderTypeBreakdownCharts(typeBreakdown) {
   // By absolute lifelong spend, so the biggest movers surface first whatever their sign.
   const orderedCategories = Object.keys(typeBreakdown)
@@ -546,10 +550,22 @@ function renderAccountCompositionChart(accounts) {
     .sort((a, b) => typeAbsTotals.get(b) - typeAbsTotals.get(a));
 
   // Evenly-spaced hues, so no count repeats a colour the way a fixed palette would.
-  const distinctColors = (count) => Array.from({ length: count }, (_, i) => `hsl(${Math.round((i * 360) / count)}, 65%, 55%)`);
+  //
+  // `band` is what keeps the two rings apart. Both used to walk the same wheel from
+  // the same starting hue, so with a similar number of types and institutions the two
+  // palettes came out IDENTICAL — the second-largest institution painted in exactly the
+  // second-largest type's colour. That's what makes a TFSA (an Investment) read as
+  // "the Saving colour": the slice matches a legend entry it has nothing to do with.
+  // The half-step offset pulls the hues off each other; the deeper, less saturated
+  // band is what still tells the rings apart when the two counts differ enough for the
+  // hues to realign anyway.
+  const TYPE_BAND = { offset: 0, saturation: 65, lightness: 55 };
+  const INSTITUTION_BAND = { offset: 0.5, saturation: 45, lightness: 42 };
+  const distinctColors = (count, band) => Array.from({ length: count }, (_, i) =>
+    `hsl(${Math.round(((i + band.offset) * 360) / count) % 360}, ${band.saturation}%, ${band.lightness}%)`);
 
   const typeColors = {};
-  distinctColors(types.length).forEach((color, i) => { typeColors[types[i]] = color; });
+  distinctColors(types.length, TYPE_BAND).forEach((color, i) => { typeColors[types[i]] = color; });
 
   // One fixed colour per institution, whatever types its accounts span.
   const institutionAbsTotals = new Map();
@@ -561,7 +577,7 @@ function renderAccountCompositionChart(accounts) {
     .filter((name) => institutionAbsTotals.get(name) > 0)
     .sort((a, b) => institutionAbsTotals.get(b) - institutionAbsTotals.get(a));
   const institutionColorMap = {};
-  distinctColors(institutionNames.length).forEach((color, i) => { institutionColorMap[institutionNames[i]] = color; });
+  distinctColors(institutionNames.length, INSTITUTION_BAND).forEach((color, i) => { institutionColorMap[institutionNames[i]] = color; });
 
   const accountLabels = [];
   const accountValues = [];
@@ -652,7 +668,7 @@ function renderAccountCompositionChart(accounts) {
   });
 }
 
-// Used until a 'Settings' tab exists, so nothing changes for anyone without one.
+// Used until a Setting tab exists, so nothing changes for anyone without one.
 const BODY_MASS_TARGET_KG_DEFAULT = 82;
 const CALORIE_TARGET_KCAL_DEFAULT = 2000;
 const SLEEP_TARGET_HOURS_DEFAULT = 8;

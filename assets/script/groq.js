@@ -45,7 +45,7 @@ async function groqChatText(systemPrompt, userMessage, temperature = 0.4) {
 // written back over what the user actually typed. The Notes field is never
 // touched by this response now; "query" below is used purely as an internal
 // USDA search term (calorie-estimator.js prefers the user's own text for the
-// Nutrition Facts table match/lookup whenever the split lines up 1:1).
+// Nutrition table match/lookup whenever the split lines up 1:1).
 const GROQ_EXTRACT_SYSTEM_PROMPT = `You are a nutrition estimator for a personal health log. The user gives you a freeform
 description of food ingredients and amounts (e.g. "2 eggs, 1 slice toast, 1 tbsp butter").
 

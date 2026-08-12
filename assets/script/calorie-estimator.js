@@ -1,6 +1,6 @@
 // AI-powered calorie estimation behind Physique's 🧮 Calculate:
 // parses a freeform ingredient description (Groq), checks each item against
-// the personal Nutrition Facts table (nutrition.js) first, and only for a
+// the personal Nutrition table (nutrition.js) first, and only for a
 // miss there cross-checks calorie density against real nutrition data (USDA
 // FoodData Central) — banking that result back into the table for next time
 // — before handing the result back. Wired up by physique.js, which runs it
@@ -87,7 +87,7 @@ function splitNotesIntoSegments(notes) {
 // Strips a leading quantity — a number (e.g. "2", "1.5", "2-3") plus an
 // optional unit glued directly onto it with no space (e.g. "100g", "30ml")
 // — off a segment, leaving just the food name portion. This is what's
-// matched against the Nutrition Facts table and what a new row gets banked
+// matched against the Nutrition table and what a new row gets banked
 // under, instead of the model's own "query" phrasing. Without the unit list
 // here, "100g egg white" would strip only "100" and leave "g egg white" as
 // the name — a real bug that banked a bogus "g egg white" row alongside an
@@ -146,7 +146,7 @@ const UNIT_TO_GRAMS = { shot: 30, shots: 30 };
 // user types one of these, the count is already known exactly from the
 // number they typed, so it's trusted over Groq's own "count" extraction,
 // which can (as observed with "spray") decide a unit isn't discrete at all
-// and silently fall back to a raw gram guess — ignoring a Nutrition Facts
+// and silently fall back to a raw gram guess — ignoring a Nutrition
 // row's own per-unit count entirely. Deliberately excludes weight/volume
 // units (g, cup, tbsp, ...): those describe a measured amount, not "how
 // many", so forcing a count from them wouldn't mean anything.
@@ -206,7 +206,7 @@ const UNIT_CANONICAL = {
 // touches the Notes text itself — the caller's notes are the ones saved,
 // verbatim, no matter what the AI extraction below returns.
 // autoBank: whether a miss (USDA/AI-only estimate) gets saved to the
-// Nutrition Facts table immediately. The interactive Calculate button (see
+// Nutrition table immediately. The interactive Calculate button (see
 // physique.js's Calculate) sets this false and instead surfaces an "Add"
 // button per row in the breakdown, so a typo'd/misphrased name (e.g. "oilve
 // oil" not matching an existing "olive oil" row) is caught and fixed by hand
@@ -223,7 +223,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   // so caching it keeps repeat clicks on the same Notes splitting into the
   // same items/quantities instead of a fresh roll each time. The macro
   // LOOKUP below this is deliberately never cached: it always re-checks the
-  // Nutrition Facts table fresh, so adding or editing a table row and
+  // Nutrition table fresh, so adding or editing a table row and
   // recalculating the exact same Notes text picks up the change immediately
   // instead of silently replaying a result computed before that row existed
   // or was corrected.
@@ -239,7 +239,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 
   // The model's own "query" field is intentionally NOT trusted as an item's
   // identity — it's free to phrase it however suits a database search (e.g.
-  // "egg" -> "egg, whole"), and using it for the Nutrition Facts match/bank
+  // "egg" -> "egg, whole"), and using it for the Nutrition match/bank
   // below would let the AI silently rename what the user typed. Instead,
   // deterministically split the user's OWN text the same way and, whenever
   // that split lines up 1:1 with the model's items (the overwhelmingly
@@ -275,7 +275,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 
   let usdaAttempts = 0;
   let usdaFailureCount = 0;
-  // Ingredients that missed the Nutrition Facts table this round and had
+  // Ingredients that missed the Nutrition table this round and had
   // to be estimated via USDA/AI — saved back to the table below so the
   // same food is a trusted lookup hit next time instead of a fresh guess.
   const newNutritionRows = [];
@@ -338,7 +338,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     // math is right but the stored density is wrong" from "the wrong branch
     // fired" when a total looks implausible.
     let density;
-    // Set only for a fresh USDA/AI miss (never for a Nutrition Facts hit) —
+    // Set only for a fresh USDA/AI miss (never for a Nutrition hit) —
     // the not-yet-saved row this item would bank, surfaced in the breakdown
     // as an opt-in "Add" button when autoBank is false.
     let newRow = null;
@@ -403,7 +403,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     // just a bare count ("1 apple", "3 egg") or a calorie anchor ("300kcal
     // cookie") — replace that placeholder with whatever Calculate actually
     // determined: the real gram weight for a weight-resolved item
-    // (Nutrition Facts or USDA/AI), or the matched unit count for a
+    // (Nutrition or USDA/AI), or the matched unit count for a
     // count-resolved one, since that's more informative than leaving "1x"
     // (or the calorie target, which the Amount field now carries anyway) in
     // the saved note once the real number is known.
@@ -451,8 +451,8 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   // always plain JS — the AI only ever supplies a per-item density
   // estimate, and only when there's no table match).
   const SOURCE_LABELS = {
-    'nutrition-table-count': 'Nutrition Facts',
-    'nutrition-table-grams': 'Nutrition Facts',
+    'nutrition-table-count': NUTRITION_TABLE_SOURCE_LABEL,
+    'nutrition-table-grams': NUTRITION_TABLE_SOURCE_LABEL,
     'usda/ai': 'USDA estimate',
     'usda-unreachable': 'AI estimate (offline)',
   };
@@ -478,7 +478,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   // Every USDA lookup that was actually attempted failed — almost certainly
   // a network/DNS problem, not a "no match" case. This ran on pure LLM
   // guesses with zero real grounding, so don't bank any of its numbers into
-  // the Nutrition Facts table as if they were verified: a retry once
+  // the Nutrition table as if they were verified: a retry once
   // connectivity is back should get a real, properly-grounded number
   // instead of replaying this ungrounded one forever.
   const usdaUnreachable = usdaAttempts > 0 && usdaFailureCount === usdaAttempts;
@@ -496,7 +496,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   return { calories, protein, breakdown, standardizedNotes, usdaUnreachable };
 }
 
-// A row.newRow means this item missed the Nutrition Facts table and was
+// A row.newRow means this item missed the Nutrition table and was
 // estimated fresh (USDA/AI) rather than looked up — nothing is banked
 // automatically (see estimateCaloriesAndProtein's autoBank param), so the
 // user reviews it here: either click 💾 to bank it as-is, or leave it
@@ -507,8 +507,8 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, t
   btn.type = 'button';
   btn.className = 'btn btn-primary';
   btn.textContent = '💾';
-  btn.title = `Not in your Nutrition Facts table yet — save "${row.name}" (${row.newRow.amount}, ${row.newRow.calories} kcal, ${row.newRow.protein}g protein) so it's a trusted lookup next time instead of a fresh guess`;
-  btn.setAttribute('aria-label', `Save ${row.name} to Nutrition Facts`);
+  btn.title = `Not in your Nutrition table yet — save "${row.name}" (${row.newRow.amount}, ${row.newRow.calories} kcal, ${row.newRow.protein}g protein) so it's a trusted lookup next time instead of a fresh guess`;
+  btn.setAttribute('aria-label', `Save ${row.name} to Nutrition`);
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     btn.textContent = '⏳';
@@ -537,7 +537,7 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, t
 // (physique.js), which keeps the same JSON in a field of its own and so gets it
 // rewritten here too.
 // Source and Save are one column, because they're two halves of the same fact
-// and can never both carry content: a Nutrition Facts hit is already banked by
+// and can never both carry content: a Nutrition hit is already banked by
 // definition (it's where the numbers came from) and so never gets a newRow,
 // while every estimate carries one until it's banked. Merging them drops a whole
 // column, and on a day that came entirely from your own table the column is one
@@ -551,11 +551,20 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, t
 // Matched on the rendered label rather than the raw source key so a breakdown
 // already saved on the sheet collapses too, and translated at render time only —
 // the stored JSON keeps the descriptive string.
-const NUTRITION_TABLE_SOURCE_LABEL = 'Nutrition Facts';
+// Named off CONFIG.SHEETS rather than spelled out, so renaming the tab renames
+// the label with it — this is the one string in the app that has to agree with a
+// tab name, and it shouldn't be a second place to remember.
+const NUTRITION_TABLE_SOURCE_LABEL = CONFIG.SHEETS.NUTRITION;
+
+// Which stored labels mean "came from your own table". More than one because the
+// label is written verbatim into every saved breakdown, so each name the tab has
+// ever had is still out there on the sheet — dropping one would turn a saved ✅
+// back into the words it was collapsed from, on rows nothing has touched since.
+const NUTRITION_TABLE_SOURCE_LABELS = [NUTRITION_TABLE_SOURCE_LABEL, 'Nutrition', 'Nutrition Facts'];
 
 function sourceCell(row, breakdown, totalCalories, totalProtein, target) {
   const cell = document.createElement('td');
-  const fromTable = row.source === NUTRITION_TABLE_SOURCE_LABEL;
+  const fromTable = NUTRITION_TABLE_SOURCE_LABELS.includes(row.source);
 
   const label = document.createElement('span');
   label.textContent = fromTable ? '✅' : row.source;

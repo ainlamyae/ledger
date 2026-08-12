@@ -68,7 +68,7 @@ function showUndoToast(message, onUndo) {
 
 let currentReport = null;
 
-// 'Accounts'!D1 holds the pre-computed net worth total.
+// The Account tab's D1 holds the pre-computed net worth total.
 function parseBalance(balanceRows) {
   return (balanceRows[0] && balanceRows[0][3]) || 0;
 }
@@ -105,7 +105,7 @@ function parseTypeBreakdown(insightRows) {
   return breakdown;
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'timesheet-modal', 'nutrition-modal', 'formula-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'breakdown-modal', 'timesheet-modal', 'nutrition-modal', 'formula-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -279,7 +279,7 @@ async function loadReport(forceRefresh) {
   const balanceRows = valueRanges[1].values || [];
   const insightRows = valueRanges[2].values || [];
 
-  // Insight!A2:F200 lists each category once per Type plus one blank-Type
+  // Breakdown!A2:F200 lists each category once per Type plus one blank-Type
   // total row, so collapse column A to a unique, order-preserving list.
   const categoryNames = [];
   insightRows.forEach((row) => {
@@ -291,7 +291,7 @@ async function loadReport(forceRefresh) {
   // sheet duplicated, so they double as the per-category benchmarks too.
   const typeBreakdown = parseTypeBreakdown(insightRows);
 
-  // Row 1 of Monthly Summary holds column headers (Income, Expenses, one
+  // Row 1 of Statement holds column headers (Income, Expenses, one
   // column per spending category, Saved, Cumulative) — used below to find
   // each category's column dynamically instead of a hardcoded index.
   const monthlyHeader = reportRows[0] || [];
@@ -320,7 +320,7 @@ async function loadReport(forceRefresh) {
   const current = monthlyRows[activeIndex];
 
   // Every category in Insight becomes a chart category as long as its name
-  // also appears as a column header in Monthly Summary — no hardcoded
+  // also appears as a column header in Statement — no hardcoded
   // category list or column indices. Columns A-C (Month, Income, Expenses)
   // are excluded since "Income" may also appear as an Insight category but
   // isn't a spending category.
@@ -387,7 +387,7 @@ async function loadReport(forceRefresh) {
     savingsTrend,
     categoryTrend,
     categoryComparison,
-    // Monthly Summary has one row per month from the first month of data
+    // Statement has one row per month from the first month of data
     // through the current month, so its row count doubles as the number of
     // months to divide the Lifelong total by for a monthly average.
     totalMonths: activeIndex + 1,
@@ -406,7 +406,7 @@ let currentSettings = {};
 // back to it instead of wiping everything — see the catch below.
 let lastLoadedSettings = null;
 
-// 'Settings'!A2:C is optional and user-managed — unlike every other tab, most
+// The Setting tab's A2:C is optional and user-managed — unlike every other tab, most
 // users won't have added it. A failure here is never a dashboard-load failure;
 // every reader falls back to its own default via getSetting() below.
 //
@@ -473,7 +473,7 @@ function getSettingStringAny(keys, fallback) {
 
 // Monthly average of the three months BEFORE the active one — a baseline this
 // month is read against, so the current (usually part-way through) month isn't
-// averaged into its own benchmark. Taken from Monthly Summary rather than
+// averaged into its own benchmark. Taken from Statement rather than
 // Insight's Last Quarter column so it shares the current month's exact
 // definition of income and expenses. Falls back to however many prior months
 // exist, and to null in the first month, when there's nothing to compare to.
@@ -619,7 +619,11 @@ async function loadDashboard(forceRefresh = false) {
     renderSummaryCards(report);
     renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
     renderSpendingBreakdownCharts(report.categoryComparison);
-    renderTypeBreakdownCharts(report.typeBreakdown);
+    // Off for now, with its section in index.html commented out to match — the
+    // per-category Type donuts are wanted again later, so nothing is deleted.
+    // `report.typeBreakdown` is still parsed and cached either way; this call and
+    // that section are the whole switch.
+    // renderTypeBreakdownCharts(report.typeBreakdown);
     renderIncomeExpenseChart(report.incomeExpenseTrend);
     renderExpenseBreakdownTrendChart(report.categoryTrend);
     renderSavingsTrendChart(report.savingsTrend);
@@ -644,13 +648,17 @@ async function loadDashboard(forceRefresh = false) {
     activitiesPromise,
     physiquePromise,
     // Protein Source Rotation needs Physique (actual servings eaten),
-    // Nutrition Facts (live per-serving calories/protein), and settings
+    // Nutrition (live per-serving calories/protein), and settings
     // (protein target) all loaded — refresh only once all three are in,
     // rather than off just one of them like the two panels above.
     Promise.all([physiquePromise, nutritionPromise]).then(() => {
       renderProteinRotationChart(wellnessDateRange());
     }),
     initContacts(forceRefresh),
+    // Its own read of the Breakdown tab rather than a share of loadReport's: that
+    // one keeps only what the charts derived from those rows, while the panel
+    // needs each row's own sheet row number to edit it.
+    initBreakdown(forceRefresh),
     initSettingsPanel(forceRefresh),
     settingsPromise.then(() => initTravel(forceRefresh)),
     initApplications(forceRefresh),

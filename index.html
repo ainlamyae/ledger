@@ -107,8 +107,8 @@
                         <span class="node-graph-tooltip">Type what you ate in plain language and let AI do the math — ingredients are extracted automatically, and both calories and protein are grounded against the USDA nutrition database for an accurate estimate. Nothing is a black box: every estimate breaks out ingredient by ingredient with the amount, calories, protein and the exact calorie density applied, summed to a total you can check by eye, and a ✅ marks each item that came from your own saved nutrition data rather than an estimate.</span>
                     </button>
                     <button type="button" class="node-graph-node">
-                        <span class="node-graph-node-title">🧠 Nutrition Facts Memory</span>
-                        <span class="node-graph-tooltip">The estimator remembers what it learns: every ingredient it looks up is saved to your own Nutrition Facts table, so the next mention is calculated instantly from a trusted value instead of re-estimated from scratch. Fine-tune any entry to match the exact brand you buy, and merge near-duplicates the AI phrased differently.</span>
+                        <span class="node-graph-node-title">🧠 Nutrition Memory</span>
+                        <span class="node-graph-tooltip">The estimator remembers what it learns: every ingredient it looks up is saved to your own Nutrition table, so the next mention is calculated instantly from a trusted value instead of re-estimated from scratch. Fine-tune any entry to match the exact brand you buy, and merge near-duplicates the AI phrased differently.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🔥 Calorie Balance</span>
@@ -531,9 +531,6 @@
 
         <div class="panel">
             <div class="panel-header">
-                <!-- "Nutrition", not "Nutrition Facts": the sheet tab it reads keeps the
-                     longer name, but the heading only has to share its line with a
-                     button. -->
                 <h2>Nutrition</h2>
                 <button id="add-nutrition-btn" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
             </div>
@@ -580,9 +577,10 @@
                 <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
             </div>
 
-            <!-- Rebuilt from the Activities sheet tab by activities.js -->
+            <!-- Rebuilt from the Activity sheet tab by activities.js -->
             <div id="activity-plan-tables"></div>
         </div>
+
     </section>
 
     <div style="height:.5rem"></div>
@@ -680,10 +678,17 @@
             <div class="donut-legend" id="spending-trend-legend"></div>
         </div>
 
+        <!-- Spending Breakdown by Type — the per-category donut wall (Housing,
+             Transportation, Grocery, Personal, Household …), four periods each plus an
+             Untyped remainder. Commented out, not deleted: it's wanted again later.
+             Uncomment this section AND the renderTypeBreakdownCharts call in app.js's
+             reportPromise — the renderer (charts.js) and its parsed data are untouched,
+             and the call is what fills this container.
         <div class="panel-section">
             <h3>Spending Breakdown by Type</h3>
             <div id="type-breakdown-container"></div>
         </div>
+        -->
 
         <div class="panel-section">
             <h3>Portfolio Allocation</h3>
@@ -854,6 +859,40 @@
                     </tfoot>
                 </table>
             </div>
+        </div>
+
+        <!-- The Breakdown tab, as a table you can maintain rather than only a chart
+             source. Its four money columns are the SHEET's own formulas — the app
+             reads them and never writes them, so only Category and Type are
+             editable here (breakdown.js). -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Breakdown</h2>
+                <button id="add-breakdown-btn" class="btn btn-primary panel-header-btn" title="Add a category/type row — it copies an existing row's formulas, so its four totals compute themselves">Add</button>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="breakdown-search" placeholder="Search category or type...">
+            </div>
+
+            <div class="table-responsive">
+                <table id="breakdown-table">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="category">Category</th>
+                        <th class="sortable" data-sort="type" title="Blank on a category's own total row — the one that sums every Type under it">Type</th>
+                        <th class="sortable num" data-sort="lastMonth">Last Month</th>
+                        <th class="sortable num" data-sort="lastQuarter">Last Quarter</th>
+                        <th class="sortable num" data-sort="lastYear">Last Year</th>
+                        <th class="sortable num" data-sort="lifelong">Lifelong</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="breakdown-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="breakdown-pagination"></div>
         </div>
     </section>
 
@@ -1119,10 +1158,15 @@
                 <input type="text" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2" required>
             </label>
 
-            <p class="hint">Use a positive amount for income, negative for expenses. You can also enter an expression, e.g. =-9.97-1.30 or -32/2.</p>
+            <!-- No hint line: the Amount placeholder already carries both halves of it
+                 (the sign convention and the expression form), and the paragraph was
+                 repeating the box it sat under. -->
             <p id="tx-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
+                <!-- Not a submit: it rewrites the Amount box and leaves the form open, so
+                     the taxed figure is on screen to check before either Save takes it. -->
+                <button type="button" id="tx-tax-btn" class="btn">Tax</button>
                 <button type="submit" id="tx-save-add-btn" class="btn btn-primary">Save &amp; Add Another</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
@@ -1159,6 +1203,33 @@
 
             <p class="hint">Leave a field blank to keep each transaction's existing value.</p>
             <p id="tx-bulk-edit-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="breakdown-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="breakdown-modal-title" hidden>
+    <div class="modal-card">
+        <button type="button" id="breakdown-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        <h2 id="breakdown-modal-title">Edit Breakdown Row</h2>
+
+        <form id="breakdown-form" class="app-form">
+            <label>Category
+                <input type="text" id="breakdown-category" list="breakdown-category-options" required>
+                <datalist id="breakdown-category-options"></datalist>
+            </label>
+            <label>Type
+                <input type="text" id="breakdown-type" list="breakdown-type-options" placeholder="Leave blank for the category's own total row">
+                <datalist id="breakdown-type-options"></datalist>
+            </label>
+
+            <!-- Shown, never sent: the four amounts are the sheet's formulas, and the
+                 save below writes columns A and B only. -->
+            <p class="hint" id="breakdown-amounts-note"></p>
+            <p id="breakdown-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
@@ -1342,7 +1413,7 @@
                         <th>Calories</th>
                         <th>Protein</th>
                         <th title="Calorie density this item was priced at — kcal per 100 g, or per unit for a row whose Amount is a count (×2)">Density</th>
-                        <th title="✅ means the item was found in your own Nutrition Facts table; anything else names the estimator that priced it, followed by 💾 to bank it for next time">Source</th>
+                        <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time">Source</th>
                     </tr>
                     </thead>
                     <tbody id="physique-calc-breakdown-body"></tbody>
@@ -1406,7 +1477,7 @@
             <legend>Solve for</legend>
             <label><input type="radio" name="formula-solve-for" value="EIN" checked> Calories</label>
             <label><input type="radio" name="formula-solve-for" value="TARGET_MASS"> Target body mass</label>
-            <label><input type="radio" name="formula-solve-for" value="TAU"> Activity target</label>
+            <label><input type="radio" name="formula-solve-for" value="TAU"> Activity</label>
             <label><input type="radio" name="formula-solve-for" value="DELTA_M"> Weekly fat loss</label>
             <!-- The odd one out, and named for what you hold rather than what it solves:
                  here the percentage of body mass is the fixed input and BOTH Eᵢₙ and t are
@@ -1897,6 +1968,7 @@
 <script src="assets/script/charts.js"></script>
 <script src="assets/script/transactions.js"></script>
 <script src="assets/script/accounts.js"></script>
+<script src="assets/script/breakdown.js"></script>
 <script src="assets/script/timesheet.js"></script>
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/activities.js"></script>

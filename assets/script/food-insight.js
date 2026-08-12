@@ -50,7 +50,7 @@ function aggregateFoodIntake(from, to) {
       }
       return {
         name: agg.name,
-        // Column A of the Nutrition Facts row this ingredient matches. Blank
+        // Column A of the Nutrition row this ingredient matches. Blank
         // when the ingredient isn't in the table yet, or is but hasn't been
         // classified — both land in the Unclassified bucket below.
         classification: findNutritionEntry(agg.name)?.classification || '',
@@ -96,12 +96,12 @@ function formatFoodGroupSummary(group) {
   return `${group.classification} — ${n} ingredient${n === 1 ? '' : 's'}, ${group.calories} kcal, ${group.protein} g protein`;
 }
 
-// Converts a unit count (e.g. 23 eggs) to grams using the Nutrition Facts
+// Converts a unit count (e.g. 23 eggs) to grams using the Nutrition
 // table's own per-unit weight for that ingredient (e.g. "1x (58g)" -> 58g
 // each), so the summary reads in one consistent unit instead of a bare,
 // hard-to-picture count — the count-branch Amount format ("×N") never
 // carries a real weight itself (see calorie-estimator.js), only the
-// Nutrition Facts row does. Returns null (leaving the count as-is for
+// Nutrition row does. Returns null (leaving the count as-is for
 // display) if there's no matching row or its Amount has no gram figure —
 // e.g. an ingredient banked via a fresh USDA/AI miss that hasn't been
 // reviewed/saved yet (see the Calculate breakdown's 💾 button).
@@ -117,7 +117,7 @@ function convertCountToGrams(name, count) {
 // A Calculate breakdown item's amount is always exactly "×N" (a count-branch
 // match, e.g. "×2") or "Ng" (a grams-branch match/USDA estimate, e.g.
 // "40.5g") — see calorie-estimator.js's amount assignments. NOT the same
-// shape as the freeform Nutrition Facts table Amount field (e.g.
+// shape as the freeform Nutrition table Amount field (e.g.
 // "1scoop (31g)") that nutrition.js's parseGramsFromAmount/
 // parseCountFromAmount are built for — reusing those here would silently
 // fail on every "×N" count string (no leading digit for parseCountFromAmount

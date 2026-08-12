@@ -1,4 +1,4 @@
-// "Protein Source Rotation" panel: for every Nutrition Facts ingredient that
+// "Protein Source Rotation" panel: for every Nutrition ingredient that
 // has a Protein % value set (nutrition.js), shows a horizontal bar — actual
 // protein eaten from that ingredient in the lookback window vs. a live
 // target — so a low/empty bar flags "you haven't had this one, eat it."
@@ -8,14 +8,14 @@
 // activity, each ingredient's gram target moves with it automatically —
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from Physique's own Calculate breakdown,
-// independent of whatever Nutrition Facts' Amount/Calories happen to say
+// independent of whatever Nutrition's Amount/Calories happen to say
 // today. Beside the bars, a two-ring donut splits the same sources by share
 // of protein actually eaten — outer ring the 4 weeks ending on the To date,
 // inner ring the last week of it — so a source's short-term share can be read
 // against its medium-term one. Wired up by initProteinRotationPanel(), called
 // from app.js.
 
-// Every Nutrition Facts row with a Protein % set — that field is the sole
+// Every Nutrition row with a Protein % set — that field is the sole
 // "is this tracked" switch (nutrition.js's refreshNutrition/openNutritionForm).
 const PROTEIN_UNCLASSIFIED_LABEL = 'Unclassified';
 
@@ -258,7 +258,7 @@ function renderProteinRotationChart({ from, to }) {
         legend: { display: false },
         title: {
           display: !hasData,
-          text: 'No ingredients tracked yet — open Nutrition Facts, edit an ingredient, and set its Protein %',
+          text: 'No ingredients tracked yet — open Nutrition, edit an ingredient, and set its Protein %',
           color: Chart.defaults.color,
           font: { size: 12 },
           padding: { top: 40 },

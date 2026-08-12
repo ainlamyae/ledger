@@ -3309,10 +3309,20 @@ function renderWellnessEnergyBalanceChart(entries) {
               // compared against. A day over maintenance reports a SURPLUS, since
               // calling it a deficit would contradict the + in front of it.
               const actualWord = d.balance > 0 ? 'Surplus' : 'Deficit';
+              // "Actual Intake", the same name Caloric Intake and Protein Intake give
+              // the figure in their own hovers — one day's eating shouldn't be called
+              // three different things across three charts of the same panel.
+              //
+              // Maintenance and Activity are the two things SUBTRACTED from it, so
+              // they're shown subtracted: the column reads top-down as the arithmetic
+              // behind the bar (intake, less maintenance, less activity, giving the
+              // balance) instead of three bare figures the reader has to remember the
+              // signs of. Activity especially — kcal burned printed as a positive reads
+              // as something ADDED to the day.
               const lines = [
-                `Eaten: ${d.intake} kcal`,
-                `Maintenance: ${d.maintenance} kcal`,
-                `Activity: ${d.activity} kcal`,
+                `Actual Intake: ${d.intake} kcal`,
+                `Maintenance: ${withExplicitSign(-d.maintenance)} kcal`,
+                `Activity: ${withExplicitSign(-d.activity)} kcal`,
                 `Expected Fat: ${withExplicitSign(d.massG)} g`,
                 `Actual ${actualWord}: ${withExplicitSign(d.balance)} kcal`,
               ];

@@ -92,6 +92,32 @@ function todaysLoggedWorkoutText() {
 // here — ticking is how the plan shows what's banked, so only the boxes ticked
 // since the last save are new work. That's what lets a gym session be logged
 // gradually: tick what's done, save, tick more, save again into the same row.
+// Shared by logWorkout (every ticked plan row) and the Add Activity modal's
+// own Log button (activities.js, one row at a time — there's no tick to read
+// there) — appends note lines to today's Workout text, opens the Physique
+// form in edit mode, and pre-runs Calculate so the form shows a real
+// duration/burn pair instead of making the user click it themselves.
+function applyWorkoutLines(lines) {
+  // Today's Workout text is carried over verbatim and the new lines appended,
+  // so any free text on the row survives being extended.
+  const today = todaysPhysiqueDay();
+  const workout = [today?.workout ?? '', ...lines].filter((part) => part.trim()).join('\n');
+
+  // Passing today's row puts the form in edit mode, so Save updates that day
+  // rather than appending a second one — which the duplicate-date guard would
+  // refuse anyway. Everything already logged for the day (meals, body mass) is
+  // left exactly as it is; only the workout side changes.
+  openPhysiqueForm(today);
+  if (today) document.getElementById('physique-modal-title').textContent = "Add to Today's Workout";
+  physiqueField('workout').value = workout;
+  physiqueField('activity-duration').value = String(workoutNoteMinutes(workout));
+
+  // If it can't run (no body mass yet) the plain-minutes prefill above stays
+  // and the reason is surfaced.
+  const messages = runPhysiqueWorkoutCalc();
+  if (messages.length) showFieldError('physique-form-error', messages.join(' '));
+}
+
 function logWorkout() {
   const logged = loggedWorkoutQuantities();
   const added = [...document.querySelectorAll('.workout-check:checked')]
@@ -106,26 +132,7 @@ function logWorkout() {
     return;
   }
 
-  // Today's Workout text is carried over verbatim and the new lines appended,
-  // so any free text on the row survives being extended.
-  const today = todaysPhysiqueDay();
-  const workout = [today?.workout ?? '', ...added].filter((part) => part.trim()).join('\n');
-
-  // Passing today's row puts the form in edit mode, so Save updates that day
-  // rather than appending a second one — which the duplicate-date guard would
-  // refuse anyway. Everything already logged for the day (meals, body mass) is
-  // left exactly as it is; only the workout side changes.
-  openPhysiqueForm(today);
-  if (today) document.getElementById('physique-modal-title').textContent = "Add to Today's Workout";
-  physiqueField('workout').value = workout;
-  physiqueField('activity-duration').value = String(workoutNoteMinutes(workout));
-
-  // Immediately run the workout half of Calculate so the form opens already
-  // showing the real duration/burn pair instead of making the user click it
-  // themselves. If it can't run (no body mass yet) the plain-minutes prefill
-  // above stays and the reason is surfaced.
-  const messages = runPhysiqueWorkoutCalc();
-  if (messages.length) showFieldError('physique-form-error', messages.join(' '));
+  applyWorkoutLines(added);
 }
 
 // Exercise name -> the quantity already logged for it today ("30x", "6000step"),

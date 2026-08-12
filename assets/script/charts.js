@@ -847,6 +847,44 @@ function latestBodyMassKg(entries) {
   return bodyMassEntries.length ? bodyMassEntries[bodyMassEntries.length - 1].amount : null;
 }
 
+// A single scale reading is a poor estimate of the mass every equation here is built on:
+// water and glycogen swing it by more than a week of fat loss does, so yesterday's dinner
+// can move the whole plan. m(t) in the decay model means clean mass, and the standard fix
+// is the 7-day rolling mean — m̄(t) = (1/7) × Σ m(t−i), i = 0…6 — which is what the plan
+// figures read instead.
+//
+// The window ends at the LATEST reading, not at today: anchoring on today would quietly
+// empty the window after a week away from the scale, and no average at all is worse than
+// an average of slightly older readings. Every reading inside it counts equally, however
+// many land on one date — averaging per-day means first would weight a day weighed twice
+// the same as a day weighed once.
+//
+// Rounded to the 0.1 kg a scale reads to, for the same reason the LBM figure is: the
+// substituted trace multiplies this number out, and a hidden extra decimal is what makes a
+// printed line fail to add up.
+const BODY_MASS_SMOOTHING_WINDOW_DAYS = 7;
+
+function smoothedBodyMassKg(entries, windowDays = BODY_MASS_SMOOTHING_WINDOW_DAYS) {
+  const readings = entries
+    .filter((e) => e.category === 'Body Mass' && e.amount !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (readings.length === 0) return null;
+
+  const windowStartMs = parseIsoDateUTC(readings[readings.length - 1].date)
+    - (windowDays - 1) * 86400000;
+  const inWindow = readings.filter((e) => parseIsoDateUTC(e.date) >= windowStartMs);
+  return Math.round((inWindow.reduce((sum, e) => sum + e.amount, 0) / inWindow.length) * 10) / 10;
+}
+
+// The mass every PLAN-level figure is evaluated at — the target intake, its direction, the
+// forecast, the playground's boxes and the Health Plan prompt. Deliberately NOT used by the
+// per-day series (Caloric Intake's target line, Calorie Balance's maintenance): those
+// describe what was true on one specific day, and that day's own reading is the honest
+// input there. Here the noise is only noise.
+function planBodyMassKg(entries) {
+  return smoothedBodyMassKg(entries);
+}
+
 // `1.6-2`, `1.6~2`, `1.6 – 2`, `1.6 to 2` all parse. A bare `1.6` is a zero-width band.
 const G_PER_KG_BAND_SEPARATOR = /\s*(?:~|-|–|—|to)\s*/i;
 
@@ -942,16 +980,119 @@ function mifflinStJeorBmr(bodyMassKg, heightCm, age, sex) {
   return 10 * bodyMassKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
 }
 
-// Resting maintenance from the profile and the latest weigh-in; null if anything is
+// Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. It asks the same question a different way
+// — fat mass is nearly metabolically inert, so the honest predictor is the lean mass alone
+// rather than a regression on total mass, height and age. Age drops out completely, and sex
+// enters only through the LBM figure.
+//
+// Which means it's only better than Mifflin to the extent the LBM behind it is: with a real
+// body-fat measurement it's the more accurate of the two, and with the app's Boer estimate
+// it's a second opinion built from the same three numbers. That's the whole trade, and it's
+// why the choice is the user's rather than a silent upgrade.
+const KATCH_BASE_KCAL = 370;
+const KATCH_KCAL_PER_KG_LBM = 21.6;
+
+function katchMcArdleBmr(lbmKg) {
+  return KATCH_BASE_KCAL + KATCH_KCAL_PER_KG_LBM * lbmKg;
+}
+
+// The LBM this equation is evaluated at, rounded to the same 0.1 kg the LBM box and the
+// protein band show — so the trace's `370 + 21.6 × 61.4` multiplies out to the BMR printed
+// beside it instead of missing it by a kcal.
+function bmrLeanBodyMassKg(bodyMassKg, heightCm, sex) {
+  return Math.round(boerLeanBodyMassKg(bodyMassKg, heightCm, sex) * 10) / 10;
+}
+
+// Which of the two the whole app runs on. A string setting rather than a flag so the sheet
+// says which equation is in force, and unset reads as Mifflin — the behaviour every existing
+// copy already has.
+const BMR_FORMULA_KEY = 'BMR_FORMULA';
+const BMR_FORMULA_DEFAULT = 'mifflin';
+
+function bmrFormula() {
+  return getSettingString(BMR_FORMULA_KEY, BMR_FORMULA_DEFAULT) === 'katch' ? 'katch' : BMR_FORMULA_DEFAULT;
+}
+
+// Age is a Mifflin term only, so a plan on the LBM equation is complete without a birth
+// date. Every guard that used to demand one unconditionally asks this instead — otherwise
+// switching equations would report a profile incomplete over a number the model no longer
+// reads.
+function bmrNeedsAge(formula = bmrFormula()) {
+  return formula !== 'katch';
+}
+
+// The app's single BMR call — the one function every maintenance figure goes through, so a
+// switched equation moves all of them together or none. `formula` is a parameter with the
+// setting as its default because the Formula Playground previews the other equation before
+// it's saved; same reason maintenanceAffineCoefficients takes one.
+function bmrKcal(bodyMassKg, heightCm, age, sex, formula = bmrFormula()) {
+  return formula === 'katch'
+    ? katchMcArdleBmr(bmrLeanBodyMassKg(bodyMassKg, heightCm, sex))
+    : mifflinStJeorBmr(bodyMassKg, heightCm, age, sex);
+}
+
+// Thermic effect of food: the energy spent digesting what you eat, ~10% of intake on a
+// mixed diet. It belongs to expenditure, so counting it RAISES the intake that produces a
+// given deficit — and because it's a share of that very intake, the balance has to be
+// solved rather than added on:
+//
+//     Eᵢₙ = BMR + Eₐ + TEF − D,  TEF = f × Eᵢₙ   ⇒   Eᵢₙ = (BMR + Eₐ − D) / (1 − f)
+//
+// Folding it into Eₐ and subtracting it separately are the same statement — intake − TEF
+// − BMR − Eₐ = −D rearranges to that same line — so the two conventions can't disagree
+// about a number here.
+//
+// Defaults to 0, which is exactly the app's arithmetic before this existed. Switching it on
+// lifts every target by ~11%, and that's a decision for whoever owns the plan.
+const TEF_PERCENT_KEY = 'TEF_PERCENT_OF_INTAKE';
+const TEF_PERCENT_DEFAULT = 0;
+
+function tefPercent() {
+  return getSetting(TEF_PERCENT_KEY, TEF_PERCENT_DEFAULT);
+}
+
+// The (1 − f) every intake and maintenance figure is divided by. Held inside 0–90%: a
+// negative share isn't a thermic effect, and at f = 1 digestion costs everything you eat
+// and the identity has no finite solution at all.
+const TEF_PERCENT_MAX = 90;
+
+function tefDivisor(percent = tefPercent()) {
+  return 1 - Math.min(Math.max(percent, 0), TEF_PERCENT_MAX) / 100;
+}
+
+// Metabolic adaptation: on a long cut, BMR falls by more than the lost mass accounts for —
+// less leptin and T3, quieter sympathetic tone, cheaper movement — and the gap widens with
+// time on the diet before levelling off. BMR_adapt(t) = BMR × (1 − λt), with λt plateauing
+// somewhere near 10–15% by week 10–12. Refeeds and diet breaks walk λt back toward 0.
+//
+// Reported, never planned with: Eᵢₙ, the deficit and the arrival date are all left as the
+// un-adapted identities give them, because the adaptation is a consequence of the diet
+// rather than an input to it, and t is a moving target while λt is still growing. What it
+// buys is the honest caveat on m∞ — a plateau at a HEAVIER mass than the constant-BMR model
+// promises, which is the usual reason a forecast overshoots in practice. adaptedPlateauKg
+// below is how much heavier.
+const ADAPT_PCT_PER_WEEK_KEY = 'BMR_ADAPT_PCT_PER_WEEK';
+const ADAPT_PCT_CAP_KEY = 'BMR_ADAPT_PCT_CAP';
+const ADAPT_PCT_PER_WEEK_DEFAULT = 1;
+const ADAPT_PCT_CAP_DEFAULT = 12;
+
+// λt at day `days` — the share of BMR lost by then, capped. Days rather than weeks because
+// every other time quantity here (t, the decay constant) is in days.
+function adaptationFraction(days, pctPerWeek, pctCap) {
+  const grown = (pctPerWeek / 100) * (days / 7);
+  return Math.max(0, Math.min(grown, pctCap / 100));
+}
+
+// Resting maintenance from the profile and the smoothed body mass; null if anything is
 // missing. Excludes activity — each caller adds the figure right for its own window.
 function restingMaintenanceKcal(entries) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
-  const bodyMassKg = latestBodyMassKg(entries);
+  const bodyMassKg = planBodyMassKg(entries);
 
-  if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female') || bodyMassKg === null) return null;
-  return mifflinStJeorBmr(bodyMassKg, heightCm, age, sex);
+  if (heightCm === null || (age === null && bmrNeedsAge()) || (sex !== 'male' && sex !== 'female') || bodyMassKg === null) return null;
+  return bmrKcal(bodyMassKg, heightCm, age, sex);
 }
 
 // Inside this margin the Physical Activity dot goes gray rather than red. Same 5% as
@@ -1024,19 +1165,27 @@ function calorieTargetDetail(bodyMassKg) {
   // everywhere at once — this tile, the per-day chart line, and the playground's preview.
   const weeklyFatLossKg = weeklyFatLossKgAt(bodyMassKg);
 
-  const haveAllInputs = bodyMassKg !== null && heightCm !== null && age !== null
+  // Age only when the BMR equation in force actually reads it (see bmrNeedsAge).
+  const haveAllInputs = bodyMassKg !== null && heightCm !== null && (age !== null || !bmrNeedsAge())
     && (sex === 'male' || sex === 'female') && weeklyFatLossKg !== null;
   if (!haveAllInputs) return null;
 
-  const bmr = mifflinStJeorBmr(bodyMassKg, heightCm, age, sex);
+  const bmr = bmrKcal(bodyMassKg, heightCm, age, sex);
   const activityKcal = activityTargetKcal(bodyMassKg);
 
   // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the target
   // above maintenance, flipping it from a ceiling to a floor. No plausibility guard: an
   // aggressive target means an aggressive setting, which is the user's call.
-  const kcal = Math.round(bmr + activityKcal - (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7);
+  //
+  // The TEF divisor is the last step, not a term: digestion's cost is a share of the intake
+  // being solved for, so it scales the whole balance rather than being added to one side of
+  // it (see tefDivisor). At the default f = 0 it divides by 1 and this is the same figure the
+  // app has always produced.
+  const divisor = tefDivisor();
+  const kcal = Math.round((bmr + activityKcal - (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7) / divisor);
 
-  return { kcal, bmr, activityKcal, weeklyFatLossKg };
+  // Off the ROUNDED intake, so `TEF = f × Eᵢₙ` multiplies out against the Eᵢₙ shown beside it.
+  return { kcal, bmr, activityKcal, weeklyFatLossKg, tefKcal: kcal * (1 - divisor), tefDivisor: divisor };
 }
 
 // Δm as a share of body mass — the unit the safety literature is written in, and with
@@ -1114,12 +1263,17 @@ function pinnedCalorieTargetKcal() {
   return getSetting(CALORIE_TARGET_PIN_KEY, null);
 }
 
-// TODAY's target: the calculated figure at the latest weigh-in, else flat
+// TODAY's target: the calculated figure at the smoothed body mass, else flat
 // CALORIE_TARGET_KCAL. Only the FIGURE — which side to be on is getCalorieTargetKind,
 // and getCalorieTarget pairs them so no label can carry one without the other.
+//
+// Smoothed rather than the last reading alone (planBodyMassKg): both terms of the target
+// scale with mass, so a single water-heavy morning would otherwise move the day's calorie
+// ceiling by ~30 kcal for no metabolic reason — and it's the same basis the Formula
+// Playground previews and saves against, so the tile and the modal can't disagree.
 function getCalorieTargetKcal(entries) {
   return pinnedCalorieTargetKcal()
-    ?? calculatedCalorieTargetKcal(latestBodyMassKg(entries))
+    ?? calculatedCalorieTargetKcal(planBodyMassKg(entries))
     ?? flatCalorieTargetKcal();
 }
 
@@ -1150,12 +1304,16 @@ function calorieTargetSeries(entries, dates) {
 // heading up. Eating 400 under a bulk's figure is no better than 400 over a cut's, so
 // scoring both sides the same way would tell half the users the opposite of the truth.
 //
-// Direction is target body mass vs. latest weigh-in. With neither, or a target already reached
-// (0.1 kg tolerance), the sign of WEEKLY_FAT_LOSS_KG decides — negative is a bulk, so a
+// Direction is target body mass vs. the smoothed body mass. With neither, or a target already
+// reached (0.1 kg tolerance), the sign of WEEKLY_FAT_LOSS_KG decides — negative is a bulk, so a
 // floor. Nothing at all keeps the ceiling.
+//
+// Smoothed for a stronger reason than the figure itself: this decides whether the target is a
+// ceiling or a floor, so within 0.1 kg of goal a single noisy reading could flip the whole
+// panel's scoring from one day to the next.
 function getCalorieTargetKind(entries) {
   const targetKg = getSetting('BODY_MASS_TARGET_KG', null);
-  const currentKg = latestBodyMassKg(entries);
+  const currentKg = planBodyMassKg(entries);
 
   if (targetKg !== null && currentKg !== null && Math.abs(targetKg - currentKg) >= 0.1) {
     return targetKg < currentKg ? 'max' : 'min';
@@ -1490,10 +1648,23 @@ function fatEnergyKcal(bodyMassKg, heightCm, age, sex) {
 // a general population. Deliberately NOT m × (1 − bodyFat%) off the Deurenberg estimate
 // above: that route squares a BMI-only approximation, and Boer was regressed against
 // measured lean mass directly. Age doesn't enter it.
+//
+// Split into its coefficients rather than written as two expressions because Katch-McArdle
+// BMR is 21.6 × this: maintenance stays affine in body mass under that equation too, and
+// maintenanceAffineCoefficients needs the per-kg and mass-independent halves separately to
+// say so. One copy of the numbers, two things read off them.
+const BOER_LBM_COEFFICIENTS = {
+  male: { perKg: 0.407, perCm: 0.267, constant: -19.2 },
+  female: { perKg: 0.252, perCm: 0.473, constant: -48.3 },
+};
+
+function boerLeanBodyMassCoefficients(sex) {
+  return sex === 'male' ? BOER_LBM_COEFFICIENTS.male : BOER_LBM_COEFFICIENTS.female;
+}
+
 function boerLeanBodyMassKg(bodyMassKg, heightCm, sex) {
-  return sex === 'male'
-    ? 0.407 * bodyMassKg + 0.267 * heightCm - 19.2
-    : 0.252 * bodyMassKg + 0.473 * heightCm - 48.3;
+  const c = boerLeanBodyMassCoefficients(sex);
+  return c.perKg * bodyMassKg + c.perCm * heightCm + c.constant;
 }
 
 // Headroom around the plotted range. The floor keeps a window of nearly identical
@@ -2078,6 +2249,30 @@ function computeBmi(bodyMassKg, heightCm) {
   return Math.round((bodyMassKg / (heightM * heightM)) * 10) / 10;
 }
 
+// The inverse — the body mass a BMI implies at this height. Only one place needs it, the
+// Formula Playground's target-BMI box, but it lives here beside computeBmi so the pair can't
+// drift apart the way two copies of one rearrangement eventually do.
+function bodyMassKgFromBmi(bmi, heightCm) {
+  const heightM = heightCm / 100;
+  return Math.round(bmi * heightM * heightM * 10) / 10;
+}
+
+// The WHO bands, for the one place a BMI is a GOAL rather than a reading: a target body mass
+// is a number you choose, and the whole reason to show its BMI is to say whether the choice
+// lands somewhere sensible. Both ends matter here, unlike the fat-loss band where only the
+// ceiling is a warning — an underweight target is as much a problem as an obese one.
+const BMI_HEALTHY_MIN = 18.5;
+const BMI_HEALTHY_MAX = 24.9;
+
+function bmiVerdict(bmi) {
+  if (bmi < 16) return { text: 'severely underweight', outside: true };
+  if (bmi < BMI_HEALTHY_MIN) return { text: 'underweight', outside: true };
+  if (bmi <= BMI_HEALTHY_MAX) return { text: `in the healthy ${BMI_HEALTHY_MIN}–${BMI_HEALTHY_MAX} band`, outside: false };
+  if (bmi < 30) return { text: 'overweight', outside: true };
+  if (bmi < 35) return { text: 'obese (class I)', outside: true };
+  return { text: 'obese (class II+)', outside: true };
+}
+
 // "NEAT (Non-Exercise Activity Thermogenesis)" -> "NEAT"; the parenthetical doesn't fit
 // a legend and isn't needed once you know the term.
 function shortActivityLabel(description) {
@@ -2523,10 +2718,52 @@ function detectPlateau(trendMap) {
 // independent and body-mass-scaling halves of BMR + activity burn. Shared by
 // projectTargetDays (the forward m_g → t direction) and the Formula Playground's reverse
 // t → m_g solve, so both read the same A/B rather than two copies of this algebra.
-function maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa }) {
-  const a = 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
-  const b = 10 + (met * tau * kappa) / ML_O2_PER_KCAL;
-  return { a, b };
+//
+// Affine under BOTH BMR equations, which is what lets one decay model serve them. Mifflin is
+// affine in m by construction; Katch-McArdle is 370 + 21.6 × LBM and Boer's LBM is itself
+// affine in m, so substituting gives 370 + 21.6×(c_h×h + c_0) as the constant half and
+// 21.6×c_m as the per-kg one. Age falls out of A entirely there.
+//
+// TEF divides both halves rather than appearing as a term: maintenance is the intake that
+// holds mass steady, and at that intake digestion is costing f of it, so M = (A₀ + B₀m)/(1−f).
+// Every consumer — m∞, the decay constant, the reverse solves — therefore gets the thermic
+// effect for free, and at the default f = 0 gets exactly today's coefficients.
+//
+// `formula` and `tef` are parameters defaulting to the saved settings so the Formula
+// Playground can preview an unsaved choice through this same function instead of a second
+// copy of the algebra. The extra returned parts are for the substituted trace and for
+// adaptedPlateauKg, which has to scale the BMR half alone.
+function maintenanceAffineCoefficients({
+  heightCm, age, sex, met, tau, kappa, formula = bmrFormula(), tef = tefPercent(),
+}) {
+  const activityPerKg = (met * tau * kappa) / ML_O2_PER_KCAL;
+  const lbm = boerLeanBodyMassCoefficients(sex);
+  const aBmr = formula === 'katch'
+    ? KATCH_BASE_KCAL + KATCH_KCAL_PER_KG_LBM * (lbm.perCm * heightCm + lbm.constant)
+    : 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
+  const bBmr = formula === 'katch' ? KATCH_KCAL_PER_KG_LBM * lbm.perKg : 10;
+  const divisor = tefDivisor(tef);
+
+  return {
+    a: aBmr / divisor,
+    b: (bBmr + activityPerKg) / divisor,
+    aBmr,
+    bBmr,
+    activityPerKg,
+    tefDivisor: divisor,
+    formula,
+  };
+}
+
+// Where the mass actually levels off once BMR has adapted — the same m∞ = (Eᵢₙ − A)/B, with
+// the BMR half of each coefficient scaled by (1 − λt) and the activity half left alone:
+// adaptation is a resting-metabolism effect, not a cheaper workout. Above the un-adapted m∞
+// whenever λt > 0, and the difference is the overshoot the plain model hides.
+function adaptedPlateauKg(intakeKcal, coefficients, adaptFraction) {
+  const { aBmr, bBmr, activityPerKg, tefDivisor: divisor } = coefficients;
+  const remaining = 1 - adaptFraction;
+  return (intakeKcal - (remaining * aBmr) / divisor)
+    / ((remaining * bBmr + activityPerKg) / divisor);
 }
 
 // The TARGET trajectory — eating exactly Eᵢₙ and hitting ACTIVITY_TARGET_MIN every
@@ -2539,8 +2776,13 @@ function maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa }) 
 // Works both directions — a surplus puts m∞ above m and the same log gives days to gain
 // — but only reaches targets BETWEEN m and m∞. Past the asymptote is genuinely
 // unreachable at that intake, and is reported rather than extrapolated.
-function projectTargetDays({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg }) {
-  const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+// `formula` and `tef` ride along unread except to reach maintenanceAffineCoefficients, so
+// the playground's unsaved BMR equation and thermic share reach the forecast the same way
+// they reach A and B. Omitted by the settings-driven callers, which get the saved pair.
+function projectTargetDays({
+  intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg, formula, tef,
+}) {
+  const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, formula, tef });
   const equilibriumKg = (intakeKcal - a) / b;
 
   if (Math.abs(bodyMassKg - targetKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG) {
@@ -2626,7 +2868,7 @@ function targetProjectionFromSettings(entries, bodyMassKg, targetKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
-  if (heightCm === null || age === null || (sex !== 'male' && sex !== 'female')) return null;
+  if (heightCm === null || (age === null && bmrNeedsAge()) || (sex !== 'male' && sex !== 'female')) return null;
 
   return targetJourneyProjection({
     // Eᵢₙ itself: the calculated target is exactly what the playground computes.
@@ -3221,11 +3463,16 @@ function renderWellnessEnergyBalanceChart(entries) {
     if (!intakeByDate.has(date)) return null;
 
     const intake = Math.round(intakeByDate.get(date));
-    const maintenance = Math.round(mifflinStJeorBmr(bodyMassForDate.get(date), heightCm, age, sex));
+    const maintenance = Math.round(bmrKcal(bodyMassForDate.get(date), heightCm, age, sex));
     const activity = Math.round(activityKcalByDate.get(date) || 0);
-    const balance = intake - maintenance - activity;
+    // Digestion is an expenditure like the other two, so it comes off the same subtraction —
+    // otherwise switching TEF on would raise the target intake here without also raising the
+    // cost of eating it, and this chart would contradict the one that set the target. A share
+    // of what was ACTUALLY eaten, not of the target: this row scores the day that happened.
+    const tef = Math.round(intake * (1 - tefDivisor()));
+    const balance = intake - maintenance - activity - tef;
 
-    detailByDate.set(date, { intake, maintenance, activity, balance, massG: Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000) });
+    detailByDate.set(date, { intake, maintenance, activity, tef, balance, massG: Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000) });
     return balance;
   });
 
@@ -3234,9 +3481,9 @@ function renderWellnessEnergyBalanceChart(entries) {
 
   // Folded into the axis range too, so the dashes can't fall off-plot on a stretch of
   // days that all undershot them.
-  // At the latest weigh-in, since a pinned percentage makes the deficit a function of body
-  // mass: one dashed line for the whole window, drawn at the rate today's mass implies.
-  const target = hasData ? targetBalanceKcal(latestBodyMassKg(entries)) : null;
+  // At the smoothed body mass, since a pinned percentage makes the deficit a function of body
+  // mass: one dashed line for the whole window, drawn at the rate the plan's mass implies.
+  const target = hasData ? targetBalanceKcal(planBodyMassKg(entries)) : null;
 
   const maxDeficit = Math.max(0, ...values.map((v) => -v), target === null ? 0 : -target);
   const maxSurplus = Math.max(0, ...values, target === null ? 0 : target);
@@ -3323,6 +3570,10 @@ function renderWellnessEnergyBalanceChart(entries) {
                 `Actual Intake: ${d.intake} kcal`,
                 `Maintenance: ${withExplicitSign(-d.maintenance)} kcal`,
                 `Activity: ${withExplicitSign(-d.activity)} kcal`,
+                // Only when there IS one. At the default f = 0 the row would be a
+                // permanent "-0", which reads as a term that failed to compute rather
+                // than one deliberately left out of the model.
+                ...(d.tef > 0 ? [`Digestion (TEF): ${withExplicitSign(-d.tef)} kcal`] : []),
                 `Expected Fat: ${withExplicitSign(d.massG)} g`,
                 `Actual ${actualWord}: ${withExplicitSign(d.balance)} kcal`,
               ];

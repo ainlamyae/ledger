@@ -32,6 +32,17 @@ const FORMULA_FIELDS = [
   // playground opens on 0 (maintenance) rather than inventing a deficit.
   { key: 'WEEKLY_FAT_LOSS_KG', inputId: 'formula-weekly-loss', fallback: () => 0 },
   { key: 'BODY_MASS_TARGET_KG', inputId: 'formula-target', fallback: () => BODY_MASS_TARGET_KG_DEFAULT },
+  // In this list, not the two below it: f divides the whole intake identity, so a blank
+  // one leaves Eᵢₙ genuinely uncomputable rather than merely undecorated.
+  { key: TEF_PERCENT_KEY, inputId: 'formula-tef-pct', fallback: () => TEF_PERCENT_DEFAULT },
+];
+
+// Metabolic adaptation's pair, kept out of FORMULA_FIELDS for the same reason the protein
+// band is: λ feeds only the two reported rows (BMR_a and the adapted plateau), so a blank
+// one should stop those from being shown, never stop the target from being computed.
+const ADAPT_FORMULA_FIELDS = [
+  { key: ADAPT_PCT_PER_WEEK_KEY, inputId: 'formula-adapt-per-week', fallback: () => ADAPT_PCT_PER_WEEK_DEFAULT },
+  { key: ADAPT_PCT_CAP_KEY, inputId: 'formula-adapt-cap', fallback: () => ADAPT_PCT_CAP_DEFAULT },
 ];
 
 // The lean-mass protein band: its own pair of fields, kept out of FORMULA_FIELDS on
@@ -60,7 +71,10 @@ const FORMULA_SOLVE_FIELD_ID = {
 // formula-weekly-loss-pct is on the list for the opposite reason to formula-eta: it's
 // never typed in DELTA_M mode, where Δm is the answer, so the percentage is an answer
 // too and the box has to go readonly with it.
-const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-days', 'formula-eta', 'formula-weekly-loss-pct'];
+// formula-target-bmi is on the list for the same reason formula-weekly-loss-pct is: in
+// TARGET_MASS the kilograms are the answer, so the BMI they come to is an answer too and the
+// box has to go readonly with them.
+const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-days', 'formula-eta', 'formula-weekly-loss-pct', 'formula-target-bmi'];
 
 // Which fields are computed in EIN and TARGET_MASS — fixed, unlike TAU and
 // DELTA_M below, which let you type either Eᵢₙ or t and compute whichever
@@ -71,7 +85,7 @@ const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-d
 // from a share of body mass and the journey is proportional rather than constant-intake.
 const FORMULA_COMPUTED_IDS = {
   EIN: ['formula-ein', 'formula-days', 'formula-eta'],
-  TARGET_MASS: ['formula-target'],
+  TARGET_MASS: ['formula-target', 'formula-target-bmi'],
   FIXED_PCT: ['formula-weekly-loss', 'formula-ein', 'formula-days', 'formula-eta'],
 };
 
@@ -91,6 +105,20 @@ const dualKnownField = { TAU: 'ein', DELTA_M: 'days' };
 // so it's typed there whatever you last touched.
 let weeklyLossKnownField = 'kg';   // 'kg' | 'pct'
 
+// The same idea again for the target body mass, which also has two boxes: kilograms and the
+// BMI they come to at this height. One quantity in two units, so whichever you last typed
+// into is the known and the other is rewritten from it on every render.
+//
+// One mode overrules the memory: TARGET_MASS solves for m_g, so both boxes are answers and
+// neither is typed. (There's no FIXED_PCT-style counterpart pinning the BMI — nothing in the
+// app holds a BMI still, so there's nothing to overrule it in the other direction.)
+let targetMassKnownField = 'kg';   // 'kg' | 'bmi'
+
+function targetBmiIsTyped() {
+  if (currentSolveFor() === 'TARGET_MASS') return false;
+  return targetMassKnownField === 'bmi';
+}
+
 function weeklyLossPctIsTyped() {
   const mode = currentSolveFor();
   if (mode === 'FIXED_PCT') return true;
@@ -100,6 +128,20 @@ function weeklyLossPctIsTyped() {
 
 function currentPinMode() {
   return document.querySelector('input[name="formula-pin-mode"]:checked').value;
+}
+
+// Which BMR equation the preview is running. Both are first-class: this is read into the
+// settings overlay so calorieTargetDetail and activityTargetKcal see it, and passed
+// explicitly to maintenanceAffineCoefficients, which is called outside the overlay.
+function currentBmrFormula() {
+  return document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+}
+
+// The mass every identity on this sheet is evaluated at — the smoothed box, never the raw
+// weigh-in above it. One accessor rather than a dozen getElementById calls so there is
+// exactly one place that decides which of the two rows the formulas read.
+function formulaBodyMassKg() {
+  return formulaNumber('formula-body-mass-smooth');
 }
 
 // The percentage in play this render: the typed one wherever the percentage is what's held,
@@ -165,19 +207,29 @@ function applySolveForMode(mode) {
 // actually ran. No blank lines between the blocks — the four-space indent on
 // every formula line is what separates it from the heading above it, so the
 // spacers only added height.
-const FORMULA_EXPRESSION = `Resting metabolic rate — Mifflin-St Jeor (1990)
+const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass
+    m̄    =  (1/7) × Σ m(t−i),  i = 0…6
+Resting metabolic rate — Mifflin-St Jeor (1990)
     BMR  =  10×m  +  6.25×h  −  5×a  +  σ
+Resting metabolic rate — Katch-McArdle (1996), from lean mass instead of age/sex
+    BMR  =  370  +  21.6×LBM
 Activity burn at the daily target — ACSM metabolic equation
     Eₐ   =  MET × m × τ × κ / ε
 Weekly fat loss as a share of body mass — 0.5–1%/week band
     Δm%  =  100 × Δm / m
 Daily energy deficit implied by the weekly fat-loss target
     D    =  (Δm × ρ) / 7
-Target daily intake
-    Eᵢₙ  =  BMR  +  Eₐ  −  D
+Thermic effect of food — a share of the very intake being solved for
+    TEF  =  f × Eᵢₙ
+Target daily intake — TEF folded in by solving, not by adding
+    Eᵢₙ  =  BMR  +  Eₐ  +  TEF  −  D    =    (BMR  +  Eₐ  −  D) / (1 − f)
+The target body mass as a BMI — 18.5–24.9 healthy band
+    BMI_g =  m_g / (h/100)²
 Maintenance is affine in body mass — M(m) = A + B×m
-    A    =  6.25×h  −  5×a  +  σ
-    B    =  10  +  MET × τ × κ / ε
+    A    =  (6.25×h  −  5×a  +  σ) / (1 − f)           under Mifflin
+    B    =  (10  +  MET × τ × κ / ε) / (1 − f)         under Mifflin
+    A    =  (370  +  21.6×(c_h×h + c_0)) / (1 − f)     under Katch
+    B    =  (21.6×c_m  +  MET × τ × κ / ε) / (1 − f)   under Katch
 Body mass at which Eᵢₙ becomes maintenance
     m∞   =  (Eᵢₙ  −  A) / B
 Exponential decay toward m∞, not linear loss
@@ -186,6 +238,9 @@ Exponential decay toward m∞, not linear loss
 Proportional journey instead, when Δm% is what's held — no plateau, so no m∞
     m(t) =  m × (1 − Δm%/100)^(t/7)
     t    =  7 × ln(m / m_g) / −ln(1 − Δm%/100)
+Metabolic adaptation — BMR sags faster than the lost mass alone predicts
+    BMR_a(t) = BMR × (1 − λt),  λt capped at λt_max ≈ 10–15% by week 10–12
+    m∞_a =  (Eᵢₙ − A_a) / B_a,  the BMR half of A and B scaled by (1 − λt)
 Lean body mass — Boer (1984)
     LBM  =  0.407×m  +  0.267×h  −  19.2      (♂)
     LBM  =  0.252×m  +  0.473×h  −  48.3      (♀)
@@ -278,16 +333,20 @@ function readFormulaInputs() {
     else overrides[field.key] = num;
   });
 
-  const bodyMassKg = formulaNumber('formula-body-mass');
+  const bodyMassKg = formulaBodyMassKg();
   const heightCm = formulaNumber('formula-height');
   const age = formulaNumber('formula-age');
   const sex = document.getElementById('formula-sex').value;
-  if (bodyMassKg === null) invalid.push('current body mass');
+  const formula = currentBmrFormula();
+  if (bodyMassKg === null) invalid.push('m̄ (smoothed body mass)');
   if (heightCm === null) invalid.push('HEIGHT_CM');
-  if (age === null) invalid.push('BIRTH_DATE (age)');
+  // Age is a Mifflin input only — Katch-McArdle reads lean mass instead — so on that
+  // equation a blank age isn't missing, it's simply not part of the model.
+  if (age === null && bmrNeedsAge(formula)) invalid.push('BIRTH_DATE (age)');
 
   if (heightCm !== null) overrides.HEIGHT_CM = heightCm;
   overrides.SEX = sex;
+  overrides[BMR_FORMULA_KEY] = formula;
 
   // The Δm box is the preview's only source of truth for the rate, so the pin key is
   // blanked out of the overlay: a WEEKLY_FAT_LOSS_PCT already on the sheet would otherwise
@@ -322,7 +381,7 @@ function readFormulaInputs() {
     invalid.push('Δm% (weekly fat loss, % of body mass)');
   }
 
-  return { mode, overrides, preview, bodyMassKg, heightCm, age, sex, einKcal, days, invalid };
+  return { mode, overrides, preview, bodyMassKg, heightCm, age, sex, formula, einKcal, days, invalid };
 }
 
 // The formula with every symbol replaced by the figure actually used, so a
@@ -337,7 +396,11 @@ function readFormulaInputs() {
 // while leaving them — nothing about LBM or the protein band depends on that solve. This
 // is also where the three protein BOXES are filled, so a shown figure and its shown
 // arithmetic always come from one read of the inputs.
-function renderFormulaSubstituted(rows) {
+// `plan` carries the figures the correction rows are derived from — the intake, the
+// coefficients behind it, the BMR and activity burn, and the horizon λt is measured along.
+// Passed in rather than re-read from the boxes because three of the five modes solve for
+// something those boxes only catch up with on the next line of this same function.
+function renderFormulaSubstituted(rows, plan = null) {
   const el = document.getElementById('formula-substituted');
   el.innerHTML = '';
   // Each derived half is guarded, and separately: this element is cleared above, so
@@ -354,14 +417,35 @@ function renderFormulaSubstituted(rows) {
   } catch (err) {
     console.error('Weekly fat-loss percentage failed to render', err);
   }
+  // The m_g → BMI half of that pair, guarded like the rest and filled here for the same
+  // reason: this is the one function every mode reaches exactly once, failure paths included,
+  // so the BMI can never be left describing a previous render's target.
+  let bmiRows = [];
+  try {
+    bmiRows = renderTargetBmiField();
+  } catch (err) {
+    console.error('Target BMI failed to render', err);
+  }
   let proteinRows = [];
   try {
     proteinRows = renderProteinFields();
   } catch (err) {
     console.error('Protein band failed to render', err);
   }
+  // Guarded separately for the same reason as the two above: BMR, M, TEF and the adaptation
+  // pair are five boxes and up to three rows, and none of them is worth taking the calorie
+  // trace down with it.
+  let correctionRows = [];
+  try {
+    correctionRows = renderCorrectionFields(plan);
+  } catch (err) {
+    console.error('Correction terms failed to render', err);
+  }
 
-  [...(rows ?? []), ...pctRows, ...proteinRows].forEach(([label, value]) => {
+  // Appended in the order the boxes themselves run — BMI_g sits with m_g near the top of the
+  // sheet, the adaptation pair sits above the lean-mass block — so the trace reads down in
+  // roughly the same order the eye just travelled.
+  [...(rows ?? []), ...bmiRows, ...pctRows, ...correctionRows, ...proteinRows].forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
@@ -426,9 +510,13 @@ function renderFormulaDaysField(proj) {
 // reach, changes sign at most once for a physically reachable target, so a
 // wide bracket and a hundred halvings pin it down to well past display
 // precision — or prove no reachable τ solves it.
-function solveBForTypedDays({ deficit, massToLose, t, rho }) {
+// `minB` is the bracket's floor: B at τ = 0, i.e. the BMR equation's own per-kg term over
+// the thermic divisor. It used to be the literal 10 Mifflin contributes, which is neither
+// Katch's 21.6×c_m nor either of them once (1 − f) has divided it — and a floor above the
+// real one silently reports a reachable τ as unsolvable.
+function solveBForTypedDays({ deficit, massToLose, t, rho, minB = 10 }) {
   const h = (B) => deficit * (1 - Math.exp((-B * t) / rho)) - massToLose * B;
-  const lo = 10;
+  const lo = minB;
   const hi = 1e7;
   const hLo = h(lo);
   const hHi = h(hi);
@@ -456,7 +544,7 @@ function solveBForTypedDays({ deficit, massToLose, t, rho }) {
 // exactly that reason, whereas a gram figure is already frozen at the mass it was
 // computed from, and only moves when you re-save here.
 function readProteinFormula() {
-  const bodyMassKg = formulaNumber('formula-body-mass');
+  const bodyMassKg = formulaBodyMassKg();
   const heightCm = formulaNumber('formula-height');
   const sex = document.getElementById('formula-sex').value;
   const perKgMin = formulaNumber('formula-protein-per-kg-min');
@@ -521,9 +609,49 @@ function renderProteinFields() {
 // and a privacy-masked placeholder in it would report WEEKLY_FAT_LOSS_KG invalid and
 // disable Save. loadFormulaInputsFromSettings fills the same box unmasked for the same
 // reason.
+// BMI_g → m_g, run before anything reads the kilograms box — same shape and same reason as
+// syncWeeklyLossFromPct below, and written raw rather than through setComputedField for the
+// same one too: m_g is a settings-backed field read unconditionally by readFormulaInputs, and
+// a privacy-masked placeholder in it would report BODY_MASS_TARGET_KG invalid and disable
+// Save.
+function syncTargetMassFromBmi() {
+  if (!targetBmiIsTyped()) return;
+  const bmi = formulaNumber('formula-target-bmi');
+  const heightCm = formulaNumber('formula-height');
+  if (bmi === null || heightCm === null || heightCm <= 0) return;
+  document.getElementById('formula-target').value = String(bodyMassKgFromBmi(bmi, heightCm));
+}
+
+// The BMI_g box and the trace row for the identity — always as a pair, so the figure shown
+// and the arithmetic behind it come from a single read. m_g comes off its box rather than
+// being passed in: by the time the trace is built that box holds this render's value in every
+// mode — typed in four of them, and freshly solved in TARGET_MASS.
+//
+// Always printed in the m_g → BMI direction whichever box was typed, for the same reason the
+// Δm% row is: the kilograms are what the rest of the sheet actually used, so tracing them is
+// the honest line even when a BMI produced them.
+function renderTargetBmiField() {
+  const targetKg = formulaNumber('formula-target');
+  const heightCm = formulaNumber('formula-height');
+  const el = document.getElementById('formula-target-bmi');
+  const typed = targetBmiIsTyped();
+
+  if (targetKg === null || heightCm === null || heightCm <= 0) {
+    if (!typed) setComputedField('formula-target-bmi', '');
+    el.classList.remove('formula-out-of-band');
+    return [];
+  }
+
+  const bmi = computeBmi(targetKg, heightCm);
+  if (!typed) setComputedField('formula-target-bmi', String(bmi));
+  const verdict = bmiVerdict(bmi);
+  el.classList.toggle('formula-out-of-band', verdict.outside);
+  return [['BMI_g', `${targetKg} / (${heightCm / 100})²  =  ${bmi} kg/m² — ${verdict.text}`]];
+}
+
 function syncWeeklyLossFromPct() {
   if (!weeklyLossPctIsTyped()) return;
-  const kg = weeklyFatLossKgFromPct(formulaNumber('formula-weekly-loss-pct'), formulaNumber('formula-body-mass'));
+  const kg = weeklyFatLossKgFromPct(formulaNumber('formula-weekly-loss-pct'), formulaBodyMassKg());
   if (kg === null) return;
   document.getElementById('formula-weekly-loss').value = String(kg);
 }
@@ -592,7 +720,7 @@ function weeklyLossPctVerdict(pct) {
 // The verdict goes in the trace line and the box's own colour, nowhere else: the unit
 // column reads `%/week` and stops there, like every other row's.
 function renderWeeklyLossPctField() {
-  const bodyMassKg = formulaNumber('formula-body-mass');
+  const bodyMassKg = formulaBodyMassKg();
   const weeklyLossKg = formulaNumber('formula-weekly-loss');
   const derivedPct = weeklyFatLossPct(weeklyLossKg, bodyMassKg);
   const pctIsTyped = weeklyLossPctIsTyped();
@@ -618,9 +746,159 @@ function renderWeeklyLossPctField() {
   return [['Δm%', `100 × ${weeklyLossKg} / ${bodyMassKg}  =  ${derivedPct} %/week — ${verdict.text}`]];
 }
 
+// The BMR line, in whichever equation the radio has selected. Both print the same way —
+// coefficients substituted, then the figure — so switching equations changes the arithmetic
+// on show rather than only the answer at the end of it. The Katch line quotes the same
+// rounded LBM the LBM box shows, which is why it multiplies out exactly.
+function formulaBmrRow(bmr, { bodyMassKg, heightCm, age, sex, formula }) {
+  if (formula === 'katch') {
+    return ['BMR', `370 + 21.6 × ${bmrLeanBodyMassKg(bodyMassKg, heightCm, sex)}  =  ${Math.round(bmr)} kcal/day — Katch-McArdle, from lean mass`];
+  }
+  const sigma = sex === 'male' ? '+ 5' : '− 161';
+  return ['BMR', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day`];
+}
+
+// The A and B lines, which move under both switches: Katch replaces BMR's mass-free terms
+// and its per-kg coefficient (age drops out), and f divides whatever those come to. Printed
+// as the bracket then the divisor, the same shape the identity is written in, so a shifted
+// figure can be traced to whichever of the two moved it. At f = 0 the divisor is left off
+// entirely rather than printed as a "/ 1" nobody needs to read.
+function formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }) {
+  const { a, b, tefDivisor: divisor, formula } = coefficients;
+  const lbm = boerLeanBodyMassCoefficients(sex);
+  const sigma = sex === 'male' ? '+ 5' : '− 161';
+  const aTerms = formula === 'katch'
+    ? `370 + 21.6 × (${lbm.perCm} × ${heightCm} − ${Math.abs(lbm.constant)})`
+    : `6.25 × ${heightCm} − 5 × ${age} ${sigma}`;
+  const bTerms = formula === 'katch'
+    ? `21.6 × ${lbm.perKg} + ${met} × ${tau} × ${kappa} / 200`
+    : `10 + ${met} × ${tau} × ${kappa} / 200`;
+  const byDivisor = divisor === 1 ? '' : `, all / ${Math.round(divisor * 1000) / 1000}`;
+  return [
+    ['A', `${aTerms}${byDivisor}  =  ${Math.round(a)} kcal/day`],
+    ['B', `${bTerms}${byDivisor}  =  ${Math.round(b * 100) / 100} kcal/day per kg`],
+  ];
+}
+
+// The Eᵢₙ line. Two forms, because there are two identities: without a thermic share it's
+// the plain sum this app has always printed, and with one it's that sum divided by (1 − f)
+// — the solved form, since TEF is a share of the answer rather than a known term.
+function formulaEinRows(coefficients, { bmr, activityKcal, deficit, einKcal }) {
+  const divisor = coefficients.tefDivisor;
+  const sum = `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(deficit)}`;
+  if (divisor === 1) return [['Eᵢₙ', `${sum}  =  ${Math.round(einKcal)} kcal/day`]];
+  return [['Eᵢₙ', `(${sum}) / ${Math.round(divisor * 1000) / 1000}  =  ${Math.round(einKcal)} kcal/day`]];
+}
+
+// The same identity read the other way, for the mode that solves for Δm: D is what's left of
+// maintenance once the intake and the digestion it costs are both accounted for. Two forms
+// again, so that at f = 0 the line is the plain subtraction it has always been.
+function formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal, deficit }) {
+  const divisor = coefficients.tefDivisor;
+  const head = `${Math.round(bmr)} + ${Math.round(activityKcal)} − `;
+  const intake = divisor === 1
+    ? `${Math.round(einKcal)}`
+    : `${Math.round(einKcal)}×${Math.round(divisor * 1000) / 1000}`;
+  return [['D', `${head}${intake}  =  ${Math.round(deficit)} kcal/day`]];
+}
+
+// f, λ and λt_max as this render sees them. Kept together because all three are read on
+// every path including the failure ones, where the boxes still have to be brought in line
+// with a plan that didn't compute.
+function readAdaptationInputs() {
+  return {
+    pctPerWeek: formulaNumber('formula-adapt-per-week'),
+    pctCap: formulaNumber('formula-adapt-cap'),
+  };
+}
+
+// The TEF box and the two adaptation boxes, plus the trace rows for them — filled from one
+// `plan` so a shown figure and its shown arithmetic can't come from different renders. Null
+// (a failed or absent calorie solve) dashes all three: none of them means anything without
+// an Eᵢₙ to be a share of.
+//
+// Adaptation is evaluated at the horizon t this render produced, because λt is a function of
+// time on the diet and t is the only day count on the sheet. Without one — an unreachable
+// target — the cap is quoted instead, which is where λt was heading anyway.
+function renderCorrectionFields(plan) {
+  const tefEl = 'formula-tef';
+  const bmrEl = 'formula-bmr-adapt';
+  const plateauEl = 'formula-plateau-adapt';
+  const { pctPerWeek, pctCap } = readAdaptationInputs();
+
+  if (plan === null) {
+    ['formula-bmr', 'formula-maintenance', 'formula-deficit', tefEl, bmrEl, plateauEl].forEach((id) => setComputedField(id, '—'));
+    return [];
+  }
+
+  const { intakeKcal, coefficients, bmr, activityKcal, deficit, days, journey } = plan;
+  const rows = [];
+
+  // Three figures with boxes but no trace rows of their own here — BMR already prints its
+  // substituted line as the first row of every mode, D prints its own in all but TARGET_MASS,
+  // and M is the BMR and Eₐ rows added together in front of the reader.
+  //
+  // D comes from the plan rather than being recomputed off the intake: in the modes where the
+  // rate is the input, the mode's own figure is the one its `Δm × 7700 / 7` line printed, and
+  // deriving it back out of a ROUNDED Eᵢₙ could land a kcal away from it.
+  setComputedField('formula-bmr', String(Math.round(bmr)));
+  setComputedField('formula-maintenance', String(Math.round(bmr + activityKcal)));
+  setComputedField('formula-deficit', String(Math.round(deficit)));
+
+  const tefKcal = Math.round(intakeKcal * (1 - coefficients.tefDivisor));
+  setComputedField(tefEl, String(tefKcal));
+  // Only when there is one: at f = 0 the identity is true and empty, and a row reading
+  // "0 × 1163 = 0" is three columns of nothing.
+  if (tefKcal > 0) {
+    rows.push(['TEF', `${Math.round((1 - coefficients.tefDivisor) * 1000) / 10}% × ${Math.round(intakeKcal)}  =  ${tefKcal} kcal/day`]);
+  }
+
+  if (pctPerWeek === null || pctCap === null || bmr === null) {
+    [bmrEl, plateauEl].forEach((id) => setComputedField(id, '—'));
+    return rows;
+  }
+
+  // At the cap when there's no arrival date to measure λt at — named as such in the trace,
+  // so the figure is never read as "by day t" when there is no t.
+  const atCap = days === null;
+  const fraction = atCap
+    ? adaptationFraction(Infinity, pctPerWeek, pctCap)
+    : adaptationFraction(days, pctPerWeek, pctCap);
+  const adaptedBmr = bmr * (1 - fraction);
+  const lostPct = Math.round(fraction * 1000) / 10;
+  setComputedField(bmrEl, String(Math.round(adaptedBmr)));
+  rows.push(['BMR_a', `${Math.round(bmr)} × (1 − ${lostPct}/100)  =  ${Math.round(adaptedBmr)} kcal/day — ${atCap ? `at the ${pctCap}% ceiling` : `by day ${Math.round(days)}`}`]);
+
+  // A proportional journey has no plateau to move, so there is no overshoot to report —
+  // the same reason the m∞ rows are dropped in that journey (see renderFormulaPreview). The
+  // reason goes in the trace, never in the unit column, which reads `kg` and stops.
+  if (journey === 'pct') {
+    setComputedField(plateauEl, '—');
+    rows.push(['m∞_a', 'no plateau on a proportional journey, so no overshoot to report']);
+    return rows;
+  }
+
+  const plateauKg = adaptedPlateauKg(intakeKcal, coefficients, fraction);
+  const plainPlateauKg = (intakeKcal - coefficients.a) / coefficients.b;
+  if (!Number.isFinite(plateauKg)) {
+    setComputedField(plateauEl, '—');
+    return rows;
+  }
+
+  const plateauRounded = Math.round(plateauKg * 10) / 10;
+  const overshootKg = Math.round((plateauKg - plainPlateauKg) * 10) / 10;
+  setComputedField(plateauEl, String(plateauRounded));
+  rows.push(['m∞_a', `(${Math.round(intakeKcal)} − ${Math.round(coefficients.aBmr * (1 - fraction) / coefficients.tefDivisor)}) / ${Math.round(((1 - fraction) * coefficients.bBmr + coefficients.activityPerKg) / coefficients.tefDivisor * 100) / 100}  =  ${plateauRounded} kg${overshootKg > 0 ? ` — ${overshootKg} kg above m∞, which is the usual overshoot` : ''}`]);
+  return rows;
+}
+
 function renderFormulaPreview() {
+  // Both unit-pair syncs first, before anything reads the box each one writes: a typed BMI
+  // has to become kilograms before m_g is read, exactly as a typed Δm% has to become
+  // kilograms before Δm is.
+  syncTargetMassFromBmi();
   syncWeeklyLossFromPct();
-  const { mode, preview, bodyMassKg, heightCm, age, sex, einKcal, days, invalid } = readFormulaInputs();
+  const { mode, preview, bodyMassKg, heightCm, age, sex, formula, einKcal, days, invalid } = readFormulaInputs();
   const noteEl = document.getElementById('formula-profile-note');
   const saveBtn = document.getElementById('formula-save-btn');
 
@@ -656,8 +934,15 @@ function renderFormulaPreview() {
   // except in whichever single mode solves for one of them.
   const met = withFormulaOverrides(preview, activityMet);
   const kappa = preview.KCAL_PER_MET_KG_MIN;
-  const bmr = mifflinStJeorBmr(bodyMassKg, heightCm, age, sex);
-  const sigma = sex === 'male' ? '+ 5' : '− 161';
+  const bmr = bmrKcal(bodyMassKg, heightCm, age, sex, formula);
+  const tef = preview[TEF_PERCENT_KEY];
+
+  // Everything maintenanceAffineCoefficients and projectTargetDays need except τ, which is
+  // the one member of the set a mode can solve for. Spread with the mode's own τ at each
+  // call site, so the two BMR equations and the thermic share reach the coefficients, the
+  // forecast and the trace through one object rather than eight repeated argument lists.
+  const profile = { heightCm, age, sex, met, kappa, formula, tef };
+  const bmrRow = formulaBmrRow(bmr, { bodyMassKg, heightCm, age, sex, formula });
 
   noteEl.textContent = '';
   saveBtn.disabled = false;
@@ -673,9 +958,10 @@ function renderFormulaPreview() {
     const detail = withFormulaOverrides(preview, () => calorieTargetDetail(bodyMassKg));
     if (detail === null) { cantCompute(); return; }
     const weeklyPct = weeklyLossPctInPlay(detail.weeklyFatLossKg, bodyMassKg);
-    const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+    const coefficients = maintenanceAffineCoefficients({ ...profile, tau });
+    const { a, b } = coefficients;
     const proj = formulaProjection({
-      intakeKcal: detail.kcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg,
+      intakeKcal: detail.kcal, bodyMassKg, targetKg, tau, ...profile,
     }, weeklyPct);
     setComputedField('formula-ein', String(Math.round(detail.kcal)));
     renderFormulaDaysField(proj);
@@ -684,23 +970,32 @@ function renderFormulaPreview() {
     const bRounded = Math.round(b * 100) / 100;
     const eqRounded = Math.round(((detail.kcal - a) / b) * 10) / 10;
     const rows = [
-      ['BMR', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(detail.bmr)} kcal/day`],
+      bmrRow,
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
       ['D', `${detail.weeklyFatLossKg} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
-      ['Eᵢₙ', `${Math.round(detail.bmr)} + ${Math.round(detail.activityKcal)} − ${Math.round(deficit)}  =  ${detail.kcal} kcal/day`],
+      ...formulaEinRows(coefficients, {
+        bmr: detail.bmr, activityKcal: detail.activityKcal, deficit, einKcal: detail.kcal,
+      }),
     ];
     // A, B and m∞ are the constant-intake journey's plateau. On the proportional one nothing
     // holds Eᵢₙ still and there is no plateau, so printing them would trace a journey this
     // t was never measured along — the same reason TARGET_MASS omits BMR/Eₐ/D.
     if (proj.journey !== 'pct') {
       rows.push(
-        ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-        ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+        ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
         ['m∞', `(${detail.kcal} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
       );
     }
     rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }));
-    renderFormulaSubstituted(rows);
+    renderFormulaSubstituted(rows, {
+      intakeKcal: detail.kcal,
+      coefficients,
+      bmr: detail.bmr,
+      activityKcal: detail.activityKcal,
+      deficit,
+      days: proj.status === 'ok' ? proj.days : null,
+      journey: proj.journey,
+    });
     return;
   }
 
@@ -710,36 +1005,54 @@ function renderFormulaPreview() {
     const targetKg = preview.BODY_MASS_TARGET_KG;
     const knownField = dualKnownField.TAU;
 
+    // Both directions below solve the same identity the coefficients are built from, so they
+    // read the thermic divisor and the BMR equation's per-kg term off ONE construction of it
+    // rather than re-deriving either. τ is a placeholder here — it cancels out of everything
+    // read at this point (the divisor, and the BMR half of B).
+    const shape = maintenanceAffineCoefficients({ ...profile, tau: 0 });
+    const divisor = shape.tefDivisor;
+
     let tau;
     if (knownField === 'ein') {
-      // Eᵢₙ = BMR + m·MET·τ·κ/ε − D  ⇒  m·MET·τ·κ/ε = Eᵢₙ + D − BMR
-      const activityKcalNeeded = einKcal + deficit - bmr;
+      // Eᵢₙ×(1−f) = BMR + m·MET·τ·κ/ε − D  ⇒  m·MET·τ·κ/ε = Eᵢₙ×(1−f) + D − BMR
+      const activityKcalNeeded = einKcal * divisor + deficit - bmr;
       tau = Math.round((activityKcalNeeded * ML_O2_PER_KCAL) / (met * bodyMassKg * kappa));
     } else {
       // t and m_g typed instead of Eᵢₙ: no algebra isolates τ here (see
-      // solveBForTypedDays), so this direction root-finds B numerically.
+      // solveBForTypedDays), so this direction root-finds B numerically. Both the deficit and
+      // the solved B are the TEF-scaled ones — dividing D by (1 − f) is exactly what turns
+      // the un-thermic identity into the thermic one (see the derivation there) — so the
+      // minutes come back out by undoing that divisor and the BMR term B carries.
       const c = (met * kappa) / ML_O2_PER_KCAL;
-      const B = solveBForTypedDays({ deficit, massToLose: bodyMassKg - targetKg, t: days, rho: GENERIC_KCAL_PER_KG_FAT });
-      tau = B === null ? NaN : Math.round((B - 10) / c);
+      const B = solveBForTypedDays({
+        deficit: deficit / divisor,
+        massToLose: bodyMassKg - targetKg,
+        t: days,
+        rho: GENERIC_KCAL_PER_KG_FAT,
+        minB: shape.bBmr / divisor,
+      });
+      tau = B === null ? NaN : Math.round((B * divisor - shape.bBmr) / c);
     }
     if (!Number.isFinite(tau) || tau < 0) { cantCompute(); return; }
     setComputedField('formula-activity-min', String(tau));
 
-    const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+    const coefficients = maintenanceAffineCoefficients({ ...profile, tau });
+    const { a, b } = coefficients;
     const activityKcal = withFormulaOverrides(
       { ...preview, ACTIVITY_TARGET_MIN: tau },
       () => activityTargetKcal(bodyMassKg),
     );
     // When t was typed, Eᵢₙ was never given — it's exactly what the solved τ
-    // implies via the same flat equation the 'ein' direction runs forward.
-    const einForDisplay = knownField === 'ein' ? einKcal : (bmr + activityKcal - deficit);
+    // implies via the same flat equation the 'ein' direction runs forward, thermic
+    // divisor and all.
+    const einForDisplay = knownField === 'ein' ? einKcal : (bmr + activityKcal - deficit) / divisor;
 
     // Pin-aware only in the Eᵢₙ-known direction, where t is computed forward from the rate.
     // The other direction SOLVED τ from a typed t through the constant-Eᵢₙ decay identity
     // (solveBForTypedDays), so its projection has to be read in that same model — a
     // proportional t here would contradict the very day count τ was fitted to.
     const weeklyPct = weeklyLossPctInPlay(deltaM, bodyMassKg);
-    const projArgs = { intakeKcal: einForDisplay, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg };
+    const projArgs = { intakeKcal: einForDisplay, bodyMassKg, targetKg, tau, ...profile };
     const proj = knownField === 'ein' ? formulaProjection(projArgs, weeklyPct) : projectTargetDays(projArgs);
     if (knownField === 'ein') {
       renderFormulaDaysField(proj);
@@ -758,20 +1071,29 @@ function renderFormulaPreview() {
       rows.push(['τ', `solved numerically so that m(t=${days}) = ${targetKg} kg`]);
     }
     rows.push(
-      ['BMR', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day`],
+      bmrRow,
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ['D', `${deltaM} × 7700 / 7  =  ${Math.round(deficit)} kcal/day`],
-      ['Eᵢₙ', `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(deficit)}  =  ${Math.round(einForDisplay)} kcal/day`],
+      ...formulaEinRows(coefficients, { bmr, activityKcal, deficit, einKcal: einForDisplay }),
     );
     if (proj.journey !== 'pct') {
       rows.push(
-        ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-        ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+        ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
         ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
       );
     }
     rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }));
-    renderFormulaSubstituted(rows);
+    renderFormulaSubstituted(rows, {
+      intakeKcal: einForDisplay,
+      coefficients,
+      bmr,
+      activityKcal,
+      deficit,
+      // Typed in the t-known direction, projected in the other — either way it's the horizon
+      // this render's plan actually arrives on, which is what λt is measured along.
+      days: knownField === 'days' ? days : (proj.status === 'ok' ? proj.days : null),
+      journey: proj.journey,
+    });
     return;
   }
 
@@ -779,7 +1101,8 @@ function renderFormulaPreview() {
     // Eᵢₙ and t are both typed; solve m_g from the same exponential-decay
     // identity projectTargetDays uses in the other direction.
     const tau = preview.ACTIVITY_TARGET_MIN;
-    const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+    const coefficients = maintenanceAffineCoefficients({ ...profile, tau });
+    const { a, b } = coefficients;
     const equilibriumKg = (einKcal - a) / b;
     const mG = equilibriumKg + (bodyMassKg - equilibriumKg) * Math.exp((-b * days) / GENERIC_KCAL_PER_KG_FAT);
     if (!Number.isFinite(mG)) { cantCompute(); return; }
@@ -797,11 +1120,26 @@ function renderFormulaPreview() {
     // mass, which this mode never claims equals the typed Eᵢₙ — only A and B
     // (the mass-independent / mass-scaling split) feed the m_g identity below.
     renderFormulaSubstituted([
-      ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-      ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+      ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
       ['m∞', `(${Math.round(einKcal)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
       ['m_g', `${eqRounded} + (${bodyMassKg} − ${eqRounded}) × e^(−${bRounded}×${days}/7700)  =  ${mGRounded} kg`],
-    ]);
+    ], (() => {
+      // The BMR, activity and deficit figures this mode doesn't print are still what the
+      // correction boxes describe, so they're computed here rather than left out — the trace
+      // omits them because they don't feed m_g, not because they're unknown. D is the one
+      // the typed Eᵢₙ implies at the CURRENT mass, which is the only sense the box can have
+      // in a mode that solves for a future one.
+      const activityKcal = withFormulaOverrides(preview, () => activityTargetKcal(bodyMassKg));
+      return {
+        intakeKcal: einKcal,
+        coefficients,
+        bmr,
+        activityKcal,
+        deficit: bmr + activityKcal - einKcal * coefficients.tefDivisor,
+        days,
+        journey: 'intake',
+      };
+    })());
     return;
   }
 
@@ -810,7 +1148,8 @@ function renderFormulaPreview() {
   // neither direction needs the numerical step TAU's t-known path does.
   const tau = preview.ACTIVITY_TARGET_MIN;
   const targetKg = preview.BODY_MASS_TARGET_KG;
-  const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+  const coefficients = maintenanceAffineCoefficients({ ...profile, tau });
+  const { a, b } = coefficients;
   const activityKcal = withFormulaOverrides(preview, () => activityTargetKcal(bodyMassKg));
   const knownField = dualKnownField.DELTA_M;
 
@@ -827,7 +1166,10 @@ function renderFormulaPreview() {
   }
   if (!Number.isFinite(einForDisplay)) { cantCompute(); return; }
 
-  const deficit = bmr + activityKcal - einForDisplay;
+  // The thermic share comes off the intake before the deficit is read from it: D is what's
+  // left of maintenance once the intake and its own digestion cost are accounted for, which
+  // is the same Eᵢₙ×(1−f) = BMR + Eₐ − D line every other mode solves.
+  const deficit = bmr + activityKcal - einForDisplay * coefficients.tefDivisor;
   const deltaMSolved = Math.round((deficit * 7 / GENERIC_KCAL_PER_KG_FAT) * 100) / 100;
   if (!Number.isFinite(deltaMSolved)) { cantCompute(); return; }
   setComputedField('formula-weekly-loss', String(deltaMSolved));
@@ -846,22 +1188,29 @@ function renderFormulaPreview() {
     // of today's mass is exactly what the pin would hold, so the journey is its own.
     const weeklyPct = weeklyFatLossPct(deltaMSolved, bodyMassKg);
     const proj = formulaProjection({
-      intakeKcal: einForDisplay, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg,
+      intakeKcal: einForDisplay, bodyMassKg, targetKg, tau, ...profile,
     }, weeklyPct);
     renderFormulaDaysField(proj);
 
     renderFormulaSubstituted([
-      ['BMR', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day`],
+      bmrRow,
       ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
-      ['D', `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(einForDisplay)}  =  ${Math.round(deficit)} kcal/day`],
+      ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
       ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
       ...(proj.journey === 'pct' ? [] : [
-        ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-        ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+        ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
         ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
       ]),
       ...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }),
-    ]);
+    ], {
+      intakeKcal: einForDisplay,
+      coefficients,
+      bmr,
+      activityKcal,
+      deficit,
+      days: proj.status === 'ok' ? proj.days : null,
+      journey: proj.journey,
+    });
     return;
   }
 
@@ -873,24 +1222,37 @@ function renderFormulaPreview() {
 
   const decayRounded = Math.round(decay * 1000) / 1000;
   renderFormulaSubstituted([
-    ['A', `6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(a)} kcal/day`],
-    ['B', `10 + ${met} × ${tau} × ${kappa} / 200  =  ${bRounded} kcal/day per kg`],
+    ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
     ['m∞', `(${targetKg} − ${bodyMassKg}×${decayRounded}) / (1 − ${decayRounded})  =  ${eqRounded} kg`],
     ['Eᵢₙ', `${Math.round(a)} + ${bRounded} × ${eqRounded}  =  ${Math.round(einForDisplay)} kcal/day`],
-    ['BMR', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day`],
+    bmrRow,
     ['Eₐ', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
-    ['D', `${Math.round(bmr)} + ${Math.round(activityKcal)} − ${Math.round(einForDisplay)}  =  ${Math.round(deficit)} kcal/day`],
+    ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
     ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
-  ]);
+  ], {
+    intakeKcal: einForDisplay,
+    coefficients,
+    bmr,
+    activityKcal,
+    deficit,
+    days,
+    journey: 'intake',
+  });
 }
 
 function loadFormulaInputsFromSettings() {
-  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS].forEach((field) => {
+  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS].forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
   });
   // Seeded from the same places the charts read, so the figure shown on open
   // matches the one on the Caloric Intake line before anything is touched.
-  document.getElementById('formula-body-mass').value = latestBodyMassKg(physiqueAsWellnessEntries()) ?? '';
+  //
+  // Both mass boxes, from the two functions that define them: the raw one is the last
+  // weigh-in, shown only for comparison, and m̄ is planBodyMassKg — the same rolling average
+  // the tile and the chart target are computed at, so the modal opens agreeing with them.
+  const wellnessEntries = physiqueAsWellnessEntries();
+  document.getElementById('formula-body-mass').value = latestBodyMassKg(wellnessEntries) ?? '';
+  document.getElementById('formula-body-mass-smooth').value = planBodyMassKg(wellnessEntries) ?? '';
   document.getElementById('formula-height').value = getSetting('HEIGHT_CM', null) ?? '';
   document.getElementById('formula-age').value = ageFromBirthDate(getSettingString('BIRTH_DATE', null)) ?? '';
   // Falls back to male only because the formula needs one of the two — an unset
@@ -922,6 +1284,9 @@ function openFormulaPlayground() {
   // Same fresh start for the Δm pair — 'kg' unless the percentage is the pinned quantity,
   // in which case it's the one on the sheet and the kilograms are what follow from it.
   weeklyLossKnownField = pinnedWeeklyFatLossPct() !== null ? 'pct' : 'kg';
+  // And the target pair, always on kilograms: BODY_MASS_TARGET_KG is what the sheet stores,
+  // so the kilograms are the known on open and the BMI is derived from them.
+  targetMassKnownField = 'kg';
   // Set from what's actually on the sheet, so the trio always shows the live state rather
   // than defaulting to one and inviting an accidental switch. The two pinnable keys are
   // mutually exclusive (Save blanks one whenever it writes the other), so this reads them
@@ -932,6 +1297,10 @@ function openFormulaPlayground() {
   document.querySelector(`input[name="formula-pin-mode"][value="${pinMode}"]`).checked = true;
   const activityPinMode = pinnedActivityTargetKcal() !== null ? 'calorie' : 'time';
   document.querySelector(`input[name="formula-activity-pin-mode"][value="${activityPinMode}"]`).checked = true;
+  // Also from the sheet rather than a fixed default: which BMR equation is in force is a
+  // saved decision, and opening the modal on the other one would misdescribe every figure
+  // behind it until something was touched.
+  document.querySelector(`input[name="formula-bmr-formula"][value="${bmrFormula()}"]`).checked = true;
   loadFormulaInputsFromSettings();
   applySolveForMode('EIN');
   renderFormulaPreview();
@@ -1005,6 +1374,15 @@ async function saveFormulaSettings() {
     overrides.PROTEIN_TARGET_G_MAX = protein.maxG;
   }
 
+  // The adaptation pair, saved the same way and for the same reason as the per-kg protein
+  // rule: they change no target, but the Health Plan prompt quotes them, so the sheet has to
+  // remember what the plateau caveat was computed with. Each only when it holds a number —
+  // a blank one is left alone rather than written as an empty cell.
+  ADAPT_FORMULA_FIELDS.forEach((field) => {
+    const value = formulaNumber(field.inputId);
+    if (value !== null) overrides[field.key] = value;
+  });
+
   const saveBtn = document.getElementById('formula-save-btn');
   const statusEl = document.getElementById('formula-status');
   const originalLabel = saveBtn.textContent;
@@ -1035,7 +1413,15 @@ async function saveFormulaSettings() {
     const proteinNote = protein === null
       ? 'The protein band was left alone — it needs body mass, height and both per-kg ends.'
       : `Protein target is now ${protein.minG}–${protein.maxG} g/day, from ${protein.perKgMin}–${protein.perKgMax} g per kg of ${protein.lbmKg} kg lean mass.`;
-    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}`);
+    // Which BMR equation is now in force, and whether digestion is being counted — the two
+    // choices that move every calorie figure in the app at once, so a save that changed one
+    // shouldn't leave you guessing which numbers just moved and why.
+    const modelNote = currentBmrFormula() === 'katch'
+      ? 'BMR now comes from Katch-McArdle (370 + 21.6 × LBM), so age no longer enters the target.'
+      : 'BMR stays on Mifflin-St Jeor.';
+    const tefSaved = formulaNumber('formula-tef-pct');
+    const tefNote = tefSaved ? ` The thermic effect of food is counted at ${tefSaved}% of intake, which lifts every target accordingly.` : '';
+    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote} ${modelNote}${tefNote}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {
@@ -1052,12 +1438,29 @@ function initFormulaPlayground() {
   // Δm is left out here and wired with Δm% below: both have to record which of the pair
   // is the known BEFORE the render, and a plain render-only listener firing first would
   // let the previous known overwrite the box being typed into.
-  [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss'),
+  // formula-body-mass is NOT here: it's the raw weigh-in, readonly and read by nothing —
+  // m̄ below it is the box every identity is evaluated at, so it's the one that re-renders.
+  //
+  // m_g is left out for the same reason Δm is, and wired with BMI_g below: both have to
+  // record which of their pair is the known BEFORE the render, and a plain render-only
+  // listener firing first would let the previous known overwrite the box being typed into.
+  [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss' && id !== 'formula-target'),
     ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
-    'formula-body-mass', 'formula-height', 'formula-age'].forEach((id) => {
+    ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
+    'formula-body-mass-smooth', 'formula-height', 'formula-age'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderFormulaPreview);
   });
   document.getElementById('formula-sex').addEventListener('change', renderFormulaPreview);
+
+  // Switching BMR equations re-derives everything: the figure, A and B, the plateau and the
+  // arrival date, and (under Katch) whether a blank age is even a problem — so it goes
+  // through the same full render a typed input does, not a cosmetic swap of one line.
+  document.querySelectorAll('input[name="formula-bmr-formula"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      clearFieldError('formula-status');
+      renderFormulaPreview();
+    });
+  });
 
   // Either box can be the one you fill in; typing into it makes it the known and pushes
   // the other one. No mode check needed: in DELTA_M both are readonly, and a readonly
@@ -1065,6 +1468,16 @@ function initFormulaPlayground() {
   [['formula-weekly-loss', 'kg'], ['formula-weekly-loss-pct', 'pct']].forEach(([id, field]) => {
     document.getElementById(id).addEventListener('input', () => {
       weeklyLossKnownField = field;
+      renderFormulaPreview();
+    });
+  });
+
+  // The target's own pair, the same way: type kilograms and the BMI follows, type a BMI and
+  // the kilograms follow. No mode check needed here either — in TARGET_MASS both are readonly,
+  // and a readonly input fires no input event.
+  [['formula-target', 'kg'], ['formula-target-bmi', 'bmi']].forEach(([id, field]) => {
+    document.getElementById(id).addEventListener('input', () => {
+      targetMassKnownField = field;
       renderFormulaPreview();
     });
   });

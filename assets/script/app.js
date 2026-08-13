@@ -858,6 +858,46 @@ function setupWidgetsToggle() {
   });
 }
 
+// A phone screen now has a fixed bar at both the top (header) and the bottom
+// (.nav, styles.css's phone breakpoint) — sliding the top one out of view on
+// the way down the page, and back in on the way up, gives the content the
+// screen space back instead of two bars permanently claiming it. Desktop
+// keeps the header put: isMobile() is read on every scroll rather than once,
+// so resizing across the breakpoint mid-session can't leave it stuck hidden.
+function setupHeaderAutoHide() {
+  const header = document.querySelector('header');
+  const dropdown = document.getElementById('account-menu-dropdown');
+  const isMobile = () => window.matchMedia('(max-width: 640px)').matches;
+
+  let lastY = window.scrollY;
+  let ticking = false;
+
+  function update() {
+    ticking = false;
+    const y = window.scrollY;
+
+    // Never hide it near the top (nothing gained, and it'd flicker in and out
+    // right at the scroll boundary), or while its own account menu is open —
+    // that menu is the header's child, so hiding the header would yank an
+    // open dropdown off-screen out from under the user.
+    if (!isMobile() || !dropdown.hidden || y < header.offsetHeight) {
+      header.classList.remove('header-hidden');
+    } else if (y > lastY) {
+      header.classList.add('header-hidden');
+    } else if (y < lastY) {
+      header.classList.remove('header-hidden');
+    }
+    lastY = y;
+  }
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+  }, { passive: true });
+}
+
 function setupScrollSpy() {
   const navLinks = [...document.querySelectorAll('#main-nav a')];
 
@@ -984,6 +1024,7 @@ function bootDashboard() {
   initFinancialInsight();
   initWorkoutPlan();
   setupScrollSpy();
+  setupHeaderAutoHide();
   setupPanelToggles();
   setupThemeToggle();
   setupPrivacyToggle();

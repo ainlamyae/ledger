@@ -47,6 +47,8 @@ textarea {
 
 :root[data-theme="dark"] {
     color-scheme: dark;
+    --color-nav: #0b1524;
+    --color-nav-hover: #1e293b;
     --color-bg: #0f172a;
     --color-surface: #1e293b;
     --color-border: #334155;
@@ -1514,11 +1516,21 @@ th.sortable:hover {
 }
 
 /* Below 820px two narrow columns squeeze the Status card's longer rows
-   ("108~132 g" etc.) too tight, so drop to one column: Status on top,
-   the Macros/Activity/Sleep stack below it, each full width. */
+   ("108~132 g" etc.) too tight at the desktop sizing above — tighten the
+   padding and shrink the row/value text instead of dropping to one column,
+   the same trade the phone breakpoint below already made; two columns stays
+   the shape all the way from desktop down to the smallest phone. */
 @media (max-width: 820px) {
-    .today-glance-cards {
-        grid-template-columns: 1fr;
+    .today-glance-cards .card {
+        padding: .35rem .35rem;
+    }
+
+    .today-glance-cards .widget-row {
+        font-size: .8rem;
+    }
+
+    .today-glance-cards .value {
+        font-size: .95rem;
     }
 }
 
@@ -1721,11 +1733,16 @@ td .btn {
     margin-top: .6rem;
 }
 
-/* Floated rather than absolutely positioned: .modal-card scrolls, so an
-   absolute corner would drift over the fields on a long form. Sits in source
-   before the <h2> so it shares that line. */
-/* Square-ish now that the label is a single ❌ rather than the word — the .btn
-   default padding is sized for text and left it stretched. */
+/* The three read-only viewers (Instructions, Micronutrients, Keyboard
+   shortcuts — no Save, nothing to scroll to) keep this floated at the top
+   beside their <h2>, same as always. Every form modal instead places this
+   same button as the last child of its own .modal-actions, beside Save —
+   flex items ignore float/margin-left, so the one rule serves both without a
+   variant: floats top-right when it's alone at the top, sits inline at the
+   end of the actions row when it's there instead. Moved out of the top
+   corner because a long form on a phone put Close off the top of the screen,
+   so closing meant scrolling all the way back up to find it — beside Save
+   it's wherever you already scrolled to finish the form. */
 .modal-close {
     float: right;
     margin-left: .75rem;
@@ -2567,13 +2584,49 @@ td .btn {
         font-size: 14px;
     }
 
-    .container {
-        padding: 1rem;
-    }
-
+    /* position: sticky (the desktop/base rule) cannot be slid out of view once
+       scrolled: past the point where it first "sticks", a sticky element is
+       permanently clamped to top:0 by its own positioning algorithm — margin,
+       transform, anything — the clamp always wins, so it never actually moves.
+       Fixed has no such clamp and answers to `top` directly. Because it's
+       fixed rather than sticky it no longer reserves its own space in the
+       page's flow, hence the body padding-top below. */
     header {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
         padding: .5rem .75rem;
         gap: .35rem;
+        transition: top .25s ease;
+    }
+
+    /* Compensates for header now being fixed (out of flow) — without this the
+       page's own content would render up under it starting from the very
+       first paint, not just after a scroll. A generous fixed estimate of the
+       mobile header's own height rather than a measured one: a few extra
+       pixels of gap below it is invisible, where too little would clip the
+       first panel under the header. */
+    body {
+        padding-top: 3.5rem;
+    }
+
+    .container {
+        /* Bottom padding clears the fixed tab bar below (.nav) so the last
+           panel on the page never sits half-hidden behind it. */
+        padding: 1rem 1rem calc(1rem + 3.5rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* A phone now has a fixed bar at both ends of the screen (this header,
+       and .nav below) — sliding this one out of view while scrolling down,
+       and back in on the way up (setupHeaderAutoHide, app.js), gives a
+       full-height screen back to the content instead of two bars permanently
+       eating into it. Bottom .nav stays put: it's the primary navigation, and
+       thumb reach means it should never require a scroll-up to reach.
+       A generous fixed amount rather than the header's exact measured height:
+       once it's off-screen a few extra pixels doesn't matter. */
+    header.header-hidden {
+        top: -6rem;
     }
 
     header h1 {
@@ -2607,16 +2660,50 @@ td .btn {
         padding: .35rem .45rem;
     }
 
+    /* A bottom tab bar below this width: a phone's header has no room for a
+       3-item nav beside the logo and account actions without crowding all
+       three, and the thumb-reach a fixed bottom bar gives is the native
+       mobile pattern anyway (iOS/Android tab bars, most app-shaped sites).
+       Taken clean out of the header's flexbox by position: fixed, so the
+       logo and header-actions lay out exactly as they would if .nav didn't
+       exist there at all. */
     .nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10;
+        margin-left: 0;
         gap: 0;
         justify-content: space-between;
+        background: var(--color-nav);
+        border-top: 1px solid rgba(255, 255, 255, .1);
+        /* iPhone home-indicator clearance — padding, not margin, so the bar's
+           own background still fills behind the indicator instead of leaving
+           a gap of the page's own background showing through. */
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     .nav a {
         flex: 1;
         text-align: center;
         font-size: 1rem;
-        padding: .5rem .25rem;
+        padding: .6rem .25rem .5rem;
+    }
+
+    /* The color change alone (.nav a.active, above) reads fine in a row of
+       text links, but a tab bar's active item needs a stronger tell at a
+       glance — the same accent every other "selected" state in the app
+       already uses, as a top edge rather than a full underline so it doesn't
+       compete with the label's own text. */
+    .nav a.active::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--color-primary);
     }
 
     #accounts,
@@ -2647,32 +2734,6 @@ td .btn {
 
     .card .value {
         font-size: 1.5rem;
-    }
-
-    /* Below 820px the general breakpoint (see .today-glance-cards there) drops
-       to one column because two narrow columns squeeze Status's longer rows
-       too tight — but on an actual phone that leaves Status, Macros, Activity
-       and Sleep stacked as four full-width cards in a row, which reads worse
-       than two tighter columns. Restore two columns here and shrink the rows
-       further so the longer Status figures still fit. */
-    .today-glance-cards {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    /* Two across a phone leaves each glance tile ~160px inside, and the
-       Activity line needs most of it — the side padding is trimmed here rather
-       than shrinking the figures further. Top/bottom is trimmed too since these
-       tiles are all rows, no title art, so vertical padding is pure dead space. */
-    .today-glance-cards .card {
-        padding: .35rem .35rem;
-    }
-
-    .today-glance-cards .widget-row {
-        font-size: .8rem;
-    }
-
-    .today-glance-cards .value {
-        font-size: .95rem;
     }
 
     .widget-card {

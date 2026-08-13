@@ -6,7 +6,11 @@
 // Calories In, Protein In, Fiber, Fat, Carbohydrate, TEF, Workout, Activity
 // Duration, Calories Out.
 const PHYSIQUE_RANGE = `'${CONFIG.SHEETS.PHYSIQUE}'!A2:O`;
-const P_PAGE_SIZE = 31;
+// 4 weeks of dated days per page. Pattern rows (no date) are date-agnostic
+// templates rather than a day, so they're excluded from this count and shown
+// on every page in full instead of being paginated away — see
+// getPhysiquePageEntries.
+const P_PAGE_SIZE = 28;
 
 let allPhysiqueEntries = [];
 // Flips true once refreshPhysique has run at least once — lets a click racing
@@ -150,8 +154,8 @@ async function initPhysique(forceRefresh = false) {
     });
 
     document.getElementById('physique-select-all').addEventListener('change', (e) => {
-      const pageRows = getFilteredPhysiqueEntries().slice((pCurrentPage - 1) * P_PAGE_SIZE, pCurrentPage * P_PAGE_SIZE);
-      pageRows.forEach((p) => (e.target.checked ? selectedPhysiqueRows.add(p.row) : selectedPhysiqueRows.delete(p.row)));
+      const { pageEntries } = getPhysiquePageEntries();
+      pageEntries.forEach((p) => (e.target.checked ? selectedPhysiqueRows.add(p.row) : selectedPhysiqueRows.delete(p.row)));
       renderPhysiqueList();
     });
     onAsyncClick('physique-bulk-calc-btn', bulkCalculatePhysique);
@@ -434,16 +438,28 @@ function physiqueSleepHours(p) {
   return sleepDurationHours(bed, wake);
 }
 
+// Patterns always sort to the top of getFilteredPhysiqueEntries() and never
+// count against a page's P_PAGE_SIZE dated days — a template isn't a day, and
+// there's usually only a handful of them, so hiding one behind pagination
+// would bury a row meant to always be at hand. Shared by the render and the
+// header select-all checkbox so both agree on exactly what's on the page.
+function getPhysiquePageEntries() {
+  const entries = getFilteredPhysiqueEntries();
+  const patterns = entries.filter((p) => !p.date);
+  const dated = entries.filter((p) => p.date);
+
+  const totalPages = Math.max(1, Math.ceil(dated.length / P_PAGE_SIZE));
+  pCurrentPage = Math.min(pCurrentPage, totalPages);
+
+  const start = (pCurrentPage - 1) * P_PAGE_SIZE;
+  return { pageEntries: [...patterns, ...dated.slice(start, start + P_PAGE_SIZE)], totalPages };
+}
+
 function renderPhysiqueList() {
   const tbody = document.getElementById('physique-body');
   tbody.innerHTML = '';
 
-  const entries = getFilteredPhysiqueEntries();
-  const totalPages = Math.max(1, Math.ceil(entries.length / P_PAGE_SIZE));
-  pCurrentPage = Math.min(pCurrentPage, totalPages);
-
-  const start = (pCurrentPage - 1) * P_PAGE_SIZE;
-  const pageEntries = entries.slice(start, start + P_PAGE_SIZE);
+  const { pageEntries, totalPages } = getPhysiquePageEntries();
 
   if (pageEntries.length === 0) {
     const message = allPhysiqueEntries.length === 0

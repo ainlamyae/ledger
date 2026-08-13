@@ -1,2 +1,5 @@
 # Personal financial data exports - never commit or push
 *.xlsx
+
+# Local editor settings - never commit or push
+.claude

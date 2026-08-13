@@ -1152,7 +1152,6 @@
 
 <div id="tx-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="tx-modal-title">Log a Transaction</h2>
 
         <form id="tx-form" class="app-form">
@@ -1202,6 +1201,7 @@
                 <button type="button" id="tx-tax-btn" class="btn">Tax</button>
                 <button type="submit" id="tx-save-add-btn" class="btn btn-primary">Save &amp; Add Another</button>
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1209,7 +1209,6 @@
 
 <div id="tx-bulk-edit-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tx-bulk-edit-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="tx-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="tx-bulk-edit-modal-title">Edit Selected Transactions</h2>
 
         <form id="tx-bulk-edit-form" class="app-form">
@@ -1239,6 +1238,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="tx-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1246,7 +1246,6 @@
 
 <div id="breakdown-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="breakdown-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="breakdown-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="breakdown-modal-title">Edit Breakdown Row</h2>
 
         <form id="breakdown-form" class="app-form">
@@ -1266,6 +1265,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="breakdown-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1273,7 +1273,6 @@
 
 <div id="account-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="account-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="account-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="account-modal-title">Add Account</h2>
 
         <form id="account-form" class="app-form">
@@ -1310,6 +1309,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="account-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1317,7 +1317,6 @@
 
 <div id="transfer-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="transfer-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="transfer-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="transfer-modal-title">Transfer Funds</h2>
 
         <form id="transfer-form" class="app-form">
@@ -1346,6 +1345,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Transfer</button>
+                <button type="button" id="transfer-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1353,7 +1353,6 @@
 
 <div id="setting-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="setting-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="setting-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="setting-modal-title">Add Setting</h2>
 
         <form id="setting-form" class="app-form">
@@ -1396,6 +1395,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="setting-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1403,7 +1403,6 @@
 
 <div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="timesheet-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="timesheet-modal-title">Log a Work Time</h2>
 
         <form id="timesheet-form" class="app-form">
@@ -1439,6 +1438,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="timesheet-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1446,7 +1446,6 @@
 
 <div id="physique-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="physique-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="physique-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="physique-modal-title">Log a Physique</h2>
 
         <form id="physique-form" class="app-form">
@@ -1564,6 +1563,7 @@
                 <input type="file" id="physique-scan-input" accept="image/*" hidden>
                 <button type="button" id="physique-scan-btn" class="btn btn-ai" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption">Scan</button>
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="physique-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -1591,7 +1591,6 @@
 
 <div id="formula-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formula-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="formula-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="formula-modal-title">Health Formula Playground</h2>
 
         <fieldset class="formula-solve-for">
@@ -2159,6 +2158,7 @@
         <div class="modal-actions">
             <button type="button" id="formula-reset-btn" class="btn">Reset</button>
             <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
+            <button type="button" id="formula-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         </div>
     </div>
 </div>
@@ -2174,7 +2174,6 @@
 
 <div id="activity-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="activity-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="activity-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="activity-modal-title">Add Activity</h2>
 
         <form id="activity-form" class="app-form">
@@ -2234,6 +2233,7 @@
             <div class="modal-actions">
                 <button type="button" id="activity-log-btn" class="btn btn-primary" title="Log this activity as today's workout">Log</button>
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="activity-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -2241,7 +2241,6 @@
 
 <div id="nutrition-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="nutrition-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="nutrition-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="nutrition-modal-title">Add Ingredient</h2>
 
         <form id="nutrition-form" class="app-form">
@@ -2292,6 +2291,7 @@
                 <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">🧬 Pull Micronutrients</button>
                 <button type="button" id="nutrition-normalize-btn" class="btn" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure">Normalize</button>
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="nutrition-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -2299,7 +2299,6 @@
 
 <div id="contact-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="contact-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="contact-modal-title">Add Contact</h2>
 
         <form id="contact-form" class="app-form">
@@ -2371,6 +2370,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="contact-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -2378,7 +2378,6 @@
 
 <div id="travel-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="travel-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="travel-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="travel-modal-title">Log a Travel Entry</h2>
 
         <form id="travel-form" class="app-form">
@@ -2415,6 +2414,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="travel-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -2422,7 +2422,6 @@
 
 <div id="application-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="application-modal-title" hidden>
     <div class="modal-card">
-        <button type="button" id="application-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="application-modal-title">Log an Application</h2>
 
         <form id="application-form" class="app-form">
@@ -2444,6 +2443,7 @@
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="application-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>

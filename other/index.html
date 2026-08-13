@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+<!-- Resolves every relative URL on this page — including every one in the markup
+     it pulls in from index.html — against the directory above this one. -->
+<base href="../">
+
+<title>Other — Ledger</title>
+
+<!-- The same two lines index.html runs, repeated because they have to land
+     before the first paint and so can't wait for the fetch below. -->
+<script>
+    if (localStorage.getItem('ledger_theme') === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+</script>
+
+<!-- Named here, rather than left to arrive with the rest of index.html's head,
+     so the stylesheet and the icon download alongside index.html instead of
+     after it. -->
+<link rel="stylesheet" href="assets/style/styles.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+<!-- This page has no markup of its own on purpose: the loader builds it from
+     index.html and shows the Other wrapper alone. -->
+<script src="assets/script/section-page.js"></script>
+</head>
+
+<body>
+<noscript>
+    <p style="margin: 2rem">Ledger needs JavaScript to run. <a href=".">Open the dashboard</a>.</p>
+</noscript>
+</body>
+</html>

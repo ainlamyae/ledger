@@ -164,4 +164,7 @@ function initLandingGraphs() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', initLandingGraphs);
+// Same reason app.js registers its start-up step this way: on a section page
+// this file arrives after DOMContentLoaded has been and gone.
+if (window.ledgerSectionPage) window.ledgerSectionPage.onBoot(initLandingGraphs);
+else document.addEventListener('DOMContentLoaded', initLandingGraphs);

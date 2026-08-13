@@ -278,6 +278,8 @@ function resolveSecondClockCity() {
 // override the hardcoded defaults, without overriding a per-browser manual
 // pick made via the location pickers.
 async function applySettingsToWidgets() {
+  if (!widgetsOnPage()) return;
+
   const defaultCityName = getSettingString('WIDGET_DEFAULT_CITY', null);
   if (defaultCityName && defaultCityName !== sheetDefaultCityQuery) {
     sheetDefaultCityQuery = defaultCityName;
@@ -621,7 +623,20 @@ async function initWeatherWidget(location) {
   }
 }
 
+// The section pages (/health/, /finance/, /other/) hide the bulbs row — it
+// belongs to the dashboard as a whole rather than to any one wrapper — and a
+// clock ticking every second behind a hidden row, with prayer-time and forecast
+// requests behind it, is work nobody can see. Checked at both entry points
+// (here and applySettingsToWidgets) rather than at the call sites, so no future
+// caller has to remember it.
+function widgetsOnPage() {
+  const row = document.querySelector('.widget-cards');
+  return Boolean(row) && !row.hidden;
+}
+
 async function initWidgets() {
+  if (!widgetsOnPage()) return;
+
   widgetLocationLabel = fallbackLocationLabel();
   renderClock();
   setInterval(renderClock, 1000);

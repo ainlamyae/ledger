@@ -49,6 +49,14 @@ async function initTransactions(forceRefresh = false) {
     document.getElementById('tx-tax-btn').addEventListener('click', applyTaxToAmount);
     onFormSubmit('tx-form', submitTransactionForm);
 
+    // Whether the balance can be updated is a property of the account, so the
+    // box and its note are re-checked whenever the account changes — not only
+    // when the form opens.
+    document.getElementById('tx-account').addEventListener('change', syncUpdateBalanceBox);
+    document.getElementById('tx-update-balance').addEventListener('change', (e) => {
+      updateBalanceWanted = e.target.checked;
+    });
+
     // Deferred full refresh when the modal closes after a keepOpen add sequence.
     // Covers all close paths: Cancel button, Escape key, and normal Save.
     new MutationObserver(() => {
@@ -365,6 +373,41 @@ function applyTaxToAmount() {
   clearFieldError('tx-form-error');
 }
 
+// The tick box's own state, kept across account changes and across forms: having
+// unticked it once, picking a different account shouldn't quietly tick it again.
+// Re-armed for each new form, since the default is on.
+let updateBalanceWanted = true;
+
+// Reflects what "Update the account balance" can actually do for the account now
+// selected. An account whose Balance the sheet computes for itself gets the box
+// turned off and the reason printed under it, rather than a tick that would have
+// double-counted the row on save (accounts.js: accountBalanceTarget).
+//
+// Deliberately doesn't disable the box while the read is in flight: a tick lost
+// to a slow read would be worse than the late correction, and the save path
+// re-checks the same verdict anyway before it writes anything.
+async function syncUpdateBalanceBox() {
+  const box = document.getElementById('tx-update-balance');
+  const note = document.getElementById('tx-update-balance-note');
+  const name = document.getElementById('tx-account').value;
+
+  note.hidden = true;
+  if (!name) {
+    box.disabled = false;
+    box.checked = updateBalanceWanted;
+    return;
+  }
+
+  const target = await accountBalanceTarget(name);
+  // The account may have been changed again while this was out.
+  if (document.getElementById('tx-account').value !== name) return;
+
+  box.disabled = !target.writable;
+  box.checked = target.writable && updateBalanceWanted;
+  note.hidden = target.writable;
+  if (!target.writable) note.textContent = target.reason;
+}
+
 function openTransactionForm(transaction, duplicate = false) {
   editingRow = (transaction && !duplicate) ? transaction.row : null;
 
@@ -381,6 +424,24 @@ function openTransactionForm(transaction, duplicate = false) {
   // A duplicate is a new row (like Add), not an in-place edit, so "Save & Add
   // Another" should be offered just like it is for a brand-new transaction.
   document.getElementById('tx-save-add-btn').hidden = !!transaction && !duplicate;
+
+  // Same test, for the same reason: the box adds the amount to a balance, which
+  // is only unambiguous for a row that didn't exist before. On an edit the
+  // balance would need the difference between the old amount and the new one —
+  // and nothing at all if the amount wasn't what changed — so rather than guess,
+  // the box is off the form and the Account panel stays the place to fix a
+  // balance by hand.
+  const newRow = !editingRow;
+  document.getElementById('tx-update-balance-label').hidden = !newRow;
+  document.getElementById('tx-update-balance-note').hidden = true;
+  if (newRow) {
+    updateBalanceWanted = true;
+    document.getElementById('tx-update-balance').checked = true;
+    // Not awaited: the form opens on the figures it already has, and the box
+    // corrects itself a moment later if this account's balance turns out to be
+    // the sheet's own formula.
+    syncUpdateBalanceBox();
+  }
 
   // One word on the button, the rate in the tooltip — where it can also stay
   // truthful about a TAX_RATE_PCT that isn't 13.
@@ -408,9 +469,13 @@ async function submitTransactionForm(event) {
     return;
   }
 
+  const account = document.getElementById('tx-account').value;
+  const balanceBox = document.getElementById('tx-update-balance');
+  const updateBalance = !editingRow && balanceBox.checked && !balanceBox.disabled;
+
   const values = [[
     document.getElementById('tx-date').value,
-    document.getElementById('tx-account').value,
+    account,
     document.getElementById('tx-payee').value,
     document.getElementById('tx-category').value,
     document.getElementById('tx-description').value,
@@ -423,6 +488,22 @@ async function submitTransactionForm(event) {
     } else {
       await appendValues(TRANSACTIONS_RANGE, values);
     }
+
+    // After the transaction row, and outside the catch below on purpose: the row
+    // is already saved by now, so neither a refused balance nor a failed write to
+    // it can be reported as a failed save — that would invite a second Save and a
+    // duplicate row. Both outcomes are said out loud instead, since the tick box
+    // promised something and this is whether it happened.
+    if (updateBalance) {
+      try {
+        const result = await addToAccountBalance(account, amount);
+        if (!result.writable) alert(`Transaction saved. ${account}'s balance was left as it is: ${result.reason}`);
+      } catch (err) {
+        console.error('Failed to update account balance:', err);
+        alert(`Transaction saved, but ${account}'s balance couldn't be updated: ${err.message}`);
+      }
+    }
+
     if (keepOpen) {
       // Optimistic local append — no API re-fetch, no datalist rebuild, no .focus() call.
       // Rebuilding datalists while a form input is focused freezes iOS WebKit.

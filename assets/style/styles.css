@@ -111,6 +111,16 @@ header h1 {
     font-size: 1.25rem;
 }
 
+/* The logo is the way back to the whole dashboard from a section page, so it's
+   a link — styled to look exactly like the plain heading it replaced. */
+.logo-link {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    color: inherit;
+    text-decoration: none;
+}
+
 .logo-icon {
     width: 1.25rem;
     height: 1.25rem;
@@ -422,7 +432,7 @@ header .btn:hover {
     margin-top: 2.5rem;
 }
 
-/* Each Health/Finances/Other group renders as a small mind-map: a
+/* Each Health/Finance/Other group renders as a small mind-map: a
    round "hub" node for the group name, its feature nodes arranged in a ring
    around it, and an SVG line from the hub to every node. The ring itself is
    computed in JS (landing-graph.js's layoutNodesRadially), not pure CSS —
@@ -439,7 +449,7 @@ header .btn:hover {
 }
 
 .node-graph-health   { --group-color: var(--color-primary); }
-.node-graph-finances { --group-color: var(--color-income); }
+.node-graph-finance { --group-color: var(--color-income); }
 .node-graph-other    { --group-color: var(--color-other); }
 
 .node-graph-lines {
@@ -899,6 +909,14 @@ kbd {
     display: flex;
     flex-direction: column;
     gap: .5rem;
+}
+
+/* A section page hides the two wrappers it isn't, and the widget row, rather
+   than removing them — every renderer still expects its elements to exist. Both
+   set display, so [hidden] needs saying. */
+.panel-group[hidden],
+.widget-cards[hidden] {
+    display: none;
 }
 
 .panel-group-title {
@@ -1421,7 +1439,7 @@ th.sortable:hover {
 /* Same reason as .today-glance-cards below: three of these four now carry two
    figures ("-$1,675.26 / -$1,700.00"), which the dashboard's 1.6rem .value
    can't hold in a ~188px card. One size across all four keeps the row even. */
-#finances > .cards .value {
+#finance > .cards .value {
     font-size: 1.1rem;
 }
 
@@ -1430,7 +1448,7 @@ th.sortable:hover {
    so these go two-up early instead of shrinking further. Scoped by id so the
    Health glance tiles, whose values are shorter, keep their own breakpoint. */
 @media (max-width: 949px) {
-    #finances > .cards {
+    #finance > .cards {
         grid-template-columns: repeat(2, 1fr);
     }
 }
@@ -2519,7 +2537,7 @@ td .btn {
     }
 
     /* On mobile the pre-sign-in landing page shows just the header (logo +
-       sign-in) — the three Health/Finances/Other feature graphs are a wall of
+       sign-in) — the three Health/Finance/Other feature graphs are a wall of
        text on a small screen, so they're dropped rather than reflowed. */
     #gate .landing-features {
         display: none;

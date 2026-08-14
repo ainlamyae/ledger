@@ -162,6 +162,12 @@ header h1 {
     transition: color .25s ease;
 }
 
+/* The stacked icon is only for the phone tab bar (below 640px); in the desktop
+   header these links are text-only, exactly as before. */
+.nav .nav-icon {
+    display: none;
+}
+
 .nav a:hover,
 .nav a.active {
     color: #fff;
@@ -2613,8 +2619,10 @@ td .btn {
 
     .container {
         /* Bottom padding clears the fixed tab bar below (.nav) so the last
-           panel on the page never sits half-hidden behind it. */
-        padding: 1rem 1rem calc(1rem + 3.5rem + env(safe-area-inset-bottom, 0px));
+           panel on the page never sits half-hidden behind it. 4rem matches the
+           bar's 56px tappable row; the env() adds the home-indicator inset the
+           bar itself pads by. */
+        padding: 1rem 1rem calc(1rem + 4rem + env(safe-area-inset-bottom, 0px));
     }
 
     /* A phone now has a fixed bar at both ends of the screen (this header,
@@ -2678,24 +2686,60 @@ td .btn {
         justify-content: space-between;
         background: var(--color-nav);
         border-top: 1px solid rgba(255, 255, 255, .1);
+        /* Lifts the bar off the content it floats over so it reads as a layer,
+           not a strip fused to the last panel. */
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, .22);
         /* iPhone home-indicator clearance — padding, not margin, so the bar's
            own background still fills behind the indicator instead of leaving
-           a gap of the page's own background showing through. */
+           a gap of the page's own background showing through. This pushes the
+           whole tappable row up clear of the home-indicator gesture zone,
+           which was swallowing taps aimed at links sitting flush to the edge. */
         padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
+    /* Stacked icon-over-label, filling a tall row: each tab is now a ~56px
+       block (comfortably past the 44px minimum touch target) instead of a
+       ~30px text sliver, so it's actually hittable with a thumb. */
     .nav a {
         flex: 1;
-        text-align: center;
-        font-size: 1rem;
-        padding: .6rem .25rem .5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: .15rem;
+        min-height: 56px;
+        padding: .4rem .25rem;
+        font-size: .7rem;
+        font-weight: 600;
+        line-height: 1.1;
+        color: rgba(255, 255, 255, .68);
+    }
+
+    .nav .nav-icon {
+        display: block;
+        width: 26px;
+        height: 26px;
+    }
+
+    .nav .nav-icon svg {
+        display: block;
+        width: 100%;
+        height: 100%;
     }
 
     /* The color change alone (.nav a.active, above) reads fine in a row of
        text links, but a tab bar's active item needs a stronger tell at a
-       glance — the same accent every other "selected" state in the app
-       already uses, as a top edge rather than a full underline so it doesn't
-       compete with the label's own text. */
+       glance — the accent every other "selected" state in the app already
+       uses: on the icon, plus a top edge rather than a full underline so it
+       doesn't compete with the label's own text. */
+    .nav a.active {
+        color: #fff;
+    }
+
+    .nav a.active .nav-icon {
+        color: var(--color-primary);
+    }
+
     .nav a.active::before {
         content: '';
         position: absolute;

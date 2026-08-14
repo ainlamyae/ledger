@@ -94,9 +94,18 @@
          address stands for, and is the only list of them anywhere — the section
          pages and the scroll-spy both read this nav rather than repeating it. -->
     <nav id="main-nav" class="nav">
-        <a href="health/" data-section="health">Health</a>
-        <a href="finance/" data-section="finance">Finance</a>
-        <a href="other/" data-section="other">Other</a>
+        <a href="health/" data-section="health">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3.5l2 5 4-12 2 7H21"/></svg></span>
+            <span class="nav-label">Health</span>
+        </a>
+        <a href="finance/" data-section="finance">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.5Z"/><path d="M16 12.5h.01" stroke-width="2.5"/></svg></span>
+            <span class="nav-label">Finance</span>
+        </a>
+        <a href="other/" data-section="other">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span>
+            <span class="nav-label">Other</span>
+        </a>
     </nav>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>

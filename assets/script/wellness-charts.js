@@ -622,11 +622,10 @@ function renderWellnessBodyMassChart(entries) {
   const trendMap = computeBodyMassTrend(byDate);
   const trendDates = [...trendMap.keys()].sort();
   const lastTrendDate = trendDates[trendDates.length - 1];
-  // The green line's slope at each of ITS points — read back below alongside the raw
-  // day-to-day delta, so a single noisy weigh-in doesn't read as the real trend.
+  // Its slope at each point, read back below alongside the raw day-to-day delta, so a
+  // single noisy weigh-in doesn't read as the real trend.
   const trendSlopeByDate = computeBodyMassTrendSlopeGramsPerDay(trendMap);
   const swingKg = lastTrendDate !== undefined ? glycogenSwingKg(byDate.get(lastTrendDate), heightCm, sex) : null;
-  const stateTrendSeries = dates.map((d) => trendMap.get(d) ?? null);
 
   // Calorie-implied trajectory: same walk the (now-hidden) State Trend & Forecast chart
   // built — start at the first weigh-in and advance by each day's calorie balance. Used
@@ -728,10 +727,12 @@ function renderWellnessBodyMassChart(entries) {
     previousKg = kg;
   });
 
-  // Sloped, not flat: a bar here is an absolute level, so the week's mean says little
-  // and its direction says everything.
-  const weekColumns = bucketedColumnCount(dates);
-  const { series: trendSeries, slopePerWeek } = weeklyTrendSeries(values, weekColumns);
+  // Smoothed, not flat: a bar here is an absolute level, so a flat week's mean says
+  // little and its direction says everything. An EMA rather than a per-week fit, so the
+  // line has no seam at a bucket boundary — today's own weigh-in blends straight in,
+  // same as any other day.
+  const trendSeries = emaSeries(values);
+  const slopePerWeek = emaSlopePerSpan(trendSeries);
 
   // A single reading against the target reads as noise, not a reversal, when the week
   // it belongs to is still trending the right way overall — gray it out rather than
@@ -748,7 +749,7 @@ function renderWellnessBodyMassChart(entries) {
   // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
   // `grace` too late to read here. The trend folds in too — a fit extended to the week's
   // edges can reach past every reading in it, and would otherwise clip.
-  const logged = [...values, ...trendSeries, ...stateTrendSeries, ...zoneUpperSeries, ...zoneLowerSeries, ...calorieTrendSeries].filter((v) => v !== null);
+  const logged = [...values, ...trendSeries, ...zoneUpperSeries, ...zoneLowerSeries, ...calorieTrendSeries].filter((v) => v !== null);
   const kgLo = logged.length ? Math.min(...logged) : 0;
   const kgHi = logged.length ? Math.max(...logged) : 0;
   const kgPad = Math.max((kgHi - kgLo) * BODY_MASS_AXIS_PAD_FRACTION, BODY_MASS_AXIS_MIN_PAD_KG);
@@ -771,7 +772,7 @@ function renderWellnessBodyMassChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Trend', trendSeries, {}, weekColumns),
+        trendLineDataset('7-Day Trend', trendSeries),
         // Yellow zone, Muscle Loss red zone, and gray Calorie-Implied Trajectory line —
         // all anchored to the calorie-implied trajectory and omitted together whenever the
         // profile is incomplete (no BMR → no trajectory). fill: '-1' chain runs upper →
@@ -839,20 +840,6 @@ function renderWellnessBodyMassChart(entries) {
             order: 1.5,
           },
         ] : []),
-        {
-          type: 'line',
-          label: 'State Trend & Forecast',
-          data: stateTrendSeries,
-          borderColor: '#16a34a',
-          borderWidth: 2,
-          fill: false,
-          tension: 0.3,
-          pointRadius: 0,
-          pointHitRadius: 0,
-          spanGaps: false,
-          isStateTrendOverlay: true,
-          order: 1.3,
-        },
       ],
     },
     options: {
@@ -879,7 +866,7 @@ function renderWellnessBodyMassChart(entries) {
             label: (item) => {
               const d = detailByDate.get(item.label) ?? {};
               const lines = [`m (Body Mass): ${item.parsed.y} kg`];
-              // The green line's own slope, not the raw day-to-day delta a single
+              // The smoothed trend's own slope, not the raw day-to-day delta a single
               // water/glycogen-heavy weigh-in would swing — this is the one shown.
               if (d.smoothedChangeGPerDay !== null && d.smoothedChangeGPerDay !== undefined) {
                 lines.push(`Δm (Changed Mass): ${withExplicitSign(d.smoothedChangeGPerDay)} g/day`);
@@ -1104,11 +1091,13 @@ function renderWellnessCaloriesChart(entries) {
     return lerpHex('#16a34a', '#dc2626', (value - dt.kcal) / (bmr - dt.kcal));
   });
 
-  // Averaged off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins
-  // don't count as days of fasting. Computed here, ahead of the axis, so a missed day
-  // can be graded against it below.
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+  // Fit off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins don't
+  // count as days of fasting. A per-week least-squares trend, not a sliding average —
+  // a sliding window reacts to a spike on either side of it, before or after it
+  // actually happened; a trend fit to a fixed week only moves once, at the week's own
+  // pace. Computed here, ahead of the axis, so a missed day can be graded against it
+  // below.
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   // A single day's overshoot reads as noise, not a habit, when the week around it is
   // still landing on the target's right side — gray it out rather than calling it a
@@ -1144,7 +1133,7 @@ function renderWellnessCaloriesChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        trendLineDataset('7-Day Average', weeklyAvg),
         {
           type: 'bar',
           label: `${target.word} for the day`,
@@ -1348,12 +1337,10 @@ function renderWellnessSleepChart(entries) {
     return [start, end];
   });
 
-  // Averaged in AXIS units, not clock minutes: the shift has already unwrapped
-  // midnight, so a plain mean works where clock times would average 23:30 and 00:30
-  // into midday.
-  const weekColumns = bucketedColumnCount(dates);
-  const bedAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null), weekColumns);
-  const wakeAvg = weeklyAverageSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null), weekColumns);
+  // Fit in AXIS units, not clock minutes: the shift has already unwrapped midnight, so
+  // a plain fit works where clock times would average 23:30 and 00:30 into midday.
+  const bedAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null));
+  const wakeAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null));
 
   // Deprivation Effect = Target Deficit × (1 - Sleep Efficiency Factor) — the kcal of
   // the plan's own deficit (targetBalanceKcal, not the day's actual eaten-vs-burned
@@ -1388,8 +1375,8 @@ function renderWellnessSleepChart(entries) {
           yAxisID: 'y1',
           order: 2,
         },
-        weeklyAverageDataset('7-Day Avg Bed', bedAvg, { yAxisID: 'y1' }, weekColumns),
-        weeklyAverageDataset('7-Day Avg Wake', wakeAvg, { yAxisID: 'y1' }, weekColumns),
+        trendLineDataset('7-Day Avg Bed', bedAvg, { yAxisID: 'y1' }),
+        trendLineDataset('7-Day Avg Wake', wakeAvg, { yAxisID: 'y1' }),
         {
           type: 'line',
           label: 'Deprivation Effect',
@@ -1673,14 +1660,12 @@ function renderWellnessActivityChart(entries) {
   };
 
   // On the kcal axis, not the minutes one — Target Burn lives there, and it's what the
-  // week is compared against. Negated like the dots it averages.
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyBurnAvg = weeklyAverageSeries(caloriesData, weekColumns);
-  const weeklyBurnDataset = weeklyAverageDataset(
+  // week is compared against. Negated like the dots it's fit to.
+  const weeklyBurnAvg = emaSeries(caloriesData);
+  const weeklyBurnDataset = trendLineDataset(
     '7-Day Average Burn',
     weeklyBurnAvg.map((v) => (v === null ? null : -v)),
     { yAxisID: 'y1' },
-    weekColumns,
   );
 
   wellnessActivityChart = upsertChart(wellnessActivityChart, ctx, {
@@ -1823,8 +1808,7 @@ function renderWellnessProteinChart(entries) {
     : [capFor(band.min, `${band.min} g target`)];
 
   // Logged days only, so the zero stand-ins don't pull the week under the band's floor.
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   const gTopProtein = Math.max(...values, band.max, band.min, 1);
   const gStepProtein = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopProtein / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
@@ -1841,7 +1825,7 @@ function renderWellnessProteinChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        trendLineDataset('7-Day Average', weeklyAvg),
         ...targetDatasets,
       ],
     },
@@ -1949,8 +1933,7 @@ function renderWellnessFiberChart(entries) {
     ]
     : [capFor(band.min, `${band.min} g target`)];
 
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   const gTopFiber = Math.max(...values, band.max, band.min, 1);
   const gStepFiber = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopFiber / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
@@ -1967,7 +1950,7 @@ function renderWellnessFiberChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        trendLineDataset('7-Day Average', weeklyAvg),
         ...targetDatasets,
       ],
     },
@@ -2084,8 +2067,7 @@ function renderWellnessFatChart(entries) {
     ]
     : [targetLine(band.min, `${band.min} g target`)];
 
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   const gTopFat = Math.max(...values, band.max, band.min, 1);
   const gStepFat = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopFat / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
@@ -2102,7 +2084,7 @@ function renderWellnessFatChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        trendLineDataset('7-Day Average', weeklyAvg),
         ...targetDatasets,
       ],
     },
@@ -2218,8 +2200,7 @@ function renderWellnessCarbChart(entries) {
     ]
     : [targetLine(band.min, `${band.min} g target`)];
 
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   const gTopCarb = Math.max(...values, band.max, band.min, 1);
   const gStepCarb = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopCarb / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
@@ -2236,7 +2217,7 @@ function renderWellnessCarbChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        trendLineDataset('7-Day Average', weeklyAvg),
         ...targetDatasets,
       ],
     },
@@ -3037,9 +3018,8 @@ function renderWellnessEnergyBalanceChart(entries) {
   // A fraction of the axis span, so the dash stays a hairline at any range.
   const targetHalf = (yMax - yMin) * 0.004;
 
-  // balanceData already nulls the unlogged days, so they sit out of the mean.
-  const weekColumns = bucketedColumnCount(labels);
-  const weeklyAvg = weeklyAverageSeries(balanceData, weekColumns);
+  // balanceData already nulls the unlogged days, so they sit out of the fit.
+  const weeklyAvg = emaSeries(balanceData);
 
   wellnessEnergyBalanceChart = upsertChart(wellnessEnergyBalanceChart, ctx, {
     data: {
@@ -3052,7 +3032,7 @@ function renderWellnessEnergyBalanceChart(entries) {
           backgroundColor: balanceData.map((v, i) => energyBalanceColor(v, isCut, target, weeklyAvg[i])),
           order: 2,
         },
-        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        trendLineDataset('7-Day Average', weeklyAvg),
         // A dash per day, the idiom Caloric Intake uses for its own target: a continuous
         // line reads as one shared limit, a mark on each bar says the target belongs to
         // that day.

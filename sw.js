@@ -4,7 +4,7 @@
 // Bump this whenever the shell file list below changes — there's no build
 // step to hash filenames automatically, so it's a manual, deliberate signal
 // to evict the old cache rather than silently keep serving stale files.
-const CACHE_NAME = 'ledger-shell-v4';
+const CACHE_NAME = 'ledger-shell-v7';
 
 // Every same-origin file the app needs to boot and render its shell. Kept as
 // an explicit list rather than parsed from index.html at install time —
@@ -62,6 +62,7 @@ const SHELL_URLS = [
   'assets/script/activity-insight.js',
   'assets/script/protein-source-rotation-insight.js',
   'assets/script/plan-insight.js',
+  'assets/script/fat-loss-pattern-insight.js',
   'assets/script/insight-panel.js',
   'assets/script/formula-fields.js',
   'assets/script/formula-render.js',

@@ -65,14 +65,14 @@ function weightedMean(items, weightFn, valueFn) {
 // ΔM), then combined with a recency weight per period (weekRecencyWeight) rather than one flat
 // average over the whole span — the size of the chunk only changes how many days each period
 // covers, never the "weigh each period, not each day" shape of the calculation.
-function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_CHUNK_DAYS_DEFAULT) {
+function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_CHUNK_DAYS_DEFAULT, endDateIso = null) {
   const eligible = (p) => p.caloriesIn !== null && p.caloriesOut !== null;
 
   // Anchored on the latest ELIGIBLE day, not today — the same "end the window at the latest
   // real reading" choice smoothedBodyMassKg makes, so a day or two away from logging doesn't
-  // empty the window entirely.
+  // empty the window entirely. endDateIso (Health Insight's To) caps it.
   const latestEligible = allPhysiqueEntries
-    .filter((p) => p.date && eligible(p))
+    .filter((p) => p.date && eligible(p) && (!endDateIso || p.date <= endDateIso))
     .sort((a, b) => a.date.localeCompare(b.date))
     .pop();
   if (!latestEligible) {

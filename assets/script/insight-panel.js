@@ -114,15 +114,17 @@ const INSIGHT_MODES = {
   },
   patterns: {
     label: 'Patterns',
-    hint: 'Range is rounded to whole 14-day periods, ending on the last day with Calories In and Out logged.',
+    // Functions, not fixed strings — the period length is the user-editable days
+    // box (patternsChunkDays()), so both have to name whatever length is live.
+    hint: (data) => `Range is rounded to whole ${data.chunkDays}-day periods, ending on the last day with Calories In and Out logged.`,
     questionPlaceholder: 'e.g. Does more strength training raise my BMR?',
     previewId: 'insight-preview-patterns',
-    gather: (from, to) => gatherFatLossPatterns(from, to),
+    gather: (from, to) => gatherFatLossPatterns(from, to, patternsChunkDays()),
     formatPrompt: (data) => formatFatLossPatternPrompt(data),
     renderPreview: (data) => renderFatLossPatternPreview(data),
     appendQuestion: true,
     needsNutrition: false,
-    systemPrompt: FAT_LOSS_PATTERN_SYSTEM_PROMPT,
+    systemPrompt: (data) => formatFatLossPatternSystemPrompt(data.chunkDays),
     resultKeys: ['INSIGHT_PATTERNS_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_PATTERNS_LAST_GENERATED_AT'],
   },
@@ -155,7 +157,21 @@ function initInsightPanel() {
     if (btn) loadInsightMode(btn.dataset.insightMode);
   });
 
+  // Same box as the Calibrate BMR panel's chunk-size field: reload only refires
+  // when Patterns is the mode on screen, so typing in it while another mode is
+  // loaded doesn't trigger a pointless recompute.
+  document.getElementById('insight-patterns-chunk-days').addEventListener('input', () => {
+    if (insightLoaded && insightLoaded.mode === 'patterns') loadInsightMode('patterns');
+  });
+
   document.getElementById('insight-generate-btn').addEventListener('click', runInsightGeneration);
+}
+
+// The typed period length, clamped to something sane — a blank/zero/negative/non-numeric
+// box falls back to the 14-day default rather than passing NaN or 0 through to date arithmetic.
+function patternsChunkDays() {
+  const raw = Number(document.getElementById('insight-patterns-chunk-days').value);
+  return (Number.isFinite(raw) && raw >= 1) ? Math.round(raw) : FAT_LOSS_PATTERN_CHUNK_DAYS_DEFAULT;
 }
 
 // The only path that computes anything. Gathers the mode's data for the current
@@ -185,7 +201,7 @@ function loadInsightMode(modeKey) {
   const data = mode.gather(from, to);
   insightLoaded = { mode: modeKey, from, to, data };
 
-  document.getElementById('insight-hint').textContent = mode.hint;
+  document.getElementById('insight-hint').textContent = typeof mode.hint === 'function' ? mode.hint(data) : mode.hint;
   textarea.placeholder = mode.questionPlaceholder;
   showInsightPreview(mode.previewId);
   mode.renderPreview(data, ctx);
@@ -275,7 +291,8 @@ async function runInsightGeneration() {
     // Built from the data the preview above was rendered from, not a fresh
     // pass — what was shown is exactly what gets sent.
     const ctx = { from, to, question: textarea.value };
-    const text = await groqChatText(mode.systemPrompt, insightUserMessage(mode, insightLoaded.data, ctx));
+    const systemPrompt = typeof mode.systemPrompt === 'function' ? mode.systemPrompt(insightLoaded.data) : mode.systemPrompt;
+    const text = await groqChatText(systemPrompt, insightUserMessage(mode, insightLoaded.data, ctx));
     body.innerHTML = '';
     renderInsightText(body, text);
 

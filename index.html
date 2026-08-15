@@ -503,6 +503,10 @@
             </div>
 
             <div id="insight-preview-patterns" hidden>
+                <label class="insight-patterns-days-label" for="insight-patterns-chunk-days">Average over
+                    <input type="text" id="insight-patterns-chunk-days" inputmode="numeric" value="14">
+                    days
+                </label>
                 <div id="insight-patterns-profile" class="insight-data-preview"></div>
                 <div class="table-responsive table-compact">
                     <table id="insight-patterns-table">
@@ -511,7 +515,7 @@
                             <th>Period</th>
                             <th title="Smoothed body mass (kg) at the period's last day">m</th>
                             <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
-                            <th title="Δm × 7700 / 14 — measured daily energy balance from mass change">ΔM (kcal)</th>
+                            <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
                             <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
                             <th title="Total energy intake, kcal/day">TEI</th>
                             <th title="Grams/day">Protein</th>

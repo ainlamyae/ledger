@@ -1049,6 +1049,34 @@ td {
     border-top: 2px solid var(--color-text);
 }
 
+/* Same idea, for the Calibrate BMR form's day-by-day table (bmr-calibration.js) — one line
+   per 7-row block, since its "week" is a fixed run of 7 consecutive days ending at the last
+   fully-logged one, not a calendar week starting on Sunday. */
+#bmr-calibration-days-body tr.bmr-calibration-week-start td {
+    border-top: 2px solid var(--color-text);
+}
+
+/* table-compact (above) strips every row's border-bottom for a denser look — reintroduced
+   just under the header of the Calibrate BMR form's two tables, and under the very last row
+   of the day table, framing them the way a table with visible borders normally would. */
+#bmr-calibration-days thead th,
+#bmr-calibration-weeks thead th {
+    border-bottom: 1px solid var(--color-border);
+}
+
+#bmr-calibration-days-body tr:last-child td {
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* table (global, above) is width: 100% — stretched across the full modal width, that spreads
+   these short numeric columns apart with far more gap than their content needs. Shrinking the
+   table itself back to its content width is what actually closes that gap; table-compact's
+   own tighter padding alone isn't enough once the table is forced wider than its content. */
+#bmr-calibration-days table,
+#bmr-calibration-weeks table {
+    width: auto;
+}
+
 /* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
    Duration/Cal workout goal (activity table), directly under the Total they're measured
    against. A target, not a measurement, so it's set off with a dashed top border instead

@@ -222,7 +222,7 @@
                 <div class="widget-row"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>t</span><span id="today-status-goal-value">—</span></div>
                 <div class="widget-row"><span>BMR</span><span id="today-status-maintenance-value">—</span></div>
-                <div class="widget-row"><span>λt</span><span id="today-status-adapt-frac-value">—</span></div>
+                <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
                 <div class="widget-row"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
                 <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
                 <div class="widget-row"><span>TEF</span><span id="today-status-digestion-value">—</span></div>
@@ -261,6 +261,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Health Indicator</h2>
+                <button type="button" id="bmr-calibration-btn" class="btn btn-secondary panel-header-btn" title="Back-solve your real BMR from the last 7 days' actual logged intake, activity and weight change, instead of the height/age/sex equation">Calibrate</button>
                 <button type="button" id="formula-playground-btn" class="btn btn-secondary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
             </div>
 
@@ -1467,7 +1468,7 @@
                     <input type="date" id="physique-date">
                 </label>
                 <label>Body Mass
-                    <input type="text" id="physique-body-mass" placeholder="e.g. 94 (kg)">
+                    <input type="text" id="physique-body-mass" inputmode="decimal" placeholder="e.g. 94 (kg)">
                 </label>
             </div>
             <div class="form-row">
@@ -1604,10 +1605,10 @@
 
         <fieldset class="formula-solve-for">
             <legend>Solve for</legend>
-            <label><input type="radio" name="formula-solve-for" value="EIN" checked> Calories</label>
+            <label><input type="radio" name="formula-solve-for" value="EIN"> Calories</label>
             <label><input type="radio" name="formula-solve-for" value="TARGET_MASS"> Healthy body mass</label>
             <label><input type="radio" name="formula-solve-for" value="TAU"> Activity</label>
-            <label><input type="radio" name="formula-solve-for" value="DELTA_M"> Weekly fat loss</label>
+            <label><input type="radio" name="formula-solve-for" value="DELTA_M" checked> Weekly fat loss</label>
             <!-- The odd one out, and named for what you hold rather than what it solves:
                  here the percentage of body mass is the fixed input and BOTH TEI and t are
                  computed from it, on the proportional journey a fixed share implies. -->
@@ -1629,6 +1630,10 @@
             <label title="Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. Fat mass is nearly inert metabolically, so this predicts from lean mass alone — more accurate the better your LBM figure is, and here LBM is the Boer estimate below. Age drops out entirely; sex enters only through LBM.">
                 <input type="radio" name="formula-bmr-formula" value="katch">
                 Katch-McArdle (LBM)
+            </label>
+            <label title="Uses whichever equation above is already active (BMR_FORMULA is untouched), but every deficit and desired calorie figure runs on it plus your saved Calibrate offset instead of the plain equation — the same switch as picking BMR_cal under 'Which BMR every deficit...' further down, exposed here too. Falls back to the plain equation until a calibration has been saved.">
+                <input type="radio" name="formula-bmr-formula" value="bmr_cal">
+                BMR_cal (calibrated)
             </label>
         </fieldset>
 
@@ -1702,14 +1707,28 @@
                 <input type="text" id="formula-lbm" inputmode="decimal" readonly>
                 <span class="formula-unit">kg</span>
             </label>
-            <!-- The figure everything downstream is measured against, readonly because it
-                 isn't a setting: whichever equation the radio above selected, evaluated at
-                 m̄. Placed with the profile rather than beside TEI because that's what it
-                 describes — the body, before any plan is applied to it. -->
-            <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, from whichever equation is selected above — what you burn before any movement. Not editable: it is derived from m̄, h, a and σ.">
+            <!-- The figures everything downstream is measured against, readonly because
+                 they aren't settings. Both equations shown always, regardless of which one
+                 the radio below has active — only the ACTIVE one (via the coefficients/plan
+                 built from it) actually feeds the rest of the sheet; these two are reference.
+                 Placed with the profile rather than beside TEI because that's what they
+                 describe — the body, before any plan is applied to it. -->
+            <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Mifflin-St Jeor — shown regardless of which equation is active below. Not editable: derived from m̄, h, a and σ. Blank without a birth date (Mifflin needs age; Katch-McArdle doesn't).">
                 <span class="formula-sym">BMR</span>
-                <span class="formula-name">basal metabolic rate</span>
-                <input type="text" id="formula-bmr" inputmode="decimal" readonly>
+                <span class="formula-name">basal metabolic rate by Mifflin-St Jeor</span>
+                <input type="text" id="formula-bmr-mifflin" inputmode="decimal" readonly>
+                <span class="formula-unit">kcal/day</span>
+            </label>
+            <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Katch-McArdle from lean mass — shown regardless of which equation is active below. Not editable: derived from m̄, h and σ.">
+                <span class="formula-sym">BMR</span>
+                <span class="formula-name">basal metabolic rate by Katch-McArdle</span>
+                <input type="text" id="formula-bmr-katch" inputmode="decimal" readonly>
+                <span class="formula-unit">kcal/day</span>
+            </label>
+            <label class="formula-row" title="BMR (whichever equation is active below) plus the saved Calibrate offset (Calibrate, beside Tune) — always shown regardless of which basis is chosen further down, so it can be compared against plain BMR here. Blank until a calibration has actually been saved.">
+                <span class="formula-sym">BMR_cal</span>
+                <span class="formula-name">calibrated basal metabolic rate</span>
+                <input type="text" id="formula-bmr-cal" inputmode="decimal" readonly>
                 <span class="formula-unit">kcal/day</span>
             </label>
             <!-- Marks the end of the profile block (m, m̄, h, a, σ, m_des, BMI_des, LBM,
@@ -2159,6 +2178,10 @@
                 <input type="radio" name="formula-bmr-basis" value="bmr_adp">
                 BMR_adp
             </label>
+            <label title="BMR back-solved from your own logged data (the Calibrate form, beside Tune) instead of the height/age/sex equation — shifts the equation's whole line up or down to match what was actually measured, keeping its slope. Falls back to Plain BMR until a calibration has been saved.">
+                <input type="radio" name="formula-bmr-basis" value="bmr_cal">
+                BMR_cal
+            </label>
         </fieldset>
 
         <p class="hint" id="formula-profile-note"></p>
@@ -2168,6 +2191,69 @@
             <button type="button" id="formula-reset-btn" class="btn">Reset</button>
             <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
             <button type="button" id="formula-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        </div>
+    </div>
+</div>
+
+<div id="bmr-calibration-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="bmr-calibration-title" hidden>
+    <div class="modal-card">
+        <h2 id="bmr-calibration-title">Calibrate BMR</h2>
+
+        <div class="app-form">
+            <div class="form-row">
+                <label>Start date
+                    <input type="date" id="bmr-calibration-start-date">
+                </label>
+                <label>Chunk size (days)
+                    <input type="text" id="bmr-calibration-chunk-days" inputmode="numeric" value="7">
+                </label>
+            </div>
+        </div>
+
+        <h4>Daily</h4>
+        <div id="bmr-calibration-days" class="table-responsive table-compact">
+            <table>
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th title="Body mass (kg) — 7-day smoothed, the same mass this day's own equation BMR (and SD/D below) is evaluated at">m</th>
+                    <th title="Sleep Deprivation Effect — extra kcal this day's short sleep cost, against that day's own equation BMR">SD</th>
+                    <th title="Total Energy Intake — logged Calories In">TEI</th>
+                    <th title="Thermic Effect of Food — this day's own measured figure, or the flat f-share estimate when it has none">TEF</th>
+                    <th title="Activity Energy Expenditure — logged Calories Out (workout burn)">AEE</th>
+                    <th title="Daily Energy Balance — TEI minus maintenance, AEE and TEF, plus the Sleep Deprivation Effect. Negative is a deficit, positive a surplus">D</th>
+                </tr>
+                </thead>
+                <tbody id="bmr-calibration-days-body"></tbody>
+            </table>
+        </div>
+
+        <h4>Periods</h4>
+        <div id="bmr-calibration-weeks" class="table-responsive table-compact">
+            <table>
+                <thead>
+                <tr>
+                    <th>Period</th>
+                    <th title="Body mass (kg) — smoothed mass ending this period's last day, the mass this period's own equation BMR is evaluated at">m</th>
+                    <th title="Change in body mass over this period (this period's mass minus the previous one's) — negative means mass lost, same sign convention as the Status card's own Δm">Δm</th>
+                    <th title="Δm × 7700 / chunk size — this period's mass change, as a daily fat-equivalent energy rate. MEASURED, independent of the equation">ΔM (kcal)</th>
+                    <th title="Average of the Daily table's own D over this period — what the CURRENT equation BMR implies happened, not independent of it">D</th>
+                    <th title="D minus ΔM — the gap between what the equation implies and what was actually measured. 0 means the equation already agrees with reality; the per-period figures here are what the final, recency-weighted Offset is built from">Offset</th>
+                    <th title="Linear recency weight — 0.1 for the oldest period in the window, 1.0 for the newest, so months of history can be included without outvoting the most recent one">Weight</th>
+                </tr>
+                </thead>
+                <tbody id="bmr-calibration-weeks-body"></tbody>
+            </table>
+        </div>
+
+        <div id="bmr-calibration-substituted" class="formula-substituted"></div>
+
+        <p id="bmr-calibration-status" class="status" hidden></p>
+
+        <div class="modal-actions">
+            <button type="button" id="bmr-calibration-refresh-btn" class="btn">Recalculate</button>
+            <button type="button" id="bmr-calibration-save-btn" class="btn btn-primary" disabled>Save</button>
+            <button type="button" id="bmr-calibration-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         </div>
     </div>
 </div>
@@ -2299,6 +2385,7 @@
             <div class="modal-actions">
                 <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">🧬 Pull Micronutrients</button>
                 <button type="button" id="nutrition-normalize-btn" class="btn" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure">Normalize</button>
+                <button type="button" id="nutrition-update-btn" class="btn" hidden title="Save these changes, then find every Physique day whose Consumption mentions this ingredient's OLD name and rewrite those lines (renaming them if the name changed) plus their Breakdown entries and day totals to match — for any line whose unit can't be locally rescaled (e.g. cup, tbsp), only the name is updated">Update</button>
                 <button type="submit" class="btn btn-primary">Save</button>
                 <button type="button" id="nutrition-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
@@ -2518,6 +2605,7 @@
 <script src="assets/script/formula-fields.js"></script>
 <script src="assets/script/formula-render.js"></script>
 <script src="assets/script/formula-playground.js"></script>
+<script src="assets/script/bmr-calibration.js"></script>
 <script src="assets/script/protein-rotation.js"></script>
 <script src="assets/script/activity-rotation.js"></script>
 <script src="assets/script/financial-insight.js"></script>

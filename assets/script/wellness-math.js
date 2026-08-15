@@ -446,7 +446,46 @@ const BMR_BASIS_KEY = 'BMR_BASIS';
 const BMR_BASIS_DEFAULT = 'bmr';
 
 function bmrBasis() {
-  return getSettingString(BMR_BASIS_KEY, BMR_BASIS_DEFAULT) === 'bmr_adp' ? 'bmr_adp' : BMR_BASIS_DEFAULT;
+  const raw = getSettingString(BMR_BASIS_KEY, BMR_BASIS_DEFAULT);
+  return (raw === 'bmr_adp' || raw === 'bmr_cal') ? raw : BMR_BASIS_DEFAULT;
+}
+
+// The Calibrate form's output (bmr-calibration.js): an empirically back-solved BMR from
+// actual logged intake/activity/weight-change, rather than the height/age/sex (or lean-mass)
+// equation. Stored as TWO numbers, not one — the calibrated figure itself (KCAL, shown as-is
+// in the Status card and the Caloric Intake chart), and the OFFSET from what the equation
+// said at calibration time (KCAL, signed, possibly negative). Everything that turns a raw
+// bmrKcal() into a plan figure keeps running the equation's own shape — how BMR moves as body
+// mass changes, i.e. its slope — and just shifts the whole line by this constant OFFSET, per
+// the "keep the equation's slope, shift the level" choice: a single measured point can't
+// imply a slope of its own, so borrowing the equation's is the only option that doesn't
+// require new data. Both keys are written together by saveBmrCalibration.
+const BMR_CALIBRATED_KCAL_KEY = 'BMR_CALIBRATED_KCAL';
+const BMR_CALIBRATED_OFFSET_KEY = 'BMR_CALIBRATED_OFFSET_KCAL';
+
+// The calibrated figure itself, for display (Status card, Caloric Intake chart) — null until
+// a calibration has actually been saved, same "nothing to show yet" convention as every other
+// optional setting here.
+function calibratedBmrKcal() {
+  return getSetting(BMR_CALIBRATED_KCAL_KEY, null);
+}
+
+// 0 outside 'bmr_cal' (nothing to shift by) or before a calibration has ever been saved
+// (falls back to the plain equation rather than silently refusing to compute) — same shape as
+// currentAdaptationFraction's own "0 unless bmr_adp" guard below.
+function currentCalibratedOffsetKcal() {
+  if (bmrBasis() !== 'bmr_cal') return 0;
+  return getSetting(BMR_CALIBRATED_OFFSET_KEY, 0);
+}
+
+// The saved offset regardless of which basis is currently active — unlike
+// currentCalibratedOffsetKcal above, which is 0 whenever 'bmr_cal' isn't the chosen basis (so
+// the planning math above is a no-op then). For display only: the Status card and Caloric
+// Intake chart show BMR_cal as a reference line "always shown regardless of which basis
+// Balance/Δm actually run on", the same convention λt/BMR_adp already follow, so the three
+// bases can be compared side by side. Null before any calibration has ever been saved.
+function calibratedOffsetKcalRaw() {
+  return getSetting(BMR_CALIBRATED_OFFSET_KEY, null);
 }
 
 // The single choke point every consumer of a raw bmrKcal() figure routes through before
@@ -459,7 +498,9 @@ function bmrBasis() {
 // taking one as a parameter, so every existing bmrKcal() call site can adopt this with a
 // one-line wrap instead of a signature change threaded through its whole call chain.
 function applyBmrBasis(bmr, atIsoDate = null) {
-  if (bmr === null || bmrBasis() !== 'bmr_adp') return bmr;
+  if (bmr === null) return bmr;
+  if (bmrBasis() === 'bmr_cal') return bmr + currentCalibratedOffsetKcal();
+  if (bmrBasis() !== 'bmr_adp') return bmr;
   const bodyMassEntries = physiqueAsWellnessEntries().filter((e) => e.category === 'Body Mass' && e.amount !== null);
   const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries, atIsoDate);
   if (daysOnDiet === null) return bmr;
@@ -991,7 +1032,7 @@ function detectPlateau(trendMap) {
 // copy of the algebra. The extra returned parts are for the substituted trace and for
 // adaptedPlateauKg, which has to scale the BMR half alone.
 function maintenanceAffineCoefficients({
-  heightCm, age, sex, met, tau, kappa, formula = bmrFormula(), tef = tefPercent(),
+  heightCm, age, sex, met, tau, kappa, formula = bmrFormula(), tef = tefPercent(), bodyMassKg = null,
 }) {
   const activityPerKg = (met * tau * kappa) / ML_O2_PER_KCAL;
   const lbm = boerLeanBodyMassCoefficients(sex);
@@ -1012,9 +1053,31 @@ function maintenanceAffineCoefficients({
   // aBmr/bBmr themselves are returned UN-discounted: adaptedPlateauKg reads them for its
   // own, separate, BY-ARRIVAL adaptation question (how adapted BMR will be BY t, once t is
   // known) — discounting them here too would double-count the same effect.
+  //
+  // bmr_cal is treated as a MAXIMUM adaptation already reached, the same shape bmr_adp
+  // itself uses (a constant FRACTION scaling both terms, not an absolute kcal amount) — just
+  // with the fraction measured from Calibrate instead of grown week-by-week from λ. Whatever
+  // % below (or above) today's plain equation BMR_cal sits at is taken as a fixed, permanent
+  // discount and held there for the WHOLE projection: aBmr and bBmr both scale by the same
+  // (1 + calibratedFraction), so BMR still moves with body mass exactly as the equation says,
+  // just uniformly discounted — never extrapolated past that measured %, since there's no
+  // calibration data for what the discount would be at any other body mass. Falls back to the
+  // ordinary shifted-line behavior when bodyMassKg isn't available to measure the fraction
+  // against (some callers, e.g. plan-insight.js's prompt-formatting path, don't have "today's
+  // mass" to hand).
   const basisFraction = currentAdaptationFraction();
-  const aBmrEff = aBmr * (1 - basisFraction);
-  const bBmrEff = bBmr * (1 - basisFraction);
+  const calibratedOffset = currentCalibratedOffsetKcal();
+  let aBmrEff;
+  let bBmrEff;
+  const equationBmrNow = bodyMassKg === null ? null : aBmr + bBmr * bodyMassKg;
+  if (bmrBasis() === 'bmr_cal' && equationBmrNow) {
+    const calibratedFraction = calibratedOffset / equationBmrNow;
+    aBmrEff = aBmr * (1 + calibratedFraction);
+    bBmrEff = bBmr * (1 + calibratedFraction);
+  } else {
+    aBmrEff = aBmr * (1 - basisFraction) + calibratedOffset;
+    bBmrEff = bBmr * (1 - basisFraction);
+  }
 
   return {
     a: aBmrEff / divisor,
@@ -1054,7 +1117,7 @@ function adaptedPlateauKg(intakeKcal, coefficients, adaptFraction) {
 function projectTargetDays({
   intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg, formula, tef,
 }) {
-  const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, formula, tef });
+  const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, formula, tef, bodyMassKg });
   const equilibriumKg = (intakeKcal - a) / b;
 
   if (Math.abs(bodyMassKg - targetKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG) {
@@ -1127,7 +1190,7 @@ function targetJourneyProjection({ intakeKcal, bodyMassKg, heightCm, age, sex, m
   const pct = pinnedWeeklyFatLossPct();
   if (pct !== null && pct > 0) {
     return {
-      ...maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa }),
+      ...maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, bodyMassKg }),
       ...projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct: pct }),
     };
   }

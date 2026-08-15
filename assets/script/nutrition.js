@@ -123,6 +123,7 @@ async function initNutrition(forceRefresh = false) {
     onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-pull-micros-single-btn').addEventListener('click', pullMicronutrientsForForm);
     document.getElementById('nutrition-normalize-btn').addEventListener('click', normalizeIngredientForm);
+    onAsyncClick('nutrition-update-btn', updateNutritionEntryAndPropagate);
 
     document.getElementById('nutrition-search').addEventListener('input', () => {
       nCurrentPage = 1;
@@ -506,6 +507,9 @@ function openNutritionForm(entry, onSaved = null) {
   // should say so too rather than calling it an edit of something that
   // doesn't exist on the sheet yet.
   document.getElementById('nutrition-modal-title').textContent = (entry && entry.row) ? 'Edit Ingredient' : 'Add Ingredient';
+  // Only meaningful once there's a saved row (and an old name/amount/macros)
+  // to propagate FROM — an Add has nothing on the Physique sheet to find yet.
+  document.getElementById('nutrition-update-btn').hidden = !(entry && entry.row);
   document.getElementById('nutrition-classification').value = entry ? entry.classification : '';
   renderNutritionClassificationOptions();
   document.getElementById('nutrition-name').value = entry ? entry.name : '';
@@ -733,9 +737,12 @@ function normalizeIngredientForm() {
   }
 }
 
-async function submitNutritionForm(event) {
-  event.preventDefault();
-
+// Reads and validates every hand-editable field of the Add/Edit Ingredient
+// form, shared by Save (submitNutritionForm) and Update
+// (updateNutritionEntryAndPropagate) so the two can't drift on what counts as
+// a valid ingredient. Shows its own field error and returns { ok: false } on
+// the first problem found — the caller just needs to check `ok` and return.
+function readNutritionFormFields() {
   const classification = document.getElementById('nutrition-classification').value.trim();
   const name = document.getElementById('nutrition-name').value.trim();
   const amount = document.getElementById('nutrition-amount').value.trim();
@@ -758,25 +765,25 @@ async function submitNutritionForm(event) {
 
   if (!name) {
     showFieldError('nutrition-form-error', 'Name is required.');
-    return;
+    return { ok: false };
   }
   if (calories === null || protein === null) {
     showFieldError('nutrition-form-error', 'Calories and Protein must be numbers.');
-    return;
+    return { ok: false };
   }
   if (proteinPercentRaw && proteinPercent === null) {
     showFieldError('nutrition-form-error', 'Protein % must be a number.');
-    return;
+    return { ok: false };
   }
 
   const fiberResult = readOptionalNumber('nutrition-fiber', 'Fiber');
-  if (!fiberResult.ok) return;
+  if (!fiberResult.ok) return { ok: false };
   const fatResult = readOptionalNumber('nutrition-fat', 'Fat');
-  if (!fatResult.ok) return;
+  if (!fatResult.ok) return { ok: false };
   const carbResult = readOptionalNumber('nutrition-carb', 'Carb');
-  if (!carbResult.ok) return;
+  if (!carbResult.ok) return { ok: false };
   const tefResult = readOptionalNumber('nutrition-tef', 'TEF');
-  if (!tefResult.ok) return;
+  if (!tefResult.ok) return { ok: false };
   const fiber = fiberResult.value;
   const fat = fatResult.value;
   const carb = carbResult.value;
@@ -795,15 +802,32 @@ async function submitNutritionForm(event) {
   ];
   if (pendingIngredientMicronutrients) rowData.push(JSON.stringify(pendingIngredientMicronutrients));
 
+  return { ok: true, classification, name, amount, calories, protein, fiber, fat, carb, tef, verified, proteinPercent, rowData };
+}
+
+// Persists `fields.rowData` (from readNutritionFormFields) to `editingNutritionRow`
+// if it's set, else appends a new row — the actual sheet write shared by Save
+// and Update, which differ only in what runs after it lands.
+async function saveNutritionFormFields(fields) {
+  if (editingNutritionRow) {
+    await ensureNutritionColumns();
+    const lastCol = pendingIngredientMicronutrients ? 'L' : 'K';
+    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:${lastCol}${editingNutritionRow}`, [fields.rowData]);
+  } else {
+    if (fields.fiber !== null || fields.fat !== null || fields.carb !== null || fields.tef !== null || pendingIngredientMicronutrients) await ensureNutritionColumns();
+    await appendValues(NUTRITION_RANGE, [fields.rowData]);
+  }
+}
+
+async function submitNutritionForm(event) {
+  event.preventDefault();
+
+  const fields = readNutritionFormFields();
+  if (!fields.ok) return;
+  const { name, amount, calories, protein, fiber, fat, carb, tef } = fields;
+
   try {
-    if (editingNutritionRow) {
-      await ensureNutritionColumns();
-      const lastCol = pendingIngredientMicronutrients ? 'L' : 'K';
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:${lastCol}${editingNutritionRow}`, [rowData]);
-    } else {
-      if (fiber !== null || fat !== null || carb !== null || tef !== null || pendingIngredientMicronutrients) await ensureNutritionColumns();
-      await appendValues(NUTRITION_RANGE, [rowData]);
-    }
+    await saveNutritionFormFields(fields);
     // Captured before closeNutritionForm, which clears it — closing the form
     // on a successful save shouldn't itself be what silences the callback.
     const onSaved = nutritionFormSaveCallback;
@@ -813,6 +837,184 @@ async function submitNutritionForm(event) {
   } catch (err) {
     showFieldError('nutrition-form-error', err.message);
   }
+}
+
+// --- Update: propagate an edited ingredient into Physique ---------------
+//
+// Ordinary Calculate reuses a day's already-saved Breakdown by exact noteLine
+// text match (estimateConsumptionIncrementally, physique-breakdown.js), so it
+// never re-checks an unchanged line against the Nutrition table — a renamed
+// or re-priced ingredient otherwise leaves every past day quietly wrong until
+// someone notices. This button is the one path that reaches back and fixes
+// them, entirely locally (no Groq/USDA call): find every Consumption line and
+// Breakdown item still under the ingredient's OLD name, rename it, and — for
+// whichever ones carry a gram or count figure Amount can be scaled against —
+// reprice its Calories/Protein too.
+
+// Same "is this the same ingredient" rule findNutritionEntry uses: exact,
+// case-insensitive, falling back to a trailing-"s" fold — matching a second,
+// looser way here would let this button and the rest of the app disagree
+// about what counts as the same food.
+function nutritionNamesMatch(a, b) {
+  const ta = String(a || '').trim().toLowerCase();
+  const tb = String(b || '').trim().toLowerCase();
+  if (!ta || !tb) return false;
+  return ta === tb || foldTrailingS(ta) === foldTrailingS(tb);
+}
+
+// Rebuilds one Consumption line under the ingredient's new name, keeping
+// whatever quantity/unit it already had — the same "<quantity><unit> <name>"
+// shape Tidy and Calculate both write (combineAndSortConsumptionText,
+// physique-breakdown.js), so a line this touches reads exactly like one
+// either of them would have produced. Null when the line's quantity can't be
+// parsed at all — the rare hand-typed line with no leading amount, left
+// exactly as typed rather than mangled, same as Tidy leaves it.
+function renamedConsumptionLine(line, newName) {
+  const { quantity, unit } = extractIngredientQuantity(line);
+  if (quantity === null) return null;
+  const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
+  return `${Math.round(quantity * 100) / 100}${unitText} ${newName}`.trim();
+}
+
+// Reprices one Breakdown item against the just-saved entry it resolved to,
+// off the item's OWN already-resolved amount ("150g" / "×3" — never a fresh
+// re-extraction of the Consumption text) using the same grams/count scaling
+// calorie-estimator.js's table-hit branch runs. Renames the item (and patches
+// its noteLine so a later Calculate's reuse-by-noteLine still recognizes it)
+// even when neither figure could be rescaled — a plain rename still has to
+// reach the item for it to keep resolving to this row next time. Returns the
+// SAME item, unchanged, when there's nothing to do, so the caller can tell
+// whether anything actually changed with `!==`.
+function repriceBreakdownItemAgainstEntry(item, entry) {
+  const renamed = entry.name !== item.name;
+  const grams = parseGramsFromAmount(item.amount);
+  const count = parseCountFromAmount(item.amount);
+  const tableGrams = parseGramsFromAmount(entry.amount);
+  const explicitCount = parseCountFromAmount(entry.amount);
+  const tableCount = explicitCount !== null ? explicitCount : (tableGrams === null ? 1 : null);
+
+  let calories = item.calories;
+  let protein = item.protein;
+  let repriced = false;
+  if (grams !== null && tableGrams) {
+    calories = Math.round((entry.calories / tableGrams) * grams);
+    protein = Math.round(((entry.protein / tableGrams) * grams) * 10) / 10;
+    repriced = true;
+  } else if (count !== null && tableCount) {
+    calories = Math.round((entry.calories / tableCount) * count);
+    protein = Math.round(((entry.protein / tableCount) * count) * 10) / 10;
+    repriced = true;
+  }
+
+  if (!renamed && !repriced) return item;
+  return {
+    ...item,
+    name: entry.name,
+    calories,
+    protein,
+    noteLine: (renamed && item.noteLine) ? item.noteLine.replace(item.name, entry.name) : item.noteLine,
+    source: repriced ? NUTRITION_TABLE_SOURCE_LABEL : item.source,
+  };
+}
+
+// The Edit Ingredient form's Update button (openNutritionForm only shows it
+// once there's a saved row — an Add has no old name to search Physique for).
+// Saves the form exactly like Save, then sweeps every Physique day for the
+// OLD name and rewrites whatever it finds — Consumption text always, and a
+// day's Breakdown/totals too wherever a matched item could actually be
+// repriced (never blanking Calories In/Protein In on a day that was only ever
+// hand-typed and has no Breakdown to derive them from).
+async function updateNutritionEntryAndPropagate() {
+  if (!editingNutritionRow || !nutritionFormEntry) return;
+  const oldName = nutritionFormEntry.name;
+
+  const fields = readNutritionFormFields();
+  if (!fields.ok) return;
+
+  clearFieldError('nutrition-form-error');
+  try {
+    await saveNutritionFormFields(fields);
+  } catch (err) {
+    showFieldError('nutrition-form-error', err.message);
+    return;
+  }
+
+  await refreshNutrition(true);
+  await refreshPhysique();
+
+  const updatedEntry = { name: fields.name, amount: fields.amount, calories: fields.calories, protein: fields.protein };
+  const candidates = allPhysiqueEntries.filter((p) => p.consumption.trim());
+  showFieldError('nutrition-form-error', `Checking ${candidates.length} Physique day${candidates.length === 1 ? '' : 's'}…`);
+
+  let linesChanged = 0;
+  const edits = candidates.map((p) => {
+    const oldBreakdown = parsePhysiqueBreakdown(p.breakdown);
+    let textTouched = false;
+    let breakdownTouched = false;
+
+    const newLines = p.consumption.split('\n').map((raw) => {
+      const line = raw.trim();
+      if (!line || !nutritionNamesMatch(extractIngredientName(line), oldName)) return raw;
+      const rebuilt = renamedConsumptionLine(line, updatedEntry.name);
+      if (rebuilt === null || rebuilt === line) return raw;
+      textTouched = true;
+      linesChanged += 1;
+      return rebuilt;
+    });
+
+    const newBreakdown = oldBreakdown.map((item) => {
+      if (!nutritionNamesMatch(item.name, oldName)) return item;
+      const repriced = repriceBreakdownItemAgainstEntry(item, updatedEntry);
+      if (repriced !== item) breakdownTouched = true;
+      return repriced;
+    });
+
+    if (!textTouched && !breakdownTouched) return null;
+
+    const values = physiqueRowValues(p);
+    values[4] = newLines.join('\n');
+    if (breakdownTouched) {
+      const tef = estimateTefBreakdown(newBreakdown);
+      const dayMacros = sumBreakdownMacros(newBreakdown);
+      values[5] = breakdownToJson(newBreakdown);
+      values[6] = Math.round(newBreakdown.reduce((sum, i) => sum + i.calories, 0));
+      values[7] = Math.round(newBreakdown.reduce((sum, i) => sum + i.protein, 0) * 10) / 10;
+      if (dayMacros.fiber !== null) values[8] = dayMacros.fiber;
+      if (dayMacros.fat !== null) values[9] = dayMacros.fat;
+      if (dayMacros.carbohydrate !== null) values[10] = dayMacros.carbohydrate;
+      if (tef) values[11] = tef.tefKcal;
+    }
+
+    return { row: p.row, values, snapshot: physiqueRowValues(p) };
+  }).filter(Boolean);
+
+  if (!edits.length) {
+    closeNutritionForm();
+    await refreshNutrition(true);
+    alert(`Saved "${updatedEntry.name}" — no Physique day mentions "${oldName}" yet.`);
+    return;
+  }
+
+  let done = 0;
+  const succeeded = [];
+  await Promise.allSettled(edits.map(async (e) => {
+    try {
+      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${e.row}:O${e.row}`, [e.values]);
+      succeeded.push({ row: e.row, values: e.snapshot });
+    } finally {
+      done += 1;
+      showFieldError('nutrition-form-error', `Updating ${done}/${edits.length} Physique days…`);
+    }
+  }));
+
+  closeNutritionForm();
+  await refreshNutrition(true);
+  await refreshPhysique(true);
+
+  showUndoToast(
+    `"${updatedEntry.name}" updated — ${succeeded.length} Physique day${succeeded.length === 1 ? '' : 's'} (${linesChanged} line${linesChanged === 1 ? '' : 's'}) rewritten.`,
+    () => restorePhysiqueSnapshots(succeeded),
+  );
 }
 
 async function deleteNutritionEntry(entry) {

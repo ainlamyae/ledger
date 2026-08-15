@@ -18,9 +18,30 @@ function loadFormulaInputsFromSettings() {
   // SEX has no neutral value to substitute here.
   const sex = getSettingString('SEX', null);
   document.getElementById('formula-sex').value = sex === 'female' ? 'female' : 'male';
-  // Eᵢₙ and t are never seeded here — every mode either computes them itself on
-  // the render that follows, or (TARGET_MASS) leaves whatever day count was
-  // already typed in place.
+  // t is never seeded here — every mode either computes it itself on the render
+  // that follows, or (TARGET_MASS) leaves whatever day count was already typed
+  // in place.
+  //
+  // Eᵢₙ IS seeded, unlike t — the default mode (DELTA_M, opened on a typed
+  // Eᵢₙ) needs a starting number in that box before the first render, since
+  // that mode computes Δm FROM it rather than the other way around.
+  //
+  // A pinned intake wins here: pinnedCalorieTargetKcal is the number actually saved and
+  // in force everywhere else (the dashboard tile, getCalorieTargetKcal) — seeding from
+  // calorieTargetDetail's own tracking-mode arithmetic instead would silently replace a
+  // real saved pin with a freshly re-derived figure the moment the modal opens, before
+  // Save is even clicked again. Only falls back to calorieTargetDetail (the same
+  // maintenance-minus-deficit arithmetic EIN mode itself would have shown) when nothing
+  // is pinned — the render that follows recomputes it from these exact boxes anyway
+  // wherever the mode leaves it computed, so that fallback is purely a plausible
+  // starting figure for wherever it's typed.
+  const pinnedEin = pinnedCalorieTargetKcal();
+  if (pinnedEin !== null) {
+    document.getElementById('formula-ein').value = pinnedEin;
+  } else {
+    const seedDetail = calorieTargetDetail(planBodyMassKg(wellnessEntries));
+    document.getElementById('formula-ein').value = seedDetail ? Math.round(seedDetail.kcal) : '';
+  }
   //
   // Δm% likewise: normally it's derived from the kg box on that same render. The exception
   // is a pinned percentage, where IT is the saved authority and the kilograms are what get
@@ -33,12 +54,12 @@ function loadFormulaInputsFromSettings() {
 
 function openFormulaPlayground() {
   clearFieldError('formula-status');
-  document.querySelector('input[name="formula-solve-for"][value="EIN"]').checked = true;
+  document.querySelector('input[name="formula-solve-for"][value="DELTA_M"]').checked = true;
   // A fresh look at TAU/DELTA_M's original single-direction behavior each
   // time the modal opens, rather than carrying over whichever side of either
   // one was last typed into in a previous session.
   dualKnownField.TAU = 'ein';
-  dualKnownField.DELTA_M = 'days';
+  dualKnownField.DELTA_M = 'ein';
   // Same fresh start for the Δm pair — 'kg' unless the percentage is the pinned quantity,
   // in which case it's the one on the sheet and the kilograms are what follow from it.
   weeklyLossKnownField = pinnedWeeklyFatLossPct() !== null ? 'pct' : 'kg';
@@ -57,11 +78,16 @@ function openFormulaPlayground() {
   document.querySelector(`input[name="formula-activity-pin-mode"][value="${activityPinMode}"]`).checked = true;
   // Also from the sheet rather than a fixed default: which BMR equation is in force is a
   // saved decision, and opening the modal on the other one would misdescribe every figure
-  // behind it until something was touched.
-  document.querySelector(`input[name="formula-bmr-formula"][value="${bmrFormula()}"]`).checked = true;
+  // behind it until something was touched. lastExplicitBmrFormula resets to the real saved
+  // equation every open too, same "fresh look, no carried-over session state" rule the
+  // dual-known fields (TAU/DELTA_M) follow above — and the equation radio shows "BMR_cal"
+  // instead whenever that's the saved basis, so the two fieldsets open already agreeing.
+  lastExplicitBmrFormula = bmrFormula();
+  const equationRadioValue = bmrBasis() === 'bmr_cal' ? 'bmr_cal' : bmrFormula();
+  document.querySelector(`input[name="formula-bmr-formula"][value="${equationRadioValue}"]`).checked = true;
   document.querySelector(`input[name="formula-bmr-basis"][value="${bmrBasis()}"]`).checked = true;
   loadFormulaInputsFromSettings();
-  applySolveForMode('EIN');
+  applySolveForMode('DELTA_M');
   renderFormulaPreview();
   // No autofocus, same as every other modal here.
   document.getElementById('formula-modal').hidden = false;
@@ -280,18 +306,45 @@ function initFormulaPlayground() {
   // Switching BMR equations re-derives everything: the figure, A and B, the plateau and the
   // arrival date, and (under Katch) whether a blank age is even a problem — so it goes
   // through the same full render a typed input does, not a cosmetic swap of one line.
+  //
+  // Picking "BMR_cal" here is a second entry point to the SAME choice the "Which BMR..."
+  // fieldset below offers — mirror the checked radio down there too, so neither fieldset
+  // ever shows a basis that isn't actually the one in effect (currentBmrBasis,
+  // formula-fields.js, gives the equation radio's own "bmr_cal" priority regardless, but a
+  // stale-looking lower radio would still read as a bug). Picking Mifflin/Katch explicitly
+  // here records it as lastExplicitBmrFormula and, if the lower fieldset was showing
+  // "BMR_cal", reverts it to Plain — an explicit equation choice up here means "not
+  // calibrated" the same way it would if made down there.
   document.querySelectorAll('input[name="formula-bmr-formula"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       clearFieldError('formula-status');
+      const value = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+      if (value === 'bmr_cal') {
+        document.querySelector('input[name="formula-bmr-basis"][value="bmr_cal"]').checked = true;
+      } else {
+        lastExplicitBmrFormula = value;
+        if (document.querySelector('input[name="formula-bmr-basis"]:checked').value === 'bmr_cal') {
+          document.querySelector('input[name="formula-bmr-basis"][value="bmr"]').checked = true;
+        }
+      }
       renderFormulaPreview();
     });
   });
 
   // Same shape: switching the basis re-derives Eᵢₙ, D and every figure built from BMR, so
-  // it goes through the same full render a typed input does.
+  // it goes through the same full render a typed input does. Kept in sync with the equation
+  // fieldset's own "BMR_cal" radio the same way, in the other direction: picking "BMR_cal"
+  // here checks it up there too; picking Plain or BMR_adp here, when the equation fieldset was
+  // showing "BMR_cal", reverts that radio back to whichever equation was last explicit.
   document.querySelectorAll('input[name="formula-bmr-basis"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       clearFieldError('formula-status');
+      const value = document.querySelector('input[name="formula-bmr-basis"]:checked').value;
+      if (value === 'bmr_cal') {
+        document.querySelector('input[name="formula-bmr-formula"][value="bmr_cal"]').checked = true;
+      } else if (document.querySelector('input[name="formula-bmr-formula"]:checked').value === 'bmr_cal') {
+        document.querySelector(`input[name="formula-bmr-formula"][value="${lastExplicitBmrFormula}"]`).checked = true;
+      }
       renderFormulaPreview();
     });
   });

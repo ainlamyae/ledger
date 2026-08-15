@@ -70,6 +70,11 @@ function targetCapHalf(axisSpan) {
 // a mid-tone in both themes, and it already means "unscored bar" on the same chart.
 const WEEKLY_AVG_COLOR = '#7c3aed';
 
+// Teal, for BMR_cal beside BMR_adp's violet — a third reference line on the same chart needs
+// its own hue, not a tint of either existing one, so all three bases stay visually distinct
+// in both themes.
+const CALIBRATED_BMR_COLOR = '#0891b2';
+
 // A continuous exponential moving average, not a fixed weekly bucket: each day blends
 // today's own reading into yesterday's already-smoothed value, rather than every column
 // in a calendar week sharing one fit that resets at the boundary — the reset is what

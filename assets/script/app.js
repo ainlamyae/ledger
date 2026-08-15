@@ -1016,6 +1016,7 @@ function bootDashboard() {
   initCsvControls();
   initInsightPanel();
   initFormulaPlayground();
+  initBmrCalibration();
   // Before the panel below it: this fills the From/To pair every Health Indicators
   // chart reads, and its first render is one of the readers.
   initWellnessRangeControl();

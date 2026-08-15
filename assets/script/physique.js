@@ -353,9 +353,14 @@ function renderPhysiqueList() {
       if (value === null) return '—';
       return privacyMode ? maskDigits(String(value)) : String(value);
     };
+    const time = (value) => {
+      if (!value) return '—';
+      return privacyMode ? maskDigits(value) : value;
+    };
 
     const sleepHours = physiqueSleepHours(p);
     const sleepTitle = sleepHours !== null ? `${sleepHours} hr of sleep` : '';
+    const maskedSleepTitle = privacyMode ? maskDigits(sleepTitle) : sleepTitle;
 
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
@@ -373,8 +378,8 @@ function renderPhysiqueList() {
     tr.append(
       checkboxCell,
       makeCell(p.date || '🔁 Pattern'),
-      makeCell(p.bedtime || '—', sleepTitle),
-      makeCell(p.wakeTime || '—', sleepTitle),
+      makeCell(time(p.bedtime), maskedSleepTitle),
+      makeCell(time(p.wakeTime), maskedSleepTitle),
       makeCell(num(p.bodyMass)),
       makeCell(num(p.caloriesIn)),
       makeCell(num(p.proteinIn)),

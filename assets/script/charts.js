@@ -966,9 +966,9 @@ function formatProteinTargetBand(band, separator = '~') {
   return band.max > band.min ? `${band.min}${separator}${band.max}` : `${band.min}`;
 }
 
-// Inside the band? The upper end is a real ceiling, not headroom, so over it is a miss
-// too. A zero-width band has no inside and keeps the plain at-or-over rule. Shared by
-// the glance tile and the chart's bar colours.
+// Inside the band? A zero-width band has no inside and keeps the plain at-or-over
+// rule. Over the top isn't a miss — both the chart's bar colours and the glance tile
+// give it its own dark-green "past the ceiling, still a hit" treatment instead.
 function withinProteinBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
@@ -1466,8 +1466,10 @@ function renderTodayGlanceCards(entries) {
   // has no room. Digit-free, so privacy mode has nothing to hide.
   document.getElementById('today-calories-label').textContent = `${calorieTarget.word} Calory Intake`;
 
-  // Protein is the one metric judged against a RANGE — inside the band only.
+  // Protein is the one metric judged against a RANGE, and the one where overshooting
+  // still counts as a hit — see withinProteinBand and the chart's PROTEIN_OVER_BAND_COLOR.
   const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
+  const proteinOverBand = protein !== null && protein > proteinBand.max;
 
   // What hitting the minutes target would burn — pinned flat if calorie burn is what's
   // pinned, else via the same activityTargetKcal the calorie target is built from, so the
@@ -1475,7 +1477,7 @@ function renderTodayGlanceCards(entries) {
   const targetBurn = bodyMassKg !== null ? `${Math.round(getActivityTargetKcal(bodyMassKg))} kcal` : null;
 
   setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
-  setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand);
+  setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
   setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, targetBurn);
   setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
 }
@@ -1483,13 +1485,15 @@ function renderTodayGlanceCards(entries) {
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
 // and mask alike. `note` restates it in a second unit ("→ 394 kcal"), inside the same
 // string rather than its own element, so the line reads at one size and masks as one.
-function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null) {
+// `isHigh` gives Protein the same dark-green-past-the-band-top the chart uses; every
+// other tile leaves it false and gets the plain two-colour split.
+function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, isHigh = false) {
   const el = document.getElementById(`${idPrefix}-value`);
-  el.classList.remove('income', 'expense');
+  el.classList.remove('income', 'income-high', 'expense');
 
   const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` → ${note}` : ''}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
-  if (value !== null) el.classList.add(isGood ? 'income' : 'expense');
+  if (value !== null) el.classList.add(isGood ? (isHigh ? 'income-high' : 'income') : 'expense');
 }
 
 // Health units never pass through formatCurrency's masking, but they're still personal
@@ -3059,6 +3063,7 @@ function renderWellnessProjectionChart(entries) {
 
   const meterWrap = document.getElementById('body-mass-progress-meter');
   const meterFill = document.getElementById('body-mass-progress-meter-fill');
+  const meterCallout = document.getElementById('body-mass-progress-meter-callout');
   const meterDone = document.getElementById('body-mass-progress-meter-done');
   const meterRemaining = document.getElementById('body-mass-progress-meter-remaining');
   const meterTarget = document.getElementById('body-mass-progress-meter-target');
@@ -3070,6 +3075,8 @@ function renderWellnessProjectionChart(entries) {
   const etaEl = document.getElementById('body-mass-projection-eta');
   const plateauNote = document.getElementById('body-mass-plateau-note');
   meterWrap.hidden = true;
+  meterCallout.textContent = '';
+  meterCallout.classList.remove('danger');
   meterDone.textContent = '';
   meterRemaining.textContent = '';
   meterTarget.textContent = '';
@@ -3108,6 +3115,13 @@ function renderWellnessProjectionChart(entries) {
     meterWrap.hidden = false;
     meterFill.style.width = `${pct}%`;
     meterFill.classList.toggle('danger', isWrongDirection);
+
+    // Same edge the fill stops at, so the bubble reads as "you are here" rather
+    // than a second, disagreeing marker.
+    meterCallout.style.left = `${pct}%`;
+    const currentText = `${lastBodyMass} kg`;
+    meterCallout.textContent = privacyMode ? maskDigits(currentText) : currentText;
+    meterCallout.classList.toggle('danger', isWrongDirection);
 
     const doneText = `${doneKg} kg`;
     meterDone.textContent = privacyMode ? maskDigits(doneText) : doneText;

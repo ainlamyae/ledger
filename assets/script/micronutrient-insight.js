@@ -273,7 +273,7 @@ function formatMicronutrientCoverageLine(data) {
 
 function renderMicronutrientInsightPreview(data) {
   renderInsightLines(document.getElementById('insight-micro-profile'), [
-    ...formatProfileLines(gatherProfileSnapshot()),
+    ...formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)),
     formatMicronutrientCoverageLine(data),
   ]);
 
@@ -305,7 +305,7 @@ function renderMicronutrientInsightPreview(data) {
 const MICRONUTRIENT_INSIGHT_DEFAULT_QUESTION = 'Is this amount enough? What is missing, and what should I eat to fix it?';
 
 function formatMicronutrientInsightPrompt(data, { from, to, question }) {
-  const profile = formatProfileLines(gatherProfileSnapshot()).join('\n');
+  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)).join('\n');
   const coverage = formatMicronutrientCoverageLine(data);
   const header = `Real, measured nutrient totals (from USDA FoodData Central, via each ingredient's own Nutrition-table entry) for the ingredients logged from ${from} to ${to} that have been priced for micronutrients — name: total over the period (average per day), ideal/day (a fixed FDA Daily Value, not personalized to this user), and whether the app's own math already flags a gap:`;
   const body = data.nutrients.length

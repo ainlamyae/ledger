@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -230,8 +230,7 @@
                 <h3>Status</h3>
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
                 <div class="widget-row"><span>m̄</span><span id="today-status-mbar-value">—</span></div>
-                <div class="widget-row"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
-                <div class="widget-row widget-row-divider"><span>t</span><span id="today-status-goal-value">—</span></div>
+                <div class="widget-row widget-row-divider"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
                 <div class="widget-row"><span>BMR</span><span id="today-status-maintenance-value">—</span></div>
                 <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
                 <div class="widget-row"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
@@ -241,6 +240,7 @@
                 <div class="widget-row widget-row-divider"><span>SD</span><span id="today-status-deprivation-value">—</span></div>
                 <div class="widget-row"><span>D</span><span id="today-status-balance-value">—</span></div>
                 <div class="widget-row"><span>Δm</span><span id="today-status-deltam-value">—</span></div>
+                <div class="widget-row"><span>t</span><span id="today-status-goal-value">—</span></div>
             </div>
             <div class="today-glance-stack">
                 <div class="card">
@@ -563,6 +563,7 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Physique</h2>
+                <button id="physique-export-csv-btn" class="btn panel-header-btn">Export CSV</button>
                 <button id="today-physique-btn" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
                 <button id="add-physique-btn" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
             </div>
@@ -587,7 +588,7 @@
                         <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
                         <th class="sortable" data-sort="date">Date</th>
                         <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
-                        <th title="Hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">Sleep</th>
+                        <th title="Sleep — hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">S</th>
                         <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
                         <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
                         <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
@@ -845,23 +846,21 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Transaction</h2>
+                <button id="export-csv-btn" class="btn panel-header-btn">Export CSV</button>
                 <button id="add-transaction-btn" class="btn btn-primary panel-header-btn" title="Log a transaction">Log</button>
             </div>
 
-            <div class="panel-actions">
-                <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
-                <input type="file" id="import-csv-input" accept=".csv" hidden>
-                <button id="tx-advanced-filters-toggle" class="btn">Advanced Filters</button>
-                <button id="export-csv-btn" class="btn">Export CSV</button>
-            </div>
+            <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
+            <input type="file" id="import-csv-input" accept=".csv" hidden>
 
             <div class="filters">
-                <input type="text" id="tx-search" placeholder="Search payee, description, account, category...">
-                <input type="text" id="tx-payee-filter" list="tx-payee-options" placeholder="All Payees" title="Narrow to one payee — type to autocomplete against your past payees">
+                <select id="tx-account-filter"></select>
+                <input type="text" id="tx-payee-filter" list="tx-payee-options" placeholder="Payee">
                 <select id="tx-category-filter"></select>
+                <input type="text" id="tx-description-filter" placeholder="Description">
             </div>
 
-            <div id="tx-advanced-filters" hidden>
+            <div id="tx-advanced-filters">
                 <form id="export-form">
                     <div class="export-date-range">
                         <label>From
@@ -1237,8 +1236,8 @@
                  sign does the work, so -10 on WV takes WV's Balance down ten and
                  a deposit puts it back. Ticked by default — a transaction and the
                  balance it moves are one act, and doing them separately is how
-                 the two drift apart. Offered for a new row only, and turned off
-                 with a reason where the sheet computes that Balance itself; see
+                 the two drift apart. On an edit, the old amount is reversed first.
+                 Turned off with a reason where the sheet computes that Balance itself; see
                  openTransactionForm. -->
             <label class="checkbox-inline-label" id="tx-update-balance-label" title="Add this amount to the selected account's Balance on the Account tab">
                 <input type="checkbox" id="tx-update-balance" checked>
@@ -2306,10 +2305,13 @@
 
 <div id="activity-instruction-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="activity-instruction-title" hidden>
     <div class="modal-card">
-        <button type="button" id="activity-instruction-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="activity-instruction-title">Instructions on the Activities</h2>
 
         <div class="instruction-body" id="instruction-body"></div>
+
+        <div class="modal-actions">
+            <button type="button" id="activity-instruction-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        </div>
     </div>
 </div>
 

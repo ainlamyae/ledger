@@ -165,9 +165,13 @@ function setupModalFocusManagement() {
     new MutationObserver(() => {
       if (!modal.hidden) {
         lastFocused = document.activeElement;
-      } else if (lastFocused) {
-        lastFocused.focus();
-        lastFocused = null;
+        document.body.classList.add('modal-open');
+      } else {
+        if (lastFocused) {
+          lastFocused.focus();
+          lastFocused = null;
+        }
+        if (!getOpenModal()) document.body.classList.remove('modal-open');
       }
     }).observe(modal, { attributes: true, attributeFilter: ['hidden'] });
   });
@@ -714,6 +718,8 @@ async function loadDashboard(forceRefresh = false) {
       // (each exercise's Group and Weekly Target) both loaded.
       Promise.all([physiquePromise, activitiesPromise]).then(() => {
         renderActivityRotationChart(wellnessDateRange());
+        renderActivityPlanTables();
+        renderInstructionList();
       }),
       initContacts(forceRefresh),
       // Its own read of the Breakdown tab rather than a share of loadReport's: that

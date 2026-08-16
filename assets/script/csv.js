@@ -35,6 +35,7 @@ function downloadTextFile(filename, content, mimeType) {
 // calls; account-menu.js only enables the button once loadDashboard has
 // actually populated them (dashboardLoaded, app.js).
 function exportFullBackup() {
+  if (!confirm('Export a full JSON backup of all your data?')) return;
   const payload = {
     exportedAt: new Date().toISOString(),
     transactions: allTransactions,
@@ -236,6 +237,7 @@ function syncExportAccountOptions() {
 }
 
 function exportTransactionsCSV() {
+  if (!confirm('Export filtered transactions to CSV?')) return;
   const rows = getFilteredTransactions()
     .map((t) => [t.date, t.account, t.payee, t.category, t.amount, t.description]);
 
@@ -246,6 +248,27 @@ function exportTransactionsCSV() {
 
   const csv = [CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
   downloadTextFile(`transactions-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
+}
+
+const PHYSIQUE_CSV_HEADER = ['Date', 'Body Mass', 'Bedtime', 'Wake', 'Calories In', 'Protein (g)', 'Fiber (g)', 'Fat (g)', 'Carbohydrate (g)', 'TEF', 'Workout', 'Duration (min)', 'Calories Out'];
+
+function exportPhysiqueCSV() {
+  if (!confirm('Export filtered physique entries to CSV?')) return;
+  const rows = getFilteredPhysiqueEntries()
+    .filter((p) => p.date)
+    .map((p) => [
+      p.date, p.bodyMass ?? '', p.bedtime ?? '', p.wakeTime ?? '',
+      p.caloriesIn ?? '', p.proteinIn ?? '', p.fiber ?? '', p.fat ?? '',
+      p.carbohydrate ?? '', p.tef ?? '', p.workout, p.duration ?? '', p.caloriesOut ?? '',
+    ]);
+
+  if (rows.length === 0) {
+    alert('No Physique entries match the selected filters.');
+    return;
+  }
+
+  const csv = [PHYSIQUE_CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
+  downloadTextFile(`physique-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
 }
 
 function parseCSV(text) {

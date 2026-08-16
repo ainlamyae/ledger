@@ -72,7 +72,10 @@ let allNutritionEntries = [];
 // real answer (an untracked ingredient and an unloaded table look identical).
 let nutritionDataLoaded = false;
 let nutritionListenersAttached = false;
-let nSort = { key: 'name', dir: 1 };
+// Default to Uses, highest first (dir -1), so the ingredients you actually log
+// sit on the first page — the Uses column is always counted now (see
+// renderNutritionList) rather than filled in on demand by a button.
+let nSort = { key: 'uses', dir: -1 };
 let nCurrentPage = 1;
 let nutritionSheetId = null;
 let editingNutritionRow = null;
@@ -101,12 +104,13 @@ let pendingIngredientMicronutrients = null;
 // a Cancel can't fire a stale caller's callback on some later unrelated Add.
 let nutritionFormSaveCallback = null;
 // Row -> how many Consumption lines (across every Physique day) resolved to
-// that row, per 📊 Count Uses beside Search. UI-only — never written to the
-// sheet — and null until that button's been clicked at least once this
-// session, so "never logged" (0) reads differently from "haven't checked
-// yet" (—). Recomputing is cheap enough (refreshPhysique is cached) to just
-// throw away and redo on every click rather than trying to keep it in sync
-// with edits in between.
+// that row, driving the always-on Uses column (and its default sort). UI-only,
+// never written to the sheet. Memoized: computed lazily in renderNutritionList
+// once Physique has loaded, and invalidated (set back to null) by both
+// refreshNutrition (the ingredient set changed) and refreshPhysique's own
+// re-render of this table (the logged days changed) so it's recounted then
+// rather than on every keystroke. null before the first count, which reads as
+// "—" (Physique not loaded yet) rather than a real 0 ("never logged").
 let nutritionUsageCounts = null;
 
 async function fetchNutritionSheetId() {
@@ -123,6 +127,7 @@ async function initNutrition(forceRefresh = false) {
     onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-pull-micros-single-btn').addEventListener('click', pullMicronutrientsForForm);
     document.getElementById('nutrition-normalize-btn').addEventListener('click', normalizeIngredientForm);
+    document.getElementById('nutrition-log-btn').addEventListener('click', logNutritionFromForm);
     onAsyncClick('nutrition-update-btn', updateNutritionEntryAndPropagate);
 
     document.getElementById('nutrition-search').addEventListener('input', () => {
@@ -130,7 +135,6 @@ async function initNutrition(forceRefresh = false) {
       selectedNutritionRows.clear();
       renderNutritionList();
     });
-    document.getElementById('nutrition-usage-btn').addEventListener('click', refreshNutritionUsageCounts);
 
     setupNutritionSorting();
     setupNutritionBulkActions();
@@ -206,6 +210,9 @@ async function refreshNutrition(forceRefresh = false) {
     .filter((n) => n.name);
 
   nutritionDataLoaded = true;
+  // The ingredient set may have changed, so the memoized Uses counts are stale
+  // — drop them and let renderNutritionList recount against current Physique.
+  nutritionUsageCounts = null;
   renderNutritionList();
 }
 
@@ -264,10 +271,11 @@ function micronutrientCount(n) {
   return parsed ? Object.keys(parsed).length : 0;
 }
 
-// null before 📊 Count Uses has run this session (see nutritionUsageCounts
-// above), otherwise how many Consumption lines resolved to this row —
-// 0 is a real, meaningful answer here ("never logged, safe to remove"), so
-// it's kept distinct from "not computed yet" rather than defaulting to it.
+// null before the Uses count has first run (Physique not loaded yet — see
+// nutritionUsageCounts above), otherwise how many Consumption lines resolved to
+// this row — 0 is a real, meaningful answer here ("never logged, safe to
+// remove"), so it's kept distinct from "not computed yet" rather than
+// defaulting to it.
 function nutritionUsageCount(n) {
   return nutritionUsageCounts ? (nutritionUsageCounts.get(n.row) ?? 0) : null;
 }
@@ -332,13 +340,23 @@ function micronutrientsCell(n) {
 // "never logged, safe to remove" case the button exists to surface.
 function usesCell(n) {
   const count = nutritionUsageCount(n);
-  if (count === null) return makeCell('—', 'Click 📊 Count Uses beside Search to fill this in');
+  if (count === null) return makeCell('—', 'Counted once your Physique days have loaded');
   return makeCell(String(count), `Appears in ${count} logged Consumption line${count === 1 ? '' : 's'} across your Physique days`);
 }
 
 function renderNutritionList() {
   const tbody = document.getElementById('nutrition-body');
   tbody.innerHTML = '';
+
+  // Count Uses once Physique is loaded, memoized until the next invalidation
+  // (refreshNutrition / refreshPhysique both reset this to null) — so the
+  // always-on Uses column and its default sort have real numbers without
+  // recounting on every search keystroke. Stays null (reads "—") until the
+  // first load, since an empty allPhysiqueEntries would otherwise count
+  // everything as a real 0.
+  if (physiqueDataLoaded && nutritionUsageCounts === null) {
+    nutritionUsageCounts = computeNutritionUsageCounts();
+  }
 
   const filtered = getFilteredNutritionEntries();
   const totalPages = Math.max(1, Math.ceil(filtered.length / N_PAGE_SIZE));
@@ -529,8 +547,48 @@ function openNutritionForm(entry, onSaved = null) {
 
   renderNutritionMicronutrientsDetails(entry);
 
+  updateNutritionFormLogButtonLabel();
   clearFieldError('nutrition-form-error');
   document.getElementById('nutrition-modal').hidden = false;
+}
+
+// The Edit/Add Ingredient form's own Log button, mirroring the activity
+// form's (logActivityFromForm, activities.js): "Log" while today's Physique
+// row has no Consumption yet, "Log More" once it does — same coarse,
+// whole-day read as the table's log-nutrition-btn (updateNutritionLogButtonLabel),
+// since one ingredient can legitimately be logged twice in a day.
+function updateNutritionFormLogButtonLabel() {
+  const today = todaysPhysiqueDay();
+  const hasToday = Boolean(today && today.consumption && today.consumption.trim());
+  const btn = document.getElementById('nutrition-log-btn');
+  btn.textContent = hasToday ? 'Log More' : 'Log';
+  btn.title = hasToday
+    ? "Add this ingredient to today's Consumption"
+    : "Log this ingredient as today's Consumption";
+}
+
+// Logs whatever's currently typed in the form as one line of today's
+// Consumption — the same bare "g name" (or "x name" for a per-each row) line
+// logSelectedNutrition appends off a ticked table row, just off the form's own
+// Name/Amount fields and without requiring the row to be saved to the
+// catalogue first (same shape as logActivityFromForm in activities.js).
+function logNutritionFromForm() {
+  const name = document.getElementById('nutrition-name').value.trim();
+  const amount = document.getElementById('nutrition-amount').value.trim();
+  if (!name) {
+    showFieldError('nutrition-form-error', 'Enter a Name before logging it to Consumption.');
+    return;
+  }
+
+  const today = todaysPhysiqueDay();
+  const consumption = [today?.consumption ?? '', `${nutritionLogUnit(amount)} ${name}`]
+    .filter((part) => part.trim())
+    .join('\n');
+
+  closeNutritionForm();
+  openPhysiqueForm(today);
+  if (today) document.getElementById('physique-modal-title').textContent = "Add to Today's Consumption";
+  physiqueField('consumption').value = consumption;
 }
 
 // The ingredient form's collapsed-by-default Micronutrients disclosure —
@@ -1276,6 +1334,11 @@ function todaysUsedNutritionRows() {
   return rows;
 }
 
+// Row -> logged-line count across every Physique day, the always-on Uses
+// column's source. Called (and memoized) from renderNutritionList once Physique
+// has loaded; reads allPhysiqueEntries directly, so an empty/unloaded Physique
+// would count everything as 0 — which is why the caller guards on
+// physiqueDataLoaded before trusting the result.
 function computeNutritionUsageCounts() {
   const counts = new Map();
   allPhysiqueEntries.forEach((p) => {
@@ -1286,35 +1349,6 @@ function computeNutritionUsageCounts() {
     });
   });
   return counts;
-}
-
-// 📊 Count Uses, beside Search — UI-only (nutritionUsageCounts is never
-// written to the sheet), so it's fine to just throw the last count away and
-// redo it in full on every click rather than trying to track edits in
-// between. Physique isn't otherwise loaded by this panel, so this pulls it
-// in itself the first time (refreshPhysique is cached, so a click made after
-// visiting Physique already is effectively free).
-async function refreshNutritionUsageCounts() {
-  const btn = document.getElementById('nutrition-usage-btn');
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Counting…';
-  try {
-    await refreshPhysique();
-    nutritionUsageCounts = computeNutritionUsageCounts();
-    // Mutated in place, not reassigned — makeSortableHeaders (ui-helpers.js)
-    // closed over this exact object when the column headers were wired up,
-    // so a new object here would desync the header's own click handler from
-    // what getFilteredNutritionEntries reads on the very next sort click.
-    nSort.key = 'uses';
-    nSort.dir = 1;
-    updateSortIndicators('#nutrition-table', nSort);
-    nCurrentPage = 1;
-    renderNutritionList();
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-  }
 }
 
 // Naive singular fold — just enough to catch "egg"/"eggs"-style plural typos

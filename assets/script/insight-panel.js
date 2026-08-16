@@ -114,9 +114,7 @@ const INSIGHT_MODES = {
   },
   patterns: {
     label: 'Patterns',
-    // Functions, not fixed strings — the period length is the user-editable days
-    // box (patternsChunkDays()), so both have to name whatever length is live.
-    hint: (data) => `Range is rounded to whole ${data.chunkDays}-day periods, ending on the last day with Calories In and Out logged.`,
+    hint: '',
     questionPlaceholder: 'e.g. Does more strength training raise my BMR?',
     previewId: 'insight-preview-patterns',
     gather: (from, to) => gatherFatLossPatterns(from, to, patternsChunkDays()),
@@ -201,7 +199,7 @@ function loadInsightMode(modeKey) {
   const data = mode.gather(from, to);
   insightLoaded = { mode: modeKey, from, to, data };
 
-  document.getElementById('insight-hint').textContent = typeof mode.hint === 'function' ? mode.hint(data) : mode.hint;
+  document.getElementById('insight-hint').textContent = mode.hint;
   textarea.placeholder = mode.questionPlaceholder;
   showInsightPreview(mode.previewId);
   mode.renderPreview(data, ctx);

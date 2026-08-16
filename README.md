@@ -31,6 +31,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Reads/writes a private "Ledger" spreadsheet via Sheets API v4.
 - All aggregation, charting, filtering, sorting and CRUD runs client-side in vanilla JS.
 - No build step, no server component to deploy or maintain.
+- The home page loads as a fast overview — each section's summary tiles (Health status/macros/activity/sleep, Finance net worth and monthly cash flow) — with the detailed panels **hidden by default** for speed; a **Show blocks** menu item (remembered via a `SHOW_BLOCKS` setting) reveals and loads them on demand. The `/health/`, `/finance/` and `/other/` section pages always show their one block in full.
 - Optional AI reads (via your own Groq key) in Health Insight — Wellness, Food, Micronutrients, Activity, Protein Sources, Health Plan, and **Patterns**, which sends period averages (mass change, intake, macros, activity by type, BMR offset) over a user-editable period length (default 14 days) and asks what drives more fat loss and a higher BMR.
 
 ---

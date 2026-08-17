@@ -160,6 +160,7 @@ async function initPhysique(forceRefresh = false) {
     });
     onAsyncClick('physique-bulk-calc-btn', bulkCalculatePhysique);
     onAsyncClick('physique-bulk-combine-btn', bulkCombineAndSortPhysique);
+    document.getElementById('physique-export-csv-btn').addEventListener('click', exportPhysiqueCSV);
   }
 
   await refreshPhysique(forceRefresh);
@@ -511,6 +512,11 @@ function renderPhysiqueList() {
       if (value === null) return '—';
       return privacyMode ? maskDigits(String(value)) : String(value);
     };
+    const int = (value) => {
+      if (value === null) return '—';
+      const s = String(Math.round(value));
+      return privacyMode ? maskDigits(s) : s;
+    };
     const sleepHours = physiqueSleepHours(p);
     // Wake minus bed, not the two clock times — those still open on Edit
     // (the form's own Bedtime/Wake-up Time fields), same as every other
@@ -562,10 +568,10 @@ function renderPhysiqueList() {
       makeCell(num(sleepHours), maskedSleepTitle),
       makeCell(privacyMode ? maskDigits(deprivationText) : deprivationText, maskedDeprivationTitle),
       makeCell(num(p.caloriesIn)),
-      makeCell(num(p.proteinIn)),
-      makeCell(num(p.fiber)),
-      makeCell(num(p.fat)),
-      makeCell(num(p.carbohydrate)),
+      makeCell(int(p.proteinIn)),
+      makeCell(int(p.fiber)),
+      makeCell(int(p.fat)),
+      makeCell(int(p.carbohydrate)),
       makeCell(num(p.tef), p.tef !== null
         ? undefined
         : 'Not calculated yet — select this day and click TEF below (needs 🧬 Micronutrients pulled for its ingredients)'),
@@ -1021,8 +1027,23 @@ async function restorePhysiqueSnapshots(snapshots) {
   }
 }
 
+function physiquePatternLabel(entry) {
+  const snippet = (text) => {
+    const first = text.split('\n')[0].trim();
+    return first.length > 45 ? first.slice(0, 45) + '…' : first;
+  };
+  const parts = [];
+  if (entry.consumption) parts.push(`Consumption: "${snippet(entry.consumption)}"`);
+  if (entry.workout)     parts.push(`Workout: "${snippet(entry.workout)}"`);
+  if (entry.bodyMass !== null)  parts.push(`Body Mass: ${entry.bodyMass}`);
+  if (entry.caloriesIn !== null) parts.push(`Cal In: ${entry.caloriesIn}`);
+  return parts.length ? parts.join(' · ') : 'no details';
+}
+
 async function deletePhysiqueEntry(entry) {
-  const label = entry.date ? `the logged day for ${entry.date}` : 'this pattern row';
+  const label = entry.date
+    ? `the logged day for ${entry.date}`
+    : `pattern (${physiquePatternLabel(entry)})`;
   await confirmAndDelete(`Delete ${label}?`, async () => {
     if (!physiqueSheetId) physiqueSheetId = await fetchPhysiqueSheetId();
     await batchUpdate([{

@@ -991,8 +991,10 @@ html[data-blocks-pref="hidden"] #dashboard .panel-group .panel {
     margin-bottom: .6rem;
 }
 
-.filters input[type="text"] {
+.filters input[type="text"],
+.filters select {
     flex: 1;
+    min-width: 0;
 }
 
 .filters input,

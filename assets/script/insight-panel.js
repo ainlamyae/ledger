@@ -45,6 +45,23 @@ const INSIGHT_MODES = {
     resultKeys: ['INSIGHT_FOOD_LAST_RESULT', 'FOOD_INSIGHT_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_FOOD_LAST_GENERATED_AT', 'FOOD_INSIGHT_LAST_GENERATED_AT'],
   },
+  micronutrients: {
+    label: 'Micronutrients',
+    hint: 'A read on real, USDA-measured vitamin/mineral totals from ingredients you\'ve priced with Pull Micronutrients — how much you\'re actually getting, and where the gaps are.',
+    questionPlaceholder: 'e.g. Is this amount enough? What is missing?',
+    previewId: 'insight-preview-micronutrients',
+    gather: (from, to) => aggregateMicronutrientIntake(from, to),
+    // Micronutrients is the other mode (with Food) that inlines the question
+    // into the prompt body rather than appending it — same reasoning as Food:
+    // it has its own default question and phrasing built around it.
+    formatPrompt: (data, { from, to, question }) => formatMicronutrientInsightPrompt(data, { from, to, question }),
+    renderPreview: (data) => renderMicronutrientInsightPreview(data),
+    appendQuestion: false,
+    needsNutrition: true,
+    systemPrompt: MICRONUTRIENT_INSIGHT_SYSTEM_PROMPT,
+    resultKeys: ['INSIGHT_MICRONUTRIENTS_LAST_RESULT'],
+    generatedAtKeys: ['INSIGHT_MICRONUTRIENTS_LAST_GENERATED_AT'],
+  },
   activity: {
     label: 'Activity',
     hint: 'A read on your workout performance — consistency, volume trend, and which muscle groups need attention.',
@@ -95,7 +112,7 @@ const INSIGHT_MODES = {
 };
 
 const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
-const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food'];
+const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food', 'insight-preview-micronutrients'];
 
 // What's on screen right now: which mode, the range it was gathered for, and
 // the gathered data itself. Send to AI reuses this data rather than re-running

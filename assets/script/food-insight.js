@@ -1,11 +1,13 @@
 // The Health Insight panel's Food mode: aggregates every ingredient logged (via
 // Physique's 🧮 Calculate breakdown) over the picked range into one
-// per-ingredient total, and phrases it for a nutrient-gap read. No vitamin or
-// mineral data exists anywhere in this app (usda.js only extracts kcal/protein),
-// so this leans entirely on the model's own food-composition knowledge — the
-// same trust level item.kcalPer100gFallback already extends it in
-// calorie-estimator.js. insight-panel.js drives it; the shared profile block and
-// the report renderer come from insight.js.
+// per-ingredient total, and phrases it for a nutrient-gap read. This mode leans
+// entirely on the model's own food-composition knowledge for vitamins/minerals
+// — the same trust level item.kcalPer100gFallback already extends it in
+// calorie-estimator.js — rather than the Nutrition table's own (partial,
+// opt-in-per-ingredient) Micronutrients column; micronutrient-insight.js's
+// mode is the one built on real, measured totals from that column instead.
+// insight-panel.js drives it; the shared profile block and the report
+// renderer come from insight.js.
 
 // Sums each Calculate-derived breakdown item across every Calories; Protein
 // entry in the window, grouped by lowercase-trimmed ingredient name. Exact
@@ -57,6 +59,12 @@ function aggregateFoodIntake(from, to) {
         calories: Math.round(agg.calories),
         protein: Math.round(agg.protein * 10) / 10,
         amountLabel: formatAggregatedAmount(grams, count),
+        // Raw totals (post count->grams conversion above), not just the
+        // display string — micronutrient-insight.js scales each ingredient's
+        // Nutrition-table micronutrient panel by these against its own
+        // reference Amount, which needs the numbers, not "350g, ×2" text.
+        grams,
+        count,
       };
     })
     .sort((a, b) => b.calories - a.calories);

@@ -57,21 +57,17 @@ function mergeDuplicateBreakdownRows(rows) {
 // USDA search can rank a token-overlap false match above the actual food (e.g.
 // "soybeans" → "Oil, soybean" at 884 kcal/100g instead of the bean at ~140).
 // Trust a database candidate only if it's in the same ballpark as the model's
-// own estimate for this food; otherwise the candidates are probably all
-// off-category and the model's estimate is the safer number to use. Protein
-// is read off that same trusted/untrusted candidate rather than picked
-// independently, since a false-match candidate is wrong for both macros at once.
+// own estimate for this food (pickPlausibleUsdaCandidate, usda.js); otherwise
+// the candidates are probably all off-category and the model's estimate is
+// the safer number to use. Protein is read off that same trusted/untrusted
+// candidate rather than picked independently, since a false-match candidate
+// is wrong for both macros at once.
 function pickPlausibleMacros(candidates, kcalFallback, proteinFallback) {
-  if (!candidates.length) return { kcal: kcalFallback, protein: proteinFallback };
-
-  const best = candidates.reduce((a, b) =>
-    Math.abs(Math.log(a.kcalPer100g / kcalFallback)) < Math.abs(Math.log(b.kcalPer100g / kcalFallback)) ? a : b
-  );
-  const ratio = best.kcalPer100g / kcalFallback;
-  const trusted = ratio <= 2.5 && ratio >= 1 / 2.5;
+  const best = pickPlausibleUsdaCandidate(candidates, kcalFallback);
+  if (!best) return { kcal: kcalFallback, protein: proteinFallback };
   return {
-    kcal: trusted ? best.kcalPer100g : kcalFallback,
-    protein: (trusted && best.proteinPer100g !== null) ? best.proteinPer100g : proteinFallback,
+    kcal: best.kcalPer100g,
+    protein: best.proteinPer100g !== null ? best.proteinPer100g : proteinFallback,
   };
 }
 

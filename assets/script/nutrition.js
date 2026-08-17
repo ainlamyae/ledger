@@ -4,8 +4,8 @@
 // the specific brand/product actually bought) is recorded here, it's reused
 // instead of being re-guessed every time.
 
-// A2:G — Classification, Name, Amount, Calories, Protein, Verification, Percent.
-const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:G`;
+// A2:H — Classification, Name, Amount, Calories, Protein, Verification, Percent, Micronutrients.
+const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:H`;
 const N_PAGE_SIZE = 25;
 
 // Amount is freeform serving-size text so it can read like a real nutrition
@@ -67,6 +67,7 @@ async function initNutrition(forceRefresh = false) {
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
     onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-usda-btn').addEventListener('click', lookupNutritionFromUsda);
+    onAsyncClick('nutrition-pull-micros-single-btn', pullMicronutrientsForEditingRow);
 
     document.getElementById('nutrition-search').addEventListener('input', () => {
       nCurrentPage = 1;
@@ -89,6 +90,7 @@ function setupNutritionBulkActions() {
   });
 
   onAsyncClick('nutrition-bulk-merge-btn', mergeSelectedNutritionEntries);
+  onAsyncClick('nutrition-pull-micros-btn', pullMicronutrientsForSelected);
 }
 
 function setupNutritionSorting() {
@@ -127,6 +129,12 @@ async function refreshNutrition(forceRefresh = false) {
       // % of your (live, body-mass/activity-driven) protein target this
       // ingredient should cover, e.g. 10 for "turkey = 10% of my protein".
       proteinPercent: (row[6] !== undefined && row[6] !== '') ? Number(row[6]) : null,
+      // Column H: JSON object of the full USDA nutrient panel (macros AND
+      // micros), scaled to this row's own Amount — written only by Pull
+      // Micronutrients below, never by hand. Kept as the raw string here;
+      // parsed on demand (parseMicronutrients) so a malformed cell can't
+      // break the whole list render.
+      micronutrients: (row[7] || '').trim(),
     }))
     .filter((n) => n.name);
 
@@ -142,6 +150,13 @@ function proteinDensity(n) {
   return (n.protein / n.calories) * 100;
 }
 
+// How many nutrients Pull Micronutrients has banked for this row — 0 for
+// "never pulled", the same count the Micronutrients cell itself displays.
+function micronutrientCount(n) {
+  const parsed = parseMicronutrients(n.micronutrients);
+  return parsed ? Object.keys(parsed).length : 0;
+}
+
 function getFilteredNutritionEntries() {
   const search = document.getElementById('nutrition-search').value.trim().toLowerCase();
   const filtered = allNutritionEntries.filter((n) => !search
@@ -152,11 +167,36 @@ function getFilteredNutritionEntries() {
 
   const { key, dir } = nSort;
   return [...filtered].sort((a, b) => {
+    if (key === 'micronutrients') return (micronutrientCount(a) - micronutrientCount(b)) * dir;
     if (key === 'calories' || key === 'protein' || key === 'proteinPercent') return ((a[key] ?? 0) - (b[key] ?? 0)) * dir;
     if (key === 'proteinDensity') return ((proteinDensity(a) ?? 0) - (proteinDensity(b) ?? 0)) * dir;
     if (key === 'verified') return ((a.verified ? 1 : 0) - (b.verified ? 1 : 0)) * dir;
     return String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * dir;
   });
+}
+
+// Malformed JSON in column H (should never happen — only Pull Micronutrients
+// writes it — but a hand-edited cell shouldn't be able to break the list
+// render) reads back as "nothing pulled yet" rather than throwing.
+function parseMicronutrients(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object') ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function micronutrientsCell(n) {
+  const parsed = parseMicronutrients(n.micronutrients);
+  if (!parsed) return makeCell('—', 'Not pulled yet — select this row and click 🧬 Pull Micronutrients below');
+
+  const names = Object.keys(parsed);
+  const tooltip = names
+    .map((name) => `${name}: ${parsed[name].amount} ${parsed[name].unit}`)
+    .join('\n');
+  return makeCell(`${names.length} nutrients`, tooltip);
 }
 
 function renderNutritionList() {
@@ -174,7 +214,7 @@ function renderNutritionList() {
     const message = allNutritionEntries.length === 0
       ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add" in the panel heading to add one yourself.'
       : 'No ingredients match your search.';
-    tbody.appendChild(renderEmptyRow(10, message));
+    tbody.appendChild(renderEmptyRow(11, message));
   }
 
   pageItems.forEach((n) => {
@@ -211,6 +251,7 @@ function renderNutritionList() {
       makeCell(density !== null ? density.toFixed(1) : '—', 'Grams of protein per 100 kcal — higher means a leaner protein source'),
       makeCell(n.verified ? '✅' : '', n.verified ? 'Verified against the label on your own purchased ingredient' : 'From the USDA/AI fallback — not yet checked against a real label'),
       makeCell(n.proteinPercent !== null ? `${n.proteinPercent}%` : '—', 'Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover'),
+      micronutrientsCell(n),
     );
 
     const actionsCell = document.createElement('td');
@@ -267,9 +308,40 @@ function openNutritionForm(entry) {
   document.getElementById('nutrition-verified').checked = entry ? entry.verified : false;
   document.getElementById('nutrition-protein-percent').value = (entry && entry.proteinPercent !== null) ? entry.proteinPercent : '';
 
+  // Pulling only makes sense against a row that already exists (it writes
+  // straight to that row's H cell by number) — hidden entirely in Add mode.
+  document.getElementById('nutrition-pull-micros-single-btn').hidden = !entry;
+  renderNutritionMicronutrientsDetails(entry);
+
   clearFieldError('nutrition-form-error');
   clearUsdaResults();
   document.getElementById('nutrition-modal').hidden = false;
+}
+
+// The Edit Ingredient form's collapsed-by-default Micronutrients disclosure —
+// hidden entirely when the row has never been pulled (nothing to show), open
+// state left alone once expanded across renders within one Pull click's refresh.
+function renderNutritionMicronutrientsDetails(entry) {
+  const details = document.getElementById('nutrition-micronutrients-details');
+  const list = document.getElementById('nutrition-micronutrients-list');
+  list.innerHTML = '';
+
+  const parsed = entry ? parseMicronutrients(entry.micronutrients) : null;
+  if (!parsed) {
+    details.hidden = true;
+    return;
+  }
+
+  Object.keys(parsed).forEach((name) => {
+    const li = document.createElement('li');
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = name;
+    const valueSpan = document.createElement('span');
+    valueSpan.textContent = `${parsed[name].amount} ${parsed[name].unit}`;
+    li.append(nameSpan, valueSpan);
+    list.appendChild(li);
+  });
+  details.hidden = false;
 }
 
 // Classifications already in use, most-used first — same idea as the Health
@@ -498,6 +570,151 @@ async function mergeSelectedNutritionEntries() {
     },
     "Couldn't merge ingredients",
   );
+}
+
+// A sheet created before this feature existed has a grid only as wide as its
+// last real column (G) — Sheets rejects any write past the grid's actual
+// size ("Range exceeds grid limits"), which is stricter than just past its
+// data, so writing to H needs the grid itself widened first. A no-op once
+// the sheet has grown past 7 columns, so this only ever does real work once.
+async function ensureNutritionMicronutrientsColumn() {
+  const metadata = await getSpreadsheetMetadata();
+  const sheet = metadata.sheets.find((s) => s.properties.title === CONFIG.SHEETS.NUTRITION);
+  const columnCount = sheet ? sheet.properties.gridProperties.columnCount : 0;
+  if (columnCount >= 8) return;
+
+  const sheetId = findSheetId(metadata, CONFIG.SHEETS.NUTRITION);
+  nutritionSheetId = sheetId;
+  await batchUpdate([{
+    appendDimension: { sheetId, dimension: 'COLUMNS', length: 8 - columnCount },
+  }]);
+  await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!H1`, [['Micronutrients']]);
+}
+
+// Core single-row pull, shared by the bulk button below and the single-row
+// one in the Edit Ingredient modal: looks up USDA, resolves a trustworthy
+// candidate (or asks via confirm() when its energy doesn't match this row's
+// own Calories), and writes the scaled nutrient panel to column H. Never
+// throws — a lookup/network failure is folded into `reason` too — so neither
+// caller needs its own try/catch around the USDA round trip.
+//
+// Column A-G are never part of the write — the update below is scoped to
+// H{row}:H{row} only, so Calories/Protein/Verified stay exactly as they were,
+// no matter how trusted the USDA match is or whether the row is verified.
+async function pullMicronutrientsForEntry(n) {
+  // USDA's figures are per 100 g — a row with no gram figure in Amount
+  // (e.g. a bare count like "2 eggs") has nothing to scale them against.
+  const grams = parseGramsFromAmount(n.amount);
+  if (grams === null) return { applied: false, reason: 'Amount has no gram figure to scale from' };
+  const kcalPer100gReference = (n.calories / grams) * 100;
+
+  try {
+    const candidates = await usdaLookupKcalCandidates(n.name);
+    if (candidates.length === 0) return { applied: false, reason: 'no USDA match' };
+
+    let candidate = pickPlausibleUsdaCandidate(candidates, kcalPer100gReference);
+    if (!candidate) {
+      const top = candidates[0];
+      const apply = confirm(
+        `USDA's top match for "${n.name}" is "${top.description}" at ${Math.round(top.kcalPer100g)} kcal/100g — ` +
+        `far from this row's own ${Math.round(kcalPer100gReference)} kcal/100g, so it's probably the wrong food. ` +
+        `Apply its micronutrients anyway?`
+      );
+      if (!apply) return { applied: false, reason: "USDA match's energy didn't match — declined" };
+      candidate = top;
+    }
+
+    if (!candidate.nutrients.length) return { applied: false, reason: 'USDA match has no nutrient detail' };
+
+    const scale = grams / 100;
+    const nutrients = {};
+    candidate.nutrients.forEach((nut) => {
+      nutrients[nut.name] = { amount: Math.round(nut.amountPer100g * scale * 10000) / 10000, unit: nut.unit };
+    });
+
+    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!H${n.row}:H${n.row}`, [[JSON.stringify(nutrients)]]);
+    return { applied: true };
+  } catch (err) {
+    return { applied: false, reason: err.message };
+  }
+}
+
+// Pulls the full USDA nutrient panel (macros AND micros — vitamins,
+// minerals, everything reported) for every selected row via
+// pullMicronutrientsForEntry above. Runs one row at a time (not Promise.all)
+// so a per-row energy-mismatch confirm() doesn't fire for several rows at
+// once, and so a rate-limited USDA key fails predictably rather than in a burst.
+async function pullMicronutrientsForSelected() {
+  const btn = document.getElementById('nutrition-pull-micros-btn');
+  const statusEl = document.getElementById('nutrition-pull-status');
+  const rows = allNutritionEntries.filter((n) => selectedNutritionRows.has(n.row)).sort((a, b) => a.row - b.row);
+  if (rows.length === 0) return;
+
+  statusEl.hidden = true;
+
+  try {
+    await ensureNutritionMicronutrientsColumn();
+  } catch (err) {
+    statusEl.hidden = false;
+    statusEl.classList.remove('status-ok');
+    statusEl.textContent = `Couldn't prepare the Micronutrients column: ${err.message}`;
+    return;
+  }
+
+  const originalLabel = btn.textContent;
+  let pulled = 0;
+  const skipped = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const n = rows[i];
+    btn.textContent = `Pulling ${i + 1} of ${rows.length}…`;
+    const result = await pullMicronutrientsForEntry(n);
+    if (result.applied) pulled++;
+    else skipped.push(`${n.name} (${result.reason})`);
+  }
+
+  btn.textContent = originalLabel;
+  statusEl.hidden = false;
+  statusEl.classList.toggle('status-ok', skipped.length === 0);
+  statusEl.textContent = skipped.length
+    ? `Pulled micronutrients for ${pulled} ingredient${pulled === 1 ? '' : 's'} — skipped: ${skipped.join('; ')}`
+    : `Pulled micronutrients for ${pulled} ingredient${pulled === 1 ? '' : 's'}.`;
+
+  await refreshNutrition(true);
+}
+
+// Single-row equivalent for the Edit Ingredient modal's own 🧬 button — only
+// ever shown there for an already-saved row (see openNutritionForm), since a
+// row has to exist to have an H cell to write into. Reads the row's saved
+// Amount/Calories, not whatever's currently typed in the form but unsaved —
+// Save first if you want a just-edited Amount reflected in the scaling.
+async function pullMicronutrientsForEditingRow() {
+  if (!editingNutritionRow) return;
+  const entry = allNutritionEntries.find((n) => n.row === editingNutritionRow);
+  if (!entry) return;
+
+  const errorEl = document.getElementById('nutrition-form-error');
+  clearFieldError('nutrition-form-error');
+  errorEl.classList.remove('status-ok');
+
+  try {
+    await ensureNutritionMicronutrientsColumn();
+  } catch (err) {
+    showFieldError('nutrition-form-error', `Couldn't prepare the Micronutrients column: ${err.message}`);
+    return;
+  }
+
+  const result = await pullMicronutrientsForEntry(entry);
+  if (!result.applied) {
+    showFieldError('nutrition-form-error', `Couldn't pull micronutrients for "${entry.name}" — ${result.reason}.`);
+    return;
+  }
+
+  await refreshNutrition(true);
+  renderNutritionMicronutrientsDetails(allNutritionEntries.find((n) => n.row === editingNutritionRow));
+  errorEl.textContent = `Pulled micronutrients for "${entry.name}".`;
+  errorEl.classList.add('status-ok');
+  errorEl.hidden = false;
 }
 
 // Naive singular fold — just enough to catch "egg"/"eggs"-style plural typos

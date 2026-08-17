@@ -117,12 +117,16 @@
                         <span class="node-graph-tooltip">The estimator remembers what it learns: every ingredient it looks up is saved to your own Nutrition table, so the next mention is calculated instantly from a trusted value instead of re-estimated from scratch. Fine-tune any entry to match the exact brand you buy, and merge near-duplicates the AI phrased differently.</span>
                     </button>
                     <button type="button" class="node-graph-node">
+                        <span class="node-graph-node-title">🧬 Micronutrient Tracking</span>
+                        <span class="node-graph-tooltip">Pull the complete USDA nutrient panel — every vitamin and mineral it reports, not just calories and protein — for any ingredient in your Nutrition table, scaled to that row's own serving size and banked right alongside it. A USDA match whose energy doesn't line up with your own logged calories is flagged before it's applied, so a wrong-food match (soybeans ranking the oil above the bean) never silently prices your vitamins. AI Health Insight's Micronutrients mode then sums what you've actually eaten from every ingredient you've priced this way and judges it against standard dietary reference intakes for your age and sex — real measured totals, not the AI's guess, with a coverage note naming exactly which ingredients that total does and doesn't yet include.</span>
+                    </button>
+                    <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🔥 Calorie Balance</span>
                         <span class="node-graph-tooltip">See each day's real energy balance as a bar: what you ate, minus the cost of simply being alive (Mifflin-St Jeor from your height, birth date, sex, and that day's body mass), minus the activity you actually logged. Below the line is a deficit, above it a surplus — which of the two you're aiming for depends on whether your target body mass is below or above today's — and a twin right-hand axis reads off the body change that balance implies, so you can compare what your eating predicts against what your body mass readings actually show.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">💡 AI Health Insight</span>
-                        <span class="node-graph-tooltip">One panel, four AI reads over any date range you pick — Wellness (your habits vs. your own targets and the period before), Food (every ingredient you actually ate, totaled by amount, calories and protein, for a nutrient-gap review), Activity (consistency, volume trend, and which muscle groups have gone neglected), and Protein Sources (how closely your actual eating matched the target rotation share you set for each protein source, and which one's furthest short). Ask a free-text question with any of them. Nothing is computed until you press a button, so the page stays fast, and every report is saved and waiting next visit instead of vanishing when you navigate away.</span>
+                        <span class="node-graph-tooltip">One panel, five AI reads over any date range you pick — Wellness (your habits vs. your own targets and the period before), Food (every ingredient you actually ate, totaled by amount, calories and protein, for a nutrient-gap review), Micronutrients (real, USDA-measured vitamin and mineral totals from the ingredients you've priced, judged against standard dietary reference intakes for your age and sex), Activity (consistency, volume trend, and which muscle groups have gone neglected), and Protein Sources (how closely your actual eating matched the target rotation share you set for each protein source, and which one's furthest short). Ask a free-text question with any of them. Nothing is computed until you press a button, so the page stays fast, and every report is saved and waiting next visit instead of vanishing when you navigate away.</span>
                     </button>
                     <button type="button" class="node-graph-node">
                         <span class="node-graph-node-title">🧪 Formula Playground</span>
@@ -451,6 +455,7 @@
             <div class="insight-mode-actions" id="insight-mode-actions">
                 <button type="button" class="btn" data-insight-mode="wellness" aria-pressed="false">Wellness</button>
                 <button type="button" class="btn" data-insight-mode="food" aria-pressed="false">Food</button>
+                <button type="button" class="btn" data-insight-mode="micronutrients" aria-pressed="false">Micronutrients</button>
                 <button type="button" class="btn" data-insight-mode="activity" aria-pressed="false">Activity</button>
                 <button type="button" class="btn" data-insight-mode="protein" aria-pressed="false">Protein Sources</button>
                 <button type="button" class="btn" data-insight-mode="plan" aria-pressed="false">Health Plan</button>
@@ -473,6 +478,22 @@
                         </tr>
                         </thead>
                         <tbody id="insight-food-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="insight-preview-micronutrients" hidden>
+                <div id="insight-micro-profile" class="insight-data-preview"></div>
+                <div class="table-responsive">
+                    <table id="insight-micro-table">
+                        <thead>
+                        <tr>
+                            <th>Nutrient</th>
+                            <th>Total (period)</th>
+                            <th>Avg / day</th>
+                        </tr>
+                        </thead>
+                        <tbody id="insight-micro-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -555,12 +576,13 @@
                         <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
                         <th class="sortable" data-sort="classification">Classification</th>
                         <th class="sortable" data-sort="name">Name</th>
-                        <th>Amount</th>
+                        <th class="sortable" data-sort="amount">Amount</th>
                         <th class="sortable" data-sort="calories">Calories</th>
                         <th class="sortable" data-sort="protein">Protein</th>
                         <th class="sortable" data-sort="proteinDensity" title="Protein density: grams of protein per 100 kcal — computed here, not stored — higher means a leaner protein source">Density</th>
                         <th class="sortable" data-sort="verified" title="Verified against the label on your own purchased ingredient">Verified</th>
                         <th class="sortable" data-sort="proteinPercent" title="Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">Protein %</th>
+                        <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click 🧬 Pull Micronutrients to fill this in. Sorts by how many nutrients have been pulled.">Micronutrients</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -571,7 +593,9 @@
             <div class="panel-actions" id="nutrition-bulk-actions" hidden>
                 <span id="nutrition-bulk-summary"></span>
                 <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
+                <button id="nutrition-pull-micros-btn" class="btn" title="Pull the full USDA nutrient panel (vitamins, minerals, and more) for the selected ingredients, scaled to each row's own Amount, into the Micronutrients column — never touches Calories, Protein or Verified">🧬 Pull Micronutrients</button>
             </div>
+            <p id="nutrition-pull-status" class="status" hidden></p>
 
             <div class="pagination" id="nutrition-pagination"></div>
         </div>
@@ -1921,13 +1945,18 @@
             </label>
 
             <p class="hint">Amount needs either a mass in grams somewhere in it (e.g. "100g" or "1 scoop (32g)") or, for a food that's naturally counted in whole pieces, a leading count (e.g. "1 rice cake", "2 eggs") — either way Calculate can scale it to whatever quantity you actually logged.</p>
-            <p class="hint">Protein % sets what share of your protein target should come from this ingredient (e.g. 10 for "10% of my protein target") — since that target already updates live with your body mass/activity, this ingredient's actual gram target moves with it automatically.</p>
             <div id="nutrition-usda-results" class="usda-results" hidden></div>
+
+            <details id="nutrition-micronutrients-details" hidden>
+                <summary>Micronutrients</summary>
+                <ul id="nutrition-micronutrients-list" class="micronutrients-list"></ul>
+            </details>
 
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
                 <button type="button" id="nutrition-usda-btn" class="btn" title="Look the typed name up in USDA FoodData Central and fill Amount, Calories and Protein from it">🔍 Look up in USDA</button>
+                <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Pull the full USDA nutrient panel (vitamins, minerals, and more) for this ingredient, scaled to its own Amount, into the Micronutrients column — never touches Calories, Protein or Verified" hidden>🧬 Pull Micronutrients</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -2130,6 +2159,7 @@
 <script src="assets/script/applications.js"></script>
 <script src="assets/script/insight.js"></script>
 <script src="assets/script/food-insight.js"></script>
+<script src="assets/script/micronutrient-insight.js"></script>
 <script src="assets/script/activity-insight.js"></script>
 <script src="assets/script/protein-source-rotation-insight.js"></script>
 <script src="assets/script/plan-insight.js"></script>

@@ -36,6 +36,7 @@ ledger/
 │       ├── timesheet-charts.js   # Work Time chart renderers
 │       ├── travel-charts.js      # Travel chart renderers (incl. world map)
 │       ├── transactions.js       # Transaction Log
+│       ├── car-service.js        # Car Service block: odometer fit + predicted services
 │       ├── accounts.js           # Account panel
 │       ├── breakdown.js          # Breakdown panel (Category/Type rows, formula-safe)
 │       ├── timesheet.js          # Work panel + analytics data

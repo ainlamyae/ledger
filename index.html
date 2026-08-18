@@ -1669,6 +1669,42 @@
             <div class="pagination" id="ts-pagination"></div>
         </div>
 
+        <div class="panel" data-route="car-service">
+            <div class="panel-header">
+                <h2>Car Service</h2>
+            </div>
+
+            <!-- Read off Transportation transactions whose description carries the odometer
+                 ("@28902km"); predictions in car-service.js. -->
+            <div class="donut-grid wellness-metrics-grid">
+                <div class="donut-item">
+                    <h4>Odometer &amp; Service</h4>
+                    <div class="chart-box">
+                        <canvas id="car-service-chart"></canvas>
+                    </div>
+                </div>
+                <div class="donut-legend" id="car-service-legend"></div>
+            </div>
+            <p class="hint" id="car-service-summary"></p>
+
+            <div class="table-responsive">
+                <table id="car-service-table" class="table-compact">
+                    <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Payee</th>
+                        <th>Service</th>
+                        <th>Odometer</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Basis</th>
+                    </tr>
+                    </thead>
+                    <tbody id="car-service-body"></tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="panel" data-route="travel">
             <div class="panel-header">
                 <h2>Travel</h2>
@@ -2646,6 +2682,7 @@
 <script src="assets/script/timesheet-charts.js"></script>
 <script src="assets/script/travel-charts.js"></script>
 <script src="assets/script/transactions.js"></script>
+<script src="assets/script/car-service.js"></script>
 <script src="assets/script/accounts.js"></script>
 <script src="assets/script/breakdown.js"></script>
 <script src="assets/script/timesheet.js"></script>

@@ -206,8 +206,9 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
 | 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 | 48 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |
+| 49 | `car-service.js` | Car Service block: Transportation `@km` transactions → odometer fit, next service per rule (Toyota km schedule, winter tires, rust protection), chart + table |
 
-`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 48 above into a page that has none of them (see [Section pages](#section-pages)).
+`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 49 above into a page that has none of them (see [Section pages](#section-pages)).
 
 ## Data Flow
 

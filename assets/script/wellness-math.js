@@ -462,6 +462,9 @@ function bmrBasis() {
 // require new data. Both keys are written together by saveBmrCalibration.
 const BMR_CALIBRATED_KCAL_KEY = 'BMR_CALIBRATED_KCAL';
 const BMR_CALIBRATED_OFFSET_KEY = 'BMR_CALIBRATED_OFFSET_KCAL';
+// The calibration window: n_p periods of L_p days, ending yesterday.
+const BMR_CALIBRATION_PERIOD_COUNT_KEY = 'BMR_CALIBRATION_PERIOD_COUNT';
+const BMR_CALIBRATION_PERIOD_DAYS_KEY = 'BMR_CALIBRATION_PERIOD_DAYS';
 
 // The calibrated figure itself, for display (Status card, Caloric Intake chart) — null until
 // a calibration has actually been saved, same "nothing to show yet" convention as every other
@@ -673,7 +676,8 @@ function sleepAdjustedDeficitKcal(rawDeficitKcal, planSleepHours, sleepTargetHou
 //
 // Body mass is an argument because both terms scale with it and Caloric Intake evaluates
 // per day. Null when an input is missing; the caller falls back to CALORIE_TARGET_KCAL.
-function calorieTargetDetail(bodyMassKg) {
+// `storedBmr`: a past day's BMR from its stored cell, used instead of the equation.
+function calorieTargetDetail(bodyMassKg, storedBmr = null) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
@@ -683,11 +687,11 @@ function calorieTargetDetail(bodyMassKg) {
   const weeklyFatLossKg = weeklyFatLossKgAt(bodyMassKg);
 
   // Age only when the BMR equation in force actually reads it (see bmrNeedsAge).
-  const haveAllInputs = bodyMassKg !== null && heightCm !== null && (age !== null || !bmrNeedsAge())
-    && (sex === 'male' || sex === 'female') && weeklyFatLossKg !== null;
+  const haveAllInputs = bodyMassKg !== null && weeklyFatLossKg !== null && (storedBmr !== null
+    || (heightCm !== null && (age !== null || !bmrNeedsAge()) && (sex === 'male' || sex === 'female')));
   if (!haveAllInputs) return null;
 
-  const bmr = applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex));
+  const bmr = storedBmr ?? applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex));
   const activityKcal = activityTargetKcal(bodyMassKg);
 
   // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the target
@@ -769,8 +773,8 @@ function weeklyFatLossKgAt(bodyMassKg) {
   return getSetting('WEEKLY_FAT_LOSS_KG', null);
 }
 
-function calculatedCalorieTargetKcal(bodyMassKg) {
-  const detail = calorieTargetDetail(bodyMassKg);
+function calculatedCalorieTargetKcal(bodyMassKg, storedBmr = null) {
+  const detail = calorieTargetDetail(bodyMassKg, storedBmr);
   return detail === null ? null : detail.kcal;
 }
 
@@ -826,7 +830,7 @@ function calorieTargetSeries(entries, dates) {
 
   return dates.map((date) => {
     const bodyMassKg = bodyMassForDate.get(date) ?? null;
-    const kcal = calculatedCalorieTargetKcal(bodyMassKg);
+    const kcal = calculatedCalorieTargetKcal(bodyMassKg, storedBmrForDate(date));
     return kcal === null ? { kcal: flat, bodyMassKg: null } : { kcal, bodyMassKg };
   });
 }

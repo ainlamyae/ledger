@@ -189,6 +189,7 @@ async function submitSettingForm(event) {
     await refreshSettingsList(true);
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
+    await recomputeStoredPhysiqueBmr([key]);
   } catch (err) {
     showFieldError('setting-form-error', err.message);
   }
@@ -243,6 +244,9 @@ async function saveSettingValues(values) {
   }
 
   const existingByKey = new Map(allSettingRows.map((r) => [r.key, r]));
+  const changedKeys = Object.entries(values)
+    .filter(([key, value]) => String(existingByKey.get(key)?.value ?? '') !== String(value ?? ''))
+    .map(([key]) => key);
   const updates = [];
   const newRows = [];
 
@@ -267,6 +271,8 @@ async function saveSettingValues(values) {
 
   await refreshSettingsList(true);
   currentSettings = await loadSettings(true);
+  // Stored per-day BMR/Deprivation follow a changed profile or BMR setting.
+  return recomputeStoredPhysiqueBmr(changedKeys);
 }
 
 async function deleteSetting(row) {

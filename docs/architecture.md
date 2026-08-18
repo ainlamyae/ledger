@@ -29,7 +29,7 @@ flowchart TD
     App -- "pick / confirm spreadsheet file" --> Picker
     Picker -. "picked file ID" .-> App
 
-    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Health Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Financial Insight reports<br/>Food photo scan (vision — qwen/qwen3.6-27b)"]
+    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Financial Insight reports<br/>Food photo scan (vision — qwen/qwen3.6-27b)"]
     USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup<br/>+ full nutrient panel (Pull Micronutrients)"]
     Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
@@ -52,9 +52,10 @@ flowchart TD
 Each panel group is reachable at an address of its own — `/health/`, `/finance/`, `/other/` — showing that one group and nothing else. They are real paths, so a refresh, a bookmark or a shared link lands on the same page instead of falling back to the dashboard.
 
 - **The markup still lives in `index.html` alone.** Each of those directories holds an identical stub (`<base href="../">`, the theme bootstrap, the stylesheet, and `section-page.js`). The loader fetches `index.html`, replays its head, its body and its scripts into the stub, then hides everything outside the group the address names. A panel added to `index.html`, or moved from one group to another, appears on the right section page with nothing to keep in sync — there is no generated copy of the dashboard anywhere.
-- **The list of sections is the `<nav>` markup.** `section-page.js` matches the last path segment against each nav link's `href` and reads the group id off its `data-section`. A fourth group needs a nav link, a `<section>`, and a copy of the stub — no change to the loader, which enumerates nothing.
+- **The list of sections is the `<nav>` markup.** `section-page.js` matches the first path segment below the app root against each nav link's `href` and reads the group id off its `data-section`. A fourth group needs a nav link, a `<section>`, and a copy of the stub — no change to the loader, which enumerates nothing.
 - **Hidden, not removed.** The other two groups stay in the DOM: `loadDashboard` renders the whole dashboard, and every renderer expects its elements to exist. The Time/Date/Azan/Weather row is hidden too, even though the home page itself shows it by default — it belongs to the dashboard as a whole, not to one wrapper — and `widgets.js` checks that row before starting anything, so a section page runs neither a ticking clock nor the forecast and prayer-time requests behind it.
 - **Start-up is registered, not listened for.** `index.html`'s scripts arrive after a section page's own `load` event, so `app.js` hands its start-up step to `window.ledgerSectionPage.onBoot()` when it exists instead of waiting on `load`/`DOMContentLoaded`. The loader runs those steps once every script — including the async Google ones, which `load` would also have waited for — has arrived, so the boot order is the one `index.html` gets.
+- **Block and button addresses go one or two levels deeper** — `/health/tune/`, `/health/physique/log/`. Each is a real folder holding a copy of its group's stub (only `<base href>` and `<title>` differ), so a reload or shared link lands there; `section-page.js` exposes the rest of the path as `ledgerSectionPage.route`, and `router.js` expands that block, opens that form once the data has loaded, and keeps the address in step as blocks and forms open and close. The slugs are `data-route` attributes on the panels and their header buttons.
 - **No address is written down.** Every URL in the markup and the loader is relative, and a section page's `canonical`/`og:url` are set from `location` at run time, so the whole thing moves with the repository.
 
 ## System Flowchart
@@ -139,7 +140,7 @@ flowchart TD
     ActParse --> ActMET["Per line: EXERCISE_MET table<br/>(fallback EXERCISE_MET_DEFAULT)<br/>+ activeSecondsForNoteLine()"]
     ActMET --> ActSum["metKcal() per line, summed →<br/>activity table (per-exercise MET,<br/>minutes, kcal) + the hidden Activity<br/>Duration / Calories Out fields.<br/>No AI, no cache — pure parse+lookup."] --> Idle
 
-    Idle --> InsightPanel["Health Insight panel<br/>(nothing computed on load)"]
+    Idle --> InsightPanel["Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
     InsightMode -- no --> Idle
     InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>Classification-grouped ingredient rollup /<br/>real Micronutrients totals vs. Ideal/day<br/>(nutrient-targets.js) + coverage count /<br/>per-muscle-group reps — no API call"]
@@ -171,7 +172,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 12 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
 | 14 | `wellness-math.js` | Pure health/target formulas with no chart or DOM code: BMR/TEF/calorie-target math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, target-date projection |
-| 15 | `wellness-charts.js` | Health Indicator chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
+| 15 | `wellness-charts.js` | Indicator chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
 | 16 | `finance-charts.js` | Financial Indicator chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Portfolio Allocation) |
 | 17 | `timesheet-charts.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
 | 18 | `travel-charts.js` | Travel chart renderers, including the country choropleth |
@@ -194,18 +195,19 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 35 | `micronutrient-insight.js` | Micronutrients mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `nutrient-targets.js`'s Ideal/day figures |
 | 36 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
 | 37 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
-| 38 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
+| 38 | `plan-insight.js` | Health Plan mode: the Tune's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
 | 39 | `fat-loss-pattern-insight.js` | Patterns mode: Calibrate BMR's periods plus macro/activity-type averages, and the pattern-finding prompt |
 | 40 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
 | 41 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 42 | `formula-fields.js` | Formula Playground's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
-| 43 | `formula-render.js` | Formula Playground's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
-| 44 | `formula-playground.js` | Health Formula Playground's modal lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
+| 42 | `formula-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
+| 43 | `formula-render.js` | Tune's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
+| 44 | `formula-playground.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
 | 45 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
 | 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
 | 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 48 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |
 
-`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 46 above into a page that has none of them (see [Section pages](#section-pages)).
+`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 48 above into a page that has none of them (see [Section pages](#section-pages)).
 
 ## Data Flow
 
@@ -245,7 +247,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 2. Only the affected cache entry is refreshed — no page reload.
 3. The clicked button shows `…` and blocks re-clicks until the write settles.
 
-**Health Insight**
+**Insight**
 
 1. Nothing is computed on load.
 2. A mode click gathers that mode's data, renders the preview, restores that mode's saved report.

@@ -710,21 +710,21 @@ async function updateActivityAndPropagate() {
     // unchanged.
     if (!textChanged && bodyMassKg === null) return null;
 
-    const values = physiqueRowValues(p);
+    const day = physiqueDayCopy(p);
     if (bodyMassKg !== null) {
       const { text: combined } = combineWorkoutText(newWorkoutText);
       const { minutes, calories, perLine } = estimateWorkoutActivity(combined, bodyMassKg);
       const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
-      values[12] = sortedPerLine.map((l) => `${l.quantity} ${l.name}`).join('\n');
-      values[13] = minutes;
-      values[14] = calories;
+      day.workout = sortedPerLine.map((l) => `${l.quantity} ${l.name}`).join('\n');
+      day.duration = minutes;
+      day.caloriesOut = calories;
     } else {
       // Rename only — leave the stale Duration/Calories Out for a later
       // Calculate (once a body mass exists) to reprice.
-      values[12] = newWorkoutText;
+      day.workout = newWorkoutText;
     }
 
-    return { row: p.row, values, snapshot: physiqueRowValues(p) };
+    return { row: p.row, day, snapshot: physiqueDayCopy(p) };
   }).filter(Boolean);
 
   if (!edits.length) {
@@ -737,7 +737,7 @@ async function updateActivityAndPropagate() {
   const succeeded = [];
   await Promise.allSettled(edits.map(async (e) => {
     try {
-      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${e.row}:O${e.row}`, [e.values]);
+      await writePhysiqueRow(e.row, e.day);
       succeeded.push({ row: e.row, values: e.snapshot });
     } finally {
       done += 1;

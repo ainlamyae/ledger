@@ -15,6 +15,7 @@
 | `'Account'!A3:A100`, `Breakdown!A2:A200` | `transactions.js` | Account dropdown and Category autocomplete |
 | `eTimeSheet!A2:H` | `timesheet.js` | Work rows |
 | `'Nutrition'!A2:L` | `nutrition.js`, `calorie-estimator.js`, `food-insight.js`, `protein-rotation.js` | Classification / Name / Amount / Calories / Protein / Fiber / Fat / Carbohydrate / TEF / Verification / Percent / Micronutrients (JSON) |
+| `'Physique'!A1:Z` | `physique.js` (all writes go through its `writePhysiqueRow`) | One row per day, **header row included**: columns are matched by header name (`PHYSIQUE_COLUMNS`), not position. Stored Sleep/BMR/Deprivation are filled in with one `values:batchUpdate` request |
 | `'Contact'!A2:U` | `contacts.js` | Contact rows |
 | `'Travel'!A2:H` | `travel.js` | Travel rows |
 | `'Application'!A2:E` | `applications.js` | Application header + status-update rows |
@@ -31,6 +32,7 @@
 | `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:H` rows |
 | `ledger_cache_nutrition` | `nutrition.js` | Raw `'Nutrition'!A2:L` rows |
 | `ledger_cache_breakdown` | `breakdown.js` | Raw `'Breakdown'!A2:F200` rows |
+| `ledger_cache_physiqueWithHeader` | `physique.js` | Raw `'Physique'!A1:Z` rows, header first (renamed from `ledger_cache_physique`, which held no header) |
 | `ledger_cache_contacts` | `contacts.js` | Raw `'Contact'!A2:U` rows |
 | `ledger_cache_travel` | `travel.js` | Raw `'Travel'!A2:H` rows |
 | `ledger_cache_applications` | `applications.js` | Raw `'Application'!A2:E` rows |

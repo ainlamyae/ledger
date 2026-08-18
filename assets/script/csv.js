@@ -250,14 +250,14 @@ function exportTransactionsCSV() {
   downloadTextFile(`transactions-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
 }
 
-const PHYSIQUE_CSV_HEADER = ['Date', 'Body Mass', 'Bedtime', 'Wake', 'Calories In', 'Protein (g)', 'Fiber (g)', 'Fat (g)', 'Carbohydrate (g)', 'TEF', 'Workout', 'Duration (min)', 'Calories Out'];
+const PHYSIQUE_CSV_HEADER = ['Date', 'Body Mass', 'Bed', 'Wake', 'Sleep (hr)', 'Deprivation (kcal)', 'TEI', 'Protein (g)', 'Dietary Fiber (g)', 'Fat (g)', 'Carbohydrate (g)', 'TEF', 'Workout', 'Duration (min)', 'AEE'];
 
 function exportPhysiqueCSV() {
   if (!confirm('Export filtered physique entries to CSV?')) return;
   const rows = getFilteredPhysiqueEntries()
     .filter((p) => p.date)
     .map((p) => [
-      p.date, p.bodyMass ?? '', p.bedtime ?? '', p.wakeTime ?? '',
+      p.date, p.bodyMass ?? '', p.bedtime ?? '', p.wakeTime ?? '', p.sleep ?? '', p.deprivation ?? '',
       p.caloriesIn ?? '', p.proteinIn ?? '', p.fiber ?? '', p.fat ?? '',
       p.carbohydrate ?? '', p.tef ?? '', p.workout, p.duration ?? '', p.caloriesOut ?? '',
     ]);

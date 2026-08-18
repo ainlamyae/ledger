@@ -73,6 +73,14 @@ function updateValues(range, values, valueInputOption = 'USER_ENTERED') {
   );
 }
 
+// Several ranges in one request — `data` is [{ range, values }].
+function batchUpdateValues(data, valueInputOption = 'USER_ENTERED') {
+  return sheetsRequest('/values:batchUpdate', {
+    method: 'POST',
+    body: JSON.stringify({ valueInputOption, data }),
+  });
+}
+
 function clearValues(range) {
   return sheetsRequest(`/values/${encodeURIComponent(range)}:clear`, { method: 'POST' });
 }

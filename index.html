@@ -105,15 +105,12 @@
          pages and the scroll-spy both read this nav rather than repeating it. -->
     <nav id="main-nav" class="nav">
         <a href="health/" data-section="health">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3.5l2 5 4-12 2 7H21"/></svg></span>
             <span class="nav-label">Health</span>
         </a>
         <a href="finance/" data-section="finance">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.5Z"/><path d="M16 12.5h.01" stroke-width="2.5"/></svg></span>
             <span class="nav-label">Finance</span>
         </a>
         <a href="other/" data-section="other">
-            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span>
             <span class="nav-label">Other</span>
         </a>
     </nav>
@@ -231,7 +228,7 @@
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
                 <div class="widget-row"><span>m̄</span><span id="today-status-mbar-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
-                <div class="widget-row"><span>BMR</span><span id="today-status-maintenance-value">—</span></div>
+                <div class="widget-row"><span id="today-status-maintenance-label">BMR</span><span id="today-status-maintenance-value">—</span></div>
                 <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
                 <div class="widget-row"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
                 <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
@@ -269,11 +266,620 @@
             <button id="health-reminder-log-btn" class="btn btn-primary">Log</button>
         </div>
 
-        <div class="panel">
+        <div class="panel" id="health-tune-panel" data-route="tune">
             <div class="panel-header">
-                <h2>Health Indicator</h2>
-                <button type="button" id="bmr-calibration-btn" class="btn btn-secondary panel-header-btn" title="Back-solve your real BMR from the last 7 days' actual logged intake, activity and weight change, instead of the height/age/sex equation">Calibrate</button>
-                <button type="button" id="formula-playground-btn" class="btn btn-secondary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
+                <h2>Tune</h2>
+                <button type="button" id="bmr-calibration-btn" data-route="calibrate" class="btn btn-secondary panel-header-btn" title="Back-solve your real BMR from the last 7 days' actual logged intake, activity and weight change, instead of the height/age/sex equation">Calibrate</button>
+            </div>
+
+            <div>
+                <fieldset class="formula-solve-for">
+                    <legend>Solve for</legend>
+                    <label><input type="radio" name="formula-solve-for" value="EIN"> Calories</label>
+                    <label><input type="radio" name="formula-solve-for" value="TARGET_MASS"> Healthy body mass</label>
+                    <label><input type="radio" name="formula-solve-for" value="TAU"> Activity</label>
+                    <label><input type="radio" name="formula-solve-for" value="DELTA_M" checked> Weekly fat loss</label>
+                    <!-- The odd one out, and named for what you hold rather than what it solves:
+                         here the percentage of body mass is the fixed input and BOTH TEI and t are
+                         computed from it, on the proportional journey a fixed share implies. -->
+                    <label title="Hold the weekly fat loss at a percentage of your body mass. The kilograms per week, the desired calorie intake and the arrival date are all computed from it — and the date follows the proportional journey, where the kilograms shrink as you do.">
+                        <input type="radio" name="formula-solve-for" value="FIXED_PCT"> Weekly fat loss %
+                    </label>
+                </fieldset>
+
+                <!-- Which BMR equation the whole plan is built on. Both are kept and both are live:
+                     Mifflin-St Jeor is the default and what every existing sheet already runs on,
+                     and switching here re-derives the preview through the other one — including A
+                     and B, since maintenance stays affine in body mass under both. -->
+                <fieldset class="formula-solve-for formula-bmr-formula">
+                    <legend>Basal metabolic rate</legend>
+                    <label title="Mifflin-St Jeor (1990): BMR from body mass, height, age and sex. The app's original equation, and the one that needs no lean-mass estimate.">
+                        <input type="radio" name="formula-bmr-formula" value="mifflin" checked>
+                        Mifflin-St Jeor (m, h, a, σ)
+                    </label>
+                    <label title="Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. Fat mass is nearly inert metabolically, so this predicts from lean mass alone — more accurate the better your LBM figure is, and here LBM is the Boer estimate below. Age drops out entirely; sex enters only through LBM.">
+                        <input type="radio" name="formula-bmr-formula" value="katch">
+                        Katch-McArdle (LBM)
+                    </label>
+                    <label title="Uses whichever equation above is already active (BMR_FORMULA is untouched), but every deficit and desired calorie figure runs on it plus your saved Calibrate offset instead of the plain equation — the same switch as picking BMR_cal under 'Which BMR every deficit...' further down, exposed here too. Falls back to the plain equation until a calibration has been saved.">
+                        <input type="radio" name="formula-bmr-formula" value="bmr_cal">
+                        BMR_cal (calibrated)
+                    </label>
+                </fieldset>
+
+                <!-- Directly above the variable list it introduces, not under the formulas: it's the
+                     list that's being defined, and the Solve-for radios in between made it read as
+                     though it were introducing those instead. -->
+                <p class="formula-where">where,</p>
+
+                <div class="formula-inputs">
+                    <!-- The raw reading, and readonly because it's a measurement rather than a
+                         knob: it's here to be compared against the smoothed figure below, which is
+                         the one every identity on this sheet is evaluated at. Type your what-ifs
+                         into m̄. -->
+                    <label class="formula-row" title="Your most recent weigh-in, exactly as logged. Shown for comparison only — the formulas below run on the smoothed mass, since a single reading carries a day's water and glycogen with it.">
+                        <span class="formula-sym">m</span>
+                        <span class="formula-name">body mass</span>
+                        <input type="text" id="formula-body-mass" inputmode="decimal" readonly>
+                        <span class="formula-unit">kg</span>
+                    </label>
+                    <!-- Directly under m, and the box that actually drives the sheet. -->
+                    <label class="formula-row" title="The mean of every weigh-in in the 7 days ending at your latest one — m̄(t) = (1/7) × Σ m(t−i). Water and glycogen move the scale by more than a week of fat loss does, and the decay model assumes clean mass, so every formula here reads this rather than the day's reading. Editable: type a figure to see the whole plan at another mass.">
+                        <span class="formula-sym">m̄</span>
+                        <span class="formula-name">7-day rolling average body mass</span>
+                        <input type="text" id="formula-body-mass-smooth" inputmode="decimal">
+                        <span class="formula-unit">kg</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">h</span>
+                        <span class="formula-name">height</span>
+                        <input type="text" id="formula-height" inputmode="decimal">
+                        <span class="formula-unit">cm</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">a</span>
+                        <span class="formula-name">age</span>
+                        <input type="text" id="formula-age" inputmode="decimal">
+                        <span class="formula-unit">years</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">σ</span>
+                        <span class="formula-name">sex</span>
+                        <select id="formula-sex">
+                            <option value="male">male</option>
+                            <option value="female">female</option>
+                        </select>
+                        <span class="formula-unit"></span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">m_des</span>
+                        <span class="formula-name">healthy body mass</span>
+                        <input type="text" id="formula-target" inputmode="decimal">
+                        <span class="formula-unit">kg</span>
+                    </label>
+                    <!-- m_des's other face, and the same two-way pair Δm%/Δm are: one quantity in
+                         two units, so whichever box you last typed into is the known and the other
+                         is rewritten from it. Directly under m_des because a goal in kilograms is a
+                         number you pick and a goal in BMI is what tells you whether picking it was
+                         sensible — the verdict rides on the trace line, never in the unit column. -->
+                    <label class="formula-row" title="The BMI your healthy body mass comes to at your height — BMI = m_des / (h/100)². Type a target mass and this follows it; type a BMI here and the target mass follows instead. The healthy band is 18.5–24.9, and outside it the box goes red. In Solve for → Healthy body mass both are answers, so neither is typed.">
+                        <span class="formula-sym">BMI_des</span>
+                        <span class="formula-name">healthy body mass index</span>
+                        <input type="text" id="formula-target-bmi" inputmode="decimal">
+                        <span class="formula-unit">kg/m²</span>
+                    </label>
+                    <!-- Sits with the rest of the profile it's derived from (m̄, h, σ) and directly
+                         above BMR: under Katch-McArdle, BMR is built from this figure rather than
+                         the other way around, so it has to be known before BMR is. -->
+                    <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Feeds Katch-McArdle BMR above and the protein/glycogen bands below.">
+                        <span class="formula-sym">LBM</span>
+                        <span class="formula-name">lean body mass</span>
+                        <input type="text" id="formula-lbm" inputmode="decimal" readonly>
+                        <span class="formula-unit">kg</span>
+                    </label>
+                    <!-- The figures everything downstream is measured against, readonly because
+                         they aren't settings. Both equations shown always, regardless of which one
+                         the radio below has active — only the ACTIVE one (via the coefficients/plan
+                         built from it) actually feeds the rest of the sheet; these two are reference.
+                         Placed with the profile rather than beside TEI because that's what they
+                         describe — the body, before any plan is applied to it. -->
+                    <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Mifflin-St Jeor — shown regardless of which equation is active below. Not editable: derived from m̄, h, a and σ. Blank without a birth date (Mifflin needs age; Katch-McArdle doesn't).">
+                        <span class="formula-sym">BMR_mif</span>
+                        <span class="formula-name">basal metabolic rate by Mifflin-St Jeor</span>
+                        <input type="text" id="formula-bmr-mifflin" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Katch-McArdle from lean mass — shown regardless of which equation is active below. Not editable: derived from m̄, h and σ.">
+                        <span class="formula-sym">BMR_kat</span>
+                        <span class="formula-name">basal metabolic rate by Katch-McArdle</span>
+                        <input type="text" id="formula-bmr-katch" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <hr class="formula-divider">
+                    <label class="formula-row" title="How many back-to-back periods BMR_cal averages, ending yesterday — the same box as the Calibrate form's">
+                        <span class="formula-sym">n_p</span>
+                        <span class="formula-name">number of periods</span>
+                        <input type="text" id="formula-cal-period-count" inputmode="numeric">
+                        <span class="formula-unit">periods</span>
+                    </label>
+                    <label class="formula-row" title="How many days each period averages — the same box as the Calibrate form's">
+                        <span class="formula-sym">L_p</span>
+                        <span class="formula-name">period length</span>
+                        <input type="text" id="formula-cal-period-days" inputmode="numeric">
+                        <span class="formula-unit">days</span>
+                    </label>
+                    <label class="formula-row" title="BMR (whichever equation is active below) plus the offset Calibrate measures over the n_p × L_p days ending yesterday — recalculated live from your logged data, and saved with Save. Blank when that window doesn't have enough logged to measure.">
+                        <span class="formula-sym">BMR_cal</span>
+                        <span class="formula-name">calibrated basal metabolic rate</span>
+                        <input type="text" id="formula-bmr-cal" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <!-- Marks the end of the profile block (m, m̄, h, a, σ, m_des, BMI_des, LBM,
+                         BMR) before the activity block starts below. -->
+                    <hr class="formula-divider">
+                    <label class="formula-row">
+                        <span class="formula-sym">τ</span>
+                        <span class="formula-name">desired walking activity</span>
+                        <input type="text" id="formula-activity-min" inputmode="decimal">
+                        <span class="formula-unit">min/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">MET</span>
+                        <span class="formula-name">walking activity intensity</span>
+                        <input type="text" id="formula-met" inputmode="decimal">
+                        <!-- The unit is the symbol here: "metabolic equivalents" was the longest
+                             string in the column and the only one that forced a second line on a
+                             phone, and the row's own name already says what MET measures. -->
+                        <span class="formula-unit">MET</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">κ</span>
+                        <span class="formula-name">oxygen uptake per MET</span>
+                        <input type="text" id="formula-met-o2" inputmode="decimal">
+                        <span class="formula-unit">mL O₂/kg/min</span>
+                    </label>
+                    <!-- Directly under κ, the other half of the O₂-to-kcal conversion AEE runs: κ
+                         is how much oxygen the activity costs, ε is what that oxygen is worth in
+                         calories, and AEE right below is the two of them applied. -->
+                    <div class="formula-row formula-row-fixed">
+                        <span class="formula-sym">ε</span>
+                        <span class="formula-name">oxygen energy yield</span>
+                        <span class="formula-fixed">200</span>
+                        <span class="formula-unit">mL O₂/kcal</span>
+                    </div>
+                    <label class="formula-row" title="Activity energy expenditure at that target: AEE = MET × m̄ × τ × κ / ε. Not editable: it is derived from MET, τ and κ above.">
+                        <span class="formula-sym">AEE</span>
+                        <span class="formula-name">daily desired activity energy expenditure</span>
+                        <input type="text" id="formula-activity-kcal" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <!-- Marks the end of the activity block (MET, τ, κ, AEE) before the sleep
+                         block starts below. -->
+                    <hr class="formula-divider">
+                    <!-- The sleep length the PLAN assumes, not a log of what actually happened — see
+                         the Sleep chart's own dot for the night-by-night reading. Defaults to the
+                         sleep target itself (0 kcal effect) so an untouched box changes nothing. -->
+                    <label class="formula-row" title="How much sleep the plan assumes you're actually getting, compared against the Sleep target in Settings. Short of it and the Sleep Efficiency Factor η below 1 means the same weekly fat-loss rate needs a bigger real deficit — see the Deprivation Effect row right below. Defaults to the sleep target itself, which is 0 effect.">
+                        <span class="formula-sym">s</span>
+                        <span class="formula-name">sleep length</span>
+                        <input type="text" id="formula-plan-sleep-hours" inputmode="decimal">
+                        <span class="formula-unit">hr/day</span>
+                    </label>
+                    <label class="formula-row" title="Reduction in fat-loss efficiency per hour of sleep below target — η = 1 − (γ/100) × hours short. The literature's own range is 2-3%/hr; this defaults to the 2.5%/hr midpoint and can be tuned.">
+                        <span class="formula-sym">γ</span>
+                        <span class="formula-name">sleep deprivation rate</span>
+                        <input type="text" id="formula-sleep-deprivation-pct" inputmode="decimal">
+                        <span class="formula-unit">%/hr</span>
+                    </label>
+                    <label class="formula-row" title="η = 1 − (γ/100) × hours short of the sleep target. kcal/day this adds to D below because that much of the deficit stops translating into fat loss on a short night. Zero at or above the sleep target. Not editable: it is derived from s and γ above.">
+                        <span class="formula-sym">SD</span>
+                        <span class="formula-name">Sleep Deprivation Effect</span>
+                        <input type="text" id="formula-deprivation-effect" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <!-- Marks the end of the sleep block (s, Deprivation Effect) before the rate
+                         block starts below. -->
+                    <hr class="formula-divider">
+                    <!-- Δm's other face, and the row above it on purpose: the percentage is the
+                         unit the safety band is written in, so it's what you set the pace in and
+                         the kilograms below follow. Type either box and the other follows it. -->
+                    <label class="formula-row" title="A weekly loss of 0.5–1% of body mass is the usual sustainable range, and 1% the ceiling — above it, more of what comes off is lean mass. Type a percentage and Δm below follows it; type kilograms there and this follows instead.">
+                        <span class="formula-sym">Δm%</span>
+                        <span class="formula-name">weekly fat loss, as a share of body mass</span>
+                        <input type="text" id="formula-weekly-loss-pct" inputmode="decimal">
+                        <span class="formula-unit">%/week</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">Δm</span>
+                        <span class="formula-name">weekly fat loss</span>
+                        <input type="text" id="formula-weekly-loss" inputmode="decimal">
+                        <span class="formula-unit">kg/week</span>
+                    </label>
+                    <div class="formula-row formula-row-fixed">
+                        <span class="formula-sym">ρ</span>
+                        <span class="formula-name">fat energy density</span>
+                        <span class="formula-fixed">7700</span>
+                        <span class="formula-unit">kcal/kg</span>
+                    </div>
+                    <!-- Directly under Δm and ρ, the two figures it's made of, and directly above
+                         TEI, the one it's subtracted from — so the three rows read as the sentence
+                         the identity is. Readonly like BMR and M: it's derived from the rate you set,
+                         not a dial of its own.
+                         Named the deficit rather than a "calorie burn", which in this app already
+                         means AEE — the burn is work you do, this is the shortfall the food has to
+                         leave. -->
+                    <label class="formula-row" title="The daily energy shortfall your weekly fat-loss target implies: D = Δm × ρ / 7. This is what comes off maintenance to give the target intake — not calories burned by activity, which is AEE.">
+                        <span class="formula-sym">D</span>
+                        <span class="formula-name">daily energy deficit</span>
+                        <input type="text" id="formula-deficit" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <!-- Marks the end of the rate block (Δm%, Δm, ρ, D) before the calorie-solve
+                         block (f, TEF, M, TEI) starts below. -->
+                    <hr class="formula-divider">
+                    <!-- Directly above TEF, the box it feeds: digestion costs a fraction of whatever
+                         you end up eating, so the identity is solved (TEI = (BMR + AEE − D)/(1 − f))
+                         rather than summed, and TEF = f × TEI reads as the very next line. -->
+                    <label class="formula-row" title="The thermic effect of food: the share of what you eat that is spent digesting it — about 10% on a mixed diet, higher on protein. It is part of expenditure, so counting it RAISES the intake that produces the same deficit. Left at 0 by default, which is the arithmetic this app has always used; type 10 and save to include it.">
+                        <span class="formula-sym">f</span>
+                        <span class="formula-name">thermic effect of food, as a share of TEI</span>
+                        <input type="text" id="formula-tef-pct" inputmode="decimal">
+                        <span class="formula-unit">% of TEI</span>
+                    </label>
+                    <label class="formula-row" title="What that share comes to in calories: TEF = f × TEI. Zero while f is zero.">
+                        <span class="formula-sym">TEF</span>
+                        <span class="formula-name">energy spent digesting that intake</span>
+                        <input type="text" id="formula-tef" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <!-- Marks the end of the TEF pair (f, TEF) before M and TEI start below. -->
+                    <hr class="formula-divider">
+                    <!-- Directly under BMR and AEE, the two figures it's the sum of, and directly
+                         above TEI — the rate is set against maintenance, so the identity reads as a
+                         sentence: BMR + AEE = M, and M minus the deficit above is what's left to
+                         eat. -->
+                    <label class="formula-row" title="Maintenance: BMR + the activity energy expenditure AEE that hitting τ minutes at MET produces. The intake that would hold your body mass still — the deficit D is measured down from this, and TEI is what's left.">
+                        <span class="formula-sym">M</span>
+                        <span class="formula-name">maintenance at m̄ — BMR + AEE</span>
+                        <input type="text" id="formula-maintenance" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">TEI</span>
+                        <span class="formula-name">desired daily intake</span>
+                        <input type="text" id="formula-ein" inputmode="decimal">
+                        <span class="formula-unit">kcal</span>
+                    </label>
+                    <!-- Not part of the algebra above — a read on how hard the cut is, not a term
+                         any other row is built from. Directly under TEI because that's the one box
+                         it compares against BMR. Flags red past DEFICIT_VS_BMR_PCT_CEILING
+                         (formula-render.js): a deficit that size relative to resting rate is where
+                         more of what comes off tends to be lean mass rather than fat. -->
+                    <label class="formula-row" title="How far intake sits below resting rate: (BMR − TEI) / BMR × 100. A negative figure means TEI is above BMR — a surplus, not a deficit. Not editable: it is derived from BMR and TEI above.">
+                        <span class="formula-sym">D_bmr%</span>
+                        <span class="formula-name">daily deficit, as a share of BMR</span>
+                        <input type="text" id="formula-deficit-bmr-pct" inputmode="decimal" readonly>
+                        <span class="formula-unit">%</span>
+                    </label>
+                    <!-- Marks the end of the calorie-solve block, TEI, before the journey block
+                         (t, dates) starts below — m_des itself now sits up with the profile, above
+                         LBM and BMR. -->
+                    <hr class="formula-divider" title="TEF is already built into TEI above — the identity is solved with f in the denominator, not summed — so it is not a further deficit to subtract on top of it.">
+
+                    <label class="formula-row">
+                        <span class="formula-sym">t</span>
+                        <span class="formula-name">days to m_des, holding TEI daily</span>
+                        <input type="text" id="formula-days" inputmode="decimal">
+                        <span class="formula-unit">days</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym"></span>
+                        <span class="formula-name">estimated arrival date</span>
+                        <input type="date" id="formula-eta">
+                        <span class="formula-unit" id="formula-eta-note"></span>
+                    </label>
+                    <!-- After t, because both of these are only meaningful measured along it: λ is a
+                         rate per week ON the diet, and the two readonly rows below are what it has
+                         done by the arrival date above. Nothing here changes TEI, D or t — see
+                         adaptedPlateauKg in wellness-math.js for why adaptation is reported and not
+                         planned with. -->
+                    <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
+                        <span class="formula-sym">λ</span>
+                        <span class="formula-name">metabolic adaptation, per week on the diet</span>
+                        <input type="text" id="formula-adapt-per-week" inputmode="decimal">
+                        <span class="formula-unit">% of BMR/week</span>
+                    </label>
+                    <label class="formula-row" title="Where λt stops growing. The literature puts the floor around 10–15% below the predicted BMR, reached by week 10–12 — past that, further loss comes from mass rather than deepening adaptation.">
+                        <span class="formula-sym">λt_max</span>
+                        <span class="formula-name">adaptation ceiling</span>
+                        <input type="text" id="formula-adapt-cap" inputmode="decimal">
+                        <span class="formula-unit">% of BMR</span>
+                    </label>
+                    <label class="formula-row" title="BMR_adapt(t) = BMR × (1 − λt), at the day count t above.">
+                        <span class="formula-sym">BMR_adp</span>
+                        <span class="formula-name">adapted BMR by t</span>
+                        <input type="text" id="formula-bmr-adapt" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <label class="formula-row" title="The plateau once BMR has adapted: the same m∞ = (TEI − A)/B with the BMR half of A and B scaled by (1 − λt). It sits ABOVE the m∞ printed in the trace, and that gap is why a constant-BMR forecast tends to overshoot in practice.">
+                        <span class="formula-sym">m∞_adp</span>
+                        <span class="formula-name">adapted plateau, and the overshoot it implies</span>
+                        <input type="text" id="formula-plateau-adapt" inputmode="decimal" readonly>
+                        <!-- `kg` and nothing else, like every other row: the overshoot against m∞,
+                             and the fact that a proportional journey has no plateau to overshoot,
+                             are both said in the substituted trace. Same rule the Δm% verdict
+                             follows — the unit column is a unit. -->
+                        <span class="formula-unit">kg</span>
+                    </label>
+                    <!-- Marks the end of the journey block (t, arrival date, adaptation) before the
+                         glycogen block starts below. -->
+                    <hr class="formula-divider">
+                    <!-- Glycogen follows the journey block now, straight after LBM up with the
+                         profile, since it reads that same LBM box rather than a flat guess: glycogen
+                         is stored in muscle, not fat, so it has to scale with lean mass, not sit
+                         unrelated to weight/height/sex. Not read by any calorie identity — this is
+                         purely the explanation for why m and m̄ above don't agree from one day to the
+                         next: glycogen stores pull water in with them, so a day of low carbs (or a
+                         big refeed) can move the scale by kilograms with no fat gained or lost at
+                         all. LBM alone overstates it: skeletal muscle is only ~40-50% of LBM (the
+                         rest is water, organs, skin and bone, none of which store meaningful
+                         glycogen), and a published muscle-tissue glycogen density (g/kg wet muscle)
+                         applied straight to LBM comes out roughly double what it should. s and
+                         m_musc below cut LBM down to that muscle share first, so g_musc can be the
+                         real muscle-tissue figure rather than a diluted per-LBM one. Only s, g_musc,
+                         g_liver and the water ratio are editable — same shape as p_min/p_max below. -->
+                    <label class="formula-row" title="Skeletal muscle, as a direct share of LBM — not of m̄, since it's a fat-free-mass ratio and m̄ still carries the fat. Skeletal muscle runs roughly 40-50% of lean body mass; the rest of LBM is water, organs, skin and bone, none of which store meaningful glycogen. Higher toward 50% for a more muscular frame, lower toward 40% otherwise.">
+                        <span class="formula-sym">s</span>
+                        <span class="formula-name">skeletal muscle, share of lean mass</span>
+                        <input type="text" id="formula-glycogen-skeletal-frac" inputmode="decimal" value="45">
+                        <span class="formula-unit">% of LBM</span>
+                    </label>
+                    <label class="formula-row" title="LBM × s — the actual skeletal muscle mass the glycogen density below applies to, rather than all of LBM (which also counts water, organs, skin and bone).">
+                        <span class="formula-sym">m_musc</span>
+                        <span class="formula-name">skeletal muscle mass</span>
+                        <input type="text" id="formula-glycogen-muscle" inputmode="decimal" readonly>
+                        <span class="formula-unit">kg</span>
+                    </label>
+                    <label class="formula-row" title="Grams of glycogen per kg of actual muscle tissue — resting muscle glycogen runs roughly 13-15 g/kg wet weight (about 70-85 mmol/kg). This is the muscle-tissue density itself, not diluted across LBM, which is why it's applied to m_musc above rather than to LBM directly.">
+                        <span class="formula-sym">g_musc</span>
+                        <span class="formula-name">glycogen per kg of muscle mass</span>
+                        <input type="text" id="formula-glycogen-per-kg-muscle" inputmode="decimal" value="14">
+                        <span class="formula-unit">g/kg muscle</span>
+                    </label>
+                    <label class="formula-row" title="The liver's own glycogen reserve — roughly constant across adults regardless of muscle mass, commonly cited around 100g.">
+                        <span class="formula-sym">g_liver</span>
+                        <span class="formula-name">liver glycogen reserve</span>
+                        <input type="text" id="formula-glycogen-liver" inputmode="decimal" value="100">
+                        <span class="formula-unit">g</span>
+                    </label>
+                    <label class="formula-row" title="g_musc × m_musc + g_liver. Not editable directly — tune the coefficients above if this doesn't match what you observe.">
+                        <span class="formula-sym">m_gly</span>
+                        <span class="formula-name">glycogen store, from muscle mass</span>
+                        <input type="text" id="formula-glycogen-g" inputmode="decimal" readonly>
+                        <span class="formula-unit">g</span>
+                    </label>
+                    <label class="formula-row" title="Grams of water glycogen holds onto per gram of itself — commonly cited as 3–4. Tune this to whatever ratio makes ΔM_gly below match what you actually see on the scale.">
+                        <span class="formula-sym">r</span>
+                        <span class="formula-name">water bound per gram of glycogen</span>
+                        <input type="text" id="formula-glycogen-water-ratio" inputmode="decimal" value="3">
+                        <span class="formula-unit">g H2O / g glycogen</span>
+                    </label>
+                    <label class="formula-row" title="ΔM_gly = m_gly × (1 + r) — the scale swing glycogen and its bound water can account for on their own. A day-to-day move up to about this size is water and glycogen, not fat; anything consistently larger than it, held over more than a day or two, is the real signal.">
+                        <span class="formula-sym">ΔM_gly</span>
+                        <span class="formula-name">glycogen + water swing</span>
+                        <input type="text" id="formula-glycogen-swing" inputmode="decimal" readonly>
+                        <span class="formula-unit">kg</span>
+                    </label>
+                    <!-- Marks the end of the glycogen block (s…ΔM_gly) before the protein block
+                         starts below. -->
+                    <hr class="formula-divider">
+                    <!-- The protein block closes the list, and reads top to bottom as one
+                         derivation: the p_min/p_max rule you set, applied to LBM (up with the
+                         profile now — see its own comment), then the grams that rule produces. Only
+                         the rule is editable — no "Solve for" mode turns the other two into inputs,
+                         since no calorie identity involves protein, so they compute in all five. -->
+                    <!-- The rule, immediately above the grams it produces: p_min/p_max used to sit
+                         with the other editable knobs several rows up, which split the protein block
+                         in two and left `p × LBM = P` as a multiplication whose two halves were
+                         nowhere near each other. Editable among readonly rows is the point — LBM
+                         above and the two P rows below are all derived, and these are the only part
+                         of the band you set. -->
+                    <label class="formula-row">
+                        <span class="formula-sym">p_min</span>
+                        <span class="formula-name">protein floor per kg of lean mass</span>
+                        <input type="text" id="formula-protein-per-kg-min" inputmode="decimal">
+                        <span class="formula-unit">g/kg LBM/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">p_max</span>
+                        <span class="formula-name">protein ceiling per kg of lean mass</span>
+                        <input type="text" id="formula-protein-per-kg-max" inputmode="decimal">
+                        <span class="formula-unit">g/kg LBM/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">P_min</span>
+                        <span class="formula-name">desired daily protein, lower end</span>
+                        <input type="text" id="formula-protein-min" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">P_max</span>
+                        <span class="formula-name">desired daily protein, upper end</span>
+                        <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                    <!-- Marks the end of the protein block (P_min, P_max) before the fiber block
+                         starts below. -->
+                    <hr class="formula-divider">
+                    <!-- The fiber band follows protein: a floor scaled to how much you eat (14 g per
+                         1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body weight
+                         (0.5 g/kg) — two different bases, unlike protein's single LBM, so both
+                         coefficients are editable and neither rides on a box the other computes.
+                         Named b_min/b_max rather than f_min/f_max: TEF's own coefficient above is
+                         already `f`, and the two would otherwise share a letter. -->
+                    <label class="formula-row">
+                        <span class="formula-sym">b_min</span>
+                        <span class="formula-name">dietary fiber floor per 1,000 kcal of intake</span>
+                        <input type="text" id="formula-fiber-per-1000kcal-min" inputmode="decimal">
+                        <span class="formula-unit">g/1,000 kcal</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">b_max</span>
+                        <span class="formula-name">dietary fiber ceiling per kg of body weight</span>
+                        <input type="text" id="formula-fiber-per-kg-max" inputmode="decimal">
+                        <span class="formula-unit">g/kg/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">F_min</span>
+                        <span class="formula-name">desired daily dietary fiber, lower end</span>
+                        <input type="text" id="formula-fiber-min" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">F_max</span>
+                        <span class="formula-name">desired daily dietary fiber, upper end</span>
+                        <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                    <!-- Marks the end of the fiber block (F_min, F_max) before the fat block
+                         starts below. -->
+                    <hr class="formula-divider">
+                    <!-- The fat band follows fiber, same two-different-bases shape but both ends
+                         scaled off TEI instead of one off body weight: 20-35% of total energy from
+                         fat is the Institute of Medicine's Acceptable Macronutrient Distribution
+                         Range for adults (Dietary Reference Intakes for Energy, Carbohydrate, Fiber,
+                         Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also the
+                         range the USDA Dietary Guidelines for Americans carries forward — not the
+                         user's own guessed 25%, which sits inside this band rather than defining it.
+                         9 kcal/g is fat's fixed energy density (Atwater), not a personal parameter,
+                         so only the two percentages are editable. -->
+                    <label class="formula-row">
+                        <span class="formula-sym">k_min</span>
+                        <span class="formula-name">fat floor, share of intake calories</span>
+                        <input type="text" id="formula-fat-pct-min" inputmode="decimal">
+                        <span class="formula-unit">% of TEI</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">k_max</span>
+                        <span class="formula-name">fat ceiling, share of intake calories</span>
+                        <input type="text" id="formula-fat-pct-max" inputmode="decimal">
+                        <span class="formula-unit">% of TEI</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">G_min</span>
+                        <span class="formula-name">desired daily fat, lower end</span>
+                        <input type="text" id="formula-fat-min" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">G_max</span>
+                        <span class="formula-name">desired daily fat, upper end</span>
+                        <input type="text" id="formula-fat-max" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                    <!-- Marks the end of the fat block (G_min, G_max) before the carb block
+                         starts below. -->
+                    <hr class="formula-divider">
+                    <!-- The carb band follows fat, same shape again — both ends a share of TEI:
+                         45-65% of total energy from carbohydrate is the same IOM AMDR report's range
+                         for carbohydrate (Dietary Reference Intakes for Energy, Carbohydrate, Fiber,
+                         Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also carried
+                         forward by the USDA Dietary Guidelines for Americans. Too much carbohydrate
+                         at once — well above this ceiling — also means more glycogen stored (see
+                         m_gly above), which binds its own water; the ceiling here is about total
+                         energy balance, not that water-retention effect directly, but staying inside
+                         it keeps glycogen swings from compounding into a genuine overconsumption.
+                         4 kcal/g is carbohydrate's fixed energy density (Atwater), not a personal
+                         parameter, so only the two percentages are editable. -->
+                    <label class="formula-row">
+                        <span class="formula-sym">q_min</span>
+                        <span class="formula-name">carbohydrate floor, share of intake calories</span>
+                        <input type="text" id="formula-carb-pct-min" inputmode="decimal">
+                        <span class="formula-unit">% of TEI</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">q_max</span>
+                        <span class="formula-name">carbohydrate ceiling, share of intake calories</span>
+                        <input type="text" id="formula-carb-pct-max" inputmode="decimal">
+                        <span class="formula-unit">% of TEI</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">C_min</span>
+                        <span class="formula-name">desired daily carbohydrate, lower end</span>
+                        <input type="text" id="formula-carb-min" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">C_max</span>
+                        <span class="formula-name">desired daily carbohydrate, upper end</span>
+                        <input type="text" id="formula-carb-max" inputmode="decimal" readonly>
+                        <span class="formula-unit">g/day</span>
+                    </label>
+                </div>
+
+                <!-- LBM, P_min and P_max trace their arithmetic here alongside every other
+                     substituted term, rather than in a block of their own — appended in all four
+                     modes by renderFormulaSubstituted itself, since no calorie identity involves
+                     protein and a failed calorie solve has no bearing on them. -->
+                <div id="formula-substituted" class="formula-substituted"></div>
+
+                <fieldset class="formula-solve-for formula-pin-mode">
+                    <legend>Which stays fixed as you lose weight</legend>
+                    <label title="Holds your desired fat loss. Every new weigh-in recalculates the daily intake that delivers it, so the calorie number falls as you get lighter and the pace stays on plan.">
+                        <input type="radio" name="formula-pin-mode" value="deficit" checked>
+                        Pin desired deficit/fat loss
+                    </label>
+                    <label title="Holds this daily intake. Maintenance falls as you get lighter, so the deficit shrinks and fat loss decelerates — the constant-intake journey the forecast above solves for.">
+                        <input type="radio" name="formula-pin-mode" value="intake">
+                        Pin desired daily intake
+                    </label>
+                    <label title="Holds the fat loss at a percentage of your body mass, so the kilograms per week shrink as you do and every weigh-in recalculates the intake. The gentlest of the three, and the only one with no plateau to fall short of — a constant share of a falling mass always reaches it.">
+                        <input type="radio" name="formula-pin-mode" value="pct">
+                        Pin desired fat-loss %
+                    </label>
+                </fieldset>
+
+                <fieldset class="formula-solve-for formula-activity-pin-mode">
+                    <legend>Which stays fixed on the desired activity as your weight changes</legend>
+                    <label title="Holds τ, the desired activity minutes. The calorie burn it implies falls as you get lighter, since the same minutes move less body mass.">
+                        <input type="radio" name="formula-activity-pin-mode" value="time" checked>
+                        Pin desired activity time
+                    </label>
+                    <label title="Holds this calorie burn. The minutes needed to reach it rise as you get lighter, since it takes more time to burn the same calories at a lower body mass.">
+                        <input type="radio" name="formula-activity-pin-mode" value="calorie">
+                        Pin desired calorie burn
+                    </label>
+                </fieldset>
+
+                <fieldset class="formula-solve-for formula-bmr-basis">
+                    <legend>Which BMR every deficit and desired calorie figure runs on, everywhere in the app</legend>
+                    <label title="BMR as-is, with no adaptation discount. The behaviour every existing sheet already has.">
+                        <input type="radio" name="formula-bmr-basis" value="bmr" checked>
+                        Plain BMR
+                    </label>
+                    <label title="BMR discounted by days actually elapsed since your first logged weigh-in (daysSinceFirstWeighIn, wellness-math.js) — how adapted metabolism realistically is by now, not a flat guess. Switches the Status card's D/Δm, the Calorie Balance chart's per-day Maintenance, the desired calorie intake everywhere it's shown, and Physique's own maintenance figure, all at once.">
+                        <input type="radio" name="formula-bmr-basis" value="bmr_adp">
+                        BMR_adp
+                    </label>
+                    <label title="BMR back-solved from your own logged data (the Calibrate form, in Tune) instead of the height/age/sex equation — shifts the equation's whole line up or down to match what was actually measured, keeping its slope. Falls back to Plain BMR until a calibration has been saved.">
+                        <input type="radio" name="formula-bmr-basis" value="bmr_cal">
+                        BMR_cal
+                    </label>
+                </fieldset>
+
+                <p class="hint" id="formula-profile-note"></p>
+                <p id="formula-status" class="status" hidden></p>
+
+                <div class="panel-actions">
+                    <button type="button" id="formula-reset-btn" class="btn">Reset</button>
+                    <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" data-route="indicator">
+            <div class="panel-header">
+                <h2>Indicator</h2>
             </div>
 
             <div class="body-mass-projection-wrap">
@@ -448,8 +1054,8 @@
             </div>
         </div>
 
-        <div class="panel" id="insight-panel">
-            <h2>Health Insight</h2>
+        <div class="panel" id="insight-panel" data-route="insight">
+            <h2>Insight</h2>
             <p class="hint" id="insight-hint"></p>
 
             <div class="export-date-range">
@@ -560,12 +1166,12 @@
             <p id="insight-status" class="status" hidden></p>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="physique">
             <div class="panel-header">
                 <h2>Physique</h2>
                 <button id="physique-export-csv-btn" class="btn panel-header-btn">Export CSV</button>
-                <button id="today-physique-btn" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
-                <button id="add-physique-btn" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
+                <button id="today-physique-btn" data-route="today" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
+                <button id="add-physique-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
             </div>
 
             <div class="filters">
@@ -614,25 +1220,25 @@
             <div class="pagination" id="physique-pagination"></div>
         </div>
 
-        <div class="panel" id="workout-plan-panel">
+        <div class="panel" id="workout-plan-panel" data-route="activity">
             <div class="panel-header">
                 <h2>Activity</h2>
                 <!-- Three buttons on one phone heading line, so each label is cut to a
                      word and carries the full wording in its tooltip. -->
-                <button type="button" id="activity-instruction-btn" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
+                <button type="button" id="activity-instruction-btn" data-route="guide" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
                 <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
-                <button type="button" id="add-activity-btn" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
+                <button type="button" id="add-activity-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
             </div>
 
             <!-- Rebuilt from the Activity sheet tab by activities.js -->
             <div id="activity-plan-tables"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="nutrition">
             <div class="panel-header">
                 <h2>Nutrition</h2>
                 <button type="button" id="log-nutrition-btn" class="btn btn-primary panel-header-btn" title="Log the ticked ingredients as today's Consumption">Log</button>
-                <button id="add-nutrition-btn" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
+                <button id="add-nutrition-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
             </div>
 
             <div class="filters">
@@ -704,7 +1310,7 @@
             </div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="financial-indicator">
         <h2>Financial Indicator</h2>
 
         <div class="panel-section">
@@ -786,7 +1392,7 @@
         </div>
     </div>
 
-        <div class="panel" id="financial-insight-panel">
+        <div class="panel" id="financial-insight-panel" data-route="financial-insight">
             <h2>Financial Insight</h2>
 
             <div class="insight-mode-actions">
@@ -843,11 +1449,11 @@
             <p id="financial-insight-form-error" class="status" hidden></p>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="transaction">
             <div class="panel-header">
                 <h2>Transaction</h2>
                 <button id="export-csv-btn" class="btn panel-header-btn">Export CSV</button>
-                <button id="add-transaction-btn" class="btn btn-primary panel-header-btn" title="Log a transaction">Log</button>
+                <button id="add-transaction-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a transaction">Log</button>
             </div>
 
             <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
@@ -908,12 +1514,12 @@
             <div class="pagination" id="tx-pagination"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="account">
             <div class="panel-header">
                 <h2>Account</h2>
                 <span id="account-reconciliation-flag" class="panel-header-flag" hidden aria-hidden="true"></span>
-                <button id="transfer-funds-btn" class="btn btn-secondary panel-header-btn" title="Move money between two of your own accounts">Transfer</button>
-                <button id="add-account-btn" class="btn btn-primary panel-header-btn" title="Add an account">Add</button>
+                <button id="transfer-funds-btn" data-route="transfer" class="btn btn-secondary panel-header-btn" title="Move money between two of your own accounts">Transfer</button>
+                <button id="add-account-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an account">Add</button>
             </div>
 
             <div class="table-responsive">
@@ -946,10 +1552,10 @@
              source. Its four money columns are the SHEET's own formulas — the app
              reads them and never writes them, so only Category and Type are
              editable here (breakdown.js). -->
-        <div class="panel">
+        <div class="panel" data-route="breakdown">
             <div class="panel-header">
                 <h2>Breakdown</h2>
-                <button id="add-breakdown-btn" class="btn btn-primary panel-header-btn" title="Add a category/type row — it copies an existing row's formulas, so its four totals compute themselves">Add</button>
+                <button id="add-breakdown-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a category/type row — it copies an existing row's formulas, so its four totals compute themselves">Add</button>
             </div>
 
             <div class="filters">
@@ -988,12 +1594,12 @@
             <button id="timesheet-reminder-enable-btn" class="btn" hidden>Enable reminders</button>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="work-time">
             <div class="panel-header">
                 <h2>Work Time</h2>
                 <!-- One word, like every other panel's action button. Which day and what
                      it logs is the modal's job to say; the tooltip carries the long form. -->
-                <button id="log-today-btn" class="btn btn-primary panel-header-btn" title="Log time for a day">Log</button>
+                <button id="log-today-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log time for a day">Log</button>
             </div>
 
             <!-- What used to be a separate "Work Analytics" panel: the charts read
@@ -1063,10 +1669,10 @@
             <div class="pagination" id="ts-pagination"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="travel">
             <div class="panel-header">
                 <h2>Travel</h2>
-                <button id="add-travel-btn" class="btn btn-primary panel-header-btn" title="Log a travel entry">Log</button>
+                <button id="add-travel-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a travel entry">Log</button>
             </div>
 
             <!-- What used to be a separate "Travel Insights" panel, same as Work Time
@@ -1110,10 +1716,10 @@
             <div class="pagination" id="travel-pagination"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="application">
             <div class="panel-header">
                 <h2>Application</h2>
-                <button id="add-application-btn" class="btn btn-primary panel-header-btn" title="Log a job application">Log</button>
+                <button id="add-application-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a job application">Log</button>
             </div>
 
             <div class="filters">
@@ -1123,10 +1729,10 @@
             <div id="applications-list"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="contact">
             <div class="panel-header">
                 <h2>Contact</h2>
-                <button id="add-contact-btn" class="btn btn-primary panel-header-btn" title="Add a contact">Add</button>
+                <button id="add-contact-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a contact">Add</button>
             </div>
 
             <div class="panel-actions">
@@ -1166,10 +1772,10 @@
             <div class="pagination" id="contacts-pagination"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel" data-route="settings">
             <div class="panel-header">
                 <h2>Settings</h2>
-                <button id="add-setting-btn" class="btn btn-primary panel-header-btn" title="Add a setting">Add</button>
+                <button id="add-setting-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a setting">Add</button>
             </div>
 
             <div class="table-responsive">
@@ -1516,11 +2122,12 @@
                     <input type="text" id="physique-body-mass" inputmode="decimal" placeholder="e.g. 94 (kg)">
                 </label>
             </div>
+            <p title="This day's four BMR figures as Save stores them in the BMR column — at its own weigh-in (else the latest earlier one), off the fields typed so far">BMR_mif: <span id="physique-bmr-mif">—</span> · BMR_kat: <span id="physique-bmr-kat">—</span> · BMR_cal: <span id="physique-bmr-cal">—</span> · BMR_adp: <span id="physique-bmr-adp">—</span></p>
             <div class="form-row">
-                <label>Bedtime
+                <label>Bed
                     <input type="time" id="physique-bedtime">
                 </label>
-                <label>Wake-up Time
+                <label>Wake
                     <input type="time" id="physique-wake-time">
                 </label>
             </div>
@@ -1626,7 +2233,6 @@
 
 <div id="physique-micro-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="physique-micro-title" hidden>
     <div class="modal-card">
-        <button type="button" id="physique-micro-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="physique-micro-title">Micronutrients</h2>
 
         <div class="table-responsive">
@@ -1641,601 +2247,9 @@
                 <tbody id="physique-micro-body"></tbody>
             </table>
         </div>
-    </div>
-</div>
-
-<div id="formula-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="formula-modal-title" hidden>
-    <div class="modal-card">
-        <h2 id="formula-modal-title">Health Formula Playground</h2>
-
-        <fieldset class="formula-solve-for">
-            <legend>Solve for</legend>
-            <label><input type="radio" name="formula-solve-for" value="EIN"> Calories</label>
-            <label><input type="radio" name="formula-solve-for" value="TARGET_MASS"> Healthy body mass</label>
-            <label><input type="radio" name="formula-solve-for" value="TAU"> Activity</label>
-            <label><input type="radio" name="formula-solve-for" value="DELTA_M" checked> Weekly fat loss</label>
-            <!-- The odd one out, and named for what you hold rather than what it solves:
-                 here the percentage of body mass is the fixed input and BOTH TEI and t are
-                 computed from it, on the proportional journey a fixed share implies. -->
-            <label title="Hold the weekly fat loss at a percentage of your body mass. The kilograms per week, the desired calorie intake and the arrival date are all computed from it — and the date follows the proportional journey, where the kilograms shrink as you do.">
-                <input type="radio" name="formula-solve-for" value="FIXED_PCT"> Weekly fat loss %
-            </label>
-        </fieldset>
-
-        <!-- Which BMR equation the whole plan is built on. Both are kept and both are live:
-             Mifflin-St Jeor is the default and what every existing sheet already runs on,
-             and switching here re-derives the preview through the other one — including A
-             and B, since maintenance stays affine in body mass under both. -->
-        <fieldset class="formula-solve-for formula-bmr-formula">
-            <legend>Basal metabolic rate</legend>
-            <label title="Mifflin-St Jeor (1990): BMR from body mass, height, age and sex. The app's original equation, and the one that needs no lean-mass estimate.">
-                <input type="radio" name="formula-bmr-formula" value="mifflin" checked>
-                Mifflin-St Jeor (m, h, a, σ)
-            </label>
-            <label title="Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. Fat mass is nearly inert metabolically, so this predicts from lean mass alone — more accurate the better your LBM figure is, and here LBM is the Boer estimate below. Age drops out entirely; sex enters only through LBM.">
-                <input type="radio" name="formula-bmr-formula" value="katch">
-                Katch-McArdle (LBM)
-            </label>
-            <label title="Uses whichever equation above is already active (BMR_FORMULA is untouched), but every deficit and desired calorie figure runs on it plus your saved Calibrate offset instead of the plain equation — the same switch as picking BMR_cal under 'Which BMR every deficit...' further down, exposed here too. Falls back to the plain equation until a calibration has been saved.">
-                <input type="radio" name="formula-bmr-formula" value="bmr_cal">
-                BMR_cal (calibrated)
-            </label>
-        </fieldset>
-
-        <!-- Directly above the variable list it introduces, not under the formulas: it's the
-             list that's being defined, and the Solve-for radios in between made it read as
-             though it were introducing those instead. -->
-        <p class="formula-where">where,</p>
-
-        <div class="formula-inputs">
-            <!-- The raw reading, and readonly because it's a measurement rather than a
-                 knob: it's here to be compared against the smoothed figure below, which is
-                 the one every identity on this sheet is evaluated at. Type your what-ifs
-                 into m̄. -->
-            <label class="formula-row" title="Your most recent weigh-in, exactly as logged. Shown for comparison only — the formulas below run on the smoothed mass, since a single reading carries a day's water and glycogen with it.">
-                <span class="formula-sym">m</span>
-                <span class="formula-name">body mass</span>
-                <input type="text" id="formula-body-mass" inputmode="decimal" readonly>
-                <span class="formula-unit">kg</span>
-            </label>
-            <!-- Directly under m, and the box that actually drives the sheet. -->
-            <label class="formula-row" title="The mean of every weigh-in in the 7 days ending at your latest one — m̄(t) = (1/7) × Σ m(t−i). Water and glycogen move the scale by more than a week of fat loss does, and the decay model assumes clean mass, so every formula here reads this rather than the day's reading. Editable: type a figure to see the whole plan at another mass.">
-                <span class="formula-sym">m̄</span>
-                <span class="formula-name">7-day rolling average body mass</span>
-                <input type="text" id="formula-body-mass-smooth" inputmode="decimal">
-                <span class="formula-unit">kg</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">h</span>
-                <span class="formula-name">height</span>
-                <input type="text" id="formula-height" inputmode="decimal">
-                <span class="formula-unit">cm</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">a</span>
-                <span class="formula-name">age</span>
-                <input type="text" id="formula-age" inputmode="decimal">
-                <span class="formula-unit">years</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">σ</span>
-                <span class="formula-name">sex</span>
-                <select id="formula-sex">
-                    <option value="male">male</option>
-                    <option value="female">female</option>
-                </select>
-                <span class="formula-unit"></span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">m_des</span>
-                <span class="formula-name">healthy body mass</span>
-                <input type="text" id="formula-target" inputmode="decimal">
-                <span class="formula-unit">kg</span>
-            </label>
-            <!-- m_des's other face, and the same two-way pair Δm%/Δm are: one quantity in
-                 two units, so whichever box you last typed into is the known and the other
-                 is rewritten from it. Directly under m_des because a goal in kilograms is a
-                 number you pick and a goal in BMI is what tells you whether picking it was
-                 sensible — the verdict rides on the trace line, never in the unit column. -->
-            <label class="formula-row" title="The BMI your healthy body mass comes to at your height — BMI = m_des / (h/100)². Type a target mass and this follows it; type a BMI here and the target mass follows instead. The healthy band is 18.5–24.9, and outside it the box goes red. In Solve for → Healthy body mass both are answers, so neither is typed.">
-                <span class="formula-sym">BMI_des</span>
-                <span class="formula-name">healthy body mass index</span>
-                <input type="text" id="formula-target-bmi" inputmode="decimal">
-                <span class="formula-unit">kg/m²</span>
-            </label>
-            <!-- Sits with the rest of the profile it's derived from (m̄, h, σ) and directly
-                 above BMR: under Katch-McArdle, BMR is built from this figure rather than
-                 the other way around, so it has to be known before BMR is. -->
-            <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Feeds Katch-McArdle BMR above and the protein/glycogen bands below.">
-                <span class="formula-sym">LBM</span>
-                <span class="formula-name">lean body mass</span>
-                <input type="text" id="formula-lbm" inputmode="decimal" readonly>
-                <span class="formula-unit">kg</span>
-            </label>
-            <!-- The figures everything downstream is measured against, readonly because
-                 they aren't settings. Both equations shown always, regardless of which one
-                 the radio below has active — only the ACTIVE one (via the coefficients/plan
-                 built from it) actually feeds the rest of the sheet; these two are reference.
-                 Placed with the profile rather than beside TEI because that's what they
-                 describe — the body, before any plan is applied to it. -->
-            <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Mifflin-St Jeor — shown regardless of which equation is active below. Not editable: derived from m̄, h, a and σ. Blank without a birth date (Mifflin needs age; Katch-McArdle doesn't).">
-                <span class="formula-sym">BMR</span>
-                <span class="formula-name">basal metabolic rate by Mifflin-St Jeor</span>
-                <input type="text" id="formula-bmr-mifflin" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Katch-McArdle from lean mass — shown regardless of which equation is active below. Not editable: derived from m̄, h and σ.">
-                <span class="formula-sym">BMR</span>
-                <span class="formula-name">basal metabolic rate by Katch-McArdle</span>
-                <input type="text" id="formula-bmr-katch" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <label class="formula-row" title="BMR (whichever equation is active below) plus the saved Calibrate offset (Calibrate, beside Tune) — always shown regardless of which basis is chosen further down, so it can be compared against plain BMR here. Blank until a calibration has actually been saved.">
-                <span class="formula-sym">BMR_cal</span>
-                <span class="formula-name">calibrated basal metabolic rate</span>
-                <input type="text" id="formula-bmr-cal" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <!-- Marks the end of the profile block (m, m̄, h, a, σ, m_des, BMI_des, LBM,
-                 BMR) before the activity block starts below. -->
-            <hr class="formula-divider">
-            <label class="formula-row">
-                <span class="formula-sym">τ</span>
-                <span class="formula-name">desired walking activity</span>
-                <input type="text" id="formula-activity-min" inputmode="decimal">
-                <span class="formula-unit">min/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">MET</span>
-                <span class="formula-name">walking activity intensity</span>
-                <input type="text" id="formula-met" inputmode="decimal">
-                <!-- The unit is the symbol here: "metabolic equivalents" was the longest
-                     string in the column and the only one that forced a second line on a
-                     phone, and the row's own name already says what MET measures. -->
-                <span class="formula-unit">MET</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">κ</span>
-                <span class="formula-name">oxygen uptake per MET</span>
-                <input type="text" id="formula-met-o2" inputmode="decimal">
-                <span class="formula-unit">mL O₂/kg/min</span>
-            </label>
-            <!-- Directly under κ, the other half of the O₂-to-kcal conversion AEE runs: κ
-                 is how much oxygen the activity costs, ε is what that oxygen is worth in
-                 calories, and AEE right below is the two of them applied. -->
-            <div class="formula-row formula-row-fixed">
-                <span class="formula-sym">ε</span>
-                <span class="formula-name">oxygen energy yield</span>
-                <span class="formula-fixed">200</span>
-                <span class="formula-unit">mL O₂/kcal</span>
-            </div>
-            <label class="formula-row" title="Activity energy expenditure at that target: AEE = MET × m̄ × τ × κ / ε. Not editable: it is derived from MET, τ and κ above.">
-                <span class="formula-sym">AEE</span>
-                <span class="formula-name">daily desired activity energy expenditure</span>
-                <input type="text" id="formula-activity-kcal" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <!-- Marks the end of the activity block (MET, τ, κ, AEE) before the sleep
-                 block starts below. -->
-            <hr class="formula-divider">
-            <!-- The sleep length the PLAN assumes, not a log of what actually happened — see
-                 the Sleep chart's own dot for the night-by-night reading. Defaults to the
-                 sleep target itself (0 kcal effect) so an untouched box changes nothing. -->
-            <label class="formula-row" title="How much sleep the plan assumes you're actually getting, compared against the Sleep target in Settings. Short of it and the Sleep Efficiency Factor η below 1 means the same weekly fat-loss rate needs a bigger real deficit — see the Deprivation Effect row right below. Defaults to the sleep target itself, which is 0 effect.">
-                <span class="formula-sym">s</span>
-                <span class="formula-name">sleep length</span>
-                <input type="text" id="formula-plan-sleep-hours" inputmode="decimal">
-                <span class="formula-unit">hr/day</span>
-            </label>
-            <label class="formula-row" title="Reduction in fat-loss efficiency per hour of sleep below target — η = 1 − (γ/100) × hours short. The literature's own range is 2-3%/hr; this defaults to the 2.5%/hr midpoint and can be tuned.">
-                <span class="formula-sym">γ</span>
-                <span class="formula-name">sleep deprivation rate</span>
-                <input type="text" id="formula-sleep-deprivation-pct" inputmode="decimal">
-                <span class="formula-unit">%/hr</span>
-            </label>
-            <label class="formula-row" title="η = 1 − (γ/100) × hours short of the sleep target. kcal/day this adds to D below because that much of the deficit stops translating into fat loss on a short night. Zero at or above the sleep target. Not editable: it is derived from s and γ above.">
-                <span class="formula-sym">SD</span>
-                <span class="formula-name">Sleep Deprivation Effect</span>
-                <input type="text" id="formula-deprivation-effect" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <!-- Marks the end of the sleep block (s, Deprivation Effect) before the rate
-                 block starts below. -->
-            <hr class="formula-divider">
-            <!-- Δm's other face, and the row above it on purpose: the percentage is the
-                 unit the safety band is written in, so it's what you set the pace in and
-                 the kilograms below follow. Type either box and the other follows it. -->
-            <label class="formula-row" title="A weekly loss of 0.5–1% of body mass is the usual sustainable range, and 1% the ceiling — above it, more of what comes off is lean mass. Type a percentage and Δm below follows it; type kilograms there and this follows instead.">
-                <span class="formula-sym">Δm%</span>
-                <span class="formula-name">weekly fat loss, as a share of body mass</span>
-                <input type="text" id="formula-weekly-loss-pct" inputmode="decimal">
-                <span class="formula-unit">%/week</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">Δm</span>
-                <span class="formula-name">weekly fat loss</span>
-                <input type="text" id="formula-weekly-loss" inputmode="decimal">
-                <span class="formula-unit">kg/week</span>
-            </label>
-            <div class="formula-row formula-row-fixed">
-                <span class="formula-sym">ρ</span>
-                <span class="formula-name">fat energy density</span>
-                <span class="formula-fixed">7700</span>
-                <span class="formula-unit">kcal/kg</span>
-            </div>
-            <!-- Directly under Δm and ρ, the two figures it's made of, and directly above
-                 TEI, the one it's subtracted from — so the three rows read as the sentence
-                 the identity is. Readonly like BMR and M: it's derived from the rate you set,
-                 not a dial of its own.
-                 Named the deficit rather than a "calorie burn", which in this app already
-                 means AEE — the burn is work you do, this is the shortfall the food has to
-                 leave. -->
-            <label class="formula-row" title="The daily energy shortfall your weekly fat-loss target implies: D = Δm × ρ / 7. This is what comes off maintenance to give the target intake — not calories burned by activity, which is AEE.">
-                <span class="formula-sym">D</span>
-                <span class="formula-name">daily energy deficit</span>
-                <input type="text" id="formula-deficit" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <!-- Marks the end of the rate block (Δm%, Δm, ρ, D) before the calorie-solve
-                 block (f, TEF, M, TEI) starts below. -->
-            <hr class="formula-divider">
-            <!-- Directly above TEF, the box it feeds: digestion costs a fraction of whatever
-                 you end up eating, so the identity is solved (TEI = (BMR + AEE − D)/(1 − f))
-                 rather than summed, and TEF = f × TEI reads as the very next line. -->
-            <label class="formula-row" title="The thermic effect of food: the share of what you eat that is spent digesting it — about 10% on a mixed diet, higher on protein. It is part of expenditure, so counting it RAISES the intake that produces the same deficit. Left at 0 by default, which is the arithmetic this app has always used; type 10 and save to include it.">
-                <span class="formula-sym">f</span>
-                <span class="formula-name">thermic effect of food, as a share of TEI</span>
-                <input type="text" id="formula-tef-pct" inputmode="decimal">
-                <span class="formula-unit">% of TEI</span>
-            </label>
-            <label class="formula-row" title="What that share comes to in calories: TEF = f × TEI. Zero while f is zero.">
-                <span class="formula-sym">TEF</span>
-                <span class="formula-name">energy spent digesting that intake</span>
-                <input type="text" id="formula-tef" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <!-- Marks the end of the TEF pair (f, TEF) before M and TEI start below. -->
-            <hr class="formula-divider">
-            <!-- Directly under BMR and AEE, the two figures it's the sum of, and directly
-                 above TEI — the rate is set against maintenance, so the identity reads as a
-                 sentence: BMR + AEE = M, and M minus the deficit above is what's left to
-                 eat. -->
-            <label class="formula-row" title="Maintenance: BMR + the activity energy expenditure AEE that hitting τ minutes at MET produces. The intake that would hold your body mass still — the deficit D is measured down from this, and TEI is what's left.">
-                <span class="formula-sym">M</span>
-                <span class="formula-name">maintenance at m̄ — BMR + AEE</span>
-                <input type="text" id="formula-maintenance" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">TEI</span>
-                <span class="formula-name">desired daily intake</span>
-                <input type="text" id="formula-ein" inputmode="decimal">
-                <span class="formula-unit">kcal</span>
-            </label>
-            <!-- Not part of the algebra above — a read on how hard the cut is, not a term
-                 any other row is built from. Directly under TEI because that's the one box
-                 it compares against BMR. Flags red past DEFICIT_VS_BMR_PCT_CEILING
-                 (formula-render.js): a deficit that size relative to resting rate is where
-                 more of what comes off tends to be lean mass rather than fat. -->
-            <label class="formula-row" title="How far intake sits below resting rate: (BMR − TEI) / BMR × 100. A negative figure means TEI is above BMR — a surplus, not a deficit. Not editable: it is derived from BMR and TEI above.">
-                <span class="formula-sym">D_bmr%</span>
-                <span class="formula-name">daily deficit, as a share of BMR</span>
-                <input type="text" id="formula-deficit-bmr-pct" inputmode="decimal" readonly>
-                <span class="formula-unit">%</span>
-            </label>
-            <!-- Marks the end of the calorie-solve block, TEI, before the journey block
-                 (t, dates) starts below — m_des itself now sits up with the profile, above
-                 LBM and BMR. -->
-            <hr class="formula-divider" title="TEF is already built into TEI above — the identity is solved with f in the denominator, not summed — so it is not a further deficit to subtract on top of it.">
-
-            <label class="formula-row">
-                <span class="formula-sym">t</span>
-                <span class="formula-name">days to m_des, holding TEI daily</span>
-                <input type="text" id="formula-days" inputmode="decimal">
-                <span class="formula-unit">days</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym"></span>
-                <span class="formula-name">estimated arrival date</span>
-                <input type="date" id="formula-eta">
-                <span class="formula-unit" id="formula-eta-note"></span>
-            </label>
-            <!-- After t, because both of these are only meaningful measured along it: λ is a
-                 rate per week ON the diet, and the two readonly rows below are what it has
-                 done by the arrival date above. Nothing here changes TEI, D or t — see
-                 adaptedPlateauKg in wellness-math.js for why adaptation is reported and not
-                 planned with. -->
-            <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
-                <span class="formula-sym">λ</span>
-                <span class="formula-name">metabolic adaptation, per week on the diet</span>
-                <input type="text" id="formula-adapt-per-week" inputmode="decimal">
-                <span class="formula-unit">% of BMR/week</span>
-            </label>
-            <label class="formula-row" title="Where λt stops growing. The literature puts the floor around 10–15% below the predicted BMR, reached by week 10–12 — past that, further loss comes from mass rather than deepening adaptation.">
-                <span class="formula-sym">λt_max</span>
-                <span class="formula-name">adaptation ceiling</span>
-                <input type="text" id="formula-adapt-cap" inputmode="decimal">
-                <span class="formula-unit">% of BMR</span>
-            </label>
-            <label class="formula-row" title="BMR_adapt(t) = BMR × (1 − λt), at the day count t above.">
-                <span class="formula-sym">BMR_adp</span>
-                <span class="formula-name">adapted BMR by t</span>
-                <input type="text" id="formula-bmr-adapt" inputmode="decimal" readonly>
-                <span class="formula-unit">kcal/day</span>
-            </label>
-            <label class="formula-row" title="The plateau once BMR has adapted: the same m∞ = (TEI − A)/B with the BMR half of A and B scaled by (1 − λt). It sits ABOVE the m∞ printed in the trace, and that gap is why a constant-BMR forecast tends to overshoot in practice.">
-                <span class="formula-sym">m∞_adp</span>
-                <span class="formula-name">adapted plateau, and the overshoot it implies</span>
-                <input type="text" id="formula-plateau-adapt" inputmode="decimal" readonly>
-                <!-- `kg` and nothing else, like every other row: the overshoot against m∞,
-                     and the fact that a proportional journey has no plateau to overshoot,
-                     are both said in the substituted trace. Same rule the Δm% verdict
-                     follows — the unit column is a unit. -->
-                <span class="formula-unit">kg</span>
-            </label>
-            <!-- Marks the end of the journey block (t, arrival date, adaptation) before the
-                 glycogen block starts below. -->
-            <hr class="formula-divider">
-            <!-- Glycogen follows the journey block now, straight after LBM up with the
-                 profile, since it reads that same LBM box rather than a flat guess: glycogen
-                 is stored in muscle, not fat, so it has to scale with lean mass, not sit
-                 unrelated to weight/height/sex. Not read by any calorie identity — this is
-                 purely the explanation for why m and m̄ above don't agree from one day to the
-                 next: glycogen stores pull water in with them, so a day of low carbs (or a
-                 big refeed) can move the scale by kilograms with no fat gained or lost at
-                 all. LBM alone overstates it: skeletal muscle is only ~40-50% of LBM (the
-                 rest is water, organs, skin and bone, none of which store meaningful
-                 glycogen), and a published muscle-tissue glycogen density (g/kg wet muscle)
-                 applied straight to LBM comes out roughly double what it should. s and
-                 m_musc below cut LBM down to that muscle share first, so g_musc can be the
-                 real muscle-tissue figure rather than a diluted per-LBM one. Only s, g_musc,
-                 g_liver and the water ratio are editable — same shape as p_min/p_max below. -->
-            <label class="formula-row" title="Skeletal muscle, as a direct share of LBM — not of m̄, since it's a fat-free-mass ratio and m̄ still carries the fat. Skeletal muscle runs roughly 40-50% of lean body mass; the rest of LBM is water, organs, skin and bone, none of which store meaningful glycogen. Higher toward 50% for a more muscular frame, lower toward 40% otherwise.">
-                <span class="formula-sym">s</span>
-                <span class="formula-name">skeletal muscle, share of lean mass</span>
-                <input type="text" id="formula-glycogen-skeletal-frac" inputmode="decimal" value="45">
-                <span class="formula-unit">% of LBM</span>
-            </label>
-            <label class="formula-row" title="LBM × s — the actual skeletal muscle mass the glycogen density below applies to, rather than all of LBM (which also counts water, organs, skin and bone).">
-                <span class="formula-sym">m_musc</span>
-                <span class="formula-name">skeletal muscle mass</span>
-                <input type="text" id="formula-glycogen-muscle" inputmode="decimal" readonly>
-                <span class="formula-unit">kg</span>
-            </label>
-            <label class="formula-row" title="Grams of glycogen per kg of actual muscle tissue — resting muscle glycogen runs roughly 13-15 g/kg wet weight (about 70-85 mmol/kg). This is the muscle-tissue density itself, not diluted across LBM, which is why it's applied to m_musc above rather than to LBM directly.">
-                <span class="formula-sym">g_musc</span>
-                <span class="formula-name">glycogen per kg of muscle mass</span>
-                <input type="text" id="formula-glycogen-per-kg-muscle" inputmode="decimal" value="14">
-                <span class="formula-unit">g/kg muscle</span>
-            </label>
-            <label class="formula-row" title="The liver's own glycogen reserve — roughly constant across adults regardless of muscle mass, commonly cited around 100g.">
-                <span class="formula-sym">g_liver</span>
-                <span class="formula-name">liver glycogen reserve</span>
-                <input type="text" id="formula-glycogen-liver" inputmode="decimal" value="100">
-                <span class="formula-unit">g</span>
-            </label>
-            <label class="formula-row" title="g_musc × m_musc + g_liver. Not editable directly — tune the coefficients above if this doesn't match what you observe.">
-                <span class="formula-sym">m_gly</span>
-                <span class="formula-name">glycogen store, from muscle mass</span>
-                <input type="text" id="formula-glycogen-g" inputmode="decimal" readonly>
-                <span class="formula-unit">g</span>
-            </label>
-            <label class="formula-row" title="Grams of water glycogen holds onto per gram of itself — commonly cited as 3–4. Tune this to whatever ratio makes ΔM_gly below match what you actually see on the scale.">
-                <span class="formula-sym">r</span>
-                <span class="formula-name">water bound per gram of glycogen</span>
-                <input type="text" id="formula-glycogen-water-ratio" inputmode="decimal" value="3">
-                <span class="formula-unit">g H2O / g glycogen</span>
-            </label>
-            <label class="formula-row" title="ΔM_gly = m_gly × (1 + r) — the scale swing glycogen and its bound water can account for on their own. A day-to-day move up to about this size is water and glycogen, not fat; anything consistently larger than it, held over more than a day or two, is the real signal.">
-                <span class="formula-sym">ΔM_gly</span>
-                <span class="formula-name">glycogen + water swing</span>
-                <input type="text" id="formula-glycogen-swing" inputmode="decimal" readonly>
-                <span class="formula-unit">kg</span>
-            </label>
-            <!-- Marks the end of the glycogen block (s…ΔM_gly) before the protein block
-                 starts below. -->
-            <hr class="formula-divider">
-            <!-- The protein block closes the list, and reads top to bottom as one
-                 derivation: the p_min/p_max rule you set, applied to LBM (up with the
-                 profile now — see its own comment), then the grams that rule produces. Only
-                 the rule is editable — no "Solve for" mode turns the other two into inputs,
-                 since no calorie identity involves protein, so they compute in all five. -->
-            <!-- The rule, immediately above the grams it produces: p_min/p_max used to sit
-                 with the other editable knobs several rows up, which split the protein block
-                 in two and left `p × LBM = P` as a multiplication whose two halves were
-                 nowhere near each other. Editable among readonly rows is the point — LBM
-                 above and the two P rows below are all derived, and these are the only part
-                 of the band you set. -->
-            <label class="formula-row">
-                <span class="formula-sym">p_min</span>
-                <span class="formula-name">protein floor per kg of lean mass</span>
-                <input type="text" id="formula-protein-per-kg-min" inputmode="decimal">
-                <span class="formula-unit">g/kg LBM/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">p_max</span>
-                <span class="formula-name">protein ceiling per kg of lean mass</span>
-                <input type="text" id="formula-protein-per-kg-max" inputmode="decimal">
-                <span class="formula-unit">g/kg LBM/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">P_min</span>
-                <span class="formula-name">desired daily protein, lower end</span>
-                <input type="text" id="formula-protein-min" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">P_max</span>
-                <span class="formula-name">desired daily protein, upper end</span>
-                <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <!-- Marks the end of the protein block (P_min, P_max) before the fiber block
-                 starts below. -->
-            <hr class="formula-divider">
-            <!-- The fiber band follows protein: a floor scaled to how much you eat (14 g per
-                 1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body weight
-                 (0.5 g/kg) — two different bases, unlike protein's single LBM, so both
-                 coefficients are editable and neither rides on a box the other computes.
-                 Named b_min/b_max rather than f_min/f_max: TEF's own coefficient above is
-                 already `f`, and the two would otherwise share a letter. -->
-            <label class="formula-row">
-                <span class="formula-sym">b_min</span>
-                <span class="formula-name">dietary fiber floor per 1,000 kcal of intake</span>
-                <input type="text" id="formula-fiber-per-1000kcal-min" inputmode="decimal">
-                <span class="formula-unit">g/1,000 kcal</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">b_max</span>
-                <span class="formula-name">dietary fiber ceiling per kg of body weight</span>
-                <input type="text" id="formula-fiber-per-kg-max" inputmode="decimal">
-                <span class="formula-unit">g/kg/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">F_min</span>
-                <span class="formula-name">desired daily dietary fiber, lower end</span>
-                <input type="text" id="formula-fiber-min" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">F_max</span>
-                <span class="formula-name">desired daily dietary fiber, upper end</span>
-                <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <!-- Marks the end of the fiber block (F_min, F_max) before the fat block
-                 starts below. -->
-            <hr class="formula-divider">
-            <!-- The fat band follows fiber, same two-different-bases shape but both ends
-                 scaled off TEI instead of one off body weight: 20-35% of total energy from
-                 fat is the Institute of Medicine's Acceptable Macronutrient Distribution
-                 Range for adults (Dietary Reference Intakes for Energy, Carbohydrate, Fiber,
-                 Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also the
-                 range the USDA Dietary Guidelines for Americans carries forward — not the
-                 user's own guessed 25%, which sits inside this band rather than defining it.
-                 9 kcal/g is fat's fixed energy density (Atwater), not a personal parameter,
-                 so only the two percentages are editable. -->
-            <label class="formula-row">
-                <span class="formula-sym">k_min</span>
-                <span class="formula-name">fat floor, share of intake calories</span>
-                <input type="text" id="formula-fat-pct-min" inputmode="decimal">
-                <span class="formula-unit">% of TEI</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">k_max</span>
-                <span class="formula-name">fat ceiling, share of intake calories</span>
-                <input type="text" id="formula-fat-pct-max" inputmode="decimal">
-                <span class="formula-unit">% of TEI</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">G_min</span>
-                <span class="formula-name">desired daily fat, lower end</span>
-                <input type="text" id="formula-fat-min" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">G_max</span>
-                <span class="formula-name">desired daily fat, upper end</span>
-                <input type="text" id="formula-fat-max" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <!-- Marks the end of the fat block (G_min, G_max) before the carb block
-                 starts below. -->
-            <hr class="formula-divider">
-            <!-- The carb band follows fat, same shape again — both ends a share of TEI:
-                 45-65% of total energy from carbohydrate is the same IOM AMDR report's range
-                 for carbohydrate (Dietary Reference Intakes for Energy, Carbohydrate, Fiber,
-                 Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also carried
-                 forward by the USDA Dietary Guidelines for Americans. Too much carbohydrate
-                 at once — well above this ceiling — also means more glycogen stored (see
-                 m_gly above), which binds its own water; the ceiling here is about total
-                 energy balance, not that water-retention effect directly, but staying inside
-                 it keeps glycogen swings from compounding into a genuine overconsumption.
-                 4 kcal/g is carbohydrate's fixed energy density (Atwater), not a personal
-                 parameter, so only the two percentages are editable. -->
-            <label class="formula-row">
-                <span class="formula-sym">q_min</span>
-                <span class="formula-name">carbohydrate floor, share of intake calories</span>
-                <input type="text" id="formula-carb-pct-min" inputmode="decimal">
-                <span class="formula-unit">% of TEI</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">q_max</span>
-                <span class="formula-name">carbohydrate ceiling, share of intake calories</span>
-                <input type="text" id="formula-carb-pct-max" inputmode="decimal">
-                <span class="formula-unit">% of TEI</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">C_min</span>
-                <span class="formula-name">desired daily carbohydrate, lower end</span>
-                <input type="text" id="formula-carb-min" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-            <label class="formula-row">
-                <span class="formula-sym">C_max</span>
-                <span class="formula-name">desired daily carbohydrate, upper end</span>
-                <input type="text" id="formula-carb-max" inputmode="decimal" readonly>
-                <span class="formula-unit">g/day</span>
-            </label>
-        </div>
-
-        <!-- LBM, P_min and P_max trace their arithmetic here alongside every other
-             substituted term, rather than in a block of their own — appended in all four
-             modes by renderFormulaSubstituted itself, since no calorie identity involves
-             protein and a failed calorie solve has no bearing on them. -->
-        <div id="formula-substituted" class="formula-substituted"></div>
-
-        <fieldset class="formula-solve-for formula-pin-mode">
-            <legend>Which stays fixed as you lose weight</legend>
-            <label title="Holds your desired fat loss. Every new weigh-in recalculates the daily intake that delivers it, so the calorie number falls as you get lighter and the pace stays on plan.">
-                <input type="radio" name="formula-pin-mode" value="deficit" checked>
-                Pin desired deficit/fat loss
-            </label>
-            <label title="Holds this daily intake. Maintenance falls as you get lighter, so the deficit shrinks and fat loss decelerates — the constant-intake journey the forecast above solves for.">
-                <input type="radio" name="formula-pin-mode" value="intake">
-                Pin desired daily intake
-            </label>
-            <label title="Holds the fat loss at a percentage of your body mass, so the kilograms per week shrink as you do and every weigh-in recalculates the intake. The gentlest of the three, and the only one with no plateau to fall short of — a constant share of a falling mass always reaches it.">
-                <input type="radio" name="formula-pin-mode" value="pct">
-                Pin desired fat-loss %
-            </label>
-        </fieldset>
-
-        <fieldset class="formula-solve-for formula-activity-pin-mode">
-            <legend>Which stays fixed on the desired activity as your weight changes</legend>
-            <label title="Holds τ, the desired activity minutes. The calorie burn it implies falls as you get lighter, since the same minutes move less body mass.">
-                <input type="radio" name="formula-activity-pin-mode" value="time" checked>
-                Pin desired activity time
-            </label>
-            <label title="Holds this calorie burn. The minutes needed to reach it rise as you get lighter, since it takes more time to burn the same calories at a lower body mass.">
-                <input type="radio" name="formula-activity-pin-mode" value="calorie">
-                Pin desired calorie burn
-            </label>
-        </fieldset>
-
-        <fieldset class="formula-solve-for formula-bmr-basis">
-            <legend>Which BMR every deficit and desired calorie figure runs on, everywhere in the app</legend>
-            <label title="BMR as-is, with no adaptation discount. The behaviour every existing sheet already has.">
-                <input type="radio" name="formula-bmr-basis" value="bmr" checked>
-                Plain BMR
-            </label>
-            <label title="BMR discounted by days actually elapsed since your first logged weigh-in (daysSinceFirstWeighIn, wellness-math.js) — how adapted metabolism realistically is by now, not a flat guess. Switches the Status card's D/Δm, the Calorie Balance chart's per-day Maintenance, the desired calorie intake everywhere it's shown, and Physique's own maintenance figure, all at once.">
-                <input type="radio" name="formula-bmr-basis" value="bmr_adp">
-                BMR_adp
-            </label>
-            <label title="BMR back-solved from your own logged data (the Calibrate form, beside Tune) instead of the height/age/sex equation — shifts the equation's whole line up or down to match what was actually measured, keeping its slope. Falls back to Plain BMR until a calibration has been saved.">
-                <input type="radio" name="formula-bmr-basis" value="bmr_cal">
-                BMR_cal
-            </label>
-        </fieldset>
-
-        <p class="hint" id="formula-profile-note"></p>
-        <p id="formula-status" class="status" hidden></p>
 
         <div class="modal-actions">
-            <button type="button" id="formula-reset-btn" class="btn">Reset</button>
-            <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
-            <button type="button" id="formula-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+            <button type="button" id="physique-micro-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         </div>
     </div>
 </div>
@@ -2246,11 +2260,11 @@
 
         <div class="app-form">
             <div class="form-row">
-                <label>Start date
-                    <input type="date" id="bmr-calibration-start-date">
+                <label title="How many back-to-back periods to average, ending yesterday — 3 periods of 10 days covers the last 30 days">Number of periods
+                    <input type="text" id="bmr-calibration-period-count" inputmode="numeric" value="3">
                 </label>
-                <label>Chunk size (days)
-                    <input type="text" id="bmr-calibration-chunk-days" inputmode="numeric" value="7">
+                <label title="How many days each period averages">Period length (days)
+                    <input type="text" id="bmr-calibration-period-days" inputmode="numeric" value="10">
                 </label>
             </div>
         </div>
@@ -2281,7 +2295,7 @@
                     <th>Period</th>
                     <th title="Body mass (kg) — smoothed mass ending this period's last day, the mass this period's own equation BMR is evaluated at">m</th>
                     <th title="Change in body mass over this period (this period's mass minus the previous one's) — negative means mass lost, same sign convention as the Status card's own Δm">Δm</th>
-                    <th title="Δm × 7700 / chunk size — this period's mass change, as a daily fat-equivalent energy rate. MEASURED, independent of the equation">ΔM (kcal)</th>
+                    <th title="Δm × 7700 / period length — this period's mass change, as a daily fat-equivalent energy rate. MEASURED, independent of the equation">ΔM (kcal)</th>
                     <th title="Average of the Daily table's own D over this period — what the CURRENT equation BMR implies happened, not independent of it">D</th>
                     <th title="D minus ΔM — the gap between what the equation implies and what was actually measured. 0 means the equation already agrees with reality; the per-period figures here are what the final, recency-weighted Offset is built from">Offset</th>
                     <th title="Linear recency weight — 0.1 for the oldest period in the window, 1.0 for the newest, so months of history can be included without outvoting the most recent one">Weight</th>
@@ -2297,6 +2311,7 @@
 
         <div class="modal-actions">
             <button type="button" id="bmr-calibration-refresh-btn" class="btn">Recalculate</button>
+            <button type="button" id="bmr-calibration-update-btn" class="btn" title="Save this Number of periods / Period length and recompute BMR_cal (and every stored BMR figure) for every day in the Physique sheet">Update</button>
             <button type="button" id="bmr-calibration-save-btn" class="btn btn-primary" disabled>Save</button>
             <button type="button" id="bmr-calibration-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         </div>
@@ -2662,5 +2677,6 @@
 <script src="assets/script/financial-insight.js"></script>
 <script src="assets/script/gate.js"></script>
 <script src="assets/script/app.js"></script>
+<script src="assets/script/router.js"></script>
 </body>
 </html>

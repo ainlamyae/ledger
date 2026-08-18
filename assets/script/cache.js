@@ -14,8 +14,19 @@ function getCached(key, ttlMs = CACHE_TTL_MS) {
   }
 }
 
+// A write failure here (most commonly QuotaExceededError — a Nutrition row's
+// banked Micronutrients JSON can be large, and enough of them blow past
+// localStorage's ~5-10MB origin quota) must never break the caller: every
+// call site already has the real data in memory from the fetch that just
+// succeeded, and was only ever going to use this as a warm-start for next
+// time. Losing that warm start is fine; surfacing "Failed to load data" for
+// a load that actually succeeded is not.
 function setCached(key, data) {
-  localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ data, timestamp: Date.now() }));
+  try {
+    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch (err) {
+    console.warn(`setCached(${key}) skipped — ${err.message}`);
+  }
 }
 
 function clearCache() {

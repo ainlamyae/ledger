@@ -17,7 +17,7 @@
 const INSIGHT_MODES = {
   wellness: {
     label: 'Wellness',
-    hint: 'A read on your recent trends vs. the previous period — grounded in your body mass trajectory, targets, and logging.',
+    hint: '',
     questionPlaceholder: 'e.g. Should I prioritize sleep or protein right now?',
     previewId: 'insight-preview-text',
     gather: (from, to) => gatherInsightMetrics(from, to),
@@ -31,7 +31,7 @@ const INSIGHT_MODES = {
   },
   food: {
     label: 'Food',
-    hint: 'A read on possible nutrient gaps in your recent food.',
+    hint: '',
     questionPlaceholder: 'e.g. Which vitamins or minerals might be missing?',
     previewId: 'insight-preview-food',
     gather: (from, to) => aggregateFoodIntake(from, to),
@@ -47,7 +47,7 @@ const INSIGHT_MODES = {
   },
   micronutrients: {
     label: 'Micronutrients',
-    hint: 'A read on real, USDA-measured vitamin/mineral totals from ingredients you\'ve priced with Pull Micronutrients — how much you\'re actually getting, and where the gaps are.',
+    hint: '',
     questionPlaceholder: 'e.g. Is this amount enough? What is missing?',
     previewId: 'insight-preview-micronutrients',
     gather: (from, to) => aggregateMicronutrientIntake(from, to),
@@ -64,7 +64,7 @@ const INSIGHT_MODES = {
   },
   activity: {
     label: 'Activity',
-    hint: 'A read on your workout performance — consistency, volume trend, and which muscle groups need attention.',
+    hint: '',
     questionPlaceholder: 'e.g. Which muscle group should I prioritize next?',
     previewId: 'insight-preview-text',
     gather: (from, to) => gatherActivityInsightMetrics(from, to),
@@ -78,7 +78,7 @@ const INSIGHT_MODES = {
   },
   protein: {
     label: 'Protein Sources',
-    hint: 'A read on how well your actual eating matched your protein-source rotation targets.',
+    hint: '',
     questionPlaceholder: 'e.g. Which source should I prioritize next?',
     previewId: 'insight-preview-text',
     // computeProteinRotationRows is protein-rotation.js's — same rows the
@@ -95,7 +95,7 @@ const INSIGHT_MODES = {
   },
   plan: {
     label: 'Health Plan',
-    hint: 'A read on the plan itself — is the target intake, deficit, activity and protein band feasible, and does your logging show it being followed?',
+    hint: '',
     questionPlaceholder: 'e.g. Is the deficit too aggressive for this timeline?',
     previewId: 'insight-preview-text',
     // The only mode whose data is the app's own SETTINGS rather than the day log —

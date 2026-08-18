@@ -474,7 +474,10 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     return { name, amount, source, density, itemCalories, itemProtein, noteLine, newRow };
   }));
   const calories = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemCalories, 0));
-  const protein = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemProtein, 0));
+  // Same 1-decimal precision as each row's own protein figure (below) — rounding
+  // this to a whole gram instead, as it used to, made the Total disagree with
+  // what you'd get by hand-adding the rows above it.
+  const protein = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemProtein, 0) * 10) / 10;
   console.debug('[calc] total kcal:', calories, 'total protein g:', protein);
 
   // Highest-calorie ingredient first — both the breakdown table and the
@@ -650,7 +653,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(row.name),
       makeCell(row.amount),
       makeCell(String(row.calories)),
-      makeCell(String(row.protein)),
+      makeCell(row.protein.toFixed(1)),
       densityCell(row.density),
       sourceCell(row, breakdown, totalCalories, totalProtein, target),
     );
@@ -663,7 +666,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
     makeCell('Total'),
     makeCell(''),
     makeCell(String(totalCalories)),
-    makeCell(String(totalProtein)),
+    makeCell(totalProtein.toFixed(1)),
     makeCell(''),
     makeCell(''),
   );

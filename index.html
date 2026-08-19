@@ -1393,8 +1393,8 @@
             <label>End
                 <input type="time" id="timesheet-end">
             </label>
-            <label>Break (minutes)
-                <input type="number" id="timesheet-break" min="0" step="1" value="0">
+            <label>Break
+                <input type="text" id="timesheet-break" inputmode="numeric" pattern="[0-9]{1,2}:[0-5][0-9]" placeholder="HH:mm" value="00:00">
             </label>
             <p>Log Time: <span id="timesheet-live-duration">—</span></p>
             <label>Task

@@ -114,7 +114,15 @@ function aggregateMicronutrientIntake(from, to) {
         severity: target ? nutrientGapSeverity(target.kind, perDay, target.amount) : null,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    // Nutrients with a known target lead (alphabetical), then everything
+    // without one (alphabetical) — so the rows worth judging against a goal
+    // aren't scattered through dozens of reference-only ones.
+    .sort((a, b) => {
+      const aHasIdeal = a.ideal !== null;
+      const bHasIdeal = b.ideal !== null;
+      if (aHasIdeal !== bHasIdeal) return aHasIdeal ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
 
   return {
     nutrients,

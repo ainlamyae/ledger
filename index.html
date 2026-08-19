@@ -1388,13 +1388,13 @@
                 Holiday / day off
             </label>
             <label>Start
-                <input type="time" id="timesheet-start">
+                <input type="text" id="timesheet-start" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm">
             </label>
             <label>End
-                <input type="time" id="timesheet-end">
+                <input type="text" id="timesheet-end" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm">
             </label>
             <label>Break
-                <input type="text" id="timesheet-break" inputmode="numeric" pattern="[0-9]{1,2}:[0-5][0-9]" placeholder="HH:mm" value="00:00">
+                <input type="text" id="timesheet-break" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm" value="00:00">
             </label>
             <p>Log Time: <span id="timesheet-live-duration">—</span></p>
             <label>Task
@@ -1893,16 +1893,16 @@
                 </label>
             </div>
             <div class="form-row">
+                <label>Weight
+                    <input type="text" id="activity-weight" placeholder="e.g. 30kg or 60lb">
+                </label>
                 <label>MET
                     <input type="text" id="activity-met" placeholder="e.g. 5 — blank uses the default">
                 </label>
-                <label>Image
-                    <input type="text" id="activity-image" placeholder="e.g. assets/images/activities/seated-row.gif">
-                </label>
             </div>
-
-            <p class="hint">Name is the join key: it has to match the workout note lines exactly, so renaming an activity here stops older logged lines being recognised as this movement. Unit is what tells a hold (<code>3 x 45 sec</code>) from reps (<code>3 x 15</code>), a step count from a minute count.</p>
-            <p class="hint">MET is the intensity the calorie burn is priced at. Leave it blank and the general fallback is used — the burn still works, just less specifically.</p>
+            <label>Image
+                <input type="text" id="activity-image" placeholder="e.g. assets/images/activities/seated-row.gif">
+            </label>
 
             <p id="activity-form-error" class="status" hidden></p>
 

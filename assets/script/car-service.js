@@ -14,18 +14,18 @@ const CAR_ODOMETER_PATTERN = /@\s*([\d,.]+)\s*km/i;
 
 // Description keyword → service type. First match wins, so specific before general.
 const CAR_SERVICE_TYPES = [
-  { type: 'oil', label: 'Oil Change', match: /oil/i, color: '#16a34a' },
-  { type: 'changeover', label: 'Tire Changeover', match: /changeover|winter tire|tire swap/i, color: '#3b82f6' },
-  { type: 'rust', label: 'Rust Protection', match: /corrosion|undercarriage|rust/i, color: '#d97706' },
-  { type: 'rotation', label: 'Tire Rotation + Inspection', match: /rotation/i, color: '#0891b2' },
-  { type: 'cabin', label: 'Cabin Air Filter', match: /cabin/i, color: '#7c3aed' },
-  { type: 'engineAir', label: 'Engine Air Filter', match: /engine air|air filter/i, color: '#7c3aed' },
-  { type: 'brakeFluid', label: 'Brake Fluid', match: /brake fluid/i, color: '#dc2626' },
-  { type: 'service3', label: 'Brake Measure, Valve & Battery Check', match: /brake|valve|battery/i, color: '#dc2626' },
-  { type: 'coolant', label: 'Coolant', match: /coolant/i, color: '#0891b2' },
-  { type: 'sparkPlugs', label: 'Spark Plugs', match: /spark/i, color: '#d97706' },
+  { type: 'oil', short: 'Oil', label: 'Oil Change', match: /oil/i, color: '#16a34a' },
+  { type: 'changeover', short: 'Tires', label: 'Tire Changeover', match: /changeover|winter tire|tire swap/i, color: '#3b82f6' },
+  { type: 'rust', short: 'Rust', label: 'Rust Protection', match: /corrosion|undercarriage|rust/i, color: '#d97706' },
+  { type: 'rotation', short: 'Rotation', label: 'Tire Rotation + Inspection', match: /rotation/i, color: '#0891b2' },
+  { type: 'cabin', short: 'Filter', label: 'Cabin Air Filter', match: /cabin/i, color: '#7c3aed' },
+  { type: 'engineAir', short: 'Filter', label: 'Engine Air Filter', match: /engine air|air filter/i, color: '#7c3aed' },
+  { type: 'brakeFluid', short: 'Brake Fluid', label: 'Brake Fluid', match: /brake fluid/i, color: '#dc2626' },
+  { type: 'service3', short: 'Brakes', label: 'Brake Measure, Valve & Battery Check', match: /brake|valve|battery/i, color: '#dc2626' },
+  { type: 'coolant', short: 'Coolant', label: 'Coolant', match: /coolant/i, color: '#0891b2' },
+  { type: 'sparkPlugs', short: 'Plugs', label: 'Spark Plugs', match: /spark/i, color: '#d97706' },
 ];
-const CAR_OTHER_TYPE = { type: 'other', label: 'Other', color: '#9ca3af' };
+const CAR_OTHER_TYPE = { type: 'other', short: 'Service', label: 'Other', color: '#9ca3af' };
 
 // What gets predicted. `resetBy` lists the types that also count as having done it.
 const CAR_SERVICE_RULES = [
@@ -40,6 +40,9 @@ const CAR_SERVICE_RULES = [
   { type: 'rust', everyDays: 365, basis: 'yearly — your own history' },
   { type: 'changeover', seasonal: true },
 ];
+
+// A service due within this many days (or overdue) flags the heading and notifies.
+const CAR_REMINDER_DAYS = 30;
 
 // Predictions further out than this stay in the table but off the chart.
 const CAR_CHART_HORIZON_DAYS = 730;
@@ -321,6 +324,31 @@ function renderCarServiceChart(records, predictions, fit, today) {
   renderCategoryLegend('car-service-legend', legendTypes.map((type) => ({ name: carTypeInfo(type).label, color: carTypeInfo(type).color })));
 }
 
+// The heading flag (like Account's "Acct>Txn") and a once-a-day Chrome notification
+// (like Work Time's), for every service due within CAR_REMINDER_DAYS or overdue.
+function updateCarServiceReminder(predictions, today) {
+  const flag = document.getElementById('car-service-flag');
+  const due = predictions.filter((p) => carDaysBetween(today, p.date) <= CAR_REMINDER_DAYS);
+  flag.hidden = due.length === 0;
+  if (!due.length) {
+    flag.textContent = '';
+    flag.title = '';
+    return;
+  }
+
+  const days = carDaysBetween(today, due[0].date);
+  const names = [...new Set(due.map((p) => carTypeInfo(p.type).short))].join('+');
+  flag.textContent = days < 0 ? `${names} overdue` : `${names} ${days}d`;
+  const detail = due.map((p) => `${p.label} (${p.date})`).join(', ');
+  flag.title = `Car service due: ${detail}`;
+
+  if ('Notification' in window && Notification.permission === 'granted'
+    && localStorage.getItem('ledger_last_car_service_notified') !== today) {
+    new Notification('Ledger', { body: days < 0 ? `Car service overdue: ${detail}` : `Car service in ${days} days: ${detail}` });
+    localStorage.setItem('ledger_last_car_service_notified', today);
+  }
+}
+
 // Called from refreshTransactions (transactions.js) whenever the rows change.
 function renderCarService() {
   if (!document.getElementById('car-service-body')) return;
@@ -331,6 +359,7 @@ function renderCarService() {
     if (carServiceChart) carServiceChart.destroy();
     carServiceChart = null;
     summary.textContent = '';
+    updateCarServiceReminder([], isoFromDate(new Date()));
     return;
   }
   const today = isoFromDate(new Date());
@@ -338,6 +367,7 @@ function renderCarService() {
   const predictions = predictCarServices(records, fit, today);
   renderCarServiceTable(records, predictions);
   renderCarServiceChart(records, predictions, fit, today);
+  updateCarServiceReminder(predictions, today);
   const perYear = carKmText(fit.kmPerDay * 365);
   summary.textContent = `Odometer trend: ${carKmText(fit.kmPerDay)} km/day (${perYear} km/year), from ${records.length} readings.`;
 }

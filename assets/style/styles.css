@@ -1053,7 +1053,8 @@ td {
 /* One line per week in the Physique table (renderPhysiqueList, physique.js),
    plus one line under the Pattern rows that always float to the top —
    both mark "a new group of rows starts here" the same way. */
-#physique-table tr.physique-week-start td {
+#physique-table tr.physique-week-start td,
+#car-service-body tr.car-service-history-start td {
     border-top: 2px solid var(--color-text);
 }
 
@@ -1115,6 +1116,12 @@ td {
    those are the genuinely variable-length columns. */
 #nutrition-table th:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)),
 #nutrition-table td:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)) {
+    white-space: nowrap;
+}
+
+/* Car Service: every cell on one line; .table-responsive scrolls sideways instead. */
+#car-service-table th,
+#car-service-table td {
     white-space: nowrap;
 }
 

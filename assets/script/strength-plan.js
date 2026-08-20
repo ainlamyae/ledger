@@ -1,6 +1,6 @@
 // The Activity Plan panel's tables (Leg/Push/Pull strength days, plus the
 // NEAT table below them) each tick off what was actually done, then hand a
-// computed duration + workout lines straight to the Physique "Log a Day"
+// computed duration + workout lines straight to the Physique "Log a Physique"
 // modal (physique.js) — this module never writes to the sheet itself, it
 // only pre-fills that modal's fields and lets the user review/edit before
 // saving, same as any other manual entry.

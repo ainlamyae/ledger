@@ -935,7 +935,7 @@
 
         <div class="panel">
             <div class="panel-header">
-                <h2>Work</h2>
+                <h2>Work Time</h2>
                 <!-- One word, like every other panel's action button. Which day and what
                      it logs is the modal's job to say; the tooltip carries the long form. -->
                 <button id="log-today-btn" class="btn btn-primary panel-header-btn" title="Log time for a day">Log</button>
@@ -1014,7 +1014,7 @@
                 <button id="add-travel-btn" class="btn btn-primary panel-header-btn" title="Log a travel entry">Log</button>
             </div>
 
-            <!-- What used to be a separate "Travel Insights" panel, same as Work
+            <!-- What used to be a separate "Travel Insights" panel, same as Work Time
                  Analytics above: both views read the same rows as the table below. -->
             <div class="donut-grid travel-insights-grid">
                 <div class="donut-item">
@@ -1373,7 +1373,7 @@
 <div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
     <div class="modal-card">
         <button type="button" id="timesheet-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
-        <h2 id="timesheet-modal-title">Log Time</h2>
+        <h2 id="timesheet-modal-title">Log a Work Time</h2>
 
         <form id="timesheet-form" class="app-form">
             <label>Company
@@ -1416,7 +1416,7 @@
 <div id="physique-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="physique-modal-title" hidden>
     <div class="modal-card">
         <button type="button" id="physique-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
-        <h2 id="physique-modal-title">Log a Day</h2>
+        <h2 id="physique-modal-title">Log a Physique</h2>
 
         <form id="physique-form" class="app-form">
             <label class="checkbox-inline-label" title="Reusable pattern: no date — always listed at the top, excluded from every chart and Insight mode">
@@ -2002,7 +2002,6 @@
                 <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
             </label>
 
-            <p class="hint">Amount needs either a mass in grams somewhere in it (e.g. "100g" or "1 scoop (32g)") or, for a food that's naturally counted in whole pieces, a leading count (e.g. "1 rice cake", "2 eggs") — either way Calculate can scale it to whatever quantity you actually logged.</p>
             <div id="nutrition-usda-results" class="usda-results" hidden></div>
 
             <details id="nutrition-micronutrients-details" hidden>
@@ -2103,7 +2102,7 @@
 <div id="travel-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="travel-modal-title" hidden>
     <div class="modal-card">
         <button type="button" id="travel-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
-        <h2 id="travel-modal-title">Log a Travel</h2>
+        <h2 id="travel-modal-title">Log a Travel Entry</h2>
 
         <form id="travel-form" class="app-form">
             <label>Country, City

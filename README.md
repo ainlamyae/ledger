@@ -59,13 +59,13 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Collapsible panels** — collapsed by default; collapsed content gets `inert`, so it leaves the a11y tree, tab order and find-in-page.
 - **Stacking order is explicit**: page chrome 0-1, sticky `header` 10, dropdowns hanging off it 20, landing tooltips 50, the floating dark-mode & privacy stack 90, **modals 100**, and toasts 110 so a countdown to undo something stays readable over an open form. The floating stack sits *below* a modal for the same reason the header does — on a phone it covered the bottom-left corner of an open form, and a toggle that's one Escape away isn't worth a field you can't reach. A modal with no `z-index` of its own lost to the header — both are positioned, so the header's 10 beat the modal's `auto` and painted over the top of a centred card, which is where `.modal-close` sits. Any long form (the card maxes at `100vh − 4rem`, so its top lands ~32px down while the header is taller than that) became uncloseable.
 - **A panel's primary action sits on its heading line** (`.panel-header`), not in a bar under it. `.panel-header` is exempt from the collapse rules, so the action stays reachable while the panel is shut. Bars under the heading are kept for the cases that aren't one primary action: bulk bars that appear on selection, secondary sets (Export CSV, the contact exporters), and a submit that belongs below the thing it submits (each **Send to AI**).
-- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work, Travel, Application and Activity all read **Log**; Nutrition, Account, Contact, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
+- **Those buttons are one word — `Log` or `Add`** — with the long phrasing moved to the `title` tooltip: Physique, Transaction, Work Time, Travel, Application and Activity all read **Log**; Nutrition, Account, Contact, Settings and Activity's catalogue button read **Add**. Which thing gets logged is the panel's own heading, and the modal that opens says it again in full.
   - Driven by **Activity**, the one panel carrying three of them (**Add**, **Guide**, **Log**): "Activity Plan" + "Add Activity" + "Instruction" + "Log a Workout" could not share a phone's heading line, and `.panel-header` wraps rather than squeezing the heading, so the labels were what had to give.
   - Modal `<h2>`s keep the long form (*Log a Transaction*, *Add Ingredient*) — a heading has the width, and it's where you land after clicking.
   - Empty-state hints quote the new label (`click "Log" in the panel heading`), so no text in the app names a button that no longer exists.
   - The one exception is the timesheet **reminder banner**'s Log Time — a standalone CTA in a sentence, not a crowded heading.
 - **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Account**, *Contact List* → **Contact**, *Accounts* → **Account**, *Health Indicators* → **Health Indicator**, *Financial Indicators* → **Financial Indicator**. The sheet tabs now read the same way (`Transaction`, `Account`, `Nutrition`, `Activity`, `Statement`, `Breakdown`, …) — but that's a spreadsheet-side choice, not something the app depends on: **every tab name lives in `CONFIG.SHEETS` (`config.js`) and nowhere else**, so renaming a tab is one line there. Labels that have to agree with a tab name (the breakdown table's "from your own table" source) are read off the same object rather than spelled out again.
-- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
+- **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work Time, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
 - **Panel groups** — Health, Finance, Other. Each is a page of its own at `/health/`, `/finance/` and `/other/`, and the nav links are those addresses rather than in-page anchors, so a group can be linked to, bookmarked and refreshed on its own (see [Section pages](#section-pages)). The logo is the way back to all three at once.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
@@ -120,11 +120,11 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Time Tracker
 
-- **Log Time** modal — Company, Start/End, Break, optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
+- **Log a Work Time** modal — Company, Start/End, Break, optional Task; live duration preview. The modal keeps the long name; the button that opens it is the app-wide one-word **Log**.
   - Break is an `HH:mm` duration typed into a plain text input (`pattern="[0-9]{1,2}:[0-5][0-9]"`), not a clock time — a `type="time"` control (still used for Start/End) would force an AM/PM time-of-day picker onto it. `parseBreakMinutes` reads the typed value back into minutes for the live duration preview, and `minutesToTimeInput` normalizes it back to an `"H:MM"` string on save, since some Break columns carry pre-existing Excel-style duration formatting that reinterprets a raw integer as a day count.
 - Company autocompletes and defaults to the most recently logged one.
 - Reminder banner on an unlogged weekday, scoped to your current company; opt-in OS notification fires once per day.
-- One **Work** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
+- One **Work Time** panel holds the lot, charts above the table — they read the same logged hours, so they collapse together rather than sitting in a separate panel:
   - Arrival, Departure and Hours Worked histograms with normal-curve overlays, plus Daily Hours Average by period.
   - **Overtime summary** — net time beyond an 8h/day pace, broken out Total/Year/Month/Week.
   - The table itself — date range, sortable, computed Duration, inline edit, paginated.
@@ -266,7 +266,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 ### Health — Physique
 
 - One row per day. Filterable/sortable table (search, date range), paginated; add/edit/delete/duplicate.
-- **Log a Day** sits in the panel heading — every panel's primary action does now (`.panel-header`), which also keeps it reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
+- **Log a Physique** sits in the panel heading — every panel's primary action does now (`.panel-header`), which also keeps it reachable while the panel is collapsed; **Pattern** saves a dateless template that 📋 Duplicate turns into a real day.
 - **Calculate** in the form fills Breakdown / Calories In / Protein In from Consumption and Activity Duration / Calories Out from Workout — all four of which are hidden fields, read instead off the Total row of the table under each of the two text areas.
 - Form layout: Date + Body Mass share a row, Bedtime + Wake-up Time the next. The pairs use `minmax(0, 1fr)` columns and the date/time inputs drop their native appearance — a bare `1fr` floors a track at its content's min-content width, and iOS Safari otherwise sizes a picker to its own content and ignores a smaller `width: 100%`, either of which leaves the plain text box beside it looking narrower.
 - **Saving onto a day already logged merges into it** rather than being refused: the first Save folds that row into the form, the second commits. Details under `Physique` below.
@@ -295,8 +295,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row a "Done" checkbox.
 - **All seven tables are one grid.** Six columns each — a NEAT row carries an empty Rest cell — with the five right-hand columns pinned to the same widths, so Muscle Group, Sets x Reps, Rest, Done and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~386px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
 - **Muscle Group** is its own column, between the exercise name and Sets x Reps/Amount — straight from the `Activity` sheet's own column, the same source the Instruction modal and the neglected-muscle Activity Insight already read.
-- **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover. The **Physique** and **Work** tables tint today's row the same green from the same declaration (`.workout-row-logged > td, .today-row > td`): in all three places it means "this is the row today's logging lands on", and two nearly-identical greens would read as a mistake.
-  - In Work it's applied outside the weekend/holiday/no-entry chain, since today can also be a weekend or a holiday. Today's tint is on the cells and theirs is on the row, so today's green paints over while their muted text colour survives.
+- **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover. The **Physique** and **Work Time** tables tint today's row the same green from the same declaration (`.workout-row-logged > td, .today-row > td`): in all three places it means "this is the row today's logging lands on", and two nearly-identical greens would read as a mistake.
+  - In Work Time it's applied outside the weekend/holiday/no-entry chain, since today can also be a weekend or a holiday. Today's tint is on the cells and theirs is on the row, so today's green paints over while their muted text colour survives.
 - **Log sends only what's newly ticked**, and extends today's entry instead of opening a second row.
   - The button reads "Log More" once something is already logged.
   - Free text already in the note is preserved; the description re-derives from everything in the session.
@@ -444,7 +444,7 @@ flowchart TD
     Idle --> CSVFlow["CSV Import (Transactions) /<br/>Export (Transactions, Contacts)"]
     CSVFlow --> CSVWork["Import: parse + appendValues rows<br/>Export: filter in-memory list →<br/>client-built CSV → browser download<br/>(no server round trip)"] --> Idle
 
-    Idle --> TSFlow["Time Tracker: 'Log a Day'"]
+    Idle --> TSFlow["Time Tracker: 'Log a Work Time'"]
     TSFlow --> TSWrite["backfillMissingDates() fills any<br/>gap, then appendValues/updateValues<br/>the logged day"]
     TSWrite --> TSReminder["checkTimesheetReminder() re-evaluates<br/>the banner, scoped to whichever<br/>company was last logged on/before today"]
     TSReminder --> Idle
@@ -508,7 +508,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 14 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
 | 15 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
 | 16 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
-| 17 | `timesheet.js` | Work panel, holiday/missed detection, analytics data, reminder banner |
+| 17 | `timesheet.js` | Work Time panel, holiday/missed detection, analytics data, reminder banner |
 | 18 | `csv.js` | CSV import, advanced filter engine, download helper |
 | 19 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
 | 20 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |

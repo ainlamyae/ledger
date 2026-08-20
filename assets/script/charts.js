@@ -3604,8 +3604,8 @@ function renderWellnessEnergyBalanceChart(entries) {
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) {
                 lines.push(`7-Day Average: ${withExplicitSign(Math.round(weeklyAvg[i]))} kcal`);
-                const weeklyMassG = Math.round((weeklyAvg[i] / GENERIC_KCAL_PER_KG_FAT) * 1000);
-                lines.push(`7-Day Expected Fatloss: ${withExplicitSign(weeklyMassG)} g`);
+                const weeklyMassG = Math.round(((weeklyAvg[i] * 7) / GENERIC_KCAL_PER_KG_FAT) * 1000);
+                lines.push(`7-Day Expected Fat: ${withExplicitSign(weeklyMassG)} g`);
               }
               return privacyMode ? lines.map(maskDigits) : lines;
             },

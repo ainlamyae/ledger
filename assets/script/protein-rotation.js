@@ -9,11 +9,12 @@
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from Physique's own Calculate breakdown,
 // independent of whatever Nutrition's Amount/Calories happen to say
-// today. Beside the bars, a two-ring donut splits the same sources by share
-// of protein actually eaten — outer ring the 4 weeks ending on the To date,
-// inner ring the last week of it — so a source's short-term share can be read
-// against its medium-term one. Wired up by initProteinRotationPanel(), called
-// from app.js.
+// today. Beside the bars, a three-ring donut splits the same sources by
+// share of protein — outermost ring the reference Protein % each source is
+// meant to cover, middle ring the 4 weeks ending on the To date, inner ring
+// the last week of it — so a source's short-term and medium-term share can
+// both be read against what it's actually supposed to be. Wired up by
+// initProteinRotationPanel(), called from app.js.
 
 // Every Nutrition row with a Protein % set — that field is the sole
 // "is this tracked" switch (nutrition.js's refreshNutrition/openNutritionForm).
@@ -130,10 +131,13 @@ function proteinRotationPalette(rows) {
   };
 }
 
-// Rings of the rotation donut beside the bars, outermost first — Chart.js
+// The time-windowed rings of the rotation donut, outermost first — Chart.js
 // draws datasets[0] as the outer ring. Both end on the To date the bars use,
-// so the outer ring is the medium-term rotation and the inner one is the
-// most recent week inside it.
+// so the first of these is the medium-term rotation and the second is the
+// most recent week inside it. The reference ring (each source's target
+// Protein %) sits outside both — see renderProteinRotationDonut — since it
+// isn't a time window at all, just the one static split the other two are
+// read against.
 const PROTEIN_ROTATION_DONUT_RINGS = [
   { label: 'Last 4 weeks', days: 28 },
   { label: 'Last week', days: 7 },
@@ -152,12 +156,23 @@ let proteinRotationChart = null;
 let proteinRotationDonut = null;
 
 // Same source order and colors as the bar chart — one source is one color
-// everywhere in the panel, in both rings and in its bar, which is what makes
+// everywhere in the panel, in every ring and in its bar, which is what makes
 // the donut readable without a legend of its own. The rings are told apart by
-// position (outer = 4 weeks, inner = last week), never by shade.
+// position (outermost = reference target, then 4 weeks, then last week),
+// never by shade.
 function renderProteinRotationDonut(rows, barColors, toIso) {
   const ctx = document.getElementById('protein-rotation-donut');
   const labels = rows.map((r) => r.name);
+
+  // Not a time window like the two below it — each source's own Protein %
+  // setting (nutrition.js), the fixed split the other two rings are read
+  // against. No `days`, which the tooltip callback below uses to tell it
+  // apart from an eaten-window ring.
+  const referenceRing = {
+    label: 'Reference target',
+    data: rows.map((r) => r.proteinPercent),
+    total: rows.reduce((sum, r) => sum + r.proteinPercent, 0),
+  };
 
   const rings = PROTEIN_ROTATION_DONUT_RINGS.map((ring) => {
     const { from, to } = proteinRotationWindow(toIso, ring.days);
@@ -166,19 +181,23 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
     return { ...ring, data, total: data.reduce((sum, v) => sum + v, 0) };
   });
 
+  // hasData is about actually-eaten protein, not the reference ring — a
+  // fresh set of tracked sources always has a reference split even before
+  // anything's been logged against it.
   const hasData = rings.some((ring) => ring.total > 0);
+  const allRings = [referenceRing, ...rings];
 
   proteinRotationDonut = upsertChart(proteinRotationDonut, ctx, {
     type: 'doughnut',
     data: {
       labels,
-      datasets: rings.map((ring) => ({ data: ring.data, backgroundColor: barColors })),
+      datasets: allRings.map((ring) => ({ data: ring.data, backgroundColor: barColors })),
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       // Without this, hovering one ring also matches the same dataIndex in
-      // the other, giving two tooltip lines for a single hover.
+      // the other rings, giving multiple tooltip lines for a single hover.
       interaction: { mode: 'point' },
       plugins: {
         legend: { display: false },
@@ -194,11 +213,17 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
         tooltip: {
           callbacks: {
             // The default title looks up data.labels by dataIndex, which is
-            // right for both rings — but the label line below already names the
+            // right for every ring — but the label line below already names the
             // source, so the slice's classification goes here instead.
             title: (items) => rows[items[0].dataIndex].classification,
             label: (item) => {
-              const ring = rings[item.datasetIndex];
+              const ring = allRings[item.datasetIndex];
+              // The reference ring's own numbers ARE percentages already —
+              // no share-of-window arithmetic to redo on top of them.
+              if (ring.days === undefined) {
+                const value = `${item.formattedValue}% of protein target`;
+                return `${labels[item.dataIndex]} — ${ring.label}: ${privacyMode ? maskDigits(value) : value}`;
+              }
               const pct = ring.total ? Math.round((item.raw / ring.total) * 1000) / 10 : 0;
               const value = `${item.formattedValue}g protein (${pct}% of the window)`;
               return `${labels[item.dataIndex]} — ${ring.label}: ${privacyMode ? maskDigits(value) : value}`;

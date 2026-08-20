@@ -307,6 +307,15 @@
                     </label>
                 </fieldset>
 
+                <!-- The model's equations (FORMULA_EXPRESSION, formula-fields.js), collapsed by
+                     default in the same disclosure style as the ingredient form's Micronutrients. -->
+                <details id="formula-expression-details">
+                    <summary>Equations</summary>
+                    <div class="table-responsive">
+                        <pre id="formula-expression"></pre>
+                    </div>
+                </details>
+
                 <!-- Directly above the variable list it introduces, not under the formulas: it's the
                      list that's being defined, and the Solve-for radios in between made it read as
                      though it were introducing those instead. -->
@@ -821,7 +830,10 @@
                      substituted term, rather than in a block of their own — appended in all four
                      modes by renderFormulaSubstituted itself, since no calorie identity involves
                      protein and a failed calorie solve has no bearing on them. -->
-                <div id="formula-substituted" class="formula-substituted"></div>
+                <details id="formula-substituted-details">
+                    <summary>Calculation</summary>
+                    <div id="formula-substituted" class="formula-substituted"></div>
+                </details>
 
                 <fieldset class="formula-solve-for formula-pin-mode">
                     <legend>Which stays fixed as you lose weight</legend>

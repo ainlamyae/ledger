@@ -1887,6 +1887,24 @@ td .btn {
     resize: vertical;
 }
 
+/* Break has no native duration input, so it's two plain number spinners
+   (hours, minutes) instead of the type="time" clock-of-day control — that
+   avoids both the AM/PM reading and a value that isn't actually a time of
+   day. */
+.timesheet-break-inputs {
+    display: flex;
+    align-items: center;
+    gap: .3rem;
+    margin-top: .1rem;
+    color: var(--color-text-muted);
+}
+
+.timesheet-break-inputs input {
+    width: 4rem;
+    flex: 0 0 auto;
+    margin-top: 0;
+}
+
 .checkbox-inline-label {
     display: flex !important;
     align-items: center;

@@ -1388,13 +1388,16 @@
                 Holiday / day off
             </label>
             <label>Start
-                <input type="text" id="timesheet-start" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm">
+                <input type="time" id="timesheet-start">
             </label>
             <label>End
-                <input type="text" id="timesheet-end" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm">
+                <input type="time" id="timesheet-end">
             </label>
             <label>Break
-                <input type="text" id="timesheet-break" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:mm" value="00:00">
+                <span class="timesheet-break-inputs">
+                    <input type="number" id="timesheet-break-h" inputmode="numeric" min="0" max="23" step="1" value="0" aria-label="Break hours">h
+                    <input type="number" id="timesheet-break-m" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="Break minutes">m
+                </span>
             </label>
             <p>Log Time: <span id="timesheet-live-duration">—</span></p>
             <label>Task
@@ -1795,6 +1798,44 @@
                 <span class="formula-name">daily protein target, upper end</span>
                 <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
                 <span class="formula-unit">g/day</span>
+            </label>
+            <!-- Glycogen closes the list, straight after LBM/protein since it reads the same
+                 LBM box above rather than a flat guess: glycogen is stored in muscle, not fat,
+                 so it has to scale with lean mass, not sit unrelated to weight/height/sex. Not
+                 read by any calorie identity — this is purely the explanation for why m and m̄
+                 above don't agree from one day to the next: glycogen stores pull water in with
+                 them, so a day of low carbs (or a big refeed) can move the scale by kilograms
+                 with no fat gained or lost at all. Only the two coefficients and the water
+                 ratio are editable, same shape as p_min/p_max above. -->
+            <label class="formula-row" title="g_lbm × LBM + g_liver. Muscle glycogen scales with lean mass; the liver's ~100g reserve doesn't. Not editable directly — tune the two coefficients below if this doesn't match what you observe.">
+                <span class="formula-sym">m_gly</span>
+                <span class="formula-name">glycogen store, scaled to lean mass</span>
+                <input type="text" id="formula-glycogen-g" inputmode="decimal" readonly>
+                <span class="formula-unit">g</span>
+            </label>
+            <label class="formula-row" title="Grams of glycogen stored per kg of lean body mass — commonly cited as 12–18 for trained muscle. Higher with more muscle mass and glycogen-loading habits, lower for a smaller or less-trained frame.">
+                <span class="formula-sym">g_lbm</span>
+                <span class="formula-name">glycogen per kg of lean mass</span>
+                <input type="text" id="formula-glycogen-per-kg-lbm" inputmode="decimal" value="15">
+                <span class="formula-unit">g/kg LBM</span>
+            </label>
+            <label class="formula-row" title="The liver's own glycogen reserve — roughly constant across adults regardless of muscle mass, commonly cited around 100g.">
+                <span class="formula-sym">g_liver</span>
+                <span class="formula-name">liver glycogen reserve</span>
+                <input type="text" id="formula-glycogen-liver" inputmode="decimal" value="100">
+                <span class="formula-unit">g</span>
+            </label>
+            <label class="formula-row" title="Grams of water glycogen holds onto per gram of itself — commonly cited as 3–4. Tune this to whatever ratio makes ΔM_gly below match what you actually see on the scale.">
+                <span class="formula-sym">r</span>
+                <span class="formula-name">water bound per gram of glycogen</span>
+                <input type="text" id="formula-glycogen-water-ratio" inputmode="decimal" value="3">
+                <span class="formula-unit">g water / g glycogen</span>
+            </label>
+            <label class="formula-row" title="ΔM_gly = m_gly × (1 + r) — the scale swing glycogen and its bound water can account for on their own. A day-to-day move up to about this size is water and glycogen, not fat; anything consistently larger than it, held over more than a day or two, is the real signal.">
+                <span class="formula-sym">ΔM_gly</span>
+                <span class="formula-name">glycogen + water swing</span>
+                <input type="text" id="formula-glycogen-swing" inputmode="decimal" readonly>
+                <span class="formula-unit">kg</span>
             </label>
         </div>
 

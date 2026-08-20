@@ -497,20 +497,9 @@ function quarterAverages(monthlyRows, activeIndex) {
   return { income: mean(1), expenses: mean(2), months: prior.length };
 }
 
-// "this month / recent average", the same actual-vs-benchmark shape the Health
-// tiles use. Just the figure on its own when there's no prior month yet.
-function withQuarterAverage(value, average) {
-  return average === null || average === undefined
-    ? formatCurrency(value)
-    : `${formatCurrency(value)} / ${formatCurrency(average)}`;
-}
-
 function renderSummaryCards(data) {
   const avg = data.quarterAverage;
   const priorMonths = avg ? `previous ${avg.months} month${avg.months === 1 ? '' : 's'}` : null;
-  // Says what a card's second figure is, since the heading can't carry it and the
-  // month count varies early on. Only Expenditure shows one on the card itself.
-  const avgTitle = avg ? `This month / average of the ${priorMonths}` : 'This month — no earlier months to average yet';
 
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
 
@@ -528,8 +517,10 @@ function renderSummaryCards(data) {
 
   document.getElementById('expenses-label').textContent = 'Monthly Expenditure';
   const expensesEl = document.getElementById('expenses-value');
-  expensesEl.textContent = withQuarterAverage(data.expenses, avg?.expenses);
-  expensesEl.title = avgTitle;
+  expensesEl.textContent = formatCurrency(data.expenses);
+  expensesEl.title = avg
+    ? `This month. Average of the ${priorMonths}: ${formatCurrency(avg.expenses)}`
+    : 'This month — no earlier months to average yet';
 
   document.getElementById('cashflow-label').textContent = 'Monthly Cash Flow';
   const savingsEl = document.getElementById('savings-value');

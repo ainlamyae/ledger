@@ -247,8 +247,10 @@ Lean body mass — Boer (1984)
 Daily protein band, scaled to lean mass
     P_min =  p_min × LBM
     P_max =  p_max × LBM
-Glycogen store, scaled to lean mass
-    m_gly  =  g_lbm × LBM  +  g_liver
+Skeletal muscle mass — the fraction of LBM that actually stores glycogen
+    m_musc =  s × LBM
+Glycogen store, from muscle mass
+    m_gly  =  g_musc × m_musc  +  g_liver
 Glycogen-bound water — the swing glycogen alone accounts for, not fat
     ΔM_gly =  m_gly × (1 + r) / 1000`;
 
@@ -546,15 +548,20 @@ function solveBForTypedDays({ deficit, massToLose, t, rho, minB = 10 }) {
   return (low + high) / 2;
 }
 
-// m_gly and the glycogen+water swing it implies, from whatever m̄, h, σ and the three
-// glycogen knobs currently read — or null when any of them is missing. Independent of
-// "Solve for" like the protein band below: no calorie identity involves it, it's purely
-// the explanation for why m and m̄ disagree day to day.
+// m_musc, m_gly and the glycogen+water swing they imply, from whatever m̄, h, σ and the
+// four glycogen knobs currently read — or null when any of them is missing. Independent
+// of "Solve for" like the protein band below: no calorie identity involves it, it's
+// purely the explanation for why m and m̄ disagree day to day.
 //
 // LBM drives it rather than body mass directly, same reasoning Katch-McArdle and the
 // protein band already use here: glycogen is stored in muscle (and the liver, which
 // doesn't scale with a lifter's muscle mass at all), not in fat, so two people at the
 // same body mass but different body composition don't carry the same glycogen store.
+// But LBM alone overstates it: skeletal muscle is only about 40-50% of LBM — the rest is
+// water, organs, skin and bone, none of which store meaningful glycogen — so applying a
+// published muscle-TISSUE glycogen density (g/kg wet muscle) straight to LBM comes out
+// roughly double. s cuts LBM down to that muscle share first, so g_musc can be the real
+// muscle-tissue figure instead of a diluted per-LBM one.
 // Re-derived from m̄/h/σ rather than reading the formula-lbm box, for the same reason
 // readProteinFormula does: this has to work in every mode, including ones where that
 // box hasn't rendered yet this pass.
@@ -562,35 +569,48 @@ function readGlycogenSwingFormula() {
   const bodyMassKg = formulaBodyMassKg();
   const heightCm = formulaNumber('formula-height');
   const sex = document.getElementById('formula-sex').value;
-  const gPerKgLbm = formulaNumber('formula-glycogen-per-kg-lbm');
+  const skeletalFrac = formulaNumber('formula-glycogen-skeletal-frac');
+  const gPerKgMuscle = formulaNumber('formula-glycogen-per-kg-muscle');
   const liverG = formulaNumber('formula-glycogen-liver');
   const waterRatio = formulaNumber('formula-glycogen-water-ratio');
-  if (bodyMassKg === null || heightCm === null || gPerKgLbm === null || liverG === null || waterRatio === null) return null;
+  if (bodyMassKg === null || heightCm === null || skeletalFrac === null || gPerKgMuscle === null
+    || liverG === null || waterRatio === null) return null;
 
   const rawLbm = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
   if (!Number.isFinite(rawLbm) || rawLbm <= 0) return null;
-  // Rounded to 0.1 kg before it's multiplied out, same as readProteinFormula — otherwise
-  // the trace's `g_lbm × LBM = m_gly` line would show a rounded LBM that doesn't actually
-  // multiply out to the grams figure beside it.
+  // Rounded to 0.1 kg before it's used further, same as readProteinFormula — otherwise
+  // the trace's `s × LBM = m_musc` line would show a rounded LBM that doesn't actually
+  // multiply out to the muscle mass figure beside it.
   const lbmKg = Math.round(rawLbm * 10) / 10;
-  const glycogenG = Math.round(gPerKgLbm * lbmKg + liverG);
-  return { lbmKg, gPerKgLbm, liverG, glycogenG, waterRatio, swingKg: Math.round((glycogenG * (1 + waterRatio)) / 100) / 10 };
+  // s is a share of LBM, not of m̄: it's a fat-free-mass ratio (skeletal muscle vs. the
+  // rest of LBM), and m̄ still carries the fat LBM has already had stripped out.
+  const muscleKg = Math.round((lbmKg * (skeletalFrac / 100)) * 10) / 10;
+  if (muscleKg <= 0) return null;
+
+  const glycogenG = Math.round(gPerKgMuscle * muscleKg + liverG);
+  return {
+    lbmKg, skeletalFrac, muscleKg, gPerKgMuscle, liverG, glycogenG,
+    waterRatio, swingKg: Math.round((glycogenG * (1 + waterRatio)) / 100) / 10,
+  };
 }
 
-// The m_gly and ΔM_gly boxes and their trace rows — always as a pair per box, same rule
-// every other computed field here follows. A dash in both when an input is missing.
+// The m_musc, m_gly and ΔM_gly boxes and their trace rows — always as a pair per box,
+// same rule every other computed field here follows. A dash in all three when an input
+// is missing.
 function renderGlycogenSwingField() {
   const swing = readGlycogenSwingFormula();
   if (swing === null) {
-    ['formula-glycogen-g', 'formula-glycogen-swing'].forEach((id) => setComputedField(id, '—'));
+    ['formula-glycogen-muscle', 'formula-glycogen-g', 'formula-glycogen-swing'].forEach((id) => setComputedField(id, '—'));
     return [];
   }
 
-  const { lbmKg, gPerKgLbm, liverG, glycogenG, waterRatio, swingKg } = swing;
+  const { lbmKg, skeletalFrac, muscleKg, gPerKgMuscle, liverG, glycogenG, waterRatio, swingKg } = swing;
+  setComputedField('formula-glycogen-muscle', String(muscleKg));
   setComputedField('formula-glycogen-g', String(glycogenG));
   setComputedField('formula-glycogen-swing', String(swingKg));
   return [
-    ['m_gly', `${gPerKgLbm} × ${lbmKg} + ${liverG}  =  ${glycogenG} g`],
+    ['m_musc', `${skeletalFrac}% × ${lbmKg}  =  ${muscleKg} kg`],
+    ['m_gly', `${gPerKgMuscle} × ${muscleKg} + ${liverG}  =  ${glycogenG} g`],
     ['ΔM_gly', `${glycogenG} × (1 + ${waterRatio}) / 1000  =  ${swingKg} kg`],
   ];
 }
@@ -1510,7 +1530,8 @@ function initFormulaPlayground() {
     ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
     ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
     'formula-body-mass-smooth', 'formula-height', 'formula-age',
-    'formula-glycogen-per-kg-lbm', 'formula-glycogen-liver', 'formula-glycogen-water-ratio'].forEach((id) => {
+    'formula-glycogen-skeletal-frac', 'formula-glycogen-per-kg-muscle', 'formula-glycogen-liver',
+    'formula-glycogen-water-ratio'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderFormulaPreview);
   });
   document.getElementById('formula-sex').addEventListener('change', renderFormulaPreview);

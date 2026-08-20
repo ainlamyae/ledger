@@ -2856,7 +2856,7 @@ td .btn {
        (it used to be minmax(0, 9rem)) dumped every spare pixel into the name,
        which on a full-width modal left a several-hundred-pixel gap between a
        label like "body mass" and its own box. */
-    grid-template-columns: 2.5rem minmax(0, 1fr) 8.45rem minmax(0, 1fr);
+    grid-template-columns: 3rem minmax(0, 1fr) 8.45rem minmax(0, 1fr);
     align-items: center;
     gap: .6rem;
     /* No divider between rows, and no padding either: the boxed inputs already mark
@@ -2955,7 +2955,7 @@ td .btn {
            lines and left the width it needed sitting empty to the right of the
            unit. The long units ("metabolic equivalents") take two lines now,
            which is the cheaper wrap — there are two of them, not twenty. */
-        grid-template-columns: 1.92rem minmax(0, 1.75fr) 8.1rem minmax(0, 1fr);
+        grid-template-columns: 2.3rem minmax(0, 1.75fr) 8.1rem minmax(0, 1fr);
         gap: .3rem;
         font-size: .7rem;
     }

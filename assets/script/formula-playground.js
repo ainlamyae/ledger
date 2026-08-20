@@ -246,7 +246,11 @@ Lean body mass — Boer (1984)
     LBM  =  0.252×m  +  0.473×h  −  48.3      (♀)
 Daily protein band, scaled to lean mass
     P_min =  p_min × LBM
-    P_max =  p_max × LBM`;
+    P_max =  p_max × LBM
+Glycogen store, scaled to lean mass
+    m_gly  =  g_lbm × LBM  +  g_liver
+Glycogen-bound water — the swing glycogen alone accounts for, not fat
+    ΔM_gly =  m_gly × (1 + r) / 1000`;
 
 function formulaFieldValue(field) {
   return getSetting(field.key, null) ?? field.fallback();
@@ -432,6 +436,14 @@ function renderFormulaSubstituted(rows, plan = null) {
   } catch (err) {
     console.error('Protein band failed to render', err);
   }
+  // Reads the same LBM box protein just filled — guarded separately so a throw here can't
+  // take LBM/protein down with it, same as every other block in this function.
+  let glycogenRows = [];
+  try {
+    glycogenRows = renderGlycogenSwingField();
+  } catch (err) {
+    console.error('Glycogen swing failed to render', err);
+  }
   // Guarded separately for the same reason as the two above: BMR, M, TEF and the adaptation
   // pair are five boxes and up to three rows, and none of them is worth taking the calorie
   // trace down with it.
@@ -443,9 +455,10 @@ function renderFormulaSubstituted(rows, plan = null) {
   }
 
   // Appended in the order the boxes themselves run — BMI_g sits with m_g near the top of the
-  // sheet, the adaptation pair sits above the lean-mass block — so the trace reads down in
-  // roughly the same order the eye just travelled.
-  [...(rows ?? []), ...bmiRows, ...pctRows, ...correctionRows, ...proteinRows].forEach(([label, value]) => {
+  // sheet, the adaptation pair sits above the lean-mass block, and glycogen closes the list
+  // right after protein — so the trace reads down in roughly the same order the eye just
+  // travelled.
+  [...(rows ?? []), ...bmiRows, ...pctRows, ...correctionRows, ...proteinRows, ...glycogenRows].forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
@@ -531,6 +544,55 @@ function solveBForTypedDays({ deficit, massToLose, t, rho, minB = 10 }) {
     if (Math.sign(h(mid)) === Math.sign(hLo)) low = mid; else high = mid;
   }
   return (low + high) / 2;
+}
+
+// m_gly and the glycogen+water swing it implies, from whatever m̄, h, σ and the three
+// glycogen knobs currently read — or null when any of them is missing. Independent of
+// "Solve for" like the protein band below: no calorie identity involves it, it's purely
+// the explanation for why m and m̄ disagree day to day.
+//
+// LBM drives it rather than body mass directly, same reasoning Katch-McArdle and the
+// protein band already use here: glycogen is stored in muscle (and the liver, which
+// doesn't scale with a lifter's muscle mass at all), not in fat, so two people at the
+// same body mass but different body composition don't carry the same glycogen store.
+// Re-derived from m̄/h/σ rather than reading the formula-lbm box, for the same reason
+// readProteinFormula does: this has to work in every mode, including ones where that
+// box hasn't rendered yet this pass.
+function readGlycogenSwingFormula() {
+  const bodyMassKg = formulaBodyMassKg();
+  const heightCm = formulaNumber('formula-height');
+  const sex = document.getElementById('formula-sex').value;
+  const gPerKgLbm = formulaNumber('formula-glycogen-per-kg-lbm');
+  const liverG = formulaNumber('formula-glycogen-liver');
+  const waterRatio = formulaNumber('formula-glycogen-water-ratio');
+  if (bodyMassKg === null || heightCm === null || gPerKgLbm === null || liverG === null || waterRatio === null) return null;
+
+  const rawLbm = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
+  if (!Number.isFinite(rawLbm) || rawLbm <= 0) return null;
+  // Rounded to 0.1 kg before it's multiplied out, same as readProteinFormula — otherwise
+  // the trace's `g_lbm × LBM = m_gly` line would show a rounded LBM that doesn't actually
+  // multiply out to the grams figure beside it.
+  const lbmKg = Math.round(rawLbm * 10) / 10;
+  const glycogenG = Math.round(gPerKgLbm * lbmKg + liverG);
+  return { lbmKg, gPerKgLbm, liverG, glycogenG, waterRatio, swingKg: Math.round((glycogenG * (1 + waterRatio)) / 100) / 10 };
+}
+
+// The m_gly and ΔM_gly boxes and their trace rows — always as a pair per box, same rule
+// every other computed field here follows. A dash in both when an input is missing.
+function renderGlycogenSwingField() {
+  const swing = readGlycogenSwingFormula();
+  if (swing === null) {
+    ['formula-glycogen-g', 'formula-glycogen-swing'].forEach((id) => setComputedField(id, '—'));
+    return [];
+  }
+
+  const { lbmKg, gPerKgLbm, liverG, glycogenG, waterRatio, swingKg } = swing;
+  setComputedField('formula-glycogen-g', String(glycogenG));
+  setComputedField('formula-glycogen-swing', String(swingKg));
+  return [
+    ['m_gly', `${gPerKgLbm} × ${lbmKg} + ${liverG}  =  ${glycogenG} g`],
+    ['ΔM_gly', `${glycogenG} × (1 + ${waterRatio}) / 1000  =  ${swingKg} kg`],
+  ];
 }
 
 // LBM and the protein band it implies, from whatever m, h and σ currently read — or
@@ -1447,7 +1509,8 @@ function initFormulaPlayground() {
   [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss' && id !== 'formula-target'),
     ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
     ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
-    'formula-body-mass-smooth', 'formula-height', 'formula-age'].forEach((id) => {
+    'formula-body-mass-smooth', 'formula-height', 'formula-age',
+    'formula-glycogen-per-kg-lbm', 'formula-glycogen-liver', 'formula-glycogen-water-ratio'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderFormulaPreview);
   });
   document.getElementById('formula-sex').addEventListener('change', renderFormulaPreview);

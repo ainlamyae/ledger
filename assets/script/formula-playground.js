@@ -23,9 +23,9 @@
 // anyone solves for.
 const FORMULA_FIELDS = [
   { key: 'KCAL_PER_MET_KG_MIN', inputId: 'formula-met-o2', fallback: () => MET_ML_O2_PER_KG_MIN_DEFAULT },
-  // activityMet() as the fallback, not the bare constant — it also honours the
-  // ACTIVITY_MET_DEFAULT spelling an existing sheet may use instead.
-  { key: 'ACTIVITY_MET', inputId: 'formula-met', fallback: () => activityMet() },
+  // Walk's own catalogue MET (Edit Activity), not the ACTIVITY_MET setting — the
+  // Activity sheet row is the one place that number is actually maintained.
+  { key: 'ACTIVITY_MET', inputId: 'formula-met', value: () => exerciseMet('Walk') },
   { key: 'ACTIVITY_TARGET_MIN', inputId: 'formula-activity-min', fallback: () => ACTIVITY_TARGET_MIN_DEFAULT },
   // No default: an unset WEEKLY_FAT_LOSS_KG is exactly what makes the target
   // uncomputable and sends the charts to the flat CALORIE_TARGET_KCAL, so the
@@ -255,6 +255,9 @@ Glycogen-bound water — the swing glycogen alone accounts for, not fat
     ΔM_gly =  m_gly × (1 + r) / 1000`;
 
 function formulaFieldValue(field) {
+  // `value` skips Settings entirely — for fields (like Activity Intensity) whose
+  // real source is somewhere else on the sheet, not a Settings key.
+  if (field.value) return field.value();
   return getSetting(field.key, null) ?? field.fallback();
 }
 
@@ -1037,13 +1040,17 @@ function renderFormulaPreview() {
   if (mode === 'EIN' || mode === 'FIXED_PCT') {
     const tau = preview.ACTIVITY_TARGET_MIN;
     const targetKg = preview.BODY_MASS_TARGET_KG;
+    // "Arrived" is judged past the target by the glycogen/water swing (see
+    // arrivalTargetKg in charts.js) — the same rule the live State Trend & Forecast
+    // chart's own arrival date uses, so this t can't disagree with it.
+    const forecastTargetKg = arrivalTargetKg(targetKg, bodyMassKg, heightCm, sex, targetKg < bodyMassKg);
     const detail = withFormulaOverrides(preview, () => calorieTargetDetail(bodyMassKg));
     if (detail === null) { cantCompute(); return; }
     const weeklyPct = weeklyLossPctInPlay(detail.weeklyFatLossKg, bodyMassKg);
     const coefficients = maintenanceAffineCoefficients({ ...profile, tau });
     const { a, b } = coefficients;
     const proj = formulaProjection({
-      intakeKcal: detail.kcal, bodyMassKg, targetKg, tau, ...profile,
+      intakeKcal: detail.kcal, bodyMassKg, targetKg: forecastTargetKg, tau, ...profile,
     }, weeklyPct);
     setComputedField('formula-ein', String(Math.round(detail.kcal)));
     renderFormulaDaysField(proj);
@@ -1068,7 +1075,7 @@ function renderFormulaPreview() {
         ['m∞', `(${detail.kcal} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
       );
     }
-    rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }));
+    rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg: forecastTargetKg, weeklyPct, bRounded, eqRounded }));
     renderFormulaSubstituted(rows, {
       intakeKcal: detail.kcal,
       coefficients,
@@ -1134,7 +1141,13 @@ function renderFormulaPreview() {
     // (solveBForTypedDays), so its projection has to be read in that same model — a
     // proportional t here would contradict the very day count τ was fitted to.
     const weeklyPct = weeklyLossPctInPlay(deltaM, bodyMassKg);
-    const projArgs = { intakeKcal: einForDisplay, bodyMassKg, targetKg, tau, ...profile };
+    // Only in the forward (Eᵢₙ-known) direction: the other direction solved τ against the
+    // TYPED target above (massToLose), so redisplaying it against a different figure here
+    // would contradict the very day count τ was fitted to.
+    const forecastTargetKg = knownField === 'ein'
+      ? arrivalTargetKg(targetKg, bodyMassKg, heightCm, sex, targetKg < bodyMassKg)
+      : targetKg;
+    const projArgs = { intakeKcal: einForDisplay, bodyMassKg, targetKg: forecastTargetKg, tau, ...profile };
     const proj = knownField === 'ein' ? formulaProjection(projArgs, weeklyPct) : projectTargetDays(projArgs);
     if (knownField === 'ein') {
       renderFormulaDaysField(proj);
@@ -1164,7 +1177,7 @@ function renderFormulaPreview() {
         ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
       );
     }
-    rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }));
+    rows.push(...formulaDaysRow(proj, { bodyMassKg, targetKg: forecastTargetKg, weeklyPct, bRounded, eqRounded }));
     renderFormulaSubstituted(rows, {
       intakeKcal: einForDisplay,
       coefficients,
@@ -1269,8 +1282,12 @@ function renderFormulaPreview() {
     // catches it up below. With the percentage pinned, that solved rate expressed as a share
     // of today's mass is exactly what the pin would hold, so the journey is its own.
     const weeklyPct = weeklyFatLossPct(deltaMSolved, bodyMassKg);
+    // "Arrived" is judged past the target by the glycogen/water swing (see
+    // arrivalTargetKg in charts.js) — the same rule the live State Trend & Forecast
+    // chart's own arrival date uses, so this t can't disagree with it.
+    const forecastTargetKg = arrivalTargetKg(targetKg, bodyMassKg, heightCm, sex, targetKg < bodyMassKg);
     const proj = formulaProjection({
-      intakeKcal: einForDisplay, bodyMassKg, targetKg, tau, ...profile,
+      intakeKcal: einForDisplay, bodyMassKg, targetKg: forecastTargetKg, tau, ...profile,
     }, weeklyPct);
     renderFormulaDaysField(proj);
 
@@ -1283,7 +1300,7 @@ function renderFormulaPreview() {
         ...formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }),
         ['m∞', `(${Math.round(einForDisplay)} − ${Math.round(a)}) / ${bRounded}  =  ${eqRounded} kg`],
       ]),
-      ...formulaDaysRow(proj, { bodyMassKg, targetKg, weeklyPct, bRounded, eqRounded }),
+      ...formulaDaysRow(proj, { bodyMassKg, targetKg: forecastTargetKg, weeklyPct, bRounded, eqRounded }),
     ], {
       intakeKcal: einForDisplay,
       coefficients,

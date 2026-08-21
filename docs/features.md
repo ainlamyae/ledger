@@ -188,6 +188,10 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 It is the **Tune** block, above Indicator in the Health wrapper; expanding it reloads its boxes from the sheet.
 
+An **Equations** dropdown above the variable list ("where,") shows the model's full equation list — `FORMULA_EXPRESSION`, the same text the Health Plan prompt sends to the AI — collapsed by default, in the ingredient form's Micronutrients disclosure style.
+
+The substituted arithmetic under the last row (C_max) — LBM, BMR, AEE, D, TEI, … down to C_max — sits in a **Calculation** dropdown of the same style, also collapsed by default.
+
 - Every term of the calorie-target and forecast algebra, with your own numbers substituted in — not a black box you have to trust.
 - **Solve for** any one of Calories, Healthy body mass, Activity or Weekly fat loss; the rest are inputs and the picked one is computed. Activity and Weekly fat loss also let you type either E_in or `t` and compute whichever you didn't touch.
 - **Weekly fat loss %** is the fifth radio and the odd one out — named for what it *holds*, not what it solves. `Δm%` is the typed input; the kilograms, `E_in`, `t` and the arrival date are all computed from it, and `t` follows the proportional journey a fixed share implies. Same arithmetic as Calories otherwise, so the two share one branch: the only differences are where `Δm` came from and which journey `t` is measured along.

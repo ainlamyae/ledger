@@ -1671,6 +1671,39 @@ function boerLeanBodyMassKg(bodyMassKg, heightCm, sex) {
   return c.perKg * bodyMassKg + c.perCm * heightCm + c.constant;
 }
 
+// The same four knobs the Formula Playground's glycogen block opens on (s, g_musc,
+// g_liver, r) — defaults here match its input boxes, so a State Trend reader who never
+// opens that modal still gets the same swing it would report for their own body.
+const GLYCOGEN_SKELETAL_FRAC_DEFAULT = 45; // % of LBM
+const GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT = 14; // g glycogen / kg muscle
+const GLYCOGEN_LIVER_G_DEFAULT = 100; // g
+const GLYCOGEN_WATER_RATIO_DEFAULT = 3; // g H2O / g glycogen
+
+// ΔM_gly = g_musc × m_musc + g_liver, water-bound at r, in kg — the same identity the
+// Formula Playground's glycogen block walks through (see its readGlycogenSwingFormula),
+// evaluated at the defaults rather than whatever's currently typed there. This is the
+// day-to-day swing glycogen and its bound water alone can account for, at this body —
+// the noise floor State Trend & Forecast measures its smoothing against.
+function glycogenSwingKg(bodyMassKg, heightCm, sex) {
+  if (bodyMassKg === null || bodyMassKg === undefined || heightCm === null || heightCm === undefined) return null;
+  const lbmKg = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
+  if (!Number.isFinite(lbmKg) || lbmKg <= 0) return null;
+  const muscleKg = lbmKg * (GLYCOGEN_SKELETAL_FRAC_DEFAULT / 100);
+  if (muscleKg <= 0) return null;
+  const glycogenG = GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT * muscleKg + GLYCOGEN_LIVER_G_DEFAULT;
+  return (glycogenG * (1 + GLYCOGEN_WATER_RATIO_DEFAULT)) / 1000;
+}
+
+// The target actually used to decide "have I arrived" — past the raw target by the
+// glycogen/water swing, in the direction travel is already headed, so a bad-water-day
+// reading can't land on the wrong side of the real target. Shared by calcProjection and
+// the Formula Playground so both count arrival the same way and can't disagree. Falls
+// back to the raw target when the swing can't be estimated (no height/sex on file).
+function arrivalTargetKg(targetKg, bodyMassKg, heightCm, sex, isDownward) {
+  const swingKg = glycogenSwingKg(bodyMassKg, heightCm, sex);
+  return swingKg === null ? targetKg : targetKg + (isDownward ? -swingKg : swingKg);
+}
+
 // Headroom around the plotted range. The floor keeps a window of nearly identical
 // readings off the top and bottom edges.
 const BODY_MASS_AXIS_PAD_FRACTION = 0.15;
@@ -1768,6 +1801,18 @@ function renderWellnessBodyMassChart(entries) {
   // and its direction says everything.
   const weekColumns = bucketedColumnCount(dates);
   const { series: trendSeries, slopePerWeek } = weeklyTrendSeries(values, weekColumns);
+
+  // A single reading against the target reads as noise, not a reversal, when the week
+  // it belongs to is still trending the right way overall — gray it out rather than
+  // calling it a miss. Stall-days are untouched: their red already means something else.
+  dates.forEach((d, i) => {
+    if (barColors[i] !== '#dc2626') return;
+    const delta = detailByDate.get(d)?.delta;
+    if (!delta) return;
+    const slope = slopePerWeek[i];
+    if (slope === null || slope === undefined) return;
+    if ((slope < 0) === targetIsDownward) barColors[i] = BODY_MASS_UNSCORED_COLOR;
+  });
 
   // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
   // `grace` too late to read here. The trend folds in too — a fit extended to the week's
@@ -1968,6 +2013,23 @@ function renderWellnessCaloriesChart(entries) {
     return score === 'near' ? CALORIE_NEAR_TARGET_COLOR : '#dc2626';
   });
 
+  // Averaged off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins
+  // don't count as days of fasting. Computed here, ahead of the axis, so a missed day
+  // can be graded against it below.
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+
+  // A single day's overshoot reads as noise, not a habit, when the week around it is
+  // still landing on the target's right side — gray it out rather than calling it a
+  // miss. Only a 'missed' bar moves: 'met' is already green and 'near' is already this
+  // same gray.
+  barColors.forEach((color, i) => {
+    if (color !== '#dc2626') return;
+    const avg = weeklyAvg[i];
+    if (avg === null || avg === undefined) return;
+    if (withinCalorieTarget(avg, dayTarget(i))) barColors[i] = CALORIE_NEAR_TARGET_COLOR;
+  });
+
   const axis = calorieAxisBounds(values.filter((v, i) => byDate.has(dates[i])), targetByDay.map((b) => b.kcal));
 
   // A cap across each bar rather than one continuous line: a line spanning the window
@@ -1975,11 +2037,6 @@ function renderWellnessCaloriesChart(entries) {
   // limit belongs to that day alone. Thickness scales with the axis span.
   const capHalf = (axis.max - axis.min) * 0.004;
   const capData = targetByDay.map((b) => [b.kcal - capHalf, b.kcal + capHalf]);
-
-  // Averaged off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins
-  // don't count as days of fasting.
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
   wellnessCaloriesChart = upsertChart(wellnessCaloriesChart, ctx, {
     data: {
@@ -2680,18 +2737,44 @@ const BODY_MASS_TREND_WINDOW_SIZE = 5;
 // lag behind afterwards. Windowing by logged points rather than elapsed days smooths
 // the same whether entries are daily or sporadic, where a time-decayed average would
 // stop smoothing once the gaps approach its decay window.
+function smoothBodyMassSeries(values, windowSize) {
+  const radius = Math.floor((windowSize - 1) / 2);
+  return values.map((_, i) => {
+    const windowValues = values.slice(Math.max(0, i - radius), Math.min(values.length, i + radius + 1));
+    return windowValues.reduce((a, b) => a + b, 0) / windowValues.length;
+  });
+}
+
 function computeBodyMassTrend(bodyMassByDate, windowSize = BODY_MASS_TREND_WINDOW_SIZE) {
   const dates = [...bodyMassByDate.keys()].sort();
   const values = dates.map((d) => bodyMassByDate.get(d));
-  const radius = Math.floor((windowSize - 1) / 2);
+  const smoothed = smoothBodyMassSeries(values, windowSize);
 
   const trend = new Map();
-  values.forEach((_, i) => {
-    const windowValues = values.slice(Math.max(0, i - radius), Math.min(values.length, i + radius + 1));
-    trend.set(dates[i], windowValues.reduce((a, b) => a + b, 0) / windowValues.length);
-  });
-
+  smoothed.forEach((v, i) => trend.set(dates[i], v));
   return trend;
+}
+
+// Where the ±swingKg band drawn AROUND the trend line is centered — deliberately
+// smoother than the trend line itself, which is already a moving average but can still
+// wobble point to point. An exponential moving average of the trend, not a copy of it:
+// each step nudges the anchor only a fraction of the way toward the trend's current
+// value, so the zone is the visually STABLE thing on the chart and the green line is
+// what moves around inside it. That fraction (alpha) is fixed and separate from
+// swingKg — swingKg still sets the band's ±WIDTH (how far the trend can wander before a
+// wobble stops reading as glycogen), this only sets how fast the band's CENTER drifts.
+const GLYCOGEN_ZONE_SMOOTHING_ALPHA = 1 / BODY_MASS_TREND_WINDOW_SIZE;
+
+function computeGlycogenZoneAnchor(trendMap, alpha = GLYCOGEN_ZONE_SMOOTHING_ALPHA) {
+  const dates = [...trendMap.keys()].sort();
+  const zone = new Map();
+  let anchor = null;
+  dates.forEach((d) => {
+    const v = trendMap.get(d);
+    anchor = anchor === null ? v : anchor + alpha * (v - anchor);
+    zone.set(d, anchor);
+  });
+  return zone;
 }
 
 // A net change this small over ~10 days is a genuine stall rather than water, sodium or
@@ -2909,8 +2992,70 @@ function calcProjection(entries) {
   if (bodyMassEntries.length < 2) return null;
 
   const lastBodyMass = bodyMassEntries[bodyMassEntries.length - 1].amount;
-  if (Math.abs(lastBodyMass - bodyMassTarget) < 0.1) return { status: 'reached' };
+  // planBodyMassKg (m̄), not the raw last reading — per its own definition, this is the
+  // mass every PLAN-level figure is evaluated at, the Formula Playground's own bodyMassKg
+  // included, so the target method's day count and ETA below can't disagree with what
+  // the Playground prints for the same profile.
+  const planMass = planBodyMassKg(entries) ?? lastBodyMass;
 
+  const arrivalTarget = arrivalTargetKg(
+    bodyMassTarget, planMass, getSetting('HEIGHT_CM', null), getSettingString('SEX', null),
+    bodyMassTargetIsDownward(entries),
+  );
+
+  // The TARGET wins whenever the profile allows it — read straight off targetProjection,
+  // the exact projectTargetDays / projectTargetDaysAtFixedPct result the Formula
+  // Playground's own t and ETA come from (via targetProjectionFromSettings), not a second
+  // copy of the day-count formula. That makes the forecast a statement of the target, not
+  // of recent behaviour: eat over the target for a fortnight and it does NOT slip.
+  // Calorie Balance is where actual-vs-target shows day by day.
+  const targetProjection = targetProjectionFromSettings(entries, planMass, arrivalTarget);
+  if (targetProjection !== null) {
+    if (targetProjection.status === 'reached') return { status: 'reached' };
+
+    // Rate at m̄, for the ETA line's note — the same mass t was solved from.
+    const slope = (calorieTarget - (targetProjection.a + targetProjection.b * planMass)) / GENERIC_KCAL_PER_KG_FAT;
+
+    if (targetProjection.status === 'unreachable') {
+      return { status: 'asymptote', method: 'target', slope, equilibriumKg: targetProjection.equilibriumKg };
+    }
+
+    // status === 'ok': today + the exact day count projectTargetDays solved, not a
+    // re-derivation of it — same rounding, so the ETA can't land a day off from the
+    // Playground's.
+    const daysToTarget = Math.round(targetProjection.days);
+    const etaDate = new Date(today);
+    etaDate.setDate(today.getDate() + daysToTarget);
+
+    // m(t) = m∞ + (m − m∞)·e^(−decay·t/ρ), the curve those same coefficients trace.
+    const bodyMassAtDay = (d) => targetProjection.equilibriumKg
+      + (planMass - targetProjection.equilibriumKg) * Math.exp(-(targetProjection.decayPerKg * d) / GENERIC_KCAL_PER_KG_FAT);
+
+    const cappedDays = Math.min(daysToTarget, 365);
+    const projectedPoints = [];
+    for (let d = 0; d <= cappedDays; d += 7) {
+      const pd = new Date(today);
+      pd.setDate(today.getDate() + d);
+      projectedPoints.push({ date: isoFromDate(pd), bodyMass: Math.round(bodyMassAtDay(d) * 10) / 10 });
+    }
+    if (daysToTarget <= 365) {
+      projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: Math.round(arrivalTarget * 10) / 10 });
+    }
+
+    return {
+      status: 'ok',
+      slope,
+      daysToTarget,
+      etaDate,
+      projectedPoints,
+      method: 'target',
+      bodyMassTarget,
+      equilibriumKg: targetProjection.equilibriumKg,
+    };
+  }
+
+  // No profile: the target can't be projected at all, so fall back to what the LOGGED
+  // behaviour of the last 14 days implies instead.
   const recentEntries = entries.filter((e) => e.date >= cutoffIso && e.date <= todayIso);
 
   const caloriesByDate = new Map();
@@ -2933,28 +3078,7 @@ function calcProjection(entries) {
   // The exponential model's coefficients; null means project as a straight line.
   let decay = null;
 
-  // The TARGET wins whenever the profile allows it, so this arrival date is the one the
-  // Formula Playground prints. That makes the forecast a statement of the target, not of
-  // recent behaviour: eat over the target for a fortnight and it does NOT slip. Calorie
-  // Balance is where actual-vs-target shows day by day.
-  const targetProjection = targetProjectionFromSettings(entries, lastBodyMass, bodyMassTarget);
-  if (targetProjection !== null && targetProjection.status !== 'reached') {
-    decay = {
-      // decayPerKg, not B: with the percentage pinned the curve decays at the rate the
-      // percentage sets, toward zero rather than toward a maintenance plateau. B is the
-      // right coefficient only for the constant-Eᵢₙ journey, which is why the projection
-      // hands back the one this curve should use rather than leaving it to be inferred.
-      perKg: targetProjection.decayPerKg,
-      // No sleep factor: the target doesn't model sleep, and dividing ρ would move the
-      // arrival date away from the playground's t.
-      kcalPerKg: GENERIC_KCAL_PER_KG_FAT,
-      equilibriumKg: targetProjection.equilibriumKg,
-    };
-    // Rate at today's mass, for the ETA line's note. The trajectory itself decelerates,
-    // which the coefficients above carry.
-    slope = (getCalorieTargetKcal(entries) - (targetProjection.a + targetProjection.b * lastBodyMass)) / GENERIC_KCAL_PER_KG_FAT;
-    method = 'target';
-  } else if (caloriesByDate.size > 0 || activityKcalByDate.size > 0) {
+  if (caloriesByDate.size > 0 || activityKcalByDate.size > 0) {
     const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
     const avgActivityKcal = activityKcalByDate.size > 0 ? avg(activityKcalByDate) : 0;
     const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
@@ -3007,7 +3131,11 @@ function calcProjection(entries) {
   // "projection unavailable".
   if (slope === 0) return { status: 'no-change', method, slope };
 
-  const goingDown = bodyMassTarget < lastBodyMass;
+  // lastBodyMass, not planMass: these methods' own slope/equilibrium above were fitted
+  // from the actual latest reading (see resting/perKg/bodyMassIndependent), so the curve
+  // has to start from the same point they describe. Only the 'target' method (returned
+  // above already) is measured at m̄.
+  const goingDown = arrivalTarget < lastBodyMass;
   if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method, slope };
 
   // A fixed intake only ever carries you to its own equilibrium, so a target on the far
@@ -3015,7 +3143,7 @@ function calcProjection(entries) {
   // is what this status exists to report.
   if (decay !== null) {
     const gapNow = lastBodyMass - decay.equilibriumKg;
-    const gapTarget = bodyMassTarget - decay.equilibriumKg;
+    const gapTarget = arrivalTarget - decay.equilibriumKg;
     if (gapTarget / gapNow <= 0) {
       return { status: 'asymptote', method, slope, equilibriumKg: decay.equilibriumKg };
     }
@@ -3024,8 +3152,8 @@ function calcProjection(entries) {
   // The straight line's division, or the closed form t = (ρ/B)·ln[(m − m∞)/(m_g − m∞)].
   const daysToTarget = decay !== null
     ? Math.round((decay.kcalPerKg / decay.perKg)
-      * Math.log((lastBodyMass - decay.equilibriumKg) / (bodyMassTarget - decay.equilibriumKg)))
-    : Math.round((bodyMassTarget - lastBodyMass) / slope);
+      * Math.log((lastBodyMass - decay.equilibriumKg) / (arrivalTarget - decay.equilibriumKg)))
+    : Math.round((arrivalTarget - lastBodyMass) / slope);
   const etaDate = new Date(today);
   etaDate.setDate(today.getDate() + daysToTarget);
 
@@ -3042,7 +3170,7 @@ function calcProjection(entries) {
     projectedPoints.push({ date: isoFromDate(pd), bodyMass: Math.round(bodyMassAtDay(d) * 10) / 10 });
   }
   if (daysToTarget <= 365) {
-    projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: bodyMassTarget });
+    projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: Math.round(arrivalTarget * 10) / 10 });
   }
 
   return {
@@ -3130,7 +3258,13 @@ function renderWellnessProjectionChart(entries) {
     meterRemaining.textContent = privacyMode ? maskDigits(remainingText) : remainingText;
     meterRemaining.classList.toggle('danger', isWrongDirection);
 
-    const targetText = `→ ${bodyMassTarget} kg`;
+    // The swing (see glycogenSwingKg) alongside the target itself — the target line is a
+    // single number, but any reading within this band of it is glycogen and water, not a
+    // real miss, the same margin State Trend & Forecast's own zone and arrival math use.
+    const targetSwingKg = glycogenSwingKg(lastBodyMass, getSetting('HEIGHT_CM', null), getSettingString('SEX', null));
+    const targetText = targetSwingKg === null
+      ? `→ ${bodyMassTarget} kg`
+      : `→ ${bodyMassTarget} kg ± ${Math.round(targetSwingKg * 10) / 10} kg`;
     meterTarget.textContent = privacyMode ? maskDigits(targetText) : targetText;
   }
 
@@ -3202,7 +3336,13 @@ function renderWellnessProjectionChart(entries) {
     bodyMassSumsByDate.set(e.date, cur);
   });
   const bodyMassByDate = new Map([...bodyMassSumsByDate].map(([d, { sum, count }]) => [d, sum / count]));
+
+  // Read here, ahead of the trend, so the zone band below can be positioned against it.
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const sex = getSettingString('SEX', null);
+  const swingKg = glycogenSwingKg(lastBodyMass, heightCm, sex);
   const trendMap = computeBodyMassTrend(bodyMassByDate);
+  const zoneAnchorMap = swingKg === null ? null : computeGlycogenZoneAnchor(trendMap);
 
   const plateauDays = detectPlateau(trendMap);
   if (plateauDays) {
@@ -3221,6 +3361,48 @@ function renderWellnessProjectionChart(entries) {
 
   // No raw per-reading series: Body Mass already plots every reading, this is the trend.
   const datasets = [
+    // The zone anchor ± the glycogen/water swing — a band the trend line can wander
+    // inside without it being a real change. Tension matches the trend line's own
+    // curve — the anchor is an EMA (see computeGlycogenZoneAnchor), so it's already a
+    // continuous, slower-moving line, not a stepped one. Two line datasets rather than
+    // one: Chart.js fills the area BETWEEN a dataset and the one its `fill` points at,
+    // so the zone needs both edges plotted, just invisibly (borderWidth 0). Omitted
+    // whenever the swing can't be estimated (no height/sex on file) rather than drawn
+    // at 0, which would claim glycogen accounts for nothing.
+    ...(zoneAnchorMap !== null ? [
+      {
+        label: 'Glycogen + Water Swing (upper)',
+        data: allLabels.map((d) => {
+          const a = zoneAnchorMap.get(d);
+          return { x: dayOffset(d), y: a === undefined ? null : a + swingKg };
+        }),
+        borderWidth: 0,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+        spanGaps: false,
+        isSwingBand: true,
+        order: 5,
+      },
+      {
+        label: 'Glycogen + Water Swing',
+        data: allLabels.map((d) => {
+          const a = zoneAnchorMap.get(d);
+          return { x: dayOffset(d), y: a === undefined ? null : a - swingKg };
+        }),
+        // The zone reads as "normal noise", not a target or a warning, so it takes the
+        // app's neutral highlight rather than either of those colours.
+        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        borderWidth: 0,
+        pointRadius: 0,
+        tension: 0.3,
+        // Fills to the upper-bound dataset just above this one in the array.
+        fill: '-1',
+        spanGaps: false,
+        isSwingBand: true,
+        order: 5,
+      },
+    ] : []),
     {
       label: 'State Trend & Forecast',
       data: allLabels.map((d) => ({ x: dayOffset(d), y: trendMap.get(d) ?? null })),
@@ -3276,8 +3458,7 @@ function renderWellnessProjectionChart(entries) {
   // Skipped without a height: BMI can't be computed, and an empty scale is worse than
   // none. There's no BMI LINE either — BMI is a fixed linear rescale of body mass, so it
   // would retrace the body-mass line pixel for pixel, and the y1 axis alone lets it be
-  // read off that line.
-  const heightCm = getSetting('HEIGHT_CM', null);
+  // read off that line. (heightCm itself was read earlier, ahead of the trend.)
 
   // Left to auto-range, Chart.js can pick a BMI span that doesn't correspond to the
   // body-mass span, so a point on the chart would read as the wrong BMI off the right axis.
@@ -3287,8 +3468,10 @@ function renderWellnessProjectionChart(entries) {
   // round-number tick algorithm, which is what produced the clean 1 kg gridlines.
   //
   // Raw weigh-ins are excluded since they're no longer plotted. lastBodyMass stays — the
-  // projection starts from it.
-  const bodyMassValues = [...trendMap.values(), ...projMap.values(), lastBodyMass, bodyMassTarget]
+  // projection starts from it. The swing band's own edges are included so the padded
+  // axis can't clip the zone it's meant to fully show.
+  const trendExtremes = zoneAnchorMap === null ? [] : [...zoneAnchorMap.values()].flatMap((v) => [v + swingKg, v - swingKg]);
+  const bodyMassValues = [...trendMap.values(), ...projMap.values(), ...trendExtremes, lastBodyMass, bodyMassTarget]
     .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
   const bodyMassMin = Math.min(...bodyMassValues);
   const bodyMassMax = Math.max(...bodyMassValues);
@@ -3351,6 +3534,9 @@ function renderWellnessProjectionChart(entries) {
         // legend here left this plot area ~30px shorter. Series are named in the tooltip.
         legend: { display: false },
         tooltip: {
+          // The band's two edges are plotting geometry for the fill, not a reading —
+          // nothing on either line is itself a value worth reporting.
+          filter: (item) => !item.dataset.isSwingBand,
           callbacks: {
             title: (items) => offsetToDateLabel(items[0].parsed.x),
             label: maskedValueTooltipLabel,

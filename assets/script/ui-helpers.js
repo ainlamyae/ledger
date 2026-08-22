@@ -86,6 +86,14 @@ function onFormSubmit(formId, handler) {
   });
 }
 
+// Standard unit symbols for USDA's upper-case ones ("G" -> "g", "UG" or "ΜG" -> "µg").
+const STANDARD_UNITS = { g: 'g', mg: 'mg', ug: 'µg', 'µg': 'µg', 'μg': 'µg', mcg: 'µg', kcal: 'kcal', kj: 'kJ', iu: 'IU', mg_ate: 'mg α-TE' };
+
+function standardUnit(unit) {
+  const raw = String(unit ?? '').trim();
+  return STANDARD_UNITS[raw.toLowerCase()] || raw;
+}
+
 // Stays the default surface button whatever it does — these are all emoji, and
 // an emoji on a filled colour is hard to read. An onClick that returns a
 // promise (every delete does; the edit/duplicate ones just open a form and

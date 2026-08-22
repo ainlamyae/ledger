@@ -176,7 +176,7 @@ function findMicronutrient(data, name) {
 // proteinTarget are always shown regardless of whether anything was logged.
 function nutrientTargetAmount(name) {
   const target = nutrientDailyTargets()[name];
-  return target ? { amount: target.amount, unit: target.unit } : { amount: null, unit: 'G' };
+  return target ? { amount: target.amount, unit: target.unit } : { amount: null, unit: 'g' };
 }
 
 function gatherInsightMetrics(fromIso, toIso) {

@@ -392,7 +392,7 @@ function parseMicronutrients(raw) {
       if (name === NUTRITION_LOCK_KEY || !info || typeof info !== 'object') return;
       const top = NUTRITION_TOP_ROWS.find((r) => r.name === name);
       if ((top && !top.panel) || info.amount === null) return;
-      nutrients[top ? top.panel : name] = { amount: info.amount, unit: info.unit };
+      nutrients[top ? top.panel : name] = { amount: info.amount, unit: standardUnit(info.unit) };
     });
     return Object.keys(nutrients).length ? nutrients : null;
   } catch {

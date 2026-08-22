@@ -1167,7 +1167,14 @@
             </div>
 
             <div id="insight-preview-patterns" hidden>
-                <p class="hint" id="insight-patterns-period"></p>
+                <!-- Tune's period length row (without its symbol), starting at Tune's value; editable here. -->
+                <div class="formula-inputs" id="insight-patterns-period">
+                    <label class="formula-row" title="How many days each period averages — starts at Tune's period length">
+                        <span class="formula-name">period length</span>
+                        <input type="text" id="insight-patterns-period-days" inputmode="numeric">
+                        <span class="formula-unit">days</span>
+                    </label>
+                </div>
                 <div id="insight-patterns-profile" class="insight-data-preview"></div>
                 <div class="table-responsive">
                     <table id="insight-patterns-table">
@@ -2226,7 +2233,7 @@
                     <input type="time" id="physique-wake-time">
                 </label>
             </div>
-            <p>Sleep Duration: <span id="physique-sleep-duration">—</span> · Sleep Deprivation: <span id="physique-sleep-deprivation" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">—</span></p>
+            <p>Sleep: <span id="physique-sleep-duration">—</span> · Deprivation: <span id="physique-sleep-deprivation" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">—</span></p>
             <label>Consumption
                 <div class="autocomplete-anchor">
                     <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
@@ -2444,17 +2451,14 @@
             <label>Protein %
                 <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
             </label>
+            <label title="Complete never changes Amount">Amount
+                <input type="text" id="nutrition-amount" placeholder="1 scoop (32g)">
+            </label>
 
             <!-- One row per value, Tune's layout: lock tick, name, box, unit. A ticked row is
                  kept as typed — Complete never overwrites it (nutrition.js). Pulled
                  micronutrient rows are appended below the divider. -->
             <div class="formula-inputs" id="nutrition-fields">
-                <label class="formula-row" title="Complete never changes Amount, so it is always kept">
-                    <input type="checkbox" id="nutrition-lock-amount" checked disabled>
-                    <span class="formula-name">Amount</span>
-                    <input type="text" id="nutrition-amount" placeholder="1 scoop (32g)">
-                    <span class="formula-unit"></span>
-                </label>
                 <label class="formula-row">
                     <input type="checkbox" id="nutrition-lock-calories" data-lock-name="Calories">
                     <span class="formula-name">Calories</span>

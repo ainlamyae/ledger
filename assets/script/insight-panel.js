@@ -159,15 +159,26 @@ function initInsightPanel() {
     if (btn) loadInsightMode(btn.dataset.insightMode);
   });
 
+  // Patterns' period length: reloads only while Patterns is on screen.
+  document.getElementById('insight-patterns-period-days').addEventListener('input', () => {
+    if (insightLoaded && insightLoaded.mode === 'patterns') loadInsightMode('patterns');
+  });
+
   document.getElementById('insight-generate-btn').addEventListener('click', runInsightGeneration);
 }
 
-// Tune's L_p (period length): the box when it holds a number, else the saved setting.
+// Patterns' L_p box, starting at Tune's L_p (its box, else the saved setting); a blank
+// or invalid entry falls back to Tune's.
 function patternsChunkDays() {
   const saved = getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
-  const days = periodInputValue('formula-cal-period-days', saved);
-  document.getElementById('insight-patterns-period').textContent = `L_p (period length): ${days} days, from Tune.`;
-  return days;
+  const tuneDays = periodInputValue('formula-cal-period-days', saved);
+  const box = document.getElementById('insight-patterns-period-days');
+  box.placeholder = String(tuneDays);
+  if (box.dataset.defaulted !== '1') {
+    box.dataset.defaulted = '1';
+    box.value = String(tuneDays);
+  }
+  return periodInputValue('insight-patterns-period-days', tuneDays);
 }
 
 // The only path that computes anything. Gathers the mode's data for the current

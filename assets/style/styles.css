@@ -3111,6 +3111,11 @@ td .btn {
     font-size: .8rem;
 }
 
+/* Patterns' period length row: Tune's row without the symbol column. */
+#insight-patterns-period {
+    grid-template-columns: max-content 8.45rem max-content;
+}
+
 .formula-sym {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-style: italic;

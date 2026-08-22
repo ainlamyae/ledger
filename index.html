@@ -1167,7 +1167,14 @@
             </div>
 
             <div id="insight-preview-patterns" hidden>
-                <p class="hint" id="insight-patterns-period"></p>
+                <!-- Tune's period length row (without its symbol), starting at Tune's value; editable here. -->
+                <div class="formula-inputs" id="insight-patterns-period">
+                    <label class="formula-row" title="How many days each period averages — starts at Tune's period length">
+                        <span class="formula-name">period length</span>
+                        <input type="text" id="insight-patterns-period-days" inputmode="numeric">
+                        <span class="formula-unit">days</span>
+                    </label>
+                </div>
                 <div id="insight-patterns-profile" class="insight-data-preview"></div>
                 <div class="table-responsive">
                     <table id="insight-patterns-table">
@@ -2226,7 +2233,7 @@
                     <input type="time" id="physique-wake-time">
                 </label>
             </div>
-            <p>Sleep Duration: <span id="physique-sleep-duration">—</span> · Sleep Deprivation: <span id="physique-sleep-deprivation" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">—</span></p>
+            <p>Sleep: <span id="physique-sleep-duration">—</span> · Deprivation: <span id="physique-sleep-deprivation" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">—</span></p>
             <label>Consumption
                 <div class="autocomplete-anchor">
                     <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>

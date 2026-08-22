@@ -42,6 +42,8 @@ const INSIGHT_MODES = {
     // the prompt body rather than appending it, so appendQuestion is false.
     formatPrompt: (rows, { from, to, question }) => formatFoodInsightPrompt(rows, from, to, question),
     renderPreview: (rows, { from, to }) => renderFoodInsightPreview(rows, from, to),
+    // Group and ingredient lines: the table above.
+    dataLine: /^( {2}- |.+ — \d+ ingredients?, )/,
     appendQuestion: false,
     needsNutrition: true,
     systemPrompt: FOOD_INSIGHT_SYSTEM_PROMPT,
@@ -59,6 +61,7 @@ const INSIGHT_MODES = {
     // it has its own default question and phrasing built around it.
     formatPrompt: (data, { from, to, question }) => formatMicronutrientInsightPrompt(data, { from, to, question }),
     renderPreview: (data) => renderMicronutrientInsightPreview(data),
+    dataLine: /^ {2}- /,
     appendQuestion: false,
     needsNutrition: true,
     systemPrompt: MICRONUTRIENT_INSIGHT_SYSTEM_PROMPT,
@@ -97,7 +100,7 @@ const INSIGHT_MODES = {
     generatedAtKeys: ['INSIGHT_PROTEIN_LAST_GENERATED_AT'],
   },
   plan: {
-    label: 'Health Plan',
+    label: 'Plan',
     hint: '',
     questionPlaceholder: 'e.g. Is the deficit too aggressive for this timeline?',
     previewId: 'insight-preview-text',
@@ -120,6 +123,7 @@ const INSIGHT_MODES = {
     gather: (from, to) => gatherFatLossPatterns(from, to, patternsChunkDays()),
     formatPrompt: (data) => formatFatLossPatternPrompt(data),
     renderPreview: (data) => renderFatLossPatternPreview(data),
+    dataLine: / \| |^\(no logged periods/,
     appendQuestion: true,
     needsNutrition: false,
     systemPrompt: (data) => formatFatLossPatternSystemPrompt(data.chunkDays),
@@ -155,21 +159,15 @@ function initInsightPanel() {
     if (btn) loadInsightMode(btn.dataset.insightMode);
   });
 
-  // Same box as the Calibrate BMR panel's chunk-size field: reload only refires
-  // when Patterns is the mode on screen, so typing in it while another mode is
-  // loaded doesn't trigger a pointless recompute.
-  document.getElementById('insight-patterns-chunk-days').addEventListener('input', () => {
-    if (insightLoaded && insightLoaded.mode === 'patterns') loadInsightMode('patterns');
-  });
-
   document.getElementById('insight-generate-btn').addEventListener('click', runInsightGeneration);
 }
 
-// The typed period length, clamped to something sane — a blank/zero/negative/non-numeric
-// box falls back to the 14-day default rather than passing NaN or 0 through to date arithmetic.
+// Tune's L_p (period length): the box when it holds a number, else the saved setting.
 function patternsChunkDays() {
-  const raw = Number(document.getElementById('insight-patterns-chunk-days').value);
-  return (Number.isFinite(raw) && raw >= 1) ? Math.round(raw) : FAT_LOSS_PATTERN_CHUNK_DAYS_DEFAULT;
+  const saved = getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
+  const days = periodInputValue('formula-cal-period-days', saved);
+  document.getElementById('insight-patterns-period').textContent = `L_p (period length): ${days} days, from Tune.`;
+  return days;
 }
 
 // The only path that computes anything. Gathers the mode's data for the current
@@ -203,6 +201,7 @@ function loadInsightMode(modeKey) {
   textarea.placeholder = mode.questionPlaceholder;
   showInsightPreview(mode.previewId);
   mode.renderPreview(data, ctx);
+  renderInsightPromptTemplate(mode, data, ctx);
   renderSavedInsight(mode);
   setInsightModeButtons(modeKey);
 
@@ -253,6 +252,32 @@ function insightUserMessage(mode, data, ctx) {
     return `${prompt}\n\nAdditional question: ${ctx.question.trim()}`;
   }
   return prompt;
+}
+
+// The system prompt plus the user message, with every line the preview already
+// shows (or a table row of it) folded into one placeholder per run.
+function renderInsightPromptTemplate(mode, data, ctx) {
+  const preview = document.getElementById(mode.previewId);
+  const seen = new Set([...preview.querySelectorAll('p, td')].map((el) => el.textContent.trim()).filter(Boolean));
+  const isData = (line) => seen.has(line.trim()) || (mode.dataLine && mode.dataLine.test(line));
+
+  const lines = [];
+  mode.formatPrompt(data, { ...ctx, question: '' }).split('\n').forEach((line) => {
+    if (!line.trim() || !isData(line)) {
+      lines.push(line.replace(/^Question: .*/, (q) => `Question: [your question, else: ${q.slice(10)}]`));
+      return;
+    }
+    // Blank lines between two runs of data fold into the one placeholder too.
+    while (lines.length && !lines.at(-1).trim() && lines.some((l) => l.trim())
+      && lines.findLast((l) => l.trim()) === '[data shown above]') lines.pop();
+    if (lines.at(-1) !== '[data shown above]') lines.push('[data shown above]');
+  });
+  if (mode.appendQuestion) lines.push('', 'Additional question: [your question, if any]');
+
+  const system = typeof mode.systemPrompt === 'function' ? mode.systemPrompt(data) : mode.systemPrompt;
+  document.getElementById('insight-prompt-template').textContent =
+    `SYSTEM\n${system}\n\nUSER\n${lines.join('\n')}`;
+  document.getElementById('insight-prompt-details').hidden = false;
 }
 
 // Only runs on an explicit Send to AI click, on the already-loaded data — so

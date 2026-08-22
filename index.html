@@ -228,7 +228,8 @@
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
                 <div class="widget-row"><span>m̄</span><span id="today-status-mbar-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
-                <div class="widget-row"><span id="today-status-maintenance-label">BMR</span><span id="today-status-maintenance-value">—</span></div>
+                <div class="widget-row"><span>BMR_mif</span><span id="today-status-bmr-mif-value">—</span></div>
+                <div class="widget-row"><span>BMR_kat</span><span id="today-status-bmr-kat-value">—</span></div>
                 <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
                 <div class="widget-row"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
                 <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
@@ -269,7 +270,6 @@
         <div class="panel" id="health-tune-panel" data-route="tune">
             <div class="panel-header">
                 <h2>Tune</h2>
-                <button type="button" id="bmr-calibration-btn" data-route="calibrate" class="btn btn-secondary panel-header-btn" title="Back-solve your real BMR from the last 7 days' actual logged intake, activity and weight change, instead of the height/age/sex equation">Calibrate</button>
             </div>
 
             <div>
@@ -304,6 +304,10 @@
                     <label title="Uses whichever equation above is already active (BMR_FORMULA is untouched), but every deficit and desired calorie figure runs on it plus your saved Calibrate offset instead of the plain equation — the same switch as picking BMR_cal under 'Which BMR every deficit...' further down, exposed here too. Falls back to the plain equation until a calibration has been saved.">
                         <input type="radio" name="formula-bmr-formula" value="bmr_cal">
                         BMR_cal (calibrated)
+                    </label>
+                    <label title="Uses whichever equation above is already active (BMR_FORMULA is untouched), but every deficit and desired calorie figure runs on it scaled by (1 − λt), the metabolic adaptation for days on the diet — the same switch as picking BMR_adp under 'Which BMR every deficit...' further down, exposed here too.">
+                        <input type="radio" name="formula-bmr-formula" value="bmr_adp">
+                        BMR_adp (adapted)
                     </label>
                 </fieldset>
 
@@ -405,13 +409,13 @@
                         <span class="formula-unit">kcal/day</span>
                     </label>
                     <hr class="formula-divider">
-                    <label class="formula-row" title="How many back-to-back periods BMR_cal averages, ending yesterday — the same box as the Calibrate form's">
+                    <label class="formula-row" title="How many back-to-back periods BMR_cal averages, ending yesterday">
                         <span class="formula-sym">n_p</span>
                         <span class="formula-name">number of periods</span>
                         <input type="text" id="formula-cal-period-count" inputmode="numeric">
                         <span class="formula-unit">periods</span>
                     </label>
-                    <label class="formula-row" title="How many days each period averages — the same box as the Calibrate form's">
+                    <label class="formula-row" title="How many days each period averages">
                         <span class="formula-sym">L_p</span>
                         <span class="formula-name">period length</span>
                         <input type="text" id="formula-cal-period-days" inputmode="numeric">
@@ -422,6 +426,36 @@
                         <span class="formula-name">calibrated basal metabolic rate</span>
                         <input type="text" id="formula-bmr-cal" inputmode="decimal" readonly>
                         <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <hr class="formula-divider">
+                    <!-- The adaptation pair and what it does to BMR by the arrival date t (below). -->
+                    <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
+                        <span class="formula-sym">λ</span>
+                        <span class="formula-name">metabolic adaptation, per week on the diet</span>
+                        <input type="text" id="formula-adapt-per-week" inputmode="decimal">
+                        <span class="formula-unit">% of BMR/week</span>
+                    </label>
+                    <label class="formula-row" title="Where λt stops growing. The literature puts the floor around 10–15% below the predicted BMR, reached by week 10–12 — past that, further loss comes from mass rather than deepening adaptation.">
+                        <span class="formula-sym">λt_max</span>
+                        <span class="formula-name">adaptation ceiling</span>
+                        <input type="text" id="formula-adapt-cap" inputmode="decimal">
+                        <span class="formula-unit">% of BMR</span>
+                    </label>
+                    <label class="formula-row" title="BMR_adapt(t) = BMR × (1 − λt), at the day count t above.">
+                        <span class="formula-sym">BMR_adp</span>
+                        <span class="formula-name">adapted BMR by t</span>
+                        <input type="text" id="formula-bmr-adapt" inputmode="decimal" readonly>
+                        <span class="formula-unit">kcal/day</span>
+                    </label>
+                    <label class="formula-row" title="The plateau once BMR has adapted: the same m∞ = (TEI − A)/B with the BMR half of A and B scaled by (1 − λt). It sits ABOVE the m∞ printed in the trace, and that gap is why a constant-BMR forecast tends to overshoot in practice.">
+                        <span class="formula-sym">m∞_adp</span>
+                        <span class="formula-name">adapted plateau, and the overshoot it implies</span>
+                        <input type="text" id="formula-plateau-adapt" inputmode="decimal" readonly>
+                        <!-- `kg` and nothing else, like every other row: the overshoot against m∞,
+                             and the fact that a proportional journey has no plateau to overshoot,
+                             are both said in the substituted trace. Same rule the Δm% verdict
+                             follows — the unit column is a unit. -->
+                        <span class="formula-unit">kg</span>
                     </label>
                     <!-- Marks the end of the profile block (m, m̄, h, a, σ, m_des, BMI_des, LBM,
                          BMR) before the activity block starts below. -->
@@ -587,40 +621,7 @@
                         <input type="date" id="formula-eta">
                         <span class="formula-unit" id="formula-eta-note"></span>
                     </label>
-                    <!-- After t, because both of these are only meaningful measured along it: λ is a
-                         rate per week ON the diet, and the two readonly rows below are what it has
-                         done by the arrival date above. Nothing here changes TEI, D or t — see
-                         adaptedPlateauKg in wellness-math.js for why adaptation is reported and not
-                         planned with. -->
-                    <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
-                        <span class="formula-sym">λ</span>
-                        <span class="formula-name">metabolic adaptation, per week on the diet</span>
-                        <input type="text" id="formula-adapt-per-week" inputmode="decimal">
-                        <span class="formula-unit">% of BMR/week</span>
-                    </label>
-                    <label class="formula-row" title="Where λt stops growing. The literature puts the floor around 10–15% below the predicted BMR, reached by week 10–12 — past that, further loss comes from mass rather than deepening adaptation.">
-                        <span class="formula-sym">λt_max</span>
-                        <span class="formula-name">adaptation ceiling</span>
-                        <input type="text" id="formula-adapt-cap" inputmode="decimal">
-                        <span class="formula-unit">% of BMR</span>
-                    </label>
-                    <label class="formula-row" title="BMR_adapt(t) = BMR × (1 − λt), at the day count t above.">
-                        <span class="formula-sym">BMR_adp</span>
-                        <span class="formula-name">adapted BMR by t</span>
-                        <input type="text" id="formula-bmr-adapt" inputmode="decimal" readonly>
-                        <span class="formula-unit">kcal/day</span>
-                    </label>
-                    <label class="formula-row" title="The plateau once BMR has adapted: the same m∞ = (TEI − A)/B with the BMR half of A and B scaled by (1 − λt). It sits ABOVE the m∞ printed in the trace, and that gap is why a constant-BMR forecast tends to overshoot in practice.">
-                        <span class="formula-sym">m∞_adp</span>
-                        <span class="formula-name">adapted plateau, and the overshoot it implies</span>
-                        <input type="text" id="formula-plateau-adapt" inputmode="decimal" readonly>
-                        <!-- `kg` and nothing else, like every other row: the overshoot against m∞,
-                             and the fact that a proportional journey has no plateau to overshoot,
-                             are both said in the substituted trace. Same rule the Δm% verdict
-                             follows — the unit column is a unit. -->
-                        <span class="formula-unit">kg</span>
-                    </label>
-                    <!-- Marks the end of the journey block (t, arrival date, adaptation) before the
+                    <!-- Marks the end of the journey block (t, arrival date) before the
                          glycogen block starts below. -->
                     <hr class="formula-divider">
                     <!-- Glycogen follows the journey block now, straight after LBM up with the
@@ -831,8 +832,28 @@
                      modes by renderFormulaSubstituted itself, since no calorie identity involves
                      protein and a failed calorie solve has no bearing on them. -->
                 <details id="formula-substituted-details">
-                    <summary>Calculation</summary>
+                    <summary>Calculations</summary>
                     <div id="formula-substituted" class="formula-substituted"></div>
+
+                    <!-- BMR_cal's own working over Tune's n_p × L_p (bmr-calibration.js). -->
+                    <h4>Periods</h4>
+                    <div class="table-responsive">
+                        <table>
+                        <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th title="Body mass (kg) — smoothed mass ending this period's last day, the mass this period's own equation BMR is evaluated at">m</th>
+                            <th title="Change in body mass over this period (this period's mass minus the previous one's) — negative means mass lost, same sign convention as the Status card's own Δm">Δm</th>
+                            <th title="Δm × 7700 / period length — this period's mass change, as a daily fat-equivalent energy rate. MEASURED, independent of the equation">ΔM (kcal)</th>
+                            <th title="Average of the Daily table's own D over this period — what the CURRENT equation BMR implies happened, not independent of it">D</th>
+                            <th title="D minus ΔM — the gap between what the equation implies and what was actually measured. 0 means the equation already agrees with reality; the per-period figures here are what the final, recency-weighted Offset is built from">Offset</th>
+                            <th title="Linear recency weight — 0.1 for the oldest period in the window, 1.0 for the newest, so months of history can be included without outvoting the most recent one">Weight</th>
+                        </tr>
+                        </thead>
+                        <tbody id="formula-cal-weeks-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="formula-cal-substituted" class="formula-substituted"></div>
                 </details>
 
                 <fieldset class="formula-solve-for formula-pin-mode">
@@ -865,17 +886,21 @@
 
                 <fieldset class="formula-solve-for formula-bmr-basis">
                     <legend>Which BMR every deficit and desired calorie figure runs on, everywhere in the app</legend>
-                    <label title="BMR as-is, with no adaptation discount. The behaviour every existing sheet already has.">
-                        <input type="radio" name="formula-bmr-basis" value="bmr" checked>
-                        Plain BMR
+                    <label title="Plain Mifflin-St Jeor BMR, with no adaptation or calibration. Same choice as Mifflin-St Jeor above.">
+                        <input type="radio" name="formula-bmr-basis" value="mifflin">
+                        BMR_mif
+                    </label>
+                    <label title="Plain Katch-McArdle BMR, with no adaptation or calibration. Same choice as Katch-McArdle above.">
+                        <input type="radio" name="formula-bmr-basis" value="katch">
+                        BMR_kat
+                    </label>
+                    <label title="BMR back-solved from your own logged data (BMR_cal in Tune, measured over n_p × L_p) instead of the height/age/sex equation — shifts the equation's whole line up or down to match what was actually measured, keeping its slope. Falls back to the plain equation until a calibration has been saved.">
+                        <input type="radio" name="formula-bmr-basis" value="bmr_cal">
+                        BMR_cal
                     </label>
                     <label title="BMR discounted by days actually elapsed since your first logged weigh-in (daysSinceFirstWeighIn, wellness-math.js) — how adapted metabolism realistically is by now, not a flat guess. Switches the Status card's D/Δm, the Calorie Balance chart's per-day Maintenance, the desired calorie intake everywhere it's shown, and Physique's own maintenance figure, all at once.">
                         <input type="radio" name="formula-bmr-basis" value="bmr_adp">
                         BMR_adp
-                    </label>
-                    <label title="BMR back-solved from your own logged data (the Calibrate form, in Tune) instead of the height/age/sex equation — shifts the equation's whole line up or down to match what was actually measured, keeping its slope. Falls back to Plain BMR until a calibration has been saved.">
-                        <input type="radio" name="formula-bmr-basis" value="bmr_cal">
-                        BMR_cal
                     </label>
                 </fieldset>
 
@@ -884,6 +909,7 @@
 
                 <div class="panel-actions">
                     <button type="button" id="formula-reset-btn" class="btn">Reset</button>
+                    <button type="button" id="formula-update-btn" class="btn" title="Save this n_p / L_p and recompute BMR_cal (and every stored BMR figure) for every day in the Physique sheet">Update</button>
                     <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
                 </div>
             </div>
@@ -1080,16 +1106,25 @@
             </div>
 
             <div class="insight-mode-actions" id="insight-mode-actions">
-                <button type="button" class="btn" data-insight-mode="wellness" aria-pressed="false">Wellness</button>
-                <button type="button" class="btn" data-insight-mode="food" aria-pressed="false">Food</button>
-                <button type="button" class="btn" data-insight-mode="micronutrients" aria-pressed="false">Micronutrients</button>
-                <button type="button" class="btn" data-insight-mode="activity" aria-pressed="false">Activity</button>
-                <button type="button" class="btn" data-insight-mode="protein" aria-pressed="false">Protein Sources</button>
-                <button type="button" class="btn" data-insight-mode="plan" aria-pressed="false">Health Plan</button>
-                <button type="button" class="btn" data-insight-mode="patterns" aria-pressed="false" title="Send the Calibrate BMR periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR">Patterns</button>
+                <button type="button" class="btn" data-insight-mode="wellness" data-route="wellness" data-route-view aria-pressed="false">Wellness</button>
+                <button type="button" class="btn" data-insight-mode="food" data-route="food" data-route-view aria-pressed="false">Food</button>
+                <button type="button" class="btn" data-insight-mode="micronutrients" data-route="micronutrients" data-route-view aria-pressed="false">Micronutrients</button>
+                <button type="button" class="btn" data-insight-mode="activity" data-route="activity" data-route-view aria-pressed="false">Activity</button>
+                <button type="button" class="btn" data-insight-mode="protein" data-route="protein-sources" data-route-view aria-pressed="false">Protein Sources</button>
+                <button type="button" class="btn" data-insight-mode="plan" data-route="plan" data-route-view aria-pressed="false">Plan</button>
+                <button type="button" class="btn" data-insight-mode="patterns" data-route="patterns" data-route-view aria-pressed="false" title="Send the BMR_cal periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR">Patterns</button>
             </div>
 
             <p class="hint" id="insight-mode-status"></p>
+
+            <!-- What Send to AI sends for the loaded mode, with the data already on screen
+                 left as placeholders; Tune's Equations dropdown style. -->
+            <details id="insight-prompt-details" hidden>
+                <summary>Prompt template</summary>
+                <div class="table-responsive">
+                    <pre id="insight-prompt-template"></pre>
+                </div>
+            </details>
 
             <div id="insight-preview-text" class="insight-data-preview" hidden></div>
 
@@ -1132,10 +1167,7 @@
             </div>
 
             <div id="insight-preview-patterns" hidden>
-                <label class="insight-patterns-days-label" for="insight-patterns-chunk-days">Average over
-                    <input type="text" id="insight-patterns-chunk-days" inputmode="numeric" value="14">
-                    days
-                </label>
+                <p class="hint" id="insight-patterns-period"></p>
                 <div id="insight-patterns-profile" class="insight-data-preview"></div>
                 <div class="table-responsive">
                     <table id="insight-patterns-table">
@@ -1145,6 +1177,10 @@
                             <th title="Smoothed body mass (kg) at the period's last day">m</th>
                             <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
                             <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
+                            <th title="Basal metabolic rate by Mifflin-St Jeor — the period's average of each day's stored BMR, kcal/day">BMR_mif</th>
+                            <th title="Basal metabolic rate by Katch-McArdle — the period's average of each day's stored BMR, kcal/day">BMR_kat</th>
+                            <th title="Calibrated basal metabolic rate — the period's average of each day's stored BMR_cal, kcal/day">BMR_cal</th>
+                            <th title="Adapted basal metabolic rate by t — the period's average of each day's stored BMR_adp, kcal/day">BMR_adp</th>
                             <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
                             <th title="Total energy intake, kcal/day">TEI</th>
                             <th title="Grams/day">Protein</th>
@@ -1271,9 +1307,8 @@
                         <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
                         <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
                         <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
-                        <th class="sortable" data-sort="verified" title="Verified against the label on your own purchased ingredient">Verified</th>
                         <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
-                        <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click 🧬 Pull Micronutrients to fill this in. Sorts by how many nutrients have been pulled.">Micronutrients</th>
+                        <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click Complete to fill this in. Shows and sorts by how many micronutrients are non-zero.">Micro</th>
                         <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
                         <th></th>
                     </tr>
@@ -1286,7 +1321,7 @@
                 <span id="nutrition-bulk-summary"></span>
                 <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
                 <button id="nutrition-bulk-capitalize-btn" class="btn" title="Capitalize each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field">Capitalize Names</button>
-                <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">🧬 Pull Micronutrients</button>
+                <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">Complete</button>
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
 
@@ -1698,22 +1733,33 @@
                 </div>
                 <div class="donut-legend" id="car-service-legend"></div>
             </div>
-            <p class="hint" id="car-service-summary"></p>
 
+            <h4>Predicted</h4>
             <div class="table-responsive">
-                <table id="car-service-table" class="table-compact">
+                <table id="car-service-predicted-table" class="table-compact car-service-table">
                     <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Payee</th>
-                        <th>Service</th>
                         <th>Odometer</th>
-                        <th>Amount</th>
-                        <th>Status</th>
+                        <th>Service</th>
                         <th>Basis</th>
                     </tr>
                     </thead>
-                    <tbody id="car-service-body"></tbody>
+                    <tbody id="car-service-predicted-body"></tbody>
+                </table>
+            </div>
+
+            <h4>Done</h4>
+            <div class="table-responsive">
+                <table id="car-service-done-table" class="table-compact car-service-table">
+                    <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Odometer</th>
+                        <th>Service</th>
+                    </tr>
+                    </thead>
+                    <tbody id="car-service-done-body"></tbody>
                 </table>
             </div>
         </div>
@@ -2303,70 +2349,6 @@
     </div>
 </div>
 
-<div id="bmr-calibration-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="bmr-calibration-title" hidden>
-    <div class="modal-card">
-        <h2 id="bmr-calibration-title">Calibrate BMR</h2>
-
-        <div class="app-form">
-            <div class="form-row">
-                <label title="How many back-to-back periods to average, ending yesterday — 3 periods of 10 days covers the last 30 days">Number of periods
-                    <input type="text" id="bmr-calibration-period-count" inputmode="numeric" value="3">
-                </label>
-                <label title="How many days each period averages">Period length (days)
-                    <input type="text" id="bmr-calibration-period-days" inputmode="numeric" value="10">
-                </label>
-            </div>
-        </div>
-
-        <h4>Daily</h4>
-        <div id="bmr-calibration-days" class="table-responsive">
-            <table>
-                <thead>
-                <tr>
-                    <th>Date</th>
-                    <th title="Body mass (kg) — 7-day smoothed, the same mass this day's own equation BMR (and SD/D below) is evaluated at">m</th>
-                    <th title="Sleep Deprivation Effect — extra kcal this day's short sleep cost, against that day's own equation BMR">SD</th>
-                    <th title="Total Energy Intake — logged Calories In">TEI</th>
-                    <th title="Thermic Effect of Food — this day's own measured figure, or the flat f-share estimate when it has none">TEF</th>
-                    <th title="Activity Energy Expenditure — logged Calories Out (workout burn)">AEE</th>
-                    <th title="Daily Energy Balance — TEI minus maintenance, AEE and TEF, plus the Sleep Deprivation Effect. Negative is a deficit, positive a surplus">D</th>
-                </tr>
-                </thead>
-                <tbody id="bmr-calibration-days-body"></tbody>
-            </table>
-        </div>
-
-        <h4>Periods</h4>
-        <div id="bmr-calibration-weeks" class="table-responsive">
-            <table>
-                <thead>
-                <tr>
-                    <th>Period</th>
-                    <th title="Body mass (kg) — smoothed mass ending this period's last day, the mass this period's own equation BMR is evaluated at">m</th>
-                    <th title="Change in body mass over this period (this period's mass minus the previous one's) — negative means mass lost, same sign convention as the Status card's own Δm">Δm</th>
-                    <th title="Δm × 7700 / period length — this period's mass change, as a daily fat-equivalent energy rate. MEASURED, independent of the equation">ΔM (kcal)</th>
-                    <th title="Average of the Daily table's own D over this period — what the CURRENT equation BMR implies happened, not independent of it">D</th>
-                    <th title="D minus ΔM — the gap between what the equation implies and what was actually measured. 0 means the equation already agrees with reality; the per-period figures here are what the final, recency-weighted Offset is built from">Offset</th>
-                    <th title="Linear recency weight — 0.1 for the oldest period in the window, 1.0 for the newest, so months of history can be included without outvoting the most recent one">Weight</th>
-                </tr>
-                </thead>
-                <tbody id="bmr-calibration-weeks-body"></tbody>
-            </table>
-        </div>
-
-        <div id="bmr-calibration-substituted" class="formula-substituted"></div>
-
-        <p id="bmr-calibration-status" class="status" hidden></p>
-
-        <div class="modal-actions">
-            <button type="button" id="bmr-calibration-refresh-btn" class="btn">Recalculate</button>
-            <button type="button" id="bmr-calibration-update-btn" class="btn" title="Save this Number of periods / Period length and recompute BMR_cal (and every stored BMR figure) for every day in the Physique sheet">Update</button>
-            <button type="button" id="bmr-calibration-save-btn" class="btn btn-primary" disabled>Save</button>
-            <button type="button" id="bmr-calibration-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
-        </div>
-    </div>
-</div>
-
 <div id="activity-instruction-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="activity-instruction-title" hidden>
     <div class="modal-card">
         <h2 id="activity-instruction-title">Instructions on the Activities</h2>
@@ -2459,44 +2441,63 @@
             <label>Name
                 <input type="text" id="nutrition-name">
             </label>
-            <label>Amount
-                <input type="text" id="nutrition-amount" placeholder="e.g. 1 scoop (32g), or 1 rice cake">
-            </label>
-            <label>Calories (kcal)
-                <input type="text" id="nutrition-calories">
-            </label>
-            <label>Protein (g)
-                <input type="text" id="nutrition-protein">
-            </label>
-            <label>Dietary Fiber (g)
-                <input type="text" id="nutrition-fiber" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
-            </label>
-            <label>Fat (g)
-                <input type="text" id="nutrition-fat" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
-            </label>
-            <label>Carbohydrates (g)
-                <input type="text" id="nutrition-carb" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
-            </label>
-            <label>TEF (kcal)
-                <input type="text" id="nutrition-tef" placeholder="optional — pre-filled from the Atwater/TEF-share formula">
-            </label>
-            <label class="checkbox-inline-label">
-                <input type="checkbox" id="nutrition-verified">
-                Verified against the label on my own purchased ingredient
-            </label>
             <label>Protein %
                 <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
             </label>
 
-            <details id="nutrition-micronutrients-details" hidden>
-                <summary>Micronutrients</summary>
-                <ul id="nutrition-micronutrients-list" class="micronutrients-list"></ul>
-            </details>
+            <!-- One row per value, Tune's layout: lock tick, name, box, unit. A ticked row is
+                 kept as typed — Complete never overwrites it (nutrition.js). Pulled
+                 micronutrient rows are appended below the divider. -->
+            <div class="formula-inputs" id="nutrition-fields">
+                <label class="formula-row" title="Complete never changes Amount, so it is always kept">
+                    <input type="checkbox" id="nutrition-lock-amount" checked disabled>
+                    <span class="formula-name">Amount</span>
+                    <input type="text" id="nutrition-amount" placeholder="1 scoop (32g)">
+                    <span class="formula-unit"></span>
+                </label>
+                <label class="formula-row">
+                    <input type="checkbox" id="nutrition-lock-calories" data-lock-name="Calories">
+                    <span class="formula-name">Calories</span>
+                    <input type="text" id="nutrition-calories">
+                    <span class="formula-unit">kcal</span>
+                </label>
+                <label class="formula-row">
+                    <input type="checkbox" id="nutrition-lock-protein" data-lock-name="Protein">
+                    <span class="formula-name">Protein</span>
+                    <input type="text" id="nutrition-protein">
+                    <span class="formula-unit">g</span>
+                </label>
+                <label class="formula-row">
+                    <input type="checkbox" id="nutrition-lock-fiber" data-lock-name="Dietary Fiber">
+                    <span class="formula-name">Dietary Fiber</span>
+                    <input type="text" id="nutrition-fiber">
+                    <span class="formula-unit">g</span>
+                </label>
+                <label class="formula-row">
+                    <input type="checkbox" id="nutrition-lock-fat" data-lock-name="Fat">
+                    <span class="formula-name">Fat</span>
+                    <input type="text" id="nutrition-fat">
+                    <span class="formula-unit">g</span>
+                </label>
+                <label class="formula-row">
+                    <input type="checkbox" id="nutrition-lock-carb" data-lock-name="Carbohydrates">
+                    <span class="formula-name">Carbohydrates</span>
+                    <input type="text" id="nutrition-carb">
+                    <span class="formula-unit">g</span>
+                </label>
+                <label class="formula-row" title="Blank uses the Atwater/TEF-share estimate">
+                    <input type="checkbox" id="nutrition-lock-tef" data-lock-name="TEF">
+                    <span class="formula-name">TEF</span>
+                    <input type="text" id="nutrition-tef">
+                    <span class="formula-unit">kcal</span>
+                </label>
+                <hr class="formula-divider" id="nutrition-micro-divider" hidden>
+            </div>
 
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">🧬 Pull Micronutrients</button>
+                <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">Complete</button>
                 <button type="button" id="nutrition-normalize-btn" class="btn" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure">Normalize</button>
                 <button type="button" id="nutrition-update-btn" class="btn" hidden title="Save these changes, then find every Physique day whose Consumption mentions this ingredient's OLD name and rewrite those lines (renaming them if the name changed) plus their Breakdown entries and day totals to match — for any line whose unit can't be locally rescaled (e.g. cup, tbsp), only the name is updated">Update</button>
                 <button type="button" id="nutrition-log-btn" class="btn btn-primary" title="Log this ingredient as today's Consumption">Log</button>

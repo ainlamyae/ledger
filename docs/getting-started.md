@@ -47,10 +47,10 @@ const CONFIG = {
 ## 4. Run locally
 
 ```sh
-python -m http.server 8000
+python scripts/serve.py 8000
 ```
 
-Then open `http://localhost:8000`. No build step.
+Then open `http://localhost:8000`. No build step. `serve.py` is `python -m http.server` plus GitHub Pages' `404.html` fallback, which row Edit addresses such as `/health/nutrition/onion/` need.
 
 ---
 

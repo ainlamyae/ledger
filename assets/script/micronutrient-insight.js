@@ -114,6 +114,8 @@ function aggregateMicronutrientIntake(from, to) {
         severity: target ? nutrientGapSeverity(target.kind, perDay, target.amount) : null,
       };
     })
+    // Zero eaten with no target (or a zero one) says nothing; a zero against a real target is a gap.
+    .filter((n) => n.total !== 0 || (n.ideal !== null && n.ideal !== 0))
     // Nutrients with a known target lead (alphabetical), then everything
     // without one (alphabetical) — so the rows worth judging against a goal
     // aren't scattered through dozens of reference-only ones.

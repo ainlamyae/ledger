@@ -1,7 +1,8 @@
-// Calibrate: measures how wrong the equation's BMR actually is, from logged data over a
-// trailing window (a number of chunk-sized periods ending yesterday), rather than trying
-// to predict BMR from height/age/sex (or lean mass) alone. In the Health Tune
-// header. Local only, no AI — every number in the trace is one this app already tracks.
+// BMR calibration: measures how wrong the equation's BMR actually is, from logged data over
+// a trailing window (n_p periods of L_p days ending yesterday), rather than trying to
+// predict BMR from height/age/sex (or lean mass) alone. Shown in Tune (BMR_cal row, its
+// Periods under Calculations, Update) and stored per day in Physique's BMR column.
+// Local only, no AI — every number in the trace is one this app already tracks.
 //
 // The core idea is two INDEPENDENT estimates of the same day's energy deficit, compared:
 //   D  = TEI − equationBMR − AEE − TEF (+SD)   — what the CURRENT equation BMR implies happened
@@ -239,40 +240,9 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
   };
 }
 
-function renderBmrCalibrationDays(days, chunkDays) {
-  const tbody = document.getElementById('bmr-calibration-days-body');
-  tbody.innerHTML = '';
-  days.forEach((d, i) => {
-    const tr = document.createElement('tr');
-    // SD, TEI, TEF, AEE — the same relative order the Physique table itself lists these
-    // four in (#physique-table), not the order they were added to this form. D (Deficit)
-    // has no Physique-table precedent to match, so it's appended last, as asked.
-    const cells = [
-      d.date,
-      d.m === null ? '—' : d.m.toFixed(1),
-      d.sd === null ? '—' : String(d.sd),
-      d.caloriesIn === null ? '—' : String(d.caloriesIn),
-      d.tef === null ? '—' : String(d.tef),
-      d.caloriesOut === null ? '—' : String(d.caloriesOut),
-      d.deficit === null ? '—' : String(d.deficit),
-    ];
-    cells.forEach((text) => {
-      const td = document.createElement('td');
-      td.textContent = privacyMode ? maskDigits(text) : text;
-      tr.appendChild(td);
-    });
-    if (!d.eligible) tr.style.opacity = '0.5';
-    // One line per period — the same visual idea as the Physique table's own
-    // .physique-week-start, just on a fixed chunkDays-row block instead of a calendar week
-    // (this form's periods don't necessarily start on a Sunday, or even span 7 days). Skips
-    // row 0: the table header already separates it from whatever's above.
-    if (i > 0 && i % chunkDays === 0) tr.classList.add('bmr-calibration-week-start');
-    tbody.appendChild(tr);
-  });
-}
-
-function renderBmrCalibrationWeeks(weeks) {
-  const tbody = document.getElementById('bmr-calibration-weeks-body');
+// Tune's Periods table and lines, under Calculations.
+function renderBmrCalibrationWeeks(weeks, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
   tbody.innerHTML = '';
   weeks.forEach((w) => {
     const tr = document.createElement('tr');
@@ -298,8 +268,8 @@ function renderBmrCalibrationWeeks(weeks) {
   });
 }
 
-function renderBmrCalibrationSubstituted(result) {
-  const el = document.getElementById('bmr-calibration-substituted');
+function renderBmrCalibrationSubstituted(result, elId) {
+  const el = document.getElementById(elId);
   el.innerHTML = '';
   if (!result.ok) return;
 
@@ -326,86 +296,16 @@ function periodInputValue(inputId, fallback) {
   return (Number.isFinite(raw) && raw >= 1) ? Math.round(raw) : fallback;
 }
 
-function bmrCalibrationPeriodDays() {
-  return periodInputValue('bmr-calibration-period-days', BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
-}
-
-function bmrCalibrationPeriodCount() {
-  return periodInputValue('bmr-calibration-period-count', BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);
-}
-
 // Ends yesterday: today is usually still being logged. Shared with Tune's BMR_cal.
 function bmrCalibrationForWindow(periodCount, periodDays) {
   return computeBmrCalibration(null, periodDays, isoDateFromDays(-1), periodCount);
 }
 
-function refreshBmrCalibration() {
-  clearFieldError('bmr-calibration-status');
-  const result = bmrCalibrationForWindow(bmrCalibrationPeriodCount(), bmrCalibrationPeriodDays());
-  renderBmrCalibrationDays(result.days, result.chunkDays);
-  renderBmrCalibrationWeeks(result.weeks);
-  renderBmrCalibrationSubstituted(result);
-
-  const saveBtn = document.getElementById('bmr-calibration-save-btn');
-  if (!result.ok) {
-    saveBtn.disabled = true;
-    showFieldError('bmr-calibration-status', result.reason);
-    return null;
-  }
-  saveBtn.disabled = false;
-  return result;
-}
-
-// Opens on Tune's n_p / L_p while Tune is expanded, the saved setting otherwise.
-function openBmrCalibrationForm() {
-  const tuneOpen = !document.getElementById('health-tune-panel').classList.contains('collapsed');
-  [['bmr-calibration-period-count', CALIBRATION_FORMULA_FIELDS[0]],
-    ['bmr-calibration-period-days', CALIBRATION_FORMULA_FIELDS[1]]].forEach(([id, field]) => {
-    const tuneValue = tuneOpen ? document.getElementById(field.inputId).value.trim() : '';
-    document.getElementById(id).value = tuneValue || formulaFieldValue(field);
-  });
-  refreshBmrCalibration();
-  document.getElementById('bmr-calibration-modal').hidden = false;
-}
-
-function closeBmrCalibrationForm() {
-  document.getElementById('bmr-calibration-modal').hidden = true;
-}
-
-async function saveBmrCalibration() {
-  // Re-run rather than trust whatever's already on screen — Physique data (or Settings) may
-  // have changed in the time the modal's been open, and Save should never persist a stale
-  // trace's numbers.
-  const result = refreshBmrCalibration();
-  if (!result) return;
-
-  try {
-    const periodCount = bmrCalibrationPeriodCount();
-    const periodDays = bmrCalibrationPeriodDays();
-    await saveSettingValues({
-      [BMR_CALIBRATED_KCAL_KEY]: result.bmrCal,
-      [BMR_CALIBRATED_OFFSET_KEY]: result.offsetKcal,
-      [BMR_CALIBRATION_PERIOD_COUNT_KEY]: periodCount,
-      [BMR_CALIBRATION_PERIOD_DAYS_KEY]: periodDays,
-    });
-    // An open Tune moves to the window just saved; a closed one reseeds on expand.
-    if (!document.getElementById('health-tune-panel').classList.contains('collapsed')) {
-      document.getElementById('formula-cal-period-count').value = periodCount;
-      document.getElementById('formula-cal-period-days').value = periodDays;
-      renderFormulaPreview();
-    }
-    showFieldError('bmr-calibration-status', `Saved — BMR_cal is ${result.bmrCal} kcal/day (${withExplicitSign(result.offsetKcal)} kcal from the equation). Pick "BMR_cal" under Tune's BMR basis to actually use it.`);
-    renderWellnessCharts(physiqueAsWellnessEntries());
-  } catch (err) {
-    showFieldError('bmr-calibration-status', err.message);
-  }
-}
-
-// Update: saves this n_p / L_p and rewrites every day's stored BMR cell (its BMR_cal
+// Tune's Update: saves n_p / L_p and rewrites every day's stored BMR cell (its BMR_cal
 // over the new window) in the Physique sheet, in one request.
 async function updateStoredBmrCalibration() {
-  const periodCount = bmrCalibrationPeriodCount();
-  const periodDays = bmrCalibrationPeriodDays();
+  const periodCount = periodInputValue('formula-cal-period-count', BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);
+  const periodDays = periodInputValue('formula-cal-period-days', BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
   if (!confirm(`Recompute BMR_cal for every day in the Physique sheet, over ${periodCount} × ${periodDays} days?`)) return;
 
   const unchanged = getSetting(BMR_CALIBRATION_PERIOD_COUNT_KEY, null) === periodCount
@@ -419,19 +319,12 @@ async function updateStoredBmrCalibration() {
         [BMR_CALIBRATION_PERIOD_DAYS_KEY]: periodDays,
       });
     if (days === null) throw new Error('Writing the BMR column failed — see the console.');
-    refreshBmrCalibration();
-    showFieldError('bmr-calibration-status', `Updated — BMR_cal recomputed over ${periodCount} × ${periodDays} days for ${days} days in the Physique sheet.`);
+    showFieldError('formula-status', `Updated — BMR_cal recomputed over ${periodCount} × ${periodDays} days for ${days} days in the Physique sheet.`);
   } catch (err) {
-    showFieldError('bmr-calibration-status', err.message);
+    showFieldError('formula-status', err.message);
   }
 }
 
 function initBmrCalibration() {
-  document.getElementById('bmr-calibration-btn').addEventListener('click', openBmrCalibrationForm);
-  document.getElementById('bmr-calibration-refresh-btn').addEventListener('click', refreshBmrCalibration);
-  document.getElementById('bmr-calibration-close-btn').addEventListener('click', closeBmrCalibrationForm);
-  document.getElementById('bmr-calibration-period-count').addEventListener('input', refreshBmrCalibration);
-  document.getElementById('bmr-calibration-period-days').addEventListener('input', refreshBmrCalibration);
-  onAsyncClick('bmr-calibration-save-btn', saveBmrCalibration);
-  onAsyncClick('bmr-calibration-update-btn', updateStoredBmrCalibration);
+  onAsyncClick('formula-update-btn', updateStoredBmrCalibration);
 }

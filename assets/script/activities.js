@@ -64,6 +64,13 @@ async function initActivities(forceRefresh = false) {
   if (!activityListenersAttached) {
     activityListenersAttached = true;
     document.getElementById('add-activity-btn').addEventListener('click', () => openActivityForm(null));
+    // health/activity/<name>/ opens that activity's Edit.
+    registerRecordRoute('activity', (slug, sub) => {
+      const activity = allActivities.find((a) => routeSlug(a.name) === slug);
+      if (!activity || sub) return null;
+      openActivityForm(activity);
+      return activity.name;
+    });
     document.getElementById('activity-cancel-btn').addEventListener('click', closeActivityForm);
     document.getElementById('activity-log-btn').addEventListener('click', logActivityFromForm);
     onAsyncClick('activity-update-btn', updateActivityAndPropagate);
@@ -292,7 +299,10 @@ function makeActivityTable(group, rows, columnVisibility) {
     const actionsCell = document.createElement('td');
     actionsCell.className = 'workout-actions-cell';
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openActivityForm(activity) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
+        routeRecordEdit('activity', { slug: routeSlug(activity.name), label: activity.name });
+        openActivityForm(activity);
+      } }),
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openActivityForm(activity, true) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteActivity(activity) }),
     );

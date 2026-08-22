@@ -7,6 +7,8 @@
 //   brake fluid at 48,000 km): toyota.ca owners maintenance-schedule generator.
 // - Toyota 2023 Corolla Warranty & Maintenance Guide (air filters 30,000 mi ≈ 48,000 km,
 //   coolant 100,000 mi ≈ 160,000 km, spark plugs 120,000 mi ≈ 193,000 km).
+// - Tire sets: replace at 6 years old (Toyota tire warranty ends at 6 years; CAA Insurance
+//   won't cover tires older than 6), sooner if the tread is worn.
 // - Winter tires: TD Insurance (+7 °C rule; Ontario discount needs them on Dec–Mar) and
 //   GTA data showing commute hours below 7 °C by 1 Nov (taylortire.ca).
 
@@ -15,6 +17,7 @@ const CAR_ODOMETER_PATTERN = /@\s*([\d,.]+)\s*km/i;
 // Description keyword → service type. First match wins, so specific before general.
 const CAR_SERVICE_TYPES = [
   { type: 'oil', short: 'Oil', label: 'Oil Change', match: /oil/i, color: '#16a34a' },
+  { type: 'tireSet', short: 'New Tires', label: 'Replace Tire Set', match: /accessory tire|new tires?|tire set|tires? purchase/i, color: '#7c3aed' },
   { type: 'changeover', short: 'Tires', label: 'Tire Changeover', match: /changeover|winter tire|tire swap/i, color: '#3b82f6' },
   { type: 'rust', short: 'Rust', label: 'Rust Protection', match: /corrosion|undercarriage|rust/i, color: '#d97706' },
   { type: 'rotation', short: 'Rotation', label: 'Tire Rotation + Inspection', match: /rotation/i, color: '#0891b2' },
@@ -39,6 +42,7 @@ const CAR_SERVICE_RULES = [
   { type: 'sparkPlugs', atKm: 193000, basis: 'at 193,000 km — Toyota' },
   { type: 'rust', everyDays: 365, basis: 'yearly — your own history' },
   { type: 'changeover', seasonal: true },
+  { type: 'tireSet', everyYears: 6, basis: '6 years old, or sooner when the tread is worn — Toyota' },
 ];
 
 // A service due within this many days (or overdue) flags the heading and notifies.
@@ -143,6 +147,16 @@ function predictCarServices(records, fit, today) {
       }));
       return;
     }
+    // One row per tire set: the car's original set (its first record) and each bought since.
+    if (rule.everyYears) {
+      const sets = [{ date: records[0].date, name: 'original set' },
+        ...records.filter((r) => r.type === rule.type).map((r) => ({ date: r.date, name: `set from ${r.date}` }))];
+      sets.forEach((set) => {
+        const date = `${Number(set.date.slice(0, 4)) + rule.everyYears}${set.date.slice(4)}`;
+        predictions.push({ type: rule.type, label: `${info.label} (${set.name})`, date, km: fit.kmAt(date), basis: rule.basis });
+      });
+      return;
+    }
     if (rule.everyDays) {
       const last = lastOf([rule.type]);
       if (!last) return;
@@ -196,32 +210,34 @@ function predictCarServices(records, fit, today) {
 }
 
 function renderCarServiceTable(records, predictions) {
-  const tbody = document.getElementById('car-service-body');
-  tbody.innerHTML = '';
+  const predictedBody = document.getElementById('car-service-predicted-body');
+  const doneBody = document.getElementById('car-service-done-body');
+  predictedBody.innerHTML = '';
+  doneBody.innerHTML = '';
   if (!records.length) {
-    tbody.appendChild(renderEmptyRow(7, 'No Transportation transactions with an odometer reading (e.g. "Service Oil Change @28902km") yet.'));
+    const message = 'No Transportation transactions with an odometer reading (e.g. "Service Oil Change @28902km") yet.';
+    predictedBody.appendChild(renderEmptyRow(4, message));
+    doneBody.appendChild(renderEmptyRow(3, message));
     return;
   }
 
-  // Upcoming first (soonest at the top), then the history, newest first.
-  const rows = [
-    ...predictions.map((p) => ({ ...p, payee: '', amount: null })),
-    ...[...records].reverse().map((r) => ({ ...r, label: r.service, status: 'Done', basis: '' })),
-  ];
-  rows.forEach((r, i) => {
+  // Upcoming, soonest first; a date already passed says so in the Service cell.
+  predictions.forEach((p) => {
     const tr = document.createElement('tr');
-    // Line between the predicted rows and the history (Physique's week-line style).
-    if (i > 0 && i === predictions.length) tr.classList.add('car-service-history-start');
     tr.append(
-      makeCell(r.date),
-      makeCell(r.payee),
-      makeCell(r.label),
-      makeCell(`${carKmText(r.km)} km`),
-      makeCell(r.amount === null ? '' : formatCurrency(r.amount)),
-      makeCell(r.status),
-      makeCell(r.basis),
+      makeCell(p.date),
+      makeCell(`${carKmText(p.km)} km`),
+      makeCell(p.status === 'Overdue' ? `${p.label} — overdue` : p.label),
+      makeCell(p.basis),
     );
-    tbody.appendChild(tr);
+    predictedBody.appendChild(tr);
+  });
+
+  // History, newest first.
+  [...records].reverse().forEach((r) => {
+    const tr = document.createElement('tr');
+    tr.append(makeCell(r.date), makeCell(`${carKmText(r.km)} km`), makeCell(r.service));
+    doneBody.appendChild(tr);
   });
 }
 
@@ -310,8 +326,8 @@ function renderCarServiceChart(records, predictions, fit, today) {
             minRotation: 45,
             autoSkip: false,
             callback(value) {
-              return new Date(parseIsoDateUTC(this.getLabelForValue(value)))
-                .toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+              // Year-month, the app's YYYY-MM-DD order.
+              return new Date(parseIsoDateUTC(this.getLabelForValue(value))).toISOString().slice(0, 7);
             },
           },
         },
@@ -351,14 +367,12 @@ function updateCarServiceReminder(predictions, today) {
 
 // Called from refreshTransactions (transactions.js) whenever the rows change.
 function renderCarService() {
-  if (!document.getElementById('car-service-body')) return;
+  if (!document.getElementById('car-service-done-body')) return;
   const records = parseCarServiceTransactions();
-  const summary = document.getElementById('car-service-summary');
   if (!records.length) {
     renderCarServiceTable([], []);
     if (carServiceChart) carServiceChart.destroy();
     carServiceChart = null;
-    summary.textContent = '';
     updateCarServiceReminder([], isoFromDate(new Date()));
     return;
   }
@@ -368,6 +382,4 @@ function renderCarService() {
   renderCarServiceTable(records, predictions);
   renderCarServiceChart(records, predictions, fit, today);
   updateCarServiceReminder(predictions, today);
-  const perYear = carKmText(fit.kmPerDay * 365);
-  summary.textContent = `Odometer trend: ${carKmText(fit.kmPerDay)} km/day (${perYear} km/year), from ${records.length} readings.`;
 }

@@ -52,7 +52,7 @@ const ADAPT_FORMULA_FIELDS = [
   { key: ADAPT_PCT_CAP_KEY, inputId: 'formula-adapt-cap', fallback: () => ADAPT_PCT_CAP_DEFAULT },
 ];
 
-// The BMR_cal window (n_p × L_p days ending yesterday), shared with the Calibrate form.
+// The BMR_cal window (n_p × L_p days ending yesterday).
 const CALIBRATION_FORMULA_FIELDS = [
   { key: BMR_CALIBRATION_PERIOD_COUNT_KEY, inputId: 'formula-cal-period-count', fallback: () => BMR_CALIBRATION_PERIOD_COUNT_DEFAULT },
   { key: BMR_CALIBRATION_PERIOD_DAYS_KEY, inputId: 'formula-cal-period-days', fallback: () => BMR_CALIBRATION_PERIOD_DAYS_DEFAULT },
@@ -176,13 +176,17 @@ function currentPinMode() {
 // whenever the checked radio is 'bmr_cal'.
 let lastExplicitBmrFormula = 'mifflin';
 
+// The equation fieldset's two basis options: each layers on the active equation rather
+// than replacing it, and mirrors the same choice in "Which BMR..." below.
+const BMR_BASIS_RADIO_VALUES = ['bmr_cal', 'bmr_adp'];
+
 // Which BMR equation the preview is running. Both are first-class: this is read into the
 // settings overlay so calorieTargetDetail and activityTargetKcal see it, and passed
 // explicitly to maintenanceAffineCoefficients, which is called outside the overlay. Never
 // 'bmr_cal' itself — see lastExplicitBmrFormula above.
 function currentBmrFormula() {
   const checked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
-  return checked === 'bmr_cal' ? lastExplicitBmrFormula : checked;
+  return BMR_BASIS_RADIO_VALUES.includes(checked) ? lastExplicitBmrFormula : checked;
 }
 
 // Which basis (applyBmrBasis, wellness-math.js) every deficit and desired calorie figure
@@ -192,8 +196,10 @@ function currentBmrFormula() {
 // change handlers keep both radios' CHECKED state in sync too, so neither looks stale).
 function currentBmrBasis() {
   const equationChecked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
-  if (equationChecked === 'bmr_cal') return 'bmr_cal';
-  return document.querySelector('input[name="formula-bmr-basis"]:checked').value;
+  if (BMR_BASIS_RADIO_VALUES.includes(equationChecked)) return equationChecked;
+  // The lower fieldset's BMR_mif / BMR_kat mean plain BMR on that equation.
+  const basisChecked = document.querySelector('input[name="formula-bmr-basis"]:checked').value;
+  return BMR_BASIS_RADIO_VALUES.includes(basisChecked) ? basisChecked : 'bmr';
 }
 
 // The mass every identity on this sheet is evaluated at — the smoothed box, never the raw
@@ -267,40 +273,47 @@ const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water a
 Lean body mass — Boer (1984)
     LBM   =  0.407×m  +  0.267×h  −  19.2      (♂)
     LBM   =  0.252×m  +  0.473×h  −  48.3      (♀)
-Resting metabolic rate — Katch-McArdle (1996), from lean mass instead of age/sex
-    BMR   =  370  +  21.6×LBM
-Resting metabolic rate — Mifflin-St Jeor (1990)
-    BMR   =  10×m  +  6.25×h  −  5×a  +  σ
-Activity burn at the daily target — ACSM metabolic equation
-    E_act =  MET × m × τ × κ / ε
-Sleep Efficiency Factor — reduction in fat-loss efficiency per hour of sleep debt
-    η     =  1 − (γ/100) × max(0, s_target − s)
-Weekly fat loss as a share of body mass — 0.5–1%/week band
-    Δm%   =  100 × Δm / m
-Daily energy deficit implied by the weekly fat-loss target, short sleep needs more of it
-    D     =  (Δm × ρ / 7) / η
-Thermic effect of food — a share of the very intake being solved for
-    TEF   =  f × E_in
-Desired daily intake — TEF folded in by solving, not by adding
-    E_in  =  BMR  +  E_act  +  TEF  −  D    =    (BMR  +  E_act  −  D) / (1 − f)
-The healthy body mass as a BMI — 18.5–24.9 healthy band
-    BMI_des =  m_des / (h/100)²
+Basal metabolic rate by Katch-McArdle (1996), from lean mass instead of age/sex
+    BMR_kat =  370  +  21.6×LBM
+Basal metabolic rate by Mifflin-St Jeor (1990)
+    BMR_mif =  10×m  +  6.25×h  −  5×a  +  σ
+Calibrated basal metabolic rate — offset measured over n_p periods of L_p days, ending yesterday
+    D_i     =  TEI − BMR − AEE − TEF + SD,  averaged over period i
+    ΔM_i    =  (m̄_end,i − m̄_start,i) × ρ / L_p
+    w_i     =  0.1 + 0.9 × i / (n_p − 1),  oldest period 0.1 → newest 1.0
+    BMR_cal =  BMR  +  Σ w_i × (D_i − ΔM_i) / Σ w_i
 Maintenance is affine in body mass — M(m) = A + B×m
     A     =  (6.25×h  −  5×a  +  σ) / (1 − f)           under Mifflin
     B     =  (10  +  MET × τ × κ / ε) / (1 − f)         under Mifflin
     A     =  (370  +  21.6×(c_h×h + c_0)) / (1 − f)     under Katch
     B     =  (21.6×c_m  +  MET × τ × κ / ε) / (1 − f)   under Katch
-Body mass at which E_in becomes maintenance
-    m∞    =  (E_in  −  A) / B
+Body mass at which TEI becomes maintenance
+    m∞    =  (TEI  −  A) / B
+Metabolic adaptation — BMR sags faster than the lost mass alone predicts
+    BMR_adp(t) = BMR × (1 − λt),  λt capped at λt_max ≈ 10–15% by week 10–12
+    m∞_adp =  (TEI − A_adp) / B_adp,  the BMR half of A and B scaled by (1 − λt)
+Activity energy expenditure at the daily target — ACSM metabolic equation
+    AEE   =  MET × m × τ × κ / ε
+Sleep efficiency — from sleep length s and sleep deprivation rate γ, per hour below the sleep target
+    η     =  1 − (γ/100) × max(0, s_target − s)
+Weekly fat loss as a share of body mass — 0.5–1%/week band
+    Δm%   =  100 × Δm / m
+Daily energy deficit implied by the weekly fat-loss target, short sleep needs more of it
+    D     =  (Δm × ρ / 7) / η
+Sleep Deprivation Effect — the part of D that only makes up for short sleep
+    SD    =  D  −  Δm × ρ / 7
+Thermic effect of food — a share of the very intake being solved for
+    TEF   =  f × TEI
+Desired daily intake — TEF folded in by solving, not by adding
+    TEI   =  BMR  +  AEE  +  TEF  −  D    =    (BMR  +  AEE  −  D) / (1 − f)
+The healthy body mass as a BMI — 18.5–24.9 healthy band
+    BMI_des =  m_des / (h/100)²
 Exponential decay toward m∞, not linear loss
     m(t)  =  m∞  +  (m − m∞) × e^(−B×t/ρ)
     t     =  (ρ / B) × ln[ (m − m∞) / (m_des − m∞) ]
 Proportional journey instead, when Δm% is what's held — no plateau, so no m∞
     m(t)  =  m × (1 − Δm%/100)^(t/7)
     t     =  7 × ln(m / m_des) / −ln(1 − Δm%/100)
-Metabolic adaptation — BMR sags faster than the lost mass alone predicts
-    BMR_adp(t) = BMR × (1 − λt),  λt capped at λt_max ≈ 10–15% by week 10–12
-    m∞_adp =  (E_in − A_adp) / B_adp,  the BMR half of A and B scaled by (1 − λt)
 Skeletal muscle mass — the fraction of LBM that actually stores glycogen
     m_musc =  s × LBM
 Glycogen store, from muscle mass
@@ -311,14 +324,14 @@ Daily protein band, scaled to lean mass
     P_min =  p_min × LBM
     P_max =  p_max × LBM
 Fiber band — a floor from daily intake, a ceiling from body weight
-    F_min =  b_min × (E_in / 1000)
+    F_min =  b_min × (TEI / 1000)
     F_max =  b_max × m
 Fat band — both ends a share of intake, 20-35% AMDR
-    G_min =  (k_min/100 × E_in) / 9
-    G_max =  (k_max/100 × E_in) / 9
+    G_min =  (k_min/100 × TEI) / 9
+    G_max =  (k_max/100 × TEI) / 9
 Carb band — both ends a share of intake, 45-65% AMDR
-    C_min =  (q_min/100 × E_in) / 4
-    C_max =  (q_max/100 × E_in) / 4`;
+    C_min =  (q_min/100 × TEI) / 4
+    C_max =  (q_max/100 × TEI) / 4`;
 
 function formulaFieldValue(field) {
   // `value` skips Settings entirely — for fields (like Activity Intensity) whose

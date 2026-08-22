@@ -604,7 +604,7 @@ function openPhysiqueMicronutrientsFromForm() {
     showFieldError('physique-form-error', 'Save this day first — Micronutrients reads the saved log.');
     return;
   }
-  openPhysiqueMicronutrients(entry);
+  openPhysiqueMicronutrients(entry, true);
 }
 
 // --- Bulk Tidy ---------------------------------------------------------

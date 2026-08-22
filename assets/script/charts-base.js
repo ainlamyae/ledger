@@ -308,10 +308,9 @@ function maskedValueTooltipLabel(item) {
   return `${prefix}${privacyMode ? maskDigits(value) : value}`;
 }
 
-// "Jun 29", matching offsetToDateLabel below, rather than the raw ISO string a
-// category axis shows by default.
+// Dates read YYYY-MM-DD everywhere, chart ticks and hovers included.
 function formatIsoDateShort(iso) {
-  return new Date(parseIsoDateUTC(iso)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return new Date(parseIsoDateUTC(iso)).toISOString().slice(0, 10);
 }
 
 // On a category scale `value` is the tick's index, so it resolves back to the ISO

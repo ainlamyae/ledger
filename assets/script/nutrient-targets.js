@@ -93,24 +93,19 @@ function nutrientDailyTargets() {
   }
 }
 
-const NUTRIENT_GAP_SEVERE_RATIO = { floor: 0.5, ceiling: 2 };
-const NUTRIENT_GAP_MILD_RATIO = { floor: 0.8, ceiling: 1.5 };
+const NUTRIENT_GAP_SEVERE_FLOOR_RATIO = 0.5;
+const NUTRIENT_GAP_MILD_FLOOR_RATIO = 0.8;
 
-// 'ceiling' only flags running OVER — under is the point. 'floor' flags a
-// shortfall (the usual case) but also a large excess, reusing the ceiling
-// ratios for that high side, so a nutrient running 2x+ over its target is
-// never silently unflagged just because it's a get-enough-of nutrient.
+// Only flags a genuine shortfall on a get-enough-of nutrient — running OVER an
+// ideal (a ceiling nutrient like sodium/alcohol, or a floor nutrient eaten well
+// past its target) is never colored, even though it may be worth noting in the
+// AI report; the row coloring is reserved for "a lot less than the ideal/day".
 function nutrientGapSeverity(kind, avgPerDay, targetAmount) {
-  if (kind !== 'floor' && kind !== 'ceiling') return null;
+  if (kind !== 'floor') return null;
   if (!targetAmount || avgPerDay === null) return null;
   const ratio = avgPerDay / targetAmount;
 
-  if (kind === 'ceiling') {
-    if (ratio > NUTRIENT_GAP_SEVERE_RATIO.ceiling) return 'severe';
-    if (ratio > NUTRIENT_GAP_MILD_RATIO.ceiling) return 'mild';
-    return null;
-  }
-  if (ratio < NUTRIENT_GAP_SEVERE_RATIO.floor || ratio > NUTRIENT_GAP_SEVERE_RATIO.ceiling) return 'severe';
-  if (ratio < NUTRIENT_GAP_MILD_RATIO.floor || ratio > NUTRIENT_GAP_MILD_RATIO.ceiling) return 'mild';
+  if (ratio < NUTRIENT_GAP_SEVERE_FLOOR_RATIO) return 'severe';
+  if (ratio < NUTRIENT_GAP_MILD_FLOOR_RATIO) return 'mild';
   return null;
 }

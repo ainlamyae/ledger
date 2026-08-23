@@ -16,11 +16,12 @@
 // showing as two summary lines is a harmless cosmetic difference, not a
 // data-quality problem, so the simpler/more predictable exact match wins.
 // Entries with no breakdown (entry.breakdown === []) are silently skipped.
-function aggregateFoodIntake(from, to) {
+// `breakdowns`: sum these instead of the window (a dateless Pattern's own).
+function aggregateFoodIntake(from, to, breakdowns = null) {
   const byName = new Map();
 
-  physiqueAsWellnessEntries()
-    .filter((e) => e.category === 'Calories; Protein' && e.date >= from && e.date <= to)
+  (breakdowns ? breakdowns.map((breakdown) => ({ breakdown })) : physiqueAsWellnessEntries()
+    .filter((e) => e.category === 'Calories; Protein' && e.date >= from && e.date <= to))
     .forEach((e) => {
       (e.breakdown || []).forEach((item) => {
         const key = String(item.name || '').trim().toLowerCase();

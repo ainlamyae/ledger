@@ -108,6 +108,15 @@ function makeRowActionButton({ emoji, title, onClick }) {
   return btn;
 }
 
+// Appends " — {date}" to a modal title for a form that's scoped to exactly one
+// calendar day (Physique, Timesheet, a day's own Micronutrients view) — one
+// shared suffix style so any such modal's heading confirms which day is open
+// at a glance. No date (e.g. a dateless Physique pattern) leaves the title
+// bare rather than showing a dash with nothing after it.
+function formTitleWithDate(base, dateStr) {
+  return dateStr ? `${base} — ${dateStr}` : base;
+}
+
 // A plain <td> with text (and an optional title/tooltip, e.g. for a
 // truncated value) — the row-cell shape repeated across every table renderer.
 function makeCell(text, title) {

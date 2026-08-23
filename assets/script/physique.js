@@ -74,6 +74,9 @@ async function initPhysique(forceRefresh = false) {
 
     document.getElementById('add-physique-btn').addEventListener('click', () => openPhysiqueForm(null));
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
+    document.getElementById('physique-micro-close-btn').addEventListener('click', () => {
+      document.getElementById('physique-micro-modal').hidden = true;
+    });
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
     document.getElementById('physique-combine-btn').addEventListener('click', combineAndSortPhysiqueConsumptionField);
     document.getElementById('physique-is-pattern').addEventListener('change', syncPhysiquePatternMode);
@@ -393,6 +396,7 @@ function renderPhysiqueList() {
       // How a pattern becomes a real day: duplicate it, and the copy opens
       // dated today with the template's contents intact.
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openPhysiqueForm(p, true) }),
+      makeRowActionButton({ emoji: '🧬', title: 'Micronutrients', onClick: () => openPhysiqueMicronutrients(p) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deletePhysiqueEntry(p) }),
     );
     tr.appendChild(actionsCell);
@@ -434,6 +438,39 @@ function updatePhysiqueBulkActionsUI() {
   document.getElementById('physique-bulk-combine-btn').disabled = !selected.some(eligibleForBulkCombine);
 }
 
+// The 🧬 row action: this day's own real, measured nutrient totals — the same
+// USDA-sourced numbers and FDA Daily Value comparison the Health Insight
+// panel's Micronutrients mode computes for a picked range (micronutrient-insight.js),
+// just narrowed to this one day by aggregating over [p.date, p.date]. Total and
+// per-day average always end up equal for a single day, so the table collapses
+// Health Insight's four columns down to three: Nutrient, Amount, Ideal / day.
+function openPhysiqueMicronutrients(p) {
+  document.getElementById('physique-micro-title').textContent = formTitleWithDate('Micronutrients', p.date);
+
+  const data = aggregateMicronutrientIntake(p.date, p.date);
+
+  const tbody = document.getElementById('physique-micro-body');
+  tbody.innerHTML = '';
+
+  if (data.nutrients.length === 0) {
+    tbody.appendChild(renderEmptyRow(3, 'Nothing to show — see the coverage note above.'));
+  } else {
+    data.nutrients.forEach((n) => {
+      const tr = document.createElement('tr');
+      if (n.severity === 'severe') tr.classList.add('nutrient-gap-severe');
+      else if (n.severity === 'mild') tr.classList.add('nutrient-gap-mild');
+      tr.append(
+        makeCell(n.displayName),
+        makeCell(`${n.total} ${n.unit}`),
+        makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
+      );
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('physique-micro-modal').hidden = false;
+}
+
 // Form field id suffix → entry property, in column order (A–K).
 const PHYSIQUE_FIELDS = [
   { id: 'date', key: 'date' },
@@ -468,8 +505,7 @@ function syncPhysiquePatternMode() {
 
 function openPhysiqueForm(entry, duplicate = false) {
   editingPhysiqueRow = (entry && !duplicate) ? entry.row : null;
-  document.getElementById('physique-modal-title').textContent =
-    duplicate ? 'Duplicate Physique' : (entry ? 'Edit Physique' : 'Log a Physique');
+  const baseTitle = duplicate ? 'Duplicate Physique' : (entry ? 'Edit Physique' : 'Log a Physique');
 
   PHYSIQUE_FIELDS.forEach(({ id, key }) => {
     const value = entry ? entry[key] : '';
@@ -482,6 +518,12 @@ function openPhysiqueForm(entry, duplicate = false) {
   document.getElementById('physique-is-pattern').checked = entry ? (!entry.date && !duplicate) : false;
   if (duplicate) physiqueField('date').value = isoFromDate(new Date());
   syncPhysiquePatternMode();
+
+  // Read back off the field rather than entry.date: a new/duplicated day has
+  // no entry.date yet, and syncPhysiquePatternMode is what just filled it in
+  // with today (or blanked it, for a pattern) above.
+  document.getElementById('physique-modal-title').textContent =
+    formTitleWithDate(baseTitle, physiqueField('date').value);
 
   // A saved breakdown is shown as its table straight away on Edit, so an
   // existing day can be checked without re-running Calculate. The activity

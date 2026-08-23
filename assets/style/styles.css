@@ -1173,24 +1173,29 @@ td {
     border-top: 2px solid var(--color-text-muted);
 }
 
-/* Micronutrients table gap flags (assets/script/micronutrient-insight.js) — a
-   row is flagged 'severe'/'mild' once its measured average sits well under a
-   get-enough-of nutrient's FDA Daily Value, or well over a limit one's, per
+/* Micronutrients table gap flags (assets/script/micronutrient-insight.js,
+   assets/script/physique.js) — a row is flagged 'severe'/'mild' once its
+   measured average sits well under a get-enough-of nutrient's FDA Daily Value;
+   running over never flags, even on a limit-type nutrient like sodium, per
    nutrient-targets.js's nutrientGapSeverity. Left-border rather than a filled
    background so the row's own numbers stay legible at both severities. */
-#insight-micro-table tr.nutrient-gap-severe td {
+#insight-micro-table tr.nutrient-gap-severe td,
+#physique-micro-table tr.nutrient-gap-severe td {
     border-left: 3px solid var(--color-danger);
 }
 
-#insight-micro-table tr.nutrient-gap-severe td:first-child {
+#insight-micro-table tr.nutrient-gap-severe td:first-child,
+#physique-micro-table tr.nutrient-gap-severe td:first-child {
     color: var(--color-danger);
 }
 
-#insight-micro-table tr.nutrient-gap-mild td {
+#insight-micro-table tr.nutrient-gap-mild td,
+#physique-micro-table tr.nutrient-gap-mild td {
     border-left: 3px solid #d97706;
 }
 
-#insight-micro-table tr.nutrient-gap-mild td:first-child {
+#insight-micro-table tr.nutrient-gap-mild td:first-child,
+#physique-micro-table tr.nutrient-gap-mild td:first-child {
     color: #d97706;
 }
 

@@ -2451,17 +2451,14 @@
             <label>Protein %
                 <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
             </label>
+            <label title="Complete never changes Amount">Amount
+                <input type="text" id="nutrition-amount" placeholder="1 scoop (32g)">
+            </label>
 
             <!-- One row per value, Tune's layout: lock tick, name, box, unit. A ticked row is
                  kept as typed — Complete never overwrites it (nutrition.js). Pulled
                  micronutrient rows are appended below the divider. -->
             <div class="formula-inputs" id="nutrition-fields">
-                <label class="formula-row" title="Complete never changes Amount, so it is always kept">
-                    <input type="checkbox" id="nutrition-lock-amount" checked disabled>
-                    <span class="formula-name">Amount</span>
-                    <input type="text" id="nutrition-amount" placeholder="1 scoop (32g)">
-                    <span class="formula-unit"></span>
-                </label>
                 <label class="formula-row">
                     <input type="checkbox" id="nutrition-lock-calories" data-lock-name="Calories">
                     <span class="formula-name">Calories</span>

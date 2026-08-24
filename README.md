@@ -44,6 +44,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 ### Dashboard widgets
 
 - Four self-contained "bulb" cards above each panel group; work before sign-in.
+- **Hidden until the logo is clicked.** The row starts `hidden` on the dashboard itself now, the same way it already was on the section pages — a clock ticking every second, plus a prayer-time and a weather fetch, is work behind a row most opens never look at. Clicking the logo/**Ledger** text (`.logo-link`, otherwise a pointless self-link back to "all sections" when you're already on it) reveals the row and starts the clock interval and the two fetches instead of reloading; a plain click toggles it shut again without re-fetching. A modified click (new tab/window) still navigates normally. Section pages keep the logo as real navigation back to the combined dashboard — their row stays hidden regardless.
 - **Time** — local `HH:mm:ss` plus a second, independently configurable reference clock.
 - **Date** — Gregorian, Shamsi and Ghamari in one aligned day/month/year grid, via `Intl`.
 - **Azan** — Sobh/Zohr/Maghreb/Midnight, computed client-side (Shia "Tehran" method).
@@ -137,6 +138,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Activity also restates its target in kcal — `— / 100 min → 394 kcal` — from `getActivityTargetKcal`, the same pin-aware figure the Physical Activity chart's target line uses.
 - The Calories heading carries which side of the target it is (max or min), since the number alone can't say it.
 - Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
+- **Sleep is graded on Rest & Recovery's own gradient** (`sleepStatusColor`, red→amber→green from half the target up to it), not the plain two-colour split above. A strict at-or-past-target read would colour a 7.8 h night against an 8 h target flat red; the chart it should agree with reads that same night as a near-miss and colours it green, so the tile now takes its colour from the identical function instead of its own boolean.
 
 ### Health — Health Indicator
 
@@ -152,6 +154,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - Progress meters above the chart: distance covered and time elapsed, side by side — each "to go" figure also names its target (target body mass — shown with its `± swing` alongside it when the swing is known — or the projected arrival date).
   - Plateau alert when the smoothed trend has held flat.
   - The status line under the chart speaks only when there is **no** forecast to draw — target reached, no net change, trending away, or levelling off short of target. A forecast that renders says nothing, since the meters and the curve already do.
+  - **Calorie-Implied Trajectory** — a solid grey line starting at the first logged weigh-in that walks forward a calendar day at a time, adding each day's calorie balance (intake minus BMR, activity and TEF) converted to kg via `GENERIC_KCAL_PER_KG_FAT` — the same arithmetic Calorie Balance itself scores, replayed here as a running body-mass total instead of a per-day bar. A day with nothing logged carries the total forward flat rather than guessing. Needs a profile (height/age/sex) for BMR, the same guard Calorie Balance uses; omitted entirely without one. Set beside the smoothed trend line, the gap between the two is what logged calories alone can't explain — water, glycogen, or a logging gap the swing zone doesn't already cover.
+  - **No hover tooltip** — the chart already carries five overlapping series (history, smoothed trend, swing band, calorie-implied trajectory, projection, target), and a hover legend spanning all of them read as clutter rather than help; everything it would have shown already lives in the meters and status line above the chart.
 - **Body Mass** — one bar per reading, scored by direction of travel; left axis restates it as stored fat energy.
   - **A red day regrades to grey when the week isn't actually going the wrong way** — if that reading rose (or fell, for a bulk) against the target but the 7-day trend at that point still slopes the right direction, the single reading reads as noise rather than a miss.
   - **Carries State Trend & Forecast's own smoothed trend line and glycogen/water swing zone**, copied onto this chart's windowed, category-axis view: a solid green line (`computeBodyMassTrend`) drawn over the bars, and a translucent amber band behind them (`computeGlycogenZoneAnchor` ± half of `glycogenSwingKg`, so the band's total height reads as the swing figure itself, ΔM_gly, rather than double it). Both are computed off the **full** history, same as that chart, so the smoothing agrees with it at the window's edges — then read back for just the dates this chart plots. Omitted like there when the swing can't be estimated (no height/sex on file).
@@ -399,7 +403,7 @@ Each panel group is reachable at an address of its own — `/health/`, `/finance
 - **The markup still lives in `index.html` alone.** Each of those directories holds an identical stub (`<base href="../">`, the theme bootstrap, the stylesheet, and `section-page.js`). The loader fetches `index.html`, replays its head, its body and its scripts into the stub, then hides everything outside the group the address names. A panel added to `index.html`, or moved from one group to another, appears on the right section page with nothing to keep in sync — there is no generated copy of the dashboard anywhere.
 - **The list of sections is the `<nav>` markup.** `section-page.js` matches the last path segment against each nav link's `href` and reads the group id off its `data-section`. A fourth group needs a nav link, a `<section>`, and a copy of the stub — no change to the loader, which enumerates nothing.
 - **Hidden, not removed.** The other two groups stay in the DOM: `loadDashboard` renders the whole dashboard, and every renderer expects its elements to exist. The Time/Date/Azan/Weather row is hidden too — it belongs to the dashboard as a whole — and `widgets.js` checks that row at both of its entry points, so a section page runs neither a ticking clock nor the forecast and prayer-time requests behind it.
-- **Start-up is registered, not listened for.** `index.html`'s scripts arrive after a section page's own `load` event, so `app.js` and `landing-graph.js` hand their start-up step to `window.ledgerSectionPage.onBoot()` when it exists instead of waiting on `load`/`DOMContentLoaded`. The loader runs those steps once every script — including the async Google ones, which `load` would also have waited for — has arrived, so the boot order is the one `index.html` gets.
+- **Start-up is registered, not listened for.** `index.html`'s scripts arrive after a section page's own `load` event, so `app.js` hands its start-up step to `window.ledgerSectionPage.onBoot()` when it exists instead of waiting on `load`/`DOMContentLoaded`. The loader runs those steps once every script — including the async Google ones, which `load` would also have waited for — has arrived, so the boot order is the one `index.html` gets.
 - **No address is written down.** Every URL in the markup and the loader is relative, and a section page's `canonical`/`og:url` are set from `location` at run time, so the whole thing moves with the repository.
 
 ### System Flowchart
@@ -537,9 +541,8 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 34 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
 | 35 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
 | 36 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 37 | `landing-graph.js` | Pre-login feature mind-maps (presentational only) |
-| 38 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
-| 39 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 37 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
+| 38 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
 `section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 39 above into a page that has none of them (see [Section pages](#section-pages)).
 
@@ -1119,7 +1122,6 @@ ledger/
 │       ├── protein-rotation.js   # Protein Source Rotation
 │       ├── formula-playground.js # Health Formula Playground
 │       ├── financial-insight.js  # Financial Insight panel
-│       ├── landing-graph.js      # Pre-login mind-maps
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration
 │       └── section-page.js       # Loaded only by the section stubs above

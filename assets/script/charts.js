@@ -1479,21 +1479,37 @@ function renderTodayGlanceCards(entries) {
   setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
   setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, targetBurn);
-  setTodayGlanceTile('today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget);
+  // Sleep gets its colour from sleepStatusColor — the same red-amber-green gradient
+  // Rest & Recovery bars use — rather than the plain hit/miss split the other three
+  // tiles get: a strict >= target boolean read 7.8 against an 8h target as a flat miss
+  // (red) while the chart, judging from half the target, reads the same 7.8 as a near
+  // miss (green). One metric, one verdict.
+  setTodayGlanceTile(
+    'today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget,
+    null, false, sleepHours !== null ? sleepStatusColor(sleepHours, sleepTarget) : null,
+  );
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
 // and mask alike. `note` restates it in a second unit ("(394 kcal)"), inside the same
 // string rather than its own element, so the line reads at one size and masks as one.
 // `isHigh` gives Protein the same dark-green-past-the-band-top the chart uses; every
-// other tile leaves it false and gets the plain two-colour split.
-function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, isHigh = false) {
+// other tile leaves it false and gets the plain two-colour split. `colorOverride`, when
+// given, paints the value that exact colour instead of picking one of the two/three
+// fixed classes — Sleep's own gradient read, see renderTodayGlanceCards above.
+function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, isHigh = false, colorOverride = null) {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'income-high', 'expense');
+  el.style.color = '';
 
   const text = `${value !== null ? value : '—'} / ${target} ${unit}${note !== null ? ` (${note})` : ''}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
-  if (value !== null) el.classList.add(isGood ? (isHigh ? 'income-high' : 'income') : 'expense');
+  if (value === null) return;
+  if (colorOverride !== null) {
+    el.style.color = colorOverride;
+  } else {
+    el.classList.add(isGood ? (isHigh ? 'income-high' : 'income') : 'expense');
+  }
 }
 
 // Health units never pass through formatCurrency's masking, but they're still personal
@@ -3426,6 +3442,45 @@ function renderWellnessProjectionChart(entries) {
   const trendMap = computeBodyMassTrend(bodyMassByDate);
   const zoneAnchorMap = swingKg === null ? null : computeGlycogenZoneAnchor(trendMap);
 
+  // The body-mass trajectory implied by logged calories alone: start at the first
+  // weigh-in, then walk forward a day at a time adding that day's calorie balance
+  // (intake minus BMR, activity and TEF) converted to kg via GENERIC_KCAL_PER_KG_FAT —
+  // the same balance Calorie Balance itself scores. A day with nothing logged carries
+  // the running total forward flat rather than guessing. Needs a profile for BMR, same
+  // as that chart. Set against the smoothed trend line, the gap between the two is what
+  // the calorie math alone can't explain — water, glycogen, or a logging gap.
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
+  const calorieTrendMap = new Map();
+  if (haveProfile) {
+    const calorieTrendDates = datesInRange(bodyMassEntries[0].date, lastDate);
+    const calorieBodyMassForDate = carryForwardBodyMassByDate(bodyMassByDate, calorieTrendDates);
+
+    const intakeByDate = new Map();
+    const activityKcalByDate = new Map();
+    entries.forEach((e) => {
+      if (e.amount === null) return;
+      if (e.category === 'Calories' || e.category === 'Calories; Protein') {
+        intakeByDate.set(e.date, (intakeByDate.get(e.date) || 0) + e.amount);
+      } else if (e.category === 'Activity' || e.category === 'Activity; Calories') {
+        const kcal = activityEntryKcal(e, calorieBodyMassForDate.get(e.date) ?? null);
+        activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
+      }
+    });
+
+    let running = startBodyMass;
+    calorieTrendDates.forEach((d) => {
+      calorieTrendMap.set(d, running);
+      if (!intakeByDate.has(d)) return;
+      const intake = intakeByDate.get(d);
+      const maintenance = bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex);
+      const activity = activityKcalByDate.get(d) || 0;
+      const tef = intake * (1 - tefDivisor());
+      const balance = intake - maintenance - activity - tef;
+      running += balance / GENERIC_KCAL_PER_KG_FAT;
+    });
+  }
+
   const plateauDays = detectPlateau(trendMap);
   if (plateauDays) {
     const plateauLine = `⚠️ Body mass trend has been flat for ~${plateauDays} days — consider adjusting your calorie limit`;
@@ -3496,6 +3551,21 @@ function renderWellnessProjectionChart(entries) {
       spanGaps: false,
       order: 4,
     },
+    // Omitted without a profile — same guard as calorieTrendMap's own computation above.
+    ...(haveProfile ? [{
+      label: 'Calorie-Implied Trajectory',
+      data: allLabels.map((d) => {
+        const y = calorieTrendMap.get(d);
+        return { x: dayOffset(d), y: y === undefined ? null : y };
+      }),
+      borderColor: '#9ca3af',
+      borderWidth: 2,
+      fill: false,
+      tension: 0,
+      pointRadius: 0,
+      spanGaps: false,
+      order: 3,
+    }] : []),
     // Omitted rather than plotted empty, so it can't sit in the legend claiming a
     // forecast exists.
     ...(hasProjection ? [{
@@ -3553,7 +3623,7 @@ function renderWellnessProjectionChart(entries) {
   // projection starts from it. The swing band's own edges are included so the padded
   // axis can't clip the zone it's meant to fully show.
   const trendExtremes = zoneAnchorMap === null ? [] : [...zoneAnchorMap.values()].flatMap((v) => [v + swingKg, v - swingKg]);
-  const bodyMassValues = [...trendMap.values(), ...projMap.values(), ...trendExtremes, lastBodyMass, bodyMassTarget]
+  const bodyMassValues = [...trendMap.values(), ...projMap.values(), ...trendExtremes, ...calorieTrendMap.values(), lastBodyMass, bodyMassTarget]
     .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
   const bodyMassMin = Math.min(...bodyMassValues);
   const bodyMassMax = Math.max(...bodyMassValues);
@@ -3615,15 +3685,7 @@ function renderWellnessProjectionChart(entries) {
         // Off, like the rest of the section: Chart.js draws it inside the canvas, so a
         // legend here left this plot area ~30px shorter. Series are named in the tooltip.
         legend: { display: false },
-        tooltip: {
-          // The band's two edges are plotting geometry for the fill, not a reading —
-          // nothing on either line is itself a value worth reporting.
-          filter: (item) => !item.dataset.isSwingBand,
-          callbacks: {
-            title: (items) => offsetToDateLabel(items[0].parsed.x),
-            label: maskedValueTooltipLabel,
-          },
-        },
+        tooltip: { enabled: false },
       },
       scales,
     },

@@ -1760,6 +1760,31 @@ function renderWellnessBodyMassChart(entries) {
   const sex = getSettingString('SEX', null);
   const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
 
+  // The same smoothed line and glycogen/water swing zone State Trend & Forecast draws
+  // (computeBodyMassTrend/computeGlycogenZoneAnchor/glycogenSwingKg, charts.js), built off
+  // the FULL history in `byDate` rather than just this window — smoothing needs the
+  // context past the window's edges to agree with the other chart there — then read back
+  // only for the dates this chart actually plots.
+  const trendMap = computeBodyMassTrend(byDate);
+  const trendDates = [...trendMap.keys()].sort();
+  const lastTrendDate = trendDates[trendDates.length - 1];
+  const swingKg = lastTrendDate !== undefined ? glycogenSwingKg(byDate.get(lastTrendDate), heightCm, sex) : null;
+  const zoneAnchorMap = swingKg === null ? null : computeGlycogenZoneAnchor(trendMap);
+  const stateTrendSeries = dates.map((d) => trendMap.get(d) ?? null);
+  // Half of swingKg on each edge, so the band's total top-to-bottom height reads as
+  // swingKg — not the doubled 2×swingKg that ± each full swingKg on both sides gave.
+  const zoneHalfKg = swingKg === null ? null : swingKg / 2;
+  const zoneUpperSeries = dates.map((d) => {
+    if (zoneAnchorMap === null) return null;
+    const a = zoneAnchorMap.get(d);
+    return a === undefined ? null : a + zoneHalfKg;
+  });
+  const zoneLowerSeries = dates.map((d) => {
+    if (zoneAnchorMap === null) return null;
+    const a = zoneAnchorMap.get(d);
+    return a === undefined ? null : a - zoneHalfKg;
+  });
+
   const values = [];
   const barColors = [];
   const detailByDate = new Map();
@@ -1817,7 +1842,7 @@ function renderWellnessBodyMassChart(entries) {
   // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
   // `grace` too late to read here. The trend folds in too — a fit extended to the week's
   // edges can reach past every reading in it, and would otherwise clip.
-  const logged = [...values, ...trendSeries].filter((v) => v !== null);
+  const logged = [...values, ...trendSeries, ...stateTrendSeries, ...zoneUpperSeries, ...zoneLowerSeries].filter((v) => v !== null);
   const kgLo = logged.length ? Math.min(...logged) : 0;
   const kgHi = logged.length ? Math.max(...logged) : 0;
   const kgPad = Math.max((kgHi - kgLo) * BODY_MASS_AXIS_PAD_FRACTION, BODY_MASS_AXIS_MIN_PAD_KG);
@@ -1845,6 +1870,63 @@ function renderWellnessBodyMassChart(entries) {
           order: 2,
         },
         weeklyAverageDataset('7-Day Trend', trendSeries, {}, weekColumns),
+        // The State Trend & Forecast chart's own smoothed line and glycogen/water swing
+        // band, copied onto this chart's category axis (see stateTrendSeries/zoneUpperSeries/
+        // zoneLowerSeries above). Two line datasets for the band, same reason that chart
+        // needs both: Chart.js fills the area BETWEEN a dataset and the one its `fill`
+        // points at, so the band needs both edges plotted, just invisibly (borderWidth 0).
+        // Omitted entirely whenever the swing can't be estimated (no height/sex on file).
+        // isStateTrendOverlay marks all three so the tooltip filter below can skip them,
+        // the same way isWeeklyAverage does for the existing 7-Day Trend line. The band's
+        // `order` (3) is higher than the bars' (2) — this codebase's convention is lower
+        // order draws later/on top (see weeklyAverageDataset's own comment) — so the band
+        // sits BEHIND the bars, a background reference rather than a wash over them; the
+        // green trend line below keeps a lower order so it still reads on top.
+        ...(zoneAnchorMap !== null ? [
+          {
+            type: 'line',
+            label: 'Glycogen + Water Swing (upper)',
+            data: zoneUpperSeries,
+            borderWidth: 0,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            tension: 0.3,
+            fill: false,
+            spanGaps: false,
+            isStateTrendOverlay: true,
+            order: 3,
+          },
+          {
+            type: 'line',
+            label: 'Glycogen + Water Swing',
+            data: zoneLowerSeries,
+            // Same neutral amber the projection chart uses — normal noise, not a target
+            // or a warning.
+            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+            borderWidth: 0,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            tension: 0.3,
+            fill: '-1',
+            spanGaps: false,
+            isStateTrendOverlay: true,
+            order: 3,
+          },
+        ] : []),
+        {
+          type: 'line',
+          label: 'State Trend & Forecast',
+          data: stateTrendSeries,
+          borderColor: '#16a34a',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+          pointHitRadius: 0,
+          spanGaps: false,
+          isStateTrendOverlay: true,
+          order: 1.3,
+        },
       ],
     },
     options: {
@@ -1865,7 +1947,7 @@ function renderWellnessBodyMassChart(entries) {
         tooltip: {
           // Days with no weigh-in plot as a gap; index mode would otherwise hand them
           // over as an empty row.
-          filter: (item) => item.raw !== null && !item.dataset.isWeeklyAverage,
+          filter: (item) => item.raw !== null && !item.dataset.isWeeklyAverage && !item.dataset.isStateTrendOverlay,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {

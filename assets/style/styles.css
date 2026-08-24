@@ -1520,7 +1520,6 @@ th.sortable:hover {
 .today-glance-stack {
     display: flex;
     flex-direction: column;
-    gap: .75rem;
 }
 
 /* Equal share of the stack's height each, content centered so the shorter
@@ -2131,15 +2130,10 @@ td .btn {
     margin-top: .75rem;
 }
 
-/* The meters and the ETA line lead the block, ABOVE the heading — where are you now
-   and when do you arrive, read first of all. So the outer meter needs clearance from
-   the heading below it, and none above: .body-mass-projection-wrap's own top margin
-   already separates it from the previous chart. Scoped to the outer meter, because
-   the nested time meter still wants the shared .75rem top gap to sit clear of the
-   distance bar, and its bottom flush so the ETA line stays with the bars. */
-.body-mass-projection-wrap > .body-mass-progress-meter {
-    margin-top: 0;
-    margin-bottom: .75rem;
+/* The meters' own card, full width under the two glance columns. */
+.today-glance-cards > .body-mass-progress-meter {
+    grid-column: 1 / -1;
+    margin: 0;
 }
 
 /* The time meter is a second, nested .body-mass-progress-meter directly under the
@@ -2165,17 +2159,22 @@ td .btn {
     position: relative;
 }
 
-/* Marks at 20/40/60/80%, drawn over the fill. */
+/* Marks at every 10%, drawn over the fill. */
 .body-mass-progress-meter-track::after {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
     background:
+        linear-gradient(var(--color-surface), var(--color-surface)) 10% / 2px 100% no-repeat,
         linear-gradient(var(--color-surface), var(--color-surface)) 20% / 2px 100% no-repeat,
+        linear-gradient(var(--color-surface), var(--color-surface)) 30% / 2px 100% no-repeat,
         linear-gradient(var(--color-surface), var(--color-surface)) 40% / 2px 100% no-repeat,
+        linear-gradient(var(--color-surface), var(--color-surface)) 50% / 2px 100% no-repeat,
         linear-gradient(var(--color-surface), var(--color-surface)) 60% / 2px 100% no-repeat,
-        linear-gradient(var(--color-surface), var(--color-surface)) 80% / 2px 100% no-repeat;
+        linear-gradient(var(--color-surface), var(--color-surface)) 70% / 2px 100% no-repeat,
+        linear-gradient(var(--color-surface), var(--color-surface)) 80% / 2px 100% no-repeat,
+        linear-gradient(var(--color-surface), var(--color-surface)) 90% / 2px 100% no-repeat;
 }
 
 /* Floats over the fill's leading edge, left offset set inline in JS to match the

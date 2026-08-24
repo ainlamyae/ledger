@@ -519,11 +519,14 @@ function openPhysiqueForm(entry, duplicate = false) {
   if (duplicate) physiqueField('date').value = isoFromDate(new Date());
   syncPhysiquePatternMode();
 
-  // Read back off the field rather than entry.date: a new/duplicated day has
-  // no entry.date yet, and syncPhysiquePatternMode is what just filled it in
-  // with today (or blanked it, for a pattern) above.
-  document.getElementById('physique-modal-title').textContent =
-    formTitleWithDate(baseTitle, physiqueField('date').value);
+  // Only a real Edit gets the date suffix — Log and Duplicate both start on
+  // today's date too (syncPhysiquePatternMode just filled it in above), but
+  // that's a default still waiting to be changed or saved, not a date this
+  // day is actually logged under yet. Same "is this really an existing row"
+  // read editingPhysiqueRow above uses.
+  document.getElementById('physique-modal-title').textContent = (entry && !duplicate)
+    ? formTitleWithDate(baseTitle, physiqueField('date').value)
+    : baseTitle;
 
   // A saved breakdown is shown as its table straight away on Edit, so an
   // existing day can be checked without re-running Calculate. The activity
@@ -747,7 +750,7 @@ function runPhysiqueWorkoutCalc() {
   // quietly flatten a real day's burn to the default. Better to show nothing.
   if (!activitiesDataLoaded) {
     hidePhysiqueActivityBreakdown();
-    messages.push('⚠️ Workout skipped — still loading the Activities catalogue, try Calculate again in a moment.');
+    messages.push('⚠️ Workout skipped — loading catalogue.');
     return messages;
   }
 
@@ -755,8 +758,8 @@ function runPhysiqueWorkoutCalc() {
   if (bodyMassKg === null) {
     hidePhysiqueActivityBreakdown();
     messages.push(physiqueDataLoaded
-      ? '⚠️ Workout skipped — fill in Body Mass first, the calorie formula needs it.'
-      : '⚠️ Workout skipped — still loading your data, try Calculate again in a moment.');
+      ? '⚠️ Workout skipped — needs Body Mass.'
+      : '⚠️ Workout skipped — loading data.');
     return messages;
   }
 
@@ -864,7 +867,7 @@ function combineAndSortPhysiqueConsumptionField() {
   field.value = text;
   clearFieldError('physique-form-error');
   if (combinedCount > 0) {
-    showFieldError('physique-form-error', `🔗 Combined ${combinedCount} duplicate line${combinedCount === 1 ? '' : 's'}, sorted by calories.`);
+    showFieldError('physique-form-error', `🔗 ${combinedCount} combined.`);
   }
 }
 
@@ -961,13 +964,13 @@ async function calculatePhysiqueDay() {
       renderPhysiqueBreakdown(breakdown, calories, protein);
 
       if (reusedCount) {
-        messages.push(`♻️ ${reusedCount} unchanged ingredient${reusedCount === 1 ? '' : 's'} reused, ${estimatedCount} re-estimated.`);
+        messages.push(`♻️ ${reusedCount} reused, ${estimatedCount} new.`);
       }
       if (usdaUnreachable) {
-        messages.push("⚠️ Couldn't reach the nutrition database (network/DNS issue) — this estimate is AI-only and may be less accurate.");
+        messages.push('⚠️ No DB — AI only.');
       }
       if (calories > PHYSIQUE_DAY_CALORIE_CEILING) {
-        messages.push(`⚠️ ${calories} kcal for one day looks unusually high — double-check before saving.`);
+        messages.push(`⚠️ ${calories} kcal, check.`);
       }
     } catch (err) {
       messages.push(`⚠️ Consumption: ${err.message}`);
@@ -1023,8 +1026,7 @@ function mergePhysiqueEntryIntoForm(saved) {
 
   editingPhysiqueRow = saved.row;
   document.getElementById('physique-modal-title').textContent = 'Edit Physique';
-  showFieldError('physique-form-error',
-    `↩︎ ${saved.date} was already logged, so that day has been merged in above — nothing is saved yet. Check it over and press Save again to write it.`);
+  showFieldError('physique-form-error', `↩︎ Merged — Save again.`);
 }
 
 function fillPhysiqueFieldIfBlank(id, savedValue) {

@@ -248,6 +248,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Food** — ingredients **grouped by Classification**, each group carrying its own ingredient count and calorie/protein totals.
   - Groups are ordered by calories; `Unclassified` always sinks to the bottom and is flagged to the model as not a food group.
   - The preview table groups identically.
+  - A fifth column, **TEF**, next to Protein: that ingredient's own estimated Thermic Effect of Food, off its pulled 🧬 Micronutrients (`estimateTefForFoodRow`, `micronutrient-insight.js`) — the same Atwater-and-macro-share math the Physique TEF column uses, just for one ingredient's range total instead of one day's Breakdown. Blank (`—`) on an ingredient with no Micronutrients pulled, never a claimed zero. Sent to the model too (`~X kcal TEF` per ingredient line), so the preview table stays a literal view of the prompt.
 - **Activity** — rep volume vs. the previous period, a routine-activity summary, and a per-muscle-group breakdown sorted most-neglected-first.
   - Each muscle group carries **the exercises that built it** — every movement logged against it in range and its total reps, heaviest first. The model is told these are the movements the user actually has access to, so recommendations name them instead of inventing lifts.
   - Non-resistance types (a walk, a swim) are **summarised, not listed per day** — one row each with days logged and the range/average of minutes, kcal and steps. Repeating a daily walk for every date buried the sessions that differ.

@@ -3457,11 +3457,17 @@ function renderWellnessProjectionChart(entries) {
     const calorieBodyMassForDate = carryForwardBodyMassByDate(bodyMassByDate, calorieTrendDates);
 
     const intakeByDate = new Map();
+    const tefByDate = new Map();
     const activityKcalByDate = new Map();
     entries.forEach((e) => {
       if (e.amount === null) return;
       if (e.category === 'Calories' || e.category === 'Calories; Protein') {
         intakeByDate.set(e.date, (intakeByDate.get(e.date) || 0) + e.amount);
+        // This day's own measured TEF (Physique column L) where calculated —
+        // same measured-over-estimated precedence Calorie Balance gives it.
+        if (e.tefKcal !== null && e.tefKcal !== undefined) {
+          tefByDate.set(e.date, (tefByDate.get(e.date) || 0) + e.tefKcal);
+        }
       } else if (e.category === 'Activity' || e.category === 'Activity; Calories') {
         const kcal = activityEntryKcal(e, calorieBodyMassForDate.get(e.date) ?? null);
         activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
@@ -3475,7 +3481,7 @@ function renderWellnessProjectionChart(entries) {
       const intake = intakeByDate.get(d);
       const maintenance = bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex);
       const activity = activityKcalByDate.get(d) || 0;
-      const tef = intake * (1 - tefDivisor());
+      const tef = tefByDate.has(d) ? tefByDate.get(d) : intake * (1 - tefDivisor());
       const balance = intake - maintenance - activity - tef;
       running += balance / GENERIC_KCAL_PER_KG_FAT;
     });
@@ -3793,6 +3799,15 @@ function renderWellnessEnergyBalanceChart(entries) {
   const intakeByDate = new Map();
   intakeEntries.forEach((e) => intakeByDate.set(e.date, (intakeByDate.get(e.date) || 0) + e.amount));
 
+  // This day's own measured TEF (Physique column L, via 🧬 Micronutrients on its
+  // ingredients) where Physique has calculated one — falls back to the flat
+  // TEF_PERCENT_OF_INTAKE estimate below on any day without one, same as before
+  // this column existed.
+  const tefByDate = new Map();
+  intakeEntries.forEach((e) => {
+    if (e.tefKcal !== null && e.tefKcal !== undefined) tefByDate.set(e.date, (tefByDate.get(e.date) || 0) + e.tefKcal);
+  });
+
   // Through the one shared rule, at the same carried-forward body mass the BMR term uses.
   const activityKcalByDate = new Map();
   entries.forEach((e) => {
@@ -3819,10 +3834,16 @@ function renderWellnessEnergyBalanceChart(entries) {
     // otherwise switching TEF on would raise the target intake here without also raising the
     // cost of eating it, and this chart would contradict the one that set the target. A share
     // of what was ACTUALLY eaten, not of the target: this row scores the day that happened.
-    const tef = Math.round(intake * (1 - tefDivisor()));
+    // Measured (tefByDate, from the day's own breakdown macros) wins over estimated
+    // whenever Physique has calculated one for this day.
+    const tefMeasured = tefByDate.has(date);
+    const tef = Math.round(tefMeasured ? tefByDate.get(date) : intake * (1 - tefDivisor()));
     const balance = intake - maintenance - activity - tef;
 
-    detailByDate.set(date, { intake, maintenance, activity, tef, balance, massG: Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000) });
+    detailByDate.set(date, {
+      intake, maintenance, activity, tef, tefMeasured, balance,
+      massG: Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000),
+    });
     return balance;
   });
 
@@ -3922,8 +3943,11 @@ function renderWellnessEnergyBalanceChart(entries) {
                 `Activity: ${withExplicitSign(-d.activity)} kcal`,
                 // Only when there IS one. At the default f = 0 the row would be a
                 // permanent "-0", which reads as a term that failed to compute rather
-                // than one deliberately left out of the model.
-                ...(d.tef > 0 ? [`Digestion (TEF): ${withExplicitSign(-d.tef)} kcal`] : []),
+                // than one deliberately left out of the model. Labelled "measured" when
+                // it's this day's own Physique figure, "est." when it's the flat
+                // TEF_PERCENT_OF_INTAKE fallback — the two can differ by a real amount,
+                // so which one produced this bar shouldn't be left ambiguous.
+                ...(d.tef > 0 ? [`Digestion (TEF, ${d.tefMeasured ? 'measured' : 'est.'}): ${withExplicitSign(-d.tef)} kcal`] : []),
                 `Expected Fat: ${withExplicitSign(d.massG)} g`,
                 `Actual ${actualWord}: ${withExplicitSign(d.balance)} kcal`,
               ];

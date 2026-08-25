@@ -132,6 +132,78 @@ function aggregateMicronutrientIntake(from, to) {
   };
 }
 
+// Estimated Thermic Effect of Food share of each macro's OWN calories —
+// Settings so they can be retuned without a code change, same idiom
+// TEF_PERCENT_KEY (charts.js) already uses for the flat whole-intake figure.
+// Defaults are the commonly-cited per-macro TEF shares: Protein 25%,
+// Carbohydrate 7.5%, Fat 2%.
+const TEF_PROTEIN_SHARE_KEY = 'TEF_PROTEIN_PERCENT';
+const TEF_CARB_SHARE_KEY = 'TEF_CARB_PERCENT';
+const TEF_FAT_SHARE_KEY = 'TEF_FAT_PERCENT';
+const TEF_PROTEIN_SHARE_DEFAULT = 25;
+const TEF_CARB_SHARE_DEFAULT = 7.5;
+const TEF_FAT_SHARE_DEFAULT = 2;
+
+// Standard Atwater energy factors (kcal/g), keyed by the exact FDC nutrient
+// name so this reads straight off the same panel nutrient-targets.js's Daily
+// Value table already keys by, no separate lookup needed. tefShare is read
+// fresh from Settings on every call rather than baked in here, so a value
+// edited in the Settings panel takes effect on the next Calculate/estimate
+// without a reload.
+function tefMacroRate() {
+  return {
+    Protein: { label: 'Protein', kcalPerGram: 4, tefShare: getSetting(TEF_PROTEIN_SHARE_KEY, TEF_PROTEIN_SHARE_DEFAULT) / 100 },
+    'Carbohydrate, by difference': { label: 'Carbohydrate', kcalPerGram: 4, tefShare: getSetting(TEF_CARB_SHARE_KEY, TEF_CARB_SHARE_DEFAULT) / 100 },
+    'Total lipid (fat)': { label: 'Fat', kcalPerGram: 9, tefShare: getSetting(TEF_FAT_SHARE_KEY, TEF_FAT_SHARE_DEFAULT) / 100 },
+  };
+}
+
+// Estimated Thermic Effect of Food for one day's own Consumption breakdown —
+// each ingredient's protein/carb/fat grams, from its own pulled 🧬
+// Micronutrients panel scaled to how much of it was actually logged (same
+// per-ingredient scaling aggregateMicronutrientIntake uses above, just over
+// one day's breakdown array directly instead of aggregateFoodIntake's range
+// total, so this also works on a day still open in the form and not yet
+// saved). Atwater, not each ingredient's own listed Calories: TEF is defined
+// against the macro split, and the two can disagree by a few percent per
+// ingredient.
+//
+// Null when nothing in the breakdown has macros pulled yet, so a day with no
+// 🧬 data can fall back to the flat TEF_PERCENT_OF_INTAKE estimate (charts.js)
+// instead of reporting a confident zero.
+function estimateTefBreakdown(breakdown) {
+  const macroGrams = { Protein: 0, 'Carbohydrate, by difference': 0, 'Total lipid (fat)': 0 };
+  let matched = false;
+
+  (breakdown || []).forEach((item) => {
+    const entry = findNutritionEntry(item.name);
+    const parsed = entry ? parseMicronutrients(entry.micronutrients) : null;
+    if (!parsed) return;
+
+    const { grams, count } = parseBreakdownAmount(item.amount);
+    const scale = micronutrientScaleFactor(entry, { grams: grams || 0, count: count || 0 });
+    if (scale <= 0) return;
+
+    Object.keys(macroGrams).forEach((name) => {
+      if (!parsed[name]) return;
+      macroGrams[name] += parsed[name].amount * scale;
+      matched = true;
+    });
+  });
+
+  if (!matched) return null;
+
+  const rate = tefMacroRate();
+  const rows = Object.entries(macroGrams).map(([name, grams]) => {
+    const { label, kcalPerGram, tefShare } = rate[name];
+    const kcal = grams * kcalPerGram;
+    return { name: label, grams, kcal, tef: kcal * tefShare };
+  });
+  const totalKcal = rows.reduce((sum, r) => sum + r.kcal, 0);
+  const totalTef = rows.reduce((sum, r) => sum + r.tef, 0);
+  return { rows, totalKcal, tefKcal: Math.round(totalTef) };
+}
+
 // The one line every render of this mode leads with — what the totals below
 // actually cover, since "18 nutrients, none of them showing iron" means
 // something very different depending on whether any iron-rich ingredient was

@@ -1111,6 +1111,13 @@ td {
     white-space: nowrap;
 }
 
+/* Basis wraps in a narrow column; long single lines made iOS enlarge it. */
+#car-service-predicted-table td:nth-child(4) {
+    white-space: normal;
+    min-width: 12rem;
+    max-width: 18rem;
+}
+
 /* Content width, left-aligned, rather than the global table's full width. */
 .car-service-table {
     width: auto;

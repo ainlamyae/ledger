@@ -17,7 +17,7 @@ function planRowsByName() {
   const map = new Map();
   document.querySelectorAll('.workout-day table tbody tr').forEach((tr) => {
     const box = tr.querySelector('.workout-check');
-    if (box) map.set(tr.children[0].textContent.trim(), { day: tr.closest('table').dataset.day, box, tr });
+    if (box) map.set(tr.children[1].textContent.trim(), { day: tr.closest('table').dataset.day, box, tr });
   });
   return map;
 }
@@ -58,7 +58,7 @@ function workoutNoteQuantityForBox(box) {
   // An isometric HOLD row (Plank) is held rather than repped, so its total is
   // sets × seconds held and the per-rep tempo doesn't apply.
   if (box.dataset.hold !== undefined) return `${Number(box.dataset.sets) * Number(box.dataset.hold)}sec`;
-  const cell = box.closest('tr').children[2].textContent;
+  const cell = box.closest('tr').children[3].textContent;
   const totalReps = totalRepsFromSetsCell(cell);
   // An unrecognized cell writes its own text with the separator normalized to a
   // bare x — still a format activity-estimator.js reads back.
@@ -92,7 +92,7 @@ function todaysLoggedWorkoutText() {
 function logWorkout() {
   const logged = loggedWorkoutQuantities();
   const added = [...document.querySelectorAll('.workout-check:checked')]
-    .map((box) => ({ name: box.closest('tr').children[0].textContent.trim(), box }))
+    .map((box) => ({ name: box.closest('tr').children[1].textContent.trim(), box }))
     .filter(({ name }) => !logged.has(name))
     .map(({ name, box }) => `${workoutNoteQuantityForBox(box)} ${name}`);
 

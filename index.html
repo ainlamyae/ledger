@@ -363,9 +363,10 @@
                             <th>Amount</th>
                             <th>Calories</th>
                             <th>Protein</th>
-                            <th title="This ingredient's own carbohydrate grams over the picked range, scaled from its pulled 🧬 Micronutrients. Blank when this ingredient has no Micronutrients pulled">Carbohydrate</th>
-                            <th title="This ingredient's own fat grams over the picked range, scaled from its pulled 🧬 Micronutrients. Blank when this ingredient has no Micronutrients pulled">Fat</th>
-                            <th title="Estimated Thermic Effect of Food — this ingredient's own protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when this ingredient has no Micronutrients pulled">TEF</th>
+                            <th title="This ingredient's own fiber grams over the picked range — its own typed Fiber if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fiber</th>
+                            <th title="This ingredient's own fat grams over the picked range — its own typed Fat if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fat</th>
+                            <th title="This ingredient's own carbohydrate grams over the picked range — its own typed Carb if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Carbohydrate</th>
+                            <th title="Estimated Thermic Effect of Food — this ingredient's own typed TEF if it has one, else its protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when neither is available">TEF</th>
                         </tr>
                         </thead>
                         <tbody id="insight-food-body"></tbody>
@@ -432,7 +433,10 @@
                         <th title="Wake-up Time">Wake</th>
                         <th class="sortable" data-sort="bodyMass" title="Body Mass">Mass</th>
                         <th class="sortable" data-sort="caloriesIn" title="Calories In">Cal↓</th>
-                        <th class="sortable" data-sort="proteinIn" title="Protein In">Pro↓</th>
+                        <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
+                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
+                        <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
+                        <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Carb</th>
                         <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
                         <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
                         <th class="sortable" data-sort="caloriesOut" title="Calories Out">Cal↑</th>
@@ -470,11 +474,14 @@
                         <th class="sortable" data-sort="classification">Classification</th>
                         <th class="sortable" data-sort="name">Name</th>
                         <th class="sortable" data-sort="amount">Amount</th>
-                        <th class="sortable" data-sort="calories">Calories</th>
-                        <th class="sortable" data-sort="protein">Protein</th>
-                        <th class="sortable" data-sort="proteinDensity" title="Protein density: grams of protein per 100 kcal — computed here, not stored — higher means a leaner protein source">Density</th>
+                        <th class="sortable" data-sort="calories" title="Calories">Cal</th>
+                        <th class="sortable" data-sort="protein" title="Protein (g)">Pro</th>
+                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">DF</th>
+                        <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
+                        <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
+                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
                         <th class="sortable" data-sort="verified" title="Verified against the label on your own purchased ingredient">Verified</th>
-                        <th class="sortable" data-sort="proteinPercent" title="Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">Protein %</th>
+                        <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
                         <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click 🧬 Pull Micronutrients to fill this in. Sorts by how many nutrients have been pulled.">Micronutrients</th>
                         <th></th>
                     </tr>
@@ -1335,23 +1342,33 @@
                         <th>Amount</th>
                         <th title="Calories">Cal</th>
                         <th title="Protein (g)">Pro</th>
-                        <th title="Carbohydrate (g) — needs 🧬 Micronutrients pulled for this ingredient">Carb</th>
-                        <th title="Fat (g) — needs 🧬 Micronutrients pulled for this ingredient">Fat</th>
-                        <th title="Estimated Thermic Effect of Food (kcal) — Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default (tune under Settings: TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT); needs 🧬 Micronutrients pulled for this ingredient">TEF</th>
+                        <th title="Fiber (g) — this ingredient's own typed Fiber if it has one, else read from its pulled 🧬 Micronutrients">DF</th>
+                        <th title="Fat (g) — this ingredient's own typed Fat if it has one, else read from its pulled 🧬 Micronutrients">Fat</th>
+                        <th title="Carbohydrate (g) — this ingredient's own typed Carb if it has one, else read from its pulled 🧬 Micronutrients">Carb</th>
+                        <th title="Estimated Thermic Effect of Food (kcal) — this ingredient's own typed TEF if it has one, else Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default (tune under Settings: TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT)">TEF</th>
                         <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time">Source</th>
                     </tr>
                     </thead>
                     <tbody id="physique-calc-breakdown-body"></tbody>
                 </table>
             </div>
-            <!-- All three totals are read off the breakdown table's Total row
-                 above, so the fields Calculate writes them into stay hidden —
-                 they're still what Save sends to columns G, H and L. -->
+            <!-- All totals are read off the breakdown table's Total row above,
+                 so the fields Calculate writes them into stay hidden — they're
+                 still what Save sends to columns G, H, I, J, K and L. -->
             <label hidden>Calories In
                 <input type="text" id="physique-calories-in" placeholder="e.g. 2100 (kcal)">
             </label>
             <label hidden>Protein In
                 <input type="text" id="physique-protein-in" placeholder="e.g. 140 (g)">
+            </label>
+            <label hidden>Fiber
+                <input type="text" id="physique-fiber" placeholder="e.g. 23 (g)">
+            </label>
+            <label hidden>Fat
+                <input type="text" id="physique-fat" placeholder="e.g. 52 (g)">
+            </label>
+            <label hidden>Carbohydrate
+                <input type="text" id="physique-carbohydrate" placeholder="e.g. 187 (g)">
             </label>
             <label hidden>TEF
                 <input type="text" id="physique-tef" placeholder="e.g. 96 (kcal)">
@@ -1376,7 +1393,7 @@
             </div>
             <!-- Read off the activity table's Total row above, same as Calories
                  In / Protein In are read off the breakdown's. Still the fields
-                 Calculate writes and Save sends to columns J and K. -->
+                 Calculate writes and Save sends to columns N and O. -->
             <label hidden>Activity Duration
                 <input type="text" id="physique-activity-duration" placeholder="e.g. 45 (min)">
             </label>
@@ -1901,6 +1918,18 @@
             </label>
             <label>Protein
                 <input type="text" id="nutrition-protein" required>
+            </label>
+            <label>Fiber (g)
+                <input type="text" id="nutrition-fiber" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
+            </label>
+            <label>Fat (g)
+                <input type="text" id="nutrition-fat" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
+            </label>
+            <label>Carb (g)
+                <input type="text" id="nutrition-carb" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
+            </label>
+            <label>TEF (kcal)
+                <input type="text" id="nutrition-tef" placeholder="optional — pre-filled from the Atwater/TEF-share formula">
             </label>
             <label class="checkbox-inline-label">
                 <input type="checkbox" id="nutrition-verified">

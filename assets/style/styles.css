@@ -1111,13 +1111,6 @@ td {
     white-space: nowrap;
 }
 
-/* Basis wraps in a narrow column; long single lines made iOS enlarge it. */
-#car-service-predicted-table td:nth-child(4) {
-    white-space: normal;
-    min-width: 12rem;
-    max-width: 18rem;
-}
-
 /* Content width, left-aligned, rather than the global table's full width. */
 .car-service-table {
     width: auto;
@@ -1504,7 +1497,10 @@ th.sortable:hover {
    figures ("-$1,675.26 / -$1,700.00"), which the dashboard's 1.6rem .value
    can't hold in a ~188px card. One size across all four keeps the row even. */
 #finance > .cards .value {
-    font-size: 1.1rem;
+    font-size: .95rem;
+    /* Regular weight, at the size of the Health cards' rows, so a figure reads the
+       same in every card of the project rather than bold here alone. */
+    font-weight: 400;
 }
 
 /* Four across only works while .container is at its full 950px; between there
@@ -1517,28 +1513,23 @@ th.sortable:hover {
     }
 }
 
-/* Status carries 9 rows against 4/3/2 for the other three, so a flat 4-up
-   grid left three cards mostly empty next to one packed one. Splitting into
-   two columns — Status alone, the other three stacked and stretched to
-   match its height — keeps every existing card/label as-is while making
-   the row read as two balanced halves instead of four uneven slivers. */
+/* Status carries far more rows than the other three, so a flat 4-up grid left
+   three cards mostly empty next to one packed one. Two columns instead: Status
+   alone, the other three stacked beside it, the stack as tall as Status. */
 .today-glance-cards {
     grid-template-columns: 1fr 1fr;
     align-items: stretch;
 }
 
+/* The spare height goes BETWEEN the cards, not inside them: the first card's top
+   lines up with Status's top and the last one's bottom with Status's bottom.
+   Growing each card to fill its share instead (Status is now 14 rows) padded
+   every one with a band of empty space above and below its own rows. */
 .today-glance-stack {
     display: flex;
     flex-direction: column;
-}
-
-/* Equal share of the stack's height each, content centered so the shorter
-   cards (Sleep's 2 rows vs Macros' 4) don't just sit pinned to the top. */
-.today-glance-stack .card {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    justify-content: space-between;
+    gap: .5rem;
 }
 
 .today-glance-cards h3 {
@@ -3088,7 +3079,7 @@ td .btn {
 .formula-row input.formula-field-computed {
     border-style: dashed;
     background: var(--color-surface);
-    color: var(--color-primary);
+    color: var(--color-text);
     font-weight: 600;
 }
 
@@ -3152,13 +3143,12 @@ td .btn {
 .formula-name {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: .72rem;
-    color: var(--color-text-muted);
+    color: var(--color-text);
     white-space: nowrap;
 }
 
 .formula-unit {
-    color: var(--color-text-muted);
-    opacity: .85;
+    color: var(--color-text);
     white-space: nowrap;
 }
 

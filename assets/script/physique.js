@@ -205,12 +205,8 @@ async function initPhysique(forceRefresh = false) {
 
 async function refreshPhysique(forceRefresh = false) {
   // A new key: the cached copy now includes the header row.
-  let values = forceRefresh ? null : getCached('physiqueWithHeader');
-  if (!values) {
-    const resp = await getValues(PHYSIQUE_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('physiqueWithHeader', values);
-  }
+  const resp = await getValues(PHYSIQUE_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   // Row 1 is always the header, as before.
   physiqueColumnIndex = physiqueColumnsFromHeader(values[0] || []);
@@ -557,6 +553,27 @@ async function backfillPhysiqueDerivedFigures() {
   const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
   fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
   await runPhysiqueBatch(fresh, 'stored missing Sleep/BMR/Deprivation');
+}
+
+// One-off rewrite of saved Breakdown amounts still in units ("×1") into grams, from
+// each food's Nutrition row (breakdownAmountInGrams). Needs Nutrition loaded, so
+// app.js runs it once both tabs are in. Foods whose row gives no weight keep "×N".
+async function convertPhysiqueBreakdownAmountsToGrams() {
+  if (physiqueBatchRunning || physiqueColumnIndex.breakdown === undefined) return;
+  const data = [];
+  allPhysiqueEntries.forEach((p) => {
+    let changed = false;
+    const items = parsePhysiqueBreakdown(p.breakdown).map((item) => {
+      const grams = breakdownAmountInGrams(item.name, item.amount);
+      if (grams === null) return item;
+      changed = true;
+      return { ...item, amount: grams };
+    });
+    if (changed) data.push(physiqueCellUpdate('breakdown', p.row, breakdownToJson(items)));
+  });
+  const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
+  fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
+  await runPhysiqueBatch(fresh, 'converted Breakdown amounts to grams');
 }
 
 // Settings that change a stored BMR or Deprivation.

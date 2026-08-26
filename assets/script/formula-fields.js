@@ -269,7 +269,7 @@ function applySolveForMode(mode) {
 // one definition of the model. The four-space indent sets each formula off from its
 // heading.
 const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass
-    m̄     =  (1/7) × Σ m(t−i),  i = 0…6
+    m̄     =  (1/L_p) × Σ m(t−i),  i = 0…L_p−1
 Lean body mass — Boer (1984)
     LBM   =  0.407×m  +  0.267×h  −  19.2      (♂)
     LBM   =  0.252×m  +  0.473×h  −  48.3      (♀)

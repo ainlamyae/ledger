@@ -104,8 +104,9 @@ function latestBodyMassKg(entries) {
 // A single scale reading is a poor estimate of the mass every equation here is built on:
 // water and glycogen swing it by more than a week of fat loss does, so yesterday's dinner
 // can move the whole plan. m(t) in the decay model means clean mass, and the standard fix
-// is the 7-day rolling mean — m̄(t) = (1/7) × Σ m(t−i), i = 0…6 — which is what the plan
-// figures read instead.
+// is a rolling mean — m̄(t) = (1/L_p) × Σ m(t−i), i = 0…L_p−1 — which is what the plan
+// figures read instead. The window is Tune's period length L_p (the same days BMR_cal
+// groups by), not a fixed week, so one setting decides how much the scale is smoothed.
 //
 // The window ends at the LATEST reading, not at today: anchoring on today would quietly
 // empty the window after a week away from the scale, and no average at all is worse than
@@ -116,9 +117,14 @@ function latestBodyMassKg(entries) {
 // Rounded to the 0.1 kg a scale reads to, for the same reason the LBM figure is: the
 // substituted trace multiplies this number out, and a hidden extra decimal is what makes a
 // printed line fail to add up.
-const BODY_MASS_SMOOTHING_WINDOW_DAYS = 7;
+//
+// The saved L_p, not Tune's box: a typed-but-unsaved period length is a what-if for
+// Tune's own sheet (formula-playground.js passes it in), not for the rest of the app.
+function bodyMassSmoothingDays() {
+  return getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
+}
 
-function smoothedBodyMassKg(entries, windowDays = BODY_MASS_SMOOTHING_WINDOW_DAYS) {
+function smoothedBodyMassKg(entries, windowDays = bodyMassSmoothingDays()) {
   const readings = entries
     .filter((e) => e.category === 'Body Mass' && e.amount !== null)
     .sort((a, b) => a.date.localeCompare(b.date));

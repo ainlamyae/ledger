@@ -1,38 +1,12 @@
-const CACHE_PREFIX = 'ledger_cache_';
-const CACHE_TTL_MS = 5 * 60 * 1000;
-
-function getCached(key, ttlMs = CACHE_TTL_MS) {
-  const raw = localStorage.getItem(CACHE_PREFIX + key);
-  if (!raw) return null;
-
-  try {
-    const { data, timestamp } = JSON.parse(raw);
-    if (Date.now() - timestamp > ttlMs) return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-// A write failure here (most commonly QuotaExceededError — a Nutrition row's
-// banked Micronutrients JSON can be large, and enough of them blow past
-// localStorage's ~5-10MB origin quota) must never break the caller: every
-// call site already has the real data in memory from the fetch that just
-// succeeded, and was only ever going to use this as a warm-start for next
-// time. Losing that warm start is fine; surfacing "Failed to load data" for
-// a load that actually succeeded is not.
-function setCached(key, data) {
-  try {
-    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ data, timestamp: Date.now() }));
-  } catch (err) {
-    console.warn(`setCached(${key}) skipped — ${err.message}`);
-  }
-}
-
-function clearCache() {
+// The app keeps no copy of sheet data any more: every load reads the sheet. This
+// clears what earlier versions stored under ledger_cache_*, so a stale copy can't
+// linger in browser storage.
+try {
   Object.keys(localStorage)
-    .filter((key) => key.startsWith(CACHE_PREFIX))
+    .filter((key) => key.startsWith('ledger_cache_'))
     .forEach((key) => localStorage.removeItem(key));
+} catch {
+  // Storage blocked: nothing could have been stored there either.
 }
 
 // Lets a numeric field (account balance, transaction amount) accept a simple
@@ -53,20 +27,4 @@ function evaluateNumberExpression(input) {
   } catch {
     return null;
   }
-}
-
-async function hardRefresh() {
-  clearCache();
-
-  if ('caches' in window) {
-    const keys = await caches.keys();
-    await Promise.all(keys.map((key) => caches.delete(key)));
-  }
-
-  if ('serviceWorker' in navigator) {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((reg) => reg.unregister()));
-  }
-
-  location.reload();
 }

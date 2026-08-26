@@ -13,6 +13,27 @@ function breakdownToJson(breakdown) {
   return (breakdown && breakdown.length) ? JSON.stringify(breakdown) : '';
 }
 
+// Grams in one unit of a Nutrition row that is counted by unit, e.g. 31 for
+// "1 scoop (31g)" or 34 for "2.94x (100g)"; null when the row is a plain weight
+// ("100g") or names no weight ("1x"). A breakdown amount is stored in grams
+// whenever this is known, so the table reads in one unit; "×N" only remains
+// for a food whose Nutrition row gives no weight to convert with.
+function nutritionGramsPerUnit(entry) {
+  const grams = parseGramsFromAmount(entry.amount);
+  const count = parseCountFromAmount(entry.amount);
+  return grams !== null && count !== null && count > 0 ? grams / count : null;
+}
+
+// A saved breakdown amount still in units ("×2"), as grams ("62g") from the
+// Nutrition row it names; null when it is already grams or can't be converted.
+function breakdownAmountInGrams(name, amount) {
+  const match = String(amount || '').trim().match(/^×(\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+  const entry = findNutritionEntry(name);
+  const perUnit = entry ? nutritionGramsPerUnit(entry) : null;
+  return perUnit === null ? null : `${Math.round(parseFloat(match[1]) * perUnit * 10) / 10}g`;
+}
+
 // For renderCalcBreakdown's table ONLY — never applied to the saved breakdown
 // itself (see the caution there). Two Consumption lines for the same
 // ingredient (e.g. "38g onion" and "28g onion", typed separately) merge into
@@ -340,24 +361,10 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   const notes = resolveDivisionQuantities(notesText.trim());
   if (!notes) throw new Error('No ingredients to calculate from.');
 
-  // Only the ingredient SPLIT (Groq) is cached by exact text — that round
-  // trip isn't guaranteed bit-for-bit reproducible (batched GPU inference
-  // means even temperature 0 + a fixed seed can shift slightly run to run),
-  // so caching it keeps repeat clicks on the same Notes splitting into the
-  // same items/quantities instead of a fresh roll each time. The macro
-  // LOOKUP below this is deliberately never cached: it always re-checks the
-  // Nutrition table fresh, so adding or editing a table row and
-  // recalculating the exact same Notes text picks up the change immediately
-  // instead of silently replaying a result computed before that row existed
-  // or was corrected.
-  // Cache key versioned to "v2": v1 entries carry a "notes" field that no
-  // longer exists.
-  const extractCacheKey = `calc-extract-v2:${notes.toLowerCase()}`;
-  let extraction = getCached(extractCacheKey, Infinity);
-  if (!extraction) {
-    extraction = await groqExtractIngredients(notes);
-    setCached(extractCacheKey, extraction);
-  }
+  // The macro lookup below always re-checks the Nutrition table fresh, so
+  // adding or editing a table row and recalculating the same Notes text picks
+  // up the change immediately.
+  const extraction = await groqExtractIngredients(notes);
   const { items } = extraction;
 
   // The model's own "query" field is intentionally NOT trusted as an item's
@@ -496,7 +503,11 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       itemCalories = kcalPerUnit * usedCount;
       itemProtein = proteinPerUnit * usedCount;
       source = 'nutrition-table-count';
-      amount = `×${usedCount}`;
+      // In grams when the row gives a weight per unit; the Notes line below keeps the count.
+      const gramsPerUnit = nutritionGramsPerUnit(tableEntry);
+      amount = gramsPerUnit !== null
+        ? `${Math.round(usedCount * gramsPerUnit * 10) / 10}g`
+        : `×${usedCount}`;
     } else if (useTableGrams) {
       kcal = (tableEntry.calories / tableGrams) * 100;
       protein = (tableEntry.protein / tableGrams) * 100;

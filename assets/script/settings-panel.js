@@ -7,14 +7,9 @@ let editingSettingRow = null;
 let settingPanelListenersAttached = false;
 
 async function initSettingsPanel(forceRefresh = false) {
-  let meta = forceRefresh ? null : getCached('settings-panel-meta');
-
-  if (!meta) {
-    const spreadsheet = await getSpreadsheetMetadata();
-    const sheet = spreadsheet.sheets.find((s) => s.properties.title === CONFIG.SHEETS.SETTINGS);
-    meta = { settingsSheetId: sheet ? sheet.properties.sheetId : null };
-    setCached('settings-panel-meta', meta);
-  }
+  const spreadsheet = await getSpreadsheetMetadata();
+  const sheet = spreadsheet.sheets.find((s) => s.properties.title === CONFIG.SHEETS.SETTINGS);
+  const meta = { settingsSheetId: sheet ? sheet.properties.sheetId : null };
 
   settingsSheetId = meta.settingsSheetId;
   settingsSheetMissing = settingsSheetId === null;
@@ -38,13 +33,8 @@ async function initSettingsPanel(forceRefresh = false) {
 }
 
 async function refreshSettingsList(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('setting-list');
-
-  if (!values) {
-    const resp = await getValues(SETTINGS_PANEL_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('setting-list', values);
-  }
+  const resp = await getValues(SETTINGS_PANEL_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allSettingRows = values.map((row, i) => ({
     row: i + 2,

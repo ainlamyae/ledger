@@ -19,23 +19,18 @@ let transactionsDirtyFromAdd = false;
 let transactionsDataLoaded = false;
 
 async function initTransactions(forceRefresh = false) {
-  let lists = forceRefresh ? null : getCached('lists');
+  const [meta, listsResp] = await Promise.all([
+    getSpreadsheetMetadata(),
+    batchGetValues([`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.INSIGHT}!A2:A200`], VALUE_PARAMS),
+  ]);
 
-  if (!lists) {
-    const [meta, listsResp] = await Promise.all([
-      getSpreadsheetMetadata(),
-      batchGetValues([`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.INSIGHT}!A2:A200`], VALUE_PARAMS),
-    ]);
-
-    lists = {
-      transactionsSheetId: findSheetId(meta, CONFIG.SHEETS.TRANSACTIONS),
-      accountOptions: (listsResp.valueRanges[0].values || []).map((r) => r[0]).filter(Boolean),
-      // Breakdown!A2:A200 repeats each category once per Type plus one
-      // blank-Type total row, so collapse to a unique list.
-      categoryOptions: [...new Set((listsResp.valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))],
-    };
-    setCached('lists', lists);
-  }
+  const lists = {
+    transactionsSheetId: findSheetId(meta, CONFIG.SHEETS.TRANSACTIONS),
+    accountOptions: (listsResp.valueRanges[0].values || []).map((r) => r[0]).filter(Boolean),
+    // Breakdown!A2:A200 repeats each category once per Type plus one
+    // blank-Type total row, so collapse to a unique list.
+    categoryOptions: [...new Set((listsResp.valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))],
+  };
 
   transactionsSheetId = lists.transactionsSheetId;
   accountOptions = lists.accountOptions;
@@ -113,13 +108,8 @@ function setupTransactionSorting() {
 }
 
 async function refreshTransactions(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('transactions');
-
-  if (!values) {
-    const resp = await getValues(TRANSACTIONS_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('transactions', values);
-  }
+  const resp = await getValues(TRANSACTIONS_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allTransactions = values.map((row, i) => ({
     row: i + 2,
@@ -176,7 +166,6 @@ async function refreshAccountOptions() {
   accountOptions = (valueRanges[0].values || []).map((r) => r[0]).filter(Boolean);
   categoryOptions = [...new Set((valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))];
 
-  setCached('lists', { transactionsSheetId, accountOptions, categoryOptions });
   populateAccountFilter();
   populateCategoryFilter();
   syncExportAccountOptions();

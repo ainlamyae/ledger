@@ -11,7 +11,7 @@
 flowchart TD
     subgraph Client["Browser (Client) — GitHub Pages static site, no build step"]
         App["index.html + assets/style/*.css + assets/script/*.js<br/>Vanilla JS (ES6+), classic &lt;script&gt; tags, one shared global scope"]
-        LS[("localStorage<br/>cache.js — 5-min TTL Sheets cache<br/>+ auth/file-selection/widget preference keys")]
+        LS[("localStorage<br/>auth/file-selection/widget preference keys<br/>(no sheet data)")]
         App <--> LS
     end
 
@@ -89,7 +89,7 @@ flowchart TD
 
     subgraph LoadDashboard["Dashboard load — loadDashboard()"]
         direction TB
-        Report["loadReport()<br/>cached or batchGetValues:<br/>Statement, Account,<br/>Breakdown — missingAmount computed<br/>client-side from the first two"]
+        Report["loadReport()<br/>batchGetValues:<br/>Statement, Account,<br/>Breakdown — missingAmount computed<br/>client-side from the first two"]
         Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initActivities · initPhysique<br/>initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications<br/>(each checks its own cache first)"]
         ProteinRot["Once Physique + Nutrition settle:<br/>renderProteinRotationChart()<br/>(protein-rotation.js)"]
         Render["The wellness/finance/timesheet/travel chart files render every canvas, lazily<br/>app.js renders summary cards<br/>each module renders its own table"]
@@ -101,7 +101,7 @@ flowchart TD
 
     Idle --> Writes["Add / edit / delete / duplicate<br/>— any single row, any module:<br/>Transaction · Account · Timesheet · Wellness · Physique<br/>Nutrition · Contact · Setting · Travel · Application"]
     Writes --> WriteCall["appendValues / updateValues / batchUpdate"]
-    WriteCall --> Refresh["Refresh that module's cache<br/>+ re-render — no page reload"]
+    WriteCall --> Refresh["Re-read that module's data<br/>+ re-render — no page reload"]
     Refresh --> Idle
 
     Idle --> Bulk["Bulk select + Edit / Delete /<br/>Merge / Recalculate<br/>— Transaction · Wellness · Contact · Nutrition"]
@@ -124,9 +124,7 @@ flowchart TD
     Calc --> CalcCategory{"handleCalculateClick():<br/>entry category?"}
 
     CalcCategory -- Food --> Split["splitNotesIntoSegments()<br/>deterministic, no AI — recovers<br/>each item's OWN typed name"]
-    Split --> ExtractCheck{"Notes text cached?<br/>(calc-extract-v2)"}
-    ExtractCheck -- hit --> Items["items[]: query (Groq's own<br/>search phrasing, never shown/<br/>stored), grams, count,<br/>kcal/protein fallback"]
-    ExtractCheck -- miss --> Groq["groqExtractIngredients()<br/>→ cache the split"] --> Items
+    Split --> Groq["groqExtractIngredients()"] --> Items["items[]: query (Groq's own<br/>search phrasing, never shown/<br/>stored), grams, count,<br/>kcal/protein fallback"]
     Items --> PerItem["Per item — resolved fresh,<br/>never cached:"]
     PerItem --> NutCheck{"Match in Nutrition table,<br/>by the user's OWN typed name<br/>— never Groq's query?"}
     NutCheck -- "count or weight match" --> Trusted["Use table row directly<br/>— no USDA/Groq-name call"]
@@ -150,8 +148,7 @@ flowchart TD
     InsightSend -- yes --> InsightReport["Groq chat-completions API<br/>renders free-text report,<br/>saved to that mode's INSIGHT_* keys"] --> Idle
     InsightSend -- no --> Idle
 
-    Idle --> Manual["Refresh /<br/>Clear Cache"]
-    Manual --> ClearCache["Clear localStorage cache<br/>— Clear Cache also clears<br/>Cache Storage/service workers,<br/>then reloads"] --> LoadDashboard
+    Idle --> Manual["Refresh"] --> LoadDashboard
 ```
 
 ## Frontend Module Map
@@ -164,7 +161,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 2 | `auth.js` | Google sign-in/out, token persistence, silent refresh, profile lookup |
 | 3 | `drive.js` | Template copy link, Google Picker, active spreadsheet ID storage |
 | 4 | `sheets.js` | Sheets API v4 wrapper; `USER_ENTERED` by default, `RAW` for Settings writes |
-| 5 | `cache.js` | `localStorage` cache with per-call TTL, hard refresh, numeric-expression evaluator |
+| 5 | `cache.js` | Numeric-expression evaluator; deletes the `ledger_cache_*` keys earlier versions stored |
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
 | 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes; vision call (`groqAnalyzeFoodImage`) for food-photo scanning via `qwen/qwen3.6-27b` |
 | 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
@@ -240,14 +237,14 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 **Dashboard load**
 
-1. `loadReport()` — cache or one `batchGetValues` for Statement, Account, Breakdown.
-2. Entity modules init concurrently via `Promise.allSettled`, each checking its own cache.
+1. `loadReport()` — one `batchGetValues` for Statement, Account, Breakdown.
+2. Entity modules init concurrently via `Promise.allSettled`, each reading its own range.
 3. The wellness/finance/timesheet/travel chart files render canvases lazily (`upsertChart`, `charts-base.js`, builds a chart only once its `.chart-box` scrolls into view); `app.js` renders summary cards; each module renders its table.
 
 **Writes**
 
 1. UI calls `appendValues` / `updateValues` / `batchUpdate` directly.
-2. Only the affected cache entry is refreshed — no page reload.
+2. Only the affected data is re-read — no page reload.
 3. The clicked button shows `…` and blocks re-clicks until the write settles.
 
 **Insight**
@@ -258,8 +255,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 **Manual refresh**
 
-- Refresh clears the cache and re-fetches.
-- Clear Cache also purges Cache Storage and service workers, then reloads.
+- Refresh re-reads every range. Nothing is cached, so there is no Clear Cache.
 
 ---
 

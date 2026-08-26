@@ -11,7 +11,11 @@ function loadFormulaInputsFromSettings() {
   // the tile and the chart target are computed at, so the modal opens agreeing with them.
   const wellnessEntries = physiqueAsWellnessEntries();
   document.getElementById('formula-body-mass').value = latestBodyMassKg(wellnessEntries) ?? '';
-  document.getElementById('formula-body-mass-smooth').value = planBodyMassKg(wellnessEntries) ?? '';
+  // Over the L_p just loaded into its box above, so the two agree on open.
+  document.getElementById('formula-body-mass-smooth').value = smoothedBodyMassKg(
+    wellnessEntries,
+    periodInputValue('formula-cal-period-days', bodyMassSmoothingDays()),
+  ) ?? '';
   document.getElementById('formula-height').value = getSetting('HEIGHT_CM', null) ?? '';
   document.getElementById('formula-age').value = ageFromBirthDate(getSettingString('BIRTH_DATE', null)) ?? '';
   // Falls back to male only because the formula needs one of the two — an unset
@@ -310,6 +314,14 @@ function initFormulaPlayground() {
   // m_g is left out for the same reason Δm is, and wired with BMI_g below: both have to
   // record which of their pair is the known BEFORE the render, and a plain render-only
   // listener firing first would let the previous known overwrite the box being typed into.
+  // m̄ is averaged over L_p, so a typed L_p re-smooths it before the render below reads it.
+  // Registered ahead of the render listeners so it runs first.
+  document.getElementById('formula-cal-period-days').addEventListener('input', () => {
+    const days = periodInputValue('formula-cal-period-days', bodyMassSmoothingDays());
+    document.getElementById('formula-body-mass-smooth').value =
+      smoothedBodyMassKg(physiqueAsWellnessEntries(), days) ?? '';
+  });
+
   [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss' && id !== 'formula-target'),
     ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
     ...FIBER_FORMULA_FIELDS.map((f) => f.inputId),

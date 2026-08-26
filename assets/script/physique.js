@@ -149,9 +149,21 @@ async function initPhysique(forceRefresh = false) {
     physiqueListenersAttached = true;
 
     document.getElementById('add-physique-btn').addEventListener('click', () => openPhysiqueForm(null));
-    document.getElementById('today-physique-btn').addEventListener('click', () => openPhysiqueForm(todaysPhysiqueDay()));
+    // Today's address is its date, the same one the row's own Edit uses, whether or
+    // not today is logged yet.
+    document.getElementById('today-physique-btn').addEventListener('click', () => {
+      routeRecordEdit('physique', todayPhysiqueRouteStep());
+      openPhysiqueForm(todaysPhysiqueDay());
+    });
     // health/physique/<date or pattern-N>/ opens that row's Edit; …/micronutrients/ its 🧬 view.
+    // Today's date opens a new Log while today isn't logged, and the old …/today/
+    // address lands on today's date.
     registerRecordRoute('physique', (slug, sub) => {
+      const today = todayPhysiqueRouteStep();
+      if (!sub && (slug === 'today' || (slug === today.slug && !todaysPhysiqueDay()))) {
+        openPhysiqueForm(todaysPhysiqueDay());
+        return today;
+      }
       const p = allPhysiqueEntries.find((e) => physiqueRouteStep(e).slug === slug);
       if (!p || (sub && sub !== 'micronutrients')) return null;
       if (sub) openPhysiqueMicronutrients(p);
@@ -1014,10 +1026,11 @@ function openPhysiqueMicronutrients(p, routed = false) {
   if (data.nutrients.length === 0) {
     tbody.appendChild(renderEmptyRow(3, 'Nothing to show — see the coverage note above.'));
   } else {
-    data.nutrients.forEach((n) => {
+    data.nutrients.forEach((n, i) => {
       const tr = document.createElement('tr');
       if (n.severity === 'severe') tr.classList.add('nutrient-gap-severe');
       else if (n.severity === 'mild') tr.classList.add('nutrient-gap-mild');
+      if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
       tr.append(
         makeCell(n.displayName),
         makeCell(`${n.total} ${n.unit}`),
@@ -1396,6 +1409,11 @@ async function restorePhysiqueSnapshots(snapshots) {
 }
 
 // A row's address step: its date, or pattern-<n> by sheet order for a Pattern.
+function todayPhysiqueRouteStep() {
+  const today = isoFromDate(new Date());
+  return { slug: today, label: today };
+}
+
 function physiqueRouteStep(entry) {
   if (entry.date) return { slug: entry.date, label: entry.date };
   const n = allPhysiqueEntries.filter((e) => !e.date).indexOf(entry) + 1;

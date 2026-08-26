@@ -1187,6 +1187,14 @@ td {
    running over never flags, even on a limit-type nutrient like sodium, per
    nutrient-targets.js's nutrientGapSeverity. Left-border rather than a filled
    background so the row's own numbers stay legible at both severities. */
+/* Section breaks: under the last Nutrition Facts line (Iron, when present), and
+   above the first nutrient with no daily target. Heavier than the row borders so
+   each reads as a break. */
+#insight-micro-table tr.nutrient-facts-end td,
+#physique-micro-table tr.nutrient-facts-end td {
+    border-bottom: 2px solid var(--color-text-muted);
+}
+
 #insight-micro-table tr.nutrient-gap-severe td,
 #physique-micro-table tr.nutrient-gap-severe td {
     border-left: 3px solid var(--color-danger);

@@ -91,11 +91,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/health/physique/today/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://ainlamyae.github.io/ledger/health/tune/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>

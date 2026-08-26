@@ -277,8 +277,8 @@ function renderFoodInsightPreview(rows, from, to) {
     makeCell(String(Math.round(calorieTarget.kcal))),
     makeCell(formatProteinTargetBand(proteinBand)),
     makeCell(formatProteinTargetBand(fiberBand)),
-    makeCell(String(dailyTargets['Total lipid (fat)'].amount)),
-    makeCell(String(dailyTargets['Carbohydrate, by difference'].amount)),
+    makeCell(String(dailyTargets['Total lipid (fat)']?.amount ?? '—')),
+    makeCell(String(dailyTargets['Carbohydrate, by difference']?.amount ?? '—')),
     makeCell('—'),
   );
   tbody.appendChild(idealRow);

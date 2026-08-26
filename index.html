@@ -1220,7 +1220,7 @@
             <div class="panel-header">
                 <h2>Physique</h2>
                 <button id="physique-export-csv-btn" class="btn panel-header-btn">Export CSV</button>
-                <button id="today-physique-btn" data-route="today" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
+                <button id="today-physique-btn" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
                 <button id="add-physique-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
             </div>
 
@@ -2142,8 +2142,9 @@
                     <option>USDA_FDC_API_KEY</option>
                 </datalist>
             </label>
+            <!-- Multi-line, since some values are long (a JSON target list, an API key). -->
             <label>Value
-                <input type="text" id="setting-value">
+                <textarea id="setting-value" rows="4" spellcheck="false"></textarea>
             </label>
             <label>Notes
                 <input type="text" id="setting-notes" placeholder="Optional">

@@ -719,33 +719,70 @@ function logNutritionFromForm() {
   physiqueField('consumption').value = consumption;
 }
 
-// The pulled micronutrient rows, appended to the form's fields table under its
-// divider: lock tick, name, typeable box, unit. Top-row panel entries are held
-// aside in nutritionFormPanelExtras instead of listed twice.
+// The Nutrition Facts lines, in the order and under the names of the Canadian
+// Nutrition Facts table. Each line lists the names it may carry in the data — a top
+// row's own name, or a USDA nutrient name (several where FoodData Central spells it
+// differently by data source); the first one present is used, and a line the food
+// has no data for is skipped. Shown under `label` everywhere these are listed (the
+// ingredient form, Micronutrients Insight, Physique's 🧬 view); the saved data keeps
+// its own names (hover a renamed row to see it).
+const NUTRITION_FACTS_ORDER = [
+  { label: 'Calories', names: ['Calories'] },
+  { label: 'Fat', names: ['Fat'] },
+  { label: 'Saturated', names: ['Fatty acids, total saturated'] },
+  { label: 'Trans', names: ['Fatty acids, total trans'] },
+  { label: 'Polyunsaturated', names: ['Fatty acids, total polyunsaturated'] },
+  { label: 'Omega-6', names: ['PUFA 18:2 n-6 c,c', 'PUFA 18:2'] }, // linoleic acid
+  { label: 'Omega-3', names: ['PUFA 18:3 n-3 c,c,c (ALA)', 'PUFA 18:3'] }, // alpha-linolenic acid
+  { label: 'Monounsaturated', names: ['Fatty acids, total monounsaturated'] },
+  { label: 'Carbohydrate', names: ['Carbohydrates'] },
+  { label: 'Fibre', names: ['Dietary Fiber'] },
+  { label: 'Soluble Fibre', names: ['Fiber, soluble'] },
+  { label: 'Insoluble Fibre', names: ['Fiber, insoluble'] },
+  { label: 'Sugars', names: ['Sugars, total including NLEA', 'Total Sugars', 'Sugars, Total'] },
+  { label: 'Sugar Alcohols', names: ['Sugar alcohols'] },
+  { label: 'Starch', names: ['Starch'] },
+  { label: 'Protein', names: ['Protein'] },
+  { label: 'Cholesterol', names: ['Cholesterol'] },
+  { label: 'Sodium', names: ['Sodium, Na'] },
+  { label: 'Potassium', names: ['Potassium, K'] },
+  { label: 'Calcium', names: ['Calcium, Ca'] },
+  { label: 'Iron', names: ['Iron, Fe'] },
+];
+
+// The Nutrition Facts lines among USDA panel names (the top rows by their panel
+// name, Calories as "Energy"): name -> { rank, label }, for the one name per line
+// actually used — the first of the line's spellings present in `names`.
+function nutritionFactsRanks(names) {
+  const present = new Set(names);
+  const panelName = (name) => (name === 'Calories'
+    ? 'Energy'
+    : NUTRITION_TOP_ROWS.find((r) => r.name === name)?.panel ?? name);
+  const ranks = new Map();
+  NUTRITION_FACTS_ORDER.forEach(({ label, names: spellings }, rank) => {
+    const found = spellings.map(panelName).find((n) => present.has(n));
+    if (found) ranks.set(found, { rank, label });
+  });
+  return ranks;
+}
+
+// Lays out the form's value rows: TEF first, then the Nutrition Facts lines above
+// (top rows and pulled micronutrients alike, in that order whatever their value),
+// then under the divider every other pulled micronutrient alphabetically, and last,
+// under a rule of their own, the ones at zero. Each micro row is lock tick, name,
+// typeable box, unit. Top-row panel entries are held aside in
+// nutritionFormPanelExtras instead of listed twice.
 function renderNutritionMicroRows(panel, locked) {
   const box = document.getElementById('nutrition-fields');
   box.querySelectorAll('.nutrition-micro-row').forEach((el) => el.remove());
   nutritionFormPanelExtras = {};
-  const shown = [];
+  const microNames = [];
   Object.keys(panel || {}).sort((a, b) => a.localeCompare(b)).forEach((name) => {
     if (NUTRITION_TOP_PANEL_KEYS.has(name)) nutritionFormPanelExtras[name] = { ...panel[name] };
-    else shown.push(name);
+    else microNames.push(name);
   });
-  // Zero amounts go last; each half stays alphabetical.
-  shown.sort((a, b) => (Number(panel[a].amount) === 0) - (Number(panel[b].amount) === 0));
-  document.getElementById('nutrition-micro-divider').hidden = shown.length === 0;
 
-  // A rule between the non-zero rows and the zero ones, so the nutrients this food
-  // actually carries read as one block. None when every row is zero (the divider above
-  // already starts the list) or none is.
-  const firstZero = shown.findIndex((name) => Number(panel[name].amount) === 0);
-
-  shown.forEach((name, i) => {
-    if (i === firstZero && i > 0) {
-      const rule = document.createElement('hr');
-      rule.className = 'formula-divider nutrition-micro-row';
-      box.appendChild(rule);
-    }
+  const microRow = (name, displayName = name) => {
     const label = document.createElement('label');
     label.className = 'formula-row nutrition-micro-row';
     const lock = document.createElement('input');
@@ -754,7 +791,8 @@ function renderNutritionMicroRows(panel, locked) {
     lock.checked = locked.has(name);
     const nameSpan = document.createElement('span');
     nameSpan.className = 'formula-name';
-    nameSpan.textContent = name;
+    nameSpan.textContent = displayName;
+    if (displayName !== name) label.title = name;
     const value = document.createElement('input');
     value.type = 'text';
     value.dataset.microName = name;
@@ -764,7 +802,50 @@ function renderNutritionMicroRows(panel, locked) {
     unit.className = 'formula-unit';
     unit.textContent = panel[name].unit;
     label.append(lock, nameSpan, value, unit);
-    box.appendChild(label);
+    return label;
+  };
+  // A top row's static label, its shown name set to the line's `label` when given.
+  const topRow = (name, label = null) => {
+    const row = NUTRITION_TOP_ROWS.find((r) => r.name === name);
+    if (!row) return null;
+    const el = document.getElementById(row.inputId).closest('label');
+    el.querySelector('.formula-name').textContent = label ?? row.name;
+    return el;
+  };
+
+  const ordered = [topRow('TEF')];
+  const placed = new Set();
+  NUTRITION_FACTS_ORDER.forEach(({ label, names }) => {
+    const top = names.map((n) => topRow(n, label)).find(Boolean);
+    if (top) {
+      ordered.push(top);
+      return;
+    }
+    const name = names.find((n) => microNames.includes(n));
+    if (name) {
+      ordered.push(microRow(name, label));
+      placed.add(name);
+    }
+  });
+
+  // The rest: non-zero first, each half alphabetical.
+  const rest = microNames.filter((name) => !placed.has(name))
+    .sort((a, b) => (Number(panel[a].amount) === 0) - (Number(panel[b].amount) === 0));
+  const divider = document.getElementById('nutrition-micro-divider');
+  divider.hidden = rest.length === 0;
+  box.append(...ordered, divider);
+
+  // A rule between the non-zero rows and the zero ones, so the nutrients this food
+  // actually carries read as one block. None when every row is zero (the divider above
+  // already starts the list) or none is.
+  const firstZero = rest.findIndex((name) => Number(panel[name].amount) === 0);
+  rest.forEach((name, i) => {
+    if (i === firstZero && i > 0) {
+      const rule = document.createElement('hr');
+      rule.className = 'formula-divider nutrition-micro-row';
+      box.appendChild(rule);
+    }
+    box.appendChild(microRow(name));
   });
 }
 

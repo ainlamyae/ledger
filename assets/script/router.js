@@ -50,9 +50,12 @@ async function openRecordRoute(panel, slug, sub = null) {
   const steps = [{ slug, label: slug }];
   if (sub) steps.push({ slug: sub, label: sub.charAt(0).toUpperCase() + sub.slice(1) });
   pendingFormRoute = { panel, steps };
-  // The modal observer runs after this, so the label can still be filled in.
-  const label = open(slug, sub);
-  if (label) steps[0].label = label;
+  // The modal observer runs after this, so the step can still be filled in. `open`
+  // returns the row's label, or a { slug, label } step when the row's own address
+  // differs from the one asked for (an alias such as physique's "today").
+  const opened = open(slug, sub);
+  if (opened && typeof opened === 'object') Object.assign(steps[0], opened);
+  else if (opened) steps[0].label = opened;
   else pendingFormRoute = null;
 }
 

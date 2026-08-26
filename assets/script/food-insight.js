@@ -167,39 +167,92 @@ function renderFoodInsightPreview(rows, from, to) {
   tbody.innerHTML = '';
 
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(7, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
+    tbody.appendChild(renderEmptyRow(8, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
     return;
   }
 
   // Grouped exactly as the prompt groups them, so the preview stays a literal
   // view of what gets sent rather than a differently-shaped summary of it.
+  let totalCalories = 0;
+  let totalProtein = 0;
+  let totalFiber;
+  let totalFat;
+  let totalCarbohydrate;
+  let totalTef;
+
   groupFoodIntakeByClassification(rows).forEach((g) => {
     const groupRow = document.createElement('tr');
     groupRow.className = 'insight-food-group-row';
     const groupCell = document.createElement('td');
-    groupCell.colSpan = 7;
+    groupCell.colSpan = 8;
     groupCell.textContent = formatFoodGroupSummary(g);
     groupRow.appendChild(groupCell);
     tbody.appendChild(groupRow);
 
     g.items.forEach((r) => {
       const tr = document.createElement('tr');
-      // Null (no 🧬 Micronutrients pulled for this ingredient) reads as a
-      // blank dash, not a claimed zero — same convention the Physique TEF
-      // column and its own breakdown table use.
-      const macros = estimateMacrosForFoodRow(r);
+      // A field absent (neither typed on the Nutrition row nor pulled via 🧬
+      // Micronutrients) reads as a blank dash, not a claimed zero — same
+      // convention the Physique TEF column and its own breakdown table use.
+      const macros = estimateMacrosForFoodRow(r) || {};
       tr.append(
         makeCell(r.name),
         makeCell(r.amountLabel),
         makeCell(String(r.calories)),
         makeCell(String(r.protein)),
-        makeCell(macros ? macros.carbohydrate.toFixed(2) : '—'),
-        makeCell(macros ? macros.fat.toFixed(2) : '—'),
-        makeCell(macros ? String(macros.tef) : '—'),
+        makeCell(macros.fiber !== undefined ? macros.fiber.toFixed(1) : '—'),
+        makeCell(macros.fat !== undefined ? macros.fat.toFixed(1) : '—'),
+        makeCell(macros.carbohydrate !== undefined ? macros.carbohydrate.toFixed(1) : '—'),
+        makeCell(macros.tef !== undefined ? String(macros.tef) : '—'),
       );
       tbody.appendChild(tr);
+
+      totalCalories += r.calories;
+      totalProtein += r.protein;
+      // Undefined stays undefined (not a confident zero) when NO ingredient
+      // in the whole table has that macro — same "—" convention as the
+      // per-row cells above, just summed instead of read off one row.
+      if (macros.fiber !== undefined) totalFiber = (totalFiber || 0) + macros.fiber;
+      if (macros.fat !== undefined) totalFat = (totalFat || 0) + macros.fat;
+      if (macros.carbohydrate !== undefined) totalCarbohydrate = (totalCarbohydrate || 0) + macros.carbohydrate;
+      if (macros.tef !== undefined) totalTef = (totalTef || 0) + macros.tef;
     });
   });
+
+  // Same "how many days actually have Calculate-derived data" divisor the
+  // Micronutrients mode's own per-day figures use (countMicronutrientLoggedDays,
+  // micronutrient-insight.js) — the picked range's calendar span would understate
+  // the daily average on a partially-logged window.
+  const daysLogged = countMicronutrientLoggedDays(from, to);
+  const perDay = (total) => (total !== undefined && daysLogged > 0) ? total / daysLogged : null;
+
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'insight-food-total-row';
+  totalRow.append(
+    makeCell('Total'),
+    makeCell(''),
+    makeCell(String(Math.round(totalCalories))),
+    makeCell((Math.round(totalProtein * 10) / 10).toFixed(1)),
+    makeCell(totalFiber !== undefined ? totalFiber.toFixed(1) : '—'),
+    makeCell(totalFat !== undefined ? totalFat.toFixed(1) : '—'),
+    makeCell(totalCarbohydrate !== undefined ? totalCarbohydrate.toFixed(1) : '—'),
+    makeCell(totalTef !== undefined ? String(Math.round(totalTef)) : '—'),
+  );
+  tbody.appendChild(totalRow);
+
+  const avgRow = document.createElement('tr');
+  avgRow.className = 'insight-food-average-row';
+  avgRow.append(
+    makeCell('Avg/day', `Averaged over ${daysLogged} day${daysLogged === 1 ? '' : 's'} logged in this range, not the range's calendar length`),
+    makeCell(''),
+    makeCell(daysLogged > 0 ? String(Math.round(totalCalories / daysLogged)) : '—'),
+    makeCell(daysLogged > 0 ? (totalProtein / daysLogged).toFixed(1) : '—'),
+    makeCell(perDay(totalFiber) !== null ? perDay(totalFiber).toFixed(1) : '—'),
+    makeCell(perDay(totalFat) !== null ? perDay(totalFat).toFixed(1) : '—'),
+    makeCell(perDay(totalCarbohydrate) !== null ? perDay(totalCarbohydrate).toFixed(1) : '—'),
+    makeCell(perDay(totalTef) !== null ? String(Math.round(perDay(totalTef))) : '—'),
+  );
+  tbody.appendChild(avgRow);
 }
 
 // Asked when the question box is left blank — this mode is the only one that

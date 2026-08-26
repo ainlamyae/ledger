@@ -158,59 +158,65 @@ function tefMacroRate() {
   };
 }
 
-// Estimated Thermic Effect of Food for one day's own Consumption breakdown —
-// each ingredient's protein/carb/fat grams, from its own pulled 🧬
-// Micronutrients panel scaled to how much of it was actually logged (same
-// per-ingredient scaling aggregateMicronutrientIntake uses above, just over
-// one day's breakdown array directly instead of aggregateFoodIntake's range
-// total, so this also works on a day still open in the form and not yet
-// saved). Atwater, not each ingredient's own listed Calories: TEF is defined
-// against the macro split, and the two can disagree by a few percent per
-// ingredient.
+// Estimated Fiber/Fat/Carbohydrate/Thermic Effect of Food for one day's own
+// Consumption breakdown — each ingredient's own typed Fiber/Fat/Carb/TEF
+// (Nutrition columns I-L) when it has one, otherwise the same 🧬
+// Micronutrients-derived/Atwater-formula estimate the Nutrition table itself
+// falls back to (resolvedNutritionMacros, nutrition.js), scaled to how much
+// of it was actually logged (same per-ingredient scaling
+// aggregateMicronutrientIntake uses above, just over one day's breakdown
+// array directly instead of aggregateFoodIntake's range total, so this also
+// works on a day still open in the form and not yet saved). Atwater, not
+// each ingredient's own listed Calories: TEF is defined against the macro
+// split, and the two can disagree by a few percent per ingredient.
 //
-// Writes carbohydrate/fat/tef straight onto each matched row (mutating
-// `breakdown` in place) — that's what lets the Physique breakdown table show
-// them alongside Name/Amount/Calories/Protein/Source as one flat table
-// instead of a second one kept in sync by hand. A row with no 🧬 data pulled
-// yet is left untouched, so it reads as "not measured" rather than a
-// confident zero. Returns the day's total TEF in kcal, or null when nothing
-// in the breakdown has macros pulled at all — callers fall back to the flat
+// Rebuilds each matched row (mutating `breakdown` in place by index) with
+// its keys in the same Amount/Calories/Protein/Fiber/Fat/Carb/TEF/Source
+// order the Nutrition table itself uses — that's what lets the Physique
+// breakdown table AND its saved JSON read the same way the sheet does,
+// instead of just carrying the same values in whatever order they were
+// first computed. A row with neither a typed figure nor 🧬 data pulled is
+// left untouched, so it reads as "not measured" rather than a confident
+// zero. Returns the day's total TEF in kcal, or null when nothing in the
+// breakdown is measurable at all — callers fall back to the flat
 // TEF_PERCENT_OF_INTAKE estimate (charts.js) in that case.
 function estimateTefBreakdown(breakdown) {
-  const rate = tefMacroRate();
-  let totalTef = 0;
+  let totalTefRaw = 0;
   let matched = false;
 
-  (breakdown || []).forEach((item) => {
+  (breakdown || []).forEach((item, i) => {
     const entry = findNutritionEntry(item.name);
-    const parsed = entry ? parseMicronutrients(entry.micronutrients) : null;
-    if (!parsed) return;
+    if (!entry) return;
 
     const { grams, count } = parseBreakdownAmount(item.amount);
     const scale = micronutrientScaleFactor(entry, { grams: grams || 0, count: count || 0 });
     if (scale <= 0) return;
 
-    const macroGrams = { Protein: 0, 'Carbohydrate, by difference': 0, 'Total lipid (fat)': 0 };
-    let itemMatched = false;
-    Object.keys(macroGrams).forEach((name) => {
-      if (!parsed[name]) return;
-      macroGrams[name] = parsed[name].amount * scale;
-      itemMatched = true;
-    });
-    if (!itemMatched) return;
+    const parsed = parseMicronutrients(entry.micronutrients);
+    const hasData = parsed || entry.fiber !== null || entry.fat !== null || entry.carb !== null || entry.tef !== null;
+    if (!hasData) return;
 
-    const itemTef = Object.entries(macroGrams)
-      .reduce((sum, [name, grams]) => sum + grams * rate[name].kcalPerGram * rate[name].tefShare, 0);
+    const resolved = resolvedNutritionMacros(entry);
+    const { name, amount, calories, protein, source, fiber, fat, carbohydrate, tef, ...rest } = item;
+    const rebuilt = { name, amount, calories, protein };
 
-    item.carbohydrate = Math.round(macroGrams['Carbohydrate, by difference'] * 100) / 100;
-    item.fat = Math.round(macroGrams['Total lipid (fat)'] * 100) / 100;
-    item.tef = Math.round(itemTef);
+    if (resolved.fiber !== null) rebuilt.fiber = Math.round(resolved.fiber * scale * 100) / 100;
+    if (resolved.fat !== null) rebuilt.fat = Math.round(resolved.fat * scale * 100) / 100;
+    if (resolved.carb !== null) rebuilt.carbohydrate = Math.round(resolved.carb * scale * 100) / 100;
+    if (resolved.tef !== null) {
+      const itemTefRaw = resolved.tef * scale;
+      rebuilt.tef = Math.round(itemTefRaw);
+      totalTefRaw += itemTefRaw;
+    }
 
-    totalTef += itemTef;
+    rebuilt.source = source;
+    Object.assign(rebuilt, rest);
+
+    breakdown[i] = rebuilt;
     matched = true;
   });
 
-  return matched ? { tefKcal: Math.round(totalTef) } : null;
+  return matched ? { tefKcal: Math.round(totalTefRaw) } : null;
 }
 
 // Same estimate as estimateTefBreakdown above, but for one aggregateFoodIntake
@@ -224,37 +230,36 @@ function estimateTefBreakdown(breakdown) {
 // there's nothing to persist it onto.
 function estimateMacrosForFoodRow(row) {
   const entry = findNutritionEntry(row.name);
-  const parsed = entry ? parseMicronutrients(entry.micronutrients) : null;
-  if (!parsed) return null;
+  if (!entry) return null;
 
   const scale = micronutrientScaleFactor(entry, row);
   if (scale <= 0) return null;
 
-  const rate = tefMacroRate();
-  const macroGrams = { Protein: 0, 'Carbohydrate, by difference': 0, 'Total lipid (fat)': 0 };
-  let matched = false;
-  Object.keys(macroGrams).forEach((name) => {
-    if (!parsed[name]) return;
-    macroGrams[name] = parsed[name].amount * scale;
-    matched = true;
-  });
-  if (!matched) return null;
+  const parsed = parseMicronutrients(entry.micronutrients);
+  const hasData = parsed || entry.fiber !== null || entry.fat !== null || entry.carb !== null || entry.tef !== null;
+  if (!hasData) return null;
 
-  const tef = Object.entries(macroGrams)
-    .reduce((sum, [name, grams]) => sum + grams * rate[name].kcalPerGram * rate[name].tefShare, 0);
+  // Same typed-over-estimated resolution the Nutrition table and Physique
+  // breakdown use (resolvedNutritionMacros, nutrition.js): your own typed
+  // Fiber/Fat/Carbohydrate/TEF when the row has one, otherwise its pulled 🧬
+  // Micronutrients panel (Fiber/Fat/Carbohydrate) or the Atwater/TEF-share
+  // formula (TEF). A field stays absent from the result (not a confident
+  // zero) when neither source has it.
+  const resolved = resolvedNutritionMacros(entry);
+  const result = {};
+  if (resolved.fiber !== null) result.fiber = Math.round(resolved.fiber * scale * 100) / 100;
+  if (resolved.fat !== null) result.fat = Math.round(resolved.fat * scale * 100) / 100;
+  if (resolved.carb !== null) result.carbohydrate = Math.round(resolved.carb * scale * 100) / 100;
+  if (resolved.tef !== null) result.tef = Math.round(resolved.tef * scale);
 
-  return {
-    carbohydrate: Math.round(macroGrams['Carbohydrate, by difference'] * 100) / 100,
-    fat: Math.round(macroGrams['Total lipid (fat)'] * 100) / 100,
-    tef: Math.round(tef),
-  };
+  return Object.keys(result).length ? result : null;
 }
 
 // Thin TEF-only wrapper — formatFoodInsightPrompt only needs the one figure,
 // not the full macro breakdown estimateMacrosForFoodRow computes it from.
 function estimateTefForFoodRow(row) {
   const macros = estimateMacrosForFoodRow(row);
-  return macros ? macros.tef : null;
+  return (macros && macros.tef !== undefined) ? macros.tef : null;
 }
 
 // The one line every render of this mode leads with — what the totals below

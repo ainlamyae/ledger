@@ -19,9 +19,17 @@ function breakdownToJson(breakdown) {
 // one displayed row rather than showing twice — the Total already treats
 // them as one, so the split served no purpose. Grouped by name AND amount
 // type (grams vs count, "×N"), since those aren't the same quantity and
-// summing them would be meaningless. Density is recomputed off the merged
-// calories/grams rather than kept from either original row, so it stays the
-// true rate for the combined amount.
+// summing them would be meaningless.
+//
+// Carbohydrate/fat/tef are only present once 🧬 Micronutrients has been
+// pulled for a row (estimateTefBreakdown, micronutrient-insight.js) — summed
+// when both sides have a figure, kept as whichever side has one when only
+// one does, and left undefined (not a confident zero) when neither does.
+function sumOptional(a, b) {
+  if (a === undefined && b === undefined) return undefined;
+  return Math.round(((a || 0) + (b || 0)) * 100) / 100;
+}
+
 function mergeDuplicateBreakdownRows(rows) {
   const merged = new Map();
 
@@ -39,10 +47,10 @@ function mergeDuplicateBreakdownRows(rows) {
     existing.quantity += quantity;
     existing.calories += row.calories;
     existing.protein = Math.round((existing.protein + row.protein) * 10) / 10;
+    existing.carbohydrate = sumOptional(existing.carbohydrate, row.carbohydrate);
+    existing.fat = sumOptional(existing.fat, row.fat);
+    existing.tef = sumOptional(existing.tef, row.tef);
     existing.amount = isCount ? `×${existing.quantity}` : `${Math.round(existing.quantity * 10) / 10}g`;
-    // Count-based density is per-unit, not per-gram, so a merged unit count
-    // still charges the same per-unit rate rather than a recomputed one.
-    if (!isCount) existing.density = `${Math.round((existing.calories / existing.quantity) * 1000) / 10} kcal/100g`;
     if (existing.source !== row.source) existing.source = `${existing.source} + ${row.source}`;
     existing.noteLine = `${existing.noteLine}\n${row.noteLine}`;
     if (!existing.newRow && row.newRow) existing.newRow = row.newRow;
@@ -365,12 +373,6 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     let amount;
     let kcal;
     let protein;
-    // Shown as its own "Density" column in the Calculate breakdown
-    // table so the actual figure applied (not just the final total) is
-    // visible without needing DevTools — this is what distinguishes "the
-    // math is right but the stored density is wrong" from "the wrong branch
-    // fired" when a total looks implausible.
-    let density;
     // Set only for a fresh USDA/AI miss (never for a Nutrition hit) —
     // the not-yet-saved row this item would bank, surfaced in the breakdown
     // as an opt-in "Add" button when autoBank is false.
@@ -392,7 +394,6 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       itemProtein = proteinPerUnit * usedCount;
       source = 'nutrition-table-count';
       amount = `×${usedCount}`;
-      density = `${Math.round(kcalPerUnit * 10) / 10} kcal/unit`;
     } else if (useTableGrams) {
       kcal = (tableEntry.calories / tableGrams) * 100;
       protein = (tableEntry.protein / tableGrams) * 100;
@@ -402,7 +403,6 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       itemProtein = (protein * usedGrams) / 100;
       source = 'nutrition-table-grams';
       amount = `${Math.round(usedGrams * 10) / 10}g`;
-      density = `${Math.round(kcal * 10) / 10} kcal/100g`;
     } else {
       usdaAttempts++;
       let candidates = [];
@@ -420,7 +420,6 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       itemProtein = (protein * usedGrams) / 100;
       source = lookupFailed ? 'usda-unreachable' : 'usda/ai';
       amount = `${Math.round(usedGrams * 10) / 10}g`;
-      density = `${Math.round(kcal * 10) / 10} kcal/100g`;
 
       // A failed lookup ran on a pure ungrounded AI guess — don't bank
       // that into the table as if it were verified. New rows are always
@@ -471,7 +470,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       itemCalories,
       itemProtein,
     })}`);
-    return { name, amount, source, density, itemCalories, itemProtein, noteLine, newRow };
+    return { name, amount, source, itemCalories, itemProtein, noteLine, newRow };
   }));
   const calories = Math.round(perItemMacros.reduce((sum, m) => sum + m.itemCalories, 0));
   // Same 1-decimal precision as each row's own protein figure (below) — rounding
@@ -503,7 +502,6 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     amount: m.amount,
     calories: Math.round(m.itemCalories),
     protein: Math.round(m.itemProtein * 10) / 10,
-    density: m.density,
     source: SOURCE_LABELS[m.source] || m.source,
     // The standardized Notes line this item produced. Stored so a later
     // Calculate can tell which lines are untouched and reuse their numbers
@@ -619,22 +617,13 @@ function sourceCell(row, breakdown, totalCalories, totalProtein, target) {
   return cell;
 }
 
-// "213.4 kcal/100g" -> "213.4", and "52 kcal/unit" -> "52". The unit was the
-// same eight characters on nearly every row, so it moves to the column header's
-// tooltip and the cell keeps only the figure.
-//
-// The two bases aren't marked apart in this column because the Amount column
-// beside it already does: a count-priced row reads "×2" and a weight-priced one
-// "120g", so which figure this is follows from the row itself. The full string
-// is on hover, and the stored JSON carries it verbatim.
-const DENSITY_SUFFIXES = [' kcal/100g', ' kcal/unit'];
-
-function densityCell(density) {
-  const text = String(density || '');
-  const suffix = DENSITY_SUFFIXES.find((s) => text.endsWith(s));
-  return suffix
-    ? makeCell(text.slice(0, -suffix.length), text)
-    : makeCell(text);
+// "—" for a cell whose ingredient has no 🧬 Micronutrients pulled yet
+// (carbohydrate/fat/tef stay undefined on that row — see estimateTefBreakdown,
+// micronutrient-insight.js) rather than a confident 0. Rounded to 2 decimals
+// so a raw scaled figure like 1.23456818 reads as 1.23, keeping the row
+// compact.
+function macroCell(value, decimals = 2) {
+  return makeCell(value === undefined ? '—' : value.toFixed(decimals));
 }
 
 function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'physique') {
@@ -647,6 +636,10 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
   // saved items back to Notes lines by exact noteLine, and merging that
   // field would make a duplicated ingredient re-estimate from scratch (an
   // extra Groq/USDA lookup) on every future Calculate instead of reusing it.
+  let totalCarbohydrate;
+  let totalFat;
+  let totalTef;
+
   mergeDuplicateBreakdownRows(breakdown).forEach((row) => {
     const tr = document.createElement('tr');
     tr.append(
@@ -654,10 +647,16 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(row.amount),
       makeCell(String(row.calories)),
       makeCell(row.protein.toFixed(1)),
-      densityCell(row.density),
+      macroCell(row.carbohydrate),
+      macroCell(row.fat),
+      macroCell(row.tef, 0),
       sourceCell(row, breakdown, totalCalories, totalProtein, target),
     );
     tbody.appendChild(tr);
+
+    if (row.carbohydrate !== undefined) totalCarbohydrate = (totalCarbohydrate || 0) + row.carbohydrate;
+    if (row.fat !== undefined) totalFat = (totalFat || 0) + row.fat;
+    if (row.tef !== undefined) totalTef = (totalTef || 0) + row.tef;
   });
 
   const totalRow = document.createElement('tr');
@@ -667,7 +666,9 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
     makeCell(''),
     makeCell(String(totalCalories)),
     makeCell(totalProtein.toFixed(1)),
-    makeCell(''),
+    macroCell(totalCarbohydrate),
+    macroCell(totalFat),
+    macroCell(totalTef, 0),
     makeCell(''),
   );
   tbody.appendChild(totalRow);

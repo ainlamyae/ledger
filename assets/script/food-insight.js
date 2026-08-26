@@ -167,7 +167,7 @@ function renderFoodInsightPreview(rows, from, to) {
   tbody.innerHTML = '';
 
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(5, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
+    tbody.appendChild(renderEmptyRow(7, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
     return;
   }
 
@@ -177,7 +177,7 @@ function renderFoodInsightPreview(rows, from, to) {
     const groupRow = document.createElement('tr');
     groupRow.className = 'insight-food-group-row';
     const groupCell = document.createElement('td');
-    groupCell.colSpan = 5;
+    groupCell.colSpan = 7;
     groupCell.textContent = formatFoodGroupSummary(g);
     groupRow.appendChild(groupCell);
     tbody.appendChild(groupRow);
@@ -187,13 +187,15 @@ function renderFoodInsightPreview(rows, from, to) {
       // Null (no 🧬 Micronutrients pulled for this ingredient) reads as a
       // blank dash, not a claimed zero — same convention the Physique TEF
       // column and its own breakdown table use.
-      const tef = estimateTefForFoodRow(r);
+      const macros = estimateMacrosForFoodRow(r);
       tr.append(
         makeCell(r.name),
         makeCell(r.amountLabel),
         makeCell(String(r.calories)),
         makeCell(String(r.protein)),
-        makeCell(tef !== null ? String(tef) : '—'),
+        makeCell(macros ? macros.carbohydrate.toFixed(2) : '—'),
+        makeCell(macros ? macros.fat.toFixed(2) : '—'),
+        makeCell(macros ? String(macros.tef) : '—'),
       );
       tbody.appendChild(tr);
     });

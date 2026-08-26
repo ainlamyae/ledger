@@ -50,12 +50,8 @@ async function initBreakdown(forceRefresh = false) {
 }
 
 async function refreshBreakdown(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('breakdown');
-  if (!values) {
-    const resp = await getValues(BREAKDOWN_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('breakdown', values);
-  }
+  const resp = await getValues(BREAKDOWN_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allBreakdownRows = values
     .map((row, i) => ({

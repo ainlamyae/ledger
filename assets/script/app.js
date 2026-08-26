@@ -258,13 +258,7 @@ function setupAccountMenu() {
 
   document.getElementById('refresh-btn').addEventListener('click', () => {
     closeMenu();
-    clearCache();
     loadDashboard(true);
-  });
-
-  document.getElementById('clear-cache-btn').addEventListener('click', () => {
-    closeMenu();
-    hardRefresh();
   });
 
   document.getElementById('open-sheet-btn').addEventListener('click', () => {
@@ -296,22 +290,7 @@ function setupAccountMenu() {
   });
 }
 
-// Versioned, because this cache holds a SHAPE, not just rows. `report` is a parsed
-// object in localStorage, which a page reload — hard reload included — does not
-// clear, so after a change to what the parse produces the charts spend the TTL
-// reading an object built by the previous version of this file: the income line
-// added to categoryTrend drew flat along zero, present but with nothing in it,
-// which looks exactly like a chart that was never wired up. Bump the suffix
-// whenever a field is added to or reshaped inside `report`; the old key simply
-// expires unread.
-const REPORT_CACHE_KEY = 'report-v2';
-
-async function loadReport(forceRefresh) {
-  if (!forceRefresh) {
-    const cached = getCached(REPORT_CACHE_KEY);
-    if (cached) return cached;
-  }
-
+async function loadReport() {
   const { valueRanges } = await batchGetValues(
     [REPORT_RANGE, BALANCE_RANGE, INSIGHT_RANGE],
     VALUE_PARAMS
@@ -437,7 +416,6 @@ async function loadReport(forceRefresh) {
     missingAmount,
   };
 
-  setCached(REPORT_CACHE_KEY, report);
   return report;
 }
 
@@ -452,25 +430,18 @@ let lastLoadedSettings = null;
 // every reader falls back to its own default via getSetting() below.
 //
 // A read failure is NOT the same as "there are no settings", though, and
-// conflating the two was a real bug: returning {} here — and caching it for
-// the full 5-minute TTL — silently wiped every setting in memory on one
-// transient read error. Targets reverted to their defaults and Health Insight
+// conflating the two was a real bug: returning {} here silently wiped every
+// setting in memory on one transient read error. Targets reverted to their defaults and Health Insight
 // reported age and height as "not set" — all while the spreadsheet itself was
 // perfectly intact, which is exactly why it looked like a dozen unrelated bugs.
 // So: keep the
-// last known-good copy, never poison the cache with a failure, and log the
-// cause, which used to be discarded entirely by a bare `catch {}`.
-async function loadSettings(forceRefresh) {
-  if (!forceRefresh) {
-    const cached = getCached('settings');
-    if (cached) return cached;
-  }
-
+// last known-good copy and log the cause, which used to be discarded entirely
+// by a bare `catch {}`.
+async function loadSettings() {
   try {
     const resp = await getValues(SETTINGS_RANGE, VALUE_PARAMS);
     const settings = parseSettings(resp.values || []);
     lastLoadedSettings = settings;
-    setCached('settings', settings);
     return settings;
   } catch (err) {
     console.error(`Failed to read the "${CONFIG.SHEETS.SETTINGS}" tab — keeping the previously loaded settings:`, err);
@@ -579,10 +550,7 @@ async function refreshNetWorth() {
   const resp = await getValues(BALANCE_RANGE, VALUE_PARAMS);
   const netWorth = parseBalance(resp.values || []);
 
-  if (currentReport) {
-    currentReport.netWorth = netWorth;
-    setCached(REPORT_CACHE_KEY, currentReport);
-  }
+  if (currentReport) currentReport.netWorth = netWorth;
 
   document.getElementById('net-worth').textContent = formatCurrency(netWorth);
 }
@@ -713,6 +681,8 @@ async function loadDashboard(forceRefresh = false) {
       // target) all loaded — refresh only once all three are in.
       Promise.all([physiquePromise, nutritionPromise]).then(() => {
         renderProteinRotationChart(wellnessDateRange());
+        // Needs both tabs: the grams come from each food's Nutrition row.
+        convertPhysiqueBreakdownAmountsToGrams();
       }),
       // Activity Rotation needs Physique (logged Workout notes) and Activities
       // (each exercise's Group and Weekly Target) both loaded.

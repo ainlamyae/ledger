@@ -186,12 +186,8 @@ function setupNutritionSorting() {
 
 async function refreshNutrition(forceRefresh = false) {
   // A new key: the cached copy now includes the header row.
-  let values = forceRefresh ? null : getCached('nutritionWithHeader');
-  if (!values) {
-    const resp = await getValues(NUTRITION_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('nutritionWithHeader', values);
-  }
+  const resp = await getValues(NUTRITION_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   nutritionColumnIndex = nutritionColumnsFromHeader(values[0] || []);
   const cell = (row, key) => (nutritionColumnIndex[key] === undefined ? undefined : row[nutritionColumnIndex[key]]);
@@ -739,7 +735,17 @@ function renderNutritionMicroRows(panel, locked) {
   shown.sort((a, b) => (Number(panel[a].amount) === 0) - (Number(panel[b].amount) === 0));
   document.getElementById('nutrition-micro-divider').hidden = shown.length === 0;
 
-  shown.forEach((name) => {
+  // A rule between the non-zero rows and the zero ones, so the nutrients this food
+  // actually carries read as one block. None when every row is zero (the divider above
+  // already starts the list) or none is.
+  const firstZero = shown.findIndex((name) => Number(panel[name].amount) === 0);
+
+  shown.forEach((name, i) => {
+    if (i === firstZero && i > 0) {
+      const rule = document.createElement('hr');
+      rule.className = 'formula-divider nutrition-micro-row';
+      box.appendChild(rule);
+    }
     const label = document.createElement('label');
     label.className = 'formula-row nutrition-micro-row';
     const lock = document.createElement('input');

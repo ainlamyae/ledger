@@ -23,9 +23,10 @@
 // anyone solves for.
 const FORMULA_FIELDS = [
   { key: 'KCAL_PER_MET_KG_MIN', inputId: 'formula-met-o2', fallback: () => MET_ML_O2_PER_KG_MIN_DEFAULT },
-  // Walk's own catalogue MET (Edit Activity), not the ACTIVITY_MET setting — the
-  // Activity sheet row is the one place that number is actually maintained.
-  { key: 'ACTIVITY_MET', inputId: 'formula-met', value: () => exerciseMet('Walk') },
+  // Walk's own catalogue MET (Edit Activity) — the Activity sheet row is the one place
+  // that number is maintained. A typed value only drives the preview: its key is a
+  // preview-only one (activityMet, wellness-math.js) that Save never writes.
+  { key: ACTIVITY_MET_PREVIEW_KEY, inputId: 'formula-met', value: () => exerciseMet('Walk') },
   { key: 'ACTIVITY_TARGET_MIN', inputId: 'formula-activity-min', fallback: () => ACTIVITY_TARGET_MIN_DEFAULT },
   // Defaults to the sleep target itself (Settings' SLEEP_TARGET_HOURS) — "assume you hit
   // it" — so an untouched box keeps producing the exact deficit this app always has. Type

@@ -52,10 +52,11 @@ function gatherProfileSnapshot() {
 // the one panel whose subject is the journey rather than today's body.
 function formatProfileLines(p, bodyMassTargetKg = null) {
   const targetSuffix = bodyMassTargetKg !== null ? ` (desired: ${bodyMassTargetKg} kg)` : '';
+  // Tune's order: sex, height, age, then body mass.
   return [
-    `Age: ${p.age !== null ? p.age : 'not set'}`,
     `Sex: ${p.sex !== null ? p.sex : 'not set'}`,
     `Height: ${p.heightCm !== null ? `${p.heightCm} cm` : 'not set'}`,
+    `Age: ${p.age !== null ? p.age : 'not set'}`,
     `Current body mass: ${p.bodyMassKg !== null ? `${p.bodyMassKg} kg${targetSuffix}` : 'not logged'}`,
     `BMI: ${p.bmi !== null ? p.bmi : 'not available (needs height and a logged body mass)'}`,
   ];
@@ -119,7 +120,7 @@ function aggregateWindow(dates) {
         byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
 
         // Every entry gets a burn figure via charts.js's activityEntryKcal — its
-        // own amount2, else its minutes at ACTIVITY_MET. A plain Activity row used
+        // own amount2, else its minutes at the Walk MET (activityMet). A plain Activity row used
         // to contribute nothing, understating what the AI was told was burned.
         const kcal = activityEntryKcal(e, bodyMassKg);
         activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);

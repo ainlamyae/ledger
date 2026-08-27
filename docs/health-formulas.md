@@ -62,7 +62,7 @@ metKcal(met, kg, min)     = met × kg × min × KCAL_PER_MET_KG_MIN/200
 activityMinutes(amt,unit) = steps/WORKOUT_STEPS_PER_MIN | hours×60 | min as-is
 
 activityEntryKcal(entry)  = entry.amount2                    if logged
-                          = metKcal(ACTIVITY_MET, kg, mins)  else, with a body mass on file
+                          = metKcal(WALK_MET, kg, mins)  else, with a body mass on file
                           = mins × 5                         else
 
 BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)   default
@@ -76,9 +76,10 @@ applyBmrBasis(BMR,atDate) = BMR_adp(atDate)          if BMR_BASIS=bmr_adp
                           = BMR + BMR_CAL_OFFSET     if BMR_BASIS=bmr_cal (0 if never calibrated)
                           = BMR                       otherwise
 
-activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)
+activityTargetKcal(kg)    = metKcal(WALK_MET, kg, ACTIVITY_TARGET_MIN)
 getActivityTargetKcal(kg) = ACTIVITY_TARGET_FIXED_KCAL, if set, else activityTargetKcal(kg)
-getActivityTargetMin(kg)  = ACTIVITY_TARGET_FIXED_KCAL / metKcal(ACTIVITY_MET, kg, 1), if set and kg known
+getActivityTargetMin(kg)  = ACTIVITY_TARGET_FIXED_KCAL / metKcal(WALK_MET, kg, 1), if set and kg known
+WALK_MET                  = the Activity sheet's Walk row MET (activityMet → exerciseMet('Walk')); no Setting
                           = ACTIVITY_TARGET_MIN                                        otherwise
 ```
 
@@ -122,7 +123,7 @@ BMR_cal        = BMR(bodyMassNow, h, a, sex, formula) + BMR_CAL_OFFSET
 - **Why the direct difference, not a back-solved BMR.** An earlier version blended `avgTEI`, `avgAEE` and `D_chunk` into one "back-solved BMR" and subtracted the equation's own prediction from that — but since `D_chunk` already contains the equation's BMR term, that approach let it algebraically cancel back out, leaving `BMR_CAL_OFFSET` dominated by TEF-estimate/SD noise instead of the real signal. Comparing `D_chunk` to `ΔM_chunk` directly avoids that: `D_chunk − ΔM_chunk ≈ trueBMR − equationBMR` (the equation's own error), because `ΔM_chunk` never routes through the equation at all.
 - Priced one **chunk** at a time — `D_chunk` from that chunk's own days, `ΔM_chunk` from that chunk's own mass reading, `chunkOffset` from those two BEFORE any cross-chunk averaging — since BMR depends on body mass and a multi-chunk window can span real weight change.
 - **Period length (days) is typeable, default 10** — the Daily table's `m`/SD/D figures are still evaluated per DAY regardless (and each period's body mass is smoothed over that same period length, so a period's `m̄` spans exactly one period); only how days are grouped into a chunk for `D_chunk`/`ΔM_chunk`/`chunkOffset` changes. A chunk shorter than 7 reacts faster but each one is noisier; longer smooths more but reacts slower to a real metabolic change.
-- Saved as `BMR_CALIBRATED_OFFSET_KCAL` (the shift) and `BMR_CALIBRATED_KCAL` (the figure at save time, display-only) — never a replacement formula. `applyBmrBasis` and `maintenanceAffineCoefficients` (§ above) both add the SAME offset to whatever the chosen equation says at any mass, so the app keeps the equation's own slope and just shifts the whole line: "keep the slope, shift the level."
+- Read from Physique, not a Setting: the latest day whose stored BMR cell has a `BMR_cal` gives the figure, and `BMR_cal` minus that day's equation BMR gives the shift (`latestStoredCalibration`) — never a replacement formula. `applyBmrBasis` and `maintenanceAffineCoefficients` (§ above) both add the SAME offset to whatever the chosen equation says at any mass, so the app keeps the equation's own slope and just shifts the whole line: "keep the slope, shift the level."
 - `D_chunk` needs at least one day in the chunk with a computable `D` (profile + that day's own mass); `ΔM_chunk` needs a mass reading on or before the chunk's start and end. A chunk missing either drops `chunkOffset` to null rather than forcing a guess.
 - The window is typed as a Number of periods (default 3), ending yesterday — one chunk averages `chunkDays` of noise, months of history averages many chunks, recency-weighted so old ones can't outvote new ones.
 - Needs the same profile (height, sex, and age unless `BMR_FORMULA=katch`) the plain equation does — `D` (and so `D_chunk`) can't be computed without it.

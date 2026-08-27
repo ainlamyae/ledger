@@ -137,7 +137,7 @@ function renderTodayGlanceCards(entries) {
   const carbUnderBand = carb !== null && !carbInBand && !carbOverBand;
 
   // Actual burn, same per-entry rule the Activity/Calorie Balance charts and Insight use
-  // (a Calculate-derived amount2 wins, else minutes at ACTIVITY_MET) — so this figure can't
+  // (a Calculate-derived amount2 wins, else minutes at the Walk MET, activityMet) — so this figure can't
   // disagree with theirs for today.
   const activityEntriesToday = todayEntries.filter((e) => e.category === 'Activity' || e.category === 'Activity; Calories');
   const activityKcal = activityEntriesToday.length

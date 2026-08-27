@@ -50,13 +50,13 @@ const INSIGHT_MODES = {
     resultKeys: ['INSIGHT_FOOD_LAST_RESULT', 'FOOD_INSIGHT_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_FOOD_LAST_GENERATED_AT', 'FOOD_INSIGHT_LAST_GENERATED_AT'],
   },
-  micronutrients: {
-    label: 'Micronutrients',
+  micronutrient: {
+    label: 'Micronutrient',
     hint: '',
     questionPlaceholder: 'e.g. Is this amount enough? What is missing?',
-    previewId: 'insight-preview-micronutrients',
+    previewId: 'insight-preview-micronutrient',
     gather: (from, to) => aggregateMicronutrientIntake(from, to),
-    // Micronutrients is the other mode (with Food) that inlines the question
+    // Micronutrient is the other mode (with Food) that inlines the question
     // into the prompt body rather than appending it — same reasoning as Food:
     // it has its own default question and phrasing built around it.
     formatPrompt: (data, { from, to, question }) => formatMicronutrientInsightPrompt(data, { from, to, question }),
@@ -65,8 +65,8 @@ const INSIGHT_MODES = {
     appendQuestion: false,
     needsNutrition: true,
     systemPrompt: MICRONUTRIENT_INSIGHT_SYSTEM_PROMPT,
-    resultKeys: ['INSIGHT_MICRONUTRIENTS_LAST_RESULT'],
-    generatedAtKeys: ['INSIGHT_MICRONUTRIENTS_LAST_GENERATED_AT'],
+    resultKeys: ['INSIGHT_MICRONUTRIENT_LAST_RESULT', 'INSIGHT_MICRONUTRIENTS_LAST_RESULT'],
+    generatedAtKeys: ['INSIGHT_MICRONUTRIENT_LAST_GENERATED_AT', 'INSIGHT_MICRONUTRIENTS_LAST_GENERATED_AT'],
   },
   activity: {
     label: 'Activity',
@@ -83,7 +83,7 @@ const INSIGHT_MODES = {
     generatedAtKeys: ['INSIGHT_ACTIVITY_LAST_GENERATED_AT', 'ACTIVITY_INSIGHT_LAST_GENERATED_AT'],
   },
   protein: {
-    label: 'Protein Sources',
+    label: 'Protein',
     hint: '',
     questionPlaceholder: 'e.g. Which source should I prioritize next?',
     previewId: 'insight-preview-text',
@@ -115,25 +115,25 @@ const INSIGHT_MODES = {
     resultKeys: ['INSIGHT_PLAN_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_PLAN_LAST_GENERATED_AT'],
   },
-  patterns: {
-    label: 'Patterns',
+  pattern: {
+    label: 'Pattern',
     hint: '',
     questionPlaceholder: 'e.g. Does more strength training raise my BMR?',
-    previewId: 'insight-preview-patterns',
-    gather: (from, to) => gatherFatLossPatterns(from, to, patternsChunkDays()),
+    previewId: 'insight-preview-pattern',
+    gather: (from, to) => gatherFatLossPattern(from, to, patternChunkDays()),
     formatPrompt: (data) => formatFatLossPatternPrompt(data),
     renderPreview: (data) => renderFatLossPatternPreview(data),
     dataLine: / \| |^\(no logged periods/,
     appendQuestion: true,
     needsNutrition: false,
     systemPrompt: (data) => formatFatLossPatternSystemPrompt(data.chunkDays),
-    resultKeys: ['INSIGHT_PATTERNS_LAST_RESULT'],
-    generatedAtKeys: ['INSIGHT_PATTERNS_LAST_GENERATED_AT'],
+    resultKeys: ['INSIGHT_PATTERN_LAST_RESULT', 'INSIGHT_PATTERNS_LAST_RESULT'],
+    generatedAtKeys: ['INSIGHT_PATTERN_LAST_GENERATED_AT', 'INSIGHT_PATTERNS_LAST_GENERATED_AT'],
   },
 };
 
 const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
-const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food', 'insight-preview-micronutrients', 'insight-preview-patterns'];
+const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food', 'insight-preview-micronutrient', 'insight-preview-pattern'];
 
 // What's on screen right now: which mode, the range it was gathered for, and
 // the gathered data itself. Send to AI reuses this data rather than re-running
@@ -159,26 +159,26 @@ function initInsightPanel() {
     if (btn) loadInsightMode(btn.dataset.insightMode);
   });
 
-  // Patterns' period length: reloads only while Patterns is on screen.
-  document.getElementById('insight-patterns-period-days').addEventListener('input', () => {
-    if (insightLoaded && insightLoaded.mode === 'patterns') loadInsightMode('patterns');
+  // Pattern's period length: reloads only while Pattern is on screen.
+  document.getElementById('insight-pattern-period-days').addEventListener('input', () => {
+    if (insightLoaded && insightLoaded.mode === 'pattern') loadInsightMode('pattern');
   });
 
   document.getElementById('insight-generate-btn').addEventListener('click', runInsightGeneration);
 }
 
-// Patterns' L_p box, starting at Tune's L_p (its box, else the saved setting); a blank
+// Pattern's L_p box, starting at Tune's L_p (its box, else the saved setting); a blank
 // or invalid entry falls back to Tune's.
-function patternsChunkDays() {
+function patternChunkDays() {
   const saved = getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
   const tuneDays = periodInputValue('formula-cal-period-days', saved);
-  const box = document.getElementById('insight-patterns-period-days');
+  const box = document.getElementById('insight-pattern-period-days');
   box.placeholder = String(tuneDays);
   if (box.dataset.defaulted !== '1') {
     box.dataset.defaulted = '1';
     box.value = String(tuneDays);
   }
-  return periodInputValue('insight-patterns-period-days', tuneDays);
+  return periodInputValue('insight-pattern-period-days', tuneDays);
 }
 
 // The only path that computes anything. Gathers the mode's data for the current

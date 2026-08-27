@@ -29,7 +29,20 @@ async function initSettingsPanel(forceRefresh = false) {
     document.getElementById('add-setting-btn').addEventListener('click', () => openSettingForm());
     document.getElementById('setting-cancel-btn').addEventListener('click', closeSettingForm);
     onFormSubmit('setting-form', submitSettingForm);
+    // other/settings/<key in lowercase>/ opens that setting's Edit.
+    registerRecordRoute('settings', (slug, sub) => {
+      const setting = allSettingRows.find((s) => settingRouteSlug(s) === slug);
+      if (!setting || sub) return null;
+      openSettingForm(setting);
+      return setting.key;
+    });
   }
+}
+
+// A setting's address segment: its key in lowercase, underscores kept
+// (BODY_MASS_TARGET_KG -> body_mass_target_kg).
+function settingRouteSlug(setting) {
+  return setting.key.trim().toLowerCase();
 }
 
 async function refreshSettingsList(forceRefresh = false) {
@@ -106,7 +119,10 @@ function renderSettingsList() {
     const actionsCell = document.createElement('td');
     if (isSecret) actionsCell.appendChild(makeSecretRevealButton(setting.key, revealed));
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openSettingForm(setting) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
+        routeRecordEdit('settings', { slug: settingRouteSlug(setting), label: setting.key });
+        openSettingForm(setting);
+      } }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteSetting(setting.row) }),
     );
 
@@ -153,7 +169,9 @@ async function submitSettingForm(event) {
 
   const values = [[
     key,
-    document.getElementById('setting-value').value,
+    // Trimmed: the box is multi-line, and a stray trailing Enter would otherwise be
+    // saved into the value ("male\n" no longer reads as male).
+    document.getElementById('setting-value').value.trim(),
     document.getElementById('setting-notes').value,
   ]];
 

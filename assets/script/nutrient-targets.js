@@ -58,12 +58,8 @@ const NUTRIENT_DAILY_TARGETS_DEFAULT = {
   // FDA consumer guidance (not a formal DRI): up to ~400mg/day is not
   // associated with adverse effects in most healthy adults.
   'Caffeine': { unit: 'mg', amount: 400, kind: 'ceiling' },
-  // Dietary Guidelines for Americans "moderate drinking" upper bound — 2
-  // drinks/day (28g alcohol), the higher of the two sexes' figures, same
-  // single-number convention as everything else. Not a target to reach: zero
-  // has no established downside, and newer evidence questions whether even
-  // this level is truly risk-free — it's listed as a ceiling, not encouragement.
-  'Alcohol, ethyl': { unit: 'g', amount: 28, kind: 'ceiling' },
+  // No alcohol target: even a "moderate" ceiling reads as an allowance, and zero has
+  // no downside.
   // NASEM 2005 indispensable-amino-acid RDA (mg/kg body weight/day),
   // multiplied by a 70kg reference adult — an actual computation, not a
   // published fixed figure like everything else above, since amino acid
@@ -86,9 +82,12 @@ function nutrientDailyTargets() {
   const raw = getSettingString('MICRONUTRIENT_DAILY_TARGETS_JSON', null);
   if (!raw) return NUTRIENT_DAILY_TARGETS_DEFAULT;
   try {
-    const overrides = JSON.parse(raw);
-    Object.values(overrides).forEach((t) => { if (t && t.unit) t.unit = standardUnit(t.unit); });
-    return { ...NUTRIENT_DAILY_TARGETS_DEFAULT, ...overrides };
+    // The setting is the whole list, not overrides on top of the defaults: a nutrient
+    // deleted from it has no target. The defaults above only stand in until the key
+    // exists (and seed it, patchMicronutrientDailyTargetAmounts below).
+    const targets = JSON.parse(raw);
+    Object.values(targets).forEach((t) => { if (t && t.unit) t.unit = standardUnit(t.unit); });
+    return targets;
   } catch {
     return NUTRIENT_DAILY_TARGETS_DEFAULT;
   }
@@ -102,12 +101,14 @@ function nutrientDailyTargets() {
 // starting point is the shipped default for whichever name isn't already overridden.
 function patchMicronutrientDailyTargetAmounts(patch) {
   const raw = getSettingString('MICRONUTRIENT_DAILY_TARGETS_JSON', null);
-  let overrides = {};
+  // The setting is the whole list (nutrientDailyTargets), so a first write starts
+  // from every default rather than just the patched names.
+  let overrides = { ...NUTRIENT_DAILY_TARGETS_DEFAULT };
   if (raw) {
     try {
       overrides = JSON.parse(raw);
     } catch {
-      overrides = {};
+      overrides = { ...NUTRIENT_DAILY_TARGETS_DEFAULT };
     }
   }
   Object.entries(patch).forEach(([name, amount]) => {

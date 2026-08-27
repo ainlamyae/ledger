@@ -46,12 +46,12 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/health/insight/micronutrients/</loc>
+    <loc>https://ainlamyae.github.io/ledger/health/insight/micronutrient/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/health/insight/patterns/</loc>
+    <loc>https://ainlamyae.github.io/ledger/health/insight/pattern/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -61,7 +61,7 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/health/insight/protein-sources/</loc>
+    <loc>https://ainlamyae.github.io/ledger/health/insight/protein/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

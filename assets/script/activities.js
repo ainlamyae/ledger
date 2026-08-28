@@ -61,6 +61,14 @@ async function initActivities(forceRefresh = false) {
     document.getElementById('add-activity-btn').addEventListener('click', () => openActivityForm(null));
     document.getElementById('activity-cancel-btn').addEventListener('click', closeActivityForm);
     onFormSubmit('activity-form', submitActivityForm);
+    // Live, not just on open — pasting a new path should preview it before Save,
+    // same as the Instruction modal's own figures do once saved.
+    document.getElementById('activity-image').addEventListener('input', renderActivityImagePreview);
+    // A path pointing at nothing hides the preview rather than showing a broken-
+    // image icon — same guard the Instruction modal's own figure uses.
+    document.getElementById('activity-image-preview').addEventListener('error', () => {
+      document.getElementById('activity-image-preview').hidden = true;
+    });
   }
 
   let values = forceRefresh ? null : getCached('activities');
@@ -207,29 +215,31 @@ function makeActivityTable(group, rows, columnVisibility) {
   const isStrength = rows.some((a) => a.quantity.sets !== undefined);
 
   const table = document.createElement('table');
-  table.className = isStrength ? 'workout-table-strength' : 'workout-table-neat';
+  // table-compact: same dense/no-border look every other data table in the
+  // app shares (styles.css) — the default padding/row-border read as loose
+  // once these tables carry their own checkbox/actions columns.
+  table.className = `table-compact ${isStrength ? 'workout-table-strength' : 'workout-table-neat'}`;
   table.dataset.day = group;
 
   // The checkbox column is first and unlabelled, same as every other
   // selectable table in the app (Nutrition, Physique). The row actions column
-  // is last and unlabelled too. Order matters beyond looks: strength-plan.js
-  // reads a ticked row's name from children[1] and its quantity from
-  // children[3] for every row where box.dataset.steps/minutes/hold are all
-  // unset (a plain reps-based strength row) — those always come from a shape
-  // where Muscle Group is visible, so that pairing never shifts. Anything
-  // conditionally shown (Muscle Group, Rest, Weight) has to sit between the
-  // name and the actions column, never before the quantity column.
+  // is last and unlabelled too. strength-plan.js reads a ticked row's name
+  // from children[1] (Name never moves) and its quantity from the
+  // "workout-quantity-cell" class rather than a fixed index — the column's
+  // position among Muscle Group/Weight/Rest shifts with columnVisibility, so
+  // only a class survives that the way workout-muscle-group-cell already
+  // does below.
   //
   // Every column between Name and the actions column gets a shared
-  // "workout-meta-cell" class, and Muscle Group its own class on top —
-  // nth-child can't target these reliably on mobile any more now that a
+  // "workout-meta-cell" class, and Muscle Group/quantity their own class on
+  // top — nth-child can't target these reliably on mobile any more now that a
   // table's own column count depends on columnVisibility, so mobile's
   // font-size/hide rules key off these classes instead of position.
   const headers = [{ label: '', className: 'workout-check-col' }, { label: isStrength ? 'Exercise/Machine' : 'Activity' }];
   if (columnVisibility.muscleGroup) headers.push({ label: 'Muscle Group', className: 'workout-meta-cell workout-muscle-group-cell' });
-  headers.push({ label: isStrength ? 'Sets x Reps' : 'Amount', className: 'workout-meta-cell' });
-  if (columnVisibility.rest) headers.push({ label: 'Rest', className: 'workout-meta-cell' });
   if (columnVisibility.weight) headers.push({ label: 'Weight', className: 'workout-meta-cell' });
+  headers.push({ label: isStrength ? 'Sets x Reps' : 'Amount', className: 'workout-meta-cell workout-quantity-cell' });
+  if (columnVisibility.rest) headers.push({ label: 'Rest', className: 'workout-meta-cell' });
   headers.push({ label: '' });
 
   const thead = document.createElement('thead');
@@ -255,9 +265,11 @@ function makeActivityTable(group, rows, columnVisibility) {
     if (columnVisibility.muscleGroup) {
       cells.push(makeCell(truncateMuscleGroup(activity.muscleGroup), activity.muscleGroup));
     }
-    cells.push(makeCell(activity.amount));
-    if (columnVisibility.rest) cells.push(makeCell(activity.rest));
     if (columnVisibility.weight) cells.push(makeCell(activity.weight));
+    const quantityCell = makeCell(activity.amount);
+    quantityCell.classList.add('workout-quantity-cell');
+    cells.push(quantityCell);
+    if (columnVisibility.rest) cells.push(makeCell(activity.rest));
     // Cells 1..n-1 are the same conditionally-shown group the headers above
     // are classed for (cells[0] is the Name column, never classed).
     cells.slice(1).forEach((cell) => cell.classList.add('workout-meta-cell'));
@@ -395,6 +407,7 @@ function openActivityForm(activity, duplicate = false) {
   setActivityField('image', activity?.image);
   setActivityField('muscle-group', activity?.muscleGroup);
   setActivityField('weight', activity?.weight);
+  renderActivityImagePreview();
 
   renderActivityDatalist('activity-category-options', 'category');
   renderActivityDatalist('activity-group-options', 'group');
@@ -411,6 +424,21 @@ function setActivityField(id, value) {
 
 function activityFieldValue(id) {
   return document.getElementById(`activity-${id}`).value.trim();
+}
+
+// Shows what's currently typed in Image under the field itself, so a path
+// can be checked before Save rather than only after — the 'error' listener
+// wired in initActivities hides it again if the path resolves to nothing.
+function renderActivityImagePreview() {
+  const img = document.getElementById('activity-image-preview');
+  const src = activityFieldValue('image');
+  if (!src) {
+    img.hidden = true;
+    img.removeAttribute('src');
+    return;
+  }
+  img.src = src;
+  img.hidden = false;
 }
 
 // Values already in use for a free-text column, most-used first — the same
@@ -518,13 +546,18 @@ async function deleteActivity(activity) {
   );
 }
 
-// "3 x 10 · 90 sec rest", or the amount alone for a row with no rest to take
-// (steps, minutes). Both halves come from the single cell splitAmountAndRest
-// already divides, so the modal shows exactly what the plan table's Sets x Reps
-// and Rest columns do.
+// "45 lbs · 3 x 10 · 90 sec rest" — Weight leads, so it reads left of the
+// Sets x Reps it applies to rather than trailing after Rest where it'd read
+// as an afterthought. Amount/Rest come from the single cell
+// splitAmountAndRest already divides, so that half shows exactly what the
+// plan table's Sets x Reps and Rest columns do; Weight is its own column
+// (row[8]), blank on any activity that doesn't load one (steps, minutes).
+// Either half missing just drops out rather than leaving a stray separator.
 function instructionPrescription(activity) {
-  if (!activity.amount) return '';
-  return activity.rest ? `${activity.amount} · ${activity.rest} rest` : activity.amount;
+  const prescription = activity.amount
+    ? (activity.rest ? `${activity.amount} · ${activity.rest} rest` : activity.amount)
+    : '';
+  return [activity.weight, prescription].filter(Boolean).join(' · ');
 }
 
 // The Instruction modal's list, grouped the same way. Figures come from the
@@ -560,7 +593,8 @@ function renderInstructionList() {
       li.append(figure, label);
 
       // The name is what you scan for, so the rest of the row sits under it at
-      // plain weight: what the movement trains, then how much of it to do. A
+      // plain (non-bold) font weight: what the movement trains, then how much
+      // of it to do (load, sets/reps, rest — see instructionPrescription). A
       // line whose cell is blank on the sheet is skipped rather than printed
       // empty.
       [activity.muscleGroup, instructionPrescription(activity)]

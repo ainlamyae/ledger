@@ -68,6 +68,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - The one exception is the timesheet **reminder banner**'s Log Time — a standalone CTA in a sentence, not a crowded heading.
 - **Panel headings are one word too** where the longer form only restated the thing behind it: *Activity Plan* → **Activity**, *Nutrition Facts* → **Nutrition**, *Account Summary* → **Account**, *Contact List* → **Contact**, *Accounts* → **Account**, *Health Indicators* → **Health Indicator**, *Financial Indicators* → **Financial Indicator**. The sheet tabs now read the same way (`Transaction`, `Account`, `Nutrition`, `Activity`, `Statement`, `Breakdown`, …) — but that's a spreadsheet-side choice, not something the app depends on: **every tab name lives in `CONFIG.SHEETS` (`config.js`) and nowhere else**, so renaming a tab is one line there. Labels that have to agree with a tab name (the breakdown table's "from your own table" source) are read off the same object rather than spelled out again.
 - **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work Time, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
+- **`.table-compact` is the app's one dense-table look** — tight `.15rem .4rem` cell padding, no per-row border (`styles.css`) — shared by every table that's mostly rows of short figures: Nutrition, Physique, Transaction, Account, Breakdown, Work Time, Travel, Contact, the Activity Plan's own per-day tables, and the two Calculate breakdown tables in Physique's modal. One class instead of the padding/border pair repeated per table id, so the look changes everywhere at once from one rule. Table-specific column widths and nowrap rules stay scoped to their own id/class, since those genuinely differ per table.
 - **Panel groups** — Health, Finance, Other. Each is a page of its own at `/health/`, `/finance/` and `/other/`, and the nav links are those addresses rather than in-page anchors, so a group can be linked to, bookmarked and refreshed on its own (see [Section pages](#section-pages)). The logo is the way back to all three at once.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
@@ -111,7 +112,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Breakdown
 
-- The `Breakdown` tab as a maintainable table rather than only a chart source (`breakdown.js`): searchable and sortable, one row per Category × Type, with that row's **Last Month / Last Quarter / Last Year / Lifelong** figures.
+- The `Breakdown` tab as a maintainable table rather than only a chart source (`breakdown.js`): searchable, sortable, paginated, one row per Category × Type, with that row's **Last Month / Last Quarter / Last Year / Lifelong** figures.
+  - `BREAKDOWN_PAGE_SIZE` is 100, not the app's usual 25 — a full Category × Type breakdown comfortably runs to that many rows, and splitting it across several pages of 25 would make one category's own total row land on a different page than the Types under it.
 - **The money is never written.** Columns C-F are the spreadsheet's own formulas — the same ones Financial Indicator is drawn from — so every write here is scoped to `A:B`, the two text columns that name the row. There is no path in this panel that can replace a formula with the number it produced.
   - Editing therefore offers Category and Type only; the four amounts appear in the modal as text, labelled as the sheet's own.
 - **A blank Type is a category's own total row** (the one summing every Type under it) — kept blank rather than normalised, since that blank is what the sheet reads as "total". The table shows `—` with a tooltip saying so.
@@ -133,19 +135,19 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Health — Today at a glance
 
-- Four tiles: **Max/Min Calory Intake**, **Activity**, **Protein**, **Sleep**.
+- Four tiles, in order: **Max/Min Calory Intake**, **Protein**, **Fiber**, **Activity**.
 - Each reads `actual / target unit`, green on the right side of the figure, red otherwise, grey when nothing's logged.
 - Activity also restates its target in kcal — `— / 100 min → 394 kcal` — from `getActivityTargetKcal`, the same pin-aware figure the Physical Activity chart's target line uses.
 - The Calories heading carries which side of the target it is (max or min), since the number alone can't say it.
 - Protein is a **band**, so its tile reads as a range (`53 / 112~154 g`).
-- **Sleep is graded on Rest & Recovery's own gradient** (`sleepStatusColor`, red→amber→green from half the target up to it), not the plain two-colour split above. A strict at-or-past-target read would colour a 7.8 h night against an 8 h target flat red; the chart it should agree with reads that same night as a near-miss and colours it green, so the tile now takes its colour from the identical function instead of its own boolean.
+- **Fiber reads the day's own persisted Physique Fiber figure** (`fiberG`, see `physiqueAsWellnessEntries`) against `FIBER_TARGET_G` (default 30g) — a plain at-or-above-target/below split, the same as Activity's.
 
 ### Health — Health Indicator
 
 Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
-- **One From/To pair, above Body Mass, is the panel's window** — Body Mass, Calorie Balance, Caloric Intake, Physical Activity, Protein Intake, Rest & Recovery and Protein Source Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
+- **One From/To pair, above Body Mass, is the panel's window** — Body Mass, Calorie Balance, Caloric Intake, Physical Activity, Protein Intake, Fiber Intake, Rest & Recovery and Protein Source Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
   - **State Trend & Forecast is deliberately outside it**: that chart is the whole journey plus a projection, and clipping it to a month would be clipping the trend it exists to show.
   - `wellnessDateRange()` reads the two inputs straight from the DOM, falling back to the default when either is blank — so it can't matter whether a chart renders before or after the control is wired. `wellnessWindowDates()` turns that into the date list, clipped forward to the first day the metric in question has anything logged, so no chart opens on a run of empty days. An inverted range yields no days, which every caller already reads as "nothing to draw".
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward target; optional BMI twin axis.
@@ -165,10 +167,11 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - **A red bar (past the target beyond the near-margin) regrades to grey when the 7-day average is still on the target's right side** — the same "one bad day, good week" read Body Mass gets, scored against the average instead of the trend.
 - **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
+- **Fiber Intake** — plain hit/miss bars (green at-or-above `FIBER_TARGET_G`, red below, unlogged days green) against a flat dashed target line, not a per-bar cap — Fiber has one constant target (a Setting), not a per-day or body-mass-derived figure like Calories or Activity, so there's exactly one line to draw and no risk of it reading as a per-day mark instead of a shared limit.
 - **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
 - **Protein Source Rotation** last — see its section below.
-- All six of the scored charts carry a **violet dashed segment per week**, so a week that quietly drifted past its target is visible next to the per-day mark.
-  - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a target cap.
+- All seven of the scored charts carry a **violet dashed segment per week**, so a week that quietly drifted past its target is visible next to the per-day mark.
+  - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a target cap (or, on Fiber Intake alone, a target *line* in that same colour).
   - Buckets are counted **back from today**, so the most recent seven days are always one whole week and only the oldest bucket can come up short.
   - Built from days that were actually **logged**; a week with nothing logged draws nothing.
   - **Flat** on five of them — the week's average. Rest & Recovery carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Target Burn lives on.
@@ -299,18 +302,18 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - The Add/Edit form offers a datalist of classifications already in use, so the column doesn't fragment.
   - Search matches classification **and** name, so typing `dairy` pulls up the whole group.
   - Left blank by Calculate's auto-bank — the app has no basis for guessing one.
-- **Look up in USDA** button beside Save fills Amount/Calories/Protein from FoodData Central.
-  - Lists **every candidate** rather than taking the top one — Calculate can sanity-check a result against an AI estimate and this can't, and USDA ranks "Oil, soybean" above the bean.
-  - Applies the top match so the common case is one click; click another to switch.
-  - Leaves Name as typed and never sets Verified — a database figure isn't a checked label.
+- **🧬 Pull Micronutrients** — one button, same name and icon everywhere it appears (this form and the bulk table action below), doing the same job: given a Name and an Amount that already carries a real gram figure, look up USDA FoodData Central's top match and fill Calories, Protein and the full Micronutrients panel from it, scaled to that gram figure.
+  - **Amount is read, never written** — no candidate picker, no 100g fallback for a blank Amount. Type a real gram figure into Amount first; without one, the button fails with "Amount has no gram figure to scale from" rather than guessing.
+  - Leaves Name as typed and never sets Verified — but does overwrite Calories/Protein, even on an already-Verified row, since both come from the one USDA match applied.
+  - In the form, the pulled panel isn't written to the sheet until Save; the bulk table action (below) writes straight to each selected row's own Calories/Protein/Micronutrients cells immediately, since there's no Save step there.
 - Merge Selected consolidates near-duplicates; matching is exact-text, never fuzzy.
 
 ### Health — Activity Plan
 
 - The panel heading reads **Activity**, and its three buttons are one word each — **Add**, **Guide**, **Log** — the reason for the app-wide convention in [Layout and interaction](#layout-and-interaction). "Log More" is the one two-word label, and only when something is already logged: **Add** next to it means a catalogue row, not another set.
 - Push/Pull/Legs/Dumbbell/Bodyweight strength tables plus NEAT and Cardio, each row an unlabeled checkbox marking it done — first column, same position and blank header every other selectable table (Nutrition, Physique) uses, not a labeled "Done" column.
-- **All seven tables are one grid.** Six columns each — a NEAT row carries an empty Rest cell — with the checkbox and the four right-hand columns pinned to the same widths, so the checkbox, Muscle Group, Sets x Reps, Rest and the row actions line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~386px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
-- **Muscle Group** is its own column, between the exercise name and Sets x Reps/Amount — straight from the `Activity` sheet's own column, the same source the Instruction modal and the neglected-muscle Activity Insight already read.
+- **All seven tables are one grid.** Checkbox, Name, then whichever of Muscle Group/Weight/Sets x Reps (or Amount)/Rest that table's own rows actually use (`activityPlanColumnVisibility`), then row actions — a NEAT row, for instance, carries no Sets x Reps or Rest at all. The checkbox and every right-hand column are pinned to the same widths across all seven tables, so they line up straight down the panel instead of each table sizing to its own longest value. Only the name column is unsized, so it takes the slack (~386px on desktop) rather than an equal share of it. Widths are measured against real content, not guessed: `table-layout` stays `auto` (see the note at `styles.css`'s `#workout-plan-panel` rules — `fixed` was tried and produced a phantom scrollbar), and auto layout overrides any width its column's content exceeds, so a hint narrower than its own header is no hint at all.
+- **Muscle Group and Weight sit between the exercise name and Sets x Reps/Amount, in that order** — straight from the `Activity` sheet's own columns, Muscle Group the same source the Instruction modal and the neglected-muscle Activity Insight already read. Because that position shifts per table with which optional columns are present, `strength-plan.js` reads the quantity cell by its own `workout-quantity-cell` class rather than a fixed column index — an index broke the moment Weight's position started varying independently of Muscle Group/Rest.
 - **Rows already in today's log are ticked and tinted**, read from the sheet — so the marks survive a reload and clear at the date rollover. The **Physique** and **Work Time** tables tint today's row the same green from the same declaration (`.workout-row-logged > td, .today-row > td`): in all three places it means "this is the row today's logging lands on", and two nearly-identical greens would read as a mistake.
   - In Work Time it's applied outside the weekend/holiday/no-entry chain, since today can also be a weekend or a holiday. Today's tint is on the cells and theirs is on the row, so today's green paints over while their muted text colour survives.
 - **Log sends only what's newly ticked**, and extends today's entry instead of opening a second row.
@@ -671,9 +674,10 @@ The exercise catalogue — one row per movement, and the single source for what 
 | C — Name | Text | The join key — must match the workout note lines exactly. A name not listed here is priced at the fallback MET, gets no muscle group, and stacks under `Other` |
 | D — Unit | Text | `x` (reps), `sec` (hold), `step`, `min`. Tells `3 x 45 sec` (a hold) from `3 x 15` (reps) |
 | E — Sets x Reps, Rest | Text | `3 x 10, 90 sec` · `3 x 45 sec, 45 sec` · `6000 step` · `30 min`. Split on the **last** comma; the rest half is optional. Both halves show in the plan table's two columns and under the Instruction modal's figures |
-| F — Image | Text | URL or repo-relative path to the Instruction modal's figure. Blank means label-only |
+| F — Image | Text | URL or repo-relative path to the Instruction modal's figure. Blank means label-only. Also previewed live under the Edit/Add Activity form's own Image field, so a path can be checked before Save — `renderActivityImagePreview` in `activities.js`, hidden again if the path 404s |
 | G — MET | Number | Metabolic equivalent for the burn formula |
 | H — Muscle Group | Text | Drives the neglected-muscle Insight, and shown under each Instruction modal figure's name. The reported groups are whatever this column names, so a new one needs no code change |
+| I — Weight | Text | Freeform, e.g. `45 lbs` or `20kg`. Shown in the Instruction modal, leading the Sets x Reps/Rest line (`45 lbs · 3 x 15 · 60 sec rest`) rather than trailing it, and as its own column in the plan table when any row in the group has one |
 
 - Both the displayed cell and the checkbox's quantity attributes are built from column E, so they can no longer disagree — they had, on 24 of 34 rows, which made Log a Workout and a later Recalculate differ by up to ~15% on the same exercise.
 - A missing or unreadable tab costs the plan tables and the category split (everything lands under `Other`); the charts still render.
@@ -730,7 +734,7 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | I — TEF | Number | kcal. Same as Fiber, except its estimate (when you haven't typed one) is the Atwater/TEF-share formula over this row's own Protein plus whichever Fat/Carbohydrate this same resolution just settled on, not a raw Micronutrients read |
 | J — Verification | Text | `1` = you checked it against a real label. Only ever set by hand — never by Calculate or the USDA lookup |
 | K — Percent | Number | Blank excludes the ingredient from Protein Source Rotation; a number is its % share of your protein target |
-| L — Micronutrients | Text (JSON) | Full USDA nutrient panel (macros and micros), scaled to this row's own Amount — written only by 🧬 Pull Micronutrients, never by hand |
+| L — Micronutrients | Text (JSON) | Full USDA nutrient panel (macros and micros), scaled to this row's own Amount — written only by 🧬 Pull Micronutrients (form or bulk table action), never by hand |
 
 - **Fiber/Fat/Carbohydrate/TEF resolve typed-over-estimated** (`resolvedNutritionMacros`, `nutrition.js`): your own saved figure when there is one, otherwise Fiber/Fat/Carbohydrate read off the pulled Micronutrients panel and TEF computed from Atwater/TEF-share — same fallback order the Physique breakdown table uses per-ingredient. The Edit Ingredient form pre-fills all four from this same resolution, so opening a row, reviewing the estimate and hitting Save is what "confirms" it as a typed figure from then on.
 - **Protein/100kcal** used to be a computed Density column; removed in favor of the Fiber/Fat/Carbohydrate/TEF columns above.
@@ -1006,8 +1010,9 @@ sort key  = classification group gap, then targetG − actualG within it, both d
 
 ### Today at a Glance
 
-- Sums today's entries per category.
-- Green/red by `withinCalorieTarget`, `withinProteinBand`, `mins ≥ getActivityTargetMin(latest body mass)`, `hrs ≥ SLEEP_TARGET_HOURS`.
+- Order: Calory Intake, Protein, Fiber, Activity.
+- Sums today's entries per category; Fiber reads the day's own persisted Physique Fiber figure.
+- Green/red by `withinCalorieTarget`, `withinProteinBand`, `fiberG ≥ FIBER_TARGET_G`, `mins ≥ getActivityTargetMin(latest body mass)`.
 - The Activity tile appends `→ getActivityTargetKcal(latest body mass)` rounded to whole kcal.
 
 ### Sleep

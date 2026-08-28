@@ -787,6 +787,7 @@ function renderAccountCompositionChart(accounts) {
 const BODY_MASS_TARGET_KG_DEFAULT = 82;
 const CALORIE_TARGET_KCAL_DEFAULT = 2000;
 const SLEEP_TARGET_HOURS_DEFAULT = 8;
+const FIBER_TARGET_G_DEFAULT = 30;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 const PROTEIN_TARGET_G_DEFAULT = 100;
 
@@ -1367,6 +1368,7 @@ let wellnessCaloriesChart = null;
 let wellnessSleepChart = null;
 let wellnessActivityChart = null;
 let wellnessProteinChart = null;
+let wellnessFiberChart = null;
 let wellnessProjectionChart = null;
 
 function lastNDates(n) {
@@ -1422,6 +1424,7 @@ function renderWellnessCharts(entries) {
   renderWellnessSleepChart(entries);
   renderWellnessActivityChart(entries);
   renderWellnessProteinChart(entries);
+  renderWellnessFiberChart(entries);
   renderWellnessProjectionChart(entries);
   renderWellnessEnergyBalanceChart(entries);
 }
@@ -1433,8 +1436,8 @@ function renderTodayGlanceCards(entries) {
 
   let calories = null;
   let protein = null;
+  let fiber = null;
   let activityMins = null;
-  let sleepHours = null;
 
   entries
     .filter((e) => e.date === todayIso)
@@ -1445,22 +1448,21 @@ function renderTodayGlanceCards(entries) {
       if (e.category === 'Calories; Protein' && e.amount2 !== null) {
         protein = (protein ?? 0) + e.amount2;
       }
+      if (e.category === 'Calories; Protein' && e.fiberG !== null && e.fiberG !== undefined) {
+        fiber = (fiber ?? 0) + e.fiberG;
+      }
       if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
         activityMins = (activityMins ?? 0) + toActivityMinutes(e.amount, e.unit);
       }
-      if (e.category === 'Sleep' && e.amount !== null) {
-        sleepHours = (sleepHours ?? 0) + e.amount;
-      }
     });
-  if (sleepHours !== null) sleepHours = Math.round(sleepHours * 10) / 10;
 
   const calorieTarget = getCalorieTarget(entries);
   const proteinBand = getProteinTargetBandG(entries);
+  const fiberTarget = getSetting('FIBER_TARGET_G', FIBER_TARGET_G_DEFAULT);
   const bodyMassKg = latestBodyMassKg(entries);
   // Minutes when time is what's pinned; rises with a lighter body mass when calorie burn
   // is pinned instead — see getActivityTargetMin.
   const activityTarget = Math.round(getActivityTargetMin(bodyMassKg));
-  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
 
   // The heading carries which target it is, since the number can't and the value line
   // has no room. Digit-free, so privacy mode has nothing to hide.
@@ -1478,16 +1480,8 @@ function renderTodayGlanceCards(entries) {
 
   setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
+  setTodayGlanceTile('today-fiber', fiber, fiberTarget, 'g', fiber !== null && fiber >= fiberTarget);
   setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, targetBurn);
-  // Sleep gets its colour from sleepStatusColor — the same red-amber-green gradient
-  // Rest & Recovery bars use — rather than the plain hit/miss split the other three
-  // tiles get: a strict >= target boolean read 7.8 against an 8h target as a flat miss
-  // (red) while the chart, judging from half the target, reads the same 7.8 as a near
-  // miss (green). One metric, one verdict.
-  setTodayGlanceTile(
-    'today-sleep', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget,
-    null, false, sleepHours !== null ? sleepStatusColor(sleepHours, sleepTarget) : null,
-  );
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
@@ -2780,6 +2774,100 @@ function renderWellnessProteinChart(entries) {
                 : [`Target: ${band.min} g`];
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              return privacyMode ? lines.map(maskDigits) : lines;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        y: {
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: maskedUnitTick('g') },
+        },
+        y1: ghostRightAxis(),
+      },
+    },
+  });
+}
+
+// Fiber has one flat target (a Setting, not body-mass- or day-derived like Calories'
+// or Activity's), and no band or near-miss tier — just met or missed, so this is
+// closer to a stripped-down Caloric Intake than a copy of Protein Intake's shaded
+// band. Read from the same Physique-day Fiber figure (fiberG) the Health tiles' own
+// Fiber card sums — see physiqueAsWellnessEntries.
+function renderWellnessFiberChart(entries) {
+  const ctx = document.getElementById('wellness-fiber-chart');
+
+  const target = getSetting('FIBER_TARGET_G', FIBER_TARGET_G_DEFAULT);
+
+  const fiberEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.fiberG !== null && e.fiberG !== undefined);
+  const dates = wellnessWindowDates(fiberEntries);
+  const byDate = new Map();
+  fiberEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.fiberG));
+
+  // Unlogged day takes the same "missing log, not a miss" green every other intake
+  // chart here gives it. A logged day is a flat hit/miss against the target — no near
+  // tier, no over-target shade, since the ask was just red-under/green-at-or-above.
+  const values = dates.map((d) => byDate.get(d) || 0);
+  const barColors = dates.map((d, i) => (!byDate.has(d) || values[i] >= target ? '#16a34a' : '#dc2626'));
+
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+
+  // A flat dashed line across the whole window, not a per-bar cap — Fiber has one
+  // constant target (a Setting), not a per-day figure like Calories/Activity, so
+  // there's exactly one line to draw and no ambiguity about it reading as a single
+  // shared limit. Same dash idiom as the weekly-average line, in the app's
+  // near-black/off-white "target" colour instead of the average's violet.
+  const targetLineDataset = {
+    type: 'line',
+    label: `${target} g target`,
+    data: dates.map(() => target),
+    borderColor: targetMarkColor(),
+    borderWidth: 2,
+    borderDash: [6, 4],
+    pointRadius: 0,
+    tension: 0,
+    isTargetLine: true,
+    order: 0,
+  };
+
+  wellnessFiberChart = upsertChart(wellnessFiberChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Actual Intake',
+          data: values,
+          backgroundColor: barColors,
+          order: 2,
+        },
+        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        targetLineDataset,
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          callbacks: {
+            title: (items) => formatIsoDateShort(items[0].label),
+            label: (item) => {
+              const text = `Actual Intake: ${item.parsed.y} g`;
+              return privacyMode ? maskDigits(text) : text;
+            },
+            afterBody: (items) => {
+              const i = items[0]?.dataIndex;
+              if (i === undefined) return '';
+              const lines = [`Target: ${target} g`];
+              if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },

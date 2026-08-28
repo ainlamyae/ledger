@@ -921,6 +921,19 @@ td {
     border-bottom: 1px solid var(--color-border);
 }
 
+/* The app's one "dense data table" look — tighter padding, no per-row border —
+   shared by every table that's mostly rows of short figures (Nutrition,
+   Physique, Transaction, Account, Breakdown, Work Time, Travel, Contact).
+   One class instead of a padding/border-bottom pair repeated per table id, so
+   changing the look changes it everywhere at once. Add `table-compact` to a
+   `<table>` to opt it in; table-specific column widths/nowrap rules stay
+   scoped to their own id below, since those genuinely differ per table. */
+.table-compact th,
+.table-compact td {
+    padding: .15rem .4rem;
+    border-bottom: none;
+}
+
 /* The 🧮 Calculate breakdown's summed last row (assets/script/calorie-estimator.js's
    renderCalcBreakdown) and the activity table's (physique.js's
    renderPhysiqueActivityBreakdown) — bold and a top border set it apart from the
@@ -942,27 +955,11 @@ td {
 
 /* Both Calculate tables are dense (the breakdown carries 9 columns —
    Name/Amount/Cal/Pro/Fiber/Fat/Carb/TEF/Source — now Fiber/Carbohydrate/Fat/TEF
-   folded into it; the activity table 5), so tighter padding and no per-row border
-   keeps them narrow instead of pushing the modal wide or wrapping onto a
-   second line on a phone screen. The Total row's own top border (above)
-   still marks it off from the per-item rows above it. */
-#physique-calc-breakdown th,
-#physique-calc-breakdown td,
-#physique-activity-breakdown th,
-#physique-activity-breakdown td {
-    padding: .15rem .4rem;
-    border-bottom: none;
-}
-
-/* Nutrition (assets/script/nutrition.js) carries more columns than any other
-   table in the app (14, including the checkbox and actions) — the same
-   dense/no-border treatment as the Calculate breakdown above, so the extra
-   Fiber/Fat/Carb/TEF columns don't force horizontal scrolling on their own. */
-#nutrition-table th,
-#nutrition-table td {
-    padding: .15rem .4rem;
-    border-bottom: none;
-}
+   folded into it; the activity table 5) — the `table-compact` class on their
+   wrapping div (see index.html) keeps them narrow instead of pushing the
+   modal wide or wrapping onto a second line on a phone screen. The Total
+   row's own top border (above) still marks it off from the per-item rows
+   above it. */
 
 /* Every numeric/short column is bounded by its own (now abbreviated) header
    rather than its data — same reasoning as the Calculate breakdown's column
@@ -1092,15 +1089,14 @@ td {
 /* Every remaining Physique column is a short date/time/number now that
    Consumption/Workout/Breakdown are gone, so none of them need to wrap —
    letting one (usually Date) wrap mid-value was what starved the actions
-   column of width and forced its 3 buttons onto separate lines. Dense
-   padding and no per-row border — same treatment as the Nutrition table
-   above — keeps the now-wider row (DF/Fat/Carb added alongside Cal/Pro/TEF)
-   compact. The .today-row tint (below) is a plain `background` on the cell,
-   not a border, so it's untouched by dropping border-bottom here. */
+   column of width and forced its 3 buttons onto separate lines. The dense
+   padding/no-border look itself comes from the shared `.table-compact` rule
+   above; this table also blanket-nowraps every column, which nutrition-table
+   doesn't (it only nowraps the numeric ones — Classification/Name/Amount stay
+   wrappable there). The .today-row tint (below) is a plain `background` on
+   the cell, not a border, so it's untouched by dropping border-bottom. */
 #physique-table th,
 #physique-table td {
-    padding: .15rem .4rem;
-    border-bottom: none;
     white-space: nowrap;
 }
 
@@ -1636,6 +1632,23 @@ td .btn {
     height: 170px;
     object-fit: contain;
     margin-bottom: .4rem;
+    background: #fff;
+    border-radius: var(--radius-md);
+}
+
+/* Edit Activity's own live preview under the Image field — same fixed-height/
+   contain/white-background treatment as .instruction-figure above, so what
+   you see while editing the path is what the Instruction modal will actually
+   show once saved. Hidden (not just empty) whenever the field is blank or the
+   path 404s — see renderActivityImagePreview/the 'error' listener in
+   activities.js. */
+.activity-image-preview {
+    display: block;
+    width: 100%;
+    height: 170px;
+    object-fit: contain;
+    margin-top: -.5rem;
+    margin-bottom: .75rem;
     background: #fff;
     border-radius: var(--radius-md);
 }
@@ -2191,35 +2204,6 @@ td .btn {
 }
 
 .insight-mode-actions .btn.active {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    font-weight: 600;
-}
-
-/* USDA lookup results in the Add Ingredient form (assets/script/nutrition.js).
-   Stacked full-width and left-aligned because the descriptions are long
-   ("Beans, kidney, red, mature seeds, raw") and need to be read, not scanned. */
-.usda-results {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: .35rem;
-    margin-bottom: .6rem;
-}
-
-.usda-results .hint {
-    margin-bottom: .15rem;
-}
-
-.usda-candidate {
-    text-align: left;
-    font-size: .8rem;
-    line-height: 1.35;
-    white-space: normal;
-}
-
-/* Marks the candidate whose figures are currently in the fields. */
-.usda-candidate[aria-pressed="true"] {
     border-color: var(--color-primary);
     color: var(--color-primary);
     font-weight: 600;

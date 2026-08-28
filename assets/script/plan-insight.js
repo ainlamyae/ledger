@@ -274,13 +274,14 @@ function planRatePinDescription(p) {
 }
 
 function planInputLines(p) {
+  // Tune's order: sex, height, age, then the body-mass rows.
   return [
+    `sigma (sex): ${p.sex}`,
+    `h (height): ${p.heightCm} cm`,
+    `a (age): ${p.age} years${p.formula === 'katch' ? ' (unused — the Katch-McArdle BMR equation does not read age)' : ''}`,
     `m (latest single weigh-in): ${p.rawBodyMassKg} kg`,
     `m_bar (L_p-day rolling average, L_p = ${bodyMassSmoothingDays()} days — the mass every figure below is evaluated at): ${p.bodyMassKg} kg`,
     `m_g (target body mass): ${p.targetKg} kg`,
-    `h (height): ${p.heightCm} cm`,
-    `a (age): ${p.age} years${p.formula === 'katch' ? ' (unused — the Katch-McArdle BMR equation does not read age)' : ''}`,
-    `sigma (sex): ${p.sex}`,
     `MET (assumed activity intensity): ${p.met}`,
     `tau (daily activity target): ${p.tau} min/day`,
     `kappa (oxygen uptake per MET): ${p.kappa} mL O2/kg/min`,

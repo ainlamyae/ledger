@@ -253,6 +253,34 @@ function renderFoodInsightPreview(rows, from, to) {
     makeCell(perDay(totalTef) !== null ? String(Math.round(perDay(totalTef))) : '—'),
   );
   tbody.appendChild(avgRow);
+
+  // What this same body would be aiming for, so the Avg/day row directly above has
+  // something to compare itself against without leaving the table. Calories and Protein
+  // reuse the exact targets the tiles/charts already compute (getCalorieTargetKcal,
+  // getProteinTargetBandG/getFiberTargetBandG) — the Formula playground's own figures,
+  // not a second copy of the arithmetic. Fat/Carbohydrate have no personalized formula
+  // in the app yet, so they fall back to the FDA Daily Value reference the Micronutrients
+  // mode already uses for the same two nutrients. TEF has no target at all — it's a
+  // measured byproduct of what you ate, not something to aim for.
+  const wellnessEntries = physiqueAsWellnessEntries();
+  const calorieTarget = getCalorieTarget(wellnessEntries);
+  const proteinBand = getProteinTargetBandG(wellnessEntries);
+  const fiberBand = getFiberTargetBandG(wellnessEntries);
+  const dailyTargets = nutrientDailyTargets();
+
+  const idealRow = document.createElement('tr');
+  idealRow.className = 'insight-food-ideal-row';
+  idealRow.append(
+    makeCell('Ideal/day', `${calorieTarget.full} calorie target, current protein/fiber bands and Fat/Carbohydrate FDA Daily Values — from the Health Formula Playground and Settings, not this range's data`),
+    makeCell(''),
+    makeCell(String(Math.round(calorieTarget.kcal))),
+    makeCell(formatProteinTargetBand(proteinBand)),
+    makeCell(formatProteinTargetBand(fiberBand)),
+    makeCell(String(dailyTargets['Total lipid (fat)'].amount)),
+    makeCell(String(dailyTargets['Carbohydrate, by difference'].amount)),
+    makeCell('—'),
+  );
+  tbody.appendChild(idealRow);
 }
 
 // Asked when the question box is left blank — this mode is the only one that

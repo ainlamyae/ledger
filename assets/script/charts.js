@@ -800,6 +800,13 @@ const PROTEIN_TARGET_G_DEFAULT = 100;
 const PROTEIN_G_PER_KG_LBM_MIN_DEFAULT = 1.8;
 const PROTEIN_G_PER_KG_LBM_MAX_DEFAULT = 2.2;
 
+// The fiber band's two coefficients — the Formula playground opens on these. 14 g/1000 kcal
+// is the USDA/Dietary Guidelines for Americans rule of thumb (derived from the ~25g/2000kcal
+// adult reference intake); 0.5 g/kg body weight is a common upper-bound heuristic so the
+// ceiling scales with the person rather than staying a flat number regardless of size.
+const FIBER_G_PER_1000_KCAL_MIN_DEFAULT = 14;
+const FIBER_G_PER_KG_MAX_DEFAULT = 0.5;
+
 // Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 5.0 compound lifting, 7.0
 // jogging). Duplicates activity-estimator.js's EXERCISE_MET_DEFAULT rather than
 // referencing it: charts.js loads first, so that const is still in its dead zone.
@@ -971,6 +978,38 @@ function formatProteinTargetBand(band, separator = '~') {
 // rule. Over the top isn't a miss — both the chart's bar colours and the glance tile
 // give it its own dark-green "past the ceiling, still a hit" treatment instead.
 function withinProteinBand(g, band) {
+  return g >= band.min && (band.max === band.min || g <= band.max);
+}
+
+// The fiber band the Formula playground writes — FIBER_TARGET_G_MIN/MAX, same shape as
+// getProteinAbsoluteBandG. Sorted, so a band that came out backwards (a very light body
+// weight paired with a high intake, where the per-kg ceiling can undercut the per-1000kcal
+// floor) still reads as a proper band rather than an inverted one.
+function getFiberAbsoluteBandG() {
+  const ends = [
+    getSetting('FIBER_TARGET_G_MIN', null),
+    getSetting('FIBER_TARGET_G_MAX', null),
+  ].filter((n) => n !== null && n > 0);
+
+  if (ends.length === 0) return null;
+  return { min: Math.round(Math.min(...ends)), max: Math.round(Math.max(...ends)) };
+}
+
+// Falls back to the flat FIBER_TARGET_G/_DEFAULT as a zero-width band, same fallback shape
+// getProteinTargetBandG uses, for whoever hasn't opened the Formula playground's fiber rows
+// yet.
+function getFiberTargetBandG(entries) {
+  const absolute = getFiberAbsoluteBandG();
+  if (absolute !== null) return absolute;
+
+  const flat = getSetting('FIBER_TARGET_G', FIBER_TARGET_G_DEFAULT);
+  return { min: flat, max: flat };
+}
+
+// In-band check only — same shape as withinProteinBand. Over-the-ceiling is its own
+// separate tier (still a hit, darker green), checked directly against band.max wherever
+// the bulb/chart need to tell the two apart.
+function withinFiberBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
 
@@ -1458,7 +1497,7 @@ function renderTodayGlanceCards(entries) {
 
   const calorieTarget = getCalorieTarget(entries);
   const proteinBand = getProteinTargetBandG(entries);
-  const fiberTarget = getSetting('FIBER_TARGET_G', FIBER_TARGET_G_DEFAULT);
+  const fiberBand = getFiberTargetBandG(entries);
   const bodyMassKg = latestBodyMassKg(entries);
   // Minutes when time is what's pinned; rises with a lighter body mass when calorie burn
   // is pinned instead — see getActivityTargetMin.
@@ -1473,6 +1512,10 @@ function renderTodayGlanceCards(entries) {
   const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
   const proteinOverBand = protein !== null && protein > proteinBand.max;
 
+  // Same in-band/over-band split as protein — see withinFiberBand/getFiberTargetBandG.
+  const fiberInBand = fiber !== null && withinFiberBand(fiber, fiberBand);
+  const fiberOverBand = fiber !== null && fiber > fiberBand.max;
+
   // What hitting the minutes target would burn — pinned flat if calorie burn is what's
   // pinned, else via the same activityTargetKcal the calorie target is built from, so the
   // two can't quote different numbers for one day.
@@ -1480,7 +1523,7 @@ function renderTodayGlanceCards(entries) {
 
   setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
-  setTodayGlanceTile('today-fiber', fiber, fiberTarget, 'g', fiber !== null && fiber >= fiberTarget);
+  setTodayGlanceTile('today-fiber', fiber, formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
   setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, targetBurn);
 }
 
@@ -2792,47 +2835,58 @@ function renderWellnessProteinChart(entries) {
   });
 }
 
-// Fiber has one flat target (a Setting, not body-mass- or day-derived like Calories'
-// or Activity's), and no band or near-miss tier — just met or missed, so this is
-// closer to a stripped-down Caloric Intake than a copy of Protein Intake's shaded
-// band. Read from the same Physique-day Fiber figure (fiberG) the Health tiles' own
-// Fiber card sums — see physiqueAsWellnessEntries.
+// Now a shaded min/max band like Protein Intake, not a flat single line — the Formula
+// playground's fiber rows produce a band the same shape protein's do (getFiberTargetBandG),
+// so the chart reads the same way: a floor that's a genuine miss (red) and a ceiling that's
+// still a hit (dark green), not a flat met-or-missed. Read from the same Physique-day Fiber
+// figure (fiberG) the Health tiles' own Fiber card sums — see physiqueAsWellnessEntries.
 function renderWellnessFiberChart(entries) {
   const ctx = document.getElementById('wellness-fiber-chart');
 
-  const target = getSetting('FIBER_TARGET_G', FIBER_TARGET_G_DEFAULT);
+  const band = getFiberTargetBandG(entries);
 
   const fiberEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.fiberG !== null && e.fiberG !== undefined);
   const dates = wellnessWindowDates(fiberEntries);
   const byDate = new Map();
   fiberEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.fiberG));
 
-  // Unlogged day takes the same "missing log, not a miss" green every other intake
-  // chart here gives it. A logged day is a flat hit/miss against the target — no near
-  // tier, no over-target shade, since the ask was just red-under/green-at-or-above.
-  const values = dates.map((d) => byDate.get(d) || 0);
-  const barColors = dates.map((d, i) => (!byDate.has(d) || values[i] >= target ? '#16a34a' : '#dc2626'));
-
-  const weekColumns = bucketedColumnCount(dates);
-  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
-
-  // A flat dashed line across the whole window, not a per-bar cap — Fiber has one
-  // constant target (a Setting), not a per-day figure like Calories/Activity, so
-  // there's exactly one line to draw and no ambiguity about it reading as a single
-  // shared limit. Same dash idiom as the weekly-average line, in the app's
-  // near-black/off-white "target" colour instead of the average's violet.
-  const targetLineDataset = {
+  // Same shape as Protein Intake's bandFill — two flat line datasets whose only job is the
+  // `fill: '+1'` shading between them, stroke off, caps drawn over them.
+  const bandFill = (value, extra = {}) => ({
     type: 'line',
-    label: `${target} g target`,
-    data: dates.map(() => target),
-    borderColor: targetMarkColor(),
-    borderWidth: 2,
-    borderDash: [6, 4],
+    label: `${value} g band edge`,
+    data: new Array(dates.length).fill(value),
+    borderWidth: 0,
     pointRadius: 0,
     tension: 0,
     isTargetLine: true,
-    order: 0,
-  };
+    order: 3,
+    ...extra,
+  });
+
+  // Same three-way split as Protein Intake: under the floor is red, in the band (or
+  // unlogged) is green, and past the ceiling is a darker green — still a hit, not a miss.
+  const FIBER_OVER_BAND_COLOR = '#166534';
+  const values = dates.map((d) => byDate.get(d) || 0);
+  const barColors = dates.map((d, i) => {
+    if (!byDate.has(d) || withinFiberBand(values[i], band)) return '#16a34a';
+    return values[i] > band.max ? FIBER_OVER_BAND_COLOR : '#dc2626';
+  });
+
+  const capHalf = targetCapHalf(Math.max(band.max, ...values, 1));
+  const capFor = (value, label) => targetCapDataset(label, new Array(dates.length).fill(value), capHalf, { isTargetLine: true });
+
+  const targetDatasets = band.max > band.min
+    ? [
+      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.min),
+      capFor(band.max, `${band.max} g upper target`),
+      capFor(band.min, `${band.min} g target floor`),
+    ]
+    : [capFor(band.min, `${band.min} g target`)];
+
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
   wellnessFiberChart = upsertChart(wellnessFiberChart, ctx, {
     data: {
@@ -2846,7 +2900,7 @@ function renderWellnessFiberChart(entries) {
           order: 2,
         },
         weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
-        targetLineDataset,
+        ...targetDatasets,
       ],
     },
     options: {
@@ -2864,10 +2918,11 @@ function renderWellnessFiberChart(entries) {
               return privacyMode ? maskDigits(text) : text;
             },
             afterBody: (items) => {
+              const lines = band.max > band.min
+                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
+                : [`Target: ${band.min} g`];
               const i = items[0]?.dataIndex;
-              if (i === undefined) return '';
-              const lines = [`Target: ${target} g`];
-              if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },

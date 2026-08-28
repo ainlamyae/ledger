@@ -1732,6 +1732,34 @@
                 <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
                 <span class="formula-unit">g/day</span>
             </label>
+            <!-- The fiber band follows protein: a floor scaled to how much you eat (14 g per
+                 1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body weight
+                 (0.5 g/kg) — two different bases, unlike protein's single LBM, so both
+                 coefficients are editable and neither rides on a box the other computes. -->
+            <label class="formula-row">
+                <span class="formula-sym">f_min</span>
+                <span class="formula-name">fiber floor per 1,000 kcal of intake</span>
+                <input type="text" id="formula-fiber-per-1000kcal-min" inputmode="decimal">
+                <span class="formula-unit">g/1,000 kcal</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">f_max</span>
+                <span class="formula-name">fiber ceiling per kg of body weight</span>
+                <input type="text" id="formula-fiber-per-kg-max" inputmode="decimal">
+                <span class="formula-unit">g/kg/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">F_min</span>
+                <span class="formula-name">daily fiber target, lower end</span>
+                <input type="text" id="formula-fiber-min" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">F_max</span>
+                <span class="formula-name">daily fiber target, upper end</span>
+                <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
             <!-- Glycogen closes the list, straight after LBM/protein since it reads the same
                  LBM box above rather than a flat guess: glycogen is stored in muscle, not fat,
                  so it has to scale with lean mass, not sit unrelated to weight/height/sex. Not

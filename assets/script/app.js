@@ -261,6 +261,11 @@ function setupAccountMenu() {
     loadDashboard(true);
   });
 
+  document.getElementById('clear-cache-btn').addEventListener('click', () => {
+    closeMenu();
+    clearCacheAndReload();
+  });
+
   document.getElementById('open-sheet-btn').addEventListener('click', () => {
     closeMenu();
     window.open(`https://docs.google.com/spreadsheets/d/${getActiveSpreadsheetId()}/edit`, '_blank');
@@ -585,6 +590,9 @@ function setLastUpdated() {
 
 async function loadDashboard(forceRefresh = false) {
   clearDashboardError();
+  // Refresh re-reads everything, the tab list included (sheets.js shares one per load).
+  if (forceRefresh) resetSheetReads();
+  const requestsBefore = sheetsRequestCount;
 
   // Wrapped end to end rather than relying solely on the Promise.allSettled
   // below: that only catches a rejection from one of the listed module
@@ -709,6 +717,7 @@ async function loadDashboard(forceRefresh = false) {
       ...detailPromises,
     ]);
 
+    console.info(`[sheets] dashboard load: ${sheetsRequestCount - requestsBefore} requests`);
     const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
     if (errors.length) {
       console.error('Failed to load dashboard data:', errors);

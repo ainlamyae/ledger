@@ -255,7 +255,8 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 **Manual refresh**
 
-- Refresh re-reads every range. Nothing is cached, so there is no Clear Cache.
+- Refresh re-reads every range; the app keeps no data cache.
+- Clear cache (`clearCacheAndReload`, `cache.js`) clears the browser's own copies — Cache Storage, any service worker, the HTTP-cached scripts and stylesheets — then reloads.
 
 ---
 

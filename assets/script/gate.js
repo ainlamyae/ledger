@@ -22,7 +22,6 @@ function setUIState(state) {
   document.getElementById('refresh-btn').hidden = state !== 'dashboard';
   document.getElementById('privacy-toggle-btn').hidden = state !== 'dashboard';
   document.getElementById('widgets-toggle-btn').hidden = state !== 'dashboard';
-  document.getElementById('blocks-toggle-btn').hidden = state !== 'dashboard';
   if (state !== 'signedOut') removeSignInBanner();
 }
 

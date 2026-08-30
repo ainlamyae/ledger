@@ -53,16 +53,6 @@
         if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_WIDGETS) === 0) {
             document.documentElement.setAttribute('data-widgets-pref', 'hidden');
         }
-        // Same pre-paint trick for the Health/Finance/Other blocks, but inverted:
-        // they're HIDDEN unless SHOW_BLOCKS is explicitly 1, so the home page
-        // paints without them (and app.js skips loading them) by default. Guarded
-        // to the root page — window.ledgerSectionPage is defined synchronously by
-        // section-page.js before this adopted script runs, and a section page must
-        // always show its one block regardless of this preference.
-        if (!window.ledgerSectionPage
-            && Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_BLOCKS) !== 1) {
-            document.documentElement.setAttribute('data-blocks-pref', 'hidden');
-        }
     } catch (e) {}
 </script>
 <script>
@@ -128,7 +118,6 @@
                 <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
-                <button id="blocks-toggle-btn" class="account-menu-item" hidden title="Show or hide the Health/Finance/Other blocks — hidden by default so the home page loads fast">Show blocks</button>
                 <button id="theme-toggle-btn" class="account-menu-item">Switch to dark mode</button>
                 <button id="privacy-toggle-btn" class="account-menu-item" hidden>Hide amounts</button>
                 <button id="widgets-toggle-btn" class="account-menu-item" hidden title="Show or hide the Time/Date/Azan/Weather row">Hide widgets</button>

@@ -3478,3 +3478,83 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         padding-left: 1rem !important;
     }
 }
+
+/* --- Form pages (router.js's updateFormPage) ---------------------------------
+   On a section page an open routed form (Log, Add, a row's Edit or view, Guide)
+   takes the page's place instead of covering it: the block is hidden, the form
+   sits in the page flow under its breadcrumb, and the footer follows it. */
+html.section-pages[data-form-page] #dashboard {
+    display: none;
+}
+
+html.section-pages[data-form-page] .form-crumb {
+    display: flex;
+    order: 1;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 1.5rem 2rem .5rem;
+}
+
+html.section-pages[data-form-page] .modal.form-page {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    display: block;
+    order: 2;
+    flex: 1;
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 2rem 2rem;
+    background: none;
+}
+
+html.section-pages[data-form-page] .modal.form-page .modal-card {
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    box-shadow: var(--shadow-card);
+}
+
+html.section-pages[data-form-page] .site-footer {
+    order: 3;
+}
+
+/* A page scrolls like any other page; only an overlay locks the page behind it. */
+html.section-pages[data-form-page] body.modal-open {
+    overflow: visible;
+}
+
+@media (min-width: 1180px) {
+    html.section-pages[data-form-page] body.with-side-nav .form-crumb,
+    html.section-pages[data-form-page] body.with-side-nav .modal.form-page {
+        margin-left: 14rem;
+        margin-right: auto;
+    }
+}
+
+/* Phone: the bottom tab bar stays, so the form clears it, and its pinned action
+   bar sits just above it rather than under it. */
+@media (max-width: 820px) {
+    html.section-pages[data-form-page] .form-crumb {
+        padding: 1rem 1rem .4rem;
+    }
+
+    html.section-pages[data-form-page] .modal.form-page {
+        padding: 0 0 calc(4rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* At least the screen between the breadcrumb and the tab bar, so a short
+       form's action bar still lands at the bottom, as it did full-screen. */
+    html.section-pages[data-form-page] .modal.form-page .modal-card {
+        padding-top: .85rem;
+        height: auto;
+        min-height: calc(100dvh - 11rem - env(safe-area-inset-bottom, 0px));
+    }
+
+    html.section-pages[data-form-page] .modal.form-page .modal-actions {
+        bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: .6rem;
+    }
+}

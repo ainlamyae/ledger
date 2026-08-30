@@ -2,7 +2,7 @@
 // four period totals the sheet computes for it.
 //
 // The money is NOT the app's to write. Columns C-F are the spreadsheet's own
-// formulas (the same figures Financial Indicators charts, read via app.js's
+// formulas (the same figures Finance's Indicator charts, read via app.js's
 // INSIGHT_RANGE), so every write here is scoped to A:B — the two text columns
 // that name the row. That's the whole design constraint: an edit renames a
 // category or type and lets the sheet recompute, and nothing in this file can

@@ -113,6 +113,32 @@ function routeHit(target) {
   return panel && panel.querySelector('h2') === heading ? { panel, button: null } : null;
 }
 
+// --- Hub and pages (section pages only; see page-nav.js) ----------------------
+//
+// <html data-page="hub"> shows the section's glance cards and page tiles;
+// data-page="block" shows one block alone, opened, under its breadcrumb. Which
+// one is current always follows the address, so a reload, Back or a shared link
+// lands on the same view.
+function showSectionPage(panel) {
+  if (!window.ledgerSectionPage) return;
+  document.documentElement.dataset.page = panel ? 'block' : 'hub';
+  document.querySelectorAll(`#${routedSectionId(null)} > .panel[data-route]`).forEach((p) => {
+    const active = p === panel;
+    p.classList.toggle('page-active', active);
+    const heading = p.querySelector('h2');
+    if (heading) setPanelCollapsed(p, heading, !active);
+  });
+  updatePageNav(panel);
+}
+
+// A tile, sidebar link or breadcrumb: one history step, no reload.
+function navigateSectionPage(panel) {
+  showSectionPage(panel);
+  history.pushState({ ledgerPage: true }, '', routeUrl(panel));
+  document.title = routeTitle(panel);
+  window.scrollTo(0, 0);
+}
+
 // Called by setupPanelToggles (app.js) on a user expand/collapse.
 function routerPanelToggled(panel) {
   if (!window.ledgerSectionPage || !panel.dataset.route) return;
@@ -212,23 +238,25 @@ function initRouter() {
       const { modal } = routedForms.pop();
       modal.hidden = true;
     }
-    // Forward into a form step: open it again.
+    // Forward into a form step: open it again, over its page.
     if (depth > routedForms.length) {
       const { panel, button, record, sub } = routeFromLocation();
+      showSectionPage(panel);
       if (button) openRoutedForm(panel, button);
       else if (record) openRecordRoute(panel, record, sub);
       return;
     }
     const top = routedForms.at(-1);
+    if (!top) showSectionPage(routeFromLocation().panel);
     document.title = top ? routeTitle(top.panel, top.steps) : routeTitle(routeFromLocation().panel);
   });
 
   const { panel, button, record, sub } = routeFromLocation();
+  showSectionPage(panel);
   if (!panel) {
     setRoute();
     return;
   }
-  setPanelCollapsed(panel, panel.querySelector('h2'), false);
   // Block entry underneath, so Back from the form lands on the block.
   setRoute(panel);
   if (button) {
@@ -239,5 +267,5 @@ function initRouter() {
     // Pushed when its form opens, once the rows have loaded.
     initialFormRoute = { panel, record, sub };
   }
-  panel.scrollIntoView({ block: 'start' });
+  window.scrollTo(0, 0);
 }

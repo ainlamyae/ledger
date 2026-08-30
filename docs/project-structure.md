@@ -65,6 +65,7 @@ ledger/
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration
 │       ├── router.js             # Block/button/row addresses (<group>/<block>/<button or row>/)
+│       ├── page-nav.js           # Section hub tiles, page breadcrumb, wide-screen sidebar
 │       └── section-page.js       # Loaded only by the section stubs above
 ├── scripts/
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template

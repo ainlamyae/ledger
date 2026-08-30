@@ -514,7 +514,7 @@ function renderSummaryCards(data) {
   // quarter that caught a bonus or a contract makes every ordinary month look
   // like a shortfall against its own baseline, which is a comparison that reads
   // as a verdict without being one. The average is still on the card's tooltip
-  // and in Financial Insight, where it comes with context.
+  // and in Finance's Insight, where it comes with context.
   document.getElementById('income-label').textContent = 'Monthly Income';
   const incomeEl = document.getElementById('income-value');
   incomeEl.textContent = formatCurrency(data.income);

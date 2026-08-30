@@ -29,7 +29,7 @@ flowchart TD
     App -- "pick / confirm spreadsheet file" --> Picker
     Picker -. "picked file ID" .-> App
 
-    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Financial Insight reports<br/>Food photo scan (vision — qwen/qwen3.6-27b)"]
+    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Finance Insight reports<br/>Food photo scan (vision — qwen/qwen3.6-27b)"]
     USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup<br/>+ full nutrient panel (Pull Micronutrients)"]
     Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
@@ -172,7 +172,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
 | 14 | `wellness-math.js` | Pure health/target formulas with no chart or DOM code: BMR/TEF/calorie-target math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, target-date projection |
 | 15 | `wellness-charts.js` | Indicator chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
-| 16 | `finance-charts.js` | Financial Indicator chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Portfolio Allocation) |
+| 16 | `finance-charts.js` | Finance Indicator chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Portfolio Allocation) |
 | 17 | `timesheet-charts.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
 | 18 | `travel-charts.js` | Travel chart renderers, including the country choropleth |
 | 19 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
@@ -201,7 +201,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 42 | `formula-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
 | 43 | `formula-render.js` | Tune's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
 | 44 | `formula-playground.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
-| 45 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 45 | `financial-insight.js` | Finance Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
 | 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
 | 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 | 48 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |

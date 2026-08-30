@@ -32,7 +32,7 @@ ledger/
 │       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
 │       ├── wellness-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
 │       ├── wellness-charts.js    # Indicator chart renderers
-│       ├── finance-charts.js     # Financial Indicator chart renderers
+│       ├── finance-charts.js     # Finance Indicator chart renderers
 │       ├── timesheet-charts.js   # Work Time chart renderers
 │       ├── travel-charts.js      # Travel chart renderers (incl. world map)
 │       ├── transactions.js       # Transaction Log
@@ -61,7 +61,7 @@ ledger/
 │       ├── formula-render.js     # Tune substituted-formula renderers
 │       ├── formula-playground.js # Tune block lifecycle
 │       ├── bmr-calibration.js    # BMR calibration — back-solves BMR_cal from logged data (Tune)
-│       ├── financial-insight.js  # Financial Insight panel
+│       ├── financial-insight.js  # Finance Insight panel
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration
 │       ├── router.js             # Block/button/row addresses (<group>/<block>/<button or row>/)

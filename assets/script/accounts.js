@@ -23,7 +23,7 @@ let accountSort = { key: null, dir: 1 };
 // has no use for.
 let accountBalanceCells = null;
 // Same purpose as physique.js's physiqueDataLoaded: lets a click that races
-// the initial fetch (e.g. Financial Insight, loaded before this resolves)
+// the initial fetch (e.g. Finance's Insight, loaded before this resolves)
 // tell "not loaded yet" apart from "loaded, zero accounts".
 let accountsDataLoaded = false;
 
@@ -321,7 +321,7 @@ async function loadAccountBalanceCells() {
 async function accountBalanceTarget(name) {
   // accountsDataLoaded, not a length check: an empty list before the first fetch
   // resolves would otherwise be reported as "no such account" (same distinction
-  // Financial Insight draws).
+  // Finance's Insight draws).
   if (!accountsDataLoaded) {
     return { writable: false, reason: `The ${CONFIG.SHEETS.ACCOUNTS} tab hasn't finished loading, so no balance is touched.` };
   }

@@ -62,6 +62,24 @@ let selectedNutritionRows = new Set();
 // write per click. Cleared whenever the form opens or closes so a stale pull
 // can't leak into the next ingredient.
 let pendingIngredientMicronutrients = null;
+// One-shot hook for a caller that needs to know once the form's Save actually
+// lands — currently just calorie-estimator.js's ✏️ button, which uses it to
+// fold the corrected numbers back into today's already-drawn Consumption
+// breakdown/total instead of leaving them only in the newly-banked Nutrition
+// row. Set by openNutritionForm's second argument, fired (with the saved
+// row's own field values) right after a successful save, and cleared by both
+// a successful save and closeNutritionForm — an open form always
+// carries at most whatever the LAST openNutritionForm call armed it with, so
+// a Cancel can't fire a stale caller's callback on some later unrelated Add.
+let nutritionFormSaveCallback = null;
+// Row -> how many Consumption lines (across every Physique day) resolved to
+// that row, per 📊 Count Uses beside Search. UI-only — never written to the
+// sheet — and null until that button's been clicked at least once this
+// session, so "never logged" (0) reads differently from "haven't checked
+// yet" (—). Recomputing is cheap enough (refreshPhysique is cached) to just
+// throw away and redo on every click rather than trying to keep it in sync
+// with edits in between.
+let nutritionUsageCounts = null;
 
 async function fetchNutritionSheetId() {
   const metadata = await getSpreadsheetMetadata();
@@ -82,6 +100,7 @@ async function initNutrition(forceRefresh = false) {
       selectedNutritionRows.clear();
       renderNutritionList();
     });
+    document.getElementById('nutrition-usage-btn').addEventListener('click', refreshNutritionUsageCounts);
 
     setupNutritionSorting();
     setupNutritionBulkActions();
@@ -213,6 +232,14 @@ function micronutrientCount(n) {
   return parsed ? Object.keys(parsed).length : 0;
 }
 
+// null before 📊 Count Uses has run this session (see nutritionUsageCounts
+// above), otherwise how many Consumption lines resolved to this row —
+// 0 is a real, meaningful answer here ("never logged, safe to remove"), so
+// it's kept distinct from "not computed yet" rather than defaulting to it.
+function nutritionUsageCount(n) {
+  return nutritionUsageCounts ? (nutritionUsageCounts.get(n.row) ?? 0) : null;
+}
+
 // One Fiber/Fat/Carb/TEF table cell: "—" when there's neither a typed figure
 // nor anything to estimate from, otherwise the resolved number with a
 // tooltip saying whether it's yours or an estimate (custom typed/estimated
@@ -234,6 +261,7 @@ function getFilteredNutritionEntries() {
   const { key, dir } = nSort;
   return [...filtered].sort((a, b) => {
     if (key === 'micronutrients') return (micronutrientCount(a) - micronutrientCount(b)) * dir;
+    if (key === 'uses') return ((nutritionUsageCount(a) ?? -1) - (nutritionUsageCount(b) ?? -1)) * dir;
     if (key === 'calories' || key === 'protein' || key === 'proteinPercent') return ((a[key] ?? 0) - (b[key] ?? 0)) * dir;
     if (key === 'fiber' || key === 'fat' || key === 'carb' || key === 'tef') {
       return ((resolvedNutritionMacros(a)[key] ?? 0) - (resolvedNutritionMacros(b)[key] ?? 0)) * dir;
@@ -267,6 +295,15 @@ function micronutrientsCell(n) {
   return makeCell(`${names.length} nutrients`, tooltip);
 }
 
+// "—" (with a hint to run it) before 📊 Count Uses has computed anything this
+// session, otherwise the count itself — 0 included, since that's exactly the
+// "never logged, safe to remove" case the button exists to surface.
+function usesCell(n) {
+  const count = nutritionUsageCount(n);
+  if (count === null) return makeCell('—', 'Click 📊 Count Uses beside Search to fill this in');
+  return makeCell(String(count), `Appears in ${count} logged Consumption line${count === 1 ? '' : 's'} across your Physique days`);
+}
+
 function renderNutritionList() {
   const tbody = document.getElementById('nutrition-body');
   tbody.innerHTML = '';
@@ -282,7 +319,7 @@ function renderNutritionList() {
     const message = allNutritionEntries.length === 0
       ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add" in the panel heading to add one yourself.'
       : 'No ingredients match your search.';
-    tbody.appendChild(renderEmptyRow(14, message));
+    tbody.appendChild(renderEmptyRow(15, message));
   }
 
   pageItems.forEach((n) => {
@@ -323,6 +360,7 @@ function renderNutritionList() {
       makeCell(n.verified ? '✅' : '', n.verified ? 'Verified against the label on your own purchased ingredient' : 'From the USDA/AI fallback — not yet checked against a real label'),
       makeCell(n.proteinPercent !== null ? `${n.proteinPercent}%` : '—', 'Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover'),
       micronutrientsCell(n),
+      usesCell(n),
     );
 
     const actionsCell = document.createElement('td');
@@ -366,11 +404,17 @@ function renderNutritionPagination(totalPages) {
   });
 }
 
-function openNutritionForm(entry) {
+function openNutritionForm(entry, onSaved = null) {
   editingNutritionRow = entry ? entry.row : null;
   pendingIngredientMicronutrients = null;
+  nutritionFormSaveCallback = onSaved;
 
-  document.getElementById('nutrition-modal-title').textContent = entry ? 'Edit Ingredient' : 'Add Ingredient';
+  // entry.row is what actually decides Add vs Edit above — a synthetic
+  // entry with no row (calorie-estimator.js's ✏️ button, prefilling a
+  // not-yet-banked estimate) still adds a new row on Save, so the title
+  // should say so too rather than calling it an edit of something that
+  // doesn't exist on the sheet yet.
+  document.getElementById('nutrition-modal-title').textContent = (entry && entry.row) ? 'Edit Ingredient' : 'Add Ingredient';
   document.getElementById('nutrition-classification').value = entry ? entry.classification : '';
   renderNutritionClassificationOptions();
   document.getElementById('nutrition-name').value = entry ? entry.name : '';
@@ -451,6 +495,7 @@ function closeNutritionForm() {
   document.getElementById('nutrition-modal').hidden = true;
   editingNutritionRow = null;
   pendingIngredientMicronutrients = null;
+  nutritionFormSaveCallback = null;
 }
 
 // The Add/Edit Ingredient form's own 🧬 Pull Micronutrients button — same
@@ -488,6 +533,20 @@ async function pullMicronutrientsForForm() {
 
   document.getElementById('nutrition-calories').value = String(result.calories);
   document.getElementById('nutrition-protein').value = result.protein !== null ? String(result.protein) : '';
+
+  // Fiber/Fat/Carb straight into their own fields too, same as Calories/
+  // Protein just above — the panel already carries these (nutrientPanelFromCandidate),
+  // so leaving the fields themselves blank and making Save rely on the JSON
+  // panel alone (computedNutritionMacros' fallback) meant the numbers were
+  // "in" the row without ever actually being visible or hand-correctable here.
+  const nutrients = result.nutrients || {};
+  const macroField = (nutrientName, fieldId) => {
+    const nutrient = nutrients[nutrientName];
+    document.getElementById(fieldId).value = nutrient ? String(nutrient.amount) : '';
+  };
+  macroField('Fiber, total dietary', 'nutrition-fiber');
+  macroField('Total lipid (fat)', 'nutrition-fat');
+  macroField('Carbohydrate, by difference', 'nutrition-carb');
 
   pendingIngredientMicronutrients = result.nutrients;
   renderMicronutrientsList(pendingIngredientMicronutrients);
@@ -568,8 +627,12 @@ async function submitNutritionForm(event) {
       if (fiber !== null || fat !== null || carb !== null || tef !== null || pendingIngredientMicronutrients) await ensureNutritionColumns();
       await appendValues(NUTRITION_RANGE, [rowData]);
     }
+    // Captured before closeNutritionForm, which clears it — closing the form
+    // on a successful save shouldn't itself be what silences the callback.
+    const onSaved = nutritionFormSaveCallback;
     closeNutritionForm();
     await refreshNutrition(true);
+    if (onSaved) onSaved({ name, amount, calories, protein, fiber, fat, carb, tef });
   } catch (err) {
     showFieldError('nutrition-form-error', err.message);
   }
@@ -773,6 +836,55 @@ async function pullMicronutrientsForSelected() {
   await refreshNutrition(true);
 }
 
+// Tallies every Consumption line ever logged against the Nutrition row it
+// resolved to — one count per line across every Physique day's own
+// Breakdown (already the exact table match Calculate itself made, via
+// findNutritionEntry — not the free-text Consumption, which may phrase a
+// name slightly differently than what actually matched). A day whose
+// Breakdown predates some ingredient's rename, or was never Calculated,
+// simply doesn't count towards it, same "only as fresh as the last
+// Calculate" caveat every other breakdown-derived figure in this app has.
+function computeNutritionUsageCounts() {
+  const counts = new Map();
+  allPhysiqueEntries.forEach((p) => {
+    parsePhysiqueBreakdown(p.breakdown).forEach((item) => {
+      const entry = findNutritionEntry(item.name);
+      if (!entry) return;
+      counts.set(entry.row, (counts.get(entry.row) || 0) + 1);
+    });
+  });
+  return counts;
+}
+
+// 📊 Count Uses, beside Search — UI-only (nutritionUsageCounts is never
+// written to the sheet), so it's fine to just throw the last count away and
+// redo it in full on every click rather than trying to track edits in
+// between. Physique isn't otherwise loaded by this panel, so this pulls it
+// in itself the first time (refreshPhysique is cached, so a click made after
+// visiting Physique already is effectively free).
+async function refreshNutritionUsageCounts() {
+  const btn = document.getElementById('nutrition-usage-btn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Counting…';
+  try {
+    await refreshPhysique();
+    nutritionUsageCounts = computeNutritionUsageCounts();
+    // Mutated in place, not reassigned — makeSortableHeaders (ui-helpers.js)
+    // closed over this exact object when the column headers were wired up,
+    // so a new object here would desync the header's own click handler from
+    // what getFilteredNutritionEntries reads on the very next sort click.
+    nSort.key = 'uses';
+    nSort.dir = 1;
+    updateSortIndicators('#nutrition-table', nSort);
+    nCurrentPage = 1;
+    renderNutritionList();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
 // Naive singular fold — just enough to catch "egg"/"eggs"-style plural typos
 // (a stray/missing trailing "s") without a full stemming library. Only used
 // as a fallback below, after an exact match has already failed.
@@ -800,6 +912,15 @@ function findNutritionEntry(name) {
 // add several ingredients in one go, so the caller refreshes once at the end.
 // Classification (column A) is left blank: the app has no basis for guessing
 // one, and a blank is honest about that where a wrong label wouldn't be.
-async function addNutritionEntry({ name, amount, calories, protein }) {
-  await appendValues(NUTRITION_RANGE, [['', name, amount, calories, protein]]);
+// Fiber/Fat/Carb are optional — only a hand-typed anchor (calorie-estimator.js)
+// or an edited row (✏️ on a Calculate breakdown) ever supplies them, so most
+// callers still bank the same five-cell row as before and the sheet's grid
+// only needs widening (ensureNutritionColumns) when one of the three is set.
+async function addNutritionEntry({ name, amount, calories, protein, fiber, fat, carb }) {
+  const hasMacros = fiber !== undefined || fat !== undefined || carb !== undefined;
+  if (hasMacros) await ensureNutritionColumns();
+  const row = hasMacros
+    ? ['', name, amount, calories, protein, fiber ?? '', fat ?? '', carb ?? '']
+    : ['', name, amount, calories, protein];
+  await appendValues(NUTRITION_RANGE, [row]);
 }

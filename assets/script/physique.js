@@ -657,6 +657,26 @@ function renderPhysiqueBreakdown(breakdown, calories, protein) {
   }
 }
 
+// Re-derives Calories In/Protein In/Fiber/Fat/Carbohydrate/TEF straight from
+// an already-drawn Consumption breakdown array — the same tail end of
+// calculatePhysiqueDay (above) runs once a fresh Calculate has its own
+// figures, but this is for when something else changes a row's numbers
+// afterwards without a full re-Calculate (currently just the ✏️ button on a
+// breakdown row, calorie-estimator.js's applyEditedRowToBreakdown), so what
+// Save eventually writes matches what the table now shows rather than the
+// stale figures the original Calculate produced.
+function syncPhysiqueTotalsFromBreakdown(breakdown, calories, protein) {
+  physiqueField('calories-in').value = calories;
+  physiqueField('protein-in').value = protein.toFixed(1);
+
+  const tef = estimateTefBreakdown(breakdown);
+  const dayMacros = sumBreakdownMacros(breakdown);
+  if (dayMacros.fiber !== null) physiqueField('fiber').value = dayMacros.fiber;
+  if (dayMacros.fat !== null) physiqueField('fat').value = dayMacros.fat;
+  if (dayMacros.carbohydrate !== null) physiqueField('carbohydrate').value = dayMacros.carbohydrate;
+  if (tef) physiqueField('tef').value = tef.tefKcal;
+}
+
 // The Workout counterpart to the breakdown table above: one row per parsed
 // exercise, the MET it was priced at, and the same summed Total row — which is
 // where the day's duration and burn are now read, the two fields themselves

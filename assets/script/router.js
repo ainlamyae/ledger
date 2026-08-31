@@ -139,6 +139,55 @@ function navigateSectionPage(panel) {
   window.scrollTo(0, 0);
 }
 
+// A routed form (Log, Add, a row's Edit or view) on a section page is a page too:
+// html[data-form-page] puts the innermost one in the page's place under a
+// breadcrumb (page-nav.js's updateFormCrumb) instead of over it. Other dialogs
+// (shortcuts, confirms) stay overlays. Leaving it returns to where the page was.
+let formPageReturnScroll = 0;
+
+function updateFormPage() {
+  if (!window.ledgerSectionPage) return;
+  const root = document.documentElement;
+  const top = routedForms.at(-1);
+  const current = document.querySelector('.modal.form-page');
+  if (current && current !== top?.modal) current.classList.remove('form-page');
+  if (!top) {
+    if (root.dataset.formPage) {
+      delete root.dataset.formPage;
+      window.scrollTo(0, formPageReturnScroll);
+    }
+    return;
+  }
+  if (!root.dataset.formPage) formPageReturnScroll = window.scrollY;
+  root.dataset.formPage = '1';
+  if (current !== top.modal) {
+    top.modal.classList.add('form-page');
+    window.scrollTo(0, 0);
+  }
+  updateFormCrumb(top.panel, top.steps);
+}
+
+// The breadcrumb's way out: closes every open form page in one history step back,
+// then shows `panel`'s page, or the hub for null.
+function closeFormPages(panel) {
+  const forms = routedForms.splice(0);
+  const steps = Math.min(forms.length, history.state?.depth || 0);
+  // Emptied first, so routerModalChanged ignores these closes.
+  forms.reverse().forEach((form) => { form.modal.hidden = true; });
+  updateFormPage();
+  const show = () => {
+    if (panel === null) navigateSectionPage(null);
+    else showSectionPage(currentRoutedPanel() || panel);
+  };
+  if (steps) {
+    window.addEventListener('popstate', show, { once: true });
+    history.go(-steps);
+  } else {
+    setRoute(panel);
+    show();
+  }
+}
+
 // Called by setupPanelToggles (app.js) on a user expand/collapse.
 function routerPanelToggled(panel) {
   if (!window.ledgerSectionPage || !panel.dataset.route) return;
@@ -155,12 +204,14 @@ function routerModalChanged(modal) {
     if (sameEntry) document.title = routeTitle(panel, steps);
     else setRoute(panel, steps, { push: true });
     routedForms.push({ modal, panel, steps });
+    updateFormPage();
     return;
   }
   const at = routedForms.findIndex((f) => f.modal === modal);
   if (at === -1) return;
   const closed = routedForms.length - at;
   routedForms.splice(at);
+  updateFormPage();
   // Step back over the closed forms' entries; popstate then retitles.
   if ((history.state?.depth || 0) >= closed) history.go(-closed);
   else {
@@ -238,6 +289,7 @@ function initRouter() {
       const { modal } = routedForms.pop();
       modal.hidden = true;
     }
+    updateFormPage();
     // Forward into a form step: open it again, over its page.
     if (depth > routedForms.length) {
       const { panel, button, record, sub } = routeFromLocation();

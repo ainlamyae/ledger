@@ -471,6 +471,7 @@
 
             <div class="filters">
                 <input type="text" id="nutrition-search" placeholder="Search classification or ingredient name...">
+                <button type="button" id="nutrition-usage-btn" class="btn" title="Count how many logged Consumption lines (across every Physique day) resolved to each ingredient below, filling in the Uses column so you can sort it and spot ones you've stopped using — never saved anywhere, just recomputed here on demand">📊 Count Uses</button>
             </div>
 
             <div class="table-responsive">
@@ -490,6 +491,7 @@
                         <th class="sortable" data-sort="verified" title="Verified against the label on your own purchased ingredient">Verified</th>
                         <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
                         <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click 🧬 Pull Micronutrients to fill this in. Sorts by how many nutrients have been pulled.">Micronutrients</th>
+                        <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -1758,6 +1760,39 @@
                 <span class="formula-sym">F_max</span>
                 <span class="formula-name">daily fiber target, upper end</span>
                 <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <!-- The fat band follows fiber, same two-different-bases shape but both ends
+                 scaled off Eᵢₙ instead of one off body weight: 20-35% of total energy from fat
+                 is the Institute of Medicine's Acceptable Macronutrient Distribution Range for
+                 adults (Dietary Reference Intakes for Energy, Carbohydrate, Fiber, Fat, Fatty
+                 Acids, Cholesterol, Protein, and Amino Acids, 2005), also the range the USDA
+                 Dietary Guidelines for Americans carries forward — not the user's own guessed
+                 25%, which sits inside this band rather than defining it. 9 kcal/g is fat's
+                 fixed energy density (Atwater), not a personal parameter, so only the two
+                 percentages are editable. -->
+            <label class="formula-row">
+                <span class="formula-sym">k_min</span>
+                <span class="formula-name">fat floor, share of intake calories</span>
+                <input type="text" id="formula-fat-pct-min" inputmode="decimal">
+                <span class="formula-unit">% of Eᵢₙ</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">k_max</span>
+                <span class="formula-name">fat ceiling, share of intake calories</span>
+                <input type="text" id="formula-fat-pct-max" inputmode="decimal">
+                <span class="formula-unit">% of Eᵢₙ</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">G_min</span>
+                <span class="formula-name">daily fat target, lower end</span>
+                <input type="text" id="formula-fat-min" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">G_max</span>
+                <span class="formula-name">daily fat target, upper end</span>
+                <input type="text" id="formula-fat-max" inputmode="decimal" readonly>
                 <span class="formula-unit">g/day</span>
             </label>
             <!-- Glycogen closes the list, straight after LBM/protein since it reads the same

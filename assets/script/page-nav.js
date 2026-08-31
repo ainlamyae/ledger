@@ -9,29 +9,6 @@
 // On a wide screen a sidebar lists every section and page; a phone uses the
 // bottom tab bar and the hub's tiles instead.
 
-// One line under each tile's title, by "<section>/<block>". A block with no entry
-// just shows its title.
-const PAGE_TILE_DESCRIPTIONS = {
-  'health/tune': 'Targets, BMR model and plan',
-  'health/indicator': 'Body mass, intake and sleep over time',
-  'health/insight': 'AI reads of your logged data',
-  'health/physique': 'Daily log: sleep, food, workout',
-  'health/activity': 'Exercise plan and catalogue',
-  'health/nutrition': 'Ingredients and their nutrients',
-  'health/settings': 'Health keys in the Setting tab',
-  'finance/indicator': 'Spending and savings over time',
-  'finance/insight': 'AI read of your finances',
-  'finance/transaction': 'Every transaction',
-  'finance/account': 'Balances and transfers',
-  'finance/breakdown': 'Categories and types',
-  'other/work-time': 'Timesheet',
-  'other/car-service': 'Service history and next due',
-  'other/travel': 'Trips',
-  'other/application': 'Applications and their status',
-  'other/contact': 'People',
-  'other/settings': 'Every key in the Setting tab',
-};
-
 function pageNavSections() {
   return [...document.querySelectorAll('#main-nav a[data-section]')].map((link) => ({
     id: link.dataset.section,
@@ -66,13 +43,6 @@ function buildPageTiles(section) {
     title.className = 'page-tile-title';
     title.textContent = routedHeadingText(panel);
     tile.appendChild(title);
-    const description = PAGE_TILE_DESCRIPTIONS[`${section.id}/${panel.dataset.route}`];
-    if (description) {
-      const note = document.createElement('span');
-      note.className = 'page-tile-note';
-      note.textContent = description;
-      tile.appendChild(note);
-    }
     tile.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
     grid.appendChild(tile);
   });
@@ -143,7 +113,12 @@ function updatePageNav(panel) {
 function initPageNav() {
   const sections = pageNavSections();
   buildSideNav(sections);
-  if (!window.ledgerSectionPage) return;
+  // Home: every section's tiles under its glance cards; each opens that page.
+  if (!window.ledgerSectionPage) {
+    document.documentElement.classList.add('home-hub');
+    sections.forEach(buildPageTiles);
+    return;
+  }
   const section = sections.find((s) => s.id === window.ledgerSectionPage.section);
   if (!section) return;
   document.documentElement.classList.add('section-pages');
@@ -159,8 +134,9 @@ function buildFormCrumb() {
   crumb.id = 'form-crumb';
   crumb.className = 'page-crumb form-crumb';
   crumb.setAttribute('aria-label', 'Breadcrumb');
-  // Before the first form, so it sits right above whichever form is the page.
-  document.body.insertBefore(crumb, document.querySelector('body > .modal'));
+  // Moved into whichever form is the page (router.js's updateFormPage), so it sits
+  // inside the same wrapper as the form, like a block page's breadcrumb.
+  document.body.appendChild(crumb);
 }
 
 function updateFormCrumb(panel, steps) {

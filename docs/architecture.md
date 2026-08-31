@@ -242,7 +242,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
    - `/health/`: Settings, Activity, Physique, Nutrition, the Settings block.
    - `/finance/`: Settings, the report (Statement/Account/Breakdown), Transaction, Account, Breakdown.
    - `/other/`: Settings, Work Time, Contact, Travel, Application, the Settings block, and Transaction (Car Service is drawn from it).
-   - Home: Settings, Activity, Physique and the report for the glance cards; every block when Show blocks is on.
+   - Home: Settings, Activity, Physique and the report — only what the glance cards need; the blocks are reached through tiles.
    Saving a BMR-affecting setting on a page without Physique loads it first, so every stored BMR is still rewritten.
 3. The wellness/finance/timesheet/travel chart files render canvases lazily (`upsertChart`, `charts-base.js`, builds a chart only once its `.chart-box` scrolls into view); `app.js` renders summary cards; each module renders its table.
 

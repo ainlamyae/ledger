@@ -148,7 +148,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
-- **One From/To pair, above Body Mass, is the panel's window** — Body Mass, Calorie Balance, Caloric Intake, Physical Activity, Protein Intake, Fiber Intake, Rest & Recovery and Protein Source Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
+- **One From/To pair, above Body Mass, is the panel's window** — Body Mass, Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Fiber Intake, Sleep and Protein Source Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
   - **State Trend & Forecast is deliberately outside it**: that chart is the whole journey plus a projection, and clipping it to a month would be clipping the trend it exists to show.
   - `wellnessDateRange()` reads the two inputs straight from the DOM, falling back to the default when either is blank — so it can't matter whether a chart renders before or after the control is wired. `wellnessWindowDates()` turns that into the date list, clipped forward to the first day the metric in question has anything logged, so no chart opens on a run of empty days. An inverted range yields no days, which every caller already reads as "nothing to draw".
 - **State Trend & Forecast** — body mass history, smoothed trend, and a projection toward target; optional BMI twin axis.
@@ -164,18 +164,18 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
   - **Carries State Trend & Forecast's own smoothed trend line and glycogen/water swing zone**, copied onto this chart's windowed, category-axis view: a solid green line (`computeBodyMassTrend`) drawn over the bars, and a translucent amber band behind them (`computeGlycogenZoneAnchor` ± half of `glycogenSwingKg`, so the band's total height reads as the swing figure itself, ΔM_gly, rather than double it). Both are computed off the **full** history, same as that chart, so the smoothing agrees with it at the window's edges — then read back for just the dates this chart plots. Omitted like there when the swing can't be estimated (no height/sex on file).
 - **Calorie Balance** — intake minus BMR minus activity, scored against the *target* deficit; grams-of-fat twin axis.
   - The hover spells out the subtraction and **signs it**: `Actual Intake` as the figure it starts from, then `Maintenance` and `Activity` as negatives, so the column reads top-down as the arithmetic behind the bar. Activity printed as a positive read as something added to the day, which is the opposite of what burning it does. The intake row carries the same name Caloric Intake and Protein Intake use in their own hovers — one day's eating shouldn't be called three different things across one panel.
+- **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Caloric Intake** — per-day bars with a per-day target drawn as a cap on each bar, not one shared line.
   - **A red bar (past the target beyond the near-margin) regrades to grey when the 7-day average is still on the target's right side** — the same "one bad day, good week" read Body Mass gets, scored against the average instead of the trend.
-- **Physical Activity** — stacked minutes per activity type, plus a calories-burned dot series. The type is derived from the day's `Workout` lines by the same `describeExerciseNames()` Log a Workout uses ("Strength Training", "NEAT", "Cardio", "NEAT + Cardio"); a workout line whose exercise isn't on the Activities tab is dropped rather than grouped under an "Other" segment.
 - **Protein Intake** — bars against a shaded target band; over the top end is a ceiling, not extra credit.
 - **Fiber Intake** — the same shaded-band treatment as Protein Intake (`getFiberTargetBandG`, shared caps, same three-way red/green/dark-green split), rather than the flat single-target line it used before the Formula Playground gained a fiber band. Falls back to one flat cap, same as Protein's zero-width case, until that band is saved.
-- **Rest & Recovery** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
+- **Sleep** — floating bars spanning bed→wake on a clock-time axis, coloured by adherence.
 - **Protein Source Rotation** last — see its section below.
 - All seven of the scored charts carry a **violet dashed segment per week**, so a week that quietly drifted past its target is visible next to the per-day mark.
   - Violet, the app's existing "not a score" colour — deliberately neither the green/red/grey of a scored bar nor the near-black/near-white of a target cap.
   - Buckets are counted **back from today**, so the most recent seven days are always one whole week and only the oldest bucket can come up short.
   - Built from days that were actually **logged**; a week with nothing logged draws nothing.
-  - **Flat** on five of them — the week's average. Rest & Recovery carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Target Burn lives on.
+  - **Flat** on five of them — the week's average. Sleep carries two, average bedtime and average wake time. Physical Activity averages the *calories burned*, not the minutes, since that's the axis Target Burn lives on.
   - **Sloped** on Body Mass alone: a bar there is an absolute level, not a per-day quantity, so a flat mean says nothing. Each week is a least-squares fit through its own readings, extended to both week edges so slopes compare directly. A week with one weigh-in shows a dot — no slope is measurable from it.
   - Every one of these charts adds the figure to its tooltip as well; Body Mass quotes the slope as `kg/week`.
 
@@ -702,7 +702,7 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 |---|---|---|
 | A — Date | Date | ISO. One row per date — saving onto a date already logged **merges** into that row rather than adding a second (see below). **Blank marks a reusable pattern row** — excluded from every chart and Insight mode, always sorted to the top, and exempt from the one-row-per-date rule |
 | B — Bedtime | Time | `HH:MM` |
-| C — Wake-up Time | Time | `HH:MM`. Hovering either time cell shows the sleep length, wrapping past midnight |
+| C — Wake-up Time | Time | `HH:MM`. The table shows one **Sleep** column, not these two — wake minus bed, wrapping past midnight, with the raw clock times on hover and on Edit |
 | D — Body Mass | Number | kg |
 | E — Consumption | Text | Free text, one food per line |
 | F — Breakdown | Text (JSON) | Calculate's per-item breakdown — `{name, amount, calories, protein, fiber, fat, carbohydrate, tef, source, noteLine, newRow}` per row, in that key order (matching `Nutrition`'s own column order below), with `fiber`/`fat`/`carbohydrate`/`tef` present only once that ingredient has a typed figure on its `Nutrition` row or its 🧬 Micronutrients has been pulled. Rendered as one table under the form; the table lists it as an item count with the names on hover |
@@ -899,7 +899,7 @@ sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
 
 - Drawn as a line whose bucket-crossing segments are transparent, so each week is one dash rather than a stepped line with risers.
 - Body Mass folds the fitted endpoints into its kg bounds before padding — a fit extended to the week edges can reach past every reading in it, and the fat-energy twin axis is derived from those same bounds.
-- Rest & Recovery averages bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 average to midnight rather than midday.
+- Sleep averages bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 average to midnight rather than midday.
 
 ### State Trend & Forecast
 

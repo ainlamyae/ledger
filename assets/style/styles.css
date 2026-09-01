@@ -2094,11 +2094,14 @@ td .btn {
    rgba of --color-income rather than the variable, so one value reads correctly
    over both themes' row backgrounds.
 
-   .today-row is the same tint on today's row in the Physique and Work tables —
-   one declaration for both, because they mean the same thing (this is the row
-   your logging lands on) and drifting into two greens would just look like a
-   mistake. */
+   .today-row is the same tint on today's row in the Physique and Work tables,
+   and .nutrition-row-logged (nutrition.js) is the same tint on a Nutrition
+   row already resolved into today's Consumption breakdown — one declaration
+   for all three, because they mean the same thing (this is the row your
+   logging lands on / already has) and drifting into separate greens would
+   just look like a mistake. */
 .workout-row-logged > td,
+.nutrition-row-logged > td,
 .today-row > td {
     background: rgba(22, 163, 74, .13);
 }
@@ -2630,6 +2633,14 @@ td .btn {
     margin: 0 0 .5rem;
     font-size: .78rem;
     color: var(--color-text-muted);
+}
+
+/* A plain break between the calorie-solve rows and the journey block below —
+   no symbol, box or unit to give it, so a formula-row would sit oddly here. */
+.formula-divider {
+    margin: .6rem 0;
+    border: none;
+    border-top: 1px solid var(--color-border);
 }
 
 .formula-solve-for {

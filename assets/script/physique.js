@@ -153,6 +153,17 @@ async function refreshPhysique(forceRefresh = false) {
   // (strength-plan.js) — here rather than in the plan's own init so a save
   // re-marks the row it just wrote.
   renderWorkoutPlanProgress();
+  // Same reason, for Nutrition's own tint/label pair (nutrition.js):
+  // .nutrition-row-logged on any row already in today's Consumption
+  // breakdown, and the Log/Log More label. A full re-render rather than just
+  // the label, since the tint itself reads todaysPhysiqueDay() too — but
+  // only once Nutrition has data of its own to draw; before that,
+  // initNutrition's own first render already picks up whatever Physique
+  // state landed by then (see nutritionDataLoaded's own load-order comment,
+  // nutrition.js), and re-rendering an empty table here would show the
+  // "no ingredients yet" empty state rather than just doing nothing.
+  if (nutritionDataLoaded) renderNutritionList();
+  else updateNutritionLogButtonLabel();
   logPhysiqueDataGaps();
 }
 

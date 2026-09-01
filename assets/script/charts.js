@@ -788,6 +788,10 @@ const BODY_MASS_TARGET_KG_DEFAULT = 82;
 const CALORIE_TARGET_KCAL_DEFAULT = 2000;
 const SLEEP_TARGET_HOURS_DEFAULT = 8;
 const FIBER_TARGET_G_DEFAULT = 30;
+// The general USDA %DV reference for total fat (2,000 kcal diet) — same role as the two
+// defaults above, a flat number to score against before the Formula Playground's own
+// pct-of-Eᵢₙ band (FAT_TARGET_G_MIN/MAX) has ever been saved.
+const FAT_TARGET_G_DEFAULT = 65;
 const ACTIVITY_TARGET_MIN_DEFAULT = 100;
 const PROTEIN_TARGET_G_DEFAULT = 100;
 
@@ -1022,6 +1026,34 @@ function getFiberTargetBandG(entries) {
 // separate tier (still a hit, darker green), checked directly against band.max wherever
 // the bulb/chart need to tell the two apart.
 function withinFiberBand(g, band) {
+  return g >= band.min && (band.max === band.min || g <= band.max);
+}
+
+// The fat band the Formula playground writes — FAT_TARGET_G_MIN/MAX, same shape as
+// getFiberAbsoluteBandG. Sorted for the same reason: both ends are a share of Eᵢₙ, so
+// there's no structural reason they can't come out backwards either.
+function getFatAbsoluteBandG() {
+  const ends = [
+    getSetting('FAT_TARGET_G_MIN', null),
+    getSetting('FAT_TARGET_G_MAX', null),
+  ].filter((n) => n !== null && n > 0);
+
+  if (ends.length === 0) return null;
+  return { min: Math.round(Math.min(...ends)), max: Math.round(Math.max(...ends)) };
+}
+
+// Falls back to the flat FAT_TARGET_G/_DEFAULT as a zero-width band, same fallback shape
+// getFiberTargetBandG uses, for whoever hasn't opened the Formula playground's fat rows yet.
+function getFatTargetBandG(entries) {
+  const absolute = getFatAbsoluteBandG();
+  if (absolute !== null) return absolute;
+
+  const flat = getSetting('FAT_TARGET_G', FAT_TARGET_G_DEFAULT);
+  return { min: flat, max: flat };
+}
+
+// In-band check only — same shape as withinFiberBand.
+function withinFatBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
 
@@ -1420,6 +1452,7 @@ let wellnessSleepChart = null;
 let wellnessActivityChart = null;
 let wellnessProteinChart = null;
 let wellnessFiberChart = null;
+let wellnessFatChart = null;
 let wellnessProjectionChart = null;
 
 function lastNDates(n) {
@@ -1476,6 +1509,7 @@ function renderWellnessCharts(entries) {
   renderWellnessActivityChart(entries);
   renderWellnessProteinChart(entries);
   renderWellnessFiberChart(entries);
+  renderWellnessFatChart(entries);
   renderWellnessProjectionChart(entries);
   renderWellnessEnergyBalanceChart(entries);
 }
@@ -2901,6 +2935,108 @@ function renderWellnessFiberChart(entries) {
   const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
   wellnessFiberChart = upsertChart(wellnessFiberChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Actual Intake',
+          data: values,
+          backgroundColor: barColors,
+          order: 2,
+        },
+        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        ...targetDatasets,
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          callbacks: {
+            title: (items) => formatIsoDateShort(items[0].label),
+            label: (item) => {
+              const text = `Actual Intake: ${item.parsed.y} g`;
+              return privacyMode ? maskDigits(text) : text;
+            },
+            afterBody: (items) => {
+              const lines = band.max > band.min
+                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
+                : [`Target: ${band.min} g`];
+              const i = items[0]?.dataIndex;
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              return privacyMode ? lines.map(maskDigits) : lines;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        y: {
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: maskedUnitTick('g') },
+        },
+        y1: ghostRightAxis(),
+      },
+    },
+  });
+}
+
+// Fiber's chart just above, with one deliberate difference: the band edges draw as a
+// single dashed line spanning the whole window rather than fiber's per-day caps + shaded
+// fill between them. Fiber's floor and ceiling come off two different bases (per-1000kcal,
+// per-kg body weight), so a fill between them reads as "the band itself"; fat's two ends
+// are both a share of the same Eᵢₙ (the AMDR), so one flat dashed line at each edge already
+// says "this held for the whole window" without needing the fill to say it again. Read
+// from the same Physique-day Fat figure (fatG) physiqueAsWellnessEntries adds beside fiberG.
+function renderWellnessFatChart(entries) {
+  const ctx = document.getElementById('wellness-fat-chart');
+
+  const band = getFatTargetBandG(entries);
+
+  const fatEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.fatG !== null && e.fatG !== undefined);
+  const dates = wellnessWindowDates(fatEntries);
+  const byDate = new Map();
+  fatEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.fatG));
+
+  // Same three-way split as Fiber/Protein Intake: under the floor is red, in the band (or
+  // unlogged) is green, and past the ceiling is a darker green — still a hit, not a miss.
+  const FAT_OVER_BAND_COLOR = '#166534';
+  const values = dates.map((d) => byDate.get(d) || 0);
+  const barColors = dates.map((d, i) => {
+    if (!byDate.has(d) || withinFatBand(values[i], band)) return '#16a34a';
+    return values[i] > band.max ? FAT_OVER_BAND_COLOR : '#dc2626';
+  });
+
+  // targetMarkColor() is near-black in light mode, near-white in dark — the same colour
+  // every other target cap on this panel uses, just as a continuous dashed line here
+  // instead of a per-column tick.
+  const targetLine = (value, label) => ({
+    type: 'line',
+    label,
+    data: new Array(dates.length).fill(value),
+    borderColor: targetMarkColor(),
+    borderWidth: 2,
+    borderDash: [6, 4],
+    pointRadius: 0,
+    tension: 0,
+    isTargetLine: true,
+    order: 0,
+  });
+
+  const targetDatasets = band.max > band.min
+    ? [targetLine(band.max, `${band.max} g upper target`), targetLine(band.min, `${band.min} g target floor`)]
+    : [targetLine(band.min, `${band.min} g target`)];
+
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+
+  wellnessFatChart = upsertChart(wellnessFatChart, ctx, {
     data: {
       labels: dates,
       datasets: [

@@ -31,37 +31,38 @@ function onPageLinkClick(event, sectionId, panel) {
 }
 
 // The actions used most, one tap from the section's hub (and from its part of the
-// home page): each stands in for a block's own header button. On the section page
+// home page), as the first tiles: each stands in for a block's own header button. On the section page
 // it clicks that button, so the form opens exactly as it does from the block; from
 // the home page it goes to the form's address instead.
 const QUICK_ACTIONS = {
   health: [
-    { label: 'Today', buttonId: 'today-physique-btn', className: 'btn-primary', href: () => `physique/${isoFromDate(new Date())}/` },
+    { label: 'Today', buttonId: 'today-physique-btn', href: () => `physique/${isoFromDate(new Date())}/` },
   ],
 };
 
 function buildQuickActions(section) {
   const actions = QUICK_ACTIONS[section.id];
-  if (!actions) return;
-  const row = document.createElement('div');
-  row.className = 'quick-actions';
-  actions.forEach((action) => {
+  const grid = document.querySelector(`#${section.id} > .page-tiles`);
+  if (!actions || !grid) return;
+  // First in the tile row, before the page tiles, styled as the one action among them.
+  [...actions].reverse().forEach((action) => {
     const source = document.getElementById(action.buttonId);
-    const link = document.createElement('a');
-    link.className = `btn ${action.className} quick-action`;
-    link.textContent = action.label;
-    if (source?.title) link.title = source.title;
-    link.href = `${section.href}${action.href()}`;
-    link.addEventListener('click', (event) => {
+    const tile = document.createElement('a');
+    tile.className = 'page-tile quick-tile';
+    if (source?.title) tile.title = source.title;
+    tile.href = `${section.href}${action.href()}`;
+    const title = document.createElement('span');
+    title.className = 'page-tile-title';
+    title.textContent = action.label;
+    tile.appendChild(title);
+    tile.addEventListener('click', (event) => {
       if (window.ledgerSectionPage?.section !== section.id || !source) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
       event.preventDefault();
       source.click();
     });
-    row.appendChild(link);
+    grid.insertBefore(tile, grid.firstChild);
   });
-  const group = document.getElementById(section.id);
-  group.insertBefore(row, group.querySelector(':scope > .page-tiles') || section.panels[0] || null);
 }
 
 function buildPageTiles(section) {

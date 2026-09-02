@@ -82,6 +82,7 @@ async function initPhysique(forceRefresh = false) {
     });
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
     document.getElementById('physique-combine-btn').addEventListener('click', combineAndSortPhysiqueConsumptionField);
+    physiqueField('consumption').addEventListener('input', syncPhysiqueCombineButtonVisibility);
     document.getElementById('physique-form-micro-btn').addEventListener('click', openPhysiqueMicronutrientsFromForm);
     document.getElementById('physique-is-pattern').addEventListener('change', syncPhysiquePatternMode);
     onFormSubmit('physique-form', submitPhysiqueForm);
@@ -603,6 +604,7 @@ function openPhysiqueForm(entry, duplicate = false) {
   estimateTefBreakdown(openedBreakdown);
   renderPhysiqueBreakdown(openedBreakdown, entry ? entry.caloriesIn : 0, entry ? entry.proteinIn : 0);
   refreshPhysiqueActivityBreakdown();
+  syncPhysiqueCombineButtonVisibility();
 
   clearFieldError('physique-form-error');
   document.getElementById('physique-modal').hidden = false;
@@ -748,7 +750,7 @@ function activityLineMinutes(seconds) {
 // openPhysiqueForm clears the error line straight after this anyway. Pressing
 // Calculate is what surfaces them.
 function refreshPhysiqueActivityBreakdown() {
-  runPhysiqueWorkoutCalc();
+  runPhysiqueWorkoutCalc(false);
 }
 
 function hidePhysiqueActivityBreakdown() {
@@ -824,7 +826,46 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
 //
 // Synchronous: unlike the food estimator this is pure local arithmetic, no
 // Groq or USDA involved.
-function runPhysiqueWorkoutCalc() {
+// Workout's counterpart to combineAndSortConsumptionText: two lines for the
+// same exercise sum into one rather than staying split. Unlike Consumption,
+// "same" also needs the same quantity TYPE — two "Nx Push-ups" lines sum
+// their reps, but "Nx Push-ups" and "Nmin Push-ups" don't merge, since
+// summing a rep count into a minute figure (or vice-versa) wouldn't mean
+// anything as one quantity token. A line the parser doesn't recognize at all
+// passes through unmerged, same as Consumption's own unparseable-line
+// fallback — nothing typed ever just vanishes.
+function combineWorkoutText(text) {
+  const rawLines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!rawLines.length) return { text, combinedCount: 0 };
+
+  const groups = new Map();
+  let unmergeable = 0;
+  rawLines.forEach((raw) => {
+    const [parsed] = parseWorkoutNoteLines(raw);
+    const key = parsed ? `${parsed.name.toLowerCase()}|${parsed.type}` : `unmergeable-${unmergeable++}`;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { parsed, raw });
+      return;
+    }
+    if (parsed.type === 'reps') existing.parsed.reps += parsed.reps;
+    else if (parsed.type === 'duration') existing.parsed.minutes += parsed.minutes;
+    else if (parsed.type === 'steps') existing.parsed.steps += parsed.steps;
+    else existing.parsed.seconds += parsed.seconds;
+  });
+  const combinedCount = rawLines.length - groups.size;
+
+  const rebuilt = [...groups.values()].map((g) => (g.parsed ? `${workoutNoteQuantityForLine(g.parsed)} ${g.parsed.name}` : g.raw));
+  return { text: rebuilt.join('\n'), combinedCount };
+}
+
+// reorderWorkoutField: rewrite the Workout box itself into the combined,
+// sorted order, not just the table below it — only on an explicit Calculate
+// click. The table sorts either way (harmless, nothing typed gets touched),
+// but the on-open refresh (refreshPhysiqueActivityBreakdown) leaves the box
+// exactly as saved, so opening a day never silently reorders or merges text
+// you didn't ask it to.
+function runPhysiqueWorkoutCalc(reorderWorkoutField) {
   const messages = [];
   const workout = physiqueField('workout').value.trim();
   if (!workout) {
@@ -851,10 +892,30 @@ function runPhysiqueWorkoutCalc() {
   }
 
   try {
-    const { minutes, calories, unmatchedNames, perLine } = estimateWorkoutActivity(workout, bodyMassKg);
+    let combinedCount = 0;
+    let estimateSource = workout;
+    if (reorderWorkoutField) {
+      const combined = combineWorkoutText(workout);
+      estimateSource = combined.text;
+      combinedCount = combined.combinedCount;
+    }
+
+    const { minutes, calories, unmatchedNames, perLine } = estimateWorkoutActivity(estimateSource, bodyMassKg);
+    // Highest-burn exercise first, same "biggest contributor at the top"
+    // read Combine & Sort gives Consumption.
+    const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
+    if (reorderWorkoutField) {
+      // Rebuilt from quantity + name rather than kept as the original lines,
+      // same as Combine & Sort rebuilds Consumption — quantity is recovered
+      // in the same token shape parsing expects (workoutNoteQuantityForLine),
+      // so a later Calculate reads this box back exactly as it would the
+      // original.
+      physiqueField('workout').value = sortedPerLine.map((line) => `${line.quantity} ${line.name}`).join('\n');
+      if (combinedCount > 0) messages.push(`🔗 ${combinedCount} workout lines combined.`);
+    }
     physiqueField('activity-duration').value = minutes;
     physiqueField('calories-out').value = calories;
-    renderPhysiqueActivityBreakdown(perLine, minutes, calories);
+    renderPhysiqueActivityBreakdown(sortedPerLine, minutes, calories);
     if (unmatchedNames.length) {
       messages.push(`⚠️ Couldn't find ${unmatchedNames.map((n) => `"${n}"`).join(', ')} in the Activity Plan — used a default MET.`);
     }
@@ -940,6 +1001,23 @@ function combineAndSortConsumptionText(text) {
   return { text: scored.map((s) => s.line).join('\n'), combinedCount };
 }
 
+// Hidden whenever running Combine & Sort would be a no-op — the box already
+// reads exactly the way combineAndSortConsumptionText would rewrite it, same
+// lines in the same order — so the button only ever appears when clicking it
+// would actually change something.
+function syncPhysiqueCombineButtonVisibility() {
+  const field = physiqueField('consumption');
+  const btn = document.getElementById('physique-combine-btn');
+  const current = field.value.trim();
+  if (!current) {
+    btn.hidden = true;
+    return;
+  }
+  const normalizedCurrent = current.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+  const { text } = combineAndSortConsumptionText(field.value);
+  btn.hidden = text === normalizedCurrent;
+}
+
 // The modal's own Combine & Sort button — same tidy-up as the bulk action
 // below, run on just the one Consumption box being edited right now, so it
 // can be cleaned up before Calculate ever runs rather than only after saving.
@@ -956,6 +1034,7 @@ function combineAndSortPhysiqueConsumptionField() {
   if (combinedCount > 0) {
     showFieldError('physique-form-error', `🔗 ${combinedCount} combined.`);
   }
+  syncPhysiqueCombineButtonVisibility();
 }
 
 // The form's own 🧬 action — same view the table row's button opens
@@ -1050,7 +1129,7 @@ async function calculatePhysiqueDay() {
   btn.textContent = 'Calculating…';
   clearFieldError('physique-form-error');
 
-  const messages = runPhysiqueWorkoutCalc();
+  const messages = runPhysiqueWorkoutCalc(true);
 
   if (consumption) {
     try {
@@ -1058,8 +1137,15 @@ async function calculatePhysiqueDay() {
         await estimateConsumptionIncrementally(consumption, physiqueField('breakdown').value);
 
       // Rebuilt from the merged breakdown rather than the fresh estimate's own
-      // standardizedNotes, which only covers the lines that were re-estimated.
-      physiqueField('consumption').value = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
+      // standardizedNotes, which only covers the lines that were re-estimated —
+      // then straight through the same tidy-up the Combine & Sort button runs,
+      // so Calculate never leaves behind a Consumption box that button would
+      // still have something to do to.
+      const rebuiltConsumption = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
+      const { text: sortedConsumption, combinedCount } = combineAndSortConsumptionText(rebuiltConsumption);
+      physiqueField('consumption').value = sortedConsumption;
+      syncPhysiqueCombineButtonVisibility();
+      if (combinedCount > 0) messages.push(`🔗 ${combinedCount} combined.`);
       physiqueField('calories-in').value = calories;
       physiqueField('protein-in').value = protein.toFixed(1);
 
@@ -1276,7 +1362,15 @@ async function recalculatePhysiqueDay(p, bodyMassKg) {
   }
 
   if (p.workout.trim() && bodyMassKg !== null) {
-    const { minutes, calories } = estimateWorkoutActivity(p.workout, bodyMassKg);
+    // Same combine + highest-burn-first sort the form's own Calculate button
+    // runs (runPhysiqueWorkoutCalc/combineWorkoutText) — bulk Calculate
+    // rewrites column M too, not just the Duration/Calories Out it already
+    // wrote, so a repeated exercise logged across several lines collapses
+    // here the same way it would through the form.
+    const { text: combinedWorkout } = combineWorkoutText(p.workout);
+    const { minutes, calories, perLine } = estimateWorkoutActivity(combinedWorkout, bodyMassKg);
+    const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
+    values[12] = sortedPerLine.map((line) => `${line.quantity} ${line.name}`).join('\n');
     values[13] = minutes;
     values[14] = calories;
   }

@@ -415,12 +415,21 @@ function updateNutritionLogButtonLabel() {
     : "Log the ticked ingredients as today's Consumption";
 }
 
+// "x" for a discrete/per-each row — Amount stored the same way Edit
+// Ingredient shows it, e.g. "1x (58g)" — "g" for everything else. Reuses
+// the same unit extraction a typed Consumption line itself goes through
+// (extractIngredientQuantity, calorie-estimator.js), so a bare "x egg" line
+// asks for the same kind of number egg's own Amount already counts in.
+function nutritionLogUnit(amount) {
+  return extractIngredientQuantity(amount).unit === 'x' ? 'x' : 'g';
+}
+
 // Appends the ticked catalogue ingredients to Consumption as bare "g name"
-// lines and opens the Physique form on them — same shape as logWorkout in
-// strength-plan.js, but without its auto-Calculate step: a set/rep count is
-// already known when a workout row is ticked, while a serving size here
-// isn't, so the line is left for the user to type an amount at its front
-// before running Calculate themselves.
+// (or, for a per-each row, "x name") lines and opens the Physique form on
+// them — same shape as logWorkout in strength-plan.js, but without its
+// auto-Calculate step: a set/rep count is already known when a workout row
+// is ticked, while a serving size here isn't, so the line is left for the
+// user to type an amount at its front before running Calculate themselves.
 function logSelectedNutrition() {
   const selected = allNutritionEntries
     .filter((n) => selectedNutritionRows.has(n.row))
@@ -431,7 +440,7 @@ function logSelectedNutrition() {
   }
 
   const today = todaysPhysiqueDay();
-  const consumption = [today?.consumption ?? '', ...selected.map((n) => `g ${n.name}`)]
+  const consumption = [today?.consumption ?? '', ...selected.map((n) => `${nutritionLogUnit(n.amount)} ${n.name}`)]
     .filter((part) => part.trim())
     .join('\n');
 

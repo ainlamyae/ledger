@@ -236,6 +236,21 @@
 
                     <p id="body-mass-projection-eta" class="body-mass-eta"></p>
                 </div>
+
+                <!-- Governs every chart from here down — State Trend & Forecast, Body Mass,
+                     Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Fiber
+                     Intake, Fat Intake, Sleep and Protein Source Rotation — so it sits right
+                     above State Trend & Forecast's own heading rather than under one chart's
+                     label, which would read as belonging to that chart alone. -->
+                <div class="export-date-range">
+                    <label>From
+                        <input type="date" id="wellness-date-from">
+                    </label>
+                    <label>To
+                        <input type="date" id="wellness-date-to">
+                    </label>
+                </div>
+
                 <div class="body-mass-projection-header">
                     <h4>State Trend &amp; Forecast</h4>
                 </div>
@@ -243,21 +258,6 @@
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
-            </div>
-
-            <!-- Above the Body Mass heading, not inside its block: it governs every
-                 chart from here down — Body Mass, Calorie Balance, Physical Activity,
-                 Caloric Intake, Protein Intake, Fiber Intake, Fat Intake, Sleep and
-                 Protein Source Rotation — so sitting under one chart's label would
-                 read as belonging to that chart alone. State Trend & Forecast above
-                 is deliberately outside it: that one reads the whole history. -->
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="wellness-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="wellness-date-to">
-                </label>
             </div>
 
             <div class="body-mass-projection-wrap">
@@ -1401,8 +1401,8 @@
                         <th>Name</th>
                         <th>Amount</th>
                         <th title="Metabolic Equivalent of Task — the intensity this exercise is priced at">MET</th>
-                        <th title="Active time in minutes, net of rest">Duration</th>
-                        <th>Calories</th>
+                        <th title="Active time in minutes, net of rest">Dur</th>
+                        <th title="Calories">Cal</th>
                     </tr>
                     </thead>
                     <tbody id="physique-activity-breakdown-body"></tbody>

@@ -3349,7 +3349,17 @@ html.section-pages[data-page="block"] .panel-group > :not(.page-active):not(.pag
     display: none;
 }
 
-html.section-pages[data-page="block"] .page-crumb {
+/* The breadcrumb tops every section page, hub included ("Health" alone there),
+   in place of the section's centred title. */
+html.section-pages .panel-group-title {
+    display: none;
+}
+
+html.section-pages[data-page="hub"] .page-crumb-back {
+    display: none;
+}
+
+html.section-pages .page-crumb:not(.form-crumb) {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;

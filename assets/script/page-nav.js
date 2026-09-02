@@ -84,19 +84,25 @@ function buildPageTiles(section) {
   group.insertBefore(grid, section.panels[0] || null);
 }
 
-// "‹ Health / Physique" over a page; the section name goes back to the hub.
+// "‹ Health / Physique" over a page, the section name going back to the hub; on
+// the hub itself just "Health", in the same place and style, in place of the
+// section's centred title.
 function buildPageCrumb(section) {
   const group = document.getElementById(section.id);
   const crumb = document.createElement('nav');
   crumb.className = 'page-crumb';
   crumb.setAttribute('aria-label', 'Breadcrumb');
   const back = document.createElement('a');
+  back.className = 'page-crumb-back';
   back.href = section.href;
   back.textContent = `‹ ${section.label}`;
   back.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
+  const separator = document.createElement('span');
+  separator.className = 'page-crumb-back';
+  separator.textContent = '/';
   const current = document.createElement('span');
   current.className = 'page-crumb-current';
-  crumb.append(back, document.createTextNode(' / '), current);
+  crumb.append(back, separator, current);
   group.insertBefore(crumb, group.firstChild);
 }
 
@@ -139,8 +145,11 @@ function updatePageNav(panel) {
     if (current) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
-  if (sectionId && panel) {
-    document.querySelector(`#${sectionId} .page-crumb-current`).textContent = routedHeadingText(panel);
+  if (sectionId) {
+    const section = pageNavSections().find((s) => s.id === sectionId);
+    document.querySelector(`#${sectionId} .page-crumb-current`).textContent = panel
+      ? routedHeadingText(panel)
+      : section.label;
   }
 }
 

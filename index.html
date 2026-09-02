@@ -1345,7 +1345,10 @@
                 </label>
             </div>
             <label>Consumption
-                <textarea id="physique-consumption" rows="8" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
+                <div class="autocomplete-anchor">
+                    <textarea id="physique-consumption" rows="8" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
+                    <ul id="physique-consumption-suggestions" class="autocomplete-suggestions" hidden></ul>
+                </div>
             </label>
             <label hidden>Breakdown
                 <textarea id="physique-breakdown" rows="3"></textarea>

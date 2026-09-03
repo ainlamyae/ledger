@@ -145,6 +145,7 @@ function updatePageNav(panel) {
     if (current) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
+  updateActionBar();
   if (sectionId) {
     const section = pageNavSections().find((s) => s.id === sectionId);
     document.querySelector(`#${sectionId} .page-crumb-current`).textContent = panel
@@ -155,6 +156,7 @@ function updatePageNav(panel) {
 
 // Runs once, before the router reads the address (bootDashboard, app.js).
 function initPageNav() {
+  initActionBars();
   const sections = pageNavSections();
   buildSideNav(sections);
   // Home: every section's tiles under its glance cards; each opens that page.
@@ -169,6 +171,7 @@ function initPageNav() {
   const section = sections.find((s) => s.id === window.ledgerSectionPage.section);
   if (!section) return;
   document.documentElement.classList.add('section-pages');
+  section.panels.forEach(groupHeaderActions);
   buildPageTiles(section);
   buildQuickActions(section);
   buildPageCrumb(section);
@@ -192,6 +195,13 @@ function updateFormCrumb(panel, steps) {
   const section = pageNavSections().find((s) => s.id === window.ledgerSectionPage?.section);
   if (!crumb || !section) return;
   crumb.textContent = '';
+  // Built from the same pieces as the page breadcrumb (buildPageCrumb): a "‹ Section"
+  // link, "/" separators, links for the levels above, the current level last.
+  const separator = () => {
+    const span = document.createElement('span');
+    span.textContent = '/';
+    return span;
+  };
   const link = (text, href, onClick) => {
     const a = document.createElement('a');
     a.href = href;
@@ -205,12 +215,98 @@ function updateFormCrumb(panel, steps) {
   };
   crumb.append(link(`‹ ${section.label}`, section.href, () => closeFormPages(null)));
   if (panel) {
-    crumb.append(' / ', link(routedHeadingText(panel), pageHref(section, panel), () => closeFormPages(panel)));
+    crumb.append(separator(), link(routedHeadingText(panel), pageHref(section, panel), () => closeFormPages(panel)));
   }
   steps.forEach((step) => {
     const current = document.createElement('span');
     current.className = 'page-crumb-current';
     current.textContent = step.label;
-    crumb.append(' / ', current);
+    crumb.append(separator(), current);
+  });
+}
+
+// --- One bottom bar at a time ---------------------------------------------------
+//
+// A page's own action row is its bottom bar while it's showing, in place of the
+// section tab bar (on a phone; styles.css). Which row, in order: an open form
+// page's actions, a block's selection bar while rows are ticked, the block's own
+// page actions (Tune's Reset/Update/Save, Insight's Send to AI), then its header
+// buttons (Physique's Export CSV / Today / Log). Every one ends in ❌ at the far
+// right.
+const SELECTION_BAR_IDS = ['physique-bulk-actions', 'nutrition-bulk-actions', 'tx-bulk-actions', 'contacts-bulk-actions'];
+
+// A block's header buttons (Physique's Export CSV / Today / Log, Activity's Guide /
+// Log / Add, …) gathered into one group that ends in ❌, so every page has the same
+// way out in the same place: top right of the header on a wide screen, the right
+// end of the bottom bar on a phone. A block with no buttons (Indicator) gets the
+// group with just ❌, and a heading without a .panel-header gets one around it.
+// Moved, not copied, so every listener stays attached.
+function groupHeaderActions(panel) {
+  let header = panel.querySelector(':scope > .panel-header');
+  if (!header) {
+    const heading = panel.querySelector(':scope > h2');
+    if (!heading) return;
+    header = document.createElement('div');
+    header.className = 'panel-header';
+    heading.before(header);
+    header.appendChild(heading);
+  }
+  const buttons = [...header.querySelectorAll(':scope > button')];
+  const group = document.createElement('div');
+  group.className = 'panel-header-actions';
+  if (buttons.length) buttons[0].before(group);
+  else header.appendChild(group);
+  group.append(...buttons);
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'btn modal-close page-action-close header-action-close';
+  close.title = 'Close';
+  close.setAttribute('aria-label', 'Close');
+  close.textContent = '❌';
+  group.appendChild(close);
+}
+
+function currentActionBar() {
+  if (!window.ledgerSectionPage) return null;
+  const formBar = document.querySelector('html[data-form-page] .modal.form-page .modal-actions');
+  if (formBar) return formBar;
+  const panel = document.querySelector(`#${window.ledgerSectionPage.section} > .panel.page-active`);
+  if (!panel) return null;
+  return panel.querySelector(SELECTION_BAR_IDS.map((id) => `#${id}:not([hidden])`).join(', '))
+    || panel.querySelector('.panel-actions[data-page-actions]')
+    || panel.querySelector(':scope > .panel-header > .panel-header-actions');
+}
+
+function updateActionBar() {
+  const bar = currentActionBar();
+  document.querySelectorAll('.action-bar').forEach((el) => {
+    if (el !== bar) el.classList.remove('action-bar');
+  });
+  if (bar) bar.classList.add('action-bar');
+  if (bar) document.documentElement.dataset.actionBar = '1';
+  else delete document.documentElement.dataset.actionBar;
+}
+
+// ❌ on a selection bar clears the selection; on a page's own actions it leaves
+// for the section hub, as the breadcrumb does. (A form's ❌ is its own Cancel.)
+function onPageActionClose(event) {
+  const close = event.target.closest('.page-action-close');
+  if (!close) return;
+  const selectionBar = close.closest(SELECTION_BAR_IDS.map((id) => `#${id}`).join(', '));
+  if (selectionBar) {
+    const panel = selectionBar.closest('.panel');
+    const selectAll = panel.querySelector('thead input[type="checkbox"]:checked');
+    if (selectAll) selectAll.click();
+    panel.querySelectorAll('tbody input[type="checkbox"]:checked').forEach((box) => box.click());
+    return;
+  }
+  if (window.ledgerSectionPage) navigateSectionPage(null);
+}
+
+function initActionBars() {
+  document.addEventListener('click', onPageActionClose);
+  SELECTION_BAR_IDS.forEach((id) => {
+    const bar = document.getElementById(id);
+    if (bar) new MutationObserver(updateActionBar).observe(bar, { attributes: true, attributeFilter: ['hidden'] });
   });
 }

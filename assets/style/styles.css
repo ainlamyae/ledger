@@ -3135,6 +3135,18 @@ td .btn {
     grid-template-columns: max-content 8.45rem max-content;
 }
 
+/* Contact: every column as wide as its text, one line per cell, rather than the
+   global full-width table squeezing a dozen columns (name, phones, emails,
+   address, …) into the panel. .table-responsive scrolls sideways when it's wider. */
+#contacts-table {
+    width: max-content;
+}
+
+#contacts-table th,
+#contacts-table td {
+    white-space: nowrap;
+}
+
 /* Settings (Health and Other): the actions column (👁️ ✏️ 🗑️) is as wide as its
    buttons on one line, rather than squeezed by the Key/Value columns until the
    buttons stacked. Key stays on one line too; Value takes the rest. */

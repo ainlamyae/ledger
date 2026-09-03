@@ -151,15 +151,21 @@ function updateFormPage() {
   const top = routedForms.at(-1);
   const current = document.querySelector('.modal.form-page');
   if (current && current !== top?.modal) current.classList.remove('form-page');
+  // Stacked forms (a 🧬 view opened from a day's Edit): only the top one is the
+  // page; the ones under it are hidden until it closes, never left as overlays.
+  document.querySelectorAll('.modal.form-page-under').forEach((m) => m.classList.remove('form-page-under'));
+  routedForms.slice(0, -1).forEach((form) => form.modal.classList.add('form-page-under'));
   if (!top) {
     if (root.dataset.formPage) {
       delete root.dataset.formPage;
       window.scrollTo(0, formPageReturnScroll);
     }
+    updateActionBar();
     return;
   }
   if (!root.dataset.formPage) formPageReturnScroll = window.scrollY;
   root.dataset.formPage = '1';
+  clearPendingFormPage();
   if (current !== top.modal) {
     top.modal.classList.add('form-page');
     // The breadcrumb lives inside the form's wrapper, above its card.
@@ -168,6 +174,59 @@ function updateFormPage() {
     window.scrollTo(0, 0);
   }
   updateFormCrumb(top.panel, top.steps);
+  updateActionBar();
+}
+
+// A form address loaded directly (a reload of …/2026-10-05/ or …/log/) opens as
+// that form page at once — its breadcrumb over a "Loading…" card in the form's
+// place — while the data it needs loads, instead of showing the block's page
+// first. The real form takes its place when it opens (updateFormPage); if it
+// can't (signed out, an unknown row), the block's page is shown instead.
+function pendingFormPage() {
+  let page = document.getElementById('form-pending');
+  if (!page) {
+    page = document.createElement('div');
+    page.id = 'form-pending';
+    page.className = 'modal form-page-pending';
+    page.hidden = true;
+    const card = document.createElement('div');
+    card.className = 'modal-card';
+    const note = document.createElement('p');
+    note.className = 'status';
+    note.textContent = 'Loading…';
+    card.appendChild(note);
+    page.appendChild(card);
+    document.body.insertBefore(page, document.querySelector('body > .modal'));
+  }
+  return page;
+}
+
+function showPendingFormPage(panel, steps) {
+  if (!window.ledgerSectionPage) return;
+  const page = pendingFormPage();
+  page.hidden = false;
+  page.classList.add('form-page');
+  document.documentElement.dataset.formPage = '1';
+  const crumb = document.getElementById('form-crumb');
+  if (crumb) page.insertBefore(crumb, page.firstChild);
+  updateFormCrumb(panel, steps);
+}
+
+function clearPendingFormPage() {
+  const page = document.getElementById('form-pending');
+  if (!page || page.hidden) return false;
+  page.hidden = true;
+  page.classList.remove('form-page');
+  return true;
+}
+
+// The form a direct load was waiting for didn't open: show its block's page, back
+// on the block's own history entry.
+function abandonPendingFormPage() {
+  if (!clearPendingFormPage() || routedForms.length) return;
+  delete document.documentElement.dataset.formPage;
+  updateActionBar();
+  if ((history.state?.depth || 0) > 0) history.back();
 }
 
 // The breadcrumb's way out: closes every open form page in one history step back,
@@ -245,8 +304,13 @@ function routerDataLoaded() {
   if (!initialFormRoute) return;
   const { panel, button, record, sub } = initialFormRoute;
   initialFormRoute = null;
-  if (record) openRecordRoute(panel, record, sub);
-  else openRoutedForm(panel, button);
+  if (record) {
+    openRecordRoute(panel, record, sub).then(() => {
+      if (!routedForms.length && !pendingFormRoute) abandonPendingFormPage();
+    });
+  } else {
+    openRoutedForm(panel, button);
+  }
 }
 
 function initRouter() {
@@ -318,9 +382,15 @@ function initRouter() {
     // A view needs no history step of its own; a form gets one underneath it.
     setRoute(panel, [buttonStep(button)], { push: !('routeView' in button.dataset) });
     initialFormRoute = { panel, button };
+    if (!('routeView' in button.dataset)) showPendingFormPage(panel, [buttonStep(button)]);
   } else if (record) {
-    // Pushed when its form opens, once the rows have loaded.
+    // The form's own entry over the block's, now, so the address stays on the
+    // row while its data loads; the form claims this entry when it opens.
+    const steps = [{ slug: record, label: record }];
+    if (sub) steps.push({ slug: sub, label: sub.charAt(0).toUpperCase() + sub.slice(1) });
+    setRoute(panel, steps, { push: true });
     initialFormRoute = { panel, record, sub };
+    showPendingFormPage(panel, steps);
   }
   window.scrollTo(0, 0);
 }

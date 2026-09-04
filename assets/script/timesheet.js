@@ -108,11 +108,18 @@ async function initTimeSheet(forceRefresh = false) {
       openTimesheetForm(isoFromDate(new Date()));
     });
     document.getElementById('timesheet-reminder-log-btn').addEventListener('click', () => {
-      openTimesheetForm(isoFromDate(new Date()));
+      const today = isoFromDate(new Date());
+      openRoutedPage('work-time', [{ slug: today, label: today }], () => openTimesheetForm(today));
     });
     document.getElementById('timesheet-reminder-enable-btn').addEventListener('click', async () => {
       await Notification.requestPermission();
       checkTimesheetReminder();
+    });
+    // other/work-time/<date>/ opens that day's Edit, logged or not.
+    registerRecordRoute('work-time', (slug, sub) => {
+      if (sub || !/^\d{4}-\d{2}-\d{2}$/.test(slug)) return null;
+      openTimesheetForm(slug);
+      return slug;
     });
     document.getElementById('timesheet-cancel-btn').addEventListener('click', closeTimesheetForm);
     onFormSubmit('timesheet-form', submitTimesheetForm);
@@ -362,7 +369,10 @@ function renderTimesheetList() {
     }
 
     const actionsCell = document.createElement('td');
-    actionsCell.appendChild(makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTimesheetForm(e.date) }));
+    actionsCell.appendChild(makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
+      routeRecordEdit('work-time', { slug: e.date, label: e.date });
+      openTimesheetForm(e.date);
+    } }));
 
     tr.append(companyCell, dateCell, dayCell, startCell, endCell, breakCell, durationCell, taskCell, actionsCell);
     if (weekend) tr.classList.add('timesheet-weekend');

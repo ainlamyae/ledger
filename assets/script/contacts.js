@@ -8,6 +8,7 @@ let cCurrentPage = 1;
 let contactsSheetId = null;
 let editingContactRow = null;
 let selectedContactRows = new Set();
+let editContact = null;
 
 async function fetchContactsSheetId() {
   const metadata = await getSpreadsheetMetadata();
@@ -19,6 +20,8 @@ async function initContacts(forceRefresh = false) {
     contactsListenersAttached = true;
 
     document.getElementById('add-contact-btn').addEventListener('click', () => openContactForm(null));
+    // other/contact/<name>/ opens that contact's Edit.
+    editContact = routedRowEdit('contact', () => allContacts, contactDisplayName, openContactForm);
     document.getElementById('contact-cancel-btn').addEventListener('click', closeContactForm);
     onFormSubmit('contact-form', submitContactForm);
     document.getElementById('export-contacts-google-btn').addEventListener('click', () => exportContactsGoogleCSV(allContacts));
@@ -170,7 +173,7 @@ function renderContactsList() {
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openContactForm(c) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editContact(c) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteContact(c) }),
     );
     tr.appendChild(actionsCell);

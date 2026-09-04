@@ -163,6 +163,65 @@ async function groqExtractIngredients(notesText) {
   return { items };
 }
 
+// Reads a photographed Nutrition Facts label. `nutrients` is [{ name, unit }], the
+// only names the model may use. Returns { name, serving, servingGrams, calories,
+// nutrients: [{ name, amount, unit, percentDV }] }, per serving as printed.
+async function groqReadNutritionLabel(base64Image, mimeType, nutrients) {
+  const apiKey = getSettingString('GROQ_API_KEY', null);
+  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
+
+  const names = nutrients.map((n) => `- ${n.name}`).join('\n');
+  const res = await fetch(GROQ_API, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROQ_VISION_MODEL,
+      temperature: 0,
+      // The free tier allows 1000 output tokens a minute; no thinking spends them.
+      max_tokens: 900,
+      reasoning_effort: 'none',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+          {
+            type: 'text',
+            text: `This is a food product's Nutrition Facts label (it may be bilingual English/French, e.g. Canadian).
+Read only what is printed; never guess a nutrient that isn't on the label.
+
+For every nutrient line, give its printed amount and unit for one serving, and its printed % Daily Value.
+Use null for whichever of the two isn't printed. Name each nutrient with exactly one of these names:
+${names}
+Skip any printed line that matches none of them.
+
+Respond with ONLY a JSON object, no other text, in exactly this shape:
+{"name": "<product name if visible, else null>", "serving": "<serving size as printed, e.g. 1 cup (250 mL) or 2 biscuits (30 g)>", "servingGrams": <grams in one serving if printed, else null>, "calories": <number or null>, "nutrients": [{"name": "<one of the names above>", "amount": <number or null>, "unit": "<g, mg or µg, or null>", "percentDV": <number or null>}]}`,
+          },
+        ],
+      }],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message || `Groq API error ${res.status}`);
+  }
+
+  const content = (await res.json()).choices[0].message.content;
+  const start = content.indexOf('{');
+  const end = content.lastIndexOf('}');
+  let parsed = null;
+  try { parsed = start === -1 ? null : JSON.parse(content.slice(start, end + 1)); } catch { parsed = null; }
+  if (!parsed || !Array.isArray(parsed.nutrients)) {
+    const snippet = content.length > 300 ? `${content.slice(0, 300)}…` : content;
+    throw new Error(`Groq returned an unexpected response: ${snippet}`);
+  }
+  return parsed;
+}
+
 // Sends a food photo to the Groq vision model and returns a plain ingredient
 // list in the same format the Consumption textarea expects (one item per line,
 // e.g. "250g chicken breast" or "2 eggs"), ready to be appended directly.

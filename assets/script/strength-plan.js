@@ -106,9 +106,10 @@ function applyWorkoutLines(lines) {
   // Passing today's row puts the form in edit mode, so Save updates that day
   // rather than appending a second one — which the duplicate-date guard would
   // refuse anyway. Everything already logged for the day (meals, body mass) is
-  // left exactly as it is; only the workout side changes.
+  // left exactly as it is; only the workout side changes. Opens as today's page.
+  routeRecordEdit('physique', todayPhysiqueRouteStep());
   openPhysiqueForm(today);
-  if (today) document.getElementById('physique-modal-title').textContent = "Add to Today's Workout";
+  if (today) setPhysiqueFormHint("Add to Today's Workout");
   physiqueField('workout').value = workout;
   physiqueField('activity-duration').value = String(workoutNoteMinutes(workout));
 
@@ -167,11 +168,9 @@ function renderWorkoutPlanProgress() {
     box.title = quantity !== undefined ? `Already logged today: ${quantity}` : '';
   });
 
-  // Short either way — the heading line holds three buttons, and a phone runs out of
-  // room long before "Add to Today's Workout" fits. "Log More", not "Add": the panel's
-  // other button is already Add (a catalogue row), and these two do different things.
+  // Always "Log"; the hover says whether it adds to today's workout or starts it.
   const logBtn = document.getElementById('log-workout-btn');
-  logBtn.textContent = logged.size ? 'Log More' : 'Log';
+  logBtn.textContent = 'Log';
   logBtn.title = logged.size
     ? "Add the newly ticked activities to today's workout"
     : "Log the ticked activities as today's workout";

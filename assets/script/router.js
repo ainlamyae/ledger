@@ -229,9 +229,20 @@ function abandonPendingFormPage() {
   if ((history.state?.depth || 0) > 0) history.back();
 }
 
+// A breadcrumb link to a level between the block and the current form (a row's
+// date over its 🧬 view). When that row's form is open underneath, closing the
+// top one returns to it; otherwise every form closes and the row's own opens.
+function openFormStep(panel, step) {
+  if (routedForms.length > 1) {
+    routedForms.at(-1).modal.hidden = true;
+    return;
+  }
+  closeFormPages(panel, () => openRecordRoute(panel, step.slug));
+}
+
 // The breadcrumb's way out: closes every open form page in one history step back,
 // then shows `panel`'s page, or the hub for null.
-function closeFormPages(panel) {
+function closeFormPages(panel, then = null) {
   const forms = routedForms.splice(0);
   const steps = Math.min(forms.length, history.state?.depth || 0);
   // Emptied first, so routerModalChanged ignores these closes.
@@ -240,6 +251,7 @@ function closeFormPages(panel) {
   const show = () => {
     if (panel === null) navigateSectionPage(null);
     else showSectionPage(currentRoutedPanel() || panel);
+    if (then) then();
   };
   if (steps) {
     window.addEventListener('popstate', show, { once: true });

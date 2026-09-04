@@ -539,8 +539,9 @@ function renderReconciliationStatus(missingAmount) {
   // of the app uses for a clean state.
   const flagEl = document.getElementById('account-reconciliation-flag');
   flagEl.hidden = isReconciled;
-  flagEl.textContent = isReconciled ? '' : `${formatCurrency(missingAmount)} ⚠️`;
-  flagEl.title = isReconciled ? '' : `Reconciliation off by ${formatCurrency(missingAmount)}`;
+  const dir = missingAmount > 0 ? 'Accounts>Transactions' : 'Accounts<Transactions';
+  flagEl.textContent = isReconciled ? '' : `${dir} ${formatCurrency(missingAmount)} ⚠️`;
+  flagEl.title = isReconciled ? '' : `Accounts ${missingAmount > 0 ? '>' : '<'} Transaction total — off by ${formatCurrency(Math.abs(missingAmount))}`;
 }
 
 async function refreshNetWorth() {

@@ -41,6 +41,8 @@ textarea {
     --shadow-dropdown: 0 4px 16px rgba(0,0,0,.15);
     --transition-colors: background-color .2s ease, color .2s ease, border-color .2s ease;
     --input-font-size: 16px;
+    /* Both phone bottom bars, the tab bar and a page's action bar: one height. */
+    --bottom-bar-height: 2.875rem;
     /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
     --chart-good: var(--color-income);
     --chart-good-high: #166534;
@@ -2688,11 +2690,8 @@ td .btn {
     }
 
     .container {
-        /* Bottom padding clears the fixed tab bar below (.nav) so the last
-           panel on the page never sits half-hidden behind it. 4rem matches the
-           bar's 56px tappable row; the env() adds the home-indicator inset the
-           bar itself pads by. */
-        padding: 1rem 1rem calc(1rem + 4rem + env(safe-area-inset-bottom, 0px));
+        /* Bottom padding clears the fixed bottom bar, home-indicator inset included. */
+        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + env(safe-area-inset-bottom, 0px));
     }
 
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */
@@ -2703,7 +2702,8 @@ td .btn {
         z-index: 21;
         justify-content: center;
         width: 3.25rem;
-        height: 56px;
+        /* The bottom bar's row plus its top border, so the avatar centres on it. */
+        height: calc(var(--bottom-bar-height) + 1px);
         margin: 0;
     }
 
@@ -2754,16 +2754,15 @@ td .btn {
         padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    /* A ~56px block per tab (past the 44px touch minimum). Label size matches
-       the form action buttons (.modal-actions .btn). */
+    /* Each tab fills the bar's height (--bottom-bar-height), the action bar's too. */
     .nav a {
         flex: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 56px;
-        padding: .4rem .25rem;
+        min-height: var(--bottom-bar-height);
+        padding: 0 .25rem;
         font-weight: 600;
         line-height: 1.1;
     }
@@ -3647,7 +3646,7 @@ html.section-pages[data-form-page] body.modal-open {
 @media (max-width: 640px) {
     html.section-pages[data-form-page] .modal.form-page {
         --form-page-gutter: 1rem;
-        margin-bottom: calc(1rem + 4rem + env(safe-area-inset-bottom, 0px));
+        margin-bottom: calc(1rem + var(--bottom-bar-height) + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -3714,7 +3713,7 @@ html.section-pages .panel.page-active:hover {
    Tune's or Insight's actions) always ends in ❌ at the far right. On a phone it
    replaces the section tab bar as the one bar pinned to the bottom of the screen,
    in the tab bar's own look: one row that scrolls sideways when it holds more
-   buttons than fit, with the primary button and ❌ kept in view at the right. */
+   buttons than fit, with ❌ kept in view at the right. */
 .panel-actions .page-action-close {
     float: none;
     margin-left: auto;
@@ -3735,10 +3734,13 @@ html.section-pages .panel.page-active:hover {
         display: flex;
         flex-wrap: nowrap;
         align-items: center;
-        gap: .4rem;
+        gap: .3rem;
         overflow-x: auto;
         margin: 0;
-        padding: .6rem .85rem calc(.6rem + env(safe-area-inset-bottom, 0px));
+        /* The tab bar's own height, which this bar replaces. */
+        box-sizing: border-box;
+        height: calc(var(--bottom-bar-height) + 1px + env(safe-area-inset-bottom, 0px));
+        padding: 0 .64rem env(safe-area-inset-bottom, 0px);
         background: var(--color-nav);
         border-top: 1px solid rgba(255, 255, 255, .1);
         border-radius: 0;
@@ -3761,9 +3763,9 @@ html.section-pages .panel.page-active:hover {
     }
 
     html[data-action-bar] .action-bar .btn {
-        height: 2.5rem;
+        height: 1.875rem;
         margin: 0;
-        padding: 0 .6rem;
+        padding: 0 .45rem;
         font-size: .85rem;
         line-height: 1;
         white-space: nowrap;
@@ -3777,19 +3779,12 @@ html.section-pages .panel.page-active:hover {
         white-space: nowrap;
     }
 
-    /* ❌ last, pinned at the right edge; the primary action pinned just left of it. */
+    /* Every button in the bar shares the rule above; only colour differs. ❌ sits
+       last, pinned at the right edge. */
     html[data-action-bar] .action-bar > .modal-close {
         position: sticky;
         right: 0;
-        width: 2.75rem;
         margin-left: auto;
-        float: none;
-    }
-
-    html[data-action-bar] .action-bar > .btn-primary,
-    html[data-action-bar] .action-bar > .btn-ai {
-        position: sticky;
-        right: calc(2.75rem + .4rem);
     }
 }
 

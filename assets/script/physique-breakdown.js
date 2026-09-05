@@ -464,7 +464,7 @@ function positionConsumptionSuggestions() {
 
   if (!isMobileConsumptionViewport() || !window.visualViewport) {
     list.classList.remove('autocomplete-suggestions--pinned');
-    list.style.removeProperty('bottom');
+    list.style.removeProperty('--keyboard-height');
     return;
   }
 
@@ -472,7 +472,7 @@ function positionConsumptionSuggestions() {
   const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
 
   list.classList.add('autocomplete-suggestions--pinned');
-  list.style.bottom = `${keyboardHeight}px`;
+  list.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
 }
 
 // The line the caret's currently on, split at the caret — "prefix" is what's
@@ -521,7 +521,7 @@ function hideConsumptionSuggestions() {
   list.hidden = true;
   list.innerHTML = '';
   list.classList.remove('autocomplete-suggestions--pinned');
-  list.style.removeProperty('bottom');
+  list.style.removeProperty('--keyboard-height');
   consumptionSuggestionMatches = [];
   consumptionSuggestionIndex = -1;
 }

@@ -1,6 +1,7 @@
 const APPLICATIONS_RANGE = `'${CONFIG.SHEETS.APPLICATIONS}'!A2:E`;
 
 let allApplications = [];
+let editApplication = null;
 let applicationsListenersAttached = false;
 let applicationsSheetId = null;
 let editingApplicationRow = null;
@@ -16,6 +17,7 @@ async function initApplications(forceRefresh = false) {
     applicationsListenersAttached = true;
 
     document.getElementById('add-application-btn').addEventListener('click', () => openApplicationForm(null));
+    editApplication = routedRowEdit('application', () => allApplications, (a) => `${a.type} ${a.appNumber}`, openApplicationForm);
     document.getElementById('application-cancel-btn').addEventListener('click', closeApplicationForm);
     onFormSubmit('application-form', submitApplicationForm);
 
@@ -181,7 +183,7 @@ function buildApplicationCard(app) {
   actions.className = 'app-card-actions';
 
   actions.append(
-    makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (e) => { e.stopPropagation(); openApplicationForm(app); } }),
+    makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (e) => { e.stopPropagation(); editApplication(app); } }),
     makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: (e) => { e.stopPropagation(); return deleteApplication(app); } }),
   );
   header.append(icon, title, actions);

@@ -730,6 +730,8 @@ function makeEditNewRowButton(row, breakdown, target) {
     title: `Not quite right? Fix "${row.name}"'s numbers before saving — Save banks the correction and updates this line`,
     onClick: () => {
       const consumedAmount = row.amount;
+      // A page over the day's, under the ingredient's own address.
+      routeRecordEdit('nutrition', { slug: routeSlug(row.name), label: row.name });
       openNutritionForm({
         row: null,
         classification: '',

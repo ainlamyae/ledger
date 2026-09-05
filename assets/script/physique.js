@@ -131,9 +131,10 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const deprivationKcal = physiqueDeprivationKcal(day, sleepHours, bmr);
   el.textContent = deprivationKcal !== null ? `${deprivationKcal} kcal` : '—';
 
-  // The four BMR figures Save will store, one line at the end of the form.
-  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key]) => {
-    const text = bmr[key] !== undefined ? `${bmr[key]} kcal` : '—';
+  // The four BMR figures Save will store, one line; "kcal" once, after the last.
+  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key], i, all) => {
+    const unit = i === all.length - 1 ? ' kcal' : '';
+    const text = bmr[key] !== undefined ? `${bmr[key]}${unit}` : '—';
     document.getElementById(`physique-bmr-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 }
@@ -155,7 +156,8 @@ async function initPhysique(forceRefresh = false) {
       routeRecordEdit('physique', todayPhysiqueRouteStep());
       openPhysiqueForm(todaysPhysiqueDay());
     });
-    // health/physique/<date or pattern-N>/ opens that row's Edit; …/micronutrients/ its 🧬 view.
+    // health/physique/<date or pattern-N>/ opens that row's Edit; …/micronutrients/ its
+    // 🧬 view, …/duplicate/ its 📋.
     // Today's date opens a new Log while today isn't logged, and the old …/today/
     // address lands on today's date.
     registerRecordRoute('physique', (slug, sub) => {
@@ -165,12 +167,14 @@ async function initPhysique(forceRefresh = false) {
         return today;
       }
       const p = allPhysiqueEntries.find((e) => physiqueRouteStep(e).slug === slug);
-      if (!p || (sub && sub !== 'micronutrients')) return null;
-      if (sub) openPhysiqueMicronutrients(p);
-      else openPhysiqueForm(p);
+      if (!p || (sub && sub !== 'micronutrients' && sub !== 'duplicate')) return null;
+      if (sub === 'micronutrients') openPhysiqueMicronutrients(p);
+      else openPhysiqueForm(p, sub === 'duplicate');
       return physiqueRouteStep(p).label;
     });
-    document.getElementById('health-reminder-log-btn').addEventListener('click', () => openPhysiqueForm(todaysPhysiqueDay()));
+    document.getElementById('health-reminder-log-btn').addEventListener('click', () => {
+      openRoutedPage('physique', [todayPhysiqueRouteStep()], () => openPhysiqueForm(todaysPhysiqueDay()));
+    });
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
     document.getElementById('physique-micro-close-btn').addEventListener('click', () => {
       document.getElementById('physique-micro-modal').hidden = true;
@@ -266,7 +270,7 @@ async function refreshPhysique(forceRefresh = false) {
   renderWorkoutPlanProgress();
   // Same reason, for Nutrition's own tint/label pair (nutrition.js):
   // .nutrition-row-logged on any row already in today's Consumption
-  // breakdown, and the Log/Log More label. A full re-render rather than just
+  // breakdown, and the Log buttons' hover. A full re-render rather than just
   // the label, since the tint itself reads todaysPhysiqueDay() too — but
   // only once Nutrition has data of its own to draw; before that,
   // initNutrition's own first render already picks up whatever Physique
@@ -968,7 +972,10 @@ function renderPhysiqueList() {
       } }),
       // How a pattern becomes a real day: duplicate it, and the copy opens
       // dated today with the template's contents intact.
-      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openPhysiqueForm(p, true) }),
+      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => {
+        routeRecordEdit('physique', physiqueRouteStep(p), { slug: 'duplicate', label: 'Duplicate' });
+        openPhysiqueForm(p, true);
+      } }),
       makeRowActionButton({ emoji: '🧬', title: 'Micronutrients', onClick: () => openPhysiqueMicronutrients(p, true) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deletePhysiqueEntry(p) }),
     );
@@ -1035,8 +1042,7 @@ function openPhysiqueMicronutrients(p, routed = false) {
   } else {
     data.nutrients.forEach((n, i) => {
       const tr = document.createElement('tr');
-      if (n.severity === 'severe') tr.classList.add('nutrient-gap-severe');
-      else if (n.severity === 'mild') tr.classList.add('nutrient-gap-mild');
+      if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
       if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
       tr.append(
         makeCell(n.displayName),
@@ -1087,8 +1093,16 @@ function syncPhysiquePatternMode() {
   else if (!dateInput.value) dateInput.value = isoFromDate(new Date());
 }
 
+// A title that says what Save will do ("Add to Today's Workout"), also on Save's
+// hover, since a form page hides the title. openPhysiqueForm clears the hover.
+function setPhysiqueFormHint(text) {
+  document.getElementById('physique-modal-title').textContent = text;
+  document.querySelector('#physique-form button[type="submit"]').title = text;
+}
+
 function openPhysiqueForm(entry, duplicate = false) {
   editingPhysiqueRow = (entry && !duplicate) ? entry.row : null;
+  document.querySelector('#physique-form button[type="submit"]').title = '';
   const baseTitle = duplicate ? 'Duplicate Physique' : (entry ? 'Edit Physique' : 'Log a Physique');
 
   PHYSIQUE_FIELDS.forEach(({ id, key }) => {

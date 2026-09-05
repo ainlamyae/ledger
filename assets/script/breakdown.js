@@ -22,6 +22,7 @@ const BREAKDOWN_AMOUNT_FIELDS = [
 ];
 
 let allBreakdownRows = [];
+let editBreakdown = null;
 let breakdownSheetId = null;
 let editingBreakdownRow = null;
 let breakdownListenersAttached = false;
@@ -33,6 +34,7 @@ async function initBreakdown(forceRefresh = false) {
     breakdownListenersAttached = true;
 
     document.getElementById('add-breakdown-btn').addEventListener('click', () => openBreakdownForm(null));
+    editBreakdown = routedRowEdit('breakdown', () => allBreakdownRows, (b) => [b.category, b.type].filter(Boolean).join(' '), openBreakdownForm);
     document.getElementById('breakdown-cancel-btn').addEventListener('click', closeBreakdownForm);
     onFormSubmit('breakdown-form', submitBreakdownForm);
     document.getElementById('breakdown-search').addEventListener('input', () => {
@@ -129,7 +131,7 @@ function renderBreakdownList() {
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openBreakdownForm(b) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editBreakdown(b) }),
       // Copies the row's formulas, not their current values: a plain append would
       // land a row with four empty money columns. See duplicateBreakdownRow.
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => duplicateBreakdownRow(b) }),

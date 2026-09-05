@@ -1,8 +1,7 @@
 ﻿// Read when each chart is constructed, so a theme switch needs no per-chart options.
 function applyChartTheme() {
-  const dark = document.documentElement.dataset.theme === 'dark';
-  Chart.defaults.color = dark ? '#94a3b8' : '#6b7280';
-  Chart.defaults.borderColor = dark ? '#334155' : '#e5e7eb';
+  Chart.defaults.color = chartColor('--color-text-muted');
+  Chart.defaults.borderColor = chartColor('--color-border');
 
   // privacyMode is read at call time; loadDashboard rebuilds the charts on toggle.
   Chart.defaults.scales.linear.ticks.callback = function (value) {
@@ -15,7 +14,7 @@ function applyChartTheme() {
 // line. Deliberately not red: red is this app's "missed" score, so a limit drawn in it
 // read as a failure rather than as the thing being measured against.
 function targetMarkColor() {
-  return document.documentElement.dataset.theme === 'dark' ? '#e2e8f0' : '#1f2937';
+  return chartColor('--color-text');
 }
 
 // Fixed y-axis label width, so plot areas line up down the section however many
@@ -68,15 +67,12 @@ function targetCapHalf(axisSpan) {
 
 // Violet, the app's existing "not a score" colour. Grey was tried first and vanished:
 // a mid-tone in both themes, and it already means "unscored bar" on the same chart.
-const WEEKLY_AVG_COLOR = '#7c3aed';
 
 // Teal, for BMR_cal beside BMR_adp's violet — a third reference line on the same chart needs
 // its own hue, not a tint of either existing one, so all three bases stay visually distinct
 // in both themes.
-const CALIBRATED_BMR_COLOR = '#0891b2';
 
 // Amber, for BMR_kat beside BMR_mif's default mark, so the two equations read apart.
-const KATCH_BMR_COLOR = '#d97706';
 
 // A continuous exponential moving average, not a fixed weekly bucket: each day blends
 // today's own reading into yesterday's already-smoothed value, rather than every column
@@ -226,6 +222,32 @@ function upsertChart(existingChart, ctx, config) {
   });
 }
 
+// Every chart colour comes from styles.css's :root (--chart-*, --color-*), read when
+// the chart is drawn, so a change there restyles the charts too. `alpha` gives rgba.
+function chartColor(name, alpha = null) {
+  const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim().toLowerCase();
+  if (alpha === null || !/^#[0-9a-f]{6}$/.test(hex)) return hex;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// A generated category colour at `hue`, saturation and lightness from styles.css;
+// `shade` steps it darker by --chart-series-shade-step.
+function seriesColor(hue, { saturation = '--chart-series-saturation', lightness = '--chart-series-lightness', shade = 0 } = {}) {
+  const pct = (name) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+  return `hsl(${hue}, ${pct(saturation)}%, ${pct(lightness) - shade * pct('--chart-series-shade-step')}%)`;
+}
+
+// A #rrggbb colour's hue, 0-360.
+function colorHue(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (!d) return 0;
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return Math.round(((h * 60) + 360) % 360);
+}
+
 // A category's four period bars share one hue, told apart by opacity (most recent =
 // most opaque).
 function hslWithAlpha(hsl, alpha) {
@@ -262,7 +284,7 @@ function renderCategoryLegend(containerId, categories, toggle) {
 
     const swatch = document.createElement('span');
     swatch.className = 'donut-legend-swatch';
-    swatch.style.backgroundColor = c.color;
+    swatch.style.setProperty('--swatch-color', c.color);
 
     item.append(swatch, document.createTextNode(c.name));
     legend.appendChild(item);

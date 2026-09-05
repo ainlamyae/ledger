@@ -173,9 +173,8 @@ async function renderWorldMapChart(visitedCountries) {
 
   const countries = ChartGeo.topojson.feature(topology, topology.objects.countries).features;
   const visited = new Set(visitedCountries.map((c) => c.toLowerCase()));
-  const dark = document.documentElement.dataset.theme === 'dark';
-  const visitedColor = '#3b82f6';
-  const unvisitedColor = dark ? '#334155' : '#e5e7eb';
+  const visitedColor = chartColor('--chart-blue');
+  const unvisitedColor = chartColor('--color-border');
 
   worldMapChart = upsertChart(worldMapChart, canvas, {
     type: 'choropleth',

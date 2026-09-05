@@ -168,11 +168,11 @@ function renderTodayGlanceCards(entries) {
   // The macro tiles show a whole-gram figure — floored, not rounded, so the readout never
   // claims a gram that isn't fully there. Band colouring above stays on the true value.
   const floorG = (g) => (g !== null ? Math.floor(g) : null);
-  setTodayGlanceTile('today-protein', floorG(protein), formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
-  setTodayGlanceTile('today-fiber', floorG(fiber), formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
-  setTodayGlanceTile('today-fat', floorG(fat), formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand, null, fatOverBand);
-  setTodayGlanceTile('today-carb', floorG(carb), formatProteinTargetBand(carbBand), 'g', carbInBand, null, false, carbUnderBand ? chartColor('--chart-neutral') : null);
-  setTodayGlanceTile('today-sleep-duration', sleepHours, sleepTarget, 'hr', null, null, false, sleepHours !== null ? sleepStatusColor(sleepHours, sleepTarget) : null);
+  setTodayGlanceTile('today-protein', floorG(protein), formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand ? 'income' : 'expense');
+  setTodayGlanceTile('today-fiber', floorG(fiber), formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand ? 'income' : 'expense');
+  setTodayGlanceTile('today-fat', floorG(fat), formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand ? 'income' : 'expense');
+  setTodayGlanceTile('today-carb', floorG(carb), formatProteinTargetBand(carbBand), 'g', carbInBand ? 'income' : (carbUnderBand ? 'neutral' : 'expense'));
+  setTodayGlanceTile('today-sleep-duration', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget ? 'income' : 'expense');
   const windowText = sleepBedMin !== null && sleepWakeMin !== null
     ? `${formatClockTime24(sleepBedMin)}-${formatClockTime24(sleepWakeMin)}`
     : '—';
@@ -350,10 +350,11 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const deprivationEl = document.getElementById('today-status-deprivation-value');
   const deprivationText = deprivationKcal !== null ? `${deprivationKcal} / 0 kcal` : '—';
   deprivationEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
-  setGradientColor(deprivationEl, deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : null);
+  deprivationEl.classList.remove('income', 'expense');
+  if (deprivationKcal !== null) deprivationEl.classList.add(deprivationKcal > 0 ? 'expense' : 'income');
 
   const balanceEl = document.getElementById('today-status-balance-value');
-  balanceEl.classList.remove('income', 'income-high', 'expense');
+  balanceEl.classList.remove('income', 'expense');
   const balanceTargetKcal = targetBalanceKcal(planBodyMassKg(entries));
   const balanceText = balanceKcal !== null
     ? `${balanceKcal}${balanceTargetKcal !== null ? ` / ${balanceTargetKcal}` : ''} kcal`
@@ -380,34 +381,15 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   document.getElementById('today-status-deltam-value').textContent = privacyMode ? maskDigits(dmText) : dmText;
 }
 
-// A value painted along a gradient (Sleep, Deprivation): the colour goes to CSS as
-// --gradient-color (.gradient-value); null clears it.
-function setGradientColor(el, color) {
-  el.classList.toggle('gradient-value', color !== null);
-  if (color !== null) el.style.setProperty('--gradient-color', color);
-  else el.style.removeProperty('--gradient-color');
-}
-
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
-// and mask alike. `note` restates it in a second unit ("(394 kcal)"), inside the same
-// string rather than its own element, so the line reads at one size and masks as one.
-// `isHigh` gives Protein the same dark-green-past-the-band-top the chart uses; every
-// other tile leaves it false and gets the plain two-colour split. `colorOverride`, when
-// given, paints the value that exact colour instead of picking one of the two/three
-// fixed classes — Sleep's own gradient read, see renderTodayGlanceCards above.
-function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, isHigh = false, colorOverride = null, separator = '/') {
+// and mask alike. `tone` is the value's colour class: 'income', 'expense' or 'neutral'.
+function setTodayGlanceTile(idPrefix, value, target, unit, tone) {
   const el = document.getElementById(`${idPrefix}-value`);
-  el.classList.remove('income', 'income-high', 'expense');
-  setGradientColor(el, null);
+  el.classList.remove('income', 'expense', 'neutral');
 
-  const text = `${value !== null ? value : '—'} ${separator} ${target} ${unit}${note !== null ? ` (${note})` : ''}`;
+  const text = `${value !== null ? value : '—'} / ${target} ${unit}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
-  if (value === null) return;
-  if (colorOverride !== null) {
-    setGradientColor(el, colorOverride);
-  } else {
-    el.classList.add(isGood ? (isHigh ? 'income-high' : 'income') : 'expense');
-  }
+  if (value !== null) el.classList.add(tone);
 }
 
 // lastNDates clipped to the earliest matching entry, so a short logging history isn't

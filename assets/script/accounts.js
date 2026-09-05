@@ -128,14 +128,14 @@ function renderAccountsList() {
     const typeCell = makeCell(account.type);
 
     const balanceCell = makeCell(account.balanceText !== null ? account.balanceText : formatCurrency(account.balance));
-    balanceCell.className = account.balanceText !== null ? 'account-closed' : (account.balance < 0 ? 'expense' : 'income');
+    balanceCell.className = account.balanceText !== null ? 'neutral' : (account.balance < 0 ? 'expense' : 'income');
 
     const currentValueCell = makeCell(
       account.currentValueText !== null ? account.currentValueText
         : account.currentValue !== null ? formatCurrency(account.currentValue) : '—'
     );
     if (account.currentValueText !== null) {
-      currentValueCell.className = 'account-closed';
+      currentValueCell.className = 'neutral';
     } else if (account.currentValue !== null) {
       currentValueCell.className = account.currentValue < 0 ? 'expense' : 'income';
     }

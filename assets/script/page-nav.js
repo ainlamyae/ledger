@@ -101,6 +101,19 @@ function crumbSeparator(className = '') {
   return span;
 }
 
+// The home page's own: "Ledger" alone, as the current level.
+function buildHomeCrumb() {
+  const crumb = document.createElement('nav');
+  crumb.className = 'page-crumb';
+  crumb.setAttribute('aria-label', 'Breadcrumb');
+  const current = document.createElement('span');
+  current.className = 'page-crumb-current';
+  current.textContent = 'Ledger';
+  crumb.appendChild(current);
+  const dashboard = document.getElementById('dashboard');
+  dashboard.insertBefore(crumb, dashboard.firstChild);
+}
+
 function buildPageCrumb(section) {
   const group = document.getElementById(section.id);
   const crumb = document.createElement('nav');
@@ -189,6 +202,7 @@ function initPageNav() {
   // Home: every section's tiles under its glance cards; each opens that page.
   if (!window.ledgerSectionPage) {
     document.documentElement.classList.add('home-hub');
+    buildHomeCrumb();
     sections.forEach((s) => {
       buildPageTiles(s);
       buildQuickActions(s);

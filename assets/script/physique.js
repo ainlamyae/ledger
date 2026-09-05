@@ -131,9 +131,10 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const deprivationKcal = physiqueDeprivationKcal(day, sleepHours, bmr);
   el.textContent = deprivationKcal !== null ? `${deprivationKcal} kcal` : '—';
 
-  // The four BMR figures Save will store, one line at the end of the form.
-  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key]) => {
-    const text = bmr[key] !== undefined ? `${bmr[key]} kcal` : '—';
+  // The four BMR figures Save will store, one line; "kcal" once, after the last.
+  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key], i, all) => {
+    const unit = i === all.length - 1 ? ' kcal' : '';
+    const text = bmr[key] !== undefined ? `${bmr[key]}${unit}` : '—';
     document.getElementById(`physique-bmr-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 }
@@ -1041,8 +1042,7 @@ function openPhysiqueMicronutrients(p, routed = false) {
   } else {
     data.nutrients.forEach((n, i) => {
       const tr = document.createElement('tr');
-      if (n.severity === 'severe') tr.classList.add('nutrient-gap-severe');
-      else if (n.severity === 'mild') tr.classList.add('nutrient-gap-mild');
+      if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
       if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
       tr.append(
         makeCell(n.displayName),

@@ -283,7 +283,7 @@ async function runFinancialInsightGeneration() {
   btn.disabled = true;
   textarea.disabled = true;
   const originalLabel = btn.textContent;
-  btn.textContent = 'Generating…';
+  btn.textContent = '🤖…';
 
   try {
     const text = await groqChatText(FINANCIAL_INSIGHT_SYSTEM_PROMPT, financialInsightUserMessage(data, textarea.value));

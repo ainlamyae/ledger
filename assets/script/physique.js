@@ -172,9 +172,6 @@ async function initPhysique(forceRefresh = false) {
       else openPhysiqueForm(p, sub === 'duplicate');
       return physiqueRouteStep(p).label;
     });
-    document.getElementById('health-reminder-log-btn').addEventListener('click', () => {
-      openRoutedPage('physique', [todayPhysiqueRouteStep()], () => openPhysiqueForm(todaysPhysiqueDay()));
-    });
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
     document.getElementById('physique-micro-close-btn').addEventListener('click', () => {
       document.getElementById('physique-micro-modal').hidden = true;
@@ -213,7 +210,6 @@ async function initPhysique(forceRefresh = false) {
     });
     onAsyncClick('physique-bulk-calc-btn', bulkCalculatePhysique);
     onAsyncClick('physique-bulk-combine-btn', bulkCombineAndSortPhysique);
-    document.getElementById('physique-export-csv-btn').addEventListener('click', exportPhysiqueCSV);
   }
 
   await refreshPhysique(forceRefresh);
@@ -637,9 +633,9 @@ async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
 // there's no day this doesn't apply to — everyone eats every day — so this
 // is just "does today have a Physique row yet".
 function checkHealthReminder() {
-  const banner = document.getElementById('health-reminder-banner');
   const today = isoFromDate(new Date());
-  banner.hidden = allPhysiqueEntries.some((p) => p.date === today);
+  const logged = allPhysiqueEntries.some((p) => p.date === today);
+  setPageBadge('health', 'physique', logged ? null : { text: 'Log', title: "Today isn't logged", record: today });
 }
 
 // --- Physique as chart input --------------------------------------------
@@ -1316,13 +1312,21 @@ async function submitPhysiqueForm(event) {
   }
 
   try {
-    if (editingPhysiqueRow !== null) {
-      await writePhysiqueRow(editingPhysiqueRow, day);
+    const editingRow = editingPhysiqueRow;
+    if (editingRow !== null) {
+      await writePhysiqueRow(editingRow, day);
     } else {
       await appendPhysiqueRow(day);
     }
     await refreshPhysique(true);
-    closePhysiqueForm();
+    // The saved day: the edited row, else the new date's (a new Pattern, the last one).
+    const saved = allPhysiqueEntries.find((p) => p.row === editingRow)
+      || (isPattern ? allPhysiqueEntries.filter((p) => !p.date).at(-1) : allPhysiqueEntries.find((p) => p.date === date));
+    if (saved) {
+      openPhysiqueForm(saved);
+      stayOnSavedForm('physique-modal', physiqueRouteStep(saved));
+    }
+    showFormSaved('physique-form-error');
   } catch (err) {
     showFieldError('physique-form-error', err.message);
   }

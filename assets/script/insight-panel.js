@@ -331,7 +331,7 @@ async function runInsightGeneration() {
   textarea.disabled = true;
   modeButtons.forEach((b) => { b.disabled = true; });
   const originalLabel = btn.textContent;
-  btn.textContent = 'Generating…';
+  btn.textContent = '🤖…';
 
   try {
     // Built from the data the preview above was rendered from, not a fresh

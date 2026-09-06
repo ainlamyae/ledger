@@ -148,6 +148,12 @@ function appendValues(range, values, valueInputOption = 'USER_ENTERED') {
   );
 }
 
+// The sheet row an append landed on, from its response ("Tab!A12:U12" -> 12).
+function appendedRow(response) {
+  const match = /![A-Z]+(\d+)/.exec(response?.updates?.updatedRange || '');
+  return match ? Number(match[1]) : null;
+}
+
 function updateValues(range, values, valueInputOption = 'USER_ENTERED') {
   return sheetsRequest(
     `/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`,

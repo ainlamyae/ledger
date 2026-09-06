@@ -191,13 +191,23 @@ function setupKeyboardShortcuts() {
     const isTyping = target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
     if (isTyping) return;
 
+    // Both work from any page: on Finance's own pages in place, elsewhere by going to
+    // the Transaction page or its Log form.
+    const txPanel = document.querySelector('#finance > .panel[data-route="transaction"]');
+    const onFinance = !window.ledgerSectionPage || window.ledgerSectionPage.section === 'finance';
     if (e.key === '/') {
       e.preventDefault();
-      document.getElementById('tx-search').focus();
+      const search = document.getElementById('tx-payee-filter');
+      if (search.offsetParent) search.focus();
+      else if (window.ledgerSectionPage?.section === 'finance') {
+        navigateSectionPage(txPanel);
+        search.focus();
+      } else location.href = routeUrl(txPanel);
     } else if (e.key === 'n') {
       // Through the button rather than openTransactionForm() directly, so the
       // shortcut passes the same auth gate a click does (setupAuthGatedActions).
-      document.getElementById('add-transaction-btn').click();
+      if (onFinance) document.getElementById('add-transaction-btn').click();
+      else location.href = routeUrl(txPanel, [{ slug: 'log' }]);
     } else if (e.key === '?') {
       toggleShortcutsHelp();
     }
@@ -205,6 +215,18 @@ function setupKeyboardShortcuts() {
 
   document.getElementById('shortcuts-close-btn').addEventListener('click', toggleShortcutsHelp);
   setupModalFocusManagement();
+}
+
+// Chrome only lets a click ask for notifications, so the account menu offers it
+// until it has been answered; Work Time's and Car Service's reminders then use it.
+function setupNotificationsButton() {
+  const btn = document.getElementById('notifications-btn');
+  const sync = () => { btn.hidden = !('Notification' in window) || Notification.permission !== 'default'; };
+  sync();
+  btn.addEventListener('click', async () => {
+    await Notification.requestPermission();
+    sync();
+  });
 }
 
 function setupAccountMenu() {
@@ -517,16 +539,12 @@ function renderSummaryCards(data) {
 function renderReconciliationStatus(missingAmount) {
   const isReconciled = Math.abs(missingAmount) < 0.005;
 
-  // A sign, not a second control: it sits on the heading line so it survives the
-  // panel being collapsed (a status line below the header wouldn't — collapsed
-  // content goes `inert`), but it isn't a button and carries no click handler of
-  // its own. Silent when reconciled, the same "nothing to say" pattern the rest
-  // of the app uses for a clean state.
-  const flagEl = document.getElementById('account-reconciliation-flag');
-  flagEl.hidden = isReconciled;
-  const dir = missingAmount > 0 ? 'Acct>Txn' : 'Acct<Txn';
-  flagEl.textContent = isReconciled ? '' : `${dir} ${formatCurrency(missingAmount)}`;
-  flagEl.title = isReconciled ? '' : `Accounts ${missingAmount > 0 ? '>' : '<'} Transaction total — off by ${formatCurrency(Math.abs(missingAmount))}`;
+  // A>T: accounts above the transactions' total; A<T: below.
+  setPageBadge('finance', 'account', isReconciled ? null : {
+    // Whole dollars (rounded up, so a few cents still show $1); the exact figure in its hover.
+    text: `A${missingAmount > 0 ? '>' : '<'}T ${formatCurrency(Math.ceil(Math.abs(missingAmount))).replace(/\.00$/, '')}`,
+    title: `Accounts ${missingAmount > 0 ? 'above' : 'below'} the transactions by ${formatCurrency(Math.abs(missingAmount))}`,
+  });
 }
 
 async function refreshNetWorth() {
@@ -619,9 +637,11 @@ async function loadDashboard(forceRefresh = false) {
     // (/health/, /finance/, /other/) loads its own blocks alone; the home page
     // loads the glance cards (Health status, Finance summary), plus every block
     // when Show blocks is on. Car Service (Other) is drawn from Transactions, so
-    // Other loads those too.
+    // Other loads those too. The home page also reads Transactions and Work Time for
+    // its tiles' badges (Car Service's days left, Work Time's Log).
     const section = window.ledgerSectionPage?.section ?? null;
-    const shows = (id) => loadBlocks && (section === null || section === id);
+    const home = section === null;
+    const shows = (id) => loadBlocks && (home || section === id);
     const needsHealth = section === null || section === 'health';
     const needsReport = section === null || section === 'finance';
 
@@ -664,7 +684,8 @@ async function loadDashboard(forceRefresh = false) {
           renderInstructionList();
         }),
       ] : []),
-      ...((shows('finance') || shows('other')) ? [initTransactions(forceRefresh)] : []),
+      ...((shows('finance') || shows('other') || home) ? [initTransactions(forceRefresh)] : []),
+      ...(home && !shows('other') ? [initTimeSheet(forceRefresh)] : []),
       ...(shows('finance') ? [initAccountManager(forceRefresh), initBreakdown(forceRefresh)] : []),
       ...(shows('other') ? [
         initTimeSheet(forceRefresh),
@@ -1009,6 +1030,7 @@ function bootDashboard() {
   setupThemeToggle();
   setupPrivacyToggle();
   setupWidgetsToggle();
+  setupNotificationsButton();
   setupKeyboardShortcuts();
   applyChartTheme();
   initWidgets();

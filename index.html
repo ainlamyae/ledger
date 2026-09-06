@@ -120,6 +120,7 @@
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
                 <button id="theme-toggle-btn" class="account-menu-item">Switch to dark mode</button>
                 <button id="privacy-toggle-btn" class="account-menu-item" hidden>Hide amounts</button>
+                <button id="notifications-btn" class="account-menu-item" hidden title="Let Chrome show Work Time's and Car Service's daily reminders">Enable notifications</button>
                 <button id="widgets-toggle-btn" class="account-menu-item" hidden title="Show or hide the Time/Date/Azan/Weather row">Hide widgets</button>
                 <button id="signout-btn" class="account-menu-item account-menu-item-divider">Sign out</button>
             </div>
@@ -284,11 +285,6 @@
             </div>
         </div>
 
-        <div id="health-reminder-banner" class="info-banner" hidden>
-            <span>You haven't logged today's Physique entry yet.</span>
-            <button id="health-reminder-log-btn" class="btn btn-primary">Log</button>
-        </div>
-
         <div class="panel" data-route="indicator">
             <div class="panel-header">
                 <h2>Indicator</h2>
@@ -430,9 +426,8 @@
         <div class="panel" data-route="physique">
             <div class="panel-header">
                 <h2>Physique</h2>
-                <button id="physique-export-csv-btn" class="btn panel-header-btn">Export CSV</button>
                 <button id="today-physique-btn" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
-                <button id="add-physique-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
+                <button id="add-physique-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a day's body mass, consumption and workout" aria-label="Log">📝</button>
             </div>
 
             <div class="filters">
@@ -475,7 +470,7 @@
             <div class="panel-actions" id="physique-bulk-actions" hidden>
                 <span id="physique-bulk-summary"></span>
                 <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
-                <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
+                <button id="physique-bulk-calc-btn" class="btn btn-icon" title="Calculate the selected days" aria-label="Calculate">🧮</button>
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
 
@@ -485,8 +480,8 @@
         <div class="panel" data-route="nutrition">
             <div class="panel-header">
                 <h2>Nutrition</h2>
-                <button type="button" id="log-nutrition-btn" class="btn btn-primary panel-header-btn" title="Log the ticked ingredients as today's Consumption">Log</button>
-                <button id="add-nutrition-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
+                <button type="button" id="log-nutrition-btn" class="btn btn-icon panel-header-btn" title="Log the ticked ingredients as today's Consumption" aria-label="Log">📝</button>
+                <button id="add-nutrition-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an ingredient to the catalogue" aria-label="Add">➕</button>
             </div>
 
             <div class="filters">
@@ -521,7 +516,7 @@
                 <span id="nutrition-bulk-summary"></span>
                 <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
                 <button id="nutrition-bulk-capitalize-btn" class="btn" title="Capitalize each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field">Capitalize Names</button>
-                <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">Complete</button>
+                <button id="nutrition-pull-micros-btn" class="btn btn-icon" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified" aria-label="Complete">🧲</button>
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
@@ -534,9 +529,9 @@
                 <h2>Activity</h2>
                 <!-- Three buttons on one phone heading line, so each label is cut to a
                      word and carries the full wording in its tooltip. -->
-                <button type="button" id="activity-instruction-btn" data-route="guide" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
-                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
-                <button type="button" id="add-activity-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
+                <button type="button" id="activity-instruction-btn" data-route="guide" class="btn btn-icon panel-header-btn" title="How to run the activities in this plan" aria-label="Guide">🧭</button>
+                <button type="button" id="log-workout-btn" class="btn btn-icon panel-header-btn" title="Log the ticked activities as today's workout" aria-label="Log">📝</button>
+                <button type="button" id="add-activity-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an exercise or activity to the plan" aria-label="Add">➕</button>
             </div>
 
             <!-- Rebuilt from the Activity sheet tab by activities.js -->
@@ -664,7 +659,7 @@
             </div>
 
             <div class="panel-actions" data-page-actions>
-                <button type="button" id="insight-generate-btn" class="btn btn-ai" disabled title="Load a data set first">Send to AI</button>
+                <button type="button" id="insight-generate-btn" class="btn btn-icon" disabled title="Send to AI (load a data set first)" aria-label="Send to AI">🤖</button>
                 <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
             </div>
 
@@ -1316,9 +1311,9 @@
                 <p id="formula-status" class="status" hidden></p>
 
                 <div class="panel-actions" data-page-actions>
-                    <button type="button" id="formula-reset-btn" class="btn">Reset</button>
-                    <button type="button" id="formula-update-btn" class="btn" title="Save this n_p / L_p and recompute BMR_cal (and every stored BMR figure) for every day in the Physique sheet">Update</button>
-                    <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
+                    <button type="button" id="formula-reset-btn" class="btn btn-icon" title="Reset" aria-label="Reset">♻️</button>
+                    <button type="button" id="formula-update-btn" class="btn btn-icon" title="Save this n_p / L_p and recompute BMR_cal (and every stored BMR figure) for every day in the Physique sheet" aria-label="Update">🔄</button>
+                    <button type="button" id="formula-save-btn" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                     <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
                 </div>
             </div>
@@ -1329,7 +1324,7 @@
         <div class="panel" data-route="settings">
             <div class="panel-header">
                 <h2>Settings</h2>
-                <button id="health-add-setting-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a setting">Add</button>
+                <button id="health-add-setting-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a setting" aria-label="Add">➕</button>
             </div>
 
             <div class="table-responsive">
@@ -1504,7 +1499,7 @@
             </div>
 
             <div class="panel-actions" data-page-actions>
-                <button type="button" id="financial-insight-generate-btn" class="btn btn-ai" disabled title="Load your financial data first">Send to AI</button>
+                <button type="button" id="financial-insight-generate-btn" class="btn btn-icon" disabled title="Send to AI (load your financial data first)" aria-label="Send to AI">🤖</button>
                 <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
             </div>
 
@@ -1516,8 +1511,7 @@
         <div class="panel" data-route="transaction">
             <div class="panel-header">
                 <h2>Transaction</h2>
-                <button id="export-csv-btn" class="btn panel-header-btn">Export CSV</button>
-                <button id="add-transaction-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a transaction">Log</button>
+                <button id="add-transaction-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a transaction" aria-label="Log">📝</button>
             </div>
 
             <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
@@ -1582,9 +1576,8 @@
         <div class="panel" data-route="account">
             <div class="panel-header">
                 <h2>Account</h2>
-                <span id="account-reconciliation-flag" class="panel-header-flag" hidden aria-hidden="true"></span>
                 <button id="transfer-funds-btn" data-route="transfer" class="btn btn-secondary panel-header-btn" title="Move money between two of your own accounts">Transfer</button>
-                <button id="add-account-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an account">Add</button>
+                <button id="add-account-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an account" aria-label="Add">➕</button>
             </div>
 
             <div class="table-responsive">
@@ -1620,7 +1613,7 @@
         <div class="panel" data-route="breakdown">
             <div class="panel-header">
                 <h2>Breakdown</h2>
-                <button id="add-breakdown-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a category/type row — it copies an existing row's formulas, so its four totals compute themselves">Add</button>
+                <button id="add-breakdown-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a category/type row — it copies an existing row's formulas, so its four totals compute themselves" aria-label="Add">➕</button>
             </div>
 
             <div class="filters">
@@ -1651,18 +1644,12 @@
     <section id="other" class="panel-group">
         <h2 class="panel-group-title"><a href="other/">Other</a></h2>
 
-        <div id="timesheet-reminder-banner" class="info-banner" hidden>
-            <span>You haven't logged today's hours yet.</span>
-            <button id="timesheet-reminder-log-btn" class="btn btn-primary">Log Time</button>
-            <button id="timesheet-reminder-enable-btn" class="btn" hidden>Enable reminders</button>
-        </div>
-
         <div class="panel" data-route="work-time">
             <div class="panel-header">
                 <h2>Work Time</h2>
                 <!-- One word, like every other panel's action button. Which day and what
                      it logs is the modal's job to say; the tooltip carries the long form. -->
-                <button id="log-today-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log time for a day">Log</button>
+                <button id="log-today-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log time for a day" aria-label="Log">📝</button>
             </div>
 
             <!-- What used to be a separate "Work Analytics" panel: the charts read
@@ -1735,7 +1722,6 @@
         <div class="panel" data-route="car-service">
             <div class="panel-header">
                 <h2>Car Service</h2>
-                <span id="car-service-flag" class="panel-header-flag" hidden aria-hidden="true"></span>
             </div>
 
             <!-- Read off Transportation transactions whose description carries the odometer
@@ -1783,7 +1769,7 @@
         <div class="panel" data-route="travel">
             <div class="panel-header">
                 <h2>Travel</h2>
-                <button id="add-travel-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a travel entry">Log</button>
+                <button id="add-travel-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a travel entry" aria-label="Log">📝</button>
             </div>
 
             <!-- What used to be a separate "Travel Insights" panel, same as Work Time
@@ -1830,7 +1816,7 @@
         <div class="panel" data-route="application">
             <div class="panel-header">
                 <h2>Application</h2>
-                <button id="add-application-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a job application">Log</button>
+                <button id="add-application-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a job application" aria-label="Log">📝</button>
             </div>
 
             <div class="filters">
@@ -1843,7 +1829,7 @@
         <div class="panel" data-route="contact">
             <div class="panel-header">
                 <h2>Contact</h2>
-                <button id="add-contact-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a contact">Add</button>
+                <button id="add-contact-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a contact" aria-label="Add">➕</button>
             </div>
 
             <div class="panel-actions">
@@ -1887,7 +1873,9 @@
         <div class="panel" data-route="settings">
             <div class="panel-header">
                 <h2>Settings</h2>
-                <button id="add-setting-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a setting">Add</button>
+                <button type="button" id="export-transactions-btn" class="btn panel-header-btn" title="Download every transaction as CSV">Export Transactions</button>
+                <button type="button" id="export-physique-btn" class="btn panel-header-btn" title="Download every Physique day as CSV">Export Physique</button>
+                <button id="add-setting-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a setting" aria-label="Add">➕</button>
             </div>
 
             <div class="table-responsive">
@@ -1973,7 +1961,7 @@
                      the taxed figure is on screen to check before either Save takes it. -->
                 <button type="button" id="tx-tax-btn" class="btn">Tax</button>
                 <button type="submit" id="tx-save-add-btn" class="btn btn-primary">Save &amp; Add Another</button>
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2010,7 +1998,7 @@
             <p id="tx-bulk-edit-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="tx-bulk-edit-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2037,7 +2025,7 @@
             <p id="breakdown-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="breakdown-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2081,7 +2069,7 @@
             <p id="account-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="account-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2167,7 +2155,7 @@
             <p id="setting-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="setting-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2210,7 +2198,7 @@
             <p id="timesheet-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="timesheet-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2325,8 +2313,7 @@
 
             <div class="modal-actions">
                 <button type="button" id="physique-combine-btn" class="btn" title="Combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
-                <button type="button" id="physique-form-micro-btn" class="btn" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved">Micronutrients</button>
-                <button type="button" id="physique-calc-btn" class="btn btn-ai">Calculate</button>
+                <button type="button" id="physique-form-micro-btn" class="btn btn-icon" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved" aria-label="Micronutrients">🧬</button>
                 <!-- No `capture` attribute: on iOS Safari it jumps straight to the Camera app
                      rather than the native picker sheet, and that app switch can make WebKit
                      reload this page under memory pressure while the camera is open — which
@@ -2335,8 +2322,9 @@
                      once a photo comes back. Dropping it restores the full sheet — Photo
                      Library AND Take Photo — without leaving the page. -->
                 <input type="file" id="physique-scan-input" accept="image/*" hidden>
-                <button type="button" id="physique-scan-btn" class="btn btn-ai" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption">Scan</button>
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="physique-scan-btn" class="btn btn-icon" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption" aria-label="Scan">📷</button>
+                <button type="button" id="physique-calc-btn" class="btn btn-icon" title="Calculate" aria-label="Calculate">🧮</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="physique-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2437,9 +2425,9 @@
             <p id="activity-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="activity-update-btn" class="btn" hidden title="Save these changes, then find every Physique day whose Workout mentions this activity's OLD name, rename those lines (if the name changed) and reprice that day's Duration and Calories Out at the new MET">Update</button>
-                <button type="button" id="activity-log-btn" class="btn btn-primary" title="Log this activity as today's workout">Log</button>
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="activity-update-btn" class="btn btn-icon" hidden title="Save these changes, then find every Physique day whose Workout mentions this activity's OLD name, rename those lines (if the name changed) and reprice that day's Duration and Calories Out at the new MET" aria-label="Update">🔄</button>
+                <button type="button" id="activity-log-btn" class="btn btn-icon" title="Log this activity as today's workout" aria-label="Log">📝</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="activity-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2511,14 +2499,14 @@
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">Complete</button>
+                <button type="button" id="nutrition-pull-micros-single-btn" class="btn btn-icon" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched" aria-label="Complete">🧲</button>
                 <!-- No `capture`: see physique-scan-input. -->
                 <input type="file" id="nutrition-scan-input" accept="image/*" hidden>
-                <button type="button" id="nutrition-scan-btn" class="btn btn-ai" title="Take a photo of the product's Nutrition Facts label — AI reads it and fills the values below (ticked rows are kept as typed)">Scan</button>
-                <button type="button" id="nutrition-normalize-btn" class="btn" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure">Norm</button>
-                <button type="button" id="nutrition-update-btn" class="btn" hidden title="Save these changes, then find every Physique day whose Consumption mentions this ingredient's OLD name and rewrite those lines (renaming them if the name changed) plus their Breakdown entries and day totals to match — for any line whose unit can't be locally rescaled (e.g. cup, tbsp), only the name is updated">Update</button>
-                <button type="button" id="nutrition-log-btn" class="btn btn-primary" title="Log this ingredient as today's Consumption">Log</button>
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="nutrition-scan-btn" class="btn btn-icon" title="Take a photo of the product's Nutrition Facts label — AI reads it and fills the values below (ticked rows are kept as typed)" aria-label="Scan">📷</button>
+                <button type="button" id="nutrition-normalize-btn" class="btn btn-icon" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure" aria-label="Norm">📏</button>
+                <button type="button" id="nutrition-update-btn" class="btn btn-icon" hidden title="Save these changes, then find every Physique day whose Consumption mentions this ingredient's OLD name and rewrite those lines (renaming them if the name changed) plus their Breakdown entries and day totals to match — for any line whose unit can't be locally rescaled (e.g. cup, tbsp), only the name is updated" aria-label="Update">🔄</button>
+                <button type="button" id="nutrition-log-btn" class="btn btn-icon" title="Log this ingredient as today's Consumption" aria-label="Log">📝</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="nutrition-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2597,7 +2585,7 @@
             <p id="contact-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="contact-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2641,7 +2629,7 @@
             <p id="travel-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="travel-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2670,7 +2658,7 @@
             <p id="application-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="application-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2682,10 +2670,10 @@
         <button type="button" id="shortcuts-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         <h2 id="shortcuts-modal-title">Keyboard Shortcuts</h2>
         <ul class="shortcuts-list">
-            <li><kbd>/</kbd> Focus transaction search</li>
-            <li><kbd>n</kbd> Add transaction</li>
-            <li><kbd>Esc</kbd> Close open modal/menu</li>
-            <li><kbd>?</kbd> Toggle this help</li>
+            <li><kbd>/</kbd> Filter transactions by payee</li>
+            <li><kbd>n</kbd> Log a transaction</li>
+            <li><kbd>Esc</kbd> Close a form or menu</li>
+            <li><kbd>?</kbd> Show or hide this help</li>
         </ul>
     </div>
 </div>

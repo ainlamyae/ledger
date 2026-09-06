@@ -115,7 +115,7 @@ flowchart TD
 
     Idle --> TSFlow["Time Tracker: 'Log a Work Time'"]
     TSFlow --> TSWrite["backfillMissingDates() fills any<br/>gap, then appendValues/updateValues<br/>the logged day"]
-    TSWrite --> TSReminder["checkTimesheetReminder() re-evaluates<br/>the banner, scoped to whichever<br/>company was last logged on/before today"]
+    TSWrite --> TSReminder["checkTimesheetReminder() re-evaluates<br/>the Log badge, scoped to whichever<br/>company was last logged on/before today"]
     TSReminder --> Idle
 
     Idle --> TravelFlow["Travel views<br/>(derived, no extra API call)"]
@@ -179,7 +179,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 19 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
 | 20 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
 | 21 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
-| 22 | `timesheet.js` | Work Time panel, holiday/missed detection, analytics data, reminder banner |
+| 22 | `timesheet.js` | Work Time panel, holiday/missed detection, analytics data, Log badge |
 | 23 | `csv.js` | CSV import, advanced filter engine, download helper |
 | 24 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
 | 25 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, table rendering, form open/close, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |

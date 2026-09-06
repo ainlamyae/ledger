@@ -217,8 +217,13 @@ async function submitBreakdownForm(event) {
       `'${CONFIG.SHEETS.INSIGHT}'!A${row}:B${row}`,
       [[category, type]]
     );
-    closeBreakdownForm();
     await refreshBreakdown(true);
+    const saved = allBreakdownRows.find((b) => b.row === row);
+    if (saved) {
+      openBreakdownForm(saved);
+      stayOnSavedForm('breakdown-modal', editBreakdown.step(saved));
+    }
+    showFormSaved('breakdown-form-error');
   } catch (err) {
     showFieldError('breakdown-form-error', err.message);
   }

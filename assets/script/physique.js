@@ -189,7 +189,7 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('physique-is-pattern').addEventListener('change', updatePhysiqueSleepDuration);
     onFormSubmit('physique-form', submitPhysiqueForm);
 
-    ['physique-search', 'physique-date-from', 'physique-date-to'].forEach((id) => {
+    ['physique-search'].forEach((id) => {
       document.getElementById(id).addEventListener('input', () => {
         pCurrentPage = 1;
         selectedPhysiqueRows.clear();
@@ -795,13 +795,8 @@ const PHYSIQUE_NUMERIC_KEYS = ['bodyMass', 'caloriesIn', 'proteinIn', 'fiber', '
 
 function getFilteredPhysiqueEntries() {
   const search = document.getElementById('physique-search').value.trim().toLowerCase();
-  const dateFrom = document.getElementById('physique-date-from').value;
-  const dateTo = document.getElementById('physique-date-to').value;
 
   const filtered = allPhysiqueEntries
-    // Pattern rows (no date) are date-agnostic templates, so an active
-    // date-range filter shouldn't hide them.
-    .filter((p) => !p.date || ((!dateFrom || p.date >= dateFrom) && (!dateTo || p.date <= dateTo)))
     .filter((p) => {
       if (!search) return true;
       return [p.date, p.consumption, p.breakdown, p.workout]

@@ -999,6 +999,18 @@ td {
     border-top: 2px solid var(--color-text-muted);
 }
 
+/* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
+   Duration/Cal workout goal (activity table), directly under the Total they're measured
+   against. A target, not a measurement, so it's set off with a dashed top border instead
+   of the Total row's solid one — same idiom as the Food insight table's own Ideal/day row
+   (#insight-food-table tr.insight-food-ideal-row below). */
+#physique-calc-breakdown tr.calc-breakdown-target td,
+#physique-activity-breakdown tr.calc-breakdown-target td {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    border-top: 2px dashed var(--color-text-muted);
+}
+
 /* Both Calculate tables sit between two fields and are where the day's four
    totals are now read, the fields themselves being hidden. The field above
    supplies only its own .35rem, so without a matching gap below, the next

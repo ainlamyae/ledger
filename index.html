@@ -254,7 +254,7 @@
                 <div class="body-mass-projection-header">
                     <h4>State Trend &amp; Forecast</h4>
                 </div>
-                <div class="chart-box">
+                <div class="chart-box chart-box-flush">
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
@@ -273,7 +273,7 @@
                 <div class="body-mass-projection-header">
                     <h4>Calorie Balance</h4>
                 </div>
-                <div class="chart-box">
+                <div class="chart-box chart-box-flush">
                     <canvas id="wellness-energy-balance-chart"></canvas>
                 </div>
             </div>
@@ -421,7 +421,14 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Physique</h2>
-                <input type="file" id="physique-scan-input" accept="image/*" capture="environment" hidden>
+                <!-- No `capture` attribute: on iOS Safari it jumps straight to the Camera app
+                     rather than the native picker sheet, and that app switch can make WebKit
+                     reload this page under memory pressure while the camera is open — which
+                     drops every listener bound here, so the 'change' event this button waits
+                     on (handlePhysiqueScanInput) never fires and the tap silently does nothing
+                     once a photo comes back. Dropping it restores the full sheet — Photo
+                     Library AND Take Photo — without leaving the page. -->
+                <input type="file" id="physique-scan-input" accept="image/*" hidden>
                 <button id="physique-scan-btn" class="btn btn-ai panel-header-btn" title="Take a photo of your meal — AI identifies foods and estimates portions, then opens the Log form pre-filled">Scan</button>
                 <button id="add-physique-btn" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
             </div>
@@ -1348,7 +1355,7 @@
             </div>
             <label>Consumption
                 <div class="autocomplete-anchor">
-                    <textarea id="physique-consumption" rows="8" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
+                    <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
                     <ul id="physique-consumption-suggestions" class="autocomplete-suggestions" hidden></ul>
                 </div>
             </label>

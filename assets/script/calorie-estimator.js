@@ -904,6 +904,36 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
   );
   tbody.appendChild(totalRow);
 
+  // What the day above is aiming for, so the Total row has something to compare itself
+  // against without leaving the table — same "Ideal/day" idiom food-insight.js's own
+  // table uses, reusing the exact targets the tiles/charts already compute
+  // (getCalorieTarget, getProteinTargetBandG/getFiberTargetBandG) rather than a second
+  // copy of the arithmetic. Fat/Carbohydrate fall back to the FDA Daily Value reference
+  // (no personalized formula for either yet); TEF and Source get no target at all.
+  // Physique-only: the Workout table's own Total has no equivalent day target to show.
+  if (target === 'physique') {
+    const wellnessEntries = physiqueAsWellnessEntries();
+    const calorieTarget = getCalorieTarget(wellnessEntries);
+    const proteinBand = getProteinTargetBandG(wellnessEntries);
+    const fiberBand = getFiberTargetBandG(wellnessEntries);
+    const dailyTargets = nutrientDailyTargets();
+
+    const targetRow = document.createElement('tr');
+    targetRow.className = 'calc-breakdown-target';
+    targetRow.append(
+      makeCell('Target', `${calorieTarget.full} calorie target, current protein/fiber band floors (${formatProteinTargetBand(proteinBand)} / ${formatProteinTargetBand(fiberBand)} full range) and Fat/Carbohydrate FDA Daily Values — from the Health Formula Playground and Settings, not today's Consumption`),
+      makeCell(''),
+      makeCell(String(Math.round(calorieTarget.kcal))),
+      makeCell(String(proteinBand.min)),
+      makeCell(String(fiberBand.min)),
+      makeCell(String(dailyTargets['Total lipid (fat)'].amount)),
+      makeCell(String(dailyTargets['Carbohydrate, by difference'].amount)),
+      makeCell('—'),
+      makeCell(''),
+    );
+    tbody.appendChild(targetRow);
+  }
+
   // Physique stores the same JSON in a visible field rather than a hidden
   // column, so every re-render (including 💾 clearing a row's newRow) keeps
   // that field in step with the table above it.

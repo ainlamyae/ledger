@@ -3886,6 +3886,33 @@ function renderWellnessProjectionChart(entries) {
         isSwingBand: true,
         order: 5,
       },
+      // Where the actual trend has dropped BELOW the swing zone's own floor — glycogen
+      // and water alone don't explain a drop that size, so unlike the zone above this
+      // reads as a real loss, not noise. Sits at the zone floor (a zero-height fill
+      // against the dataset above) whenever the trend is inside or above the zone, and
+      // drops to the trend's own value — opening up a red fill down to it — for exactly
+      // the stretch it's actually below. tension 0 to match the zone's own straight
+      // edges rather than the trend line's smoothed curve.
+      {
+        label: 'Muscle Loss (below swing zone)',
+        data: allLabels.map((d) => {
+          const a = zoneAnchorMap.get(d);
+          const trend = trendMap.get(d);
+          if (a === undefined || trend === null || trend === undefined) return { x: dayOffset(d), y: null };
+          return { x: dayOffset(d), y: Math.min(trend, a - swingKg) };
+        }),
+        // A real warning, so it reads noticeably stronger than the yellow zone's own
+        // 0.15 neutral tint rather than matching it.
+        backgroundColor: 'rgba(220, 38, 38, 0.45)',
+        borderWidth: 0,
+        pointRadius: 0,
+        tension: 0,
+        // Fills to the zone-floor dataset just above this one in the array.
+        fill: '-1',
+        spanGaps: false,
+        isSwingBand: true,
+        order: 5,
+      },
     ] : []),
     {
       label: 'State Trend & Forecast',

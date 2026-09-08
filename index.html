@@ -53,8 +53,8 @@
         if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_WIDGETS) === 0) {
             document.documentElement.setAttribute('data-widgets-pref', 'hidden');
         }
-        // Same for "Hide bulbs" (SHOW_BULBS).
-        if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_BULBS) === 0) {
+        // Same for "Hide bulbs" (SHOW_BULBS), main page only: section pages run this head too.
+        if (!window.ledgerSectionPage && Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_BULBS) === 0) {
             document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
         }
     } catch (e) {}

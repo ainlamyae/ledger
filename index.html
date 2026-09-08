@@ -53,6 +53,10 @@
         if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_WIDGETS) === 0) {
             document.documentElement.setAttribute('data-widgets-pref', 'hidden');
         }
+        // Same for "Hide bulbs" (SHOW_BULBS).
+        if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_BULBS) === 0) {
+            document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
+        }
     } catch (e) {}
 </script>
 <script>
@@ -122,6 +126,7 @@
                 <button id="privacy-toggle-btn" class="account-menu-item" hidden>Hide amounts</button>
                 <button id="notifications-btn" class="account-menu-item" hidden title="Let Chrome show Work Time's and Car Service's daily reminders">Enable notifications</button>
                 <button id="widgets-toggle-btn" class="account-menu-item" hidden title="Show or hide the Time/Date/Azan/Weather row">Hide widgets</button>
+                <button id="bulbs-toggle-btn" class="account-menu-item" hidden title="Show or hide the home page's Health and Finance glance cards">Hide bulbs</button>
                 <button id="signout-btn" class="account-menu-item account-menu-item-divider">Sign out</button>
             </div>
         </div>

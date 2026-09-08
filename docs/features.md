@@ -49,6 +49,7 @@
 - **Dark mode** — floating toggle, persisted.
 - **Privacy mode** — floating toggle masks amounts, health figures, contact details and Settings values.
 - **Widget visibility** — the account menu's **Hide widgets** / **Show widgets** item toggles the bulb row on the home page, persisted to a `SHOW_WIDGETS` Setting (same 0/1 convention as Privacy mode's `SHOW_AMOUNTS`) so it survives a refresh. Deliberately left alone on the three section pages — they already hide the row unconditionally (`section-page.js`'s `showOnly`), so this toggle only has an effect on `/`.
+- **Bulb visibility** — the account menu's **Hide bulbs** / **Show bulbs** item toggles the home page's Health and Finance glance cards (Status, Intake Macros, Physical Activity, Sleep, Progress; Net Worth, Monthly Cash Flow, Income, Expenditure), persisted to a `SHOW_BULBS` Setting the same way as `SHOW_WIDGETS`. Section pages always keep their cards.
 - **No service worker** — the page's HTML/CSS/JS always come from the server. The old offline shell cache (`sw.js`) served cached scripts ahead of the network while section pages fetch `index.html` fresh, so an update ran new markup against old scripts; `sw.js` is now a stub that clears every cache and unregisters itself in browsers that still have it, and `index.html` removes any leftover registration on load.
 
 ## Hub and pages

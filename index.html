@@ -58,6 +58,16 @@
             document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
         }
     } catch (e) {}
+    // The hub/page layout before first paint, so a reload never shows the blocks as
+    // they sit in the raw page (every one open, Indicator's charts first) while the
+    // scripts load. page-nav.js and router.js add the same classes later and fill
+    // in the rest — the tiles, and which block a page shows — on the same layout.
+    if (!window.ledgerSectionPage) {
+        document.documentElement.classList.add('home-hub');
+    } else {
+        document.documentElement.classList.add('section-pages');
+        document.documentElement.dataset.page = window.ledgerSectionPage.route.length ? 'block' : 'hub';
+    }
 </script>
 <script>
     // There's no service worker any more: it served its saved copy of every

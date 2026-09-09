@@ -634,8 +634,7 @@ function widgetsOnPage() {
   return Boolean(row) && !row.hidden;
 }
 
-// Guards the interval/fetches from starting twice — the reveal click below
-// can fire after this already ran (or vice versa) once the row is unhidden.
+// Guards the interval/fetches from starting twice.
 let widgetsStarted = false;
 
 async function startWidgets() {
@@ -651,38 +650,6 @@ async function startWidgets() {
   applyLocation(resolveLocation());
 }
 
-// The bulbs now start hidden on the dashboard itself too, not just on the
-// section pages — a clock ticking every second, plus a prayer-time and a
-// weather fetch, is work behind a row most opens never look at. Clicking the
-// logo (its own link back to "all sections", which does nothing useful on
-// the page that already IS all sections) reveals the row and starts them
-// instead of reloading. Section pages keep that click as real navigation —
-// their bulbs row belongs to a different page, not to this one.
-let widgetRevealWired = false;
-
-function setupWidgetReveal() {
-  if (widgetRevealWired || window.ledgerSectionPage) return;
-  widgetRevealWired = true;
-
-  const link = document.querySelector('.logo-link');
-  const row = document.querySelector('.widget-cards');
-  if (!link || !row) return;
-
-  link.addEventListener('click', (e) => {
-    // A modified or non-primary click (new tab, new window) is left to
-    // navigate normally rather than silently doing something else instead.
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
-
-    row.hidden = !row.hidden;
-    if (!row.hidden) {
-      startWidgets();
-      applySettingsToWidgets();
-    }
-  });
-}
-
 function initWidgets() {
-  setupWidgetReveal();
   startWidgets();
 }

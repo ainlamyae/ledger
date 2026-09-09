@@ -65,6 +65,16 @@ function sleepDurationHours(bedMin, wakeMin) {
   return Math.round((diff / 60) * 10) / 10;
 }
 
+// Mirrors updateTimesheetLiveDuration's live read-out, just off Bedtime/Wake-up
+// Time instead of Start/End — same wraparound sleepDurationHours already gives
+// the Sleep chart, read back live as the two clock fields are typed.
+function updatePhysiqueSleepDuration() {
+  const bed = parseClockTime(physiqueField('bedtime').value);
+  const wake = parseClockTime(physiqueField('wake-time').value);
+  document.getElementById('physique-sleep-duration').textContent =
+    (bed !== null && wake !== null) ? `${sleepDurationHours(bed, wake)} hr` : '—';
+}
+
 // The two activity categories physiqueAsWellnessEntries emits and every
 // activity consumer (charts.js, activity-insight.js) filters on.
 function isActivityCategory(category) {
@@ -76,6 +86,7 @@ async function initPhysique(forceRefresh = false) {
     physiqueListenersAttached = true;
 
     document.getElementById('add-physique-btn').addEventListener('click', () => openPhysiqueForm(null));
+    document.getElementById('today-physique-btn').addEventListener('click', () => openPhysiqueForm(todaysPhysiqueDay()));
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
     document.getElementById('physique-micro-close-btn').addEventListener('click', () => {
       document.getElementById('physique-micro-modal').hidden = true;
@@ -88,6 +99,7 @@ async function initPhysique(forceRefresh = false) {
     setupConsumptionAutocomplete();
     document.getElementById('physique-form-micro-btn').addEventListener('click', openPhysiqueMicronutrientsFromForm);
     document.getElementById('physique-is-pattern').addEventListener('change', syncPhysiquePatternMode);
+    ['bedtime', 'wake-time'].forEach((id) => physiqueField(id).addEventListener('input', updatePhysiqueSleepDuration));
     onFormSubmit('physique-form', submitPhysiqueForm);
 
     ['physique-search', 'physique-date-from', 'physique-date-to'].forEach((id) => {
@@ -608,6 +620,7 @@ function openPhysiqueForm(entry, duplicate = false) {
   renderPhysiqueBreakdown(openedBreakdown, entry ? entry.caloriesIn : 0, entry ? entry.proteinIn : 0);
   refreshPhysiqueActivityBreakdown();
   syncPhysiqueCombineButtonVisibility();
+  updatePhysiqueSleepDuration();
 
   clearFieldError('physique-form-error');
   document.getElementById('physique-modal').hidden = false;
@@ -1310,15 +1323,17 @@ async function handlePhysiqueScanInput(e) {
 
     const ingredientText = await groqAnalyzeFoodImage(base64, file.type);
 
-    // Open a blank Log form for today, then pre-fill Consumption and Calculate.
-    openPhysiqueForm(null);
-    physiqueField('consumption').value = ingredientText;
+    // Lives inside the already-open Log form now, so it appends to whatever
+    // Consumption already holds rather than wiping the rest of the day's
+    // fields the way opening a fresh blank form would.
+    const consumptionField = physiqueField('consumption');
+    consumptionField.value = consumptionField.value.trim()
+      ? `${consumptionField.value.trim()}\n${ingredientText}`
+      : ingredientText;
     syncPhysiqueCombineButtonVisibility();
     await calculatePhysiqueDay();
   } catch (err) {
     console.error('[Scan Food]', err);
-    // openPhysiqueForm calls clearFieldError, so show the error after it.
-    openPhysiqueForm(null);
     showFieldError('physique-form-error', `Scan failed: ${err.message}`);
   } finally {
     btn.disabled = false;
@@ -1499,6 +1514,7 @@ function mergePhysiqueEntryIntoForm(saved) {
   // the summed figures above with a single estimate of the combined session.
   // Where it can't run (no body mass on file) the sums stand.
   refreshPhysiqueActivityBreakdown();
+  updatePhysiqueSleepDuration();
 
   editingPhysiqueRow = saved.row;
   document.getElementById('physique-modal-title').textContent = 'Edit Physique';

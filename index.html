@@ -106,7 +106,7 @@
 
     <p id="dashboard-loading" class="status status-info" hidden>Loading your data…</p>
 
-    <div class="widget-cards" hidden>
+    <div class="widget-cards">
         <div class="widget-card" id="widget-clock">
             <h3>Time</h3>
             <div class="widget-row widget-clock-row">
@@ -168,7 +168,7 @@
     </div>
 
     <section id="health" class="panel-group">
-        <h2 class="panel-group-title">Health</h2>
+        <h2 class="panel-group-title"><a href="health/">Health</a></h2>
 
         <div class="cards today-glance-cards">
             <div class="card">
@@ -192,9 +192,6 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Health Indicator</h2>
-                <!-- Primary, not plain: this one writes back to Settings rather than
-                     just showing a formula. -->
-                <button type="button" id="formula-playground-btn" class="btn btn-primary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
             </div>
 
             <div class="body-mass-projection-wrap">
@@ -421,16 +418,11 @@
         <div class="panel">
             <div class="panel-header">
                 <h2>Physique</h2>
-                <!-- No `capture` attribute: on iOS Safari it jumps straight to the Camera app
-                     rather than the native picker sheet, and that app switch can make WebKit
-                     reload this page under memory pressure while the camera is open — which
-                     drops every listener bound here, so the 'change' event this button waits
-                     on (handlePhysiqueScanInput) never fires and the tap silently does nothing
-                     once a photo comes back. Dropping it restores the full sheet — Photo
-                     Library AND Take Photo — without leaving the page. -->
-                <input type="file" id="physique-scan-input" accept="image/*" hidden>
-                <button id="physique-scan-btn" class="btn btn-ai panel-header-btn" title="Take a photo of your meal — AI identifies foods and estimates portions, then opens the Log form pre-filled">Scan</button>
+                <!-- Primary, not plain: this one writes back to Settings rather than
+                     just showing a formula. -->
+                <button type="button" id="formula-playground-btn" class="btn btn-primary panel-header-btn" title="Tune the health targets, formulas and settings">Tune</button>
                 <button id="add-physique-btn" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
+                <button id="today-physique-btn" class="btn panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
             </div>
 
             <div class="filters">
@@ -544,7 +536,7 @@
     <div style="height:.5rem"></div>
 
     <section id="finance" class="panel-group">
-        <h2 class="panel-group-title">Finance</h2>
+        <h2 class="panel-group-title"><a href="finance/">Finance</a></h2>
 
         <div class="cards">
             <div class="card">
@@ -844,7 +836,7 @@
     <div style="height:.5rem"></div>
 
     <section id="other" class="panel-group">
-        <h2 class="panel-group-title">Other</h2>
+        <h2 class="panel-group-title"><a href="other/">Other</a></h2>
 
         <div id="timesheet-reminder-banner" class="info-banner" hidden>
             <span>You haven't logged today's hours yet.</span>
@@ -1353,6 +1345,7 @@
                     <input type="time" id="physique-wake-time">
                 </label>
             </div>
+            <p>Sleep Duration: <span id="physique-sleep-duration">—</span></p>
             <label>Consumption
                 <div class="autocomplete-anchor">
                     <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
@@ -1436,6 +1429,15 @@
                 <button type="button" id="physique-combine-btn" class="btn" title="Combine duplicate ingredient lines (same name and unit) and sort by calories — local only, no AI">Combine &amp; Sort</button>
                 <button type="button" id="physique-form-micro-btn" class="btn" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved">Micronutrients</button>
                 <button type="button" id="physique-calc-btn" class="btn btn-ai">Calculate</button>
+                <!-- No `capture` attribute: on iOS Safari it jumps straight to the Camera app
+                     rather than the native picker sheet, and that app switch can make WebKit
+                     reload this page under memory pressure while the camera is open — which
+                     drops every listener bound here, so the 'change' event this button waits
+                     on (handlePhysiqueScanInput) never fires and the tap silently does nothing
+                     once a photo comes back. Dropping it restores the full sheet — Photo
+                     Library AND Take Photo — without leaving the page. -->
+                <input type="file" id="physique-scan-input" accept="image/*" hidden>
+                <button type="button" id="physique-scan-btn" class="btn btn-ai" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption">Scan</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>

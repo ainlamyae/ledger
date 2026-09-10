@@ -273,6 +273,8 @@ function physiqueAsWellnessEntries() {
         fiberG: p.fiber,
         // Same shape, one column over (J) — read by the Wellness Fat Intake chart.
         fatG: p.fat,
+        // Same shape, one column over again (K) — read by the Wellness Carb Intake chart.
+        carbG: p.carbohydrate,
       });
     }
 

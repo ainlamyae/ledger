@@ -823,6 +823,20 @@ const FAT_PCT_OF_KCAL_MAX_DEFAULT = 35;
 // plain constant rather than an overridable setting the way the two percentages above are.
 const KCAL_PER_G_FAT = 9;
 
+// The carb band's two coefficients — 45-65% of total energy from carbohydrate is the same
+// IOM AMDR report's range for carbohydrate (Dietary Reference Intakes for Energy,
+// Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also
+// carried forward by the USDA Dietary Guidelines for Americans. Both ends scale off Eᵢₙ, same
+// shape as the fat band above, since that's how the AMDR itself is defined for every macro.
+const CARB_PCT_OF_KCAL_MIN_DEFAULT = 45;
+const CARB_PCT_OF_KCAL_MAX_DEFAULT = 65;
+// Carbohydrate's fixed energy density (Atwater) — grams per kcal, same role as KCAL_PER_G_FAT.
+const KCAL_PER_G_CARB = 4;
+// The general USDA %DV reference for total carbohydrate (2,000 kcal diet) — same role as
+// FAT_TARGET_G_DEFAULT, a flat number to score against before the Formula Playground's own
+// pct-of-Eᵢₙ band (CARB_TARGET_G_MIN/MAX) has ever been saved.
+const CARB_TARGET_G_DEFAULT = 275;
+
 // Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 5.0 compound lifting, 7.0
 // jogging). Duplicates activity-estimator.js's EXERCISE_MET_DEFAULT rather than
 // referencing it: charts.js loads first, so that const is still in its dead zone.
@@ -1054,6 +1068,33 @@ function getFatTargetBandG(entries) {
 
 // In-band check only — same shape as withinFiberBand.
 function withinFatBand(g, band) {
+  return g >= band.min && (band.max === band.min || g <= band.max);
+}
+
+// The carb band the Formula playground writes — CARB_TARGET_G_MIN/MAX, same shape as
+// getFatAbsoluteBandG. Sorted for the same reason: both ends are a share of Eᵢₙ.
+function getCarbAbsoluteBandG() {
+  const ends = [
+    getSetting('CARB_TARGET_G_MIN', null),
+    getSetting('CARB_TARGET_G_MAX', null),
+  ].filter((n) => n !== null && n > 0);
+
+  if (ends.length === 0) return null;
+  return { min: Math.round(Math.min(...ends)), max: Math.round(Math.max(...ends)) };
+}
+
+// Falls back to the flat CARB_TARGET_G/_DEFAULT as a zero-width band, same fallback shape
+// getFatTargetBandG uses, for whoever hasn't opened the Formula playground's carb rows yet.
+function getCarbTargetBandG(entries) {
+  const absolute = getCarbAbsoluteBandG();
+  if (absolute !== null) return absolute;
+
+  const flat = getSetting('CARB_TARGET_G', CARB_TARGET_G_DEFAULT);
+  return { min: flat, max: flat };
+}
+
+// In-band check only — same shape as withinFatBand.
+function withinCarbBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
 
@@ -1453,6 +1494,7 @@ let wellnessActivityChart = null;
 let wellnessProteinChart = null;
 let wellnessFiberChart = null;
 let wellnessFatChart = null;
+let wellnessCarbChart = null;
 let wellnessProjectionChart = null;
 
 function lastNDates(n) {
@@ -1510,6 +1552,7 @@ function renderWellnessCharts(entries) {
   renderWellnessProteinChart(entries);
   renderWellnessFiberChart(entries);
   renderWellnessFatChart(entries);
+  renderWellnessCarbChart(entries);
   renderWellnessProjectionChart(entries);
   renderWellnessEnergyBalanceChart(entries);
 }
@@ -3056,6 +3099,125 @@ function renderWellnessFatChart(entries) {
   const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
   wellnessFatChart = upsertChart(wellnessFatChart, ctx, {
+    data: {
+      labels: dates,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Actual Intake',
+          data: values,
+          backgroundColor: barColors,
+          order: 2,
+        },
+        weeklyAverageDataset('7-Day Average', weeklyAvg, {}, weekColumns),
+        ...targetDatasets,
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          callbacks: {
+            title: (items) => formatIsoDateShort(items[0].label),
+            label: (item) => {
+              const text = `Actual Intake: ${item.parsed.y} g`;
+              return privacyMode ? maskDigits(text) : text;
+            },
+            afterBody: (items) => {
+              const lines = band.max > band.min
+                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
+                : [`Target: ${band.min} g`];
+              const i = items[0]?.dataIndex;
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              return privacyMode ? lines.map(maskDigits) : lines;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 7, callback: shortDateTickCallback } },
+        y: {
+          beginAtZero: true,
+          afterFit: fixTrendYAxisWidth,
+          ticks: { callback: maskedUnitTick('g') },
+        },
+        y1: ghostRightAxis(),
+      },
+    },
+  });
+}
+
+// Fat's chart just above, same dashed-band-edge shape but the opposite severity read:
+// too little carbohydrate isn't a deficiency the way too little fiber or protein is, so
+// under the floor is merely unscored grey (BODY_MASS_UNSCORED_COLOR's own shade) rather
+// than a red miss — it's over the ceiling that's flagged, since that's the end actually
+// linked to the bloating/water-retention complaint this band exists to catch. Read from
+// the same Physique-day Carbohydrate figure (carbG) physiqueAsWellnessEntries adds beside
+// fiberG/fatG.
+function renderWellnessCarbChart(entries) {
+  const ctx = document.getElementById('wellness-carb-chart');
+
+  const band = getCarbTargetBandG(entries);
+
+  const carbEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.carbG !== null && e.carbG !== undefined);
+  const dates = wellnessWindowDates(carbEntries);
+  const byDate = new Map();
+  carbEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.carbG));
+
+  const CARB_UNDER_BAND_COLOR = '#9ca3af';
+  const values = dates.map((d) => byDate.get(d) || 0);
+  const barColors = dates.map((d, i) => {
+    if (!byDate.has(d) || withinCarbBand(values[i], band)) return '#16a34a';
+    return values[i] > band.max ? '#dc2626' : CARB_UNDER_BAND_COLOR;
+  });
+
+  // Same shape as Fiber/Fat Intake's bandFill — two flat line datasets whose only job
+  // is the `fill: '+1'` shading between them, stroke off, drawn behind the bars.
+  const bandFill = (value, extra = {}) => ({
+    type: 'line',
+    label: `${value} g band edge`,
+    data: new Array(dates.length).fill(value),
+    borderWidth: 0,
+    pointRadius: 0,
+    tension: 0,
+    isTargetLine: true,
+    order: 3,
+    ...extra,
+  });
+
+  // targetMarkColor() is near-black in light mode, near-white in dark — the same colour
+  // every other target cap on this panel uses, just as a continuous dashed line here
+  // instead of a per-column tick.
+  const targetLine = (value, label) => ({
+    type: 'line',
+    label,
+    data: new Array(dates.length).fill(value),
+    borderColor: targetMarkColor(),
+    borderWidth: 2,
+    borderDash: [6, 4],
+    pointRadius: 0,
+    tension: 0,
+    isTargetLine: true,
+    order: 0,
+  });
+
+  const targetDatasets = band.max > band.min
+    ? [
+      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.min),
+      targetLine(band.max, `${band.max} g upper target`),
+      targetLine(band.min, `${band.min} g target floor`),
+    ]
+    : [targetLine(band.min, `${band.min} g target`)];
+
+  const weekColumns = bucketedColumnCount(dates);
+  const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
+
+  wellnessCarbChart = upsertChart(wellnessCarbChart, ctx, {
     data: {
       labels: dates,
       datasets: [

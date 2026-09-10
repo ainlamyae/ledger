@@ -235,10 +235,11 @@
                 </div>
 
                 <!-- Governs every chart from here down — State Trend & Forecast, Body Mass,
-                     Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Fiber
-                     Intake, Fat Intake, Sleep and Protein Source Rotation — so it sits right
-                     above State Trend & Forecast's own heading rather than under one chart's
-                     label, which would read as belonging to that chart alone. -->
+                     Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Dietary
+                     Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep and Protein Source
+                     Rotation — so it sits right above State Trend & Forecast's own heading
+                     rather than under one chart's label, which would read as belonging to that
+                     chart alone. -->
                 <div class="export-date-range">
                     <label>From
                         <input type="date" id="wellness-date-from">
@@ -298,7 +299,7 @@
                 </div>
 
                 <div class="donut-item">
-                    <h4>Fiber Intake</h4>
+                    <h4>Dietary Fiber Intake</h4>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-fiber-chart"></canvas>
                     </div>
@@ -308,6 +309,13 @@
                     <h4>Fat Intake</h4>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-fat-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Carbohydrate Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-carb-chart"></canvas>
                     </div>
                 </div>
 
@@ -1853,25 +1861,25 @@
                  coefficients are editable and neither rides on a box the other computes. -->
             <label class="formula-row">
                 <span class="formula-sym">f_min</span>
-                <span class="formula-name">fiber floor per 1,000 kcal of intake</span>
+                <span class="formula-name">dietary fiber floor per 1,000 kcal of intake</span>
                 <input type="text" id="formula-fiber-per-1000kcal-min" inputmode="decimal">
                 <span class="formula-unit">g/1,000 kcal</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">f_max</span>
-                <span class="formula-name">fiber ceiling per kg of body weight</span>
+                <span class="formula-name">dietary fiber ceiling per kg of body weight</span>
                 <input type="text" id="formula-fiber-per-kg-max" inputmode="decimal">
                 <span class="formula-unit">g/kg/day</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">F_min</span>
-                <span class="formula-name">daily fiber target, lower end</span>
+                <span class="formula-name">daily dietary fiber target, lower end</span>
                 <input type="text" id="formula-fiber-min" inputmode="decimal" readonly>
                 <span class="formula-unit">g/day</span>
             </label>
             <label class="formula-row">
                 <span class="formula-sym">F_max</span>
-                <span class="formula-name">daily fiber target, upper end</span>
+                <span class="formula-name">daily dietary fiber target, upper end</span>
                 <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
                 <span class="formula-unit">g/day</span>
             </label>
@@ -1909,6 +1917,44 @@
                 <span class="formula-sym">G_max</span>
                 <span class="formula-name">daily fat target, upper end</span>
                 <input type="text" id="formula-fat-max" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <!-- Marks the end of the fat block (G_min, G_max) before the carb block
+                 starts below. -->
+            <hr class="formula-divider">
+            <!-- The carb band follows fat, same shape again — both ends a share of Eᵢₙ: 45-65%
+                 of total energy from carbohydrate is the same IOM AMDR report's range for
+                 carbohydrate (Dietary Reference Intakes for Energy, Carbohydrate, Fiber, Fat,
+                 Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also carried forward
+                 by the USDA Dietary Guidelines for Americans. Too much carbohydrate at once —
+                 well above this ceiling — also means more glycogen stored (see m_gly above),
+                 which binds its own water; the ceiling here is about total energy balance, not
+                 that water-retention effect directly, but staying inside it keeps glycogen
+                 swings from compounding into a genuine overconsumption. 4 kcal/g is
+                 carbohydrate's fixed energy density (Atwater), not a personal parameter, so
+                 only the two percentages are editable. -->
+            <label class="formula-row">
+                <span class="formula-sym">q_min</span>
+                <span class="formula-name">carbohydrate floor, share of intake calories</span>
+                <input type="text" id="formula-carb-pct-min" inputmode="decimal">
+                <span class="formula-unit">% of Eᵢₙ</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">q_max</span>
+                <span class="formula-name">carbohydrate ceiling, share of intake calories</span>
+                <input type="text" id="formula-carb-pct-max" inputmode="decimal">
+                <span class="formula-unit">% of Eᵢₙ</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">C_min</span>
+                <span class="formula-name">daily carbohydrate target, lower end</span>
+                <input type="text" id="formula-carb-min" inputmode="decimal" readonly>
+                <span class="formula-unit">g/day</span>
+            </label>
+            <label class="formula-row">
+                <span class="formula-sym">C_max</span>
+                <span class="formula-name">daily carbohydrate target, upper end</span>
+                <input type="text" id="formula-carb-max" inputmode="decimal" readonly>
                 <span class="formula-unit">g/day</span>
             </label>
         </div>

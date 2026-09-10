@@ -154,16 +154,57 @@ function aggregateWindow(dates) {
   };
 }
 
+// Fat and fiber, the two classic "deficit but skipping the wrong macros"
+// signals that calories/protein alone can't surface. Pulled from the same
+// real per-ingredient Nutrition-table totals the Micronutrients mode is
+// built on (aggregateMicronutrientIntake, micronutrient-insight.js) rather
+// than duplicating its whole nutrient list here — Wellness only needs these
+// two, everything else stays behind the dedicated Micronutrients button.
+const WELLNESS_FAT_NUTRIENT = 'Total lipid (fat)';
+const WELLNESS_FIBER_NUTRIENT = 'Fiber, total dietary';
+const WELLNESS_CARB_NUTRIENT = 'Carbohydrate, by difference';
+
+function findMicronutrient(data, name) {
+  return data.nutrients.find((n) => n.name === name) || null;
+}
+
+// The fixed FDA Daily Value/day for one nutrient, target amount and unit
+// split out so the caller can show a target even on a window with no priced
+// intake at all (the fat/fiber rows below), the same way calorieTarget and
+// proteinTarget are always shown regardless of whether anything was logged.
+function nutrientTargetAmount(name) {
+  const target = nutrientDailyTargets()[name];
+  return target ? { amount: target.amount, unit: target.unit } : { amount: null, unit: 'G' };
+}
+
 function gatherInsightMetrics(fromIso, toIso) {
   const dates = datesInRange(fromIso, toIso);
   const lookbackDays = dates.length;
   const current = aggregateWindow(dates);
-  const previous = aggregateWindow(previousDateRange(fromIso, toIso));
+  const previousDates = previousDateRange(fromIso, toIso);
+  const previous = aggregateWindow(previousDates);
 
   // Reuses the exact same trajectory logic the State Trend & Forecast chart
   // is built from (charts.js) — Insight doesn't compute its own trend, it just
   // reports this one.
   const projection = calcProjection(physiqueAsWellnessEntries());
+
+  const microCurrent = aggregateMicronutrientIntake(fromIso, toIso);
+  const microPrevious = previousDates.length
+    ? aggregateMicronutrientIntake(previousDates[0], previousDates[previousDates.length - 1])
+    : { nutrients: [], daysLogged: 0, contributing: [], missing: [] };
+
+  const fat = findMicronutrient(microCurrent, WELLNESS_FAT_NUTRIENT);
+  const prevFat = findMicronutrient(microPrevious, WELLNESS_FAT_NUTRIENT);
+  const fatTarget = nutrientTargetAmount(WELLNESS_FAT_NUTRIENT);
+
+  const fiber = findMicronutrient(microCurrent, WELLNESS_FIBER_NUTRIENT);
+  const prevFiber = findMicronutrient(microPrevious, WELLNESS_FIBER_NUTRIENT);
+  const fiberTarget = nutrientTargetAmount(WELLNESS_FIBER_NUTRIENT);
+
+  const carb = findMicronutrient(microCurrent, WELLNESS_CARB_NUTRIENT);
+  const prevCarb = findMicronutrient(microPrevious, WELLNESS_CARB_NUTRIENT);
+  const carbTarget = nutrientTargetAmount(WELLNESS_CARB_NUTRIENT);
 
   return {
     lookbackDays,
@@ -205,6 +246,28 @@ function gatherInsightMetrics(fromIso, toIso) {
     prevAvgSleepHours: previous.avgSleepHours,
     sleepTarget: getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT),
     sleepDaysLogged: current.sleepDaysLogged,
+
+    // 'reference', not 'floor'/'ceiling' — a total-fat Daily Value isn't a
+    // pass/fail line the way fiber's is, so formatInsightPrompt labels it
+    // differently below. daysLogged here is Calculate-derived days (same
+    // count the Micronutrients mode uses), which can run behind
+    // caloriesDaysLogged when a logged meal hasn't been priced yet.
+    avgFat: fat ? fat.perDay : null,
+    prevAvgFat: prevFat ? prevFat.perDay : null,
+    fatTarget: fatTarget.amount,
+    fatDaysLogged: microCurrent.daysLogged,
+
+    avgFiber: fiber ? fiber.perDay : null,
+    prevAvgFiber: prevFiber ? prevFiber.perDay : null,
+    fiberTarget: fiberTarget.amount,
+    fiberDaysLogged: microCurrent.daysLogged,
+
+    // Same 'reference' shape as fat above — carbohydrate's Daily Value is a
+    // reference figure too, not a pass/fail line.
+    avgCarb: carb ? carb.perDay : null,
+    prevAvgCarb: prevCarb ? prevCarb.perDay : null,
+    carbTarget: carbTarget.amount,
+    carbDaysLogged: microCurrent.daysLogged,
   };
 }
 
@@ -279,14 +342,24 @@ function formatInsightPrompt(m) {
     return `Avg activity total: ${m.avgActivityMins} min/day${kcalNow} (target: ${m.activityTarget} min/day)${trend}${coverage}`;
   })();
 
+  // Ordered to match the Wellness charts below it (State Trend & Forecast,
+  // Body Mass [in the profile block above], Physical Activity, Caloric
+  // Intake, Protein Intake, Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep —
+  // index.html) so the report reads in the same sequence as the data it's
+  // summarizing. "Calorie Balance" has no line of its own here: it's the
+  // same intake and activity-burn figures below it, just plotted net rather
+  // than reported again as a third number.
   const lines = [
     ...formatProfileLines(m.profile, m.bodyMassTargetKg),
-    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieTarget.kind),
-    line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
+    formatTrajectoryLine(m.projection),
     activityTotalLine,
     ...formatActivityBreakdownLines(m),
+    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieTarget.kind),
+    line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
+    line('Avg dietary fiber intake', m.avgFiber, ' g/day', m.fiberTarget, m.fiberDaysLogged, m.prevAvgFiber),
+    line('Avg fat intake', m.avgFat, ' g/day', m.fatTarget, m.fatDaysLogged, m.prevAvgFat, 'reference'),
+    line('Avg carbohydrate intake', m.avgCarb, ' g/day', m.carbTarget, m.carbDaysLogged, m.prevAvgCarb, 'reference'),
     line('Avg sleep', m.avgSleepHours, ' hr/day', m.sleepTarget, m.sleepDaysLogged, m.prevAvgSleepHours),
-    formatTrajectoryLine(m.projection),
   ];
 
   return lines.filter((l) => l !== null).join('\n');
@@ -294,11 +367,13 @@ function formatInsightPrompt(m) {
 
 const INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing someone's own self-tracked data. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given their age, sex, height, BMI, current body mass vs. target, their average calorie/protein intake, activity, and sleep for a recent period compared to both their own personal figure and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a body-mass-trajectory line (their actual estimated rate of progress toward their target). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
+You'll be given their age, sex, height, BMI, current body mass vs. target, their average calorie/protein/dietary fiber/fat/carbohydrate intake, activity, and sleep for a recent period compared to both their own personal figure and the immediately preceding period of the same length (so you can tell if things are improving or slipping, not just where they stand today), and a body-mass-trajectory line (their actual estimated rate of progress toward their target). Activity is also broken down by type (e.g. NEAT, Resistance, Cardio), each with its own minutes/day and trend versus the previous period, beneath the combined "Avg activity total" line — use this to comment on the balance between activity types (e.g. cardio-only with no resistance training, or a specific type dropping off) rather than just the total minutes. Some values may be missing or under-logged (marked "not set", "not logged this period", or "[only N/X days logged]") — treat those as missing data to note, never as zero. The protein target may be given as a range (e.g. "target: 131-164 g/day"): anywhere inside that range is on target, and both falling below its low end and exceeding its top end are off target.
+
+Dietary fiber, fat and carbohydrate are labeled differently from the other targets. Dietary fiber's "(target: 28 g/day)" is a floor: at or above it is on track, below it is a real gap worth naming, especially alongside a calorie deficit. Fat's and carbohydrate's are both "(reference: X g/day)", a general adult reference figure to mention only in passing, not a pass/fail line — don't score someone against it the way you would protein or dietary fiber. A carbohydrate average that's running well past its reference figure is worth a brief mention of bloating/water retention from the glycogen it gets stored as (which shows up as scale weight, not fat) — but only as a passing physiological note, not as a diet mistake to fix, since there's no ADA/IOM ceiling being violated the way going over a calorie "max" would be. All three figures come from actually-logged, ingredient-priced meals, which can lag behind what's logged for calories/protein — "not logged this period" here may just mean those meals haven't been priced for fiber/fat/carbohydrate yet, not that nothing was eaten, so don't state a confident zero.
 
 Calorie intake's target is DIRECTIONAL, not a point to land on, and the label says which side: "(max: 1388 kcal/day)" is a ceiling: they are aiming to lose body mass, so at or under it is on track and over it is off track. "(min: 2600 kcal/day)" is a floor: they are aiming to gain body mass, so at or over it is on track and under it is off track. Never treat a day under a "min" as a win or read it as a deficit worth praising, and never describe being under a "max" as falling short. If the average sits far on the good side of a max, that is a deeper deficit than the target called for, not a failure — comment on whether the pace looks sustainable (especially alongside protein and sleep) rather than scoring it as a miss.
 
-Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only.
+Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point (several things going well, several things needing attention), put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Overview: one or two sentences on the overall picture, grounded in the body mass trajectory line, not just the current period's numbers in isolation.
 Going well: what's on track, including any improvement vs. the previous period.

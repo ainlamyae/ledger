@@ -8,17 +8,19 @@
 // ageFromBirthDate is also called from charts.js (BMR/BMI paths), so it lives
 // here rather than moving into the panel file.
 
-// Whole-years-old as of today; null if BIRTH_DATE isn't set or unparseable.
-function ageFromBirthDate(birthDateStr) {
+// Whole-years-old as of `asOf` (today by default); null if BIRTH_DATE isn't set or
+// unparseable. Takes a reference date so a per-day figure (Caloric Intake's resting
+// metabolic rate hover) can ask "how old were they on THIS day" instead of always
+// reading today's age onto every day in the window.
+function ageFromBirthDate(birthDateStr, asOf = new Date()) {
   if (!birthDateStr) return null;
   const birth = new Date(birthDateStr);
   if (Number.isNaN(birth.getTime())) return null;
 
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const beforeBirthdayThisYear = today.getMonth() < birth.getMonth()
-    || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
-  if (beforeBirthdayThisYear) age--;
+  let age = asOf.getFullYear() - birth.getFullYear();
+  const beforeBirthdayThatYear = asOf.getMonth() < birth.getMonth()
+    || (asOf.getMonth() === birth.getMonth() && asOf.getDate() < birth.getDate());
+  if (beforeBirthdayThatYear) age--;
   return age;
 }
 

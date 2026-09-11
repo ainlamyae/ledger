@@ -39,6 +39,17 @@
     // are collapsed/re-rendered fresh on every load anyway.
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 </script>
+<script>
+    // App-shell offline support (sw.js) — never the live sheet data, just the
+    // static page itself. Registered here rather than from app.js so it's one
+    // inline block section-page.js's adoptHead() already duplicates onto
+    // /health/, /finance/ and /other/ too (the same mechanism that repeats the
+    // theme script above onto those pages), and 'sw.js' resolves correctly
+    // from all of them via their own <base href="../">.
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+</script>
 </head>
 
 <body>
@@ -51,11 +62,15 @@
          assets/script/section-page.js). data-section names the wrapper the
          address stands for, and is the only list of them anywhere — the section
          pages and the scroll-spy both read this nav rather than repeating it. -->
-    <nav id="main-nav" class="nav" hidden>
+    <nav id="main-nav" class="nav">
         <a href="health/" data-section="health">Health</a>
         <a href="finance/" data-section="finance">Finance</a>
         <a href="other/" data-section="other">Other</a>
     </nav>
+    <div class="header-search" id="global-search-wrap" hidden>
+        <input type="search" id="global-search" placeholder="Search transactions, contacts, ingredients…">
+        <span id="global-search-status" class="global-search-status" hidden></span>
+    </div>
     <div class="header-actions">
         <span id="last-updated" class="last-updated"></span>
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
@@ -72,6 +87,7 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                 </div>
                 <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
+                <button id="export-backup-btn" class="account-menu-item" disabled title="Load your data first">Export full backup (JSON)</button>
                 <button id="clear-cache-btn" class="account-menu-item">Clear cache</button>
                 <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
@@ -83,12 +99,6 @@
         </div>
     </div>
 </header>
-
-<div id="gate" class="gate">
-    <div class="landing">
-        <p id="auth-status" class="status" hidden></p>
-    </div>
-</div>
 
 <div id="file-gate" class="gate" hidden>
     <div class="landing">
@@ -102,7 +112,7 @@
     </div>
 </div>
 
-<div id="dashboard" class="container" hidden>
+<div id="dashboard" class="container">
 
     <p id="dashboard-loading" class="status status-info" hidden>Loading your data…</p>
 
@@ -187,6 +197,11 @@
                 <h3>Activity</h3>
                 <div class="value" id="today-activity-value">—</div>
             </div>
+        </div>
+
+        <div id="health-reminder-banner" class="info-banner" hidden>
+            <span>You haven't logged today's Physique entry yet.</span>
+            <button id="health-reminder-log-btn" class="btn btn-primary">Log</button>
         </div>
 
         <div class="panel">
@@ -632,7 +647,7 @@
              Transportation, Grocery, Personal, Household …), four periods each plus an
              Untyped remainder. Commented out, not deleted: it's wanted again later.
              Uncomment this section AND the renderTypeBreakdownCharts call in app.js's
-             reportPromise — the renderer (charts.js) and its parsed data are untouched,
+             reportPromise — the renderer (finance-charts.js) and its parsed data are untouched,
              and the call is what fills this container.
         <div class="panel-section">
             <h3>Spending Breakdown by Type</h3>
@@ -1725,8 +1740,8 @@
             <!-- After t, because both of these are only meaningful measured along it: λ is a
                  rate per week ON the diet, and the two readonly rows below are what it has
                  done by the arrival date above. Nothing here changes Eᵢₙ, D or t — see
-                 adaptedPlateauKg in charts.js for why adaptation is reported and not planned
-                 with. -->
+                 adaptedPlateauKg in wellness-math.js for why adaptation is reported and not
+                 planned with. -->
             <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
                 <span class="formula-sym">λ</span>
                 <span class="formula-name">metabolic adaptation, per week on the diet</span>
@@ -2313,7 +2328,12 @@
 <script src="assets/script/nutrition.js"></script>
 <script src="assets/script/calorie-estimator.js"></script>
 <script src="assets/script/widgets.js"></script>
-<script src="assets/script/charts.js"></script>
+<script src="assets/script/charts-base.js"></script>
+<script src="assets/script/wellness-math.js"></script>
+<script src="assets/script/wellness-charts.js"></script>
+<script src="assets/script/finance-charts.js"></script>
+<script src="assets/script/timesheet-charts.js"></script>
+<script src="assets/script/travel-charts.js"></script>
 <script src="assets/script/transactions.js"></script>
 <script src="assets/script/accounts.js"></script>
 <script src="assets/script/breakdown.js"></script>
@@ -2321,6 +2341,7 @@
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/activities.js"></script>
 <script src="assets/script/physique.js"></script>
+<script src="assets/script/physique-breakdown.js"></script>
 <script src="assets/script/strength-plan.js"></script>
 <script src="assets/script/activity-estimator.js"></script>
 <script src="assets/script/contacts.js"></script>
@@ -2335,9 +2356,12 @@
 <script src="assets/script/plan-insight.js"></script>
 <!-- After the five above: INSIGHT_MODES reads their prompt constants by value. -->
 <script src="assets/script/insight-panel.js"></script>
+<script src="assets/script/formula-fields.js"></script>
+<script src="assets/script/formula-render.js"></script>
 <script src="assets/script/formula-playground.js"></script>
 <script src="assets/script/protein-rotation.js"></script>
 <script src="assets/script/financial-insight.js"></script>
+<script src="assets/script/global-search.js"></script>
 <script src="assets/script/gate.js"></script>
 <script src="assets/script/app.js"></script>
 </body>

@@ -44,7 +44,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 ### Dashboard widgets
 
 - Four self-contained "bulb" cards; work before sign-in.
-- **Visible by default on the home page, hidden on the three section pages.** The home page *is* the bulb view now (see the Panel groups bullet below), so the row starts unhidden and its clock interval, prayer-time call and weather fetch all start with it. `/health/`, `/finance/` and `/other/` still hide the row outright (`section-page.js`) and never start any of that behind it — it belongs to the dashboard as a whole, not to one wrapper, and a clock ticking behind a hidden row is work nobody there can see.
+- **Visible on the home page, hidden on the three section pages.** The row belongs to the dashboard as a whole, not to one group, so it starts unhidden on `/` and its clock interval, prayer-time call and weather fetch all start with it. `/health/`, `/finance/` and `/other/` hide the row outright (`section-page.js`) and never start any of that behind it — a clock ticking behind a hidden row is work nobody there can see.
 - **Time** — local `HH:mm:ss` plus a second, independently configurable reference clock.
 - **Date** — Gregorian, Shamsi and Ghamari in one aligned day/month/year grid, via `Intl`.
 - **Azan** — Sobh/Zohr/Maghreb/Midnight, computed client-side (Shia "Tehran" method).
@@ -71,11 +71,14 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **Charts live in the panel of the data they describe** rather than a panel of their own, so a view and its table collapse together: Work Analytics folded into Work Time, Travel Insights into Travel, Protein Source Rotation into Health Indicator.
 - **`.table-compact` is the app's one dense-table look** — tight `.15rem .4rem` cell padding, no per-row border (`styles.css`) — shared by every table that's mostly rows of short figures: Nutrition, Physique, Transaction, Account, Breakdown, Work Time, Travel, Contact, the Activity Plan's own per-day tables, and the two Calculate breakdown tables in Physique's modal. One class instead of the padding/border pair repeated per table id, so the look changes everywhere at once from one rule. Table-specific column widths and nowrap rules stay scoped to their own id/class, since those genuinely differ per table.
 - **Panel groups** — Health, Finance, Other. Each is a page of its own at `/health/`, `/finance/` and `/other/`, and the nav links are those addresses rather than in-page anchors, so a group can be linked to, bookmarked and refreshed on its own (see [Section pages](#section-pages)). The logo is the way back to all three at once.
-- **The home page itself shows only each group's title and its summary cards row** — Health's four glance tiles, Finance's four summary cards — not the panels behind them. The title doubles as a link to that group's own page (`<h2 class="panel-group-title"><a href="health/">…`), the same address the top nav already points at. Pure CSS, scoped off the `data-section` attribute `section-page.js` stamps on the three sub-pages: `html:not([data-section]) .panel-group > *:not(.panel-group-title):not(.cards)`. Every panel's data still loads the same as it always has — this trims what the home page *paints*, not what it *fetches*. **Other has no summary cards row**, so it has nothing to lead with and is left off the home page entirely, reachable only through the top nav's own Other link.
+- **The home page shows every panel of every group**, one long page — every chart, table and form-launcher a section page would show, not just a summary. The top nav becomes a scroll-spy over that one page instead of the only way to reach a panel's actual content (`setupScrollSpy`, `app.js`); the title link on each group's heading (`<h2 class="panel-group-title"><a href="health/">…`) still opens that group's own isolated page for anyone who wants just Health, just Finance, or just Other. This used to collapse each group down to its title and summary cards row alone — that CSS rule is gone; every panel's data already loaded the same either way, so showing it costs nothing extra in fetches, only in what gets painted up front.
+- **Global search**, in the header — types into and re-filters each of the 7 panels that already have their own search box (Transactions, Physique, Nutrition, Contacts, Travel, Applications, Breakdown) simultaneously on Enter, rather than a separate search index (`global-search.js`). Reports a match count per panel and scrolls (expanding the panel first if it's collapsed) to the first one with a match, in that fixed order. Accounts, Settings and Activity have no existing filter of their own and are out of scope for this box. Distinct from the `/` shortcut below, which still only focuses Transactions' own search field.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
 - **Dark mode** — floating toggle, persisted.
 - **Privacy mode** — floating toggle masks amounts, health figures, contact details and Settings values.
+- **Export full backup (JSON)**, in the account menu — one downloadable snapshot of every tab (`exportFullBackup`, `csv.js`), reusing the same `downloadTextFile` helper Transactions' CSV export uses. Disabled until `loadDashboard`'s first pass has actually populated the in-memory arrays it reads (`dashboardLoaded`, `app.js`) — the data already lives in the user's own Google Sheet, so this is a portability/backup copy, not the primary one.
+- **Offline app shell** — a service worker (`sw.js`, registered from `index.html`'s own head) caches the static HTML/CSS/JS so the page itself loads instantly and works with no connection at all; live Google Sheets/Drive/Groq/USDA/weather data is deliberately never cached, so numbers shown offline can't be mistaken for current ones — same-origin requests get the cache immediately with a background refresh (stale-while-revalidate), everything cross-origin passes straight through untouched. `cache.js`'s `hardRefresh()` already unregisters it and clears its cache as part of a full reset.
 
 ### Button roles
 
@@ -94,7 +97,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - The income line is what retired the separate **Revenue vs. Expenditure** area chart: that chart's expense series was this one's stack total, and its income series is now the line — so "where did it go" and "was it more than came in" are read off one shape instead of two. The line is `targetMarkColor()` (near-black on light, near-white on dark) rather than a literal black, which would vanish in dark mode; it carries its own `stack` so a stacked y axis draws it *across* the bars instead of on top of them, and `order: 0` keeps it drawn over the tallest month.
   - **`stepped: 'middle'`, not a sloped line.** A month's income is one flat figure for that month, so joining the points with a slope invents a value for every day in between and renders a pay rise as a peak. Stepping halfway between months puts each flat run centred over its own bar, with the jump on the boundary — the same read the old stepped area chart gave.
   - The axis maximum is 1.2× the **second**-highest month, measured on whichever is taller that month, spend or income — sizing on the stack alone drew the line off the top of the plot in every month that earned more than it spent.
-  - **Spending Breakdown by Type is currently switched off** — the per-category donut wall (Housing, Transportation, Grocery, Personal, Household …, four periods each plus an *Untyped* remainder), driven by a free-text `Description` prefix convention and built dynamically from `Breakdown`. It's commented out in two places and deleted in none: the section in `index.html` and the `renderTypeBreakdownCharts` call in `app.js`'s `reportPromise`. The renderer in `charts.js` and the `typeBreakdown` parse behind it are untouched, so uncommenting those two brings it back exactly as it was.
+  - **Spending Breakdown by Type is currently switched off** — the per-category donut wall (Housing, Transportation, Grocery, Personal, Household …, four periods each plus an *Untyped* remainder), driven by a free-text `Description` prefix convention and built dynamically from `Breakdown`. It's commented out in two places and deleted in none: the section in `index.html` and the `renderTypeBreakdownCharts` call in `app.js`'s `reportPromise`. The renderer in `finance-charts.js` and the `typeBreakdown` parse behind it are untouched, so uncommenting those two brings it back exactly as it was.
 - **Financial Insight (AI)** — click "Financial Snapshot" to preview net worth, total Market Value, monthly cash flow/income/expenditure, spending by category over four complete periods (Previous Month/Quarter/Year/Lifelong), and every open account's Balance vs. Market Value; optionally ask a question, then **Send to AI** for a plain-text read — Overview, Going well, Needs attention, Investment Outlook (short-term liquidity, long-term growth), Suggestions. Nothing is computed until that click — same as Health Insight below.
   - A same-day figure (Cash Flow/Income/Expenditure) is flagged "partial month in progress" so the AI doesn't mistake an early-month total for a decline; closed/empty accounts and Institution are left out of what's sent.
 - **Transaction Log** — searchable, filterable, sortable, paginated; add/edit/delete/duplicate.
@@ -137,6 +140,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Health — Today at a glance
 
+- **Reminder banner** above Health Indicator when today has no Physique row yet (`checkHealthReminder`, `physique.js`, re-evaluated at the end of every `refreshPhysique`) — no weekend skip (unlike the Time Tracker's own reminder below, since people eat every day) and no separate OS-notification opt-in, just the banner and a Log button that opens today's entry the same way the panel's own **Today** button does.
 - Four tiles, in order: **Max/Min Calory Intake**, **Protein**, **Fiber**, **Activity**.
 - Each reads `actual / target unit`, green on the right side of the figure, red otherwise, grey when nothing's logged.
 - Activity also restates its target in kcal — `— / 100 min → 394 kcal` — from `getActivityTargetKcal`, the same pin-aware figure the Physical Activity chart's target line uses.
@@ -146,7 +150,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 ### Health — Health Indicator
 
-Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `charts.js` consumes. It is the only tab any of them read.
+Every chart and tile below reads the **`Physique`** tab — one row per day — via `physiqueAsWellnessEntries()` (`physique.js`), which expands each day back into the per-event shape `wellness-math.js`/`wellness-charts.js` consume. It is the only tab any of them read.
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
 - **One From/To pair, between the progress meters and the State Trend & Forecast heading, is the panel's window** — State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep and Protein Source Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
@@ -220,7 +224,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **`Δm%` and `Δm` are one quantity in two units** — `Δm% = 100 × Δm / m` — not a fifth solve mode. Type a percentage and the kilograms follow; type kilograms and the percentage follows. The percentage sits *above* the kilograms because it's the unit the safety band is written in, so it's the one you set the pace in.
   - **0.5–1% of body mass per week** is the usual sustainable range and **1% the ceiling**. The band is named in the identity block's own heading, the verdict (`in the 0.5–1%/week band`, `above the 1%/week ceiling`, `under the 0.5%/week floor`, `maintenance`, `a surplus, not a deficit`) rides on the `Δm%` trace line, and above the ceiling the box itself goes `--color-danger`. **Nothing goes in the unit column** — it reads `%/week` and stops, like every other row's. Under the floor is merely slow, and a negative rate is a deliberate lean bulk, so neither is coloured — the same asymmetry `calorieTargetDetail` already allows. It never blocks Save: an aggressive target is the user's call.
   - Whichever box you last typed into is the known (`weeklyLossKnownField`), and the other is rewritten on every render — so a typed 1% keeps meaning 1% as `m` changes instead of freezing the kilograms it meant when you typed it. The pct → kg direction runs first in `renderFormulaPreview`, before anything reads `Δm`; the kg → pct direction is written where the trace is built, the one place every mode reaches exactly once, failure paths included.
-  - **`WEEKLY_FAT_LOSS_KG` is still the only thing saved.** The percentage is derived from the live body mass, so storing it would freeze the wrong half. `weeklyFatLossPct` / `weeklyFatLossKgFromPct` live in `charts.js` with the rest of the target math because Health Plan Insight quotes the same figure — and kg is kept to 3 decimals, since 1% of 86.9 kg is 0.869 and 0.87 would read back as 1.001%.
+  - **`WEEKLY_FAT_LOSS_KG` is still the only thing saved.** The percentage is derived from the live body mass, so storing it would freeze the wrong half. `weeklyFatLossPct` / `weeklyFatLossKgFromPct` live in `wellness-math.js` with the rest of the target math because Health Plan Insight quotes the same figure — and kg is kept to 3 decimals, since 1% of 86.9 kg is 0.869 and 0.87 would read back as 1.001%.
   - In **Solve for → Weekly fat loss** both boxes go readonly: `Δm` is the answer there, so the percentage is an answer too.
 - **Lean body mass and the protein band it implies** close out the list: `LBM` (Boer 1984), then `P_min = p_min × LBM` and `P_max = p_max × LBM` from the editable `p_min`/`p_max` pair (defaults 1.8 and 2.2 g per kg of lean mass). All three are readonly in every mode, and trace their arithmetic in the substituted block with everything else.
   - Independent of **Solve for** — no calorie identity involves protein — so they compute in all five modes, and survive a calorie solve that can't complete.
@@ -449,19 +453,20 @@ Where the diagram above shows *who the browser talks to*, this shows *what happe
 ```mermaid
 flowchart TD
     Start(["Page load"]) --> Widgets["initWidgets()<br/>Time / Date / Azan / Weather bulbs<br/>(independent of sign-in)"]
-    Start --> Gate["initGate()<br/>wires sign-in / file-gate buttons"]
+    Start --> Shell["Dashboard shell paints immediately<br/>every block/panel, placeholder content<br/>(independent of sign-in — index.html has<br/>no [hidden] on #dashboard/#main-nav)"]
+    Start --> Gate["initGate()<br/>wires sign-in button / file-gate buttons"]
     Gate --> Auth["initAuth(handleAuthChange)"]
 
     Auth --> TokenCheck{"Non-expired token<br/>in localStorage?"}
     TokenCheck -- yes --> HandleAuth["handleAuthChange(token)"]
     TokenCheck -- no --> Silent{"Silent requestAccessToken<br/>(prompt: none) succeeds?"}
     Silent -- yes --> HandleAuth
-    Silent -- no --> SignInBtn["Landing page:<br/>'Sign in with Google'"]
+    Silent -- no --> SignInBtn["Sign-in banner, prepended over<br/>the still-visible dashboard shell<br/>(showSignInBanner, gate.js) —<br/>not a full-page gate"]
     SignInBtn --> Consent["Full OAuth consent prompt"] --> HandleAuth
 
     HandleAuth --> FileCheck{"getActiveSpreadsheetId()<br/>set in localStorage?"}
     FileCheck -- yes --> LoadDashboard
-    FileCheck -- no --> FileGate["File-selection gate"]
+    FileCheck -- no --> FileGate["File-selection gate<br/>(the one state that still takes over<br/>the whole page — no spreadsheet<br/>to show blocks from yet)"]
 
     FileGate --> Template["'Get the Template'<br/>opens Sheets /copy URL<br/>(no extra scope needed)"]
     FileGate --> Pick["'Select my Ledger'<br/>pickSpreadsheet() → Google Picker"]
@@ -473,7 +478,7 @@ flowchart TD
         Report["loadReport()<br/>cached or batchGetValues:<br/>Statement, Account,<br/>Breakdown — missingAmount computed<br/>client-side from the first two"]
         Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initActivities · initPhysique<br/>initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications<br/>(each checks its own cache first)"]
         ProteinRot["Once Physique + Nutrition settle:<br/>renderProteinRotationChart()<br/>(protein-rotation.js)"]
-        Render["charts.js renders every canvas<br/>app.js renders summary cards<br/>each module renders its own table"]
+        Render["The wellness/finance/timesheet/travel chart files render every canvas, lazily<br/>app.js renders summary cards<br/>each module renders its own table"]
         Report --> Render
         Modules --> ProteinRot --> Render
     end
@@ -553,34 +558,43 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 10 | `nutrition.js` | Nutrition table, Classification column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry`, Log/Log More into today's Physique Consumption |
 | 11 | `calorie-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
 | 12 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
-| 13 | `charts.js` | Every Chart.js renderer, plus the shared health/target formulas |
-| 14 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
-| 15 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
-| 16 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
-| 17 | `timesheet.js` | Work Time panel, holiday/missed detection, analytics data, reminder banner |
-| 18 | `csv.js` | CSV import, advanced filter engine, download helper |
-| 19 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
-| 20 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, incremental food + workout Calculate, bulk Calculate over selected days, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
-| 21 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
-| 22 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
-| 23 | `contacts.js` | Contact panel, CRUD, bulk export/delete/merge |
-| 24 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
-| 25 | `travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
-| 26 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
-| 27 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
-| 28 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
-| 29 | `micronutrient-insight.js` | Micronutrients mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `nutrient-targets.js`'s Ideal/day figures |
-| 30 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 31 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
-| 32 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
-| 33 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
-| 34 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 35 | `formula-playground.js` | Health Formula Playground modal: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
-| 36 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 37 | `gate.js` | Pre-login flow: sign-in gate, file gate, auth-state transitions |
-| 38 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
+| 14 | `wellness-math.js` | Pure health/target formulas with no chart or DOM code: BMR/TEF/calorie-target math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, target-date projection |
+| 15 | `wellness-charts.js` | Health Indicator chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
+| 16 | `finance-charts.js` | Financial Indicator chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Portfolio Allocation) |
+| 17 | `timesheet-charts.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
+| 18 | `travel-charts.js` | Travel chart renderers, including the country choropleth |
+| 19 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
+| 20 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
+| 21 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
+| 22 | `timesheet.js` | Work Time panel, holiday/missed detection, analytics data, reminder banner |
+| 23 | `csv.js` | CSV import, advanced filter engine, download helper |
+| 24 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
+| 25 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, table rendering, form open/close, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
+| 26 | `physique-breakdown.js` | Physique's food/workout Calculate (incremental + bulk over selected days), Combine & Sort, and the Consumption autocomplete — loads right after `physique.js`, sharing its module state |
+| 27 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
+| 28 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
+| 29 | `contacts.js` | Contact panel, CRUD, bulk export/delete/merge |
+| 30 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
+| 31 | `travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
+| 32 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
+| 33 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
+| 34 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
+| 35 | `micronutrient-insight.js` | Micronutrients mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `nutrient-targets.js`'s Ideal/day figures |
+| 36 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
+| 37 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
+| 38 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
+| 39 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 40 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 41 | `formula-fields.js` | Formula Playground's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
+| 42 | `formula-render.js` | Formula Playground's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
+| 43 | `formula-playground.js` | Health Formula Playground's modal lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
+| 44 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 45 | `global-search.js` | The header search box: drives each of the 7 panels' own existing `-search` input directly (sets its value, dispatches a real `input` event) rather than reimplementing their filters, then scrolls to the first panel with a match |
+| 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
+| 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts, `dashboardLoaded` (gates the backup-export button) |
 
-`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 39 above into a page that has none of them (see [Section pages](#section-pages)).
+`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 47 above into a page that has none of them (see [Section pages](#section-pages)).
 
 ### Data Flow
 
@@ -612,7 +626,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 1. `loadReport()` — cache or one `batchGetValues` for Statement, Account, Breakdown.
 2. Entity modules init concurrently via `Promise.allSettled`, each checking its own cache.
-3. `charts.js` renders canvases; `app.js` renders summary cards; each module renders its table.
+3. The wellness/finance/timesheet/travel chart files render canvases lazily (`upsertChart`, `charts-base.js`, builds a chart only once its `.chart-box` scrolls into view); `app.js` renders summary cards; each module renders its table.
 
 **Writes**
 
@@ -806,19 +820,19 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 
 | Constant | Value | Where |
 |---|---|---|
-| `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `charts.js` |
-| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `charts.js` |
-| `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort with no body mass on file | `charts.js` |
+| `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `wellness-math.js` |
+| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `wellness-math.js` |
+| `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort with no body mass on file | `wellness-math.js` |
 | `WORKOUT_REP_SEC_DEFAULT` | `3` s per rep — a brisk tempo. Overridable via `WORKOUT_REP_SEC` | `activity-estimator.js` |
-| `WORKOUT_STEPS_PER_MIN_DEFAULT` | `100` steps/min. Overridable via `WORKOUT_STEPS_PER_MIN` | `charts.js` |
-| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `charts.js`, `activity-estimator.js` |
-| `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `charts.js` |
-| `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `charts.js` |
-| `GLYCOGEN_SKELETAL_FRAC_DEFAULT` | `45 %` of LBM is skeletal muscle | `charts.js` |
-| `GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT` | `14` g glycogen / kg muscle | `charts.js` |
-| `GLYCOGEN_LIVER_G_DEFAULT` | `100` g liver glycogen reserve | `charts.js` |
-| `GLYCOGEN_WATER_RATIO_DEFAULT` | `3` g H₂O bound per g glycogen | `charts.js` |
-| `GLYCOGEN_ZONE_SMOOTHING_ALPHA` | `1 / BODY_MASS_TREND_WINDOW_SIZE` (`0.2`) | `charts.js` |
+| `WORKOUT_STEPS_PER_MIN_DEFAULT` | `100` steps/min. Overridable via `WORKOUT_STEPS_PER_MIN` | `wellness-charts.js` |
+| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `wellness-math.js`, `activity-estimator.js` |
+| `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `wellness-math.js` |
+| `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `wellness-math.js` |
+| `GLYCOGEN_SKELETAL_FRAC_DEFAULT` | `45 %` of LBM is skeletal muscle | `wellness-charts.js` |
+| `GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT` | `14` g glycogen / kg muscle | `wellness-charts.js` |
+| `GLYCOGEN_LIVER_G_DEFAULT` | `100` g liver glycogen reserve | `wellness-charts.js` |
+| `GLYCOGEN_WATER_RATIO_DEFAULT` | `3` g H₂O bound per g glycogen | `wellness-charts.js` |
+| `GLYCOGEN_ZONE_SMOOTHING_ALPHA` | `1 / BODY_MASS_TREND_WINDOW_SIZE` (`0.2`) | `wellness-math.js` |
 
 ### Scoring thresholds
 
@@ -844,7 +858,7 @@ LBM (kg)           = 0.407·kg + 0.267·cm − 19.2     ♂       (Boer 1984)
                      rounded to 0.1 kg before anything scales off it
 ```
 
-- **Boer, not `kg × (1 − bodyFat%)`.** That route would square a BMI-only approximation; Boer was regressed against measured lean mass directly, and is the LBM equation clinical dosing uses. Age doesn't enter it. Lives in `charts.js` as `boerLeanBodyMassKg`, next to the Deurenberg chain it deliberately doesn't reuse.
+- **Boer, not `kg × (1 − bodyFat%)`.** That route would square a BMI-only approximation; Boer was regressed against measured lean mass directly, and is the LBM equation clinical dosing uses. Age doesn't enter it. Lives in `wellness-charts.js` as `boerLeanBodyMassKg`, next to the Deurenberg chain it deliberately doesn't reuse.
 
 ```
 trend[i]           = mean(values[i−2 … i+2])   centered SMA over logged points
@@ -948,7 +962,7 @@ t      = (ρ / B) · ln[ (m̄ − m∞) / (target∓ΔM_gly − m∞) ]
 - `t` is the exact closed-form solution of `dm/dt = (Eᵢₙ − A − B·m) / ρ`, verified against numeric integration.
 - Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
 - **`m̄` (`planBodyMassKg`), not the last raw weigh-in** — the same smoothed mass the Formula Playground's own boxes run on, so the two start the curve from the same point.
-- `calcProjection` (`charts.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Formula Playground makes — rather than a second copy of this formula. The chart and the playground read one function, so they cannot print two different day counts for the same profile.
+- `calcProjection` (`wellness-math.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Formula Playground makes — rather than a second copy of this formula. The chart and the playground read one function, so they cannot print two different day counts for the same profile.
 - **With `WEEKLY_FAT_LOSS_PCT` pinned it's a different journey**, and `projectTargetDaysAtFixedPct` is the one that runs. A constant share of a falling mass is `dm/dt = −k·m`, `k = −ln(1 − p/100)/7` per day:
 
 ```
@@ -1132,11 +1146,12 @@ divided ("200/5g bar") — resolved before any of the above runs:
 
 ```text
 ledger/
-├── index.html                    # Page shell: gates, dashboard, modals, footer
+├── index.html                    # Page shell: dashboard, file-gate, modals, footer
 ├── health/index.html             # One-group pages: identical stubs, no markup of
 ├── finance/index.html            #   their own — section-page.js builds each from
 ├── other/index.html              #   index.html and shows that group alone
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
+├── sw.js                         # App-shell offline cache (never live sheet data)
 ├── assets/
 │   ├── images/                   # Social preview, touch icon
 │   │   └── activities/            # One figure per movement — animated .gif or two-position .jpg
@@ -1155,13 +1170,19 @@ ledger/
 │       ├── calorie-estimator.js  # Calculate for food
 │       ├── activity-estimator.js # Calculate for workouts
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
-│       ├── charts.js             # Chart.js renderers + health formulas
+│       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
+│       ├── wellness-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
+│       ├── wellness-charts.js    # Health Indicator chart renderers
+│       ├── finance-charts.js     # Financial Indicator chart renderers
+│       ├── timesheet-charts.js   # Work Time chart renderers
+│       ├── travel-charts.js      # Travel chart renderers (incl. world map)
 │       ├── transactions.js       # Transaction Log
 │       ├── accounts.js           # Account panel
 │       ├── breakdown.js          # Breakdown panel (Category/Type rows, formula-safe)
 │       ├── timesheet.js          # Work panel + analytics data
 │       ├── csv.js                # CSV import/export + filter engine
 │       ├── physique.js           # Physique (one row per day)
+│       ├── physique-breakdown.js # Physique's Calculate + Consumption autocomplete
 │       ├── strength-plan.js      # Activity Plan
 │       ├── contacts.js           # Contact panel
 │       ├── settings-panel.js     # Settings table
@@ -1175,8 +1196,11 @@ ledger/
 │       ├── plan-insight.js       # Insight Health Plan mode
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
-│       ├── formula-playground.js # Health Formula Playground
+│       ├── formula-fields.js     # Formula Playground field descriptors + input utils
+│       ├── formula-render.js     # Formula Playground substituted-formula renderers
+│       ├── formula-playground.js # Health Formula Playground modal lifecycle
 │       ├── financial-insight.js  # Financial Insight panel
+│       ├── global-search.js      # Header search box, drives each panel's own filter
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration
 │       └── section-page.js       # Loaded only by the section stubs above

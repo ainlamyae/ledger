@@ -250,6 +250,7 @@ function updatePageNav(panel) {
 // Runs once, before the router reads the address (bootDashboard, app.js).
 function initPageNav() {
   initActionBars();
+  liftFormActions();
   const sections = pageNavSections();
   buildSideNav(sections);
   // Home: every section's tiles under its glance cards; each opens that page.
@@ -266,6 +267,7 @@ function initPageNav() {
   if (!section) return;
   document.documentElement.classList.add('section-pages');
   section.panels.forEach(groupHeaderActions);
+  section.panels.forEach(liftPageActions);
   buildPageTiles(section);
   buildQuickActions(section);
   buildPageCrumb(section);
@@ -361,6 +363,33 @@ function groupHeaderActions(panel) {
   close.setAttribute('aria-label', 'Close');
   close.textContent = '❌';
   group.appendChild(close);
+}
+
+// One place for a page's actions on every screen: the top, in the phone bar's
+// order (actions, then ❌ last). A block's own action row (Tune's ♻️ 🔄 💾,
+// Insight's Send to AI) joins its header group before ❌, and every form's action
+// row moves to the top of the form, under its title. Moved, not copied, so every
+// listener (and a form's submit button) stays attached; on a phone the bar is
+// pinned to the bottom of the screen wherever it sits in the page.
+function liftPageActions(panel) {
+  const row = panel.querySelector('.panel-actions[data-page-actions]');
+  const group = panel.querySelector(':scope > .panel-header > .panel-header-actions');
+  if (!row || !group) return;
+  const close = group.querySelector('.header-action-close');
+  [...row.children]
+    .filter((el) => !el.classList.contains('page-action-close'))
+    .forEach((el) => group.insertBefore(el, close));
+  row.remove();
+}
+
+function liftFormActions() {
+  document.querySelectorAll('.modal .modal-actions').forEach((bar) => {
+    bar.classList.add('modal-actions-top');
+    const parent = bar.parentElement;
+    const title = parent.querySelector(':scope > h2');
+    if (title) title.after(bar);
+    else parent.prepend(bar);
+  });
 }
 
 function currentActionBar() {

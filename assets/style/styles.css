@@ -586,10 +586,18 @@ kbd {
 
 .widget-row {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: .5rem;
     font-size: .95rem;
     padding: .15rem 0;
+}
+
+/* A value that doesn't fit beside its label wraps as a whole onto its own line —
+   flex-wrap above moves the whole span down instead of this splitting mid-word
+   (e.g. "kcal" stranded alone under "— / 1300"). */
+.widget-row > span:last-child {
+    white-space: nowrap;
 }
 
 #widget-date {

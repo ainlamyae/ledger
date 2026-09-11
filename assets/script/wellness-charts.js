@@ -159,6 +159,22 @@ function renderTodayGlanceCards(entries) {
   // quote different numbers for one day.
   const activityTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
 
+  // Same three buckets the Physical Activity chart stacks by (Activity sheet's own
+  // Category column, physiqueActivityByCategory) — matched by prefix rather than an exact
+  // string, since a sheet can use "Strength" or "Strength Training" for the same bucket.
+  // Purely informational: no target to score against, so no green/red here.
+  const activityCategoryLine = (prefix) => {
+    const matches = activityEntriesToday.filter((e) => e.description?.toLowerCase().startsWith(prefix));
+    if (!matches.length) return '0 min (0 kcal)';
+    const mins = Math.round(matches.reduce((sum, e) => sum + toActivityMinutes(e.amount, e.unit), 0));
+    const kcal = Math.round(matches.reduce((sum, e) => sum + activityEntryKcal(e, bodyMassKg), 0));
+    return `${mins} min (${kcal} kcal)`;
+  };
+  ['cardio', 'neat', 'strength'].forEach((prefix) => {
+    const text = activityCategoryLine(prefix);
+    document.getElementById(`today-activity-${prefix}-value`).textContent = privacyMode ? maskDigits(text) : text;
+  });
+
   setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries, calories, activityKcal, tefKcalToday);
   setTodayGlanceTile('today-activity-duration', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
   setTodayGlanceTile('today-activity-calories', activityKcal, activityTargetKcal, 'kcal', activityKcal !== null && activityKcal >= activityTargetKcal);

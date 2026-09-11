@@ -1947,10 +1947,12 @@ td .btn {
 }
 
 /* Name and unit match the form's labels; Tune keeps its own look. */
+/* The page's own text size, like the values beside them, not the smaller field-
+   label size. */
 .app-form .formula-name,
 .app-form .formula-unit {
     font-family: inherit;
-    font-size: .85rem;
+    font-size: 1rem;
     color: var(--color-text-muted);
     opacity: 1;
 }
@@ -2890,11 +2892,6 @@ td .btn {
 
     .app-form label {
         margin-bottom: .3rem;
-        font-size: .8rem;
-    }
-
-    .app-form .formula-name,
-    .app-form .formula-unit {
         font-size: .8rem;
     }
 

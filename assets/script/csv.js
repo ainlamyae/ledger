@@ -28,6 +28,31 @@ function downloadTextFile(filename, content, mimeType) {
   URL.revokeObjectURL(url);
 }
 
+// One JSON snapshot of every tab, for backup/portability — the data already
+// lives in the user's own Google Sheet, so this isn't the primary copy, just
+// something to keep offline. Reuses each module's own already-loaded array
+// rather than re-fetching anything, so it's instant and costs no extra API
+// calls; account-menu.js only enables the button once loadDashboard has
+// actually populated them (dashboardLoaded, app.js).
+function exportFullBackup() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    transactions: allTransactions,
+    accounts: allAccounts,
+    breakdown: allBreakdownRows,
+    timesheet: allTimeEntries,
+    physique: allPhysiqueEntries,
+    activities: allActivities,
+    nutrition: allNutritionEntries,
+    contacts: allContacts,
+    settings: allSettingRows,
+    travel: allTravel,
+    applications: allApplications,
+    report: currentReport,
+  };
+  downloadTextFile(`ledger-backup-${todayStamp()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+}
+
 // Field-specific operator lists for the export filter builder. Amount is
 // numeric (comparison operators); the rest are plain text (substring/exact
 // match), matched case-insensitively.

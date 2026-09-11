@@ -27,6 +27,13 @@ const FORMULA_FIELDS = [
   // Activity sheet row is the one place that number is actually maintained.
   { key: 'ACTIVITY_MET', inputId: 'formula-met', value: () => exerciseMet('Walk') },
   { key: 'ACTIVITY_TARGET_MIN', inputId: 'formula-activity-min', fallback: () => ACTIVITY_TARGET_MIN_DEFAULT },
+  // Defaults to the sleep target itself (Settings' SLEEP_TARGET_HOURS) — "assume you hit
+  // it" — so an untouched box keeps producing the exact deficit this app always has. Type
+  // fewer hours and D (below) grows to compensate for the lost fat-loss efficiency.
+  { key: 'PLAN_SLEEP_HOURS', inputId: 'formula-plan-sleep-hours', fallback: () => getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT) },
+  // The literature's own 2-3%/hr range, defaulting to its midpoint — a rate, not a fixed
+  // constant, so it's tunable here like every other coefficient on this sheet.
+  { key: SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY, inputId: 'formula-sleep-deprivation-pct', fallback: () => SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT },
   // No default: an unset WEEKLY_FAT_LOSS_KG is exactly what makes the target
   // uncomputable and sends the charts to the flat CALORIE_TARGET_KCAL, so the
   // playground opens on 0 (maintenance) rather than inventing a deficit.
@@ -242,10 +249,12 @@ Resting metabolic rate — Mifflin-St Jeor (1990)
     BMR  =  10×m  +  6.25×h  −  5×a  +  σ
 Activity burn at the daily target — ACSM metabolic equation
     Eₐ   =  MET × m × τ × κ / ε
+Sleep Efficiency Factor — reduction in fat-loss efficiency per hour of sleep debt
+    η    =  1 − (γ/100) × max(0, s_target − s)
 Weekly fat loss as a share of body mass — 0.5–1%/week band
     Δm%  =  100 × Δm / m
-Daily energy deficit implied by the weekly fat-loss target
-    D    =  (Δm × ρ) / 7
+Daily energy deficit implied by the weekly fat-loss target, short sleep needs more of it
+    D    =  (Δm × ρ / 7) / η
 Thermic effect of food — a share of the very intake being solved for
     TEF  =  f × Eᵢₙ
 Target daily intake — TEF folded in by solving, not by adding

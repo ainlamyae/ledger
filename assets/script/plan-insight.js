@@ -81,7 +81,15 @@ function gatherPlanSnapshot() {
     adaptPct: Math.round(adaptFraction * 1000) / 10,
     adaptedBmr: Math.round(detail.bmr * (1 - adaptFraction)),
     adaptedPlateau,
-    deficitKcal: Math.round((detail.weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7),
+    // The REALIZED deficit the intake was actually built from, not the raw dm × 7700 / 7
+    // rate — the two differ whenever PLAN_SLEEP_HOURS is short of the sleep target (see
+    // sleepAdjustedDeficitKcal), and Ein below has to be traceable back to whichever one
+    // actually produced it.
+    deficitKcal: Math.round(detail.deficit),
+    rawDeficitKcal: Math.round(detail.rawDeficit),
+    sleepDeprivationEffectKcal: detail.sleepDeprivationEffectKcal,
+    planSleepHours: detail.planSleepHours,
+    sleepTargetHours: detail.sleepTargetHours,
     weeklyFatLossKg: detail.weeklyFatLossKg,
     bmr: Math.round(detail.bmr),
     activityKcal: Math.round(detail.activityKcal),
@@ -136,7 +144,9 @@ function planSubstitutedLines(p) {
     // asked to judge the plan against is written in percent, and this is the same figure
     // the playground shows beside the Δm box.
     `dm%: 100 × ${p.weeklyFatLossKg} / ${p.bodyMassKg} = ${p.weeklyFatLossPct} %/week`,
-    `D: ${p.weeklyFatLossKg} × 7700 / 7 = ${p.deficitKcal} kcal/day`,
+    p.sleepDeprivationEffectKcal > 0
+      ? `D: (${p.weeklyFatLossKg} × 7700 / 7) / eta = ${p.rawDeficitKcal} / eta = ${p.deficitKcal} kcal/day — eta is the Sleep Efficiency Factor for ${p.planSleepHours}h of assumed sleep against an ${p.sleepTargetHours}h target, so short sleep adds ${p.sleepDeprivationEffectKcal} kcal/day to the raw rate the weekly target alone implies`
+      : `D: ${p.weeklyFatLossKg} × 7700 / 7 = ${p.deficitKcal} kcal/day`,
     p.tefPercent > 0
       ? `Ein: (${p.bmr} + ${p.activityKcal} − ${p.deficitKcal}) / (1 − ${p.tefPercent}/100) = ${p.intakeKcal} kcal/day, of which TEF (digestion) is ${p.tefKcal} kcal/day`
       : `Ein: ${p.bmr} + ${p.activityKcal} − ${p.deficitKcal} = ${p.intakeKcal} kcal/day`,
@@ -203,6 +213,7 @@ function planInputLines(p) {
     `tau (daily activity target): ${p.tau} min/day`,
     `kappa (oxygen uptake per MET): ${p.kappa} mL O2/kg/min`,
     `dm (weekly fat loss target): ${p.weeklyFatLossKg} kg/week, i.e. ${p.weeklyFatLossPct}% of current body mass per week`,
+    `s (sleep length the plan assumes) vs. sleep target: ${p.planSleepHours}h vs. ${p.sleepTargetHours}h${p.sleepDeprivationEffectKcal > 0 ? ` — short of target, so the deficit above is inflated by ${p.sleepDeprivationEffectKcal} kcal/day to compensate` : ' — at or above target, no deficit adjustment'}`,
     `p_min - p_max (protein per kg of lean mass): ${p.proteinPerKgMin} - ${p.proteinPerKgMax} g/kg LBM/day`,
     `BMR equation in force: ${p.formula === 'katch' ? 'Katch-McArdle, BMR = 370 + 21.6 x LBM' : 'Mifflin-St Jeor, BMR = 10m + 6.25h - 5a + sigma'}`,
     `f (thermic effect of food): ${p.tefPercent}% of intake${p.tefPercent > 0 ? '' : ' (not counted in this plan)'}`,

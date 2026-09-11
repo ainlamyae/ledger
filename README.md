@@ -72,7 +72,6 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - **`.table-compact` is the app's one dense-table look** — tight `.15rem .4rem` cell padding, no per-row border (`styles.css`) — shared by every table that's mostly rows of short figures: Nutrition, Physique, Transaction, Account, Breakdown, Work Time, Travel, Contact, the Activity Plan's own per-day tables, and the two Calculate breakdown tables in Physique's modal. One class instead of the padding/border pair repeated per table id, so the look changes everywhere at once from one rule. Table-specific column widths and nowrap rules stay scoped to their own id/class, since those genuinely differ per table.
 - **Panel groups** — Health, Finance, Other. Each is a page of its own at `/health/`, `/finance/` and `/other/`, and the nav links are those addresses rather than in-page anchors, so a group can be linked to, bookmarked and refreshed on its own (see [Section pages](#section-pages)). The logo is the way back to all three at once.
 - **The home page shows every panel of every group**, one long page — every chart, table and form-launcher a section page would show, not just a summary. The top nav becomes a scroll-spy over that one page instead of the only way to reach a panel's actual content (`setupScrollSpy`, `app.js`); the title link on each group's heading (`<h2 class="panel-group-title"><a href="health/">…`) still opens that group's own isolated page for anyone who wants just Health, just Finance, or just Other. This used to collapse each group down to its title and summary cards row alone — that CSS rule is gone; every panel's data already loaded the same either way, so showing it costs nothing extra in fetches, only in what gets painted up front.
-- **Global search**, in the header — types into and re-filters each of the 7 panels that already have their own search box (Transactions, Physique, Nutrition, Contacts, Travel, Applications, Breakdown) simultaneously on Enter, rather than a separate search index (`global-search.js`). Reports a match count per panel and scrolls (expanding the panel first if it's collapsed) to the first one with a match, in that fixed order. Accounts, Settings and Activity have no existing filter of their own and are out of scope for this box. Distinct from the `/` shortcut below, which still only focuses Transactions' own search field.
 - **Keyboard shortcuts** — `/` search, `n` add transaction, `Esc` close modal, `?` help. Ignored while typing.
 - **Accessibility** — `role="dialog"`/`aria-modal` on modals, focus trap, focus restore, keyboard-operable headers, visible focus rings.
 - **Dark mode** — floating toggle, persisted.
@@ -590,11 +589,10 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 42 | `formula-render.js` | Formula Playground's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
 | 43 | `formula-playground.js` | Health Formula Playground's modal lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
 | 44 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 45 | `global-search.js` | The header search box: drives each of the 7 panels' own existing `-search` input directly (sets its value, dispatches a real `input` event) rather than reimplementing their filters, then scrolls to the first panel with a match |
-| 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
-| 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts, `dashboardLoaded` (gates the backup-export button) |
+| 45 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
+| 46 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts, `dashboardLoaded` (gates the backup-export button) |
 
-`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 47 above into a page that has none of them (see [Section pages](#section-pages)).
+`section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 46 above into a page that has none of them (see [Section pages](#section-pages)).
 
 ### Data Flow
 
@@ -1200,7 +1198,6 @@ ledger/
 │       ├── formula-render.js     # Formula Playground substituted-formula renderers
 │       ├── formula-playground.js # Health Formula Playground modal lifecycle
 │       ├── financial-insight.js  # Financial Insight panel
-│       ├── global-search.js      # Header search box, drives each panel's own filter
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration
 │       └── section-page.js       # Loaded only by the section stubs above

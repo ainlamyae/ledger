@@ -930,7 +930,6 @@ function bootDashboard() {
   initProteinRotationPanel();
   initFinancialInsight();
   initWorkoutPlan();
-  initGlobalSearch();
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();

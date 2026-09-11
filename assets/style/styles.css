@@ -180,42 +180,6 @@ header h1 {
     margin-left: auto;
 }
 
-.header-search {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    flex-shrink: 0;
-}
-
-.header-search[hidden] {
-    display: none;
-}
-
-#global-search {
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .35rem .6rem;
-    border-radius: var(--radius-md);
-    border: 1px solid rgba(255, 255, 255, .35);
-    background: rgba(255, 255, 255, .08);
-    color: #fff;
-    width: 12rem;
-}
-
-#global-search::placeholder {
-    color: rgba(255, 255, 255, .55);
-}
-
-.global-search-status {
-    color: rgba(255, 255, 255, .75);
-    font-size: .8rem;
-    white-space: nowrap;
-}
-
-.global-search-status[hidden] {
-    display: none;
-}
-
 .last-updated {
     color: rgba(255, 255, 255, .65);
     font-size: .8rem;

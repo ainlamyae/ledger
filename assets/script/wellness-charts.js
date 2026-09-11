@@ -57,35 +57,61 @@ function renderWellnessCharts(entries) {
 }
 
 // The charts answer "how's the trend", not "am I on track right now" — these tiles give
-// today's actual-vs-target for all four metrics without reading four rightmost bars.
+// today's actual-vs-target for every Health Indicator metric without reading the
+// rightmost bar of each chart. Ordered to match that panel: Body Mass, then the
+// donut-grid order (Activity, Caloric, Protein, Fiber, Fat, Carbohydrate, Sleep).
 function renderTodayGlanceCards(entries) {
   const todayIso = isoFromDate(new Date());
+  const todayEntries = entries.filter((e) => e.date === todayIso);
 
+  let bodyMassKgToday = null;
   let calories = null;
   let protein = null;
   let fiber = null;
+  let fat = null;
+  let carb = null;
   let activityMins = null;
+  let sleepHours = null;
+  let sleepBedMin = null;
+  let sleepWakeMin = null;
 
-  entries
-    .filter((e) => e.date === todayIso)
-    .forEach((e) => {
-      if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
-        calories = (calories ?? 0) + e.amount;
-      }
-      if (e.category === 'Calories; Protein' && e.amount2 !== null) {
-        protein = (protein ?? 0) + e.amount2;
-      }
-      if (e.category === 'Calories; Protein' && e.fiberG !== null && e.fiberG !== undefined) {
-        fiber = (fiber ?? 0) + e.fiberG;
-      }
-      if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
-        activityMins = (activityMins ?? 0) + toActivityMinutes(e.amount, e.unit);
-      }
-    });
+  todayEntries.forEach((e) => {
+    if (e.category === 'Body Mass' && e.amount !== null) {
+      bodyMassKgToday = Math.round(e.amount * 100) / 100;
+    }
+    if ((e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null) {
+      calories = (calories ?? 0) + e.amount;
+    }
+    if (e.category === 'Calories; Protein' && e.amount2 !== null) {
+      protein = (protein ?? 0) + e.amount2;
+    }
+    if (e.category === 'Calories; Protein' && e.fiberG !== null && e.fiberG !== undefined) {
+      fiber = (fiber ?? 0) + e.fiberG;
+    }
+    if (e.category === 'Calories; Protein' && e.fatG !== null && e.fatG !== undefined) {
+      fat = (fat ?? 0) + e.fatG;
+    }
+    if (e.category === 'Calories; Protein' && e.carbG !== null && e.carbG !== undefined) {
+      carb = (carb ?? 0) + e.carbG;
+    }
+    if ((e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null) {
+      activityMins = (activityMins ?? 0) + toActivityMinutes(e.amount, e.unit);
+    }
+    if (e.category === 'Sleep' && e.amount !== null) {
+      sleepHours = e.amount;
+      sleepBedMin = e.sleepBedMin;
+      sleepWakeMin = e.sleepWakeMin;
+    }
+  });
 
+  const bodyMassTarget = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const targetIsDownward = bodyMassTargetIsDownward(entries);
   const calorieTarget = getCalorieTarget(entries);
   const proteinBand = getProteinTargetBandG(entries);
   const fiberBand = getFiberTargetBandG(entries);
+  const fatBand = getFatTargetBandG(entries);
+  const carbBand = getCarbTargetBandG(entries);
+  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
   const bodyMassKg = latestBodyMassKg(entries);
   // Minutes when time is what's pinned; rises with a lighter body mass when calorie burn
   // is pinned instead — see getActivityTargetMin.
@@ -93,7 +119,11 @@ function renderTodayGlanceCards(entries) {
 
   // The heading carries which target it is, since the number can't and the value line
   // has no room. Digit-free, so privacy mode has nothing to hide.
-  document.getElementById('today-calories-label').textContent = `${calorieTarget.word} Calory Intake`;
+  document.getElementById('today-calories-label').textContent = `${calorieTarget.word} Calory`;
+
+  // Down on a cut, up on a bulk — same read as the Body Mass chart's bar colours.
+  const bodyMassGood = bodyMassKgToday !== null
+    && (targetIsDownward ? bodyMassKgToday <= bodyMassTarget : bodyMassKgToday >= bodyMassTarget);
 
   // Protein is the one metric judged against a RANGE, and the one where overshooting
   // still counts as a hit — see withinProteinBand and the chart's PROTEIN_OVER_BAND_COLOR.
@@ -104,15 +134,69 @@ function renderTodayGlanceCards(entries) {
   const fiberInBand = fiber !== null && withinFiberBand(fiber, fiberBand);
   const fiberOverBand = fiber !== null && fiber > fiberBand.max;
 
-  // What hitting the minutes target would burn — pinned flat if calorie burn is what's
-  // pinned, else via the same activityTargetKcal the calorie target is built from, so the
-  // two can't quote different numbers for one day.
-  const targetBurn = bodyMassKg !== null ? `${Math.round(getActivityTargetKcal(bodyMassKg))} kcal` : null;
+  // Same shape again — see withinFatBand/getFatTargetBandG and the chart's
+  // FAT_OVER_BAND_COLOR.
+  const fatInBand = fat !== null && withinFatBand(fat, fatBand);
+  const fatOverBand = fat !== null && fat > fatBand.max;
 
+  // Carbohydrate reads the other way round (see renderWellnessCarbChart): under the
+  // floor isn't a miss, just unscored, so that case gets the chart's own gray instead
+  // of either fixed colour.
+  const carbInBand = carb !== null && withinCarbBand(carb, carbBand);
+  const carbOverBand = carb !== null && carb > carbBand.max;
+  const carbUnderBand = carb !== null && !carbInBand && !carbOverBand;
+
+  // Actual burn, same per-entry rule the Activity/Calorie Balance charts and Insight use
+  // (a Calculate-derived amount2 wins, else minutes at ACTIVITY_MET) — so this figure can't
+  // disagree with theirs for today.
+  const activityEntriesToday = todayEntries.filter((e) => e.category === 'Activity' || e.category === 'Activity; Calories');
+  const activityKcal = activityEntriesToday.length
+    ? Math.round(activityEntriesToday.reduce((sum, e) => sum + activityEntryKcal(e, bodyMassKg), 0))
+    : null;
+  // What hitting the minutes target would burn — pinned flat if calorie burn is what's
+  // pinned, else via the same rate the calorie target is built from, so the two can't
+  // quote different numbers for one day.
+  const activityTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
+
+  setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries);
+  setTodayGlanceTile('today-activity-duration', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
+  setTodayGlanceTile('today-activity-calories', activityKcal, activityTargetKcal, 'kcal', activityKcal !== null && activityKcal >= activityTargetKcal);
   setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget));
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
   setTodayGlanceTile('today-fiber', fiber, formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
-  setTodayGlanceTile('today-activity', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget, targetBurn);
+  setTodayGlanceTile('today-fat', fat, formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand, null, fatOverBand);
+  setTodayGlanceTile('today-carb', carb, formatProteinTargetBand(carbBand), 'g', carbInBand, null, false, carbUnderBand ? BODY_MASS_UNSCORED_COLOR : null);
+  setTodayGlanceTile('today-sleep-duration', sleepHours, sleepTarget, 'hr', null, null, false, sleepHours !== null ? sleepStatusColor(sleepHours, sleepTarget) : null);
+  const bedtimeText = sleepBedMin !== null ? formatClockTime24(sleepBedMin) : '—';
+  document.getElementById('today-sleep-bedtime-value').textContent = privacyMode ? maskDigits(bedtimeText) : bedtimeText;
+  const wakeText = sleepWakeMin !== null ? formatClockTime24(sleepWakeMin) : '—';
+  document.getElementById('today-sleep-wake-value').textContent = privacyMode ? maskDigits(wakeText) : wakeText;
+}
+
+// Body Mass gets its own four-row layout (Today/Target/Estimate/Days left) instead of
+// the generic value-over-target line — Estimate and Days left read calcProjection's own
+// ETA and day count, the same figures State Trend & Forecast's time-progress meter
+// shows, so none of them can disagree.
+function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries) {
+  const todayEl = document.getElementById('today-bodymass-value');
+  todayEl.classList.remove('income', 'income-high', 'expense');
+  const todayText = bodyMassKgToday !== null ? `${bodyMassKgToday} kg` : '—';
+  todayEl.textContent = privacyMode ? maskDigits(todayText) : todayText;
+  if (bodyMassKgToday !== null) todayEl.classList.add(isGood ? 'income' : 'expense');
+
+  const targetText = `${bodyMassTarget} kg`;
+  document.getElementById('today-bodymass-target-value').textContent = privacyMode ? maskDigits(targetText) : targetText;
+
+  const proj = calcProjection(entries);
+  const etaText = proj?.status === 'reached' ? 'Reached'
+    : (proj?.status === 'ok' && proj.etaDate) ? isoFromDate(proj.etaDate)
+    : '—';
+  document.getElementById('today-bodymass-eta-value').textContent = privacyMode ? maskDigits(etaText) : etaText;
+
+  const daysText = proj?.status === 'reached' ? '0'
+    : (proj?.status === 'ok' && proj.daysToTarget !== undefined) ? `${proj.daysToTarget}`
+    : '—';
+  document.getElementById('today-bodymass-days-value').textContent = privacyMode ? maskDigits(daysText) : daysText;
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate

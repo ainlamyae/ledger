@@ -945,5 +945,11 @@ function bootDashboard() {
 // index.html after its own load event has already fired, so a load listener
 // there would never run: it starts the page itself instead, once every script
 // index.html asks for has arrived.
+//
+// DOMContentLoaded rather than window.load: load also waits on every image and
+// the chart CDN scripts, which have nothing to do with the dashboard shell or
+// the sign-in check — that wait was the whole reason the sign-in banner used
+// to take seconds to appear after the (already-visible) shell.
 if (window.ledgerSectionPage) window.ledgerSectionPage.onBoot(bootDashboard);
-else window.addEventListener('load', bootDashboard);
+else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootDashboard);
+else bootDashboard();

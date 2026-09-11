@@ -83,10 +83,22 @@ function scheduleTokenRefresh(expiresAt) {
   refreshTimer = setTimeout(requestSilently, delay);
 }
 
-function initAuth(onAuthChange) {
+// index.html loads gsi/client with `async`, so it can still be in flight when
+// this file runs (bootDashboard no longer waits on window.load, which used to
+// guarantee it had arrived) — wait for the script's own load event rather than
+// assuming `google` exists yet. Resolves immediately if it's already there.
+function waitForGoogleIdentity() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve();
+  const script = document.querySelector('script[src^="https://accounts.google.com/gsi/client"]');
+  return new Promise((resolve) => script.addEventListener('load', resolve, { once: true }));
+}
+
+async function initAuth(onAuthChange) {
   authChangeHandler = onAuthChange;
   const stored = loadStoredToken();
   accessToken = stored?.token || null;
+
+  await waitForGoogleIdentity();
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.CLIENT_ID,

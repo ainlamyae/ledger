@@ -441,18 +441,13 @@ function positionConsumptionSuggestions() {
   if (!isMobileConsumptionViewport() || !window.visualViewport) {
     list.classList.remove('autocomplete-suggestions--pinned');
     list.style.removeProperty('bottom');
-    list.style.removeProperty('left');
-    list.style.removeProperty('width');
     return;
   }
 
-  const fieldRect = physiqueField('consumption').getBoundingClientRect();
   const vv = window.visualViewport;
   const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
 
   list.classList.add('autocomplete-suggestions--pinned');
-  list.style.left = `${fieldRect.left}px`;
-  list.style.width = `${fieldRect.width}px`;
   list.style.bottom = `${keyboardHeight}px`;
 }
 
@@ -503,8 +498,6 @@ function hideConsumptionSuggestions() {
   list.innerHTML = '';
   list.classList.remove('autocomplete-suggestions--pinned');
   list.style.removeProperty('bottom');
-  list.style.removeProperty('left');
-  list.style.removeProperty('width');
   consumptionSuggestionMatches = [];
   consumptionSuggestionIndex = -1;
 }

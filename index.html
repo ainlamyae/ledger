@@ -83,7 +83,6 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                 </div>
                 <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
-                <button id="export-backup-btn" class="account-menu-item" disabled title="Load your data first">Export full backup (JSON)</button>
                 <button id="clear-cache-btn" class="account-menu-item">Clear cache</button>
                 <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
@@ -181,13 +180,14 @@
                 <h3>Status</h3>
                 <div class="widget-row"><span>Body Mass</span><span id="today-bodymass-value">—</span></div>
                 <div class="widget-row"><span>BMI</span><span id="today-bodymass-bmi-value">—</span></div>
-                <div class="widget-row"><span>Change</span><span id="today-bodymass-change-value">—</span></div>
+                <div class="widget-row"><span>Maintenance</span><span id="today-status-maintenance-value">—</span></div>
                 <div class="widget-row"><span>Balance</span><span id="today-bodymass-balance-value">—</span></div>
                 <div class="widget-row"><span>Estimate</span><span id="today-bodymass-eta-value">—</span></div>
             </div>
             <div class="card">
                 <h3>Intake Macros</h3>
-                <div class="widget-row"><span>Calories</span><span id="today-calories-value">—</span></div>
+                <div class="widget-row"><span>Intake</span><span id="today-macros-intake-value">—</span></div>
+                <div class="widget-row"><span>Digestion</span><span id="today-macros-digestion-value">—</span></div>
                 <div class="widget-row"><span>Protein</span><span id="today-protein-value">—</span></div>
                 <div class="widget-row"><span>Fiber</span><span id="today-fiber-value">—</span></div>
                 <div class="widget-row"><span>Fat</span><span id="today-fat-value">—</span></div>
@@ -195,17 +195,16 @@
             </div>
             <div class="card">
                 <h3>Physical Activity</h3>
-                <div class="widget-row"><span>Duration</span><span id="today-activity-duration-value">—</span></div>
-                <div class="widget-row"><span>Calories</span><span id="today-activity-calories-value">—</span></div>
+                <div class="widget-row"><span>Activity</span><span id="today-macros-activity-value">—</span></div>
                 <div class="widget-row"><span>Cardio</span><span id="today-activity-cardio-value">—</span></div>
                 <div class="widget-row"><span>NEAT</span><span id="today-activity-neat-value">—</span></div>
                 <div class="widget-row"><span>Strength</span><span id="today-activity-strength-value">—</span></div>
             </div>
             <div class="card">
                 <h3>Sleep</h3>
-                <div class="widget-row"><span>Window</span><span id="today-sleep-window-value">—</span></div>
+                <div class="widget-row"><span>Deprivation</span><span id="today-sleep-deprivation-card-value">—</span></div>
                 <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
-                <div class="widget-row"><span>Deprivation Effect</span><span id="today-sleep-deprivation-value">—</span></div>
+                <div class="widget-row"><span>Window</span><span id="today-sleep-window-value">—</span></div>
             </div>
         </div>
 
@@ -274,12 +273,14 @@
                     </label>
                 </div>
 
+                <!-- State Trend & Forecast chart — temporarily hidden; re-enable by uncommenting
                 <div class="body-mass-projection-header">
                     <h4>State Trend &amp; Forecast</h4>
                 </div>
                 <div class="chart-box chart-box-flush">
                     <canvas id="wellness-projection-chart"></canvas>
                 </div>
+                -->
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
             </div>
 
@@ -1592,9 +1593,9 @@
                  isn't a setting: whichever equation the radio above selected, evaluated at
                  m̄. Placed with the profile rather than beside Eᵢₙ because that's what it
                  describes — the body, before any plan is applied to it. -->
-            <label class="formula-row" title="Resting metabolic rate at your smoothed body mass, from whichever equation is selected above — what you burn before any movement. Not editable: it is derived from m̄, h, a and σ.">
+            <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, from whichever equation is selected above — what you burn before any movement. Not editable: it is derived from m̄, h, a and σ.">
                 <span class="formula-sym">BMR</span>
-                <span class="formula-name">resting metabolic rate, at m̄</span>
+                <span class="formula-name">basal metabolic rate, at m̄</span>
                 <input type="text" id="formula-bmr" inputmode="decimal" readonly>
                 <span class="formula-unit">kcal/day</span>
             </label>

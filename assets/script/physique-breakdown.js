@@ -780,6 +780,8 @@ async function calculatePhysiqueDay() {
     }
   }
 
+  updatePhysiqueSleepDuration();
+
   btn.disabled = false;
   btn.textContent = originalLabel;
 

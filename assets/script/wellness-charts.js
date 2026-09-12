@@ -176,9 +176,6 @@ function renderTodayGlanceCards(entries) {
   });
 
   setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, bodyMassGood, entries, calories, activityKcal, tefKcalToday, sleepHours);
-  setTodayGlanceTile('today-activity-duration', activityMins, activityTarget, 'min', activityMins !== null && activityMins >= activityTarget);
-  setTodayGlanceTile('today-activity-calories', activityKcal, activityTargetKcal, 'kcal', activityKcal !== null && activityKcal >= activityTargetKcal);
-  setTodayGlanceTile('today-calories', calories, calorieTarget.kcal, 'kcal', calories !== null && withinCalorieTarget(calories, calorieTarget), null, false, null, '<');
   setTodayGlanceTile('today-protein', protein, formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
   setTodayGlanceTile('today-fiber', fiber, formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
   setTodayGlanceTile('today-fat', fat, formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand, null, fatOverBand);
@@ -203,47 +200,50 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
   todayEl.textContent = privacyMode ? maskDigits(combinedText) : combinedText;
   if (bodyMassKgToday !== null) todayEl.classList.add(isGood ? 'income' : 'expense');
 
-  const bmiEl = document.getElementById('today-bodymass-bmi-value');
-  bmiEl.classList.remove('income', 'income-high', 'expense');
   const heightCm = getSetting('HEIGHT_CM', null);
-  const bmiText = bodyMassKgToday !== null && heightCm !== null
-    ? `${computeBmi(bodyMassKgToday, heightCm)} / ${computeBmi(bodyMassTarget, heightCm)} kg/m²`
-    : '—';
-  bmiEl.textContent = privacyMode ? maskDigits(bmiText) : bmiText;
-  if (bodyMassKgToday !== null && heightCm !== null) bmiEl.classList.add(isGood ? 'income' : 'expense');
-
-  const changeEl = document.getElementById('today-bodymass-change-value');
-  changeEl.classList.remove('income', 'income-high', 'expense');
-
-  // Same smoothed slope the Body Mass chart's own "Smoothed Change" tooltip line
-  // reads — computeBodyMassTrend/computeBodyMassTrendSlopeGramsPerDay off the FULL
-  // history, at its last point, so this can't quote a different figure than the chart.
-  const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
-  let actualGPerDay = null;
-  if (bodyMassEntries.length >= 2) {
-    const trendMap = computeBodyMassTrend(bodyMassByDateMap(bodyMassEntries));
-    const slopeByDate = computeBodyMassTrendSlopeGramsPerDay(trendMap);
-    const trendDates = [...slopeByDate.keys()].sort();
-    actualGPerDay = slopeByDate.get(trendDates[trendDates.length - 1]) ?? null;
-  }
-
-  // The Formula Playground's own weekly rate (weeklyFatLossKgAt), converted to a daily
-  // g/day figure in the same signed convention as actualGPerDay above (negative =
-  // losing) — this app's rate plans are always framed as a loss, so the sign flips only
-  // with which direction BODY_MASS_TARGET_KG itself calls for.
   const bodyMassKg = latestBodyMassKg(entries);
-  const weeklyFatLossKg = weeklyFatLossKgAt(bodyMassKg);
-  const targetIsDownward = bodyMassTargetIsDownward(entries);
-  const targetGPerDay = weeklyFatLossKg ? Math.round((weeklyFatLossKg * 1000) / 7) * (targetIsDownward ? -1 : 1) : null;
 
-  const changeText = actualGPerDay !== null && targetGPerDay !== null
-    ? `${withExplicitSign(actualGPerDay)} / ${withExplicitSign(targetGPerDay)} g/day`
-    : '—';
-  changeEl.textContent = privacyMode ? maskDigits(changeText) : changeText;
-  if (actualGPerDay !== null && targetGPerDay !== null) {
-    const changeGood = targetIsDownward ? actualGPerDay <= targetGPerDay : actualGPerDay >= targetGPerDay;
-    changeEl.classList.add(changeGood ? 'income' : 'expense');
+  // BMI row — today's reading and the target, both in kg/m².
+  const bmiEl = document.getElementById('today-bodymass-bmi-value');
+  bmiEl.classList.remove('income', 'expense');
+  if (bodyMassKgToday !== null && heightCm !== null) {
+    const bmiToday = computeBmi(bodyMassKgToday, heightCm);
+    const bmiTarget = computeBmi(bodyMassTarget, heightCm);
+    const bmiText = `${bmiToday} / ${bmiTarget} kg/m²`;
+    bmiEl.textContent = privacyMode ? maskDigits(bmiText) : bmiText;
+    bmiEl.classList.add(isGood ? 'income' : 'expense');
+  } else {
+    bmiEl.textContent = '—';
   }
+
+  // Intake — computed for the Intake Macros card mirror; no Status row.
+  const calTarget = getCalorieTarget(entries);
+  const intakeText = caloriesToday !== null
+    ? `${withExplicitSign(Math.round(caloriesToday))} < ${calTarget.kcal} kcal`
+    : '—';
+  const macrosIntakeEl = document.getElementById('today-macros-intake-value');
+  macrosIntakeEl.classList.remove('income', 'expense');
+  macrosIntakeEl.textContent = privacyMode ? maskDigits(intakeText) : intakeText;
+  if (caloriesToday !== null) macrosIntakeEl.classList.add(withinCalorieTarget(caloriesToday, calTarget) ? 'income' : 'expense');
+
+  // Activity — computed for the Physical Activity card mirror; no Status row.
+  const actTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
+  const actText = activityKcalToday !== null
+    ? `${withExplicitSign(-activityKcalToday)} / ${actTargetKcal} kcal`
+    : '—';
+  const macrosActivityEl = document.getElementById('today-macros-activity-value');
+  macrosActivityEl.classList.remove('income', 'expense');
+  macrosActivityEl.textContent = privacyMode ? maskDigits(actText) : actText;
+  if (activityKcalToday !== null) macrosActivityEl.classList.add(activityKcalToday >= actTargetKcal ? 'income' : 'expense');
+
+  // Digestion — computed for the Intake Macros card mirror; no Status row.
+  const digKcal = tefKcalToday !== null
+    ? Math.round(tefKcalToday)
+    : (caloriesToday !== null ? Math.round(caloriesToday * (1 - tefDivisor())) : null);
+  const digTarget = Math.round(calTarget.kcal * (1 - tefDivisor()));
+  const digText = digKcal !== null ? `${withExplicitSign(-digKcal)} / ${withExplicitSign(-digTarget)} kcal` : '—';
+  const macrosDigestionEl = document.getElementById('today-macros-digestion-value');
+  if (macrosDigestionEl) macrosDigestionEl.textContent = privacyMode ? maskDigits(digText) : digText;
 
   const balanceEl = document.getElementById('today-bodymass-balance-value');
   balanceEl.classList.remove('income', 'income-high', 'expense');
@@ -260,23 +260,31 @@ function setBodyMassGlanceTile(bodyMassKgToday, bodyMassTarget, isGood, entries,
 
   let balanceKcal = null;
   let deprivationKcal = null;
+  let maintenanceKcal = null;
   if (haveProfile && caloriesToday !== null && bodyMassKg !== null) {
-    const maintenance = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
+    maintenanceKcal = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
     const activity = activityKcalToday ?? 0;
     const tef = tefKcalToday !== null
       ? Math.round(tefKcalToday)
       : Math.round(caloriesToday * (1 - tefDivisor()));
     ({ deprivationKcal, balance: balanceKcal } = dailyEnergyBalanceKcal(
-      Math.round(caloriesToday), maintenance, activity, tef, sleepHoursToday, sleepTarget,
+      Math.round(caloriesToday), maintenanceKcal, activity, tef, sleepHoursToday, sleepTarget,
     ));
   }
 
-  // Same gradient as the Sleep chart's own dot for this day, so the tile and the chart
-  // can't disagree about how bad the night was.
-  const deprivationEl = document.getElementById('today-sleep-deprivation-value');
-  const deprivationText = deprivationKcal !== null ? `${deprivationKcal} kcal` : '—';
-  deprivationEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
-  deprivationEl.style.color = deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : '';
+  // Maintenance row — BMR as a signed expenditure, same sign convention as the
+  // Calorie Balance tooltip's own Maintenance line.
+  const maintenanceEl = document.getElementById('today-status-maintenance-value');
+  const maintenanceText = maintenanceKcal !== null ? `${withExplicitSign(-maintenanceKcal)} kcal` : '—';
+  if (maintenanceEl) maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
+
+  // Deprivation — computed for the Sleep card mirror; no Status row.
+  const deprivationText = deprivationKcal !== null ? `${withExplicitSign(deprivationKcal)} / 0 kcal` : '—';
+  const sleepDeprivationCardEl = document.getElementById('today-sleep-deprivation-card-value');
+  if (sleepDeprivationCardEl) {
+    sleepDeprivationCardEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
+    sleepDeprivationCardEl.style.color = deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : '';
+  }
 
   const isCut = getCalorieTargetKind(entries) === 'max';
   const balanceTargetKcal = targetBalanceKcal(planBodyMassKg(entries));
@@ -505,6 +513,8 @@ const BODY_MASS_AXIS_MIN_PAD_KG = 0.5;
 // Smallest first; the first step keeping the count under BODY_MASS_MAX_GRIDLINES wins, so
 // every line lands on a round kg.
 const BODY_MASS_TICK_STEPS_KG = [0.5, 1, 2, 5, 10];
+// Step candidates for macro gram axes; same max-gridlines guard as the kg axis.
+const MACRO_G_TICK_STEPS = [5, 10, 25, 50, 100, 200, 500, 1000];
 const BODY_MASS_MAX_GRIDLINES = 8;
 
 // One bar per reading, scored by direction of travel on the same dates Caloric Intake
@@ -557,20 +567,58 @@ function renderWellnessBodyMassChart(entries) {
   // day-to-day delta, so a single noisy weigh-in doesn't read as the real trend.
   const trendSlopeByDate = computeBodyMassTrendSlopeGramsPerDay(trendMap);
   const swingKg = lastTrendDate !== undefined ? glycogenSwingKg(byDate.get(lastTrendDate), heightCm, sex) : null;
-  const zoneAnchorMap = swingKg === null ? null : computeGlycogenZoneAnchor(trendMap);
   const stateTrendSeries = dates.map((d) => trendMap.get(d) ?? null);
-  // Half of swingKg on each edge, so the band's total top-to-bottom height reads as
-  // swingKg — not the doubled 2×swingKg that ± each full swingKg on both sides gave.
-  const zoneHalfKg = swingKg === null ? null : swingKg / 2;
-  const zoneUpperSeries = dates.map((d) => {
-    if (zoneAnchorMap === null) return null;
-    const a = zoneAnchorMap.get(d);
-    return a === undefined ? null : a + zoneHalfKg;
-  });
+
+  // Calorie-implied trajectory: same walk the (now-hidden) State Trend & Forecast chart
+  // built — start at the first weigh-in and advance by each day's calorie balance. Used
+  // here for the gray reference line, the yellow zone, and the Muscle Loss red zone.
+  // Requires a full profile (height/age/sex) for BMR; omitted otherwise.
+  const calorieTrendMap = new Map();
+  if (haveProfile) {
+    const sortedWeighInDates = [...byDate.keys()].sort();
+    if (sortedWeighInDates.length >= 1) {
+      const calorieTrendDates = datesInRange(sortedWeighInDates[0], sortedWeighInDates[sortedWeighInDates.length - 1]);
+      const calorieBodyMassForDate = carryForwardBodyMassByDate(byDate, calorieTrendDates);
+      const cIntakeByDate = new Map();
+      const cTefByDate = new Map();
+      const cActivityKcalByDate = new Map();
+      const cSleepHoursByDate = new Map();
+      entries.forEach((e) => {
+        if (e.amount === null) return;
+        if (e.category === 'Calories' || e.category === 'Calories; Protein') {
+          cIntakeByDate.set(e.date, (cIntakeByDate.get(e.date) || 0) + e.amount);
+          if (e.tefKcal !== null && e.tefKcal !== undefined) {
+            cTefByDate.set(e.date, (cTefByDate.get(e.date) || 0) + e.tefKcal);
+          }
+        } else if (e.category === 'Activity' || e.category === 'Activity; Calories') {
+          const kcal = activityEntryKcal(e, calorieBodyMassForDate.get(e.date) ?? null);
+          cActivityKcalByDate.set(e.date, (cActivityKcalByDate.get(e.date) || 0) + kcal);
+        } else if (e.category === 'Sleep') {
+          cSleepHoursByDate.set(e.date, (cSleepHoursByDate.get(e.date) || 0) + e.amount);
+        }
+      });
+      const cSleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+      let running = byDate.get(sortedWeighInDates[0]);
+      calorieTrendDates.forEach((d) => {
+        calorieTrendMap.set(d, running);
+        if (!cIntakeByDate.has(d)) return;
+        const intake = cIntakeByDate.get(d);
+        const maintenance = bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex);
+        const activity = cActivityKcalByDate.get(d) || 0;
+        const tef = cTefByDate.has(d) ? cTefByDate.get(d) : intake * (1 - tefDivisor());
+        const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, cSleepHoursByDate.get(d), cSleepTarget);
+        running += balance / GENERIC_KCAL_PER_KG_FAT;
+      });
+    }
+  }
+  const calorieTrendSeries = dates.map((d) => calorieTrendMap.get(d) ?? null);
+
+  // Yellow zone anchored to the calorie-implied trajectory, matching State Trend &
+  // Forecast exactly: upper edge = gray line, lower edge = gray line − full swingKg.
+  const zoneUpperSeries = dates.map((d) => calorieTrendMap.get(d) ?? null);
   const zoneLowerSeries = dates.map((d) => {
-    if (zoneAnchorMap === null) return null;
-    const a = zoneAnchorMap.get(d);
-    return a === undefined ? null : a - zoneHalfKg;
+    const c = calorieTrendMap.get(d);
+    return c !== undefined && swingKg !== null ? c - swingKg : null;
   });
 
   const values = [];
@@ -626,7 +674,7 @@ function renderWellnessBodyMassChart(entries) {
   // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
   // `grace` too late to read here. The trend folds in too — a fit extended to the week's
   // edges can reach past every reading in it, and would otherwise clip.
-  const logged = [...values, ...trendSeries, ...stateTrendSeries, ...zoneUpperSeries, ...zoneLowerSeries].filter((v) => v !== null);
+  const logged = [...values, ...trendSeries, ...stateTrendSeries, ...zoneUpperSeries, ...zoneLowerSeries, ...calorieTrendSeries].filter((v) => v !== null);
   const kgLo = logged.length ? Math.min(...logged) : 0;
   const kgHi = logged.length ? Math.max(...logged) : 0;
   const kgPad = Math.max((kgHi - kgLo) * BODY_MASS_AXIS_PAD_FRACTION, BODY_MASS_AXIS_MIN_PAD_KG);
@@ -637,10 +685,6 @@ function renderWellnessBodyMassChart(entries) {
     ?? BODY_MASS_TICK_STEPS_KG[BODY_MASS_TICK_STEPS_KG.length - 1];
   const yMin = Math.max(0, Math.floor((kgLo - kgPad) / kgStep) * kgStep);
   const yMax = Math.ceil((kgHi + kgPad) / kgStep) * kgStep;
-
-  // Without the full profile the axis falls back to the invisible spacer, so the plot
-  // area still lines up with its neighbours.
-  const canShowFatEnergy = logged.length > 0 && haveProfile;
 
   wellnessBodyMassChart = upsertChart(wellnessBodyMassChart, ctx, {
     data: {
@@ -654,19 +698,12 @@ function renderWellnessBodyMassChart(entries) {
           order: 2,
         },
         weeklyAverageDataset('7-Day Trend', trendSeries, {}, weekColumns),
-        // The State Trend & Forecast chart's own smoothed line and glycogen/water swing
-        // band, copied onto this chart's category axis (see stateTrendSeries/zoneUpperSeries/
-        // zoneLowerSeries above). Two line datasets for the band, same reason that chart
-        // needs both: Chart.js fills the area BETWEEN a dataset and the one its `fill`
-        // points at, so the band needs both edges plotted, just invisibly (borderWidth 0).
-        // Omitted entirely whenever the swing can't be estimated (no height/sex on file).
-        // isStateTrendOverlay marks all three so the tooltip filter below can skip them,
-        // the same way isWeeklyAverage does for the existing 7-Day Trend line. The band's
-        // `order` (3) is higher than the bars' (2) — this codebase's convention is lower
-        // order draws later/on top (see weeklyAverageDataset's own comment) — so the band
-        // sits BEHIND the bars, a background reference rather than a wash over them; the
-        // green trend line below keeps a lower order so it still reads on top.
-        ...(zoneAnchorMap !== null ? [
+        // Yellow zone, Muscle Loss red zone, and gray Calorie-Implied Trajectory line —
+        // all anchored to the calorie-implied trajectory and omitted together whenever the
+        // profile is incomplete (no BMR → no trajectory). fill: '-1' chain runs upper →
+        // lower (yellow fill) → Muscle Loss (red fill), matching State Trend & Forecast.
+        // Band order (3) sits behind bars (2); lines use lower orders to read on top.
+        ...(calorieTrendMap.size > 0 && swingKg !== null ? [
           {
             type: 'line',
             label: 'Glycogen + Water Swing (upper)',
@@ -674,7 +711,7 @@ function renderWellnessBodyMassChart(entries) {
             borderWidth: 0,
             pointRadius: 0,
             pointHitRadius: 0,
-            tension: 0.3,
+            tension: 0,
             fill: false,
             spanGaps: false,
             isStateTrendOverlay: true,
@@ -684,17 +721,48 @@ function renderWellnessBodyMassChart(entries) {
             type: 'line',
             label: 'Glycogen + Water Swing',
             data: zoneLowerSeries,
-            // Same neutral amber the projection chart uses — normal noise, not a target
-            // or a warning.
             backgroundColor: 'rgba(245, 158, 11, 0.15)',
             borderWidth: 0,
             pointRadius: 0,
             pointHitRadius: 0,
-            tension: 0.3,
+            tension: 0,
             fill: '-1',
             spanGaps: false,
             isStateTrendOverlay: true,
             order: 3,
+          },
+          {
+            type: 'line',
+            label: 'Muscle Loss (below swing zone)',
+            data: dates.map((d) => {
+              const c = calorieTrendMap.get(d);
+              const trend = trendMap.get(d);
+              if (c === undefined || trend === null || trend === undefined) return null;
+              return Math.min(trend, c - swingKg);
+            }),
+            backgroundColor: 'rgba(220, 38, 38, 0.45)',
+            borderWidth: 0,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            tension: 0,
+            fill: '-1',
+            spanGaps: false,
+            isStateTrendOverlay: true,
+            order: 3,
+          },
+          {
+            type: 'line',
+            label: 'Calorie-Implied Trajectory',
+            data: calorieTrendSeries,
+            borderColor: '#9ca3af',
+            borderWidth: 2,
+            fill: false,
+            tension: 0,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            spanGaps: false,
+            isStateTrendOverlay: true,
+            order: 1.5,
           },
         ] : []),
         {
@@ -749,15 +817,12 @@ function renderWellnessBodyMassChart(entries) {
               }
               // BMI leads the derived rows because the rest are computed from it.
               // Unitless by definition, so no unit.
-              if (d.bmi !== null && d.bmi !== undefined) lines.push(`BMI: ${d.bmi}`);
+              if (d.bmi !== null && d.bmi !== undefined) lines.push(`BMI: ${d.bmi} kg/m²`);
               // Composition before energy, which derives from it. All Deurenberg
               // estimates, so all three vanish together without the full profile.
               if (d.bodyFatPct !== null && d.bodyFatPct !== undefined) {
                 lines.push(`Body Fat: ${Math.round(d.bodyFatPct * 10) / 10} %`);
                 lines.push(`Fat Mass: ${Math.round(d.fatMassKg * 10) / 10} kg`);
-              }
-              if (d.fatKcal !== null && d.fatKcal !== undefined) {
-                lines.push(`Fat Energy: ${Math.round(d.fatKcal / 1000)}k kcal`);
               }
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -774,38 +839,39 @@ function renderWellnessBodyMassChart(entries) {
       },
       scales: {
         x: wellnessCategoryXScale(dates),
-        // Fat energy left, kg right — but kg keeps the gridlines: it's what the bars
-        // are read against, and the only one that lands on round numbers. Only the
-        // sides move; the bars stay on `y`.
         y: {
-          // The one chart here that must NOT begin at zero — a 0 kg baseline puts every
-          // bar within a pixel of the same height and hides the movement it exists for.
+          // Must NOT begin at zero — a 0 kg baseline puts every bar within a pixel of
+          // the same height and hides the movement the chart exists for.
           beginAtZero: false,
-          position: 'right',
+          position: 'left',
           min: yMin,
           max: yMax,
           afterFit: fixTrendYAxisWidth,
           // autoSkip off so the step is honoured exactly.
           ticks: { stepSize: kgStep, autoSkip: false, callback: maskedUnitTick('kg', kgStep < 1 ? 1 : 0) },
         },
-        y1: canShowFatEnergy
-          ? {
-            // Twin of y as stored fat energy; see above for why it anchors at the ends.
-            position: 'left',
-            min: fatEnergyKcal(yMin, heightCm, age, sex),
-            max: fatEnergyKcal(yMax, heightCm, age, sex),
-            afterFit: fixTrendYAxisWidth,
-            // No lines of its own; its step is kg's equivalent, so each kcal label still
-            // sits on one of kg's lines even though the figures can't also be round.
-            grid: { drawOnChartArea: false },
-            ticks: {
-              stepSize: (fatEnergyKcal(yMax, heightCm, age, sex) - fatEnergyKcal(yMin, heightCm, age, sex))
-                / ((yMax - yMin) / kgStep),
-              autoSkip: false,
-              callback: maskedThousandsTick('kcal'),
-            },
-          }
-          : ghostLeftAxis(),
+        // BMI (kg/m²) right axis — a fixed linear rescale of kg so it stays a true
+        // pixel-for-pixel twin of y. Step derived from kgStep / height² so the tick
+        // density matches the left axis, then snapped to the nearest clean BMI step.
+        y1: heightCm !== null
+          ? (() => {
+            const BMI_TICK_STEPS = [0.1, 0.2, 0.5, 1, 2, 5];
+            const rawBmiStep = kgStep / Math.pow(heightCm / 100, 2);
+            const bmiStep = BMI_TICK_STEPS.find((s) => s >= rawBmiStep) ?? BMI_TICK_STEPS[BMI_TICK_STEPS.length - 1];
+            return {
+              min: computeBmi(yMin, heightCm),
+              max: computeBmi(yMax, heightCm),
+              position: 'right',
+              afterFit: fixTrendYAxisWidth,
+              grid: { drawOnChartArea: false },
+              ticks: {
+                stepSize: bmiStep,
+                includeBounds: false,
+                callback: maskedUnitTick('kg/m²', bmiStep < 1 ? 1 : 0),
+              },
+            };
+          })()
+          : ghostRightAxis(),
       },
     },
   });
@@ -1616,6 +1682,10 @@ function renderWellnessProteinChart(entries) {
   const weekColumns = bucketedColumnCount(dates);
   const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
+  const gTopProtein = Math.max(...values, band.max, band.min, 1);
+  const gStepProtein = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopProtein / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
+  const gMaxProtein = Math.ceil(gTopProtein / gStepProtein) * gStepProtein;
+
   wellnessProteinChart = upsertChart(wellnessProteinChart, ctx, {
     data: {
       labels: dates,
@@ -1664,11 +1734,20 @@ function renderWellnessProteinChart(entries) {
       scales: {
         x: wellnessCategoryXScale(dates),
         y: {
-          beginAtZero: true,
+          min: 0,
+          max: gMaxProtein,
+          position: 'right',
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: maskedUnitTick('g') },
+          grid: { drawOnChartArea: false },
+          ticks: { stepSize: gStepProtein, autoSkip: false, callback: maskedUnitTick('g') },
         },
-        y1: ghostRightAxis(),
+        y1: {
+          min: 0,
+          max: gMaxProtein * 4,
+          position: 'left',
+          afterFit: fixTrendYAxisWidth,
+          ticks: { stepSize: gStepProtein * 4, autoSkip: false, callback: maskedUnitTick('kcal') },
+        },
       },
     },
   });
@@ -1729,6 +1808,10 @@ function renderWellnessFiberChart(entries) {
   const weekColumns = bucketedColumnCount(dates);
   const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
+  const gTopFiber = Math.max(...values, band.max, band.min, 1);
+  const gStepFiber = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopFiber / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
+  const gMaxFiber = Math.ceil(gTopFiber / gStepFiber) * gStepFiber;
+
   wellnessFiberChart = upsertChart(wellnessFiberChart, ctx, {
     data: {
       labels: dates,
@@ -1772,11 +1855,20 @@ function renderWellnessFiberChart(entries) {
       scales: {
         x: wellnessCategoryXScale(dates),
         y: {
-          beginAtZero: true,
+          min: 0,
+          max: gMaxFiber,
+          position: 'right',
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: maskedUnitTick('g') },
+          grid: { drawOnChartArea: false },
+          ticks: { stepSize: gStepFiber, autoSkip: false, callback: maskedUnitTick('g') },
         },
-        y1: ghostRightAxis(),
+        y1: {
+          min: 0,
+          max: gMaxFiber * 2,
+          position: 'left',
+          afterFit: fixTrendYAxisWidth,
+          ticks: { stepSize: gStepFiber * 2, autoSkip: false, callback: maskedUnitTick('kcal') },
+        },
       },
     },
   });
@@ -1851,6 +1943,10 @@ function renderWellnessFatChart(entries) {
   const weekColumns = bucketedColumnCount(dates);
   const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
+  const gTopFat = Math.max(...values, band.max, band.min, 1);
+  const gStepFat = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopFat / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
+  const gMaxFat = Math.ceil(gTopFat / gStepFat) * gStepFat;
+
   wellnessFatChart = upsertChart(wellnessFatChart, ctx, {
     data: {
       labels: dates,
@@ -1894,11 +1990,20 @@ function renderWellnessFatChart(entries) {
       scales: {
         x: wellnessCategoryXScale(dates),
         y: {
-          beginAtZero: true,
+          min: 0,
+          max: gMaxFat,
+          position: 'right',
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: maskedUnitTick('g') },
+          grid: { drawOnChartArea: false },
+          ticks: { stepSize: gStepFat, autoSkip: false, callback: maskedUnitTick('g') },
         },
-        y1: ghostRightAxis(),
+        y1: {
+          min: 0,
+          max: gMaxFat * KCAL_PER_G_FAT,
+          position: 'left',
+          afterFit: fixTrendYAxisWidth,
+          ticks: { stepSize: gStepFat * KCAL_PER_G_FAT, autoSkip: false, callback: maskedUnitTick('kcal') },
+        },
       },
     },
   });
@@ -1972,6 +2077,10 @@ function renderWellnessCarbChart(entries) {
   const weekColumns = bucketedColumnCount(dates);
   const weeklyAvg = weeklyAverageSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), weekColumns);
 
+  const gTopCarb = Math.max(...values, band.max, band.min, 1);
+  const gStepCarb = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopCarb / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
+  const gMaxCarb = Math.ceil(gTopCarb / gStepCarb) * gStepCarb;
+
   wellnessCarbChart = upsertChart(wellnessCarbChart, ctx, {
     data: {
       labels: dates,
@@ -2015,11 +2124,20 @@ function renderWellnessCarbChart(entries) {
       scales: {
         x: wellnessCategoryXScale(dates),
         y: {
-          beginAtZero: true,
+          min: 0,
+          max: gMaxCarb,
+          position: 'right',
           afterFit: fixTrendYAxisWidth,
-          ticks: { callback: maskedUnitTick('g') },
+          grid: { drawOnChartArea: false },
+          ticks: { stepSize: gStepCarb, autoSkip: false, callback: maskedUnitTick('g') },
         },
-        y1: ghostRightAxis(),
+        y1: {
+          min: 0,
+          max: gMaxCarb * KCAL_PER_G_CARB,
+          position: 'left',
+          afterFit: fixTrendYAxisWidth,
+          ticks: { stepSize: gStepCarb * KCAL_PER_G_CARB, autoSkip: false, callback: maskedUnitTick('kcal') },
+        },
       },
     },
   });
@@ -2042,6 +2160,7 @@ function renderWellnessProjectionChart(entries) {
   const etaEl = document.getElementById('body-mass-projection-eta');
   const plateauNote = document.getElementById('body-mass-plateau-note');
   meterWrap.hidden = true;
+  meterWrap.style.removeProperty('--fill-pct');
   meterCallout.textContent = '';
   meterCallout.classList.remove('danger');
   meterDone.textContent = '';
@@ -2049,6 +2168,7 @@ function renderWellnessProjectionChart(entries) {
   meterTarget.textContent = '';
   meterRemaining.classList.remove('danger');
   timeWrap.hidden = true;
+  timeWrap.style.removeProperty('--fill-pct');
   timeElapsed.textContent = '';
   timeRemaining.textContent = '';
   timeEta.textContent = '';
@@ -2082,6 +2202,7 @@ function renderWellnessProjectionChart(entries) {
     meterWrap.hidden = false;
     meterFill.style.width = `${pct}%`;
     meterFill.classList.toggle('danger', isWrongDirection);
+    if (!isWrongDirection) meterWrap.style.setProperty('--fill-pct', `${Math.round(pct)}%`);
 
     // Same edge the fill stops at, so the bubble reads as "you are here" rather
     // than a second, disagreeing marker.
@@ -2146,6 +2267,7 @@ function renderWellnessProjectionChart(entries) {
       const timePct = Math.max(0, Math.min(100, (daysElapsed / totalDays) * 100));
       timeWrap.hidden = false;
       timeFill.style.width = `${timePct}%`;
+      timeWrap.style.setProperty('--fill-pct', `${Math.round(timePct)}%`);
 
       const elapsedText = `${daysElapsed} ${daysElapsed === 1 ? 'day' : 'days'}`;
       timeElapsed.textContent = privacyMode ? maskDigits(elapsedText) : elapsedText;
@@ -2531,21 +2653,25 @@ function renderWellnessProjectionChart(entries) {
     };
   }
 
-  wellnessProjectionChart = upsertChart(wellnessProjectionChart, ctx, {
-    type: 'line',
-    data: { datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        // Off, like the rest of the section: Chart.js draws it inside the canvas, so a
-        // legend here left this plot area ~30px shorter. Series are named in the tooltip.
-        legend: { display: false },
-        tooltip: { enabled: false },
+  // Chart canvas is currently hidden in HTML — skip rendering, but keep everything
+  // above so the progress meters and ETA text still populate normally.
+  if (ctx) {
+    wellnessProjectionChart = upsertChart(wellnessProjectionChart, ctx, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          // Off, like the rest of the section: Chart.js draws it inside the canvas, so a
+          // legend here left this plot area ~30px shorter. Series are named in the tooltip.
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
+        scales,
       },
-      scales,
-    },
-  });
+    });
+  }
 
 }
 
@@ -2818,7 +2944,7 @@ function renderWellnessEnergyBalanceChart(entries) {
                 // it's this day's own Physique figure, "est." when it's the flat
                 // TEF_PERCENT_OF_INTAKE fallback — the two can differ by a real amount,
                 // so which one produced this bar shouldn't be left ambiguous.
-                ...(d.tef > 0 ? [`Digestion (TEF, ${d.tefMeasured ? 'measured' : 'est.'}): ${withExplicitSign(-d.tef)} kcal`] : []),
+                ...(d.tef > 0 ? [`Digestion: ${withExplicitSign(-d.tef)} kcal`] : []),
                 // Added, not subtracted: on a deficit this is how much less of it became
                 // fat loss; on a surplus it's how much MORE was gained, since short sleep
                 // drives hunger and cuts NEAT rather than sitting out surplus days. Shown

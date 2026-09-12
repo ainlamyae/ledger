@@ -713,14 +713,14 @@ kbd {
 }
 
 /* Narrow-viewport variant (physique.js positionConsumptionSuggestions) — pinned
-   to the bottom of the visual viewport, i.e. right above the on-screen
-   keyboard, the same spot Description's native datalist bar (tx-description-
-   options, transactions.js) shows on iPhone. left/width/bottom are set inline
-   from window.visualViewport, since only JS knows the live keyboard height. */
+   full-width to the bottom of the visual viewport, i.e. right above the on-screen
+   keyboard, the same spot a native datalist bar shows on iPhone. left/right are
+   set here; only bottom is set inline from JS since only JS knows the keyboard height. */
 .autocomplete-suggestions--pinned {
     position: fixed;
     top: auto;
-    right: auto;
+    left: 0;
+    right: 0;
     margin: 0;
     border-radius: var(--radius-md) var(--radius-md) 0 0;
     max-height: 40vh;
@@ -1975,13 +1975,13 @@ td .btn {
 }
 
 /* Floats over the fill's leading edge, left offset set inline in JS to match the
-   fill's width so it tracks the same number the bar is showing. Blue like the
-   fill itself — this is the current reading, not a second, competing value. */
+   fill's width so it tracks the same number the bar is showing. Colour matches
+   the fill — this is the current reading, not a second, competing value. */
 .body-mass-progress-meter-callout {
     position: absolute;
     top: 0;
     transform: translateX(-50%);
-    background: var(--color-primary);
+    background: color-mix(in srgb, var(--color-income) var(--fill-pct, 0%), var(--color-primary));
     color: #fff;
     font-size: .72rem;
     font-weight: 700;
@@ -1990,6 +1990,7 @@ td .btn {
     border-radius: 5px;
     white-space: nowrap;
     pointer-events: none;
+    transition: background .4s ease;
 }
 
 .body-mass-progress-meter-callout::after {
@@ -1999,7 +2000,7 @@ td .btn {
     left: 50%;
     transform: translateX(-50%);
     border: 4px solid transparent;
-    border-top-color: var(--color-primary);
+    border-top-color: color-mix(in srgb, var(--color-income) var(--fill-pct, 0%), var(--color-primary));
 }
 
 .body-mass-progress-meter-callout.danger {
@@ -2013,8 +2014,8 @@ td .btn {
 .body-mass-progress-meter-fill {
     height: 100%;
     border-radius: 999px;
-    background: var(--color-primary);
-    transition: width .4s ease;
+    background: color-mix(in srgb, var(--color-income) var(--fill-pct, 0%), var(--color-primary));
+    transition: width .4s ease, background .4s ease;
 }
 
 .body-mass-progress-meter-fill.danger {

@@ -2294,7 +2294,10 @@
             </label>
 
             <label>Workout
-                <textarea id="physique-workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
+                <div class="autocomplete-anchor">
+                    <textarea id="physique-workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
+                    <ul id="physique-workout-suggestions" class="autocomplete-suggestions" hidden></ul>
+                </div>
             </label>
             <div id="physique-activity-breakdown" class="table-responsive table-compact" hidden>
                 <table>

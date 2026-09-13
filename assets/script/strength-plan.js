@@ -145,9 +145,10 @@ function loggedWorkoutQuantities() {
   return byName;
 }
 
-// Ticks every plan row that's already in today's log and labels it with the
-// quantity — the visible answer to "did I do this today?", and the state
-// logWorkout reads to tell banked work from newly ticked work. Called after
+// Tints every plan row that's already in today's log, with the quantity in its
+// hover — the visible answer to "did I do this today?", the same green a logged
+// Nutrition row gets, and like it with no tick: the tick box is only for picking
+// what to log next (logWorkout skips anything already logged). Called after
 // every Physique refresh (physique.js), so a save re-marks the rows it just
 // wrote and the marks clear by themselves at the date rollover.
 function renderWorkoutPlanProgress() {
@@ -155,17 +156,11 @@ function renderWorkoutPlanProgress() {
 
   planRowsByName().forEach(({ box, tr }, name) => {
     const quantity = logged.get(name);
-    const wasLogged = tr.classList.contains('workout-row-logged');
     tr.classList.toggle('workout-row-logged', quantity !== undefined);
-    // Only a row that was marked gets unticked when it drops out of the log
-    // (a rollover past midnight, or the entry being deleted) — anything the
-    // user ticked but hasn't saved yet has to survive a background refresh.
-    if (quantity !== undefined) box.checked = true;
-    else if (wasLogged) box.checked = false;
-
-    // The tint is what separates a banked row from one the user just ticked —
-    // both are checked, so the checkbox alone can't say which is which.
-    box.title = quantity !== undefined ? `Already logged today: ${quantity}` : '';
+    // A logged row's tick is cleared (it was the pick that just got saved);
+    // anything ticked but not saved yet survives a background refresh.
+    if (quantity !== undefined) box.checked = false;
+    tr.title = quantity !== undefined ? `Already logged today: ${quantity}` : '';
   });
 
   // Always 📝; the hover says whether it adds to today's workout or starts it.

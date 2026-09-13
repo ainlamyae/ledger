@@ -182,6 +182,7 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('physique-combine-btn').addEventListener('click', combineAndSortPhysiqueConsumptionField);
     physiqueField('consumption').addEventListener('input', syncPhysiqueCombineButtonVisibility);
     setupConsumptionAutocomplete();
+    setupWorkoutAutocomplete();
     document.getElementById('physique-form-micro-btn').addEventListener('click', openPhysiqueMicronutrientsFromForm);
     document.getElementById('physique-is-pattern').addEventListener('change', syncPhysiquePatternMode);
     // Date and body mass move the BMR line too.
@@ -1142,6 +1143,7 @@ function closePhysiqueForm() {
   hideCalcBreakdown('physique');
   hidePhysiqueActivityBreakdown();
   hideConsumptionSuggestions();
+  hideWorkoutSuggestions();
 }
 
 // A whole day, not one meal, so a per-meal ceiling would fire

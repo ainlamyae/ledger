@@ -567,6 +567,131 @@ function applyConsumptionSuggestion(name) {
   syncPhysiqueCombineButtonVisibility();
 }
 
+// Exercise-name suggestions for the Workout textarea: the same per-line dropdown
+// as Consumption's (pinned above the keyboard on a phone), offering the Activity
+// sheet's names (allActivities, activities.js) — the names a workout line is
+// priced against. Matches what's typed after the line's amount ("36x ", "3x10 ",
+// "30min ", "10000step ", "45sec "), and accepting keeps that amount.
+const WORKOUT_LINE_AMOUNT_PATTERN = /^\s*\d+(?:[x×]\d+)?(?:[x×]|min|step|sec)?\s+/i;
+let workoutSuggestionMatches = [];
+let workoutSuggestionIndex = -1;
+
+function workoutSuggestionsList() {
+  return document.getElementById('physique-workout-suggestions');
+}
+
+function currentWorkoutLine() {
+  const field = physiqueField('workout');
+  const before = field.value.slice(0, field.selectionStart);
+  const lineStart = before.lastIndexOf('\n') + 1;
+  const prefix = before.slice(lineStart);
+  const amount = prefix.match(WORKOUT_LINE_AMOUNT_PATTERN)?.[0] ?? '';
+  return { nameStart: lineStart + amount.length, query: prefix.slice(amount.length).trim().toLowerCase() };
+}
+
+function setupWorkoutAutocomplete() {
+  const field = physiqueField('workout');
+  field.addEventListener('input', renderWorkoutSuggestions);
+  field.addEventListener('keydown', handleWorkoutSuggestionKey);
+  // Deferred, as Consumption's: a mousedown on a suggestion fires blur first.
+  field.addEventListener('blur', () => setTimeout(hideWorkoutSuggestions, 150));
+  workoutSuggestionsList().addEventListener('mousedown', (e) => {
+    const item = e.target.closest('li');
+    if (!item) return;
+    e.preventDefault();
+    applyWorkoutSuggestion(item.dataset.name);
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', positionWorkoutSuggestions);
+    window.visualViewport.addEventListener('scroll', positionWorkoutSuggestions);
+  }
+}
+
+// Same placement as positionConsumptionSuggestions.
+function positionWorkoutSuggestions() {
+  const list = workoutSuggestionsList();
+  if (list.hidden) return;
+  if (!isMobileConsumptionViewport() || !window.visualViewport) {
+    list.classList.remove('autocomplete-suggestions--pinned');
+    list.style.removeProperty('--keyboard-height');
+    return;
+  }
+  const vv = window.visualViewport;
+  list.classList.add('autocomplete-suggestions--pinned');
+  list.style.setProperty('--keyboard-height', `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+}
+
+function renderWorkoutSuggestions() {
+  const { query } = currentWorkoutLine();
+  if (!query) { hideWorkoutSuggestions(); return; }
+  const starts = [];
+  const contains = [];
+  allActivities.forEach((a) => {
+    const name = String(a.name || '').trim();
+    const lower = name.toLowerCase();
+    if (!name || lower === query) return;
+    if (lower.startsWith(query)) starts.push(name);
+    else if (lower.includes(query)) contains.push(name);
+  });
+  workoutSuggestionMatches = [...new Set([...starts, ...contains])].slice(0, 8);
+  if (!workoutSuggestionMatches.length) { hideWorkoutSuggestions(); return; }
+  const list = workoutSuggestionsList();
+  list.innerHTML = '';
+  workoutSuggestionMatches.forEach((name) => {
+    const li = document.createElement('li');
+    li.textContent = name;
+    li.dataset.name = name;
+    list.appendChild(li);
+  });
+  workoutSuggestionIndex = -1;
+  list.hidden = false;
+  positionWorkoutSuggestions();
+}
+
+function hideWorkoutSuggestions() {
+  const list = workoutSuggestionsList();
+  if (!list) return;
+  list.hidden = true;
+  list.innerHTML = '';
+  list.classList.remove('autocomplete-suggestions--pinned');
+  list.style.removeProperty('--keyboard-height');
+  workoutSuggestionMatches = [];
+  workoutSuggestionIndex = -1;
+}
+
+function handleWorkoutSuggestionKey(e) {
+  const list = workoutSuggestionsList();
+  if (list.hidden || !workoutSuggestionMatches.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const count = workoutSuggestionMatches.length;
+    workoutSuggestionIndex = e.key === 'ArrowDown'
+      ? (workoutSuggestionIndex + 1) % count
+      : (workoutSuggestionIndex - 1 + count) % count;
+    [...list.children].forEach((li, i) => li.classList.toggle('active', i === workoutSuggestionIndex));
+    list.children[workoutSuggestionIndex].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    applyWorkoutSuggestion(workoutSuggestionMatches[workoutSuggestionIndex] ?? workoutSuggestionMatches[0]);
+  } else if (e.key === 'Escape') {
+    hideWorkoutSuggestions();
+  }
+}
+
+// Replaces the name typed after the line's amount, keeping the amount and the
+// rest of the box.
+function applyWorkoutSuggestion(name) {
+  const field = physiqueField('workout');
+  const { nameStart } = currentWorkoutLine();
+  const before = field.value.slice(0, nameStart);
+  const after = field.value.slice(field.selectionEnd);
+  field.value = `${before}${name}${after}`;
+  const caret = before.length + name.length;
+  field.setSelectionRange(caret, caret);
+  field.focus();
+  hideWorkoutSuggestions();
+}
+
 // The modal's own Tidy button — same tidy-up as the bulk action below, run
 // on just the one Consumption box being edited right now, so it can be
 // cleaned up before Calculate ever runs rather than only after saving.

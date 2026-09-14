@@ -2385,8 +2385,8 @@ td .btn {
     margin-right: 0;
 }
 
-/* Already in today's log (strength-plan.js). Both a banked row and one the user
-   just ticked show a checked box, so the tint is what tells them apart. Flat
+/* Already in today's log (strength-plan.js): the tint alone marks it, with no
+   tick, as on a logged Nutrition row. Flat
    rgba of --color-income rather than the variable, so one value reads correctly
    over both themes' row backgrounds.
 

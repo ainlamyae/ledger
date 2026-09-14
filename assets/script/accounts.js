@@ -46,6 +46,13 @@ async function initAccountManager(forceRefresh = false) {
     document.getElementById('account-cancel-btn').addEventListener('click', closeAccountForm);
     onFormSubmit('account-form', submitAccountForm);
     setupAccountSorting();
+
+    document.getElementById('transfer-funds-btn').addEventListener('click', openTransferForm);
+    document.getElementById('transfer-cancel-btn').addEventListener('click', closeTransferForm);
+    document.getElementById('transfer-from').addEventListener('change', syncTransferPayoff);
+    document.getElementById('transfer-to').addEventListener('change', syncTransferPayoff);
+    document.getElementById('transfer-payoff').addEventListener('change', syncTransferPayoff);
+    onFormSubmit('transfer-form', submitTransferForm);
   }
 }
 
@@ -375,6 +382,99 @@ async function addToAccountBalance(name, amount) {
   await refreshAccountsList(true);
   await refreshNetWorth();
   return { writable: true, from: target.current, to: next };
+}
+
+// Moves money between two of your own accounts by writing straight to each
+// one's Balance cell — no Transaction rows, since this is just the automated
+// form of what the Account tab's Balance boxes already let you edit by hand.
+
+// The figure that brings `toName`'s balance to zero — what "pay off full
+// balance" fills the Amount box with.
+function transferPayoffAmount(toName) {
+  const toAccount = allAccounts.find((a) => a.name === toName);
+  if (!toAccount) return null;
+  return Math.round(-toAccount.balance * 100) / 100;
+}
+
+function openTransferForm() {
+  const names = allAccounts.map((a) => a.name);
+  populateSelect(document.getElementById('transfer-from'), names);
+  populateSelect(document.getElementById('transfer-to'), names);
+  document.getElementById('transfer-amount').value = '';
+  document.getElementById('transfer-amount').disabled = false;
+  document.getElementById('transfer-payoff').checked = false;
+  clearFieldError('transfer-form-error');
+  document.getElementById('transfer-modal').hidden = false;
+}
+
+function closeTransferForm() {
+  document.getElementById('transfer-modal').hidden = true;
+}
+
+// Keeps the Amount box in sync with the payoff checkbox: ticking it fills in
+// the exact figure that zeroes out the To account and locks the box so
+// that's visibly what will be sent; unticking hands it back for manual entry.
+// Also re-run on From/To changes, so flipping either after ticking the box
+// doesn't leave a stale figure on screen.
+function syncTransferPayoff() {
+  const amountBox = document.getElementById('transfer-amount');
+  const checked = document.getElementById('transfer-payoff').checked;
+
+  if (!checked) {
+    amountBox.disabled = false;
+    return;
+  }
+
+  const amount = transferPayoffAmount(document.getElementById('transfer-to').value);
+  amountBox.disabled = true;
+  amountBox.value = amount === null ? '' : amount.toFixed(2);
+}
+
+async function submitTransferForm(event) {
+  event.preventDefault();
+
+  const from = document.getElementById('transfer-from').value;
+  const to = document.getElementById('transfer-to').value;
+  if (!from || !to) {
+    showFieldError('transfer-form-error', 'Pick a From and a To account.');
+    return;
+  }
+  if (from === to) {
+    showFieldError('transfer-form-error', 'From and To must be different accounts.');
+    return;
+  }
+
+  const payoff = document.getElementById('transfer-payoff').checked;
+  const amount = payoff
+    ? transferPayoffAmount(to)
+    : evaluateNumberExpression(document.getElementById('transfer-amount').value);
+
+  if (amount === null || amount <= 0) {
+    showFieldError('transfer-form-error', 'Amount must be a positive number — check the To account actually has a balance to pay off.');
+    return;
+  }
+
+  // Both legs checked before either is written, so a formula-protected
+  // account (accountBalanceTarget — same guard the transaction form's
+  // "update the account balance" box uses) can't end up with one side of the
+  // transfer applied and the other silently skipped.
+  const [fromTarget, toTarget] = await Promise.all([accountBalanceTarget(from), accountBalanceTarget(to)]);
+  if (!fromTarget.writable) {
+    showFieldError('transfer-form-error', fromTarget.reason);
+    return;
+  }
+  if (!toTarget.writable) {
+    showFieldError('transfer-form-error', toTarget.reason);
+    return;
+  }
+
+  try {
+    await addToAccountBalance(from, -amount);
+    await addToAccountBalance(to, amount);
+    closeTransferForm();
+  } catch (err) {
+    showFieldError('transfer-form-error', err.message);
+  }
 }
 
 async function deleteAccount(row) {

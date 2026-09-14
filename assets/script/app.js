@@ -540,7 +540,7 @@ function renderReconciliationStatus(missingAmount) {
   const flagEl = document.getElementById('account-reconciliation-flag');
   flagEl.hidden = isReconciled;
   const dir = missingAmount > 0 ? 'Accounts>Transactions' : 'Accounts<Transactions';
-  flagEl.textContent = isReconciled ? '' : `${dir} ${formatCurrency(missingAmount)} ⚠️`;
+  flagEl.textContent = isReconciled ? '' : `⚠️ ${dir} ${formatCurrency(missingAmount)}`;
   flagEl.title = isReconciled ? '' : `Accounts ${missingAmount > 0 ? '>' : '<'} Transaction total — off by ${formatCurrency(Math.abs(missingAmount))}`;
 }
 

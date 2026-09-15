@@ -496,7 +496,7 @@
 
             <div class="panel-actions" id="physique-bulk-actions" hidden>
                 <span id="physique-bulk-summary"></span>
-                <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit) and sort by calories — local only, no AI">Combine &amp; Sort</button>
+                <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
                 <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
             </div>
 
@@ -557,6 +557,7 @@
             <div class="panel-actions" id="nutrition-bulk-actions" hidden>
                 <span id="nutrition-bulk-summary"></span>
                 <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
+                <button id="nutrition-bulk-capitalize-btn" class="btn" title="Capitalize each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field">Capitalize Names</button>
                 <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">🧬 Pull Micronutrients</button>
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
@@ -1490,7 +1491,7 @@
             <p id="physique-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="physique-combine-btn" class="btn" title="Combine duplicate ingredient lines (same name and unit) and sort by calories — local only, no AI">Combine &amp; Sort</button>
+                <button type="button" id="physique-combine-btn" class="btn" title="Combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
                 <button type="button" id="physique-form-micro-btn" class="btn" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved">Micronutrients</button>
                 <button type="button" id="physique-calc-btn" class="btn btn-ai">Calculate</button>
                 <!-- No `capture` attribute: on iOS Safari it jumps straight to the Camera app
@@ -2213,6 +2214,7 @@
 
             <div class="modal-actions">
                 <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">🧬 Pull Micronutrients</button>
+                <button type="button" id="nutrition-normalize-btn" class="btn" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure">Normalize</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>

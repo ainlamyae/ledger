@@ -195,9 +195,13 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // Playground's read-only m row: water and glycogen move this one day to day, which is
   // exactly why every plan figure below reads m̄ instead.
   const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  // The glycogen/water swing at the latest reading, beside the target on both m and
+  // m̄ (and the Progress card): a reading within it of the target is water, not a miss.
+  const swingKg = glycogenSwingKg(bodyMassKg, heightCm, getSettingString('SEX', null));
+  const swingText = swingKg === null ? '' : ` ± ${Math.round(swingKg * 10) / 10}`;
   const mEl = document.getElementById('today-status-m-value');
   mEl.classList.remove('income', 'expense');
-  const mText = bodyMassKg !== null ? `${bodyMassKg} / ${healthyMassKg} kg` : '—';
+  const mText = bodyMassKg !== null ? `${bodyMassKg} / ${healthyMassKg}${swingText} kg` : '—';
   mEl.textContent = privacyMode ? maskDigits(mText) : mText;
   if (bodyMassKg !== null) {
     const mGood = bodyMassTargetIsDownward(entries) ? bodyMassKg <= healthyMassKg : bodyMassKg >= healthyMassKg;
@@ -211,8 +215,6 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const mBar = planBodyMassKg(entries);
   const mBarEl = document.getElementById('today-status-mbar-value');
   mBarEl.classList.remove('income', 'expense');
-  const swingKg = glycogenSwingKg(bodyMassKg, heightCm, getSettingString('SEX', null));
-  const swingText = swingKg === null ? '' : ` ± ${Math.round(swingKg * 10) / 10}`;
   const mBarText = mBar !== null ? `${mBar} / ${healthyMassKg}${swingText} kg` : '—';
   mBarEl.textContent = privacyMode ? maskDigits(mBarText) : mBarText;
   if (mBar !== null) {

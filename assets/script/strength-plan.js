@@ -145,9 +145,9 @@ function loggedWorkoutQuantities() {
   return byName;
 }
 
-// Tints every plan row that's already in today's log, with the quantity in its
-// hover — the visible answer to "did I do this today?", the same green a logged
-// Nutrition row gets, and like it with no tick: the tick box is only for picking
+// Tints every plan row that's already in today's log — the visible answer to
+// "did I do this today?", the same green a logged Nutrition row gets, and like
+// it with no tick or hover note (today's log itself is on the Physique page): the tick box is only for picking
 // what to log next (logWorkout skips anything already logged). Called after
 // every Physique refresh (physique.js), so a save re-marks the rows it just
 // wrote and the marks clear by themselves at the date rollover.
@@ -160,7 +160,6 @@ function renderWorkoutPlanProgress() {
     // A logged row's tick is cleared (it was the pick that just got saved);
     // anything ticked but not saved yet survives a background refresh.
     if (quantity !== undefined) box.checked = false;
-    tr.title = quantity !== undefined ? `Already logged today: ${quantity}` : '';
   });
 
   // Always 📝; the hover says whether it adds to today's workout or starts it.

@@ -2137,6 +2137,12 @@ td .btn {
     min-height: 1.2em;
 }
 
+/* Only a note to show (reached, no change, wrong direction, levelling off) takes
+   room; on track it's empty, and the card ends at its last bar. */
+.body-mass-eta:empty {
+    display: none;
+}
+
 .body-mass-progress-meter {
     margin-top: .75rem;
 }

@@ -1930,13 +1930,30 @@ td .btn {
 .app-form input[type="date"],
 .app-form input[type="time"],
 .app-form input[type="datetime-local"] {
+    display: block;
     text-align: left;
+    /* iOS lays these out as a flex box that centres its value. */
+    justify-content: flex-start;
 }
 
+/* The value's own box and the editable fields inside it (WebKit/Blink), each of
+   which can carry its own centring. */
 .app-form input[type="date"]::-webkit-date-and-time-value,
 .app-form input[type="time"]::-webkit-date-and-time-value,
 .app-form input[type="datetime-local"]::-webkit-date-and-time-value {
     text-align: left;
+    margin: 0;
+}
+
+.app-form input[type="date"]::-webkit-datetime-edit,
+.app-form input[type="time"]::-webkit-datetime-edit,
+.app-form input[type="datetime-local"]::-webkit-datetime-edit,
+.app-form input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.app-form input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+.app-form input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+    text-align: left;
+    justify-content: flex-start;
+    padding-left: 0;
 }
 
 .app-form input,

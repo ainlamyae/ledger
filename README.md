@@ -14,14 +14,14 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - [Architecture](docs/architecture.md) — system diagram, section pages, request flowchart, frontend module map, data flow.
 - [Data Model](docs/data-model.md) — every sheet tab, column by column.
 - [Health Formula Reference](docs/health-formulas.md) — every formula the Health section computes, and where it lives.
-- [Tech Stack](docs/tech-stack.md)
-- [Project Structure](docs/project-structure.md)
+- [Tech Stack](docs/tech-stack.md) — every layer and library, from the vanilla-JS frontend to the key-less widget APIs.
+- [Project Structure](docs/project-structure.md) — the full file tree, one line per module.
 - [Getting Started](docs/getting-started.md) — deploy your own copy.
-- [Deployment](docs/deployment.md)
-- [Configuration Reference](docs/configuration.md)
-- [Caching Strategy](docs/caching.md)
-- [Security & Privacy](docs/security.md)
-- [License](#license)
+- [Deployment](docs/deployment.md) — publishing to GitHub Pages and authorizing the OAuth origin.
+- [Configuration Reference](docs/configuration.md) — every sheet range, cache key and localStorage entry the app touches.
+- [Caching Strategy](docs/caching.md) — how the localStorage cache, writes and Refresh/Clear Cache interact.
+- [Security & Privacy](docs/security.md) — scopes, what's a secret and what isn't, and exactly what each widget or AI call sends.
+- [License](#license) — usage terms.
 
 ---
 

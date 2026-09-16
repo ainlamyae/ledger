@@ -623,27 +623,36 @@ async function pullMicronutrientsForForm() {
     return;
   }
 
-  document.getElementById('nutrition-calories').value = String(result.calories);
-  document.getElementById('nutrition-protein').value = result.protein !== null ? String(result.protein) : '';
+  // "Verified against the label on my own purchased ingredient" means the typed
+  // macros are ground truth from a real package — the USDA/AI pull is less
+  // trustworthy than what's already in the fields, so we bank the micronutrient
+  // panel (the whole point of the button) but leave Calories/Protein/Fiber/Fat/
+  // Carb exactly as the user entered them rather than overwriting them.
+  const isVerified = document.getElementById('nutrition-verified').checked;
 
-  // Fiber/Fat/Carb straight into their own fields too, same as Calories/
-  // Protein just above — the panel already carries these (nutrientPanelFromCandidate),
-  // so leaving the fields themselves blank and making Save rely on the JSON
-  // panel alone (computedNutritionMacros' fallback) meant the numbers were
-  // "in" the row without ever actually being visible or hand-correctable here.
-  const nutrients = result.nutrients || {};
-  const macroField = (nutrientName, fieldId) => {
-    const nutrient = nutrients[nutrientName];
-    document.getElementById(fieldId).value = nutrient ? String(nutrient.amount) : '';
-  };
-  macroField('Fiber, total dietary', 'nutrition-fiber');
-  macroField('Total lipid (fat)', 'nutrition-fat');
-  macroField('Carbohydrate, by difference', 'nutrition-carb');
+  if (!isVerified) {
+    document.getElementById('nutrition-calories').value = String(result.calories);
+    document.getElementById('nutrition-protein').value = result.protein !== null ? String(result.protein) : '';
+
+    // Fiber/Fat/Carb straight into their own fields too, same as Calories/
+    // Protein just above — the panel already carries these (nutrientPanelFromCandidate),
+    // so leaving the fields themselves blank and making Save rely on the JSON
+    // panel alone (computedNutritionMacros' fallback) meant the numbers were
+    // "in" the row without ever actually being visible or hand-correctable here.
+    const nutrients = result.nutrients || {};
+    const macroField = (nutrientName, fieldId) => {
+      const nutrient = nutrients[nutrientName];
+      document.getElementById(fieldId).value = nutrient ? String(nutrient.amount) : '';
+    };
+    macroField('Fiber, total dietary', 'nutrition-fiber');
+    macroField('Total lipid (fat)', 'nutrition-fat');
+    macroField('Carbohydrate, by difference', 'nutrition-carb');
+  }
 
   pendingIngredientMicronutrients = result.nutrients;
   renderMicronutrientsList(pendingIngredientMicronutrients);
 
-  if (result.protein === null) {
+  if (!isVerified && result.protein === null) {
     showFieldError('nutrition-form-error', `"${result.description}" has no protein figure in USDA — fill Protein in yourself before saving.`);
   }
 }

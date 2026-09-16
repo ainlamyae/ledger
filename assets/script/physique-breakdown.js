@@ -86,16 +86,32 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
   // ACTIVITY_TARGET_MIN's minutes/kcal at today's body mass — same pinned-vs-flat
   // rule the Physical Activity tile/chart use (getActivityTargetMin/Kcal, charts.js),
   // so this row can't drift from what "hitting the workout goal" means elsewhere.
+  const desireMin = Math.round(getActivityTargetMin(bodyMassKg));
+  const desireKcal = Math.round(getActivityTargetKcal(bodyMassKg));
   const targetRow = document.createElement('tr');
   targetRow.className = 'calc-breakdown-target';
   targetRow.append(
-    makeCell('Target', 'Workout duration/burn goal — from the Health Formula Playground and Settings, not today\'s Workout'),
+    makeCell('Desire', 'Workout duration/burn goal — from the Health Formula Playground and Settings, not today\'s Workout'),
     makeCell(''),
     makeCell(''),
-    makeCell(String(Math.round(getActivityTargetMin(bodyMassKg)))),
-    makeCell(String(Math.round(getActivityTargetKcal(bodyMassKg)))),
+    makeCell(String(desireMin)),
+    makeCell(String(desireKcal)),
   );
   tbody.appendChild(targetRow);
+
+  // Remaining — Desire minus Total, the duration/burn still left to hit the goal. Left
+  // unclamped, so once the Total overshoots the Desire it reads as a negative surplus
+  // rather than a flat zero.
+  const remainingRow = document.createElement('tr');
+  remainingRow.className = 'calc-breakdown-remaining';
+  remainingRow.append(
+    makeCell('Remain', 'Desire − Total — duration/burn still left to reach the goal (negative once you\'ve passed it)'),
+    makeCell(''),
+    makeCell(''),
+    makeCell(String(Math.round(desireMin - minutes))),
+    makeCell(String(Math.round(desireKcal - calories))),
+  );
+  tbody.appendChild(remainingRow);
 
   document.getElementById('physique-activity-breakdown').hidden = false;
 }
@@ -238,7 +254,17 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
   const messages = [];
   const workout = physiqueField('workout').value.trim();
   if (!workout) {
-    hidePhysiqueActivityBreakdown();
+    // An empty Workout is a real answer — zero burn — not "nothing to show", so rather
+    // than hide the table we render it with a Total of 0, the Desire (goal) and the full
+    // Remain, the same "0 so far, not unknown" read the Physical Activity tile uses. The
+    // goals are computed at Body Mass, so without one there's genuinely nothing to show.
+    // Display only: the hidden duration/burn fields are left untouched, exactly as before.
+    const emptyBodyMassKg = physiqueBodyMassKg();
+    if (emptyBodyMassKg === null) {
+      hidePhysiqueActivityBreakdown();
+      return messages;
+    }
+    renderPhysiqueActivityBreakdown([], 0, 0, emptyBodyMassKg);
     return messages;
   }
 

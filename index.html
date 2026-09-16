@@ -178,31 +178,31 @@
         <div class="cards today-glance-cards">
             <div class="card">
                 <h3>Status</h3>
-                <div class="widget-row"><span>Body Mass</span><span id="today-bodymass-value">—</span></div>
-                <div class="widget-row"><span>BMI</span><span id="today-bodymass-bmi-value">—</span></div>
-                <div class="widget-row"><span>Maintenance</span><span id="today-status-maintenance-value">—</span></div>
-                <div class="widget-row"><span>Balance</span><span id="today-bodymass-balance-value">—</span></div>
-                <div class="widget-row"><span>Estimate</span><span id="today-bodymass-eta-value">—</span></div>
+                <div class="widget-row"><span>m̄</span><span id="today-status-mbar-value">—</span></div>
+                <div class="widget-row"><span>BMR</span><span id="today-status-maintenance-value">—</span></div>
+                <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
+                <div class="widget-row"><span>TEF</span><span id="today-status-digestion-value">—</span></div>
+                <div class="widget-row"><span>AEE</span><span id="today-status-activity-value">—</span></div>
+                <div class="widget-row"><span>SD</span><span id="today-status-deprivation-value">—</span></div>
+                <div class="widget-row"><span>D</span><span id="today-status-balance-value">—</span></div>
+                <div class="widget-row"><span>Δm</span><span id="today-status-deltam-value">—</span></div>
+                <div class="widget-row"><span>t</span><span id="today-status-goal-value">—</span></div>
             </div>
             <div class="card">
                 <h3>Intake Macros</h3>
-                <div class="widget-row"><span>Intake</span><span id="today-macros-intake-value">—</span></div>
-                <div class="widget-row"><span>TEF</span><span id="today-macros-digestion-value">—</span></div>
-                <div class="widget-row"><span>Protein</span><span id="today-protein-value">—</span></div>
-                <div class="widget-row"><span>Fiber</span><span id="today-fiber-value">—</span></div>
+                <div class="widget-row"><span>Pro</span><span id="today-protein-value">—</span></div>
+                <div class="widget-row"><span>DF</span><span id="today-fiber-value">—</span></div>
                 <div class="widget-row"><span>Fat</span><span id="today-fat-value">—</span></div>
                 <div class="widget-row"><span>Carb</span><span id="today-carb-value">—</span></div>
             </div>
             <div class="card">
                 <h3>Physical Activity</h3>
-                <div class="widget-row"><span>Activity</span><span id="today-macros-activity-value">—</span></div>
                 <div class="widget-row"><span>Cardio</span><span id="today-activity-cardio-value">—</span></div>
                 <div class="widget-row"><span>NEAT</span><span id="today-activity-neat-value">—</span></div>
                 <div class="widget-row"><span>Strength</span><span id="today-activity-strength-value">—</span></div>
             </div>
             <div class="card">
                 <h3>Sleep</h3>
-                <div class="widget-row"><span>Deprivation</span><span id="today-sleep-deprivation-card-value">—</span></div>
                 <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
                 <div class="widget-row"><span>Window</span><span id="today-sleep-window-value">—</span></div>
             </div>
@@ -476,17 +476,17 @@
                     <tr>
                         <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
                         <th class="sortable" data-sort="date">Date</th>
-                        <th class="sortable" data-sort="bodyMass" title="Body Mass">Mass</th>
+                        <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
                         <th title="Hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">Sleep</th>
-                        <th title="Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">Depr</th>
-                        <th class="sortable" data-sort="caloriesIn" title="Calories In">Cal↓</th>
+                        <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
+                        <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
                         <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
                         <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
                         <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
                         <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Carb</th>
                         <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
                         <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
-                        <th class="sortable" data-sort="caloriesOut" title="Calories Out">Cal↑</th>
+                        <th class="sortable" data-sort="caloriesOut" title="AEE — Activity Energy Expenditure (Calories Out)">AEE</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -2179,19 +2179,19 @@
             <label>Amount
                 <input type="text" id="nutrition-amount" placeholder="e.g. 1 scoop (32g), or 1 rice cake">
             </label>
-            <label>Calories
+            <label>Calories (kcal)
                 <input type="text" id="nutrition-calories" required>
             </label>
-            <label>Protein
+            <label>Protein (g)
                 <input type="text" id="nutrition-protein" required>
             </label>
-            <label>Fiber (g)
+            <label>Dietary Fiber (g)
                 <input type="text" id="nutrition-fiber" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
             </label>
             <label>Fat (g)
                 <input type="text" id="nutrition-fat" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
             </label>
-            <label>Carb (g)
+            <label>Carbohydrates (g)
                 <input type="text" id="nutrition-carb" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
             </label>
             <label>TEF (kcal)

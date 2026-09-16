@@ -587,8 +587,12 @@ kbd {
 }
 
 .widget-clock-time-value {
-    font-size: 1.4rem;
+    font-size: 1.26rem;
     font-weight: 700;
+    /* Fixed-width digits so the colons stay put as the numbers tick over —
+       otherwise a "1" is narrower than a "0" and the whole clock (and its ":")
+       jitters horizontally every second. */
+    font-variant-numeric: tabular-nums;
 }
 
 .widget-clock-time-secondary {
@@ -1021,6 +1025,13 @@ td {
     font-weight: 600;
     color: var(--color-text-muted);
     border-top: 2px dashed var(--color-text-muted);
+}
+
+/* Remain — Desire − Total, sitting directly under the Desire it's derived from. No
+   border of its own so it reads as a continuation of that goal line, just muted. */
+#physique-calc-breakdown tr.calc-breakdown-remaining td,
+#physique-activity-breakdown tr.calc-breakdown-remaining td {
+    color: var(--color-text-muted);
 }
 
 /* Both Calculate tables sit between two fields and are where the day's four
@@ -2572,7 +2583,7 @@ td .btn {
     }
 
     .widget-clock-time-value {
-        font-size: 1.25rem;
+        font-size: 1.125rem;
     }
 
     .panel {

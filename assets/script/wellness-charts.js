@@ -206,13 +206,13 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   }
 
   // Intake — the one positive contribution to Balance, shown against its target
-  // with the </> sense the target kind carries (a cut wants intake under the cap,
-  // a bulk over the floor).
+  // (a cut wants intake under the cap, a bulk over the floor; the color carries
+  // that sense, not the separator).
   const calTarget = getCalorieTarget(entries);
   const intakeEl = document.getElementById('today-status-intake-value');
   intakeEl.classList.remove('income', 'expense');
   const intakeText = caloriesToday !== null
-    ? `${withExplicitSign(Math.round(caloriesToday))} ${isCut ? '<' : '>'} ${calTarget.kcal} kcal`
+    ? `${Math.round(caloriesToday)} / ${calTarget.kcal} kcal`
     : '—';
   intakeEl.textContent = privacyMode ? maskDigits(intakeText) : intakeText;
   if (caloriesToday !== null) intakeEl.classList.add(withinCalorieTarget(caloriesToday, calTarget) ? 'income' : 'expense');
@@ -234,7 +234,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     ? Math.round(tefKcalToday)
     : (caloriesToday !== null ? Math.round(caloriesToday * (1 - tefDivisor())) : null);
   const digTarget = Math.round(calTarget.kcal * (1 - tefDivisor()));
-  const digText = digKcal !== null ? `${withExplicitSign(-digKcal)} / ${withExplicitSign(-digTarget)} kcal` : '—';
+  const digText = digKcal !== null ? `${-digKcal} / ${-digTarget} kcal` : '—';
   document.getElementById('today-status-digestion-value').textContent = privacyMode ? maskDigits(digText) : digText;
 
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
@@ -260,13 +260,13 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // Maintenance row — BMR as a signed expenditure, same sign convention as the
   // Calorie Balance tooltip's own Maintenance line.
   const maintenanceEl = document.getElementById('today-status-maintenance-value');
-  const maintenanceText = maintenanceKcal !== null ? `${withExplicitSign(-maintenanceKcal)} kcal` : '—';
+  const maintenanceText = maintenanceKcal !== null ? `${-maintenanceKcal} kcal` : '—';
   maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
 
   // Deprivation — the Sleep Deprivation Effect as a signed addition to Balance,
   // against a target of 0 (a full night costs nothing).
   const deprivationEl = document.getElementById('today-status-deprivation-value');
-  const deprivationText = deprivationKcal !== null ? `${withExplicitSign(deprivationKcal)} / 0 kcal` : '—';
+  const deprivationText = deprivationKcal !== null ? `${deprivationKcal} / 0 kcal` : '—';
   deprivationEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
   deprivationEl.style.color = deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : '';
 
@@ -274,7 +274,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   balanceEl.classList.remove('income', 'income-high', 'expense');
   const balanceTargetKcal = targetBalanceKcal(planBodyMassKg(entries));
   const balanceText = balanceKcal !== null
-    ? `${withExplicitSign(balanceKcal)}${balanceTargetKcal !== null ? ` / ${withExplicitSign(balanceTargetKcal)}` : ''} kcal`
+    ? `${balanceKcal}${balanceTargetKcal !== null ? ` / ${balanceTargetKcal}` : ''} kcal`
     : '—';
   balanceEl.textContent = privacyMode ? maskDigits(balanceText) : balanceText;
   if (balanceKcal !== null) {
@@ -292,7 +292,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const weeklyFatLossKg = weeklyFatLossKgAt(planBodyMassKg(entries));
   const dmTarget = weeklyFatLossKg !== null ? Math.round((weeklyFatLossKg / 7) * 1000) : null;
   const dmText = dmActual !== null
-    ? `${withExplicitSign(dmActual)}${dmTarget !== null ? ` / ${dmTarget}` : ''} g`
+    ? `${dmActual}${dmTarget !== null ? ` / ${dmTarget}` : ''} g`
     : '—';
   document.getElementById('today-status-deltam-value').textContent = privacyMode ? maskDigits(dmText) : dmText;
 

@@ -2744,6 +2744,9 @@ td .btn {
         white-space: nowrap;
         border-top: none;
         background: var(--color-bg);
+        /* 10px lower than centred in its strip, nearer the screen's edge; the bars
+           above don't move. */
+        transform: translateY(10px);
     }
 
     /* The page clears the bar and the strip under it. */

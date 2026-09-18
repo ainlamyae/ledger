@@ -204,7 +204,7 @@ function currentBmrBasis() {
 }
 
 // The mass every identity on this sheet is evaluated at — the smoothed box, never the raw
-// weigh-in above it. One accessor rather than a dozen getElementById calls so there is
+// body-mass reading above it. One accessor rather than a dozen getElementById calls so there is
 // exactly one place that decides which of the two rows the formulas read.
 function formulaBodyMassKg() {
   return formulaNumber('formula-body-mass-smooth');
@@ -324,7 +324,7 @@ Glycogen-bound water — the swing glycogen alone accounts for, not fat
 Daily protein band, scaled to lean mass
     P_min =  p_min × LBM
     P_max =  p_max × LBM
-Fiber band — a floor from daily intake, a ceiling from body weight
+Fiber band — a floor from daily intake, a ceiling from body mass
     F_min =  b_min × (TEI / 1000)
     F_max =  b_max × m
 Fat band — both ends a share of intake, 20-35% AMDR

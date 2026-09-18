@@ -61,7 +61,7 @@ const SETTING_TABLES = [
 const HEALTH_SETTING_KEY_PATTERN = new RegExp('^(?:' + [
   'BIRTH_DATE$', 'SEX$', 'HEIGHT_CM$', 'BODY_MASS_', 'WEEKLY_FAT_LOSS_',
   'CALORIE_', 'PROTEIN_', 'FIBER_', 'FAT_', 'CARB_', 'ACTIVITY_', 'SLEEP_', 'PLAN_',
-  'BMR_', 'TEF_', 'MICRONUTRIENT_', 'KCAL_PER_MET', 'WORKOUT_', 'USDA_',
+  'BMR_', 'TEF_', 'GLYCOGEN_', 'MICRONUTRIENT_', 'KCAL_PER_MET', 'WORKOUT_', 'USDA_',
   'INSIGHT_', 'WELLNESS_INSIGHT_', 'FOOD_INSIGHT_',
 ].join('|') + ')', 'i');
 

@@ -26,7 +26,7 @@ function ageFromBirthDate(birthDateStr, asOf = new Date()) {
 
 // Age, sex, height, latest logged body mass and the BMI those two imply — the
 // body every one of this app's health numbers is actually about. Read straight
-// from Settings and the latest weigh-in (latestBodyMassKg/computeBmi, charts.js),
+// from Settings and the latest body-mass reading (latestBodyMassKg/computeBmi, charts.js),
 // so all three AI panels describe the same person.
 function gatherProfileSnapshot() {
   const heightCm = getSetting('HEIGHT_CM', null);

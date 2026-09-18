@@ -29,6 +29,9 @@ const PHYSIQUE_COLUMNS = [
   { key: 'workout', headers: ['Workout'] },
   { key: 'duration', headers: ['Duration', 'Activity Duration'] },
   { key: 'caloriesOut', headers: ['AEE', 'Calories Out'] },
+  // JSON of the day's body-mass figures (see "Stored body mass" below). Last, so a
+  // sheet without it gets it added at the far right.
+  { key: 'mass', headers: ['Mass'] },
 ];
 const PHYSIQUE_DEFAULT_COLUMNS = Object.fromEntries(PHYSIQUE_COLUMNS.map(({ key }, i) => [key, i]));
 // key -> 0-based column, from the header row (refreshPhysique).
@@ -131,6 +134,12 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const deprivationKcal = physiqueDeprivationKcal(day, sleepHours, bmr);
   el.textContent = deprivationKcal !== null ? `${deprivationKcal} kcal` : '—';
 
+  // The Mass figures Save will store (the saved ones while Body Mass is unchanged).
+  const mass = document.getElementById('physique-is-pattern').checked ? {} : physiqueMassForSave(day.date, day.bodyMass);
+  const massText = mass.m === undefined ? '—'
+    : `${mass.m} kg/${mass.BMI ?? '—'}/${mass.m_avg !== undefined ? `${mass.m_avg} kg` : '—'}/${mass.m_d !== undefined ? `${mass.m_d} g/day` : '—'}`;
+  document.getElementById('physique-mass-figures').textContent = privacyMode ? maskDigits(massText) : massText;
+
   // The four BMR figures Save will store, one line; "kcal" once, after the last.
   [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key], i, all) => {
     const unit = i === all.length - 1 ? ' kcal' : '';
@@ -223,6 +232,7 @@ async function refreshPhysique(forceRefresh = false) {
 
   // Row 1 is always the header, as before.
   physiqueColumnIndex = physiqueColumnsFromHeader(values[0] || []);
+  physiqueHeaderWidth = (values[0] || []).length;
   const cell = (row, key) => (physiqueColumnIndex[key] === undefined ? undefined : row[physiqueColumnIndex[key]]);
 
   allPhysiqueEntries = values.slice(1)
@@ -237,6 +247,7 @@ async function refreshPhysique(forceRefresh = false) {
       sleep: numberCell(cell(row, 'sleep')),
       deprivation: numberCell(cell(row, 'deprivation')),
       bmr: parsePhysiqueBmr(cell(row, 'bmr')),
+      mass: parsePhysiqueBmr(cell(row, 'mass')),
       consumption: cell(row, 'consumption') || '',
       breakdown: cell(row, 'breakdown') || '',
       caloriesIn: numberCell(cell(row, 'caloriesIn')),
@@ -305,6 +316,76 @@ function physiqueColumnLetter(i) {
   return letters;
 }
 
+// --- Stored body mass --------------------------------------------------------
+//
+// Each day's Mass cell holds {"m","BMI","m_avg","m_d"}: the body-mass reading as of that day
+// (its own, else the latest earlier one), BMI at m_avg, the L_p-day rolling average,
+// and the smoothed trend's slope in g/day — all as of that day, worked out once on
+// save (and for days saved before the column existed, on load) and then only read:
+// by the Status card, the Body Mass chart and the day form. A changed body-mass reading
+// rewrites the days after it; a changed L_p or height rewrites every day.
+const MASS_JSON_ORDER = ['m', 'BMI', 'm_avg', 'm_d'];
+// Header cells in row 1, so a missing Mass column is added right after the last.
+let physiqueHeaderWidth = 0;
+
+function computePhysiqueMassFigures(date, bodyMassKg = undefined) {
+  if (!date) return {};
+  const readings = physiqueDatedAscending()
+    .filter((p) => p.date <= date && p.date !== date && p.bodyMass !== null)
+    .map((p) => ({ category: 'Body Mass', date: p.date, amount: p.bodyMass }));
+  const own = bodyMassKg !== undefined
+    ? bodyMassKg
+    : allPhysiqueEntries.find((p) => p.date === date)?.bodyMass ?? null;
+  if (own !== null && own !== undefined) readings.push({ category: 'Body Mass', date, amount: own });
+  if (!readings.length) return {};
+
+  const figures = { m: readings[readings.length - 1].amount };
+  const mAvg = smoothedBodyMassKg(readings);
+  if (mAvg !== null) figures.m_avg = mAvg;
+  const heightCm = getSetting('HEIGHT_CM', null);
+  if (mAvg !== null && heightCm !== null) figures.BMI = computeBmi(mAvg, heightCm);
+  const trend = computeBodyMassTrend(bodyMassByDateMap(readings));
+  const trendDates = [...trend.keys()].sort();
+  const slope = trendDates.length ? computeBodyMassTrendSlopeGramsPerDay(trend).get(trendDates.at(-1)) : null;
+  if (slope !== null && slope !== undefined) figures.m_d = slope;
+  return figures;
+}
+
+// What a save stores for `date`: the saved figures while its Body Mass is unchanged.
+function physiqueMassForSave(date, bodyMassKg) {
+  if (!date) return {};
+  const saved = allPhysiqueEntries.find((p) => p.date && p.date === date);
+  if (saved?.mass && (saved.bodyMass ?? null) === (bodyMassKg ?? null)) return { ...saved.mass };
+  return computePhysiqueMassFigures(date, bodyMassKg ?? null);
+}
+
+// The stored figures for `date`, else the latest dated day before it with some.
+function storedMassAsOf(date) {
+  const days = physiqueDatedAscending();
+  for (let i = days.length - 1; i >= 0; i--) {
+    if (days[i].date <= date && days[i].mass && days[i].mass.m !== undefined) return days[i].mass;
+  }
+  return null;
+}
+
+function storedMassByDate() {
+  return new Map(physiqueDatedAscending().filter((p) => p.mass).map((p) => [p.date, p.mass]));
+}
+
+// Rewrites the Mass cells of the days after `fromDate` that a changed body-mass reading moved
+// (their rolling average and trend read it); only cells whose figures differ.
+async function recomputeStoredMassAfter(fromDate) {
+  if (physiqueBatchRunning || physiqueColumnIndex.mass === undefined) return;
+  const data = [];
+  physiqueDatedAscending().filter((p) => p.date > fromDate).forEach((p) => {
+    const figures = computePhysiqueMassFigures(p.date);
+    if (physiqueCellValue('mass', figures) !== physiqueCellValue('mass', p.mass)) {
+      data.push(physiqueCellUpdate('mass', p.row, figures));
+    }
+  });
+  await runPhysiqueBatch(data, 'recomputed Mass after a changed body-mass reading');
+}
+
 // --- Stored BMR ------------------------------------------------------------
 //
 // Each day's BMR cell holds {"BMR_mif","BMR_kat","BMR_cal","BMR_adp"} (kcal),
@@ -356,7 +437,7 @@ function physiqueRowAsOf(date) {
   return found;
 }
 
-// The day's own weigh-in, else the latest earlier one — the mass the charts use.
+// The day's own body-mass reading, else the latest earlier one — the mass the charts use.
 function physiqueBodyMassAsOf(date) {
   let mass = null;
   for (const p of physiqueDatedAscending()) {
@@ -409,7 +490,7 @@ function physiqueCalibratedBmr(date, plainBmr) {
 }
 
 // All four figures for a day, computed fresh. `bodyMassKg` overrides the
-// carried-forward mass (a day being saved with its own new weigh-in).
+// carried-forward mass (a day being saved with its own new body-mass reading).
 function computePhysiqueBmrFigures(date, bodyMassKg = physiqueBodyMassAsOf(date)) {
   const figures = physiqueBaseBmrFigures(date, bodyMassKg);
   const calibrated = physiqueCalibratedBmr(date, figures[BMR_EQUATION_KEYS[bmrFormula()]]);
@@ -458,7 +539,7 @@ function physiqueDeprivationKcal(day, sleepHours, bmrFigures) {
   ).deprivationKcal;
 }
 
-// The BMR figures a save stores for `date`: its own weigh-in, else the latest earlier one.
+// The BMR figures a save stores for `date`: its own body-mass reading, else the latest earlier one.
 // Only a changed Body Mass recomputes a stored day; otherwise its cell is kept as is.
 function physiqueBmrForSave(date, bodyMassKg) {
   if (!date) return {};
@@ -470,18 +551,20 @@ function physiqueBmrForSave(date, bodyMassKg) {
   return bmr;
 }
 
-// Sleep, BMR and Deprivation as stored — computed here, once per save.
+// Sleep, BMR, Deprivation and Mass as stored — computed here, once per save.
 function physiqueDerivedFigures(day) {
   const sleep = physiqueSleepHours(day);
   const bmr = physiqueBmrForSave(day.date, day.bodyMass);
-  return { sleep, bmr, deprivation: physiqueDeprivationKcal(day, sleep, bmr) };
+  const mass = physiqueMassForSave(day.date, day.bodyMass);
+  return { sleep, bmr, deprivation: physiqueDeprivationKcal(day, sleep, bmr), mass };
 }
 
 const BMR_JSON_ORDER = ['BMR_mif', 'BMR_kat', 'BMR_cal', 'BMR_adp'];
 
 function physiqueCellValue(key, value) {
-  if (key !== 'bmr') return value ?? '';
-  const present = BMR_JSON_ORDER.filter((k) => value?.[k] !== undefined);
+  if (key !== 'bmr' && key !== 'mass') return value ?? '';
+  const order = key === 'mass' ? MASS_JSON_ORDER : BMR_JSON_ORDER;
+  const present = order.filter((k) => value?.[k] !== undefined);
   return present.length ? JSON.stringify(Object.fromEntries(present.map((k) => [k, value[k]]))) : '';
 }
 
@@ -563,9 +646,22 @@ async function backfillPhysiqueDerivedFigures() {
       if (deprivation !== null) data.push(physiqueCellUpdate('deprivation', p.row, deprivation));
     }
   });
+  // The Mass column, added at the far right of the header when the sheet has none
+  // (nothing else moves), then every dated day without its figures.
+  if (physiqueColumnIndex.mass === undefined && physiqueColumnIndex.date !== undefined && physiqueHeaderWidth < 26) {
+    physiqueColumnIndex = { ...physiqueColumnIndex, mass: physiqueHeaderWidth };
+    data.push({ range: `'${CONFIG.SHEETS.PHYSIQUE}'!${physiqueColumnLetter(physiqueHeaderWidth)}1`, values: [['Mass']] });
+  }
+  if (physiqueColumnIndex.mass !== undefined) {
+    physiqueDatedAscending().forEach((p) => {
+      if (p.mass) return;
+      const figures = computePhysiqueMassFigures(p.date);
+      if (Object.keys(figures).length) data.push(physiqueCellUpdate('mass', p.row, figures));
+    });
+  }
   const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
   fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
-  await runPhysiqueBatch(fresh, 'stored missing Sleep/BMR/Deprivation');
+  await runPhysiqueBatch(fresh, 'stored missing Sleep/BMR/Deprivation/Mass');
 }
 
 // One-off rewrite of saved Breakdown amounts still in units ("×1") into grams, from
@@ -608,7 +704,8 @@ async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
     await initPhysique();
   }
   if (!physiqueDataLoaded || physiqueBatchRunning) return 0;
-  if (physiqueColumnIndex.bmr === undefined && physiqueColumnIndex.deprivation === undefined) return 0;
+  if (physiqueColumnIndex.bmr === undefined && physiqueColumnIndex.deprivation === undefined
+    && physiqueColumnIndex.mass === undefined) return 0;
 
   ignoreStoredBmr = true;
   bmrFiguresCache = new Map();
@@ -617,6 +714,8 @@ async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
     physiqueDatedAscending().forEach((p) => {
       const figures = computePhysiqueBmrFigures(p.date);
       if (physiqueColumnIndex.bmr !== undefined) data.push(physiqueCellUpdate('bmr', p.row, figures));
+      // L_p (m_avg, m_d) and height (BMI) are among these settings too.
+      if (physiqueColumnIndex.mass !== undefined) data.push(physiqueCellUpdate('mass', p.row, computePhysiqueMassFigures(p.date)));
       if (physiqueColumnIndex.deprivation !== undefined) {
         data.push(physiqueCellUpdate('deprivation', p.row,
           physiqueDeprivationKcal(p, p.sleep ?? physiqueSleepHours(p), figures)));
@@ -1310,12 +1409,15 @@ async function submitPhysiqueForm(event) {
 
   try {
     const editingRow = editingPhysiqueRow;
+    const before = allPhysiqueEntries.find((p) => p.date && p.date === date);
     if (editingRow !== null) {
       await writePhysiqueRow(editingRow, day);
     } else {
       await appendPhysiqueRow(day);
     }
     await refreshPhysique(true);
+    // A changed body-mass reading moves the stored Mass figures of the days after it.
+    if (date && (before?.bodyMass ?? null) !== (day.bodyMass ?? null)) await recomputeStoredMassAfter(date);
     // The saved day: the edited row, else the new date's (a new Pattern, the last one).
     const saved = allPhysiqueEntries.find((p) => p.row === editingRow)
       || (isPattern ? allPhysiqueEntries.filter((p) => !p.date).at(-1) : allPhysiqueEntries.find((p) => p.date === date));

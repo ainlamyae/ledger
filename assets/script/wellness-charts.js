@@ -205,6 +205,20 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     mBarEl.classList.add(mBarGood ? 'income' : 'expense');
   }
 
+  // BMI — the same m̄/target pair as above, rescaled by height (computeBmi is a fixed
+  // linear rescale of mass, so "good" tracks mBar's direction check exactly). Needs
+  // only height, so it survives a profile missing birth date or sex.
+  const bmiEl = document.getElementById('today-status-bmi-value');
+  bmiEl.classList.remove('income', 'expense');
+  const bmi = mBar !== null && heightCm !== null ? computeBmi(mBar, heightCm) : null;
+  const targetBmi = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
+  const bmiText = bmi !== null && targetBmi !== null ? `${bmi} / ${targetBmi} kg/m²` : '—';
+  bmiEl.textContent = privacyMode ? maskDigits(bmiText) : bmiText;
+  if (bmi !== null && targetBmi !== null) {
+    const bmiGood = bodyMassTargetIsDownward(entries) ? bmi <= targetBmi : bmi >= targetBmi;
+    bmiEl.classList.add(bmiGood ? 'income' : 'expense');
+  }
+
   // Intake — the one positive contribution to Balance, shown against its target
   // (a cut wants intake under the cap, a bulk over the floor; the color carries
   // that sense, not the separator).
@@ -245,9 +259,13 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
 
   let balanceKcal = null;
   let deprivationKcal = null;
+  // The BMR row IS this figure — plain BMR or BMR_adp, whichever the Formula
+  // Playground's "Basal metabolic rate basis" fieldset has selected (applyBmrBasis,
+  // wellness-math.js). One row rather than two: switching that setting changes what's
+  // shown here, and what Balance/Δm below are measured against, at the same time.
   let maintenanceKcal = null;
   if (haveProfile && caloriesToday !== null && bodyMassKg !== null) {
-    maintenanceKcal = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
+    maintenanceKcal = Math.round(applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex)));
     const activity = activityKcalToday ?? 0;
     const tef = tefKcalToday !== null
       ? Math.round(tefKcalToday)
@@ -257,14 +275,34 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     ));
   }
 
-  // Maintenance row — BMR as a signed expenditure, same sign convention as the
-  // Calorie Balance tooltip's own Maintenance line.
+  // BMR row — the effective figure above as a signed expenditure, same sign convention
+  // as the Calorie Balance tooltip's own Maintenance line.
   const maintenanceEl = document.getElementById('today-status-maintenance-value');
   const maintenanceText = maintenanceKcal !== null ? `${-maintenanceKcal} kcal` : '—';
   maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
 
+  // λt row — how much of the BMR above is actually the adaptation discount, so the
+  // figure reads as "BMR minus λt" instead of an unexplained number. 0% under the plain
+  // 'bmr' basis (no discount applied); under 'bmr_adp', days actually elapsed since the
+  // first logged weigh-in — the same basis applyBmrBasis (wellness-math.js) itself uses.
+  const adaptFracEl = document.getElementById('today-status-adapt-frac-value');
+  let adaptFracText = '0 %';
+  if (bmrBasis() === 'bmr_adp') {
+    const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
+    const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries);
+    if (daysOnDiet !== null) {
+      const adaptPctPerWeek = getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT);
+      const adaptPctCap = getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT);
+      const pct = Math.round(adaptationFraction(daysOnDiet, adaptPctPerWeek, adaptPctCap) * 1000) / 10;
+      adaptFracText = `${pct} %`;
+    } else {
+      adaptFracText = '—';
+    }
+  }
+  adaptFracEl.textContent = privacyMode ? maskDigits(adaptFracText) : adaptFracText;
+
   // Deprivation — the Sleep Deprivation Effect as a signed addition to Balance,
-  // against a target of 0 (a full night costs nothing).
+  // against a desired figure of 0 (a full night costs nothing).
   const deprivationEl = document.getElementById('today-status-deprivation-value');
   const deprivationText = deprivationKcal !== null ? `${deprivationKcal} / 0 kcal` : '—';
   deprivationEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
@@ -580,7 +618,11 @@ function renderWellnessBodyMassChart(entries) {
   if (haveProfile) {
     const sortedWeighInDates = [...byDate.keys()].sort();
     if (sortedWeighInDates.length >= 1) {
-      const calorieTrendDates = datesInRange(sortedWeighInDates[0], sortedWeighInDates[sortedWeighInDates.length - 1]);
+      // Through the chart's own last plotted date, not just the last actual weigh-in —
+      // otherwise a day (or several) without a fresh weigh-in leaves this line flat short
+      // of today, disagreeing with the Status card's own Δm for a day it never reaches.
+      // carryForwardBodyMassByDate below fills the gap with the last known reading.
+      const calorieTrendDates = datesInRange(sortedWeighInDates[0], dates[dates.length - 1]);
       const calorieBodyMassForDate = carryForwardBodyMassByDate(byDate, calorieTrendDates);
       const cIntakeByDate = new Map();
       const cTefByDate = new Map();
@@ -606,7 +648,7 @@ function renderWellnessBodyMassChart(entries) {
         calorieTrendMap.set(d, running);
         if (!cIntakeByDate.has(d)) return;
         const intake = cIntakeByDate.get(d);
-        const maintenance = bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex);
+        const maintenance = applyBmrBasis(bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex), d);
         const activity = cActivityKcalByDate.get(d) || 0;
         const tef = cTefByDate.has(d) ? cTefByDate.get(d) : intake * (1 - tefDivisor());
         const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, cSleepHoursByDate.get(d), cSleepTarget);
@@ -645,12 +687,10 @@ function renderWellnessBodyMassChart(entries) {
     const progress = bodyMassChangeIsProgress(delta, kg, targetIsDownward, stallDays);
 
     const fatKcal = haveProfile ? fatEnergyKcal(kg, heightCm, age, sex) : null;
-    const bodyFatPct = haveProfile ? clampedBodyFatPercent(kg, heightCm, age, sex) : null;
-    const fatMassKg = haveProfile ? estimatedFatMassKg(kg, heightCm, age, sex) : null;
     // BMI needs only height, so it survives a profile missing birth date or sex.
     const bmi = heightCm !== null ? computeBmi(kg, heightCm) : null;
     const smoothedChangeGPerDay = trendSlopeByDate.get(d) ?? null;
-    detailByDate.set(d, { delta, fatKcal, bodyFatPct, fatMassKg, bmi, smoothedChangeGPerDay });
+    detailByDate.set(d, { delta, fatKcal, bmi, smoothedChangeGPerDay });
 
     values.push(kg);
     barColors.push(progress === null ? BODY_MASS_UNSCORED_COLOR : (progress ? '#16a34a' : '#dc2626'));
@@ -807,26 +847,15 @@ function renderWellnessBodyMassChart(entries) {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
               const d = detailByDate.get(item.label) ?? {};
-              const lines = [`Body Mass: ${item.parsed.y} kg`];
-              // Against the previous READING, not "yesterday" — on an every-third-day
-              // habit those differ. Omitted on the first bar.
-              if (d.delta !== null && d.delta !== undefined) {
-                lines.push(`Changed Mass: ${withExplicitSign(Math.round(d.delta * 1000))} g`);
-              }
-              // The green line's own slope here, not the raw day-to-day delta above —
-              // a single water/glycogen-heavy weigh-in swings that one, this doesn't.
+              const lines = [`m (Body Mass): ${item.parsed.y} kg`];
+              // The green line's own slope, not the raw day-to-day delta a single
+              // water/glycogen-heavy weigh-in would swing — this is the one shown.
               if (d.smoothedChangeGPerDay !== null && d.smoothedChangeGPerDay !== undefined) {
-                lines.push(`Smoothed Change: ${withExplicitSign(d.smoothedChangeGPerDay)} g/day`);
+                lines.push(`Δm (Changed Mass): ${withExplicitSign(d.smoothedChangeGPerDay)} g/day`);
               }
               // BMI leads the derived rows because the rest are computed from it.
               // Unitless by definition, so no unit.
-              if (d.bmi !== null && d.bmi !== undefined) lines.push(`BMI: ${d.bmi} kg/m²`);
-              // Composition before energy, which derives from it. All Deurenberg
-              // estimates, so all three vanish together without the full profile.
-              if (d.bodyFatPct !== null && d.bodyFatPct !== undefined) {
-                lines.push(`Body Fat: ${Math.round(d.bodyFatPct * 10) / 10} %`);
-                lines.push(`Fat Mass: ${Math.round(d.fatMassKg * 10) / 10} kg`);
-              }
+              if (d.bmi !== null && d.bmi !== undefined) lines.push(`BMI (Body Mass Index): ${d.bmi} kg/m²`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
             // Flush left and last, like every reference figure in the section. Rate
@@ -952,6 +981,27 @@ function renderWellnessCaloriesChart(entries) {
     });
   }
 
+  // BMR_adp, per day — the same reference figure the Status card's own BMR row shows
+  // under the 'bmr_adp' basis, but always the adapted reading here regardless of the
+  // Formula Playground's "Basal metabolic rate basis" setting, so the two bases can be
+  // compared on the chart at once. Each day gets its OWN discount (days actually elapsed
+  // since the first logged weigh-in, evaluated AT that day — daysSinceFirstWeighIn,
+  // wellness-math.js), not a single constant applied alike everywhere — a day early in
+  // the diet sits close to plain BMR, one further in sits further below it.
+  const restingAdaptKcalByDate = new Map();
+  if (haveRestingProfile) {
+    const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
+    const adaptPctPerWeek = getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT);
+    const adaptPctCap = getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT);
+    dates.forEach((d) => {
+      const bmr = restingKcalByDate.get(d);
+      if (bmr === undefined) return;
+      const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries, d);
+      if (daysOnDiet === null) return;
+      restingAdaptKcalByDate.set(d, bmr * (1 - adaptationFraction(daysOnDiet, adaptPctPerWeek, adaptPctCap)));
+    });
+  }
+
   // Re-evaluated per day, so there's no single figure to draw: each bar carries its own
   // and is scored against that one alone.
   const targetByDay = calorieTargetSeries(entries, dates);
@@ -1043,6 +1093,12 @@ function renderWellnessCaloriesChart(entries) {
         ...(restingKcalValues.length === 0 ? [] : [
           targetCapDataset('Basal Metabolic Rate', dates.map((d) => restingKcalByDate.get(d) ?? null), capHalf, { isTargetLine: true }),
         ]),
+        // Adapted BMR, right beside it — a distinct colour (WEEKLY_AVG_COLOR, the app's
+        // existing "reference, not a score" violet) since the two caps would otherwise be
+        // indistinguishable marks at slightly different heights.
+        ...(restingAdaptKcalByDate.size === 0 ? [] : [
+          targetCapDataset('Adapted BMR', dates.map((d) => restingAdaptKcalByDate.get(d) ?? null), capHalf, { isTargetLine: true, backgroundColor: WEEKLY_AVG_COLOR }),
+        ]),
       ],
     },
     options: {
@@ -1061,18 +1117,22 @@ function renderWellnessCaloriesChart(entries) {
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
-              const lines = [`Actual Intake: ${item.parsed.y} kcal`];
+              const lines = [`TEI (Total Energy Intake): ${item.parsed.y} kcal`];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
             // afterBody rather than a label row: Chart.js indents body lines to clear the
             // colour swatch, while this sits flush left. target.word, so it reads
-            // "Target Max" rather than "Target Maximum".
+            // "Desired Max" rather than "Desired Maximum". No TEI prefix here — TEI
+            // already labels the Actual Intake line above, and repeating it on this one
+            // in the same tooltip would say the same symbol means two different things.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
-              const lines = [`Target ${target.word}: ${targetByDay[i].kcal} kcal`];
+              const lines = [`Desired ${target.word}: ${targetByDay[i].kcal} kcal`];
               const restingKcal = restingKcalByDate.get(items[0].label);
-              if (restingKcal !== undefined) lines.push(`Basal Metabolic Rate: ${Math.round(restingKcal)} kcal`);
+              if (restingKcal !== undefined) lines.push(`BMR (Basal Metabolic Rate): ${Math.round(restingKcal)} kcal`);
+              const restingAdaptKcal = restingAdaptKcalByDate.get(items[0].label);
+              if (restingAdaptKcal !== undefined) lines.push(`BMR_adp (Adapted BMR): ${Math.round(restingAdaptKcal)} kcal`);
               if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -1292,7 +1352,7 @@ function renderWellnessSleepChart(entries) {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
               if (item.dataset.label === 'Deprivation Effect') {
-                const text = `Deprivation Effect: ${item.raw} kcal`;
+                const text = `SD (Sleep Deprivation Effect): ${item.raw} kcal`;
                 return privacyMode ? maskDigits(text) : text;
               }
               const r = rangeByDate.get(item.label);
@@ -1603,7 +1663,7 @@ function renderWellnessActivityChart(entries) {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
               const lines = [];
-              if (targetBurnKcal[i] !== null) lines.push(`Target Burn: ${-Math.round(targetBurnKcal[i])} kcal`);
+              if (targetBurnKcal[i] !== null) lines.push(`AEE (Desired Activity Energy Expenditure): ${-Math.round(targetBurnKcal[i])} kcal`);
               if (weeklyBurnAvg[i] !== null) lines.push(`7-Day Average Burn: ${-Math.round(weeklyBurnAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -1731,15 +1791,15 @@ function renderWellnessProteinChart(entries) {
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
-              const text = `Actual Intake: ${item.parsed.y} g`;
+              const text = `P (Actual Protein): ${item.parsed.y} g`;
               return privacyMode ? maskDigits(text) : text;
             },
             // Both ends, flush left and last — the Actual/Target shape the other charts
             // use. A zero-width band reads as one target, not an equal Min and Max.
             afterBody: (items) => {
               const lines = band.max > band.min
-                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
-                : [`Target: ${band.min} g`];
+                ? [`P_min (Desired Protein, lower end): ${band.min} g`, `P_max (Desired Protein, upper end): ${band.max} g`]
+                : [`P_min (Desired Protein): ${band.min} g`];
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -1854,13 +1914,13 @@ function renderWellnessFiberChart(entries) {
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
-              const text = `Actual Intake: ${item.parsed.y} g`;
+              const text = `F (Actual Dietary Fiber): ${item.parsed.y} g`;
               return privacyMode ? maskDigits(text) : text;
             },
             afterBody: (items) => {
               const lines = band.max > band.min
-                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
-                : [`Target: ${band.min} g`];
+                ? [`F_min (Desired Dietary Fiber, lower end): ${band.min} g`, `F_max (Desired Dietary Fiber, upper end): ${band.max} g`]
+                : [`F_min (Desired Dietary Fiber): ${band.min} g`];
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -1989,13 +2049,13 @@ function renderWellnessFatChart(entries) {
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
-              const text = `Actual Intake: ${item.parsed.y} g`;
+              const text = `G (Actual Fat): ${item.parsed.y} g`;
               return privacyMode ? maskDigits(text) : text;
             },
             afterBody: (items) => {
               const lines = band.max > band.min
-                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
-                : [`Target: ${band.min} g`];
+                ? [`G_min (Desired Fat, lower end): ${band.min} g`, `G_max (Desired Fat, upper end): ${band.max} g`]
+                : [`G_min (Desired Fat): ${band.min} g`];
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -2123,13 +2183,13 @@ function renderWellnessCarbChart(entries) {
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
-              const text = `Actual Intake: ${item.parsed.y} g`;
+              const text = `C (Actual Carbohydrate): ${item.parsed.y} g`;
               return privacyMode ? maskDigits(text) : text;
             },
             afterBody: (items) => {
               const lines = band.max > band.min
-                ? [`Target Min: ${band.min} g`, `Target Max: ${band.max} g`]
-                : [`Target: ${band.min} g`];
+                ? [`C_min (Desired Carbohydrate, lower end): ${band.min} g`, `C_max (Desired Carbohydrate, upper end): ${band.max} g`]
+                : [`C_min (Desired Carbohydrate): ${band.min} g`];
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -2254,12 +2314,12 @@ function renderWellnessProjectionChart(entries) {
     return `${direction} ~${kgPerWeek} kg/week`;
   };
   const statusNote = {
-    reached: () => 'Target reached! 🎉',
+    reached: () => 'Desired mass reached! 🎉',
     'no-change': () => 'No net change at current habits',
-    'wrong-direction': () => `Current habits trend away from target — ${rateNote()}, so no arrival date can be projected`,
-    // Right direction, but it decays to zero before the target: the intake these habits
-    // average IS maintenance at that body mass.
-    asymptote: () => `Currently ${rateNote()}, but these habits level off around ${Math.round(proj.equilibriumKg * 10) / 10} kg — the target isn't reachable without changing them`,
+    'wrong-direction': () => `Current habits trend away from the desired mass — ${rateNote()}, so no arrival date can be projected`,
+    // Right direction, but it decays to zero before the desired mass: the intake these
+    // habits average IS maintenance at that body mass.
+    asymptote: () => `Currently ${rateNote()}, but these habits level off around ${Math.round(proj.equilibriumKg * 10) / 10} kg — the desired mass isn't reachable without changing them`,
   }[proj.status];
   if (statusNote) {
     const note = statusNote();
@@ -2386,7 +2446,7 @@ function renderWellnessProjectionChart(entries) {
       calorieTrendMap.set(d, running);
       if (!intakeByDate.has(d)) return;
       const intake = intakeByDate.get(d);
-      const maintenance = bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex);
+      const maintenance = applyBmrBasis(bmrKcal(calorieBodyMassForDate.get(d), heightCm, age, sex), d);
       const activity = activityKcalByDate.get(d) || 0;
       const tef = tefByDate.has(d) ? tefByDate.get(d) : intake * (1 - tefDivisor());
       // Same sleep-adjusted balance Calorie Balance itself scores (dailyEnergyBalanceKcal)
@@ -2542,8 +2602,8 @@ function renderWellnessProjectionChart(entries) {
     }] : []),
     {
       // bodyMassTarget, not proj.bodyMassTarget — that's only set on an 'ok' projection, but
-      // the target line is drawn either way.
-      label: `${bodyMassTarget} kg Target`,
+      // the desired-mass line is drawn either way.
+      label: `${bodyMassTarget} kg Desired`,
       data: allLabels.map((d) => ({ x: dayOffset(d), y: bodyMassTarget })),
       // Solid, like the section's hairline caps. It stays a continuous LINE rather than
       // caps because this chart has no columns: its x-axis is a linear time scale, so
@@ -2833,19 +2893,37 @@ function renderWellnessEnergyBalanceChart(entries) {
 
   const detailByDate = new Map();
 
+  const adaptPctPerWeek = getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT);
+  const adaptPctCap = getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT);
+
   const balanceData = labels.map((date) => {
     // No food logged is no data, not a day of eating nothing — an empty slot rather
     // than a huge fake deficit.
     if (!intakeByDate.has(date)) return null;
 
     const intake = Math.round(intakeByDate.get(date));
-    const maintenance = Math.round(bmrKcal(bodyMassForDate.get(date), heightCm, age, sex));
+    const bmr = bmrKcal(bodyMassForDate.get(date), heightCm, age, sex);
+    const bmrRounded = Math.round(bmr);
+    // ALWAYS the adapted figure (days actually elapsed since the first logged weigh-in,
+    // evaluated AT this day), regardless of the Formula Playground's "Basal metabolic
+    // rate basis" setting — a fixed comparison, the same way Caloric Intake's two dashed
+    // lines are, rather than "whichever basis is active" (which would mislabel itself
+    // the moment the setting is plain BMR and this figure stopped being adapted at all).
+    const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries, date);
+    const bmrAdaptedRounded = daysOnDiet !== null
+      ? Math.round(bmr * (1 - adaptationFraction(daysOnDiet, adaptPctPerWeek, adaptPctCap)))
+      : bmrRounded;
+    // Whichever of the two the Playground's setting has picked (applyBmrBasis,
+    // wellness-math.js) is what actually drives this bar's colour, the axis and the
+    // weekly average — the two rows above are shown either way, but only one of them is
+    // "official" for the day.
+    const maintenance = bmrBasis() === 'bmr_adp' ? bmrAdaptedRounded : bmrRounded;
     const activity = Math.round(activityKcalByDate.get(date) || 0);
     // Digestion is an expenditure like the other two, so it comes off the same subtraction —
-    // otherwise switching TEF on would raise the target intake here without also raising the
-    // cost of eating it, and this chart would contradict the one that set the target. A share
-    // of what was ACTUALLY eaten, not of the target: this row scores the day that happened.
-    // Measured (tefByDate, from the day's own breakdown macros) wins over estimated
+    // otherwise switching TEF on would raise the desired intake here without also raising the
+    // cost of eating it, and this chart would contradict the one that set it. A share
+    // of what was ACTUALLY eaten, not of the desired figure: this row scores the day that
+    // happened. Measured (tefByDate, from the day's own breakdown macros) wins over estimated
     // whenever Physique has calculated one for this day.
     const tefMeasured = tefByDate.has(date);
     const tef = Math.round(tefMeasured ? tefByDate.get(date) : intake * (1 - tefDivisor()));
@@ -2853,8 +2931,20 @@ function renderWellnessEnergyBalanceChart(entries) {
       intake, maintenance, activity, tef, sleepHoursByDate.get(date), sleepTarget,
     );
 
+    // The same balance again off each fixed basis — always both, so the two deficits (one
+    // assumes maintenance held steady, the other accounts for the metabolic slowdown the
+    // diet itself causes) can be read side by side regardless of which one the chart itself
+    // is currently scored against.
+    const { balance: balanceFromBmr } = dailyEnergyBalanceKcal(
+      intake, bmrRounded, activity, tef, sleepHoursByDate.get(date), sleepTarget,
+    );
+    const { balance: balanceFromBmrAdp } = dailyEnergyBalanceKcal(
+      intake, bmrAdaptedRounded, activity, tef, sleepHoursByDate.get(date), sleepTarget,
+    );
+
     detailByDate.set(date, {
       intake, maintenance, activity, tef, tefMeasured, rawBalance, deprivationKcal, balance,
+      bmrRounded, bmrAdaptedRounded, balanceFromBmr, balanceFromBmrAdp,
       massG: Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000),
     });
     return balance;
@@ -2939,7 +3029,8 @@ function renderWellnessEnergyBalanceChart(entries) {
               // Last of the body rows, to sit beside the Target row its colour is
               // compared against. A day over maintenance reports a SURPLUS, since
               // calling it a deficit would contradict the + in front of it.
-              const actualWord = d.balance > 0 ? 'Surplus' : 'Deficit';
+              const actualWordAdp = d.balanceFromBmrAdp > 0 ? 'Surplus' : 'Deficit';
+              const actualWordBmr = d.balanceFromBmr > 0 ? 'Surplus' : 'Deficit';
               // "Actual Intake", the same name Caloric Intake and Protein Intake give
               // the figure in their own hovers — one day's eating shouldn't be called
               // three different things across three charts of the same panel.
@@ -2951,23 +3042,25 @@ function renderWellnessEnergyBalanceChart(entries) {
               // signs of. Activity especially — kcal burned printed as a positive reads
               // as something ADDED to the day.
               const lines = [
-                `Actual Intake: ${d.intake} kcal`,
-                `Maintenance: ${withExplicitSign(-d.maintenance)} kcal`,
-                `Activity: ${withExplicitSign(-d.activity)} kcal`,
+                `TEI (Total Energy Intake): ${d.intake} kcal`,
+                `BMR (basal metabolic rate): ${withExplicitSign(-d.bmrRounded)} kcal`,
+                `BMR_adp (adapted BMR by t): ${withExplicitSign(-d.bmrAdaptedRounded)} kcal`,
+                `AEE (Activity Energy Expenditure): ${withExplicitSign(-d.activity)} kcal`,
                 // Only when there IS one. At the default f = 0 the row would be a
                 // permanent "-0", which reads as a term that failed to compute rather
                 // than one deliberately left out of the model. Labelled "measured" when
                 // it's this day's own Physique figure, "est." when it's the flat
                 // TEF_PERCENT_OF_INTAKE fallback — the two can differ by a real amount,
                 // so which one produced this bar shouldn't be left ambiguous.
-                ...(d.tef > 0 ? [`Digestion: ${withExplicitSign(-d.tef)} kcal`] : []),
+                ...(d.tef > 0 ? [`TEF (Thermic Effect of Food): ${withExplicitSign(-d.tef)} kcal`] : []),
                 // Added, not subtracted: on a deficit this is how much less of it became
                 // fat loss; on a surplus it's how much MORE was gained, since short sleep
                 // drives hunger and cuts NEAT rather than sitting out surplus days. Shown
                 // only when a night actually fell short of the target.
-                ...(d.deprivationKcal > 0 ? [`Sleep Deprivation Effect: ${withExplicitSign(d.deprivationKcal)} kcal`] : []),
+                ...(d.deprivationKcal > 0 ? [`SD (Sleep Deprivation Effect): ${withExplicitSign(d.deprivationKcal)} kcal`] : []),
                 `Expected Fat: ${withExplicitSign(d.massG)} g`,
-                `Actual ${actualWord}: ${withExplicitSign(d.balance)} kcal`,
+                `D (${actualWordAdp} from BMR_adp): ${withExplicitSign(d.balanceFromBmrAdp)} kcal`,
+                `D (${actualWordBmr} from BMR): ${withExplicitSign(d.balanceFromBmr)} kcal`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -2977,7 +3070,7 @@ function renderWellnessEnergyBalanceChart(entries) {
               const lines = [];
               if (target !== null) {
                 const word = target < 0 ? 'Deficit' : 'Surplus';
-                lines.push(`Target ${word}: ${withExplicitSign(target)} kcal/day`);
+                lines.push(`D (Desired ${word}): ${withExplicitSign(target)} kcal/day`);
               }
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) {

@@ -97,7 +97,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     return;
   }
 
-  const maintenance = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex));
+  const maintenance = Math.round(applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex)));
   const activity = evaluateNumberExpression(physiqueField('calories-out').value.trim()) || 0;
   const typedTef = evaluateNumberExpression(physiqueField('tef').value.trim());
   const tef = typedTef || Math.round(intake * (1 - tefDivisor()));
@@ -494,7 +494,7 @@ function renderPhysiqueList() {
     const deprivationKcal = (haveProfile && p.bodyMass !== null && p.caloriesIn !== null && sleepHours !== null)
       ? dailyEnergyBalanceKcal(
         p.caloriesIn,
-        Math.round(bmrKcal(p.bodyMass, heightCm, age, sex)),
+        Math.round(applyBmrBasis(bmrKcal(p.bodyMass, heightCm, age, sex), p.date)),
         p.caloriesOut ?? 0,
         p.tef !== null ? p.tef : Math.round(p.caloriesIn * (1 - tefDivisor())),
         sleepHours,

@@ -5,7 +5,7 @@
 // and the gif/jpg animation list (strength-plan.js).
 //
 // Columns: Category · Group · Name · Unit · "Sets x Reps, Rest" · Image ·
-// MET · Muscle Group · Weight. Name is the join key everything else matches
+// MET · Muscle Group · Load (the sheet's Weight column). Name is the join key everything else matches
 // on — it has to be exactly what the workout note lines carry.
 
 const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:J`;
@@ -195,12 +195,12 @@ function makeActivityCheckbox(activity) {
   return box;
 }
 
-// Muscle Group/Rest/Weight, checked across every row of one table SHAPE
+// Muscle Group/Rest/Load, checked across every row of one table SHAPE
 // (every strength day together, or NEAT+Cardio together) rather than table by
 // table — so a column with real data somewhere in that shape (e.g. Muscle
 // Group, blank on Bodyweight Day's own rows but filled on every other
 // strength day) still renders, while one nothing in that shape has ever
-// filled in (Rest/Weight on every NEAT/Cardio row; Weight everywhere, before
+// filled in (Rest/Load on every NEAT/Cardio row; Load everywhere, before
 // it's ever been typed once) is dropped instead of rendering as a permanently
 // empty column. Deciding per shape, not per table, is also what keeps Leg Day
 // and Bodyweight Day showing the same columns in the same order as each other.
@@ -242,7 +242,7 @@ function makeActivityTable(group, rows, columnVisibility) {
   // is last and unlabelled too. strength-plan.js reads a ticked row's name
   // from children[1] (Name never moves) and its quantity from the
   // "workout-quantity-cell" class rather than a fixed index — the column's
-  // position among Muscle Group/Weight/Rest shifts with columnVisibility, so
+  // position among Muscle Group/Load/Rest shifts with columnVisibility, so
   // only a class survives that the way workout-muscle-group-cell already
   // does below.
   //
@@ -253,7 +253,7 @@ function makeActivityTable(group, rows, columnVisibility) {
   // font-size/hide rules key off these classes instead of position.
   const headers = [{ label: '', className: 'workout-check-col' }, { label: isStrength ? 'Exercise/Machine' : 'Activity' }];
   if (columnVisibility.muscleGroup) headers.push({ label: 'Muscle Group', className: 'workout-meta-cell workout-muscle-group-cell' });
-  if (columnVisibility.weight) headers.push({ label: 'Weight', className: 'workout-meta-cell' });
+  if (columnVisibility.weight) headers.push({ label: 'Load', className: 'workout-meta-cell' });
   headers.push({ label: isStrength ? 'Sets x Reps' : 'Amount', className: 'workout-meta-cell workout-quantity-cell' });
   if (columnVisibility.rest) headers.push({ label: 'Rest', className: 'workout-meta-cell' });
   headers.push({ label: '' });
@@ -793,11 +793,11 @@ async function deleteActivity(activity) {
   );
 }
 
-// "45 lbs · 3 x 10 · 90 sec rest" — Weight leads, so it reads left of the
+// "45 lbs · 3 x 10 · 90 sec rest" — Load leads, so it reads left of the
 // Sets x Reps it applies to rather than trailing after Rest where it'd read
 // as an afterthought. Amount/Rest come from the single cell
 // splitAmountAndRest already divides, so that half shows exactly what the
-// plan table's Sets x Reps and Rest columns do; Weight is its own column
+// plan table's Sets x Reps and Rest columns do; Load is its own column
 // (row[8]), blank on any activity that doesn't load one (steps, minutes).
 // Either half missing just drops out rather than leaving a stray separator.
 function instructionPrescription(activity) {

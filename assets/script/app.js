@@ -673,6 +673,8 @@ async function loadDashboard(forceRefresh = false) {
     const detailPromises = [
       ...(shows('health') ? [
         nutritionPromise,
+        // Once, if missing: the glycogen swing as a saved setting from now on.
+        physiquePromise.then(() => seedGlycogenSwingSetting()).catch((err) => console.error('Saving GLYCOGEN_SWING_KG failed:', err)),
         // Protein Source Rotation needs Physique (actual servings eaten),
         // Nutrition (live per-serving calories/protein), and settings
         // (protein target) all loaded — refresh only once all three are in.

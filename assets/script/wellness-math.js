@@ -424,6 +424,65 @@ function adaptationFraction(days, pctPerWeek, pctCap) {
   return Math.max(0, Math.min(grown, pctCap / 100));
 }
 
+// Days actually elapsed since the first logged weigh-in, as of `atIsoDate` (today when
+// omitted) — the real-world "how long have you actually been dieting" basis BMR_adp uses
+// everywhere OUTSIDE the Formula Playground itself. The Playground's own BMR_adp is
+// deliberately forward-looking instead — adaptation BY ARRIVAL at m_des, t days from now
+// (see formula-render.js/renderCorrectionFields) — a different question (how adapted will
+// you be when you get there) from the one this answers (how adapted are you right now, or
+// were you on some past logged day). Clamped to >= 0 so a date before the first weigh-in
+// can't go negative. Null with no weigh-in logged at all — there's no diet start to count from.
+function daysSinceFirstWeighIn(bodyMassEntries, atIsoDate = null) {
+  if (!bodyMassEntries.length) return null;
+  const firstDate = bodyMassEntries.map((e) => e.date).sort()[0];
+  const atMs = parseIsoDateUTC(atIsoDate !== null ? atIsoDate : isoFromDate(new Date()));
+  return Math.max(0, Math.round((atMs - parseIsoDateUTC(firstDate)) / 86400000));
+}
+
+// Which basis the WHOLE APP runs deficits and the calorie desired figure on — a Formula
+// Playground fieldset, the same shape as BMR_FORMULA_KEY above. Unset reads as plain 'bmr',
+// the behaviour every existing sheet already has.
+const BMR_BASIS_KEY = 'BMR_BASIS';
+const BMR_BASIS_DEFAULT = 'bmr';
+
+function bmrBasis() {
+  return getSettingString(BMR_BASIS_KEY, BMR_BASIS_DEFAULT) === 'bmr_adp' ? 'bmr_adp' : BMR_BASIS_DEFAULT;
+}
+
+// The single choke point every consumer of a raw bmrKcal() figure routes through before
+// using it in a deficit or the calorie desired figure — so flipping the BMR_BASIS setting
+// changes every one of them identically (the desired daily intake, Calorie Balance's
+// per-day Maintenance, the Status card's D/Δm, Physique's own maintenance figure) instead
+// of each deciding for itself. Under 'bmr' this is a no-op; under 'bmr_adp' it discounts
+// by adaptationFraction at daysSinceFirstWeighIn, evaluated `atIsoDate` (today when
+// omitted). Reads the full entry list itself via physiqueAsWellnessEntries() rather than
+// taking one as a parameter, so every existing bmrKcal() call site can adopt this with a
+// one-line wrap instead of a signature change threaded through its whole call chain.
+function applyBmrBasis(bmr, atIsoDate = null) {
+  if (bmr === null || bmrBasis() !== 'bmr_adp') return bmr;
+  const bodyMassEntries = physiqueAsWellnessEntries().filter((e) => e.category === 'Body Mass' && e.amount !== null);
+  const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries, atIsoDate);
+  if (daysOnDiet === null) return bmr;
+  const pctPerWeek = getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT);
+  const pctCap = getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT);
+  return bmr * (1 - adaptationFraction(daysOnDiet, pctPerWeek, pctCap));
+}
+
+// TODAY's adaptation fraction — applyBmrBasis's "just the fraction" twin, for the one
+// caller that has to scale aBmr/bBmr SEPARATELY rather than one whole BMR figure
+// (maintenanceAffineCoefficients, below) — a plain BMR value doesn't exist yet at the
+// point that needs this number. 0 under the plain 'bmr' basis, or with no weigh-in to
+// count a diet start from.
+function currentAdaptationFraction() {
+  if (bmrBasis() !== 'bmr_adp') return 0;
+  const bodyMassEntries = physiqueAsWellnessEntries().filter((e) => e.category === 'Body Mass' && e.amount !== null);
+  const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries);
+  if (daysOnDiet === null) return 0;
+  const pctPerWeek = getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT);
+  const pctCap = getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT);
+  return adaptationFraction(daysOnDiet, pctPerWeek, pctCap);
+}
+
 // Resting maintenance from the profile and the smoothed body mass; null if anything is
 // missing. Excludes activity — each caller adds the figure right for its own window.
 function restingMaintenanceKcal(entries) {
@@ -433,7 +492,7 @@ function restingMaintenanceKcal(entries) {
   const bodyMassKg = planBodyMassKg(entries);
 
   if (heightCm === null || (age === null && bmrNeedsAge()) || (sex !== 'male' && sex !== 'female') || bodyMassKg === null) return null;
-  return bmrKcal(bodyMassKg, heightCm, age, sex);
+  return applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex));
 }
 
 // Inside this margin the Physical Activity dot goes gray rather than red. Same 5% as
@@ -587,7 +646,7 @@ function calorieTargetDetail(bodyMassKg) {
     && (sex === 'male' || sex === 'female') && weeklyFatLossKg !== null;
   if (!haveAllInputs) return null;
 
-  const bmr = bmrKcal(bodyMassKg, heightCm, age, sex);
+  const bmr = applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex));
   const activityKcal = activityTargetKcal(bodyMassKg);
 
   // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the target
@@ -942,9 +1001,24 @@ function maintenanceAffineCoefficients({
   const bBmr = formula === 'katch' ? KATCH_KCAL_PER_KG_LBM * lbm.perKg : 10;
   const divisor = tefDivisor(tef);
 
+  // The forecast's own a/b run on whichever BMR basis the Formula Playground's toggle has
+  // picked (bmrBasis/applyBmrBasis, above) — TODAY's adaptation fraction held constant for
+  // the whole trip (currentAdaptationFraction), since the closed-form decay model needs a
+  // fixed A/B, not one that keeps shrinking as the trip goes on. A lower effective BMR
+  // means a smaller real deficit at the same intake, so t (and every date built from it)
+  // comes out LONGER under bmr_adp, not unchanged — adaptation slows the trip, it doesn't
+  // just relabel a box.
+  //
+  // aBmr/bBmr themselves are returned UN-discounted: adaptedPlateauKg reads them for its
+  // own, separate, BY-ARRIVAL adaptation question (how adapted BMR will be BY t, once t is
+  // known) — discounting them here too would double-count the same effect.
+  const basisFraction = currentAdaptationFraction();
+  const aBmrEff = aBmr * (1 - basisFraction);
+  const bBmrEff = bBmr * (1 - basisFraction);
+
   return {
-    a: aBmr / divisor,
-    b: (bBmr + activityPerKg) / divisor,
+    a: aBmrEff / divisor,
+    b: (bBmrEff + activityPerKg) / divisor,
     aBmr,
     bBmr,
     activityPerKg,

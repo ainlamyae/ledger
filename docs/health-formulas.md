@@ -67,6 +67,13 @@ activityEntryKcal(entry)  = entry.amount2                    if logged
 
 BMR (Mifflin-St Jeor)     = 10·kg + 6.25·cm − 5·age + (male ? +5 : −161)   default
 BMR (Katch-McArdle)       = 370 + 21.6·LBM(kg, cm, sex)                    if BMR_FORMULA=katch
+
+daysOnDiet(atDate)        = atDate − date of the first logged weigh-in, days, floored at 0
+λt(atDate)                = min(BMR_ADAPT_PCT_PER_WEEK/100 × daysOnDiet(atDate)/7,
+                                 BMR_ADAPT_PCT_CAP/100)
+BMR_adp(atDate)           = BMR × (1 − λt(atDate))
+applyBmrBasis(BMR,atDate) = BMR_adp(atDate)  if BMR_BASIS=bmr_adp, else BMR unchanged
+
 activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)
 getActivityTargetKcal(kg) = ACTIVITY_TARGET_FIXED_KCAL, if set, else activityTargetKcal(kg)
 getActivityTargetMin(kg)  = ACTIVITY_TARGET_FIXED_KCAL / metKcal(ACTIVITY_MET, kg, 1), if set and kg known

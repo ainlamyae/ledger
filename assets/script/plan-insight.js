@@ -8,7 +8,7 @@
 // target is a different proposition for someone averaging 1,300 than for someone
 // averaging 2,100.
 //
-// Computed from `Settings` plus the latest weigh-in, NOT from the playground's
+// Computed from `Settings` plus the latest body-mass reading, NOT from the playground's
 // input boxes — the modal may never have been opened this session, and the saved
 // values are what the app actually runs on. Every figure goes through the same
 // functions the playground and the charts use (calorieTargetDetail,
@@ -192,7 +192,7 @@ function planSubstitutedLines(p) {
   // plan runs on whichever PLAN INPUTS names (its value is what D, Ein, A and B below use).
   if (p.mifflinBmr !== null) lines.push(`BMR_mif (Mifflin-St Jeor): 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.mifflinBmr} kcal/day`);
   lines.push(`BMR_kat (Katch-McArdle, from lean mass): 370 + 21.6 × ${p.lbmKg} = ${p.katchBmr} kcal/day`);
-  if (p.calibratedBmr !== null) lines.push(`BMR_cal (calibrated — back-solved from logged intake/activity/weight change): ${p.calibratedBmr} kcal/day`);
+  if (p.calibratedBmr !== null) lines.push(`BMR_cal (calibrated — back-solved from logged intake/activity/body-mass change): ${p.calibratedBmr} kcal/day`);
 
   lines.push(`Ea (AEE): ${p.met} × ${p.bodyMassKg} × ${p.tau} × ${p.kappa} / 200 = ${p.activityKcal} kcal/day`);
 
@@ -264,13 +264,13 @@ function planSubstitutedLines(p) {
 // Which of the three rate plans is in force, in words — the pins are mutually exclusive, so
 // exactly one of these describes the sheet. It matters to the judgement, not just the
 // arithmetic: the same target intake is a different promise depending on whether it will be
-// recut at the next weigh-in, and how.
+// recut at the next body-mass reading, and how.
 function planRatePinDescription(p) {
   if (p.intakeIsPinned) return 'the daily intake is pinned, so the deficit shrinks as body mass drops';
   if (p.pinnedPct !== null) {
-    return `the fat-loss rate is pinned as a PERCENTAGE of body mass (${p.pinnedPct}%/week), so the kilograms per week and the intake are both recalculated at every weigh-in and the pace stays proportional`;
+    return `the fat-loss rate is pinned as a PERCENTAGE of body mass (${p.pinnedPct}%/week), so the kilograms per week and the intake are both recalculated at every body-mass reading and the pace stays proportional`;
   }
-  return 'the weekly fat-loss rate is pinned in kilograms, so the intake is recalculated at every weigh-in';
+  return 'the weekly fat-loss rate is pinned in kilograms, so the intake is recalculated at every body-mass reading';
 }
 
 function planInputLines(p) {
@@ -279,7 +279,7 @@ function planInputLines(p) {
     `sigma (sex): ${p.sex}`,
     `h (height): ${p.heightCm} cm`,
     `a (age): ${p.age} years${p.formula === 'katch' ? ' (unused — the Katch-McArdle BMR equation does not read age)' : ''}`,
-    `m (latest single weigh-in): ${p.rawBodyMassKg} kg`,
+    `m (latest single body-mass reading): ${p.rawBodyMassKg} kg`,
     `m_bar (L_p-day rolling average, L_p = ${bodyMassSmoothingDays()} days — the mass every figure below is evaluated at): ${p.bodyMassKg} kg`,
     `m_g (target body mass): ${p.targetKg} kg`,
     `MET (assumed activity intensity): ${p.met}`,
@@ -329,7 +329,7 @@ function formatPlanInsightPrompt(data) {
 
 const PLAN_INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing a fat-loss plan someone built for themselves, and the self-tracked logging that shows how they are actually doing against it. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given three things: THE PLAN (the published formulas the app uses — a BMR equation, either Mifflin-St Jeor or Katch-McArdle from lean mass, whichever PLAN INPUTS says is in force; the ACSM activity equation; an optional thermic-effect-of-food correction; an exponential body-mass decay model; and the Boer lean-body-mass equation. Body mass throughout is a 7-day rolling average, not a single weigh-in), PLAN INPUTS (the person's own numbers fed into them, plus which figure they hold fixed as body mass falls), WHAT THOSE INPUTS PRODUCE (the same arithmetic substituted, ending in a target daily intake Ein, a plateau body mass m_inf, an estimated number of days t to the target, and a daily protein band P_min-P_max scaled to lean mass), and RECENT LOGGING (their recent averages versus their targets and the preceding period, and their measured body-mass trajectory).
+You'll be given three things: THE PLAN (the published formulas the app uses — a BMR equation, either Mifflin-St Jeor or Katch-McArdle from lean mass, whichever PLAN INPUTS says is in force; the ACSM activity equation; an optional thermic-effect-of-food correction; an exponential body-mass decay model; and the Boer lean-body-mass equation. Body mass throughout is a 7-day rolling average, not a single body-mass reading), PLAN INPUTS (the person's own numbers fed into them, plus which figure they hold fixed as body mass falls), WHAT THOSE INPUTS PRODUCE (the same arithmetic substituted, ending in a target daily intake Ein, a plateau body mass m_inf, an estimated number of days t to the target, and a daily protein band P_min-P_max scaled to lean mass), and RECENT LOGGING (their recent averages versus their targets and the preceding period, and their measured body-mass trajectory).
 
 Your job is to judge whether this plan is FEASIBLE and SAFE for this person, and whether their logging shows it being followed. Reason about the actual numbers you were given — quote them.
 

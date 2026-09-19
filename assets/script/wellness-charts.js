@@ -187,7 +187,7 @@ function renderTodayGlanceCards(entries) {
 // Physical Activity / Sleep cards no longer carry mirror copies.
 function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalToday, sleepHoursToday) {
   const heightCm = getSetting('HEIGHT_CM', null);
-  // m, m_avg, BMI and m_d as stored in today's Mass cell (physique.js), read rather
+  // m, m_avg, BMI and m_d as stored in today's BMR cell (physique.js), read rather
   // than worked out; only a day saved before the column existed falls back to them.
   const stored = storedMassAsOf(isoFromDate(new Date()));
   const bodyMassKg = stored?.m ?? latestBodyMassKg(entries);
@@ -744,7 +744,7 @@ function renderWellnessBodyMassChart(entries) {
 
     const fatKcal = haveProfile ? fatEnergyKcal(kg, heightCm, age, sex) : null;
     // BMI needs only height, so it survives a profile missing birth date or sex.
-    // BMI and Δm (Changed Mass) as stored in the day's Mass cell (physique.js), read
+    // BMI and Δm (Changed Mass) as stored in the day's BMR cell (physique.js), read
     // rather than worked out; a day without one falls back to the calculation.
     const storedMass = storedMassByDay.get(d);
     const bmi = storedMass?.BMI ?? (heightCm !== null ? computeBmi(kg, heightCm) : null);

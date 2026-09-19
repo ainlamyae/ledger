@@ -234,7 +234,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // it moves toward the target, red when away.
   const changedEl = document.getElementById('today-status-changed-mass-value');
   changedEl.classList.remove('income', 'expense');
-  let changedGPerDay = stored?.m_d ?? null;
+  let changedGPerDay = massChangeGPerDay(stored);
   if (changedGPerDay === null) {
     const trendMap = computeBodyMassTrend(bodyMassByDateMap(
       entries.filter((e) => e.category === 'Body Mass' && e.amount !== null),
@@ -748,7 +748,7 @@ function renderWellnessBodyMassChart(entries) {
     // rather than worked out; a day without one falls back to the calculation.
     const storedMass = storedMassByDay.get(d);
     const bmi = storedMass?.BMI ?? (heightCm !== null ? computeBmi(kg, heightCm) : null);
-    const smoothedChangeGPerDay = storedMass?.m_d ?? trendSlopeByDate.get(d) ?? null;
+    const smoothedChangeGPerDay = massChangeGPerDay(storedMass) ?? trendSlopeByDate.get(d) ?? null;
     detailByDate.set(d, { delta, fatKcal, bmi, smoothedChangeGPerDay });
 
     values.push(kg);

@@ -327,11 +327,12 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
 
   // Δm — the daily body-mass change today's Balance implies (Balance ÷ ~7700 kcal/kg, the
   // fat-equivalent GENERIC_KCAL_PER_KG_FAT), shown against the plan's own expected fat-loss
-  // rate (WEEKLY_FAT_LOSS_KG spread over 7 days). Actual is a signed mass change (negative
-  // = losing); the target keeps the plan's stored sign (positive for a cut).
+  // rate (WEEKLY_FAT_LOSS_KG spread over 7 days). Both are signed mass changes (negative =
+  // losing), so WEEKLY_FAT_LOSS_KG — stored positive for a cut — is negated here the same
+  // way targetBalanceKcal negates it for D, its own deficit target.
   const dmActual = balanceKcal !== null ? Math.round((balanceKcal / GENERIC_KCAL_PER_KG_FAT) * 1000) : null;
   const weeklyFatLossKg = weeklyFatLossKgAt(planBodyMassKg(entries));
-  const dmTarget = weeklyFatLossKg !== null ? Math.round((weeklyFatLossKg / 7) * 1000) : null;
+  const dmTarget = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
   const dmText = dmActual !== null
     ? `${dmActual}${dmTarget !== null ? ` / ${dmTarget}` : ''} g`
     : '—';

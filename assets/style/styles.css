@@ -2184,6 +2184,16 @@ td .btn {
     margin: 0;
 }
 
+/* Finance's Cumulative Net Worth card, full width under its four cards like Health's
+   Progress card, about its height: just the line. */
+.finance-trend-card {
+    grid-column: 1 / -1;
+}
+
+.chart-box.chart-box-glance {
+    height: 6.5rem;
+}
+
 /* The time meter is a second, nested .body-mass-progress-meter directly under the
    body-mass one. Its track is drawn a touch lighter so the pair reads as
    "distance (primary) / time (secondary)" rather than two competing bars. */

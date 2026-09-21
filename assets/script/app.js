@@ -702,8 +702,8 @@ async function loadDashboard(forceRefresh = false) {
         settingsPromise.then(() => initTravel(forceRefresh)),
         initApplications(forceRefresh),
       ] : []),
-      // Both Health and Other have a Settings block.
-      ...((shows('health') || shows('other')) ? [initSettingsPanel(forceRefresh)] : []),
+      // Other's Settings block (saving a setting from anywhere loads it on its own).
+      ...(shows('other') ? [initSettingsPanel(forceRefresh)] : []),
     ];
 
     const results = await Promise.allSettled([

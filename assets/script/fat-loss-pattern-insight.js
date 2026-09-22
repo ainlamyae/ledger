@@ -101,7 +101,6 @@ function renderFatLossPatternPreview(data) {
       td.textContent = read(r);
       tr.appendChild(td);
     });
-    if (!r.loggedDays) tr.classList.add('row-empty');
     tbody.appendChild(tr);
   });
 }

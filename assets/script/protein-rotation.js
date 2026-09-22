@@ -207,7 +207,7 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
           display: rows.length > 0 && !hasData,
           text: ['No protein logged from a tracked', 'source in these 4 weeks'],
           color: Chart.defaults.color,
-          font: { size: 12 },
+          font: { size: chartFontSize() },
           padding: { top: 40 },
         },
         tooltip: {
@@ -285,7 +285,7 @@ function renderProteinRotationChart({ from, to }) {
           display: !hasData,
           text: 'No ingredients tracked yet — open Nutrition, edit an ingredient, and set its Protein %',
           color: Chart.defaults.color,
-          font: { size: 12 },
+          font: { size: chartFontSize() },
           padding: { top: 40 },
         },
         tooltip: {

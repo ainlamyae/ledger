@@ -353,13 +353,12 @@ function renderTimesheetList() {
     } }));
 
     tr.append(companyCell, dateCell, dayCell, startCell, endCell, breakCell, durationCell, taskCell, actionsCell);
-    if (weekend) tr.classList.add('timesheet-weekend');
-    else if (isHoliday) tr.classList.add('timesheet-holiday');
+    // A weekend and a holiday are the same thing to this table: a day off.
+    if (weekend || isHoliday) tr.classList.add('timesheet-off');
     else if (isNoEntry) tr.classList.add('timesheet-no-entry');
-    // Not part of that chain: today can also be a weekend or a holiday, and both
-    // marks are worth keeping. The green lands on the cells (.today-row > td) while
-    // weekend/holiday tint the row itself, so today's tint paints over theirs while
-    // their muted text colour survives.
+    // Not part of that chain: today can also be a day off, and both marks are worth
+    // keeping. The green lands on the cells (.today-row > td) while a day off tints
+    // the row itself, so today's tint paints over it while its muted text survives.
     if (e.date === todayIso) tr.classList.add('today-row');
     tbody.appendChild(tr);
   });

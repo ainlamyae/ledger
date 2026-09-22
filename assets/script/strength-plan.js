@@ -119,6 +119,39 @@ function applyWorkoutLines(lines) {
   if (messages.length) showFieldError('physique-form-error', messages.join(' '));
 }
 
+// The fast path (GYM's 📝): the same appended lines, priced the way the
+// form's Calculate prices them, saved straight to today's row with no form to
+// review. Undo writes the day back as it was (or clears a row this created).
+async function quickLogWorkoutLines(lines) {
+  const today = todaysPhysiqueDay();
+  const day = today
+    ? physiqueDayCopy(today)
+    : { cells: [], ...Object.fromEntries(PHYSIQUE_FIELDS.map(({ key, numeric }) => [key, numeric ? null : ''])),
+      date: isoFromDate(new Date()) };
+  const workout = [day.workout ?? '', ...lines].filter((part) => part.trim()).join('\n');
+
+  const bodyMassKg = day.bodyMass ?? physiqueBodyMassKgFromLog();
+  if (bodyMassKg === null) throw new Error('Log a body mass first: the burn is priced from it.');
+  const { text } = combineWorkoutText(workout);
+  const { minutes, calories, perLine } = estimateWorkoutActivity(text, bodyMassKg);
+  day.workout = [...perLine].sort((a, b) => b.calories - a.calories)
+    .map((line) => `${line.quantity} ${line.name}`).join('\n');
+  day.duration = minutes;
+  day.caloriesOut = calories;
+
+  if (today) await writePhysiqueRow(today.row, day);
+  else await appendPhysiqueRow(day);
+  await refreshPhysique(true);
+
+  // A row this created is undone to an empty workout rather than deleted.
+  const before = today ?? { ...day, workout: '', duration: null, caloriesOut: null };
+  const row = today?.row ?? todaysPhysiqueDay()?.row;
+  const what = lines.length === 1 ? lines[0].replace(/^\S+\s+/, '') : `${lines.length} activities`;
+  showUndoToast(`${what} logged to today.`, () => {
+    if (row) restorePhysiqueSnapshots([{ row, values: physiqueDayCopy(before) }]);
+  });
+}
+
 function logWorkout() {
   const logged = loggedWorkoutQuantities();
   const added = [...document.querySelectorAll('.workout-check:checked')]
@@ -177,9 +210,19 @@ function initWorkoutPlan() {
   // a button inside it would close the panel on the way to opening the modal.
   const instructionModal = document.getElementById('activity-instruction-modal');
   document.getElementById('activity-instruction-btn').addEventListener('click', () => {
+    // Opens on its group tiles, or straight onto a group when its address was loaded
+    // (…/gym/push-day/); a group is a page of its own under GYM's address.
+    const sub = takeInitialFormSub('gym');
+    guideGroupSlug = sub && guideGroupName(sub) !== null ? sub : null;
+    renderInstructionList();
     instructionModal.hidden = false;
   });
+  registerFormSubView('gym', showGuideGroup, guideGroupName);
+  document.getElementById('guide-log-btn').addEventListener('click', logGuideTicks);
+  // ❌ goes back one level: from a group's page to GYM's tiles, from the tiles
+  // out of GYM.
   document.getElementById('activity-instruction-close-btn').addEventListener('click', () => {
-    instructionModal.hidden = true;
+    if (guideGroupSlug !== null) showGuideGroup(null);
+    else instructionModal.hidden = true;
   });
 }

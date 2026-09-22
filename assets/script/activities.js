@@ -807,31 +807,112 @@ function instructionPrescription(activity) {
   return [activity.weight, prescription].filter(Boolean).join(' · ');
 }
 
-// The Instruction modal's list, grouped the same way. Figures come from the
-// sheet's Image column — the slug guessing and the hand-maintained list of
-// which movements were animated are both gone.
-function renderInstructionList() {
-  const body = document.getElementById('instruction-body');
-  body.innerHTML = '';
+// GYM: one tile per Group (Insight's tile style), and under them the chosen
+// group's activities — figure, name, muscle group, then load, sets x reps and rest.
+// Each group is a page of its own, …/activity/gym/<group>/ (registerFormSubView,
+// router.js); GYM's own address shows just the tiles. Figures come from the
+// sheet's Image column.
+let guideGroupSlug = null;
 
-  groupInOrder(sortActivitiesByRotation(allActivities).filter((a) => a.image), 'group').forEach((rows, group) => {
-    const heading = document.createElement('h3');
-    heading.textContent = group;
+function guideGroups() {
+  // The gym's: every strength activity (Sets x Reps, as the plan's strength tables
+  // tell them apart), pictured or not. NEAT and Cardio stay out.
+  return groupInOrder(sortActivitiesByRotation(allActivities).filter((a) => a.quantity.sets !== undefined), 'group');
+}
+
+// The group a page slug names, or null.
+function guideGroupName(slug) {
+  return [...guideGroups().keys()].find((g) => routeSlug(g) === slug) ?? null;
+}
+
+// Shows a group's page (or the tiles alone, for null) and puts it in the address.
+function showGuideGroup(slug) {
+  const groups = guideGroups();
+  const name = [...groups.keys()].find((g) => routeSlug(g) === slug) ?? null;
+  guideGroupSlug = name === null ? null : slug;
+  renderInstructionList();
+  if (!document.getElementById('activity-instruction-modal').hidden) {
+    setFormSubView(guideGroupSlug, name);
+  }
+}
+
+function renderInstructionList() {
+  const tiles = document.getElementById('instruction-groups');
+  const body = document.getElementById('instruction-body');
+  tiles.innerHTML = '';
+  body.innerHTML = '';
+  const groups = guideGroups();
+  // As Insight's modes: the tiles alone on GYM's page, a group's list alone on
+  // its own (the breadcrumb's GYM goes back to the tiles).
+  tiles.hidden = guideGroupSlug !== null;
+
+  groups.forEach((rows, group) => {
+    const slug = routeSlug(group);
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'page-tile';
+    tile.setAttribute('aria-pressed', String(slug === guideGroupSlug));
+    const title = document.createElement('span');
+    title.className = 'page-tile-title';
+    title.textContent = group;
+    tile.appendChild(title);
+    tile.addEventListener('click', () => showGuideGroup(slug));
+    tiles.appendChild(tile);
+  });
+
+  groups.forEach((rows, group) => {
+    if (routeSlug(group) !== guideGroupSlug) return;
 
     const list = document.createElement('ul');
     list.className = 'instruction-activities';
 
+    const logged = loggedWorkoutQuantities();
     rows.forEach((activity) => {
       const li = document.createElement('li');
+      // A tick in the figure's corner picks it for 📝 (logGuideTicks); a card already
+      // in today's workout is tinted instead, as the plan tables' rows are.
+      const isLogged = logged.has(activity.name);
+      li.classList.toggle('instruction-logged', isLogged);
+      const tick = document.createElement('input');
+      tick.type = 'checkbox';
+      tick.className = 'instruction-check';
+      tick.dataset.name = activity.name;
+      tick.disabled = isLogged;
+      tick.title = isLogged ? "Already in today's workout" : 'Tick to log with 📝';
+      tick.setAttribute('aria-label', `Log ${activity.name}`);
+      tick.addEventListener('change', updateGuideLogButton);
+      // ✏️ in the figure's other corner opens the activity's Edit page over this one;
+      // its ❌ comes back here.
+      const edit = makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (event) => {
+        event.stopPropagation();
+        routeRecordEdit('activity', { slug: routeSlug(activity.name), label: activity.name });
+        openActivityForm(activity);
+      } });
+      edit.classList.add('instruction-edit');
+      li.append(tick, edit);
+      // The whole card toggles its tick: one tap per activity at the gym.
+      li.addEventListener('click', (event) => {
+        if (event.target === tick || tick.disabled) return;
+        tick.checked = !tick.checked;
+        updateGuideLogButton();
+      });
 
-      const figure = document.createElement('img');
-      figure.className = 'instruction-figure';
-      figure.src = activity.image;
-      figure.alt = `${activity.name}, movement guide`;
-      figure.loading = 'lazy';
-      // An Image cell pointing at nothing leaves the label standing on its
-      // own, rather than a broken-image icon.
-      figure.addEventListener('error', () => figure.remove(), { once: true });
+      // No image (a blank cell, or a path that 404s) keeps the figure's box, empty,
+      // so every card in the grid stays the same height.
+      const blank = () => {
+        const box = document.createElement('div');
+        box.className = 'instruction-figure';
+        return box;
+      };
+      let figure = blank();
+      if (activity.image) {
+        figure = document.createElement('img');
+        figure.className = 'instruction-figure';
+        figure.src = activity.image;
+        figure.alt = `${activity.name}, movement guide`;
+        figure.loading = 'lazy';
+        figure.addEventListener('error', () => figure.replaceWith(blank()), { once: true });
+      }
 
       const label = document.createElement('span');
       label.className = 'instruction-activity-name';
@@ -844,11 +925,12 @@ function renderInstructionList() {
       // of it to do (load, sets/reps, rest — see instructionPrescription). A
       // line whose cell is blank on the sheet is skipped rather than printed
       // empty.
-      [activity.muscleGroup, instructionPrescription(activity)]
-        .filter(Boolean)
-        .forEach((text) => {
+      // The prescription is what's read mid-set, so it's in the text colour, not muted.
+      [[activity.muscleGroup, ''], [instructionPrescription(activity), ' instruction-activity-prescription']]
+        .filter(([text]) => text)
+        .forEach(([text, extra]) => {
           const meta = document.createElement('span');
-          meta.className = 'instruction-activity-meta';
+          meta.className = `instruction-activity-meta${extra}`;
           meta.textContent = text;
           li.appendChild(meta);
         });
@@ -856,6 +938,36 @@ function renderInstructionList() {
       list.appendChild(li);
     });
 
-    body.append(heading, list);
+    body.append(list);
   });
+  updateGuideLogButton();
+}
+
+// 📝 shows on a group's page and is live once something is ticked.
+function updateGuideLogButton() {
+  const btn = document.getElementById('guide-log-btn');
+  const ticked = document.querySelectorAll('#instruction-body .instruction-check:checked').length;
+  btn.hidden = guideGroupSlug === null;
+  btn.disabled = ticked === 0;
+  btn.title = ticked ? `Log ${ticked} ticked to today's workout` : 'Tick activities to log them';
+}
+
+// Saves the ticked activities straight into today's workout; the page stays put.
+async function logGuideTicks() {
+  const btn = document.getElementById('guide-log-btn');
+  const lines = [...document.querySelectorAll('#instruction-body .instruction-check:checked')]
+    .map((box) => activitiesByName.get(box.dataset.name.toLowerCase()))
+    .filter(Boolean)
+    .map((a) => `${workoutNoteQuantityForForm(a.unit, a.amount)} ${a.name}`);
+  if (!lines.length) return;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    await quickLogWorkoutLines(lines);
+  } catch (err) {
+    alert(`Not logged: ${err.message}`);
+  } finally {
+    btn.textContent = '📝';
+    renderInstructionList();
+  }
 }

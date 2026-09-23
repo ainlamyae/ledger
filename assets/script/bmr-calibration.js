@@ -264,7 +264,6 @@ function renderBmrCalibrationWeeks(weeks, tbodyId) {
       td.textContent = privacyMode ? maskDigits(text) : text;
       tr.appendChild(td);
     });
-    if (!w.eligibleCount) tr.classList.add('row-empty');
     tbody.appendChild(tr);
   });
 }

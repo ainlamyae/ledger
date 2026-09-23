@@ -246,8 +246,8 @@ function currentSolveFor() {
 // currently driving the solve is still the one you'd click into to switch
 // which one does — so it can't be truly readonly there, unlike everywhere
 // else a field is "computed". It's marked with this class instead, which
-// gets the same dashed/highlighted look .formula-row input:read-only does,
-// without blocking interaction.
+// marks it as computed without blocking interaction (it looks like every
+// other box).
 const FORMULA_DUAL_FIELD_IDS = ['formula-ein', 'formula-days', 'formula-eta'];
 
 function applySolveForMode(mode) {

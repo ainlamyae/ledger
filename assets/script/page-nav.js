@@ -36,6 +36,7 @@ function onPageLinkClick(event, sectionId, panel) {
 // the home page it goes to the form's address instead.
 const QUICK_ACTIONS = {
   health: [
+    { label: 'GYM', buttonId: 'activity-instruction-btn', href: () => 'activity/gym/' },
     { label: 'Today', buttonId: 'today-physique-btn', href: () => `physique/${isoFromDate(new Date())}/` },
   ],
 };
@@ -314,7 +315,11 @@ function updateFormCrumb(panel, steps) {
   steps.forEach((step, i) => {
     if (i < steps.length - 1 && panel) {
       const href = `${pageHref(section, panel)}${steps.slice(0, i + 1).map((s) => `${s.slug}/`).join('')}`;
-      crumb.append(separator(), link(step.label, href, () => openFormStep(panel, step)));
+      // A form's own top level (GYM above one of its groups) goes back to it in place.
+      const onClick = step.view
+        ? () => formSubViews.get(step.slug)?.show(null)
+        : () => openFormStep(panel, step);
+      crumb.append(separator(), link(step.label, href, onClick));
       return;
     }
     const current = document.createElement('span');
@@ -334,7 +339,7 @@ function updateFormCrumb(panel, steps) {
 // right.
 const SELECTION_BAR_IDS = ['physique-bulk-actions', 'nutrition-bulk-actions', 'tx-bulk-actions', 'contacts-bulk-actions'];
 
-// A block's header buttons (Physique's Export CSV / Today / Log, Activity's Guide /
+// A block's header buttons (Physique's Export CSV / Today / Log, Activity's GYM /
 // Log / Add, …) gathered into one group that ends in ❌, so every page has the same
 // way out in the same place: top right of the header on a wide screen, the right
 // end of the bottom bar on a phone. A block with no buttons (Indicator) gets the

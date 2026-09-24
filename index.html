@@ -89,6 +89,7 @@
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
                 <button id="theme-toggle-btn" class="account-menu-item">Switch to dark mode</button>
                 <button id="privacy-toggle-btn" class="account-menu-item" hidden>Hide amounts</button>
+                <button id="widgets-toggle-btn" class="account-menu-item" hidden title="Show or hide the Time/Date/Azan/Weather row">Hide widgets</button>
                 <button id="signout-btn" class="account-menu-item account-menu-item-divider">Sign out</button>
             </div>
         </div>
@@ -375,6 +376,24 @@
                 </div>
 
                 <div class="donut-legend" id="protein-rotation-legend"></div>
+            </div>
+
+            <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
+                 (sessions done vs. desired per Group this window) and one rotational
+                 donut (reference weekly split, last 4 weeks, last week). -->
+            <div class="body-mass-projection-wrap">
+                <h4>Activity Rotation</h4>
+
+                <div class="protein-rotation-charts">
+                    <div class="chart-box">
+                        <canvas id="activity-rotation-chart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="activity-rotation-donut"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-legend" id="activity-rotation-legend"></div>
             </div>
         </div>
 
@@ -2123,9 +2142,12 @@
         <h2 id="activity-modal-title">Add Activity</h2>
 
         <form id="activity-form" class="app-form">
+            <label>Category
+                <input type="text" id="activity-category" list="activity-category-options" required placeholder="e.g. Strength, Cardio, NEAT">
+            </label>
             <div class="form-row">
-                <label>Category
-                    <input type="text" id="activity-category" list="activity-category-options" required placeholder="e.g. Strength, Cardio, NEAT">
+                <label>Weekly Target
+                    <input type="text" id="activity-weekly-target" placeholder="optional — sessions/week this Group should hit, e.g. 7 for NEAT — same on every row of the Group, leave blank to exclude from Activity Rotation">
                 </label>
                 <label>Group
                     <input type="text" id="activity-group" list="activity-group-options" required placeholder="e.g. Push, Pull, Legs">
@@ -2451,6 +2473,7 @@
 <script src="assets/script/formula-render.js"></script>
 <script src="assets/script/formula-playground.js"></script>
 <script src="assets/script/protein-rotation.js"></script>
+<script src="assets/script/activity-rotation.js"></script>
 <script src="assets/script/financial-insight.js"></script>
 <script src="assets/script/gate.js"></script>
 <script src="assets/script/app.js"></script>

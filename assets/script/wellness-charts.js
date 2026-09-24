@@ -620,6 +620,11 @@ function renderWellnessBodyMassChart(entries) {
   // here for the gray reference line, the yellow zone, and the Muscle Loss red zone.
   // Requires a full profile (height/age/sex) for BMR; omitted otherwise.
   const calorieTrendMap = new Map();
+  // Each day's OWN balance-implied change, in grams — the exact figure the Status card's
+  // Δm computes for today, kept per-date here so the hover's Calorie Trend Slope can read
+  // it directly instead of diffing two calorieTrendMap points (see the comment where this
+  // is filled in below for why that diff is off by a day).
+  const calorieDayBalanceGPerDay = new Map();
   if (haveProfile) {
     const sortedWeighInDates = [...byDate.keys()].sort();
     if (sortedWeighInDates.length >= 1) {
@@ -650,6 +655,13 @@ function renderWellnessBodyMassChart(entries) {
       const cSleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
       let running = byDate.get(sortedWeighInDates[0]);
       calorieTrendDates.forEach((d) => {
+        // Plotted BEFORE this day's own balance is folded in — calorieTrendMap.get(d) is
+        // the trajectory as of the START of d (last night's number), and d's own balance
+        // only shows up in TOMORROW's point. Reading two consecutive points back out of
+        // calorieTrendMap to get "today's slope" would therefore actually read YESTERDAY's
+        // balance instead — calorieDayBalanceGPerDay below is captured right here, the one
+        // place that balance actually exists per day, so the hover's slope line can't get
+        // the date shifted by one the way a naive point-to-point diff did.
         calorieTrendMap.set(d, running);
         if (!cIntakeByDate.has(d)) return;
         const intake = cIntakeByDate.get(d);
@@ -657,6 +669,7 @@ function renderWellnessBodyMassChart(entries) {
         const activity = cActivityKcalByDate.get(d) || 0;
         const tef = cTefByDate.has(d) ? cTefByDate.get(d) : intake * (1 - tefDivisor());
         const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, cSleepHoursByDate.get(d), cSleepTarget);
+        calorieDayBalanceGPerDay.set(d, Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000));
         running += balance / GENERIC_KCAL_PER_KG_FAT;
       });
     }
@@ -863,13 +876,50 @@ function renderWellnessBodyMassChart(entries) {
               if (d.bmi !== null && d.bmi !== undefined) lines.push(`BMI (Body Mass Index): ${d.bmi} kg/m²`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // Flush left and last, like every reference figure in the section. Rate
-            // only; the rows above already run to seven. Absent on a week with no slope.
+            // Flush left and last, like every reference figure in the section. One fact
+            // per line, same rule every other row in this tooltip already follows (the
+            // label callback's own Body Mass/Changed Mass/BMI rows never combine two
+            // figures on one line either) — value and slope are two separate lines, not
+            // one line with the slope parenthesized after the value.
+            //
+            // The gray line (renamed "Calorie Trend" for the hover — "Calorie-Implied
+            // Trajectory" is the chart's own internal/legend name) is filtered out of the
+            // item rows above (isStateTrendOverlay), same as every other overlay line, so
+            // its own value/slope never showed anywhere in the hover — added here instead,
+            // right above 7-Day Trend so the two rates read together. calorieTrendMap
+            // already holds its value per date.
+            //
+            // Slope is that day's OWN balance-implied change (calorieDayBalanceGPerDay,
+            // captured while the trajectory is built above), not a diff between two
+            // calorieTrendMap points — calorieTrendMap.get(d) is the trajectory as of the
+            // START of d, so a naive point-to-point diff actually reads the PRIOR day's
+            // balance (the one that moved d-1's point to d's), landing one day off from
+            // what the number was labeled as. Reading the captured balance directly is
+            // also exactly the Status card's own Δm arithmetic for today, so the two can't
+            // disagree the way a diffed or averaged figure could.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
-              if (i === undefined || slopePerWeek[i] === null) return '';
-              const text = `7-Day Trend: ${withExplicitSign(Math.round(slopePerWeek[i] * 100) / 100)} kg/week`;
-              return privacyMode ? maskDigits(text) : text;
+              if (i === undefined) return [];
+              const d = items[0].label;
+              const lines = [];
+
+              const trajectoryKg = calorieTrendMap.get(d);
+              if (trajectoryKg !== undefined) {
+                lines.push(`Calorie Trend: ${Math.round(trajectoryKg * 100) / 100} kg`);
+                const slopeGPerDay = calorieDayBalanceGPerDay.get(d);
+                if (slopeGPerDay !== undefined) {
+                  // g/day, not kg/week — same unit Δm (Changed Mass) above uses, so the
+                  // two rates read on the same scale instead of forcing a unit conversion
+                  // to compare them.
+                  lines.push(`Calorie Trend Slope: ${withExplicitSign(slopeGPerDay)} g/day`);
+                }
+              }
+
+              if (slopePerWeek[i] !== null) {
+                lines.push(`7-Day Trend: ${withExplicitSign(Math.round(slopePerWeek[i] * 100) / 100)} kg/week`);
+              }
+
+              return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
         },

@@ -834,6 +834,17 @@ kbd {
     display: none;
 }
 
+/* The "Hide widgets" preference, applied before the row itself even exists in
+   the DOM — index.html's early head script reads the cached SHOW_WIDGETS
+   setting straight out of localStorage (synchronously, before first paint)
+   and stamps this attribute on <html>, same trick as its dark-mode data-theme
+   above it. Without it the row always painted visible for one frame (its
+   default state) and only got hidden once app.js's own settings fetch
+   resolved — a flash on every refresh for anyone who'd turned it off. */
+html[data-widgets-pref="hidden"] .widget-cards {
+    display: none;
+}
+
 .panel-group-title {
     margin: 0 0 .25rem;
     text-align: center;
@@ -1838,6 +1849,13 @@ td .btn {
     gap: 0 .6rem;
 }
 
+/* Three short fields on one line instead of two — same minmax(0, 1fr) floor,
+   just one more track. Falls back to .form-row's own single-column override
+   below 420px like every other row. */
+.form-row-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 /* Same reason: a grid item's own auto minimum would re-introduce the floor
    minmax(0, …) just removed. */
 .form-row > label {
@@ -1931,6 +1949,31 @@ td .btn {
     display: flex !important;
     align-items: center;
     gap: .5rem;
+}
+
+/* Transfer Funds' From/To selects, each with its account's current balance
+   read off right beside it. The select shrinks to its own content instead of
+   the app-wide `.app-form select { width: 100% }` — full-width here stretched
+   the select across the whole 900px modal card and stranded the balance far
+   off to the right of the actual account name, a wide dead gap between the
+   two that read as broken rather than as one field. */
+.select-with-balance {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.select-with-balance select {
+    width: auto;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.field-balance {
+    flex: 0 0 auto;
+    font-size: .85rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
 }
 
 .checkbox-inline-label input[type="checkbox"] {

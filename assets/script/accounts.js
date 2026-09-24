@@ -403,8 +403,27 @@ function openTransferForm() {
   document.getElementById('transfer-amount').value = '';
   document.getElementById('transfer-amount').disabled = false;
   document.getElementById('transfer-payoff').checked = false;
+  syncTransferBalances();
   clearFieldError('transfer-form-error');
   document.getElementById('transfer-modal').hidden = false;
+}
+
+// The From/To selects' own current balance, read off to the right of each —
+// same account list the selects themselves are populated from, so it can
+// never name a balance for an account that isn't actually selectable.
+// balanceText (a closed/non-numeric account, e.g. "Closed") is shown as-is,
+// same convention the Account tab's own balance column uses.
+function accountBalanceLabel(name) {
+  const account = allAccounts.find((a) => a.name === name);
+  if (!account) return '';
+  return account.balanceText !== null ? account.balanceText : formatCurrency(account.balance);
+}
+
+function syncTransferBalances() {
+  document.getElementById('transfer-from-balance').textContent =
+    accountBalanceLabel(document.getElementById('transfer-from').value);
+  document.getElementById('transfer-to-balance').textContent =
+    accountBalanceLabel(document.getElementById('transfer-to').value);
 }
 
 function closeTransferForm() {
@@ -417,6 +436,8 @@ function closeTransferForm() {
 // Also re-run on From/To changes, so flipping either after ticking the box
 // doesn't leave a stale figure on screen.
 function syncTransferPayoff() {
+  syncTransferBalances();
+
   const amountBox = document.getElementById('transfer-amount');
   const checked = document.getElementById('transfer-payoff').checked;
 

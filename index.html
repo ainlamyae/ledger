@@ -38,6 +38,22 @@
     // same page by default — always start at the top instead, since panels
     // are collapsed/re-rendered fresh on every load anyway.
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    // Same reasoning as the theme check above, for the "Hide widgets" toggle
+    // (app.js's applyWidgetsVisibility/SHOW_WIDGETS): the row's real hidden
+    // state isn't known until the Settings tab is fetched, long after this
+    // page has already painted it visible — so it flashed on every refresh
+    // for anyone who'd turned it off. Reading the cached copy of that setting
+    // straight out of localStorage here, before first paint, lets styles.css
+    // start the row hidden immediately instead of hiding it a moment later.
+    // A stale/missing cache just falls back to the row's default (visible),
+    // same as app.js's own getSetting('SHOW_WIDGETS', 1) fallback — the real
+    // fetch still corrects it either way once settings load for real.
+    try {
+        var cachedSettings = JSON.parse(localStorage.getItem('ledger_cache_settings') || 'null');
+        if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_WIDGETS) === 0) {
+            document.documentElement.setAttribute('data-widgets-pref', 'hidden');
+        }
+    } catch (e) {}
 </script>
 <script>
     // App-shell offline support (sw.js) — never the live sheet data, just the
@@ -1133,11 +1149,11 @@
                 <select id="tx-account" required></select>
             </label>
             <label>Payee
-                <input type="text" id="tx-payee" list="tx-payee-options" required>
+                <input type="text" id="tx-payee" list="tx-payee-options">
                 <datalist id="tx-payee-options"></datalist>
             </label>
             <label>Category
-                <input type="text" id="tx-category" list="tx-category-options" required>
+                <input type="text" id="tx-category" list="tx-category-options">
                 <datalist id="tx-category-options"></datalist>
             </label>
             <label>Description
@@ -1145,7 +1161,7 @@
                 <datalist id="tx-description-options"></datalist>
             </label>
             <label>Amount
-                <input type="text" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2" required>
+                <input type="text" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2">
             </label>
 
             <!-- Directly under Amount, because the amount is what it moves: the
@@ -1221,7 +1237,7 @@
 
         <form id="breakdown-form" class="app-form">
             <label>Category
-                <input type="text" id="breakdown-category" list="breakdown-category-options" required>
+                <input type="text" id="breakdown-category" list="breakdown-category-options">
                 <datalist id="breakdown-category-options"></datalist>
             </label>
             <label>Type
@@ -1248,13 +1264,13 @@
 
         <form id="account-form" class="app-form">
             <label>Account Name
-                <input type="text" id="account-name" required>
+                <input type="text" id="account-name">
             </label>
             <label>Institution
                 <input type="text" id="account-institution">
             </label>
             <label>Type
-                <input type="text" id="account-type" list="account-type-options" required>
+                <input type="text" id="account-type" list="account-type-options">
                 <datalist id="account-type-options">
                     <option>Cash</option>
                     <option>Chequing</option>
@@ -1270,7 +1286,7 @@
                 </datalist>
             </label>
             <label>Balance
-                <input type="text" id="account-balance" placeholder="e.g. 1234.56 or =5000-1234.56" required>
+                <input type="text" id="account-balance" placeholder="e.g. 1234.56 or =5000-1234.56">
             </label>
             <label>Market Value
                 <input type="text" id="account-current-value" placeholder="optional — today's cash-out value, if different from Balance">
@@ -1292,13 +1308,19 @@
 
         <form id="transfer-form" class="app-form">
             <label>From
-                <select id="transfer-from" required></select>
+                <div class="select-with-balance">
+                    <select id="transfer-from"></select>
+                    <span id="transfer-from-balance" class="field-balance"></span>
+                </div>
             </label>
             <label>To
-                <select id="transfer-to" required></select>
+                <div class="select-with-balance">
+                    <select id="transfer-to"></select>
+                    <span id="transfer-to-balance" class="field-balance"></span>
+                </div>
             </label>
             <label>Amount
-                <input type="text" id="transfer-amount" placeholder="e.g. 500 or =1234.56-34.56" required>
+                <input type="text" id="transfer-amount" placeholder="e.g. 500 or =1234.56-34.56">
             </label>
 
             <label class="checkbox-inline-label" id="transfer-payoff-label" title="Sets Amount to whatever brings the To account's balance to zero">
@@ -1322,7 +1344,7 @@
 
         <form id="setting-form" class="app-form">
             <label>Key
-                <input type="text" id="setting-key" list="setting-key-options" required>
+                <input type="text" id="setting-key" list="setting-key-options">
                 <datalist id="setting-key-options">
                     <option>BODY_MASS_TARGET_KG</option>
                     <option>CALORIE_TARGET_KCAL</option>
@@ -1376,7 +1398,7 @@
             </label>
             <datalist id="timesheet-company-options"></datalist>
             <label>Date
-                <input type="date" id="timesheet-date" required>
+                <input type="date" id="timesheet-date">
             </label>
             <label class="checkbox-inline-label">
                 <input type="checkbox" id="timesheet-holiday">
@@ -1420,7 +1442,7 @@
             </label>
             <div class="form-row">
                 <label>Date
-                    <input type="date" id="physique-date" required>
+                    <input type="date" id="physique-date">
                 </label>
                 <label>Body Mass
                     <input type="text" id="physique-body-mass" placeholder="e.g. 94 (kg)">
@@ -2142,23 +2164,26 @@
         <h2 id="activity-modal-title">Add Activity</h2>
 
         <form id="activity-form" class="app-form">
-            <label>Category
-                <input type="text" id="activity-category" list="activity-category-options" required placeholder="e.g. Strength, Cardio, NEAT">
-            </label>
-            <div class="form-row">
+            <div class="form-row form-row-3">
+                <label>Category
+                    <input type="text" id="activity-category" list="activity-category-options" placeholder="e.g. Strength, Cardio, NEAT">
+                </label>
                 <label>Weekly Target
                     <input type="text" id="activity-weekly-target" placeholder="optional — sessions/week this Group should hit, e.g. 7 for NEAT — same on every row of the Group, leave blank to exclude from Activity Rotation">
                 </label>
                 <label>Group
-                    <input type="text" id="activity-group" list="activity-group-options" required placeholder="e.g. Push, Pull, Legs">
+                    <input type="text" id="activity-group" list="activity-group-options" placeholder="e.g. Push, Pull, Legs">
                 </label>
             </div>
             <datalist id="activity-category-options"></datalist>
             <datalist id="activity-group-options"></datalist>
             <label>Name
-                <input type="text" id="activity-name" required placeholder="e.g. Seated Row machine">
+                <input type="text" id="activity-name" placeholder="e.g. Seated Row machine">
             </label>
             <div class="form-row">
+                <label>Muscle Group
+                    <input type="text" id="activity-muscle-group" list="activity-muscle-group-options" placeholder="e.g. Back, Chest, Core">
+                </label>
                 <label>Unit
                     <select id="activity-unit">
                         <option value="x">x — reps</option>
@@ -2166,9 +2191,6 @@
                         <option value="step">step — step count</option>
                         <option value="min">min — fixed duration</option>
                     </select>
-                </label>
-                <label>Muscle Group
-                    <input type="text" id="activity-muscle-group" list="activity-muscle-group-options" placeholder="e.g. Back, Chest, Core">
                 </label>
             </div>
             <datalist id="activity-muscle-group-options"></datalist>
@@ -2213,16 +2235,16 @@
             </label>
             <datalist id="nutrition-classification-options"></datalist>
             <label>Name
-                <input type="text" id="nutrition-name" required>
+                <input type="text" id="nutrition-name">
             </label>
             <label>Amount
                 <input type="text" id="nutrition-amount" placeholder="e.g. 1 scoop (32g), or 1 rice cake">
             </label>
             <label>Calories (kcal)
-                <input type="text" id="nutrition-calories" required>
+                <input type="text" id="nutrition-calories">
             </label>
             <label>Protein (g)
-                <input type="text" id="nutrition-protein" required>
+                <input type="text" id="nutrition-protein">
             </label>
             <label>Dietary Fiber (g)
                 <input type="text" id="nutrition-fiber" placeholder="optional — pre-filled from 🧬 Micronutrients when pulled">
@@ -2346,13 +2368,13 @@
 
         <form id="travel-form" class="app-form">
             <label>Country, City
-                <input type="text" id="travel-country-city" placeholder="e.g. Canada, Toronto" required>
+                <input type="text" id="travel-country-city" placeholder="e.g. Canada, Toronto">
             </label>
             <label>Port
                 <input type="text" id="travel-port" placeholder="e.g. Pearson International Airport (YYZ)">
             </label>
             <label>Type
-                <select id="travel-type" required>
+                <select id="travel-type">
                     <option value="">— Select —</option>
                     <option value="Departure">Departure</option>
                     <option value="Arival">Arrival</option>
@@ -2362,7 +2384,7 @@
                 <input type="text" id="travel-via" placeholder="e.g. Flight, Bus">
             </label>
             <label>Date
-                <input type="date" id="travel-date" required>
+                <input type="date" id="travel-date">
             </label>
             <label>Time
                 <input type="time" id="travel-time">
@@ -2390,16 +2412,16 @@
 
         <form id="application-form" class="app-form">
             <label>Type
-                <input type="text" id="application-type" placeholder="e.g. Visa 6, Work Permit" required>
+                <input type="text" id="application-type" placeholder="e.g. Visa 6, Work Permit">
             </label>
             <label>App Number
-                <input type="text" id="application-number" required>
+                <input type="text" id="application-number">
             </label>
             <label>Submitted Date
-                <input type="date" id="application-date" required>
+                <input type="date" id="application-date">
             </label>
             <label>Action
-                <input type="text" id="application-action" value="Submited" required>
+                <input type="text" id="application-action" value="Submited">
             </label>
 
             <p class="hint">Delay and status updates are calculated/tracked directly in the Sheet as the application progresses.</p>

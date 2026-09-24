@@ -400,6 +400,7 @@ function initWellnessRangeControl() {
   initDateRangeControl('wellness-date-from', 'wellness-date-to', WELLNESS_METRICS_DAYS, () => {
     renderWellnessCharts(physiqueAsWellnessEntries());
     renderProteinRotationChart(wellnessDateRange());
+    renderActivityRotationChart(wellnessDateRange());
   });
 }
 

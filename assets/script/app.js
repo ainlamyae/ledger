@@ -10,6 +10,11 @@ const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', curr
 // the dashboard somewhere it can be seen over your shoulder).
 let privacyMode = false;
 
+// The Time/Date/Azan/Weather "bulb" row (widgets.js) is shown by default;
+// clicking "Hide widgets" hides the whole row, same SHOW_WIDGETS-setting
+// pattern as privacyMode/SHOW_AMOUNTS above.
+let widgetsVisible = true;
+
 // Replaces every digit with '*', so masked values keep their currency
 // symbol, sign, and separators (e.g. "$1,234.56" -> "$*,***.**").
 function maskDigits(str) {
@@ -599,6 +604,10 @@ async function loadDashboard(forceRefresh = false) {
     // this survives a refresh instead of always starting shown.
     privacyMode = getSetting('SHOW_AMOUNTS', 1) === 0;
     updatePrivacyButtonUI();
+    // Same 0/1 convention as SHOW_AMOUNTS, just for the bulb row.
+    widgetsVisible = getSetting('SHOW_WIDGETS', 1) !== 0;
+    updateWidgetsButtonUI();
+    applyWidgetsVisibility();
     applySettingsToWidgets();
   });
 
@@ -658,6 +667,12 @@ async function loadDashboard(forceRefresh = false) {
     // rather than off just one of them like the two panels above.
     Promise.all([physiquePromise, nutritionPromise]).then(() => {
       renderProteinRotationChart(wellnessDateRange());
+    }),
+    // Activity Rotation needs Physique (logged Workout notes) and Activities
+    // (each exercise's Group and Weekly Target) both loaded — same
+    // refresh-once-both-are-in reasoning as Protein Source Rotation above.
+    Promise.all([physiquePromise, activitiesPromise]).then(() => {
+      renderActivityRotationChart(wellnessDateRange());
     }),
     initContacts(forceRefresh),
     // Its own read of the Breakdown tab rather than a share of loadReport's: that
@@ -793,6 +808,39 @@ function setupPrivacyToggle() {
   });
 }
 
+// Reflects the current widgetsVisible on the menu item's label — same
+// standalone-from-setup shape as updatePrivacyButtonUI, so loadDashboard's
+// SHOW_WIDGETS read can call it too.
+function updateWidgetsButtonUI() {
+  const btn = document.getElementById('widgets-toggle-btn');
+  btn.textContent = widgetsVisible ? 'Hide widgets' : 'Show widgets';
+}
+
+// Shows/hides the Time/Date/Azan/Weather row per widgetsVisible. Section pages
+// (/health/, /finance/, /other/) hide that row themselves — see
+// section-page.js's showOnly — and want it hidden regardless of this setting,
+// so this leaves it alone there rather than fighting that call.
+function applyWidgetsVisibility() {
+  if (window.ledgerSectionPage) return;
+  document.querySelectorAll('#dashboard .widget-cards').forEach((row) => {
+    row.hidden = !widgetsVisible;
+  });
+}
+
+function setupWidgetsToggle() {
+  updateWidgetsButtonUI();
+
+  document.getElementById('widgets-toggle-btn').addEventListener('click', () => {
+    widgetsVisible = !widgetsVisible;
+    updateWidgetsButtonUI();
+    applyWidgetsVisibility();
+    // Same best-effort persistence as SHOW_AMOUNTS above.
+    saveSettingValues({ SHOW_WIDGETS: widgetsVisible ? 1 : 0 }).catch((err) => {
+      console.error('Failed to save SHOW_WIDGETS setting:', err);
+    });
+  });
+}
+
 function setupScrollSpy() {
   const navLinks = [...document.querySelectorAll('#main-nav a')];
 
@@ -914,12 +962,14 @@ function bootDashboard() {
   // chart reads, and its first render is one of the readers.
   initWellnessRangeControl();
   initProteinRotationPanel();
+  initActivityRotationPanel();
   initFinancialInsight();
   initWorkoutPlan();
   setupScrollSpy();
   setupPanelToggles();
   setupThemeToggle();
   setupPrivacyToggle();
+  setupWidgetsToggle();
   setupKeyboardShortcuts();
   applyChartTheme();
   initWidgets();

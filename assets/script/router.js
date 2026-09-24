@@ -540,6 +540,8 @@ function initRouter() {
   if (button) {
     // A view or a form gets a history step over the block's.
     if ('routeView' in button.dataset) {
+      // The view's page now, not the block's tiles until the data loads.
+      panel.dataset.insightMode = button.dataset.route;
       history.pushState({ ledgerPage: true }, '', routeUrl(panel, [buttonStep(button)]));
       document.title = routeTitle(panel, [buttonStep(button)]);
     } else {

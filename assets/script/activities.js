@@ -314,46 +314,6 @@ function makeActivityTable(group, rows, columnVisibility) {
   return table;
 }
 
-// Each table sizes to its own content independently (table-layout: auto, no
-// fixed table width — see .workout-table-strength/.workout-table-neat in
-// styles.css), so on its own a short table (Bodyweight Day) computes
-// different column widths than a long one (Push Day) and the stacked tables
-// stop lining up. This measures every table's own natural per-column width
-// AFTER they've all rendered, takes the max across the tables that share a
-// shape (strength tables together, NEAT+Cardio together — they no longer
-// have the same column count as each other), and pins every table in that
-// group to those widths via a <colgroup>. Alignment then comes from the
-// widest real value in the group, not a guessed pixel constant.
-function syncActivityPlanColumnWidths() {
-  ['.workout-table-strength', '.workout-table-neat'].forEach((selector) => {
-    const tables = [...document.querySelectorAll(`#workout-plan-panel ${selector}`)];
-    if (tables.length < 2) return;
-
-    const columnCount = tables[0].tHead.rows[0].cells.length;
-    const maxWidths = Array(columnCount).fill(0);
-
-    tables.forEach((table) => {
-      [...table.tHead.rows[0].cells].forEach((th, i) => {
-        maxWidths[i] = Math.max(maxWidths[i], th.getBoundingClientRect().width);
-      });
-    });
-
-    tables.forEach((table) => {
-      let colgroup = table.querySelector('colgroup');
-      if (!colgroup) {
-        colgroup = document.createElement('colgroup');
-        table.insertBefore(colgroup, table.firstChild);
-      }
-      colgroup.innerHTML = '';
-      maxWidths.forEach((w) => {
-        const col = document.createElement('col');
-        col.style.setProperty('--col-width', `${Math.ceil(w)}px`);
-        colgroup.appendChild(col);
-      });
-    });
-  });
-}
-
 // Sort activities by rotation completion: least done (biggest gap) first.
 // Groups with no Weekly Target (untracked) fall to the end in sheet order.
 // Shared by the plan tables and the Instructions modal.
@@ -415,7 +375,6 @@ function renderActivityPlanTables() {
   // with them — put them back. Matters most after an edit here: the plan
   // shouldn't look like nothing was logged just because a row was renamed.
   renderWorkoutPlanProgress();
-  syncActivityPlanColumnWidths();
 }
 
 // --- Add / Edit / Duplicate / Delete --------------------------------------

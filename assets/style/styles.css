@@ -98,6 +98,13 @@ textarea {
     --chart-ring-lightness: 42%;
 }
 
+/* iOS Safari zooms into any field under 16px on tap. */
+@media (pointer: coarse) {
+    :root {
+        --input-font-size: 16px;
+    }
+}
+
 :root[data-theme="dark"] {
     color-scheme: dark;
     --color-nav: #0b1524;
@@ -1002,6 +1009,25 @@ td:has(.btn) {
 #insight-food-table tr.insight-food-total-row td {
     font-weight: 600;
     border-top: 2px solid var(--color-nav);
+}
+
+/* The same line under the header row of Physique's, Nutrition's, Pattern's,
+   Transaction's, Account's, Breakdown's, Work Time's, Car Service's, Travel's,
+   Contact's and Settings' tables and both Physique breakdowns. */
+.car-service-table thead th,
+#travel-table thead th,
+#contacts-table thead th,
+#settings-table thead th,
+#timesheet-table thead th,
+#transactions-table thead th,
+#accounts-table thead th,
+#breakdown-table thead th,
+#physique-table thead th,
+#nutrition-table thead th,
+#insight-pattern-table thead th,
+#physique-calc-breakdown thead th,
+#physique-activity-breakdown thead th {
+    border-bottom: 2px solid var(--color-nav);
 }
 
 /* One line per week in the Physique table (renderPhysiqueList, physique.js),
@@ -1950,7 +1976,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
    Chrome keeps its calendar icon). Desktop never showed this — a ~410px column
    is wider than the native width, so there was nothing to overflow. */
 .app-form input[type="date"],
-.app-form input[type="time"] {
+.app-form input[type="time"],
+.export-date-range input[type="date"] {
     -webkit-appearance: none;
     appearance: none;
     width: 100%;
@@ -2481,6 +2508,7 @@ html.home-hub .page-tiles,
 
 .export-date-range label {
     flex: 1;
+    min-width: 0;
 }
 
 .export-filter-row {
@@ -2506,10 +2534,6 @@ html.home-hub .page-tiles,
 
 #export-add-filter-btn {
     margin-bottom: var(--space-l);
-}
-
-.export-summary-text {
-    margin-top: var(--space-l);
 }
 
 @media (max-width: 800px) {
@@ -2681,7 +2705,7 @@ html.home-hub .page-tiles,
     }
 
     .export-date-range {
-        gap: var(--space-s);
+        gap: var(--space-l);
     }
 
     .location-picker-dropdown {

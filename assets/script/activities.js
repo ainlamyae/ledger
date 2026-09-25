@@ -60,6 +60,7 @@ async function initActivities(forceRefresh = false) {
     activityListenersAttached = true;
     document.getElementById('add-activity-btn').addEventListener('click', () => openActivityForm(null));
     document.getElementById('activity-cancel-btn').addEventListener('click', closeActivityForm);
+    document.getElementById('activity-log-btn').addEventListener('click', logActivityFromForm);
     onFormSubmit('activity-form', submitActivityForm);
     // Live, not just on open — pasting a new path should preview it before Save,
     // same as the Instruction modal's own figures do once saved.
@@ -420,8 +421,56 @@ function openActivityForm(activity, duplicate = false) {
   renderActivityDatalist('activity-group-options', 'group');
   renderActivityDatalist('activity-muscle-group-options', 'muscleGroup');
 
+  updateActivityLogButtonLabel();
   clearFieldError('activity-form-error');
   document.getElementById('activity-modal').hidden = false;
+}
+
+// Same Log/Log More toggle logWorkout's own button uses (strength-plan.js) —
+// "Log More" once anything is already in today's workout, regardless of
+// whether it's this particular activity, since that's the button it stands in for.
+function updateActivityLogButtonLabel() {
+  const btn = document.getElementById('activity-log-btn');
+  const hasToday = loggedWorkoutQuantities().size > 0;
+  btn.textContent = hasToday ? 'Log More' : 'Log';
+  btn.title = hasToday
+    ? "Add this activity to today's workout"
+    : "Log this activity as today's workout";
+}
+
+// The quantity half of a workout note line ("30x", "6000step") for whatever's
+// currently typed in the form — same cases workoutNoteQuantityForBox
+// (strength-plan.js) reads off a ticked plan row, just off the form's own
+// Unit/Sets x Reps fields instead of a checkbox's dataset.
+function workoutNoteQuantityForForm(unit, amount) {
+  const { sets, reps, hold, steps, minutes } = parseActivityAmount(amount, unit);
+  if (steps !== undefined) return `${steps}step`;
+  if (minutes !== undefined) return `${minutes}min`;
+  if (hold !== undefined) return `${sets * hold}sec`;
+  if (reps !== undefined) return `${sets * reps}x`;
+  return amount.trim().replace(REPS_SEPARATOR_PATTERN, 'x');
+}
+
+// The modal's own Log button — logs whatever's currently typed as one line of
+// today's workout, the same way ticking this row in the Activity Plan and
+// clicking its Log button would, without requiring the row to be saved to the
+// catalogue first.
+function logActivityFromForm() {
+  const name = activityFieldValue('name');
+  const amount = activityFieldValue('amount');
+  if (!name || !amount) {
+    showFieldError('activity-form-error', 'Enter a Name and Sets x Reps (or an amount) before logging.');
+    return;
+  }
+
+  if (loggedWorkoutQuantities().has(name)) {
+    alert(`"${name}" is already in today's workout — edit that line from the Physique panel to change it.`);
+    return;
+  }
+
+  const line = `${workoutNoteQuantityForForm(activityFieldValue('unit'), amount)} ${name}`;
+  closeActivityForm();
+  applyWorkoutLines([line]);
 }
 
 function setActivityField(id, value) {

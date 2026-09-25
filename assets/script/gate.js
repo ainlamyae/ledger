@@ -1,11 +1,13 @@
-// Owns the page shown before the dashboard is reachable: the sign-in banner,
-// the "connect your spreadsheet" file-gate, and the auth-state-driven
+// Owns the page shown before the dashboard is reachable: the sign-in error
+// banner, the "connect your spreadsheet" file-gate, and the auth-state-driven
 // switch between them and the dashboard itself. Kept out of app.js (the
 // dashboard proper) so the pre-login flow can be read and changed on its
 // own, without wading through unrelated dashboard code.
 
-// 'signedOut' -> dashboard shell visible (every block, all placeholders) with
-//   a sign-in banner prepended to it — no data has loaded yet.
+// 'signedOut' -> dashboard shell visible (every block, all placeholders), no
+//   data loaded — just the header's sign-in icon, no banner nagging about it.
+//   Clicking any gated action (setupAuthGatedActions in app.js) signs the
+//   user in first and then carries out whatever was clicked.
 // 'needsFile' -> signed in, but no spreadsheet selected yet (new user, or
 //   returning user who cleared storage / switched browsers): the one state
 //   that still takes over the whole page, since there's no spreadsheet to
@@ -25,12 +27,20 @@ function setUIState(state) {
 
 // Prepended to #dashboard rather than a full-page gate, so every block stays
 // visible (with its placeholder content) behind it — matches showDashboardError's
-// pattern in app.js, just for "no data loaded yet" instead of "load failed".
+// pattern in app.js. Only ever shown for an actual sign-in failure: the plain
+// "you're signed out" case has no banner at all — the header's sign-in icon is
+// the only cue, and any gated action (setupAuthGatedActions in app.js) signs
+// the user in on click and then carries on with whatever they clicked.
 function removeSignInBanner() {
   document.getElementById('signin-banner')?.remove();
 }
 
 function showSignInBanner(errorMessage) {
+  if (!errorMessage) {
+    removeSignInBanner();
+    return;
+  }
+
   const dashboard = document.getElementById('dashboard');
   let banner = document.getElementById('signin-banner');
   if (!banner) {
@@ -49,9 +59,8 @@ function showSignInBanner(errorMessage) {
     dashboard.prepend(banner);
   }
 
-  banner.className = `status ${errorMessage ? 'error-banner' : 'info-banner'}`;
-  banner.firstElementChild.textContent = errorMessage
-    || "Sign in to load your data — you're browsing an empty preview.";
+  banner.className = 'status error-banner';
+  banner.firstElementChild.textContent = errorMessage;
 }
 
 function handleAuthChange(token, error) {

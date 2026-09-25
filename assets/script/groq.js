@@ -7,7 +7,7 @@ const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SEED = 42;
 // Llama 4 Scout is Groq's fastest vision-capable model — used only for the
 // food-photo scan path where image_url content is required.
-const GROQ_VISION_MODEL = 'qwen/qwen3.6-27b';
+const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
 // The free-text chat call every Health Insight mode makes: same model, key
 // guard and error shape all three used to hand-roll separately. Returns the

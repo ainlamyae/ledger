@@ -907,10 +907,13 @@ const AUTH_GATED_SELECTOR = [
 // Instruction modal is the Activities tab already in memory.
 const AUTH_GATE_EXEMPT_IDS = ['activity-instruction-btn'];
 
-// Renews the access token BEFORE a form opens, rather than letting a stale one
-// surface as a Google auth error on Save with the filled-in form still on screen.
-// GIS tokens last ~1hr and this is a tab people leave open all day, so that was a
-// routine way to lose typed data.
+// Ensures a live access token BEFORE a form opens, rather than letting a stale
+// or missing one surface as a Google auth error on Save with the filled-in form
+// still on screen. Covers both endpoints of the same problem: a signed-out click
+// runs the full sign-in flow first (silent, then the visible popup if needed),
+// and a signed-in click with a token nearing its ~1hr expiry gets a silent
+// refresh — either way the button's own action runs only once a token is in
+// hand, so there's no separate "sign in, then try again" step for the user.
 //
 // One capture-phase listener on the document instead of a check inside fifteen
 // handlers: it sees the click before the button's own listener (all of which are
@@ -925,9 +928,6 @@ function setupAuthGatedActions() {
     // second click while the first one's token request is still open.
     if (btn.dataset.authChecked === '1' || btn.dataset.authPending === '1' || btn.disabled) return;
 
-    // Nothing to gate before the dashboard exists — the gate itself is showing.
-    if (!isSignedIn()) return;
-
     event.preventDefault();
     event.stopImmediatePropagation();
 
@@ -939,8 +939,9 @@ function setupAuthGatedActions() {
     ensureAccessToken().then((token) => {
       delete btn.dataset.authPending;
       // No message needed on failure: every path that ends without a token has
-      // already sent handleAuthChange the sign-out, so the sign-in gate is back up
-      // with its own reason — a form opened over it would be the wrong outcome.
+      // already sent handleAuthChange the sign-out (with its own error banner if
+      // there's a reason to show one) — a form opened over that would be the
+      // wrong outcome.
       if (!token) return;
 
       // Same click, now with a live token. The flag is what lets it through the

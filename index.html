@@ -336,18 +336,18 @@
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
             </div>
 
-            <div class="body-mass-projection-wrap">
+            <div class="body-mass-projection-wrap card">
                 <div class="body-mass-projection-header">
-                    <h4>Body Mass</h4>
+                    <h3>Body Mass</h3>
                 </div>
                 <div class="chart-box chart-box-flush">
                     <canvas id="wellness-body-mass-chart"></canvas>
                 </div>
             </div>
 
-            <div class="body-mass-projection-wrap">
+            <div class="body-mass-projection-wrap card">
                 <div class="body-mass-projection-header">
-                    <h4>Calorie Balance</h4>
+                    <h3>Calorie Balance</h3>
                 </div>
                 <div class="chart-box chart-box-flush">
                     <canvas id="wellness-energy-balance-chart"></canvas>
@@ -355,50 +355,50 @@
             </div>
 
             <div class="donut-grid wellness-metrics-grid">
-                <div class="donut-item">
-                    <h4 id="wellness-calories-label">Caloric Intake</h4>
+                <div class="card">
+                    <h3 id="wellness-calories-label">Caloric Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-calories-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Protein Intake</h4>
+                <div class="card">
+                    <h3>Protein Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-protein-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Dietary Fiber Intake</h4>
+                <div class="card">
+                    <h3>Dietary Fiber Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-fiber-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Fat Intake</h4>
+                <div class="card">
+                    <h3>Fat Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-fat-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Carbohydrate Intake</h4>
+                <div class="card">
+                    <h3>Carbohydrate Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-carb-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Physical Activity</h4>
+                <div class="card">
+                    <h3>Physical Activity</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-activity-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Sleep</h4>
+                <div class="card">
+                    <h3>Sleep</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="wellness-sleep-chart"></canvas>
                     </div>
@@ -408,8 +408,8 @@
             <!-- Was its own "Protein Source Rotation" panel, moved in last so every
                  Health chart is in one place and they collapse together. The wrap is
                  what makes its heading one of the set, not a style of its own. -->
-            <div class="body-mass-projection-wrap">
-                <h4>Protein Source Rotation</h4>
+            <div class="body-mass-projection-wrap card">
+                <h3>Protein Source Rotation</h3>
 
                 <div class="protein-rotation-charts">
                     <div class="chart-box">
@@ -426,8 +426,8 @@
             <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
                  (sessions done vs. desired per Group this window) and one rotational
                  donut (reference weekly split, last 4 weeks, last week). -->
-            <div class="body-mass-projection-wrap">
-                <h4>Activity Rotation</h4>
+            <div class="body-mass-projection-wrap card">
+                <h3>Activity Rotation</h3>
 
                 <div class="protein-rotation-charts">
                     <div class="chart-box">
@@ -612,7 +612,7 @@
             <div id="insight-preview-micronutrient" hidden>
                 <div id="insight-micro-profile" class="insight-data-preview"></div>
                 <div class="table-responsive">
-                    <table id="insight-micro-table">
+                    <table id="insight-micro-table" class="table-compact">
                         <thead>
                         <tr>
                             <th>Nutrient</th>
@@ -1368,29 +1368,29 @@
         <div class="panel" data-route="indicator">
         <h2>Indicator</h2>
 
-        <div class="panel-section">
+        <div class="panel-section card">
             <h3>Cumulative Net Worth</h3>
-            <div class="chart-box">
+            <div class="chart-box chart-box-flush">
                 <canvas id="savings-trend-chart"></canvas>
             </div>
         </div>
 
-        <div class="panel-section">
+        <div class="panel-section card">
             <h3>Category Expenditure Trend</h3>
-            <div class="chart-box">
+            <div class="chart-box chart-box-flush">
                 <canvas id="expense-breakdown-trend-chart"></canvas>
             </div>
             <div class="donut-legend" id="expense-breakdown-trend-legend"></div>
         </div>
 
-        <div class="panel-section">
+        <div class="panel-section card">
             <h3>Average Monthly Spending by Category</h3>
-            <div class="chart-box">
+            <div class="chart-box chart-box-flush">
                 <canvas id="spending-trend-chart"></canvas>
             </div>
         </div>
 
-        <div class="panel-section">
+        <div class="panel-section card">
             <h3>Spending Breakdown by Category</h3>
             <div class="donut-grid">
                 <div class="donut-item">
@@ -1431,15 +1431,15 @@
              Uncomment this section AND the renderTypeBreakdownCharts call in app.js's
              reportPromise — the renderer (finance-charts.js) and its parsed data are untouched,
              and the call is what fills this container.
-        <div class="panel-section">
+        <div class="panel-section card">
             <h3>Spending Breakdown by Type</h3>
             <div id="type-breakdown-container"></div>
         </div>
         -->
 
-        <div class="panel-section">
+        <div class="panel-section card">
             <h3>Portfolio Allocation</h3>
-            <div class="chart-box">
+            <div class="chart-box chart-box-flush">
                 <canvas id="account-composition-chart"></canvas>
             </div>
             <div class="donut-legend" id="account-composition-legend"></div>
@@ -1650,31 +1650,31 @@
             <!-- What used to be a separate "Work Analytics" panel: the charts read
                  the same logged hours as the table below them, so they live in the
                  same panel and collapse with it. -->
-            <div class="donut-grid">
-                <div class="donut-item">
-                    <h4>Arrival Distribution</h4>
-                    <div class="chart-box">
+            <div class="cards">
+                <div class="card">
+                    <h3>Arrival Distribution</h3>
+                    <div class="chart-box chart-box-flush">
                         <canvas id="timesheet-start-distribution-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Departure Distribution</h4>
-                    <div class="chart-box">
+                <div class="card">
+                    <h3>Departure Distribution</h3>
+                    <div class="chart-box chart-box-flush">
                         <canvas id="timesheet-end-distribution-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Hours Worked Distribution</h4>
-                    <div class="chart-box">
+                <div class="card">
+                    <h3>Hours Worked Distribution</h3>
+                    <div class="chart-box chart-box-flush">
                         <canvas id="timesheet-duration-distribution-chart"></canvas>
                     </div>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Daily Hours Average</h4>
-                    <div class="chart-box">
+                <div class="card">
+                    <h3>Daily Hours Average</h3>
+                    <div class="chart-box chart-box-flush">
                         <canvas id="timesheet-daily-average-chart"></canvas>
                     </div>
                 </div>
@@ -1722,13 +1722,13 @@
             <!-- Read off Transportation transactions whose description carries the odometer
                  ("@28902km"); predictions in car-service.js. -->
             <div class="donut-grid wellness-metrics-grid">
-                <div class="donut-item">
-                    <h4>Odometer &amp; Service</h4>
-                    <div class="chart-box">
+                <div class="card">
+                    <h3>Odometer &amp; Service</h3>
+                    <div class="chart-box chart-box-flush">
                         <canvas id="car-service-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="car-service-legend"></div>
                 </div>
-                <div class="donut-legend" id="car-service-legend"></div>
             </div>
 
             <h4>Predicted</h4>
@@ -1770,14 +1770,14 @@
             <!-- What used to be a separate "Travel Insights" panel, same as Work Time
                  Analytics above: both views read the same rows as the table below. -->
             <div class="donut-grid travel-insights-grid">
-                <div class="donut-item">
-                    <h4>Time Spent by Country</h4>
+                <div class="card">
+                    <h3>Time Spent by Country</h3>
                     <ul id="travel-country-days-list" class="country-tiles"></ul>
                 </div>
 
-                <div class="donut-item">
-                    <h4>Countries Visited</h4>
-                    <div class="chart-box chart-box-map">
+                <div class="card">
+                    <h3>Countries Visited</h3>
+                    <div class="chart-box chart-box-map chart-box-flush">
                         <canvas id="travel-world-map-chart"></canvas>
                     </div>
                 </div>
@@ -2334,7 +2334,7 @@
         <h2 id="physique-micro-title">Micronutrients</h2>
 
         <div class="table-responsive">
-            <table id="physique-micro-table">
+            <table id="physique-micro-table" class="table-compact">
                 <thead>
                 <tr>
                     <th>Nutrient</th>

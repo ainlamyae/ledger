@@ -4,6 +4,8 @@ function applyChartTheme() {
   Chart.defaults.borderColor = chartColor('--color-border');
   // Every chart's text at .9rem, the app's own size for that band, in the px Chart.js takes.
   Chart.defaults.font.size = chartFontSize();
+  // The page's own font family, not Chart.js's Helvetica/Arial.
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 
   // privacyMode is read at call time; loadDashboard rebuilds the charts on toggle.
   Chart.defaults.scales.linear.ticks.callback = function (value) {

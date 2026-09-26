@@ -1005,7 +1005,8 @@ td:has(.btn) {
 
 /* The same line under the header row of Physique's, Nutrition's, Pattern's,
    Transaction's, Account's, Breakdown's, Work Time's, Car Service's, Travel's,
-   Contact's, Settings' and both Micronutrients' tables and both Physique breakdowns. */
+   Contact's, Settings', Activity's and both Micronutrients' tables and both
+   Physique breakdowns. */
 #physique-micro-table thead th,
 #insight-micro-table thead th,
 .car-service-table thead th,
@@ -1020,7 +1021,9 @@ td:has(.btn) {
 #nutrition-table thead th,
 #insight-pattern-table thead th,
 #physique-calc-breakdown thead th,
-#physique-activity-breakdown thead th {
+#physique-activity-breakdown thead th,
+.workout-table-strength thead th,
+.workout-table-neat thead th {
     border-bottom: 2px solid var(--color-nav);
 }
 

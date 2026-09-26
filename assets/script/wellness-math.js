@@ -460,7 +460,7 @@ function bmrBasis() {
 
 // The current BMR calibration: an empirically back-solved BMR from actual logged
 // intake/activity/weight-change, rather than the height/age/sex (or lean-mass) equation.
-// Read from the Physique sheet itself — the latest day whose stored BMR cell carries a
+// Read from the Physique sheet itself — the latest day whose stored Derived cell carries a
 // BMR_cal (physique.js keeps those current) — not from a Setting copy that could drift
 // from it. Two numbers come out of that day: the calibrated figure itself (shown as-is in
 // the Status card and the Caloric Intake chart), and its OFFSET from that day's equation

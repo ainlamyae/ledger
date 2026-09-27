@@ -92,9 +92,9 @@ D      = rawD > 0 ? rawD / max(η, 0.2) : rawD        bigger deficit needed if s
 target = round( (BMR + activityTargetKcal − D) / (1 − f) )
 ```
 
-- `PLAN_SLEEP_HOURS` defaults to `SLEEP_TARGET_HOURS` itself — `η = 1`, `D = rawD`, byte-identical to the target this app always produced. See the [Tune](features.md#health--formula-playground)'s `s`/`γ`/`δ` fields for where it's tuned.
+- `PLAN_SLEEP_HOURS` defaults to `SLEEP_TARGET_HOURS` itself — `η = 1`, `D = rawD`, byte-identical to the target this app always produced. See the [Tune](features/health-tune.md#health--tune)'s `s`/`γ`/`δ` fields for where it's tuned.
 - Falls back to flat `CALORIE_TARGET_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing. Age only when the BMR equation in force reads it (`bmrNeedsAge`) — Katch-McArdle doesn't.
-- `f` is `TEF_PERCENT_OF_INTAKE / 100`, default **0**, in which case this is exactly the sum it has always been. See the [Tune](features.md#health--formula-playground) for why digestion divides rather than adds.
+- `f` is `TEF_PERCENT_OF_INTAKE / 100`, default **0**, in which case this is exactly the sum it has always been. See the [Tune](features/health-tune.md#health--tune) for why digestion divides rather than adds.
 - **Today's** figure is evaluated at the L_p-day rolling average body mass (`planBodyMassKg`, L_p = Tune's saved period length), not the last single reading — so a water-heavy morning doesn't move the day's ceiling. The per-day chart line still re-evaluates from that day's carried-forward body mass.
 - Moves ≈ 15.8 kcal per kg, so a 6 kg loss shifts it by roughly 95 kcal.
 - **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Tune's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's E_in — instead of being recalculated from each body-mass reading. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
@@ -269,7 +269,7 @@ protein/100kcal = protein / calories × 100
 
 - Three sources, most specific first. The **absolute gram band wins**: it is already a mass × a per-kg figure (the playground's `p × LBM`), so re-scaling it by a basis mass would double-count. The g/kg band is next, and the flat `PROTEIN_TARGET_G` last.
 - Absolute grams don't drift as you diet — which is what the g/kg band needs `BODY_MASS_TARGET_KG` for. A gram figure is frozen at the lean mass it was computed from and only moves when you re-save the playground.
-- Written by the [Tune](features.md#health--formula-playground) as `p_min/p_max × LBM`, which is the only place in the app that scales anything to **lean** mass rather than total mass. Set the pair by hand on the `Setting` tab and it behaves the same; either end alone is enough, and a backwards pair is sorted.
+- Written by the [Tune](features/health-tune.md#health--tune) as `p_min/p_max × LBM`, which is the only place in the app that scales anything to **lean** mass rather than total mass. Set the pair by hand on the `Setting` tab and it behaves the same; either end alone is enough, and a backwards pair is sorted.
 
 **Protein Source Rotation**, per tracked ingredient:
 

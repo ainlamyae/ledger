@@ -52,5 +52,13 @@ python scripts/serve.py 8000
 
 Then open `http://localhost:8000`. No build step. `serve.py` is `python -m http.server` plus GitHub Pages' `404.html` fallback, which row Edit addresses such as `/health/nutrition/onion/` need.
 
+## 5. Enable version stamping
+
+```sh
+git config core.hooksPath scripts/hooks
+```
+
+Each commit then stamps the footer's version. See [Versioning](versioning.md).
+
 ---
 

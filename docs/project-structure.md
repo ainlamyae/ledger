@@ -64,6 +64,7 @@ ledger/
 │       ├── bmr-calibration.js    # BMR calibration — back-solves BMR_cal from logged data (Tune)
 │       ├── financial-insight.js  # Finance Insight panel
 │       ├── gate.js               # Pre-login flow
+│       ├── version.js            # APP_VERSION, written by the pre-commit hook
 │       ├── app.js                # Orchestration
 │       ├── router.js             # Block/button/row addresses (<group>/<block>/<button or row>/)
 │       ├── page-nav.js           # Section hub tiles, page breadcrumb, wide-screen sidebar

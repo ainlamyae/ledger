@@ -197,7 +197,6 @@ async function initPhysique(forceRefresh = false) {
     // Date and body mass move the BMR line too.
     ['bedtime', 'wake-time', 'date', 'body-mass'].forEach((id) => physiqueField(id).addEventListener('input', updatePhysiqueSleepDuration));
     document.getElementById('physique-is-pattern').addEventListener('change', updatePhysiqueSleepDuration);
-    physiqueField('body-mass').addEventListener('change', celebrateBodyMassProgress);
     onFormSubmit('physique-form', submitPhysiqueForm);
 
     ['physique-search'].forEach((id) => {
@@ -884,19 +883,14 @@ function todaysPhysiqueDay() {
   return allPhysiqueEntries.find((p) => p.date === today) ?? null;
 }
 
-// Confetti when today's typed body mass is closer to the target than the last earlier reading.
-let celebratedBodyMass = null;
-function celebrateBodyMassProgress() {
+// Confetti when today's saved body mass is closer to the target than the last earlier reading.
+function celebrateBodyMassProgress(date, bodyMass) {
   const today = isoFromDate(new Date());
-  if (document.getElementById('physique-is-pattern').checked || physiqueField('date').value !== today) return;
-  const typed = evaluateNumberExpression(physiqueField('body-mass').value.trim());
-  if (!typed || typed === celebratedBodyMass) return;
+  if (date !== today || !bodyMass) return;
   const previous = physiqueDatedAscending().filter((p) => p.date < today && p.bodyMass !== null).at(-1)?.bodyMass;
   if (previous == null) return;
   const target = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
-  if (Math.abs(typed - target) >= Math.abs(previous - target)) return;
-  celebratedBodyMass = typed;
-  celebrateWithConfetti();
+  if (Math.abs(bodyMass - target) < Math.abs(previous - target)) celebrateWithConfetti();
 }
 
 // Which days came across incomplete. console only — a chart gap is otherwise
@@ -1462,6 +1456,8 @@ async function submitPhysiqueForm(event) {
       stayOnSavedForm('physique-modal', physiqueRouteStep(saved));
     }
     showFormSaved('physique-form-error');
+    // Only a new or changed reading celebrates, so re-saving the same day doesn't.
+    if ((before?.bodyMass ?? null) !== (day.bodyMass ?? null)) celebrateBodyMassProgress(date, day.bodyMass);
   } catch (err) {
     showFieldError('physique-form-error', err.message);
   }

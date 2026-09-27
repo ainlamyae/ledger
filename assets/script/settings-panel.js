@@ -310,7 +310,7 @@ async function saveSettingValues(values) {
 }
 
 // Keys the app no longer reads: the walking MET is the Activity sheet's Walk row,
-// BMR_cal is each Physique day's stored BMR cell, and SHOW_BLOCKS went with the home
+// BMR_cal is each Physique day's stored Derived cell, and SHOW_BLOCKS went with the home
 // page's Show blocks (it shows page tiles instead). A copy left in the Setting tab would only be a stale duplicate, so any row
 // still holding one is deleted on load (once; nothing writes them any more).
 const RETIRED_SETTING_KEYS = ['ACTIVITY_MET', 'ACTIVITY_MET_DEFAULT', 'BMR_CALIBRATED_KCAL', 'BMR_CALIBRATED_OFFSET_KCAL', 'SHOW_BLOCKS'];

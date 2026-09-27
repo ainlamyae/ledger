@@ -1,7 +1,7 @@
 // BMR calibration: measures how wrong the equation's BMR actually is, from logged data over
 // a trailing window (n_p periods of L_p days ending yesterday), rather than trying to
 // predict BMR from height/age/sex (or lean mass) alone. Shown in Tune (BMR_cal row, its
-// Periods under Calculations, Update) and stored per day in Physique's BMR column.
+// Periods under Calculations, Update) and stored per day in Physique's Derived column.
 // Local only, no AI — every number in the trace is one this app already tracks.
 //
 // The core idea is two INDEPENDENT estimates of the same day's energy deficit, compared:
@@ -128,7 +128,7 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     let deficit = null;
     if (p && p.caloriesIn !== null) {
       tef = p.tef !== null ? p.tef : Math.round(p.caloriesIn * (1 - divisor));
-      // The day's stored plain BMR (Physique's BMR column), not recomputed here.
+      // The day's stored plain BMR (Physique's Derived column), not recomputed here.
       const maintenanceForDay = haveProfile ? pickBmrForBasis(bmrFiguresForDate(date), 'bmr') : null;
       if (maintenanceForDay !== null) {
         const activity = p.caloriesOut ?? 0;
@@ -301,7 +301,7 @@ function bmrCalibrationForWindow(periodCount, periodDays) {
   return computeBmrCalibration(null, periodDays, isoDateFromDays(-1), periodCount);
 }
 
-// Tune's Update: saves n_p / L_p and rewrites every day's stored BMR cell (its BMR_cal
+// Tune's Update: saves n_p / L_p and rewrites every day's stored Derived cell (its BMR_cal
 // over the new window) and its body-mass figures (m_avg over the new L_p, with the BMI and m_d that
 // follow it) in the Physique sheet, in one request.
 async function updateStoredBmrCalibration() {
@@ -319,7 +319,7 @@ async function updateStoredBmrCalibration() {
         [BMR_CALIBRATION_PERIOD_COUNT_KEY]: periodCount,
         [BMR_CALIBRATION_PERIOD_DAYS_KEY]: periodDays,
       });
-    if (days === null) throw new Error('Writing the BMR column failed — see the console.');
+    if (days === null) throw new Error('Writing the Derived column failed — see the console.');
     showFieldError('formula-status', `Updated — BMR_cal over ${periodCount} × ${periodDays} days and m_avg over ${periodDays} days recomputed for ${days} days in the Physique sheet.`);
   } catch (err) {
     showFieldError('formula-status', err.message);

@@ -30,6 +30,7 @@ ledger/
 │       ├── activity-estimator.js # Calculate for workouts
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
+│       ├── confetti.js           # Confetti burst for body-mass progress
 │       ├── wellness-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
 │       ├── wellness-charts.js    # Indicator chart renderers
 │       ├── finance-charts.js     # Finance Indicator chart renderers
@@ -73,6 +74,7 @@ ledger/
 │   ├── build_sitemap.py               # sitemap.xml from the address stub folders
 │   ├── fetch_activity_images.mjs      # Still exercise guides → assets/images/activities
 │   └── fetch_activity_animations.mjs  # Animated exercise loops → assets/images/activities
+├── docs/                         # Reference docs; features/ holds one file per section
 ├── 404.html                      # Fallback page: row Edit addresses (see router.js)
 ├── LICENSE
 └── README.md

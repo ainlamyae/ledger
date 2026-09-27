@@ -527,6 +527,16 @@ header .btn:hover {
     z-index: 110;
 }
 
+/* Confetti over everything, toast included (confetti.js); clicks pass through. */
+.confetti-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 120;
+}
+
 kbd {
     display: inline-block;
     min-width: 1.4em;
@@ -741,19 +751,16 @@ kbd {
     box-shadow: var(--shadow-dropdown);
 }
 
-/* Narrow-viewport variant (physique.js positionConsumptionSuggestions) — pinned
-   full-width to the bottom of the visual viewport, i.e. right above the on-screen
-   keyboard, the same spot a native datalist bar shows on iPhone. left/right are
-   set here; only bottom is set inline from JS since only JS knows the keyboard height. */
+/* Phone variant (positionPinnedSuggestions): pinned to the top of the visible
+   area, clear of the keyboard and its ∧ ∨ Done bar. */
 .autocomplete-suggestions--pinned {
     position: fixed;
-    top: auto;
-    /* Just above the on-screen keyboard (--keyboard-height, physique-breakdown.js). */
-    bottom: var(--keyboard-height, 0px);
+    top: var(--suggestions-top, 0px);
+    bottom: auto;
     left: 0;
     right: 0;
     margin: 0;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
     max-height: 40vh;
     z-index: 110;
 }
@@ -1005,7 +1012,8 @@ td:has(.btn) {
 
 /* The same line under the header row of Physique's, Nutrition's, Pattern's,
    Transaction's, Account's, Breakdown's, Work Time's, Car Service's, Travel's,
-   Contact's, Settings' and both Micronutrients' tables and both Physique breakdowns. */
+   Contact's, Settings', Activity's and both Micronutrients' tables and both
+   Physique breakdowns. */
 #physique-micro-table thead th,
 #insight-micro-table thead th,
 .car-service-table thead th,
@@ -1020,7 +1028,9 @@ td:has(.btn) {
 #nutrition-table thead th,
 #insight-pattern-table thead th,
 #physique-calc-breakdown thead th,
-#physique-activity-breakdown thead th {
+#physique-activity-breakdown thead th,
+.workout-table-strength thead th,
+.workout-table-neat thead th {
     border-bottom: 2px solid var(--color-nav);
 }
 

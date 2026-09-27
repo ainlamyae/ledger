@@ -11,7 +11,7 @@
 const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:J`;
 
 // Compendium 02054 general value, for a name the sheet doesn't price.
-// Distinct from charts.js's ACTIVITY_MET_FALLBACK, which is the assumed
+// Distinct from wellness-math.js's ACTIVITY_MET_FALLBACK, which is the assumed
 // intensity for the daily activity TARGET rather than any one exercise.
 const EXERCISE_MET_FALLBACK = 3.5;
 
@@ -140,7 +140,7 @@ function activityCategory(name) {
   return activityByName(name)?.category || 'Other';
 }
 
-// Named for the exercise, not the day: charts.js's activityMet() is the
+// Named for the exercise, not the day: wellness-math.js's activityMet() is the
 // target-intensity MET and takes no argument.
 function exerciseMet(name) {
   const met = activityByName(name)?.met;
@@ -804,6 +804,9 @@ function renderInstructionList() {
   // As Insight's modes: the tiles alone on GYM's page, a group's list alone on
   // its own (the breadcrumb's GYM goes back to the tiles).
   tiles.hidden = guideGroupSlug !== null;
+  // The Activity Rotation copy (activity-rotation.js) rides along with the
+  // tiles — a group's own page has no room for it beside the activity list.
+  document.getElementById('instruction-rotation-card').hidden = guideGroupSlug !== null;
 
   groups.forEach((rows, group) => {
     const slug = routeSlug(group);

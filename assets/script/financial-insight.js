@@ -39,7 +39,7 @@ function gatherFinancialInsightData() {
   const avg = report.quarterAverage;
 
   // report.categoryComparison holds Math.abs'd PERIOD TOTALS, not monthly
-  // averages — renderSpendingTrendChart (charts.js) is the only other reader
+  // averages — renderSpendingTrendChart (finance-charts.js) is the only other reader
   // of this data, and it divides by 3/12/totalMonths itself at chart-render
   // time (SPENDING_TREND_PERIODS). Do the same division here, then negate:
   // every one of these categories is real spending (Income is excluded
@@ -290,7 +290,7 @@ async function runFinancialInsightGeneration() {
     body.innerHTML = '';
     renderInsightText(body, text);
 
-    const generatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const generatedAt = localTimestamp(new Date());
     try {
       await saveSettingValues({
         FINANCIAL_INSIGHT_LAST_RESULT: text,

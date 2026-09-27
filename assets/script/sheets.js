@@ -169,10 +169,6 @@ function batchUpdateValues(data, valueInputOption = 'USER_ENTERED') {
   });
 }
 
-function clearValues(range) {
-  return sheetsRequest(`/values/${encodeURIComponent(range)}:clear`, { method: 'POST' });
-}
-
 function batchUpdate(requests) {
   // Can add, delete or rename tabs, so the shared tab list may be out of date.
   resetSheetReads();

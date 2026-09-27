@@ -1,8 +1,8 @@
 const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
 // A stronger model needs far fewer hand-written rules to get food/portion
 // estimates right (see the trimmed prompt below). Its own run-to-run variance
-// no longer matters for determinism — the exact-text result cache in
-// wellness.js guarantees a consistent repeat answer regardless of the model.
+// no longer matters for determinism — Calculate keeps a line's saved
+// figures while the line is unchanged (physique.js), so a repeat stays consistent.
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SEED = 42;
 // Groq's vision-capable model — used only for the food-photo/physique scan

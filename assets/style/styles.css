@@ -248,8 +248,12 @@ header h1 {
     margin-left: auto;
 }
 
+/* In the account menu's info block, under the email and above Refresh — reads
+   like a third, muted line rather than a button. */
 .last-updated {
-    color: #fff;
+    display: block;
+    margin-top: var(--space-xs);
+    color: var(--color-text-muted);
     font-size: .8rem;
 }
 
@@ -730,7 +734,7 @@ kbd {
     position: relative;
 }
 
-/* Per-line ingredient suggestions for the Consumption textarea (physique.js) —
+/* Per-line ingredient suggestions for the Consumption and Workout textareas (physique-breakdown.js) —
    a plain <datalist> can't target one line of a multi-line value, so this is a
    hand-rolled dropdown instead, styled to match .account-menu-dropdown. */
 .autocomplete-suggestions {
@@ -751,8 +755,8 @@ kbd {
     box-shadow: var(--shadow-dropdown);
 }
 
-/* Phone variant (positionPinnedSuggestions): pinned to the top of the visible
-   area, clear of the keyboard and its ∧ ∨ Done bar. */
+/* Phone variant (positionPinnedSuggestions): placed by JS next to the caret's
+   line, inside the visible area, clear of the keyboard and its ∧ ∨ Done bar. */
 .autocomplete-suggestions--pinned {
     position: fixed;
     top: var(--suggestions-top, 0px);
@@ -760,8 +764,7 @@ kbd {
     left: 0;
     right: 0;
     margin: 0;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-    max-height: 40vh;
+    max-height: var(--suggestions-max-height, 40vh);
     z-index: 110;
 }
 
@@ -1029,6 +1032,7 @@ td:has(.btn) {
 #insight-pattern-table thead th,
 #physique-calc-breakdown thead th,
 #physique-activity-breakdown thead th,
+#physique-derived-table thead th,
 .workout-table-strength thead th,
 .workout-table-neat thead th {
     border-bottom: 2px solid var(--color-nav);
@@ -1039,6 +1043,26 @@ td:has(.btn) {
    both mark "a new group of rows starts here" the same way. */
 #physique-table tr.physique-week-start td {
     border-top: 2px solid var(--color-nav);
+}
+
+/* Breakdown: one line where the Category changes from the row above
+   (renderBreakdownList, breakdown.js), so each category's rows read as a
+   visual group, and one line closing the table under its last row — the
+   compact look's per-row border is off, so without this the table would
+   otherwise just stop. */
+#breakdown-table tr.breakdown-category-start td {
+    border-top: 2px solid var(--color-nav);
+}
+
+#breakdown-table tbody tr:last-child td {
+    border-bottom: 2px solid var(--color-nav);
+}
+
+/* Physique's Derived table: one line closing each group (mass, BMR, the
+   energy-balance inputs) before the next one starts, same idiom as
+   physique-week-start/breakdown-category-start above. */
+#physique-derived-table tr.physique-derived-group-end td {
+    border-bottom: 2px solid var(--color-nav);
 }
 
 /* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
@@ -2475,9 +2499,25 @@ html.home-hub .page-tiles,
 
 #formula-expression-details summary,
 #formula-substituted-details summary,
-#insight-prompt-details summary {
+#insight-prompt-details summary,
+#physique-derived-details summary,
+#physique-consumption-details summary,
+#physique-workout-details summary {
     cursor: pointer;
     color: var(--color-text-muted);
+}
+
+/* Matches .app-form label's own size/spacing, since these replace a label. */
+#physique-derived-details,
+#physique-consumption-details,
+#physique-workout-details {
+    margin-bottom: var(--space-xs);
+}
+
+#physique-derived-details summary,
+#physique-consumption-details summary,
+#physique-workout-details summary {
+    font-size: .8rem;
 }
 
 /* Prompts are paragraphs, so they wrap. */
@@ -2537,14 +2577,15 @@ html.home-hub .page-tiles,
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1179px) {
     html {
         font-size: 14px;
     }
 
-    /* No top bar on a phone: the header's box goes, the tab bar (.nav) and the
-       account avatar (.header-actions) stay, both pinned to the bottom. The
-       breadcrumb's Ledger link replaces the logo. */
+    /* No top bar below the sidebar's own breakpoint (1180px): the header's box
+       goes, the tab bar (.nav) and the account avatar (.header-actions) stay,
+       both pinned to the bottom, on tablet as well as phone. The breadcrumb's
+       Ledger link replaces the logo. */
     header {
         display: contents;
     }
@@ -2621,10 +2662,6 @@ html.home-hub .page-tiles,
         left: 0;
         max-height: calc(100dvh - 6rem);
         overflow-y: auto;
-    }
-
-    .last-updated {
-        display: none;
     }
 
     .btn {
@@ -2735,6 +2772,12 @@ html.home-hub .page-tiles,
 
     .filters select {
         width: 100%;
+    }
+
+    /* Transaction's four filters: 2×2 instead of four rows. */
+    [data-route="transaction"] > .filters {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
     }
 
     .pagination {
@@ -3399,11 +3442,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         border-top: 1px solid var(--color-border);
     }
 
-    .last-updated {
-        order: 1;
-        color: var(--color-text-muted);
-    }
-
     header .btn {
         color: var(--color-text);
         border-color: var(--color-border);
@@ -3500,17 +3538,17 @@ html.section-pages[data-form-page] body.modal-open {
     }
 }
 
-/* Phone: the container's 1rem gutter, clear of the bottom tab bar, the card's
-   corners and padding kept (the full-screen overlay squared them off), and the
-   pinned action bar just above the tab bar. */
-@media (max-width: 640px) {
+/* Tablet and phone: the container's 1rem gutter, clear of the bottom tab bar,
+   the card's corners and padding kept (the full-screen overlay squared them
+   off), and the pinned action bar just above the tab bar. */
+@media (max-width: 1179px) {
     html.section-pages[data-form-page] .modal.form-page {
         --form-page-gutter: var(--space-l);
         margin-bottom: calc(var(--space-l) + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1179px) {
     html.section-pages[data-form-page] .modal.form-page .modal-card {
         height: auto;
         /* At least the screen between the breadcrumb and the tab bar, so a short
@@ -3538,7 +3576,7 @@ html.section-pages[data-form-page] body.modal-open {
     display: none;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1179px) {
     .panel-header-actions .header-action-close {
         display: none;
     }
@@ -3574,7 +3612,7 @@ html.section-pages .panel.page-active:hover {
     margin-left: auto;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1179px) {
     html[data-action-bar] .nav {
         display: none;
     }
@@ -3657,7 +3695,7 @@ html.section-pages .panel.page-active:hover {
 }
 
 /* Room at the left for the account avatar (.header-actions), pinned there. */
-@media (max-width: 640px) {
+@media (max-width: 1179px) {
     html[data-action-bar] .action-bar,
     html[data-action-bar] .app-form .modal-actions.action-bar {
         padding-left: var(--bottom-bar-start);

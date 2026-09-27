@@ -392,7 +392,7 @@ function setTodayGlanceTile(idPrefix, value, target, unit, tone) {
 
 // lastNDates clipped to the earliest matching entry, so a short logging history isn't
 // pushed to the right behind a run of empty days.
-// The one window the whole Health Indicators panel plots, bar State Trend & Forecast:
+// The one window the whole Health Indicator panel plots, bar State Trend & Forecast:
 // whatever the From/To pair above Body Mass holds, else the WELLNESS_METRICS_DAYS
 // default. Protein Source Rotation reads it too — it wants the two ends rather than
 // every day between them, which is why this returns the range and not the date list.
@@ -639,7 +639,7 @@ function renderWellnessBodyMassChart(entries) {
   const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
 
   // The same smoothed line and glycogen/water swing zone State Trend & Forecast draws
-  // (computeBodyMassTrend/computeGlycogenZoneAnchor/glycogenSwingKg, charts.js), built off
+  // (computeBodyMassTrend/computeGlycogenZoneAnchor in wellness-math.js, glycogenSwingKg here), built off
   // the FULL history in `byDate` rather than just this window — smoothing needs the
   // context past the window's edges to agree with the other chart there — then read back
   // only for the dates this chart actually plots.
@@ -795,10 +795,18 @@ function renderWellnessBodyMassChart(entries) {
       labels: dates,
       datasets: [
         {
-          type: 'bar',
+          // Dots, not bars — same style as the Physical Activity chart's own
+          // "Actual Burn" dots (showLine: false, pointRadius/pointBorder below),
+          // just colored the way the bars used to be (barColors).
+          type: 'line',
           label: 'Body Mass',
           data: values,
-          backgroundColor: barColors,
+          showLine: false,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: barColors,
+          pointBorderColor: chartColor('--chart-point-border'),
+          pointBorderWidth: 1.5,
           order: 2,
         },
         trendLineDataset('7-Day Trend', trendSeries),
@@ -806,7 +814,7 @@ function renderWellnessBodyMassChart(entries) {
         // all anchored to the calorie-implied trajectory and omitted together whenever the
         // profile is incomplete (no BMR → no trajectory). fill: '-1' chain runs upper →
         // lower (yellow fill) → Muscle Loss (red fill), matching State Trend & Forecast.
-        // Band order (3) sits behind bars (2); lines use lower orders to read on top.
+        // Band order (3) sits behind the dots (2); lines use lower orders to read on top.
         ...(calorieTrendMap.size > 0 && swingKg !== null ? [
           {
             type: 'line',
@@ -1461,7 +1469,7 @@ function renderWellnessSleepChart(entries) {
 // applies everywhere at once — this chart, the Activity target, and the workout
 // estimator's own duration (activeSecondsForNoteLine, activity-estimator.js).
 // The default lives here rather than beside WORKOUT_REP_SEC_DEFAULT because
-// charts.js loads first: a const in the later file would still be in its dead
+// this file loads first: a const in the later file would still be in its dead
 // zone. Nothing there needs it anyway — the estimator calls this function.
 const WORKOUT_STEPS_PER_MIN_DEFAULT = 100;
 

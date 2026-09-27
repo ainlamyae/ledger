@@ -5,7 +5,7 @@
 // insight-panel.js owns the panel itself — the buttons, the Groq call, and
 // persisting each mode's last report.
 //
-// ageFromBirthDate is also called from charts.js (BMR/BMI paths), so it lives
+// ageFromBirthDate is also called from wellness-math.js and wellness-charts.js (BMR/BMI paths), so it lives
 // here rather than moving into the panel file.
 
 // Whole-years-old as of `asOf` (today by default); null if BIRTH_DATE isn't set or
@@ -14,7 +14,8 @@
 // reading today's age onto every day in the window.
 function ageFromBirthDate(birthDateStr, asOf = new Date()) {
   if (!birthDateStr) return null;
-  const birth = new Date(birthDateStr);
+  // Local midnight: new Date('YYYY-MM-DD') is UTC, the day before in the Americas.
+  const birth = /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr.trim()) ? dateFromIso(birthDateStr.trim()) : new Date(birthDateStr);
   if (Number.isNaN(birth.getTime())) return null;
 
   let age = asOf.getFullYear() - birth.getFullYear();
@@ -26,7 +27,7 @@ function ageFromBirthDate(birthDateStr, asOf = new Date()) {
 
 // Age, sex, height, latest logged body mass and the BMI those two imply — the
 // body every one of this app's health numbers is actually about. Read straight
-// from Settings and the latest body-mass reading (latestBodyMassKg/computeBmi, charts.js),
+// from Settings and the latest body-mass reading (latestBodyMassKg in wellness-math.js, computeBmi in wellness-charts.js),
 // so all three AI panels describe the same person.
 function gatherProfileSnapshot() {
   const heightCm = getSetting('HEIGHT_CM', null);
@@ -78,7 +79,7 @@ function previousDateRange(fromIso, toIso) {
 
 // Aggregates physiqueAsWellnessEntries() over an arbitrary set of dates (a
 // datesInRange or previousDateRange result) the same way calcProjection() does
-// (charts.js) — shared so the current and previous period get identical
+// (wellness-math.js) — shared so the current and previous period get identical
 // aggregation logic.
 function aggregateWindow(dates) {
   const from = dates[0];
@@ -119,7 +120,7 @@ function aggregateWindow(dates) {
         const byDate = activityByDescriptionByDate.get(description);
         byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
 
-        // Every entry gets a burn figure via charts.js's activityEntryKcal — its
+        // Every entry gets a burn figure via wellness-math.js's activityEntryKcal — its
         // own amount2, else its minutes at the Walk MET (activityMet). A plain Activity row used
         // to contribute nothing, understating what the AI was told was burned.
         const kcal = activityEntryKcal(e, bodyMassKg);
@@ -188,7 +189,7 @@ function gatherInsightMetrics(fromIso, toIso) {
   const previous = aggregateWindow(previousDates);
 
   // Reuses the exact same trajectory logic the State Trend & Forecast chart
-  // is built from (charts.js) — Insight doesn't compute its own trend, it just
+  // is built from (calcProjection, wellness-math.js) — Insight doesn't compute its own trend, it just
   // reports this one.
   const projection = calcProjection(physiqueAsWellnessEntries());
 
@@ -274,7 +275,7 @@ function gatherInsightMetrics(fromIso, toIso) {
   };
 }
 
-// Covers every status calcProjection() (charts.js) can return, so the
+// Covers every status calcProjection() (wellness-math.js) can return, so the
 // trajectory line is always sensible text — never undefined/NaN leaking
 // into the prompt.
 function formatTrajectoryLine(projection) {

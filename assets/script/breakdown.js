@@ -120,8 +120,11 @@ function renderBreakdownList() {
       : 'No rows match your search.'));
   }
 
+  let prevCategory = null;
   pageItems.forEach((b) => {
     const tr = document.createElement('tr');
+    if (prevCategory !== null && b.category !== prevCategory) tr.classList.add('breakdown-category-start');
+    prevCategory = b.category;
 
     tr.append(
       makeCell(b.category),

@@ -248,8 +248,12 @@ header h1 {
     margin-left: auto;
 }
 
+/* In the account menu's info block, under the email and above Refresh — reads
+   like a third, muted line rather than a button. */
 .last-updated {
-    color: #fff;
+    display: block;
+    margin-top: var(--space-xs);
+    color: var(--color-text-muted);
     font-size: .8rem;
 }
 
@@ -1038,6 +1042,19 @@ td:has(.btn) {
    both mark "a new group of rows starts here" the same way. */
 #physique-table tr.physique-week-start td {
     border-top: 2px solid var(--color-nav);
+}
+
+/* Breakdown: one line where the Category changes from the row above
+   (renderBreakdownList, breakdown.js), so each category's rows read as a
+   visual group, and one line closing the table under its last row — the
+   compact look's per-row border is off, so without this the table would
+   otherwise just stop. */
+#breakdown-table tr.breakdown-category-start td {
+    border-top: 2px solid var(--color-nav);
+}
+
+#breakdown-table tbody tr:last-child td {
+    border-bottom: 2px solid var(--color-nav);
 }
 
 /* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
@@ -2536,14 +2553,15 @@ html.home-hub .page-tiles,
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1179px) {
     html {
         font-size: 14px;
     }
 
-    /* No top bar on a phone: the header's box goes, the tab bar (.nav) and the
-       account avatar (.header-actions) stay, both pinned to the bottom. The
-       breadcrumb's Ledger link replaces the logo. */
+    /* No top bar below the sidebar's own breakpoint (1180px): the header's box
+       goes, the tab bar (.nav) and the account avatar (.header-actions) stay,
+       both pinned to the bottom, on tablet as well as phone. The breadcrumb's
+       Ledger link replaces the logo. */
     header {
         display: contents;
     }
@@ -2620,10 +2638,6 @@ html.home-hub .page-tiles,
         left: 0;
         max-height: calc(100dvh - 6rem);
         overflow-y: auto;
-    }
-
-    .last-updated {
-        display: none;
     }
 
     .btn {
@@ -3404,11 +3418,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         border-top: 1px solid var(--color-border);
     }
 
-    .last-updated {
-        order: 1;
-        color: var(--color-text-muted);
-    }
-
     header .btn {
         color: var(--color-text);
         border-color: var(--color-border);
@@ -3505,17 +3514,17 @@ html.section-pages[data-form-page] body.modal-open {
     }
 }
 
-/* Phone: the container's 1rem gutter, clear of the bottom tab bar, the card's
-   corners and padding kept (the full-screen overlay squared them off), and the
-   pinned action bar just above the tab bar. */
-@media (max-width: 640px) {
+/* Tablet and phone: the container's 1rem gutter, clear of the bottom tab bar,
+   the card's corners and padding kept (the full-screen overlay squared them
+   off), and the pinned action bar just above the tab bar. */
+@media (max-width: 1179px) {
     html.section-pages[data-form-page] .modal.form-page {
         --form-page-gutter: var(--space-l);
         margin-bottom: calc(var(--space-l) + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1179px) {
     html.section-pages[data-form-page] .modal.form-page .modal-card {
         height: auto;
         /* At least the screen between the breadcrumb and the tab bar, so a short
@@ -3543,7 +3552,7 @@ html.section-pages[data-form-page] body.modal-open {
     display: none;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1179px) {
     .panel-header-actions .header-action-close {
         display: none;
     }
@@ -3579,7 +3588,7 @@ html.section-pages .panel.page-active:hover {
     margin-left: auto;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1179px) {
     html[data-action-bar] .nav {
         display: none;
     }
@@ -3662,7 +3671,7 @@ html.section-pages .panel.page-active:hover {
 }
 
 /* Room at the left for the account avatar (.header-actions), pinned there. */
-@media (max-width: 640px) {
+@media (max-width: 1179px) {
     html[data-action-bar] .action-bar,
     html[data-action-bar] .app-form .modal-actions.action-bar {
         padding-left: var(--bottom-bar-start);

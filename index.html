@@ -1514,6 +1514,15 @@
             <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
             <input type="file" id="import-csv-input" accept=".csv" hidden>
 
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="export-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="export-date-to">
+                </label>
+            </div>
+
             <div class="filters">
                 <select id="tx-account-filter"></select>
                 <input type="text" id="tx-payee-filter" list="tx-payee-options" placeholder="Payee">
@@ -1523,15 +1532,6 @@
 
             <div id="tx-advanced-filters">
                 <form id="export-form">
-                    <div class="export-date-range">
-                        <label>From
-                            <input type="date" id="export-date-from">
-                        </label>
-                        <label>To
-                            <input type="date" id="export-date-to">
-                        </label>
-                    </div>
-
                     <div id="export-filters"></div>
                     <datalist id="export-account-options"></datalist>
 

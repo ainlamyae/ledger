@@ -33,8 +33,8 @@
 | `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* target stays green |
 | Protein over-band | — | Above the top end is a darker green (`#166534`), not red or grey. Below the floor stays red |
 | Calorie Balance vs. target | — | At/beyond target green, short but right side of zero grey, wrong side red |
-| Body Mass vs. its own 7-Day Trend | sign of the week's slope | A day scored red (moved the wrong way since the last reading) regrades to grey if that week's own least-squares trend (`weeklyTrendSeries`) still slopes toward the target. Stall-reds (a flat reading held too long) are untouched — a different signal |
-| Caloric Intake vs. its own 7-Day Average | `withinCalorieTarget` | A red bar (past the target beyond `CALORIE_TARGET_NEAR_FRACTION`) regrades to grey if the 7-day average is still on the target's right side |
+| Body Mass vs. its own 7-Day Trend | sign of the rate | A day scored red (moved the wrong way since the last reading) regrades to grey if the smoothed curve's own trailing-7-day rate (`emaSlopePerSpan`) still points toward the target. Stall-reds (a flat reading held too long) are untouched — a different signal |
+| Caloric Intake vs. its own 7-Day Average | `withinCalorieTarget` | A red bar (past the target beyond `CALORIE_TARGET_NEAR_FRACTION`) regrades to grey if the EMA-smoothed average (`emaSeries`) is still on the target's right side |
 
 ## Body
 
@@ -119,24 +119,22 @@ expected g  = (balance / 7700) × 1000
 - **Measured wins over estimated.** `TEF = f × intake` is the fallback — whenever a day's Physique row has its own TEF column calculated (see [`Physique`](data-model.md#physique)), that figure is used instead, and the tooltip's Digestion row says which one produced the bar (`measured` vs. `est.`). State Trend & Forecast's gray Calorie-Implied Trajectory line gives the same day the same precedence, so the two charts can't disagree about which TEF a given day used.
 - **`deprivation` is zero without that day's own sleep logged** — no basis to apply `η` to, not assumed perfect. The tooltip's `Sleep Deprivation Effect` line only appears when it's nonzero, right before `Expected Fat`/the `Actual Deficit`/`Actual Surplus` figure it feeds. This is the *reverse* question from the calorie-target `D` above (`sleepDeprivationKcal` vs. `sleepAdjustedDeficitKcal`, both `wellness-math.js`) — "how much did last night cost the balance that actually happened" rather than "how much bigger does the planned deficit need to be" — so it multiplies by `(1 − η)` instead of dividing by `η`.
 
-## 7-day dash (all nine scored Health Indicator charts)
+## 7-day trend line (all nine scored Health Indicator charts)
 
 ```
-bucket(i)  = floor((columnCount − 1 − i) / 7)      counted back from today
+ema(i) = i is the first logged day ? value[i]
+                                    : α·value[i] + (1−α)·ema(i−1)     α = 2/(span+1), span = 7
 
-flat       = mean of that bucket's LOGGED days     unlogged days sit out
-sloped     = least-squares fit over that bucket's (columnIndex, kg) pairs,
-             evaluated at all 7 columns            Body Mass only, ≥2 readings
+rate   = ema(i) − ema(i−7)      Body Mass only — regrading and the kg/week tooltip figure
 ```
 
-- **Today sits out of the weekly maths entirely** (`bucketedColumnCount`). It's a day in progress — the food logged by 10am, the steps walked so far — so averaging it in drags the current week down by an amount that shrinks as the day goes on, reporting "this week" as worse than it is. Today's column gets **no dash at all** rather than one drawn from a partial day.
-  - So `count` above is the window minus that trailing column, and the buckets run back from **yesterday**. Today's bucket index is `-1`, which reads as "belongs to no week" everywhere: `buckets.get(-1)` is undefined, so the average is null, and the dash-joining test refuses to connect a segment to it.
-  - Only when the window actually **ends today**. A window ending on a past date has no partial column and keeps all of them.
-  - The arithmetic follows from that: a 28-day window ending today leaves 27 bucketed days — three full weeks plus a 6-day oldest one, since only the oldest bucket may come up short. Four full weeks plus today needs a 29-day window.
-
-- Drawn as a line whose bucket-crossing segments are transparent, so each week is one dash rather than a stepped line with risers.
-- Body Mass folds the fitted endpoints into its kg bounds before padding — a fit extended to the week edges can reach past every reading in it, and the fat-energy twin axis is derived from those same bounds.
-- Sleep averages bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 average to midnight rather than midday.
+- **A continuous exponential moving average, not a fixed weekly bucket** (`emaSeries`, `charts-base.js`). Each day blends its own reading straight into yesterday's already-smoothed value, so there's no calendar-week boundary where the fit resets and the line jumps — the whole curve moves at one steady pace.
+- **Today is not held out.** A logged reading for today updates the average the moment it's entered, same as any other day — unlike the day-in-progress exceptions elsewhere in this doc, there's no partial-day discount here.
+- **An unlogged day carries the last smoothed value forward** rather than breaking the line or sitting out of the average.
+- Drawn as one solid curve (`trendLineDataset`) in the panel's own near-black/near-white neutral (`targetMarkColor()`) — not the dashed violet segments earlier versions of this chart family used — with `monotone` cubic interpolation so the curve can't overshoot past a local high or low into a bump the data never had.
+- **Body Mass alone also derives a rate** (`emaSlopePerSpan`): the smoothed curve's own change over the trailing 7 days, read off two points on the one continuous curve rather than re-fit each week. Used both to regrade a red bar and quoted in the tooltip as `kg/week`.
+- Body Mass folds this smoothed series into its kg bounds before padding, and the fat-energy twin axis is derived from those same bounds.
+- Sleep smooths bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 blend toward midnight rather than midday.
 
 ## State Trend & Forecast
 

@@ -86,32 +86,37 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
   // ACTIVITY_TARGET_MIN's minutes/kcal at today's body mass — same pinned-vs-flat
   // rule the Physical Activity tile/chart use (getActivityTargetMin/Kcal, wellness-math.js),
   // so this row can't drift from what "hitting the workout goal" means elsewhere.
-  const desireMin = Math.round(getActivityTargetMin(bodyMassKg));
-  const desireKcal = Math.round(getActivityTargetKcal(bodyMassKg));
-  const targetRow = document.createElement('tr');
-  targetRow.className = 'calc-breakdown-target';
-  targetRow.append(
-    makeCell('Desire', 'Workout duration/burn goal — from Tune and Settings, not today\'s Workout'),
-    makeCell(''),
-    makeCell(''),
-    makeCell(String(desireMin)),
-    makeCell(String(desireKcal)),
-  );
-  tbody.appendChild(targetRow);
+  // Only today's own form: every other day is read after the fact, so "still left
+  // to reach today's goal" doesn't apply to it the way it does to the one day
+  // actually being logged.
+  if (physiqueField('date').value === isoFromDate(new Date())) {
+    const desireMin = Math.round(getActivityTargetMin(bodyMassKg));
+    const desireKcal = Math.round(getActivityTargetKcal(bodyMassKg));
+    const targetRow = document.createElement('tr');
+    targetRow.className = 'calc-breakdown-target';
+    targetRow.append(
+      makeCell('Desire', 'Workout duration/burn goal — from Tune and Settings, not today\'s Workout'),
+      makeCell(''),
+      makeCell(''),
+      makeCell(String(desireMin)),
+      makeCell(String(desireKcal)),
+    );
+    tbody.appendChild(targetRow);
 
-  // Remaining — Desire minus Total, the duration/burn still left to hit the goal. Left
-  // unclamped, so once the Total overshoots the Desire it reads as a negative surplus
-  // rather than a flat zero.
-  const remainingRow = document.createElement('tr');
-  remainingRow.className = 'calc-breakdown-remaining';
-  remainingRow.append(
-    makeCell('Remain', 'Desire − Total — duration/burn still left to reach the goal (negative once you\'ve passed it)'),
-    makeCell(''),
-    makeCell(''),
-    makeCell(String(Math.round(desireMin - minutes))),
-    makeCell(String(Math.round(desireKcal - calories))),
-  );
-  tbody.appendChild(remainingRow);
+    // Remaining — Desire minus Total, the duration/burn still left to hit the goal. Left
+    // unclamped, so once the Total overshoots the Desire it reads as a negative surplus
+    // rather than a flat zero.
+    const remainingRow = document.createElement('tr');
+    remainingRow.className = 'calc-breakdown-remaining';
+    remainingRow.append(
+      makeCell('Remain', 'Desire − Total — duration/burn still left to reach the goal (negative once you\'ve passed it)'),
+      makeCell(''),
+      makeCell(''),
+      makeCell(String(Math.round(desireMin - minutes))),
+      makeCell(String(Math.round(desireKcal - calories))),
+    );
+    tbody.appendChild(remainingRow);
+  }
 
   document.getElementById('physique-activity-breakdown').hidden = false;
 }

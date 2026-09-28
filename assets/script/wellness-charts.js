@@ -795,10 +795,18 @@ function renderWellnessBodyMassChart(entries) {
       labels: dates,
       datasets: [
         {
-          type: 'bar',
+          // Dots, not bars — same style as the Physical Activity chart's own
+          // "Actual Burn" dots (showLine: false, pointRadius/pointBorder below),
+          // just colored the way the bars used to be (barColors).
+          type: 'line',
           label: 'Body Mass',
           data: values,
-          backgroundColor: barColors,
+          showLine: false,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: barColors,
+          pointBorderColor: chartColor('--chart-point-border'),
+          pointBorderWidth: 1.5,
           order: 2,
         },
         trendLineDataset('7-Day Trend', trendSeries),
@@ -806,7 +814,7 @@ function renderWellnessBodyMassChart(entries) {
         // all anchored to the calorie-implied trajectory and omitted together whenever the
         // profile is incomplete (no BMR → no trajectory). fill: '-1' chain runs upper →
         // lower (yellow fill) → Muscle Loss (red fill), matching State Trend & Forecast.
-        // Band order (3) sits behind bars (2); lines use lower orders to read on top.
+        // Band order (3) sits behind the dots (2); lines use lower orders to read on top.
         ...(calorieTrendMap.size > 0 && swingKg !== null ? [
           {
             type: 'line',

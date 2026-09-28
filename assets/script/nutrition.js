@@ -33,7 +33,7 @@ const NUTRITION_TITLE_CASE_MINOR_WORDS = new Set([
   'nor', 'of', 'on', 'or', 'so', 'the', 'to', 'with', 'yet',
 ]);
 
-// Shared by the Nutrition form's own Normalize button and Physique's bulk
+// Shared by the Nutrition form's own Norm button and Physique's bulk
 // Capitalize Names — collapses stray whitespace and capitalizes each word,
 // except a minor joining word (NUTRITION_TITLE_CASE_MINOR_WORDS) unless it
 // leads the name, so a name typed/logged in any casing settles on one
@@ -96,7 +96,7 @@ let nSort = { key: 'uses', dir: -1 };
 let nCurrentPage = 1;
 let nutritionSheetId = null;
 let editingNutritionRow = null;
-// The entry Normalize needs beyond what's already sitting in the form's own
+// The entry Norm needs beyond what's already sitting in the form's own
 // fields: a saved-but-not-yet-repulled Micronutrients panel (entry.micronutrients)
 // lives only on the entry, never in an input, so there'd be nothing to scale
 // without holding onto it. null in Add mode (nothing saved yet to fall back on).
@@ -285,7 +285,7 @@ async function appendNutritionRow(entry) {
 // panel (already scaled to Amount — see column L comment below) — the
 // estimate resolvedNutritionMacros below falls back to on any of Fiber/Fat/
 // Carb/TEF (F:I) you haven't typed a real number into yourself. All null on
-// a row that's never had Pull Micronutrients run.
+// a row that's never had Complete run.
 function computedNutritionMacros(n) {
   const parsed = parseMicronutrients(n.micronutrients);
   if (!parsed) return { fiber: null, fat: null, carb: null };
@@ -375,7 +375,7 @@ function getFilteredNutritionEntries() {
   });
 }
 
-// Malformed JSON in column L (should never happen — only Pull Micronutrients
+// Malformed JSON in column L (should never happen — only Complete
 // writes it — but a hand-edited cell shouldn't be able to break the list
 // render) reads back as "nothing pulled yet" rather than throwing.
 function parseMicronutrients(raw) {
@@ -1102,7 +1102,7 @@ async function scanNutritionLabel(e) {
 // match a new gram figure" idea pullNutritionFromUsda already does against
 // USDA's per-100g panel, just applied to whatever's currently typed instead
 // of a USDA candidate. Requires a real gram figure to scale from (same
-// parseGramsFromAmount Calculate and Pull Micronutrients both depend on);
+// parseGramsFromAmount Calculate and Complete both depend on);
 // there's no sane 100g equivalent for a count-only Amount like "2 eggs".
 function normalizeIngredientForm() {
   clearFieldError('nutrition-form-error');
@@ -1506,7 +1506,7 @@ async function mergeSelectedNutritionEntries() {
 }
 
 // Beside 🔗 Merge Selected: title-cases every selected row's Name
-// (titleCaseIngredientName — same casing the Add/Edit form's own Normalize
+// (titleCaseIngredientName — same casing the Add/Edit form's own Norm
 // button applies) and writes back only the rows that actually change,
 // leaving every other field untouched. Local only, no AI, no lookup.
 async function capitalizeSelectedNutritionNames() {

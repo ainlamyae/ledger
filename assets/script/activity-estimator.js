@@ -14,7 +14,7 @@
 
 // How long each note-line unit actually takes. Only the two units that need
 // converting are tunable — seconds per rep here, steps per minute via
-// WORKOUT_STEPS_PER_MIN (toActivityMinutes, charts.js). A "135sec" hold and a
+// WORKOUT_STEPS_PER_MIN (toActivityMinutes, wellness-charts.js). A "135sec" hold and a
 // "30min" swim already carry their own time, so there's nothing to set on those.
 //
 // Seconds per rep is a lifting tempo, and 3 s is a brisk one — a machine rep
@@ -90,7 +90,7 @@ function parseWorkoutNoteLines(notes) {
 // A parsed line's active seconds, net of rest — the one place the plan's
 // duration math lives, read by both Log Workout's prefill and Calculate so the
 // two can't drift apart on the same exercises. Steps convert via the same
-// steps↔minutes ratio the Activity chart uses (toActivityMinutes, charts.js),
+// steps↔minutes ratio the Activity chart uses (toActivityMinutes, wellness-charts.js),
 // which reads WORKOUT_STEPS_PER_MIN.
 function activeSecondsForNoteLine(line) {
   if (line.type === 'reps') return line.reps * workoutRepSec();
@@ -148,13 +148,4 @@ function estimateWorkoutActivity(notes, bodyMassKg) {
     unmatchedNames,
     perLine,
   };
-}
-
-// Latest logged body mass (kg), read off the Physique tab — same lookup
-// insight.js's gatherProfileSnapshot uses. Null if none has ever been logged.
-function getLatestBodyMassKg() {
-  const bodyMassEntries = physiqueAsWellnessEntries()
-    .filter((e) => e.category === 'Body Mass' && e.amount !== null)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  return bodyMassEntries.length ? bodyMassEntries[bodyMassEntries.length - 1].amount : null;
 }

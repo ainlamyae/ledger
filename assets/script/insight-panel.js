@@ -1,5 +1,5 @@
-// The one "Health Insight" panel, shared by every AI read (Wellness, Food,
-// Activity, Protein Sources, Health Plan). The first three used to be separate
+// The one "Health Insight" panel, shared by every AI read (Plan, Wellness, Food,
+// Micronutrient, Activity, Protein, Pattern). The first three used to be separate
 // panels running an identical flow — pick a range, compute a local preview,
 // optionally ask a question, POST to Groq, render, persist — so everything except
 // the real per-mode differences (what data to gather, how to phrase it, which
@@ -344,7 +344,7 @@ async function runInsightGeneration() {
 
     // Persisted per mode, so a fresh page load can show the last read once that
     // mode is loaded again instead of going blank.
-    const generatedAt = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const generatedAt = localTimestamp(new Date());
     try {
       await saveSettingValues({
         [mode.resultKeys[0]]: text,

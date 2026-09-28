@@ -89,6 +89,13 @@ function isoFromDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+// Local "YYYY-MM-DD HH:mm", for timestamps shown to the user.
+function localTimestamp(date) {
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${isoFromDate(date)} ${hh}:${mm}`;
+}
+
 function dayNameFromDate(dateStr) {
   return dateFromIso(dateStr).toLocaleDateString(undefined, { weekday: 'long' });
 }

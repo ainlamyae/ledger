@@ -47,11 +47,6 @@ function ghostRightAxis() {
   };
 }
 
-// Mirror, for a chart whose real axis sits on the right (Body Mass's kg scale).
-function ghostLeftAxis() {
-  return { ...ghostRightAxis(), position: 'left' };
-}
-
 // The section's one mark for "the figure that applies here": a hairline floating bar
 // (`[from, to]`, `grouped: false`) overlaying its own column. Shared so the mark means
 // the same thing everywhere. One `values` entry per column; null leaves it unmarked.
@@ -333,12 +328,6 @@ function maskedUnitTick(unit, decimals = null) {
   };
 }
 
-function maskedValueTooltipLabel(item) {
-  const prefix = item.dataset.label ? `${item.dataset.label}: ` : '';
-  const value = String(item.formattedValue);
-  return `${prefix}${privacyMode ? maskDigits(value) : value}`;
-}
-
 // Dates read YYYY-MM-DD everywhere, chart ticks and hovers included.
 function formatIsoDateShort(iso) {
   return new Date(parseIsoDateUTC(iso)).toISOString().slice(0, 10);
@@ -396,13 +385,5 @@ function wellnessCategoryXScale(dates) {
     // decided — which is exactly the kind of divergence afterBuildTicks was meant to
     // rule out. Off here, the ticks this function chose are the ticks that get drawn.
     ticks: { maxRotation: 45, minRotation: 45, autoSkip: false, callback: shortDateTickCallback },
-  };
-}
-
-// Fat energy runs to six figures against a capped axis width, so "175k kcal".
-function maskedThousandsTick(unit) {
-  return (v) => {
-    const label = `${Math.round(v / 1000)}k ${unit}`;
-    return privacyMode ? maskDigits(label) : label;
   };
 }

@@ -281,7 +281,7 @@ function renderActivityRotationChart({ from, to }) {
 }
 
 // No From/To pair of its own, same as Protein Source Rotation: the Health
-// Indicators panel's wellnessDateRange() (wellness-charts.js) is the one
+// Indicator panel's wellnessDateRange() (wellness-charts.js) is the one
 // window every chart in it reads, and initWellnessRangeControl() redraws this
 // on a change.
 function initActivityRotationPanel() {

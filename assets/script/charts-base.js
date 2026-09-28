@@ -70,118 +70,49 @@ function targetCapHalf(axisSpan) {
 // a mid-tone in both themes, and it already means "unscored bar" on the same chart.
 const WEEKLY_AVG_COLOR = '#7c3aed';
 
-// Counted back from the last BUCKETED column — see bucketedColumnCount: that's the
-// last column of the window, except when the window ends today, in which case it's
-// yesterday. So the most recent seven complete days are one whole bucket and only
-// the oldest can come up short.
-//
-// Returns -1 for a column past the bucketed range (today), which every caller reads
-// as "belongs to no week": buckets.get(-1) is undefined, so the column averages to
-// null and weeklyAverageDataset's sameBucket() refuses to join a dash to it.
-function weeklyBucketIndex(i, count) {
-  return Math.floor((count - 1 - i) / 7);
-}
-
-// How many of `dates`' columns the weekly maths may bucket. Today is left out
-// whenever it's the last column: it's a day in progress — the food logged by
-// 10am, the steps walked so far — so averaging it in drags the current week down
-// by an amount that shrinks as the day goes on, and reports "this week" as worse
-// than it is. A window ending on a past date has no such column and keeps all of
-// them.
-function bucketedColumnCount(dates) {
-  const endsToday = dates.length > 0 && dates[dates.length - 1] === isoFromDate(new Date());
-  return endsToday ? dates.length - 1 : dates.length;
-}
-
-// Per column, the mean of its 7-day bucket. Nulls are unlogged days and sit out (avg()'s
-// rule), so a missing log can't drag the week under a target it was never measured
-// against. A bucket with nothing logged stays null.
-function weeklyAverageSeries(values, columnsToBucket = values.length) {
-  const buckets = new Map();
-  values.forEach((v, i) => {
-    if (v === null || v === undefined) return;
-    const b = weeklyBucketIndex(i, columnsToBucket);
-    if (b < 0) return;
-    const acc = buckets.get(b) ?? { total: 0, n: 0 };
-    buckets.set(b, { total: acc.total + v, n: acc.n + 1 });
-  });
-  return values.map((_, i) => {
-    const acc = buckets.get(weeklyBucketIndex(i, columnsToBucket));
-    return acc ? acc.total / acc.n : null;
+// A continuous exponential moving average, not a fixed weekly bucket: each day blends
+// today's own reading into yesterday's already-smoothed value, rather than every column
+// in a calendar week sharing one fit that resets at the boundary — the reset is what
+// made the old per-week trend jump at every seventh column even when the data barely
+// changed. alpha = 2/(span+1) gives it roughly a `span`-day memory. An unlogged day
+// carries the last smoothed value forward rather than breaking the line.
+function emaSeries(values, span = 7) {
+  const alpha = 2 / (span + 1);
+  let prev = null;
+  return values.map((v) => {
+    if (v === null || v === undefined) return prev;
+    prev = prev === null ? v : alpha * v + (1 - alpha) * prev;
+    return prev;
   });
 }
 
-// For bars that are an absolute LEVEL, not a per-day quantity (Body Mass): a flat mean
-// says almost nothing there, so each week gets the least-squares fit through its own
-// readings, evaluated across all seven columns. Columns are consecutive days, so the
-// slope is per day. One reading yields just that reading — a flat dash would claim the
-// week didn't move, which isn't measured. None yields nothing.
-function weeklyTrendSeries(values, columnsToBucket = values.length) {
-  const points = new Map();
-  values.forEach((v, i) => {
-    if (v === null || v === undefined) return;
-    const b = weeklyBucketIndex(i, columnsToBucket);
-    if (b < 0) return;
-    if (!points.has(b)) points.set(b, { xs: [], ys: [] });
-    points.get(b).xs.push(i);
-    points.get(b).ys.push(v);
-  });
-
-  const fits = new Map();
-  points.forEach((p, b) => {
-    if (p.xs.length >= 2) fits.set(b, linearRegression(p.xs, p.ys));
-  });
-
-  const series = values.map((v, i) => {
-    const bucket = weeklyBucketIndex(i, columnsToBucket);
-    // Today: no fit, and no bare reading either. Falling back to `v` here would draw
-    // a lone dot on a "7-Day Trend" line from a single day of data.
-    if (bucket < 0) return null;
-    const fit = fits.get(bucket);
-    if (fit) return fit.slope * i + fit.intercept;
-    return v === null || v === undefined ? null : v;
-  });
-  // Per column so the tooltip needn't re-derive the bucket; per week because that's the
-  // figure worth acting on.
-  const slopePerWeek = values.map((_, i) => {
-    const fit = fits.get(weeklyBucketIndex(i, columnsToBucket));
-    return fit ? fit.slope * 7 : null;
-  });
-  return { series, slopePerWeek };
+// The smoothed series' own rate of change over the trailing `span` days — comparable to
+// the old per-week slope, but read off two points on one continuous curve instead of a
+// fit that jumps at a bucket boundary. Null until there's a full span of smoothed values
+// behind it.
+function emaSlopePerSpan(series, span = 7) {
+  return series.map((_, i) => (i >= span && series[i] !== null && series[i - span] !== null
+    ? series[i] - series[i - span]
+    : null));
 }
 
-// One dashed segment per week — flat for an average, sloped for a trend. The segment
-// crossing a bucket boundary is painted transparent, so the weeks read as separate
-// dashes rather than one line joined by vertical risers.
-function weeklyAverageDataset(label, series, extra = {}, columnsToBucket = series.length) {
-  // Bounds-checked: an out-of-range index can otherwise land back on a real bucket
-  // number and hide a one-column week. A -1 bucket (today) matches nothing, so the
-  // segment into today's column is transparent like any other week boundary.
-  const sameBucket = (a, b) => a >= 0 && b >= 0 && a < series.length && b < series.length
-    && weeklyBucketIndex(a, columnsToBucket) >= 0
-    && weeklyBucketIndex(a, columnsToBucket) === weeklyBucketIndex(b, columnsToBucket);
-  const hasValue = (i) => series[i] !== null && series[i] !== undefined;
-  const joined = (a, b) => sameBucket(a, b) && hasValue(a) && hasValue(b);
+// The trend line: a solid curve in the dark/light neutral every other reference
+// mark on these charts uses. `monotone` interpolation keeps the curve from overshooting
+// past a local high/low into a bump the data never had.
+function trendLineDataset(label, series, extra = {}) {
   return {
     type: 'line',
     label,
     data: series,
-    borderColor: WEEKLY_AVG_COLOR,
-    // Matched to the target caps, which land near 2px on a 200-240px plot area.
+    borderColor: targetMarkColor(),
     borderWidth: 2,
-    borderDash: [6, 4],
-    tension: 0,
-    segment: {
-      borderColor: (c) => (sameBucket(c.p0DataIndex, c.p1DataIndex) ? WEEKLY_AVG_COLOR : 'transparent'),
-    },
-    // With no drawable segment either side, show a dot rather than nothing — the
-    // clipped oldest bucket, or a Body Mass week holding one weigh-in.
-    pointRadius: (c) => (hasValue(c.dataIndex)
-      && !joined(c.dataIndex, c.dataIndex - 1) && !joined(c.dataIndex, c.dataIndex + 1) ? 2 : 0),
-    pointBackgroundColor: WEEKLY_AVG_COLOR,
+    fill: false,
+    tension: 0.3,
+    cubicInterpolationMode: 'monotone',
+    spanGaps: false,
+    pointRadius: 0,
     pointHitRadius: 0,
     isWeeklyAverage: true,
-    // Between the bars (2) and the target caps (0), so the cap stays the top mark.
     order: 1,
     ...extra,
   };

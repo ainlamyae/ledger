@@ -495,7 +495,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="nutrition-search" placeholder="Search classification or ingredient name...">
+                <input type="text" id="nutrition-search" placeholder="Search group or ingredient name...">
             </div>
 
             <div class="table-responsive">
@@ -503,7 +503,7 @@
                     <thead>
                     <tr>
                         <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
-                        <th class="sortable" data-sort="classification">Classification</th>
+                        <th class="sortable" data-sort="group">Group</th>
                         <th class="sortable" data-sort="name">Name</th>
                         <th class="sortable" data-sort="amount">Amount</th>
                         <th class="sortable" data-sort="calories" title="Calories">Cal</th>
@@ -513,7 +513,6 @@
                         <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
                         <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
                         <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
-                        <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click Complete to fill this in. Shows and sorts by how many micronutrients are non-zero.">Micro</th>
                         <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
                         <th></th>
                     </tr>
@@ -1447,64 +1446,6 @@
         </div>
     </div>
 
-        <div class="panel" id="financial-insight-panel" data-route="insight">
-            <h2>Insight</h2>
-
-            <div class="insight-mode-actions" id="financial-insight-mode-actions">
-                <button type="button" id="financial-insight-load-btn" class="page-tile" data-route="snapshot" data-route-view aria-pressed="false" title="Net worth, cash flow, spending by category and accounts"><span class="page-tile-title">Snapshot</span></button>
-            </div>
-
-            <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
-                <textarea id="financial-insight-question" rows="4" placeholder="e.g. Should I move cash into investments?"></textarea>
-            </label>
-
-            <p class="hint" id="financial-insight-status"></p>
-
-            <div id="financial-insight-preview" class="insight-data-preview" hidden></div>
-
-            <div id="financial-insight-category-preview" hidden>
-                <div class="table-responsive">
-                    <table id="financial-insight-category-table">
-                        <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th>Previous Month</th>
-                            <th>Quarter avg</th>
-                            <th>Year avg</th>
-                            <th>Lifelong avg</th>
-                        </tr>
-                        </thead>
-                        <tbody id="financial-insight-category-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="financial-insight-accounts-preview" hidden>
-                <div class="table-responsive">
-                    <table id="financial-insight-accounts-table">
-                        <thead>
-                        <tr>
-                            <th>Account</th>
-                            <th>Type</th>
-                            <th>Balance</th>
-                            <th>Market Value</th>
-                        </tr>
-                        </thead>
-                        <tbody id="financial-insight-accounts-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="panel-actions" data-page-actions>
-                <button type="button" id="financial-insight-generate-btn" class="btn btn-icon" disabled title="Send to AI (load your financial data first)" aria-label="Send to AI">🤖</button>
-                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
-            </div>
-
-            <p id="financial-insight-generated-at" class="hint" hidden></p>
-            <div id="financial-insight-body" class="insight-body"></div>
-            <p id="financial-insight-form-error" class="status" hidden></p>
-        </div>
-
         <div class="panel" data-route="transaction">
             <div class="panel-header">
                 <h2>Transaction</h2>
@@ -1633,6 +1574,64 @@
             </div>
 
             <div class="pagination" id="breakdown-pagination"></div>
+        </div>
+
+        <div class="panel" id="financial-insight-panel" data-route="insight">
+            <h2>Insight</h2>
+
+            <div class="insight-mode-actions" id="financial-insight-mode-actions">
+                <button type="button" id="financial-insight-load-btn" class="page-tile" data-route="snapshot" data-route-view aria-pressed="false" title="Net worth, cash flow, spending by category and accounts"><span class="page-tile-title">Snapshot</span></button>
+            </div>
+
+            <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
+                <textarea id="financial-insight-question" rows="4" placeholder="e.g. Should I move cash into investments?"></textarea>
+            </label>
+
+            <p class="hint" id="financial-insight-status"></p>
+
+            <div id="financial-insight-preview" class="insight-data-preview" hidden></div>
+
+            <div id="financial-insight-category-preview" hidden>
+                <div class="table-responsive">
+                    <table id="financial-insight-category-table">
+                        <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Previous Month</th>
+                            <th>Quarter avg</th>
+                            <th>Year avg</th>
+                            <th>Lifelong avg</th>
+                        </tr>
+                        </thead>
+                        <tbody id="financial-insight-category-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="financial-insight-accounts-preview" hidden>
+                <div class="table-responsive">
+                    <table id="financial-insight-accounts-table">
+                        <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Type</th>
+                            <th>Balance</th>
+                            <th>Market Value</th>
+                        </tr>
+                        </thead>
+                        <tbody id="financial-insight-accounts-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-actions" data-page-actions>
+                <button type="button" id="financial-insight-generate-btn" class="btn btn-icon" disabled title="Send to AI (load your financial data first)" aria-label="Send to AI">🤖</button>
+                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
+            </div>
+
+            <p id="financial-insight-generated-at" class="hint" hidden></p>
+            <div id="financial-insight-body" class="insight-body"></div>
+            <p id="financial-insight-form-error" class="status" hidden></p>
         </div>
     </section>
 
@@ -2211,7 +2210,9 @@
                 <input type="checkbox" id="physique-is-pattern">
                 Pattern
             </label>
-            <div class="form-row">
+            <!-- Both rows are hidden while Pattern is ticked (syncPhysiquePatternMode):
+                 a pattern has no date, body mass or sleep of its own. -->
+            <div class="form-row" id="physique-date-row">
                 <label>Date
                     <input type="date" id="physique-date">
                 </label>
@@ -2219,7 +2220,7 @@
                     <input type="text" id="physique-body-mass" inputmode="decimal" placeholder="e.g. 94 (kg)">
                 </label>
             </div>
-            <div class="form-row">
+            <div class="form-row" id="physique-sleep-row">
                 <label>Bed
                     <input type="time" id="physique-bedtime">
                 </label>
@@ -2504,10 +2505,10 @@
         <h2 id="nutrition-modal-title">Add Ingredient</h2>
 
         <form id="nutrition-form" class="app-form">
-            <label>Classification
-                <input type="text" id="nutrition-classification" list="nutrition-classification-options" placeholder="optional — e.g. Dairy, Poultry, Grain">
+            <label>Group
+                <input type="text" id="nutrition-group" list="nutrition-group-options" placeholder="optional — e.g. Dairy, Poultry, Grain">
             </label>
-            <datalist id="nutrition-classification-options"></datalist>
+            <datalist id="nutrition-group-options"></datalist>
             <label>Name
                 <input type="text" id="nutrition-name">
             </label>
@@ -2515,7 +2516,7 @@
                 <input type="text" id="nutrition-protein-percent" placeholder="optional — leave blank to exclude from Protein Source Rotation">
             </label>
             <label title="Complete never changes Amount">Amount
-                <input type="text" id="nutrition-amount" placeholder="1 scoop (32g)">
+                <input type="text" id="nutrition-amount" placeholder="32g (1x)">
             </label>
 
             <!-- One row per value, Tune's layout: lock tick, name, box, unit. A ticked row is

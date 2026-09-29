@@ -95,7 +95,7 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 | F — Sleep | Number | hours, wake minus bed, wrapping past midnight. **Stored, not recalculated per render** — written on every save from Bed/Wake |
 | G — Deprivation | Number | kcal, the day's Sleep Deprivation Effect (SD), from its Body Mass, TEI, AEE, TEF and Sleep against the profile in Settings. Stored the same way as Sleep, so it reflects the profile and BMR basis at the time the day was last saved — re-run Calculate to refresh it |
 | H — Consumption | Text | Free text, one food per line |
-| I — Breakdown | Text (JSON) | Calculate's per-item breakdown — `{name, amount, calories, protein, fiber, fat, carbohydrate, tef, source, noteLine, newRow}` per row, in that key order (matching `Nutrition`'s own column order below), with `fiber`/`fat`/`carbohydrate`/`tef` present only once that ingredient has a typed figure on its `Nutrition` row or its 🧬 Micronutrients has been pulled. Rendered as one table under the form; the table lists it as an item count with the names on hover `amount` is grams (`"62g"`) whenever the food's Nutrition row gives a weight per unit (`1 scoop (31g)`); `"×N"` remains only for a food whose row names no weight. Older `×N` amounts are rewritten to grams once on load (`convertPhysiqueBreakdownAmountsToGrams`). |
+| I — Breakdown | Text (JSON) | Calculate's per-item breakdown — `{name, amount, calories, protein, fiber, fat, carbohydrate, tef, source, noteLine, newRow}` per row, in that key order (matching `Nutrition`'s own column order below), with `fiber`/`fat`/`carbohydrate`/`tef` present only once that ingredient has a typed figure on its `Nutrition` row or its 🧬 Micronutrients has been pulled. Rendered as one table under the form; the table lists it as an item count with the names on hover `amount` is grams (`"62g"`) whenever the food's Nutrition row gives a weight per unit (`31g (1 scoop)`); `"×N"` remains only for a food whose row names no weight. Older `×N` amounts are rewritten to grams once on load (`convertPhysiqueBreakdownAmountsToGrams`). |
 | J — TEI | Number | kcal. Hidden on the form — Calculate fills it, and the breakdown table's Total row is where you read it |
 | K — Protein | Number | grams. Hidden on the form, same as TEI |
 | L — Dietary Fiber | Number | grams. Hidden on the form, same as TEI — summed from the day's own Breakdown items (their own typed Fiber, or their pulled 🧬 Micronutrients) |
@@ -130,9 +130,9 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 
 | Column | Type | Notes |
 |---|---|---|
-| A — Classification | Text | Free-text grouping (`Dairy`, `Poultry`, `Grain`). Drives the Food insight grouping and Protein Source Rotation colours. Left blank by Calculate's auto-bank |
+| A — Group | Text | Free-text grouping (`Dairy`, `Poultry`, `Grain`). Drives the Food insight grouping and Protein Source Rotation colours. Left blank by Calculate's auto-bank |
 | B — Name | Text | Matched case-insensitively against the text *you typed*, never the AI's rephrasing |
-| C — Amount | Text | Needs a gram figure (`100g`, `1 scoop (32g)`) to scale by weight, or a leading count (`1 rice cake`) to scale by count |
+| C — Amount | Text | Grams first: needs a gram figure (`100g`, `32g (1 scoop)`, `325g (1x)`) to scale by weight, or a count (`1 rice cake`) to scale by count. `1x (325g)`-style amounts are turned around to grams-first on save and once on load |
 | D — Calories | Number | kcal for the stated Amount |
 | E — Protein | Number | grams for the stated Amount |
 | F — Fiber | Number | grams for the stated Amount. Optional — typed by hand, pre-filled in the Edit Ingredient form from the pulled 🧬 Micronutrients panel (column L) when you haven't typed one yourself |
@@ -144,7 +144,7 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 
 - **Fiber/Fat/Carbohydrate/TEF resolve typed-over-estimated** (`resolvedNutritionMacros`, `nutrition.js`): your own saved figure when there is one, otherwise Fiber/Fat/Carbohydrate read off the pulled Micronutrients panel and TEF computed from Atwater/TEF-share — same fallback order the Physique breakdown table uses per-ingredient. The Edit Ingredient form pre-fills all four from this same resolution, so opening a row, reviewing the estimate and hitting Save is what "confirms" it as a typed figure from then on.
 - **Protein/100kcal** used to be a computed Density column; removed in favor of the Fiber/Fat/Carbohydrate/TEF columns above.
-- Rows are added three ways: manually, via the breakdown's 💾 button (or ✏️, which opens the same Add Ingredient form pre-filled before banking — see [Food logging](health-formulas.md#food-logging-calculate)), or auto-banked by Recalculate Selected — a fresh row this way carries Classification (blank) through Protein always, and Fiber/Fat/Carb too whenever a typed anchor or a fresh USDA lookup supplied one that Calculate run; TEF/Verification/Percent/Micronutrients are still left for you (or 🧬 Pull Micronutrients) to fill in.
+- Rows are added three ways: manually, via the breakdown's 💾 button (or ✏️, which opens the same Add Ingredient form pre-filled before banking — see [Food logging](health-formulas.md#food-logging-calculate)), or auto-banked by Recalculate Selected — a fresh row this way carries Group (blank) through Protein always, and Fiber/Fat/Carb too whenever a typed anchor or a fresh USDA lookup supplied one that Calculate run; TEF/Verification/Percent/Micronutrients are still left for you (or 🧬 Pull Micronutrients) to fill in.
 - Lookup tries exact match, then folds a trailing "s" off both sides, before reporting a miss.
 
 ## `Contact`

@@ -50,7 +50,7 @@ const CONFIG = {
 python scripts/serve.py 8000
 ```
 
-Then open `http://localhost:8000`. No build step. `serve.py` is `python -m http.server` plus GitHub Pages' `404.html` fallback, which row Edit addresses such as `/health/nutrition/onion/` need.
+Then open `http://localhost:8000`. No build step. `serve.py` is `python -m http.server` plus GitHub Pages' `404.html` fallback, which row Edit addresses such as `/health/nutrition/onion/` and `/health/physique/pattern-1/` need — plain `python -m http.server` shows *Error code: 404 — File not found* for them. Use `python3` where `python` isn't installed (e.g. WSL).
 
 ## 5. Enable version stamping
 

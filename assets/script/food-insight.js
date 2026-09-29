@@ -65,7 +65,7 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
         // Column A of the Nutrition row this ingredient matches. Blank
         // when the ingredient isn't in the table yet, or is but hasn't been
         // classified — both land in the Unclassified bucket below.
-        classification: findNutritionEntry(agg.name)?.classification || '',
+        group: findNutritionEntry(agg.name)?.group || '',
         calories: Math.round(agg.calories),
         protein: Math.round(agg.protein * 10) / 10,
         amountLabel: formatAggregatedAmount(grams, count),
@@ -83,15 +83,15 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
 
 const FOOD_UNCLASSIFIED_LABEL = 'Unclassified';
 
-// The same ingredients bucketed by classification, each bucket carrying its own
+// The same ingredients bucketed by group, each bucket carrying its own
 // totals — "which food groups is this diet actually built on" is a different
 // question from "which single ingredients dominate", and only the grouped view
 // can answer it. Ingredients keep their calorie ordering inside each bucket.
-function groupFoodIntakeByClassification(rows) {
+function groupFoodIntakeByGroup(rows) {
   const byClass = new Map();
   rows.forEach((r) => {
-    const key = r.classification || FOOD_UNCLASSIFIED_LABEL;
-    if (!byClass.has(key)) byClass.set(key, { classification: key, items: [], calories: 0, protein: 0 });
+    const key = r.group || FOOD_UNCLASSIFIED_LABEL;
+    if (!byClass.has(key)) byClass.set(key, { group: key, items: [], calories: 0, protein: 0 });
     const group = byClass.get(key);
     group.items.push(r);
     group.calories += r.calories;
@@ -103,8 +103,8 @@ function groupFoodIntakeByClassification(rows) {
     // Biggest calorie contributor first, but the unclassified bucket always
     // sinks to the bottom — it's a gap in the catalog, not a food group.
     .sort((a, b) => {
-      const aUnknown = a.classification === FOOD_UNCLASSIFIED_LABEL;
-      const bUnknown = b.classification === FOOD_UNCLASSIFIED_LABEL;
+      const aUnknown = a.group === FOOD_UNCLASSIFIED_LABEL;
+      const bUnknown = b.group === FOOD_UNCLASSIFIED_LABEL;
       if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
       return b.calories - a.calories;
     });
@@ -112,11 +112,11 @@ function groupFoodIntakeByClassification(rows) {
 
 function formatFoodGroupSummary(group) {
   const n = group.items.length;
-  return `${group.classification} — ${n} ingredient${n === 1 ? '' : 's'}, ${group.calories} kcal, ${group.protein} g protein`;
+  return `${group.group} — ${n} ingredient${n === 1 ? '' : 's'}, ${group.calories} kcal, ${group.protein} g protein`;
 }
 
 // Converts a unit count (e.g. 23 eggs) to grams using the Nutrition
-// table's own per-unit weight for that ingredient (e.g. "1x (58g)" -> 58g
+// table's own per-unit weight for that ingredient (e.g. "58g (1x)" -> 58g
 // each), so the summary reads in one consistent unit instead of a bare,
 // hard-to-picture count — the count-branch Amount format ("×N") never
 // carries a real weight itself (see calorie-estimator.js), only the
@@ -191,7 +191,7 @@ function renderFoodInsightPreview(rows, from, to) {
   let totalCarbohydrate;
   let totalTef;
 
-  groupFoodIntakeByClassification(rows).forEach((g) => {
+  groupFoodIntakeByGroup(rows).forEach((g) => {
     const groupRow = document.createElement('tr');
     groupRow.className = 'insight-food-group-row';
     const groupCell = document.createElement('td');
@@ -306,8 +306,8 @@ const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missin
 // without knowing the body it's feeding.
 function formatFoodInsightPrompt(rows, from, to, question) {
   const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)).join('\n');
-  const header = `Aggregated ingredients logged from ${from} to ${to}, grouped by the classification each ingredient is filed under in the user's own ingredient catalog. Each group line gives that group's ingredient count and totals, followed by its ingredients (name (total amount): total calories, total protein, estimated TEF where measured):`;
-  const groups = groupFoodIntakeByClassification(rows);
+  const header = `Aggregated ingredients logged from ${from} to ${to}, grouped by the Group each ingredient is filed under in the user's own ingredient catalog. Each group line gives that group's ingredient count and totals, followed by its ingredients (name (total amount): total calories, total protein, estimated TEF where measured):`;
+  const groups = groupFoodIntakeByGroup(rows);
   const body = groups.length
     ? groups.map((g) => [
       formatFoodGroupSummary(g),
@@ -326,7 +326,7 @@ function formatFoodInsightPrompt(rows, from, to, question) {
 
 const FOOD_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewing a plain list of foods someone logged over a recent period — each ingredient's total amount eaten and the total calories/protein it contributed. No vitamin or mineral data is provided; none was measured. Use your general knowledge of typical food composition to infer which vitamins/minerals this pattern of eating is likely rich in or short on, and answer the user's specific question.
 
-The ingredients are grouped under the classifications the user files them under in their own catalog, and each group line carries that group's ingredient count and calorie/protein totals. Read the diet at that level too, not just ingredient by ingredient: which food groups carry most of the calories and protein, which groups are thin or missing entirely, and how varied the ingredients are within each. A whole group that is absent is usually a stronger signal about likely nutrient gaps than any single ingredient. A group named "Unclassified" is not a food group — those are simply ingredients the user has not classified yet, so judge them individually and do not read anything into the label itself.
+The ingredients are grouped under the Group the user files each one under in their own catalog, and each group line carries that group's ingredient count and calorie/protein totals. Read the diet at that level too, not just ingredient by ingredient: which food groups carry most of the calories and protein, which groups are thin or missing entirely, and how varied the ingredients are within each. A whole group that is absent is usually a stronger signal about likely nutrient gaps than any single ingredient. A group named "Unclassified" is not a food group — those are simply ingredients the user has not classified yet, so judge them individually and do not read anything into the label itself.
 
 The list is preceded by their age, sex, height, current body mass and BMI. Use it: reference intakes for iron, calcium, folate, B12 and protein differ by sex and age, and whether a day's total food is a lot or a little depends on the body eating it. Any of those fields may read "not set" or "not logged" — that means the app doesn't have it, so say what you'd need rather than assuming a figure.
 
@@ -334,9 +334,9 @@ Be explicit that this is an inference from typical food composition, not a lab-m
 
 Write a short plain-text report with exactly these five sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point, put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
-Overview: one or two sentences on the overall inferred nutrient picture this pattern of eating suggests, naming which classifications the diet leans on most.
-Going well: vitamins/minerals this pattern likely covers well, and which classifications supply them.
-Needs attention: vitamins/minerals this pattern likely falls short on, naming any classification that is thin or missing.
+Overview: one or two sentences on the overall inferred nutrient picture this pattern of eating suggests, naming which groups the diet leans on most.
+Going well: vitamins/minerals this pattern likely covers well, and which groups supply them.
+Needs attention: vitamins/minerals this pattern likely falls short on, naming any group that is thin or missing.
 Suggestions: 2-4 concrete, specific food-based ways to close the likely gaps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — do not run them together in one line.
 Answer: directly answers the question included below.
 

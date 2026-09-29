@@ -13,12 +13,12 @@ function formatProteinRotationInsightPrompt(rows) {
     return lines.join('\n');
   }
 
-  lines.push('Protein source rotation — each tracked ingredient\'s target share of the protein target vs. the share actually eaten this window, grouped by classification, largest shortfall first:');
-  let lastClassification = null;
+  lines.push('Protein source rotation — each tracked ingredient\'s target share of the protein target vs. the share actually eaten this window, grouped by Group, largest shortfall first:');
+  let lastGroup = null;
   rows.forEach((r) => {
-    if (r.classification !== lastClassification) {
-      lines.push(`${r.classification}:`);
-      lastClassification = r.classification;
+    if (r.group !== lastGroup) {
+      lines.push(`${r.group}:`);
+      lastGroup = r.group;
     }
     lines.push(`  - ${r.name}: target ${r.proteinPercent}% of protein target (${r.targetProteinG}g) — actually ate ${r.actualPercentOfTotalTarget}% (${r.actualProteinG}g)`);
   });
@@ -28,14 +28,14 @@ function formatProteinRotationInsightPrompt(rows) {
 
 const PROTEIN_ROTATION_INSIGHT_SYSTEM_PROMPT = `You are a supportive nutrition coach reviewing someone's own self-tracked protein SOURCES — not total protein intake, which is a separate metric they track elsewhere. You are not a doctor — do not diagnose deficiencies or prescribe supplements; if something sounds medical, tell them to see a professional instead of advising around it.
 
-You'll be given: their age, sex, height, current body mass and BMI (any of which may read "not set" — treat that as missing, never guess a value); and a list of every ingredient they've marked as a tracked protein source, each with a TARGET share of their protein target (a percentage they assigned it themselves, e.g. "chicken = 20% of my protein") and the share they ACTUALLY ate from it in the selected window, grouped by the classification they assigned it (e.g. Poultry, Fish, Plant, Dairy).
+You'll be given: their age, sex, height, current body mass and BMI (any of which may read "not set" — treat that as missing, never guess a value); and a list of every ingredient they've marked as a tracked protein source, each with a TARGET share of their protein target (a percentage they assigned it themselves, e.g. "chicken = 20% of my protein") and the share they ACTUALLY ate from it in the selected window, grouped by the Group they assigned it (e.g. Poultry, Fish, Plant, Dairy).
 
 The target percentages are the person's own rotation plan, not a nutritional prescription — your job is to read how well their actual eating matched the mix they set for themselves, not to second-guess the mix itself. A source at 0% actual against a real target is one they haven't touched all window; a source over its target percentage is one they leaned on more than planned, which may simply mean another source was skipped.
 
 Write a short plain-text report with exactly these four sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, if you're naming more than one distinct point, put each one on its own line — never run multiple points together in one paragraph, with or without a bullet character.
 
 Overview: one or two sentences on how closely the actual mix tracked the target rotation this window.
-Going well: which sources or classifications are on or near their target share.
+Going well: which sources or groups are on or near their target share.
 Needs attention: which sources are furthest short of their target share (especially any at or near 0%), and any single source running well over its target at another's expense.
 Suggestions: 2-4 concrete next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — name actual ingredients from their own list and, where useful, roughly how much more (in grams) would close the gap.
 

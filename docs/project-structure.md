@@ -25,7 +25,7 @@ ledger/
 │       ├── groq.js               # Groq chat client
 │       ├── usda.js               # USDA FoodData Central client
 │       ├── nutrient-targets.js   # Ideal/day targets for Micronutrient mode
-│       ├── nutrition.js          # Nutrition table, Classification, USDA lookup
+│       ├── nutrition.js          # Nutrition table, Group, USDA lookup
 │       ├── calorie-estimator.js  # Calculate for food
 │       ├── activity-estimator.js # Calculate for workouts
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs

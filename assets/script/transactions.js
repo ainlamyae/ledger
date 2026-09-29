@@ -254,6 +254,18 @@ function resetTransactionsPageAndRender() {
   renderTransactions();
 }
 
+// A long Payee or Description stretched the row past every other column.
+// Truncated for display only — the full text is in the cell's title attribute
+// and in the edit form, same convention as truncateSettingValue
+// (settings-panel.js).
+const TRANSACTION_PAYEE_DISPLAY_MAX = 16;
+const TRANSACTION_DESCRIPTION_DISPLAY_MAX = 32;
+
+function truncateTransactionText(text, max) {
+  const value = String(text ?? '');
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
 function renderTransactions() {
   const filtered = getFilteredTransactions();
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -295,11 +307,11 @@ function renderTransactions() {
     accountCell.textContent = t.account;
 
     const payeeCell = document.createElement('td');
-    payeeCell.textContent = t.payee;
+    payeeCell.textContent = truncateTransactionText(t.payee, TRANSACTION_PAYEE_DISPLAY_MAX);
     payeeCell.title = t.payee;
 
     const descCell = document.createElement('td');
-    descCell.textContent = t.description;
+    descCell.textContent = truncateTransactionText(t.description, TRANSACTION_DESCRIPTION_DISPLAY_MAX);
     descCell.title = t.description;
 
     const categoryCell = document.createElement('td');

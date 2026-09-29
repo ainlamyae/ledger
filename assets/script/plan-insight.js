@@ -47,7 +47,7 @@ function gatherPlanSnapshot() {
   const kappa = getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT);
   const targetKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
 
-  const coefficients = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa });
+  const coefficients = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, bodyMassKg });
   const { a, b } = coefficients;
   // targetJourneyProjection, not projectTargetDays: with the percentage pinned the plan walks
   // the proportional journey, and the prompt has to be judging the same arrival date the Body

@@ -769,6 +769,19 @@ async function calculatePhysiqueDay() {
       const { calories, protein, breakdown, usdaUnreachable, reusedCount, estimatedCount } =
         await estimateConsumptionIncrementally(consumption, physiqueField('breakdown').value);
 
+      // Consumption gets title-cased below via combineAndSortConsumptionText —
+      // applied here too so the Breakdown table/JSON (rendered straight from
+      // this array) shows the same casing instead of the AI/reused item's
+      // original name. noteLine is patched the same way since it's what next
+      // Calculate's reuse matching compares against a future (also title-cased)
+      // Consumption line.
+      breakdown.forEach((item) => {
+        const titleCased = titleCaseIngredientName(item.name);
+        if (titleCased === item.name) return;
+        if (item.noteLine) item.noteLine = item.noteLine.replace(item.name, titleCased);
+        item.name = titleCased;
+      });
+
       // Rebuilt from the merged breakdown rather than the fresh estimate's own
       // standardizedNotes, which only covers the lines that were re-estimated —
       // then straight through the same tidy-up the Combine & Sort button runs,

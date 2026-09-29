@@ -295,13 +295,12 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const maintenanceText = maintenanceKcal !== null ? `${-maintenanceKcal} kcal` : '—';
   maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
 
-  // λt and BMR_adp — always shown regardless of which basis Balance/Δm actually run on,
-  // so BMR_adp reads as a plain derivation (BMR × (1 − λt)) rather than an unexplained
-  // number. Days actually elapsed since the first logged weigh-in
-  // (daysSinceFirstWeighIn, wellness-math.js) — the same basis applyBmrBasis itself uses.
-  const adaptFracEl = document.getElementById('today-status-adapt-frac-value');
+  // BMR_adp — always shown regardless of which basis Balance/Δm actually run on, so it
+  // reads as a plain derivation (BMR × (1 − λt)) rather than an unexplained number. Days
+  // actually elapsed since the first logged weigh-in (daysSinceFirstWeighIn,
+  // wellness-math.js) — the same basis applyBmrBasis itself uses. λt itself (the fraction)
+  // is still computed here to derive this row, just no longer its own displayed row.
   const bmrAdaptEl = document.getElementById('today-status-bmr-adapt-value');
-  let adaptFracText = '—';
   let bmrAdaptText = '—';
   if (maintenanceKcal !== null) {
     const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
@@ -310,12 +309,26 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
       const adaptPctPerWeek = getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT);
       const adaptPctCap = getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT);
       const fraction = adaptationFraction(daysOnDiet, adaptPctPerWeek, adaptPctCap);
-      adaptFracText = `${Math.round(fraction * 1000) / 10} %`;
       bmrAdaptText = `${-Math.round(maintenanceKcal * (1 - fraction))} kcal`;
     }
   }
-  adaptFracEl.textContent = privacyMode ? maskDigits(adaptFracText) : adaptFracText;
   bmrAdaptEl.textContent = privacyMode ? maskDigits(bmrAdaptText) : bmrAdaptText;
+
+  // BMR_cal — same "always shown regardless of basis" idea as BMR_adp above, so all three
+  // bases can be compared here at once. Hidden entirely (not just dashed) until a calibration
+  // has actually been saved, since most sheets will never have one. The LIVE figure, not a
+  // frozen snapshot from calibration day: equation BMR at TODAY's mass plus the saved
+  // offset, the same "keep the slope, shift the level" shift applyBmrBasis itself applies.
+  const bmrCalRow = document.getElementById('today-status-bmr-cal-row');
+  const bmrCalEl = document.getElementById('today-status-bmr-cal-value');
+  const calibratedOffset = calibratedOffsetKcalRaw();
+  if (calibratedOffset !== null && maintenanceKcal !== null) {
+    bmrCalRow.hidden = false;
+    const bmrCalText = `${-Math.round(maintenanceKcal + calibratedOffset)} kcal`;
+    bmrCalEl.textContent = privacyMode ? maskDigits(bmrCalText) : bmrCalText;
+  } else {
+    bmrCalRow.hidden = true;
+  }
 
   // Deprivation — the Sleep Deprivation Effect as a signed addition to Balance,
   // against a desired figure of 0 (a full night costs nothing).
@@ -1057,6 +1070,21 @@ function renderWellnessCaloriesChart(entries) {
     });
   }
 
+  // BMR_cal, per day — the Calibrate form's offset (calibratedOffsetKcalRaw, wellness-math.js)
+  // added to THAT day's own equation BMR, same "keep the slope, shift the level" shift
+  // applyBmrBasis applies to a live figure. Shown regardless of the Formula Playground's
+  // basis setting, same as BMR_adp above, so all three bases can be compared on the chart at
+  // once. Empty entirely until a calibration has actually been saved.
+  const restingCalKcalByDate = new Map();
+  const calibratedOffset = calibratedOffsetKcalRaw();
+  if (calibratedOffset !== null) {
+    dates.forEach((d) => {
+      const bmr = restingKcalByDate.get(d);
+      if (bmr === undefined) return;
+      restingCalKcalByDate.set(d, bmr + calibratedOffset);
+    });
+  }
+
   // Re-evaluated per day, so there's no single figure to draw: each bar carries its own
   // and is scored against that one alone.
   const targetByDay = calorieTargetSeries(entries, dates);
@@ -1156,6 +1184,11 @@ function renderWellnessCaloriesChart(entries) {
         ...(restingAdaptKcalByDate.size === 0 ? [] : [
           targetCapDataset('Adapted BMR', dates.map((d) => restingAdaptKcalByDate.get(d) ?? null), capHalf, { isTargetLine: true, backgroundColor: WEEKLY_AVG_COLOR }),
         ]),
+        // Calibrated BMR, a third mark beside the two above — its own colour (teal) since
+        // both existing ones are already spoken for.
+        ...(restingCalKcalByDate.size === 0 ? [] : [
+          targetCapDataset('Calibrated BMR', dates.map((d) => restingCalKcalByDate.get(d) ?? null), capHalf, { isTargetLine: true, backgroundColor: CALIBRATED_BMR_COLOR }),
+        ]),
       ],
     },
     options: {
@@ -1190,6 +1223,8 @@ function renderWellnessCaloriesChart(entries) {
               if (restingKcal !== undefined) lines.push(`BMR (Basal Metabolic Rate): ${Math.round(restingKcal)} kcal`);
               const restingAdaptKcal = restingAdaptKcalByDate.get(items[0].label);
               if (restingAdaptKcal !== undefined) lines.push(`BMR_adp (Adapted BMR): ${Math.round(restingAdaptKcal)} kcal`);
+              const restingCalKcal = restingCalKcalByDate.get(items[0].label);
+              if (restingCalKcal !== undefined) lines.push(`BMR_cal (Calibrated BMR): ${Math.round(restingCalKcal)} kcal`);
               if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },

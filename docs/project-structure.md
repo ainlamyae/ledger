@@ -57,6 +57,7 @@ ledger/
 │       ├── formula-fields.js     # Formula Playground field descriptors + input utils
 │       ├── formula-render.js     # Formula Playground substituted-formula renderers
 │       ├── formula-playground.js # Health Formula Playground modal lifecycle
+│       ├── bmr-calibration.js    # Calibrate BMR modal — back-solves BMR from logged data
 │       ├── financial-insight.js  # Financial Insight panel
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration

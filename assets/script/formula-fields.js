@@ -122,10 +122,11 @@ const FORMULA_COMPUTED_IDS = {
 
 // For TAU and DELTA_M, either Eᵢₙ or t can be the known that drives the solve
 // — whichever you last typed into. Tracked per mode (not reset when you
-// switch radios and back) so it remembers which one you were using. Defaults
-// match each mode's original, single-direction behavior until you type into
-// the other box: TAU opens on a typed Eᵢₙ, DELTA_M on a typed day count.
-const dualKnownField = { TAU: 'ein', DELTA_M: 'days' };
+// switch radios and back) so it remembers which one you were using. Both
+// default to a typed Eᵢₙ: picking either radio should let you fix a calorie
+// figure and see what it solves for immediately, not open on a dashed,
+// look-readonly Calories box you have to type into once before it responds.
+const dualKnownField = { TAU: 'ein', DELTA_M: 'ein' };
 
 // The same idea for Δm, which also has two boxes: kg/week and % of current body mass
 // per week. One quantity in two units, like t and its arrival date, so whichever you last
@@ -161,17 +162,31 @@ function currentPinMode() {
   return document.querySelector('input[name="formula-pin-mode"]:checked').value;
 }
 
+// Which REAL equation (mifflin/katch) is underneath, whichever radio in
+// formula-bmr-formula is actually checked — including while "BMR_cal" is checked there,
+// since that radio doesn't replace the equation, it layers the calibrated offset on top of
+// whichever one was already active. Updated by the mifflin/katch change handler
+// (formula-playground.js) each time one of them is explicitly picked; read as the fallback
+// whenever the checked radio is 'bmr_cal'.
+let lastExplicitBmrFormula = 'mifflin';
+
 // Which BMR equation the preview is running. Both are first-class: this is read into the
 // settings overlay so calorieTargetDetail and activityTargetKcal see it, and passed
-// explicitly to maintenanceAffineCoefficients, which is called outside the overlay.
+// explicitly to maintenanceAffineCoefficients, which is called outside the overlay. Never
+// 'bmr_cal' itself — see lastExplicitBmrFormula above.
 function currentBmrFormula() {
-  return document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+  const checked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+  return checked === 'bmr_cal' ? lastExplicitBmrFormula : checked;
 }
 
 // Which basis (applyBmrBasis, wellness-math.js) every deficit and desired calorie figure
-// in the app runs on. Read the same way currentBmrFormula() is, into the overlay this
-// preview runs under.
+// in the app runs on. The equation fieldset's own "BMR_cal" radio is a second entry point to
+// the SAME choice "Which BMR..." below offers — checking it here takes priority, so the two
+// fieldsets can't disagree about which basis is actually active (formula-playground.js's
+// change handlers keep both radios' CHECKED state in sync too, so neither looks stale).
 function currentBmrBasis() {
+  const equationChecked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+  if (equationChecked === 'bmr_cal') return 'bmr_cal';
   return document.querySelector('input[name="formula-bmr-basis"]:checked').value;
 }
 

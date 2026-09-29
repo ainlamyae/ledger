@@ -72,7 +72,9 @@ daysOnDiet(atDate)        = atDate − date of the first logged weigh-in, days, 
 λt(atDate)                = min(BMR_ADAPT_PCT_PER_WEEK/100 × daysOnDiet(atDate)/7,
                                  BMR_ADAPT_PCT_CAP/100)
 BMR_adp(atDate)           = BMR × (1 − λt(atDate))
-applyBmrBasis(BMR,atDate) = BMR_adp(atDate)  if BMR_BASIS=bmr_adp, else BMR unchanged
+applyBmrBasis(BMR,atDate) = BMR_adp(atDate)          if BMR_BASIS=bmr_adp
+                          = BMR + BMR_CAL_OFFSET     if BMR_BASIS=bmr_cal (0 if never calibrated)
+                          = BMR                       otherwise
 
 activityTargetKcal(kg)    = metKcal(ACTIVITY_MET, kg, ACTIVITY_TARGET_MIN)
 getActivityTargetKcal(kg) = ACTIVITY_TARGET_FIXED_KCAL, if set, else activityTargetKcal(kg)
@@ -101,6 +103,29 @@ target = round( (BMR + activityTargetKcal − D) / (1 − f) )
 - **`WEEKLY_FAT_LOSS_PCT` replaces the rate rather than scaling it.** Set (via the playground's **Pin target fat-loss %**, or by hand) and `weeklyFatLossKgAt` recomputes the kilograms from whichever body mass the target is being evaluated at — so the figure above becomes `(p·m/100 × 7700) / 7` and moves with every weigh-in, per day on the chart. Blank means the flat `WEEKLY_FAT_LOSS_KG` behaviour, unchanged. It's mutually exclusive with `CALORIE_TARGET_FIXED_KCAL`: pinning either blanks the other.
 - Uses the raw, pin-blind `activityTargetKcal` — same as the Formula Playground's own live preview — so a pinned activity calorie-burn target (below) doesn't move today's calorie-intake figure; that's a deliberately separate dial.
 - **`ACTIVITY_TARGET_FIXED_KCAL` pins the activity target itself** the same way `CALORIE_TARGET_FIXED_KCAL` pins intake (via the Formula Playground's **Pin target calorie burn**, or by hand): the Activity tile, the Physical Activity chart's target line/dot colour, and Activity Insight's stated target all switch from `activityTargetKcal`/flat `ACTIVITY_TARGET_MIN` to `getActivityTargetKcal`/`getActivityTargetMin`, so the calorie burn stays put and the minutes needed rise as body mass falls, instead of the reverse.
+
+## Calibrate BMR (`bmr-calibration.js`)
+
+Measures how wrong the equation's BMR actually is, from actual logged data — **Calibrate**, beside **Tune** in the Health Indicator heading. Two INDEPENDENT estimates of the same deficit, compared; the gap between them is the correction.
+
+```
+chunkDays  = typed chunk size, default 7                         the window is split into whole chunks of this many days
+D_chunk    = avg(day.D over the chunk)                            day.D from dailyEnergyBalanceKcal — assumes the equation's BMR is right
+ΔM_chunk   = (massStart_chunk − massEnd_chunk) × 7700 / chunkDays measured, from real mass change — the equation never enters into it
+chunkOffset = D_chunk − ΔM_chunk        0 if the equation already agrees with what was measured; the gap IS the error
+
+weight(i, n)   = 0.1 + 0.9 × i/(n−1)     linear, oldest chunk=0.1 → newest=1.0  (n=1 → weight 1)
+BMR_CAL_OFFSET = Σ(weight × chunkOffset) / Σ(weight)             recency-weighted mean of the per-chunk OFFSETS
+BMR_cal        = BMR(bodyMassNow, h, a, sex, formula) + BMR_CAL_OFFSET
+```
+
+- **Why the direct difference, not a back-solved BMR.** An earlier version blended `avgTEI`, `avgAEE` and `D_chunk` into one "back-solved BMR" and subtracted the equation's own prediction from that — but since `D_chunk` already contains the equation's BMR term, that approach let it algebraically cancel back out, leaving `BMR_CAL_OFFSET` dominated by TEF-estimate/SD noise instead of the real signal. Comparing `D_chunk` to `ΔM_chunk` directly avoids that: `D_chunk − ΔM_chunk ≈ trueBMR − equationBMR` (the equation's own error), because `ΔM_chunk` never routes through the equation at all.
+- Priced one **chunk** at a time — `D_chunk` from that chunk's own days, `ΔM_chunk` from that chunk's own mass reading, `chunkOffset` from those two BEFORE any cross-chunk averaging — since BMR depends on body mass and a multi-chunk window can span real weight change.
+- **Chunk size is typeable, default 7** — the Daily table's `m`/SD/D figures are still evaluated per DAY regardless (and body-mass smoothing stays a fixed 7-day window, `BODY_MASS_SMOOTHING_WINDOW_DAYS`, a separate idea); only how days are grouped into a chunk for `D_chunk`/`ΔM_chunk`/`chunkOffset` changes. A chunk shorter than 7 reacts faster but each one is noisier; longer smooths more but reacts slower to a real metabolic change.
+- Saved as `BMR_CALIBRATED_OFFSET_KCAL` (the shift) and `BMR_CALIBRATED_KCAL` (the figure at save time, display-only) — never a replacement formula. `applyBmrBasis` and `maintenanceAffineCoefficients` (§ above) both add the SAME offset to whatever the chosen equation says at any mass, so the app keeps the equation's own slope and just shifts the whole line: "keep the slope, shift the level."
+- `D_chunk` needs at least one day in the chunk with a computable `D` (profile + that day's own mass); `ΔM_chunk` needs a mass reading on or before the chunk's start and end. A chunk missing either drops `chunkOffset` to null rather than forcing a guess.
+- The window is typed as a start date, rounded UP to whole chunks ending at the latest fully-logged day — one chunk averages `chunkDays` of noise, months of history averages many chunks, recency-weighted so old ones can't outvote new ones.
+- Needs the same profile (height, sex, and age unless `BMR_FORMULA=katch`) the plain equation does — `D` (and so `D_chunk`) can't be computed without it.
 
 ## Calorie Balance (per day)
 

@@ -2,7 +2,7 @@
 // each period's macro and activity-type averages, sent to AI to spot which habits line up
 // with more fat lost (ΔM) and a higher real BMR (Offset). insight-panel.js drives it.
 
-const FAT_LOSS_PATTERN_CHUNK_DAYS = 14;
+const FAT_LOSS_PATTERN_CHUNK_DAYS_DEFAULT = 14;
 
 // Column label, then how to read it off a period row. Shared by the table and the prompt.
 const FAT_LOSS_PATTERN_COLUMNS = [
@@ -36,9 +36,9 @@ function meanOfPresent(values) {
 }
 
 // computeBmrCalibration's own periods (so m/Δm/ΔM/D/Offset match the Calibrate form
-// exactly), plus 14-day averages of the columns that form doesn't show.
-function gatherFatLossPatterns(fromIso, toIso) {
-  const result = computeBmrCalibration(fromIso, FAT_LOSS_PATTERN_CHUNK_DAYS, toIso);
+// exactly), plus period averages of the columns that form doesn't show.
+function gatherFatLossPatterns(fromIso, toIso, chunkDays = FAT_LOSS_PATTERN_CHUNK_DAYS_DEFAULT) {
+  const result = computeBmrCalibration(fromIso, chunkDays, toIso);
   const byDate = new Map(allPhysiqueEntries.filter((p) => p.date).map((p) => [p.date, p]));
 
   const periods = result.weeks.map((w) => {
@@ -73,11 +73,16 @@ function gatherFatLossPatterns(fromIso, toIso) {
     };
   });
 
-  return { periods, reason: result.ok ? null : result.reason };
+  return {
+    periods,
+    reason: result.ok ? null : result.reason,
+    chunkDays,
+    bodyMassTargetKg: getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT),
+  };
 }
 
 function renderFatLossPatternPreview(data) {
-  renderInsightLines(document.getElementById('insight-patterns-profile'), formatProfileLines(gatherProfileSnapshot()));
+  renderInsightLines(document.getElementById('insight-patterns-profile'), formatProfileLines(gatherProfileSnapshot(), data.bodyMassTargetKg));
   const tbody = document.getElementById('insight-patterns-body');
   tbody.innerHTML = '';
 
@@ -103,15 +108,15 @@ function formatFatLossPatternPrompt(data) {
     .filter((r) => r.loggedDays)
     .map((r) => FAT_LOSS_PATTERN_COLUMNS.map(([, read]) => read(r)).join(' | '));
   return [
-    ...formatProfileLines(gatherProfileSnapshot()),
+    ...formatProfileLines(gatherProfileSnapshot(), data.bodyMassTargetKg),
     '',
-    `PERIODS (${FAT_LOSS_PATTERN_CHUNK_DAYS}-day averages, oldest first):`,
+    `PERIODS (${data.chunkDays}-day averages, oldest first):`,
     header,
     ...(rows.length ? rows : ['(no logged periods in this range)']),
     '',
     'COLUMNS:',
     'm: smoothed body mass (kg) at the period end. Δm: change in body mass over the period (kg, negative = lost).',
-    `ΔM (kcal): Δm × 7700 / ${FAT_LOSS_PATTERN_CHUNK_DAYS} — measured daily energy balance from real mass change (negative = deficit / fat lost).`,
+    `ΔM (kcal): Δm × 7700 / ${data.chunkDays} — measured daily energy balance from real mass change (negative = deficit / fat lost).`,
     'SD: sleep-deprivation energy effect (kcal/day). TEI: total energy intake (kcal/day).',
     'Protein, Dietary Fiber, Fat, Carbohydrate: grams/day.',
     'TEF: thermic effect of food (kcal/day). AEE: total activity energy expenditure (kcal/day), split into Cardio, NEAT and Strength (kcal/day).',
@@ -120,9 +125,12 @@ function formatFatLossPatternPrompt(data) {
   ].join('\n');
 }
 
-const FAT_LOSS_PATTERN_SYSTEM_PROMPT = `You are a data-minded personal health coach. You are not a doctor — do not give medical diagnoses or prescribe treatment.
+// A function of chunkDays, not a fixed string — the period length is user-editable
+// (Patterns' days box), so the prompt has to name whatever length is actually in the table.
+function formatFatLossPatternSystemPrompt(chunkDays) {
+  return `You are a data-minded personal health coach. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll get a table of self-tracked ${FAT_LOSS_PATTERN_CHUNK_DAYS}-day periods. Each row is one period's averages: body mass and its change, measured energy balance from mass change (ΔM), sleep effect, intake and macros, thermic effect of food, activity split by type, the equation-implied balance (D), and Offset (D − ΔM, a proxy for how much higher the person's real BMR ran than the equation's).
+You'll get a table of self-tracked ${chunkDays}-day periods. Each row is one period's averages: body mass and its change, measured energy balance from mass change (ΔM), sleep effect, intake and macros, thermic effect of food, activity split by type, the equation-implied balance (D), and Offset (D − ΔM, a proxy for how much higher the person's real BMR ran than the equation's).
 
 Your job: find which habits line up with (1) MORE fat lost — the most negative ΔM — and (2) a HIGHER real BMR — the most positive Offset. Compare the best and worst periods on each outcome, and look for columns that move together with them (e.g. higher protein, more strength, more NEAT, more carbs, better sleep). Quote the actual numbers. Be honest about the limits: few periods, logging noise and water-weight swings make these associations, not proof — say how confident each pattern is, and do not invent a pattern the numbers don't show.
 
@@ -136,3 +144,4 @@ Caveats: 1-2 lines on what the data can't tell yet and what to log to make it cl
 If an additional question from the user is included after the data, also answer it directly in a final section, "Answer: text".
 
 Keep the whole report under 320 words.`;
+}

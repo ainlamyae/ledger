@@ -2512,6 +2512,26 @@ td .btn {
     resize: vertical;
 }
 
+.insight-patterns-days-label {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin-bottom: .75rem;
+    font-size: .85rem;
+    color: var(--color-text-muted);
+}
+
+.insight-patterns-days-label input {
+    width: 4.5rem;
+    font: inherit;
+    font-size: var(--input-font-size);
+    padding: .35rem .5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
 #insight-food-table {
     margin-bottom: 1rem;
 }

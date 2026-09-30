@@ -141,6 +141,7 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
     // all depend on the body doing the lifting, so the coach shouldn't be
     // reasoning about this log without knowing whose it is.
     profile: gatherProfileSnapshot(),
+    bodyMassTargetKg: getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT),
     activityDaysLogged: current.activityDaysLogged,
     prevActivityDaysLogged: previous.activityDaysLogged,
     avgActivityMins: current.avgActivityMins,
@@ -222,7 +223,7 @@ function formatMuscleGroupLines(rows) {
 
 function formatActivityInsightPrompt(m) {
   const lines = [
-    ...formatProfileLines(m.profile),
+    ...formatProfileLines(m.profile, m.bodyMassTargetKg),
     '',
     `Total resistance-training reps, all muscle groups: ${m.totalRepsInRange} — previous period: ${m.prevTotalRepsInRange}`,
     ...formatActivityBreakdownLines(m),

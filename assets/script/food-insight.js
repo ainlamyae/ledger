@@ -161,7 +161,7 @@ function renderFoodInsightPreview(rows, from, to) {
   // hides from someone glancing over at the charts. Rendered one line per fact
   // by the panel's shared renderer, so the profile block reads the same here as
   // it does inside the Wellness/Activity prompt previews.
-  renderInsightLines(document.getElementById('insight-food-profile'), formatProfileLines(gatherProfileSnapshot()));
+  renderInsightLines(document.getElementById('insight-food-profile'), formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)));
 
   const tbody = document.getElementById('insight-food-body');
   tbody.innerHTML = '';
@@ -294,7 +294,7 @@ const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missin
 // sex and age, and "is this enough food" can't be read off an ingredient list
 // without knowing the body it's feeding.
 function formatFoodInsightPrompt(rows, from, to, question) {
-  const profile = formatProfileLines(gatherProfileSnapshot()).join('\n');
+  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)).join('\n');
   const header = `Aggregated ingredients logged from ${from} to ${to}, grouped by the classification each ingredient is filed under in the user's own ingredient catalog. Each group line gives that group's ingredient count and totals, followed by its ingredients (name (total amount): total calories, total protein, estimated TEF where measured):`;
   const groups = groupFoodIntakeByClassification(rows);
   const body = groups.length

@@ -51,6 +51,9 @@ textarea {
     --radius-lg: 12px;
     --shadow-card: 0 1px 3px rgba(0,0,0,.08);
     --shadow-dropdown: 0 4px 16px rgba(0,0,0,.15);
+    /* The lift on a hovered tile or panel — darker than a dropdown's, so the
+       raised block reads clearly against the page. */
+    --shadow-hover: 0 6px 20px rgba(0,0,0,.32);
     --transition-colors: background-color .2s ease, color .2s ease, border-color .2s ease;
     --input-font-size: 15px;
     /* The six spacing steps — every margin, padding and gap uses one of these,
@@ -851,7 +854,7 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 .page-tile:hover,
 .page-tile:focus-visible {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-dropdown);
+    box-shadow: var(--shadow-hover);
 }
 
 .panel h2 {

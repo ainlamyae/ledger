@@ -33,7 +33,7 @@ One font family — the device's `system-ui` — for page text, fields, Tune's f
 | Token | Values |
 |---|---|
 | Spacing | `--space-xs` … `--space-xxl`: .2rem, .5rem, .75rem, 1rem, 1.5rem, 2rem (only the sidebar's own layout sizes sit outside them) |
-| Shadows | `--shadow-card` (cards, tiles) · `--shadow-dropdown` (menus, toast, phone bars, hover) |
+| Shadows | `--shadow-card` (cards, tiles) · `--shadow-dropdown` (menus, toast, phone bars) · `--shadow-hover` (the lift on a hovered tile or panel, darker) |
 | Line height | 1.2 text and controls · 1.5 paragraphs |
 | Weight | One bold: 600 |
 | Disabled | One opacity: .5 |

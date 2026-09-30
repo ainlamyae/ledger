@@ -30,7 +30,7 @@ ledger/
 │       ├── activity-estimator.js # Calculate for workouts
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
-│       ├── confetti.js           # Confetti burst for body-mass progress
+│       ├── confetti.js           # Confetti burst for body-mass progress and income saves
 │       ├── wellness-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
 │       ├── wellness-charts.js    # Indicator chart renderers
 │       ├── finance-charts.js     # Finance Indicator chart renderers

@@ -195,14 +195,15 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 36 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
 | 37 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
 | 38 | `plan-insight.js` | Health Plan mode: the Formula Playground's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
-| 39 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
-| 40 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
-| 41 | `formula-fields.js` | Formula Playground's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
-| 42 | `formula-render.js` | Formula Playground's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
-| 43 | `formula-playground.js` | Health Formula Playground's modal lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
-| 44 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
-| 45 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
-| 46 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 39 | `fat-loss-pattern-insight.js` | Patterns mode: Calibrate BMR's periods plus macro/activity-type averages, and the pattern-finding prompt |
+| 40 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 41 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
+| 42 | `formula-fields.js` | Formula Playground's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
+| 43 | `formula-render.js` | Formula Playground's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
+| 44 | `formula-playground.js` | Health Formula Playground's modal lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
+| 45 | `financial-insight.js` | Financial Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
+| 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 
 `section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 46 above into a page that has none of them (see [Section pages](#section-pages)).
 

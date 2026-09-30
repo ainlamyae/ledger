@@ -31,6 +31,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Reads/writes a private "Ledger" spreadsheet via Sheets API v4.
 - All aggregation, charting, filtering, sorting and CRUD runs client-side in vanilla JS.
 - No build step, no server component to deploy or maintain.
+- Optional AI reads (via your own Groq key) in Health Insight — Wellness, Food, Micronutrients, Activity, Protein Sources, Health Plan, and **Patterns**, which sends 14-day period averages (mass change, intake, macros, activity by type, BMR offset) and asks what drives more fat loss and a higher BMR.
 
 ---
 

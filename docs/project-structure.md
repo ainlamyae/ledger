@@ -52,6 +52,7 @@ ledger/
 │       ├── activity-insight.js   # Insight Activity mode
 │       ├── protein-source-rotation-insight.js # Insight Protein Sources mode
 │       ├── plan-insight.js       # Insight Health Plan mode
+│       ├── fat-loss-pattern-insight.js # Insight Patterns mode
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
 │       ├── formula-fields.js     # Formula Playground field descriptors + input utils

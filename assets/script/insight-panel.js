@@ -112,10 +112,24 @@ const INSIGHT_MODES = {
     resultKeys: ['INSIGHT_PLAN_LAST_RESULT'],
     generatedAtKeys: ['INSIGHT_PLAN_LAST_GENERATED_AT'],
   },
+  patterns: {
+    label: 'Patterns',
+    hint: 'Range is rounded to whole 14-day periods, ending on the last day with Calories In and Out logged.',
+    questionPlaceholder: 'e.g. Does more strength training raise my BMR?',
+    previewId: 'insight-preview-patterns',
+    gather: (from, to) => gatherFatLossPatterns(from, to),
+    formatPrompt: (data) => formatFatLossPatternPrompt(data),
+    renderPreview: (data) => renderFatLossPatternPreview(data),
+    appendQuestion: true,
+    needsNutrition: false,
+    systemPrompt: FAT_LOSS_PATTERN_SYSTEM_PROMPT,
+    resultKeys: ['INSIGHT_PATTERNS_LAST_RESULT'],
+    generatedAtKeys: ['INSIGHT_PATTERNS_LAST_GENERATED_AT'],
+  },
 };
 
 const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
-const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food', 'insight-preview-micronutrients'];
+const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food', 'insight-preview-micronutrients', 'insight-preview-patterns'];
 
 // What's on screen right now: which mode, the range it was gathered for, and
 // the gathered data itself. Send to AI reuses this data rather than re-running

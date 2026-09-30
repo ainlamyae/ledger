@@ -457,6 +457,7 @@
                 <button type="button" class="btn" data-insight-mode="activity" aria-pressed="false">Activity</button>
                 <button type="button" class="btn" data-insight-mode="protein" aria-pressed="false">Protein Sources</button>
                 <button type="button" class="btn" data-insight-mode="plan" aria-pressed="false">Health Plan</button>
+                <button type="button" class="btn" data-insight-mode="patterns" aria-pressed="false" title="Send the Calibrate BMR periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR">Patterns</button>
             </div>
 
             <p class="hint" id="insight-mode-status"></p>
@@ -497,6 +498,36 @@
                         </tr>
                         </thead>
                         <tbody id="insight-micro-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="insight-preview-patterns" hidden>
+                <div id="insight-patterns-profile" class="insight-data-preview"></div>
+                <div class="table-responsive table-compact">
+                    <table id="insight-patterns-table">
+                        <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th title="Smoothed body mass (kg) at the period's last day">m</th>
+                            <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
+                            <th title="Δm × 7700 / 14 — measured daily energy balance from mass change">ΔM (kcal)</th>
+                            <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
+                            <th title="Total energy intake, kcal/day">TEI</th>
+                            <th title="Grams/day">Protein</th>
+                            <th title="Grams/day">Dietary Fiber</th>
+                            <th title="Grams/day">Fat</th>
+                            <th title="Grams/day">Carbohydrate</th>
+                            <th title="Thermic effect of food, kcal/day">TEF</th>
+                            <th title="Activity energy expenditure, kcal/day">AEE</th>
+                            <th title="Cardio share of AEE, kcal/day">Cardio</th>
+                            <th title="NEAT share of AEE, kcal/day">NEAT</th>
+                            <th title="Strength share of AEE, kcal/day">Strength</th>
+                            <th title="Equation-implied daily balance — negative is a deficit">D</th>
+                            <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
+                        </tr>
+                        </thead>
+                        <tbody id="insight-patterns-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -2600,6 +2631,7 @@
 <script src="assets/script/activity-insight.js"></script>
 <script src="assets/script/protein-source-rotation-insight.js"></script>
 <script src="assets/script/plan-insight.js"></script>
+<script src="assets/script/fat-loss-pattern-insight.js"></script>
 <!-- After the five above: INSIGHT_MODES reads their prompt constants by value. -->
 <script src="assets/script/insight-panel.js"></script>
 <script src="assets/script/formula-fields.js"></script>

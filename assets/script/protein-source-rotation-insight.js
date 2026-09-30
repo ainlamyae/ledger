@@ -6,7 +6,7 @@
 // Rotation chart. insight-panel.js drives it.
 
 function formatProteinRotationInsightPrompt(rows) {
-  const lines = [...formatProfileLines(gatherProfileSnapshot()), ''];
+  const lines = [...formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)), ''];
 
   if (rows.length === 0) {
     lines.push('No ingredients are tracked for protein-source rotation yet — nothing has a Protein % set in Nutrition.');

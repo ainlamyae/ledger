@@ -4,7 +4,7 @@
 
 ## At a glance
 
-- An overview of all three sections: each section's glance cards, then its page tiles, with no section titles between them.
+- An overview of all four sections: each section's glance cards, then one card titled with the section's name (`.card` + `h3`, `buildPageTiles`) holding all its page tiles — the same card its own hub shows.
 - Health cards: Status, Intake Macros, Physical Activity, Sleep, Progress. Finance cards: Net Worth, Monthly Cash Flow, then a Cumulative Net Worth card (line only, no axes or grid).
 - Time, Date, Azan and Weather widgets are `.card` bulbs in a `.cards` row; only their text size is their own.
 - All card text uses `--card-text-size`, regular weight, one padding; titles have their own single size.
@@ -15,7 +15,7 @@
 ## Dashboard widgets
 
 - Four self-contained "bulb" cards; work before sign-in.
-- **Visible on the home page, hidden on the three section pages.** The row belongs to the dashboard as a whole, not to one group, so it starts unhidden on `/` and its clock interval, prayer-time call and weather fetch all start with it. `/health/`, `/finance/` and `/other/` hide the row outright (`section-page.js`) and never start any of that behind it — a clock ticking behind a hidden row is work nobody there can see.
+- **Visible on the home page, hidden on the four section pages.** The row belongs to the dashboard as a whole, not to one group, so it starts unhidden on `/` and its clock interval, prayer-time call and weather fetch all start with it. `/health/`, `/finance/`, `/track/` and `/other/` hide the row outright (`section-page.js`) and never start any of that behind it — a clock ticking behind a hidden row is work nobody there can see.
 - **Time** — local `HH:mm:ss` plus a second, independently configurable reference clock.
 - **Date** — Gregorian, Shamsi and Ghamari in one aligned year/month/day grid (the app's YYYY-MM-DD order), via `Intl`.
 - **Azan** — Sobh/Zohr/Maghreb/Midnight, computed client-side (Shia "Tehran" method).

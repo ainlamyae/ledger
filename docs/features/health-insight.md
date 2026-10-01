@@ -4,7 +4,7 @@
 
 ## At a glance
 
-- `/health/insight/` shows seven mode tiles; each mode is a page (`/health/insight/plan/`).
+- `/health/insight/` shows seven mode tiles in one card titled **Insight**; each mode is a page (`/health/insight/plan/`).
 - Page order: From/To, question box, prompt template, data, Send to AI, answer.
 - Modes: **Plan**, Wellness, Food, Micronutrient, Activity, **Protein** (formerly Protein Sources), **Pattern**.
   - **Micronutrient:** skips zero nutrients with no target; targets come from `MICRONUTRIENT_DAILY_TARGETS_JSON`.

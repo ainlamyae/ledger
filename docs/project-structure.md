@@ -7,7 +7,8 @@ ledger/
 ├── index.html                    # Page shell: dashboard, file-gate, modals, footer
 ├── health/index.html             # One-group pages: identical stubs, no markup of
 ├── finance/index.html            #   their own — section-page.js builds each from
-├── other/index.html              #   index.html and shows that group alone
+├── track/index.html              #   index.html and shows that group alone
+├── other/index.html              #
 ├── <group>/<block>/[<button>/]index.html # Copies of the stub above, one per address (see router.js)
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
 ├── sw.js                         # Retired service worker: clears old caches, unregisters itself

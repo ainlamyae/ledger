@@ -1,4 +1,4 @@
-// Turns /health/, /finance/ and /other/ into pages of their own.
+// Turns /health/, /finance/, /track/ and /other/ into pages of their own.
 //
 // Each of those directories holds an identical stub whose only job is to load
 // this file. The dashboard's markup lives in index.html and nowhere else: this

@@ -4,8 +4,8 @@
 
 ## At a glance
 
-- **GYM** (`/health/activity/gym/`, Activity's 💪, a tile on home and the Health hub): one tile per strength Group; NEAT and Cardio stay out.
-- Each group is a page (`/health/activity/gym/leg-day/`) with a card per activity: figure, name, muscle group, `3 x 10 · 90 sec rest`.
+- **GYM** (`/health/activity/gym/`, Activity's 💪, a tile on home and the Health hub): one tile per strength Group, in one card titled **GYM**; NEAT and Cardio stay out.
+- Each group is a page (`/health/activity/gym/leg-day/`) with a card per activity: the name as the card's label, then `3 x 10 · 90 sec rest`, then the figure (the muscle group isn't shown here; the figure marks it in red).
 - Tap cards to pick, then 📝 saves them into today's Physique row, priced like Calculate, with an undo toast.
 - Cards logged today are tinted green and can't be picked twice; ✏️ opens the activity's Edit.
 - A logged Activity row is marked like Nutrition's: green, no tick.
@@ -33,7 +33,7 @@
 - **GYM** (💪) in the panel heading opens `/health/activity/gym/`: one tile per strength Group (activities with Sets x Reps — NEAT and Cardio stay out), each group a page of its own (`…/gym/leg-day/`, `registerFormSubView` in `router.js`). Reloading a group's address opens straight onto it; the page stays hidden until the group's name is known, so the breadcrumb is drawn once.
   - **A copy of Health Indicator's own Activity Rotation card sits under the tiles**, on the tiles page only — hidden the moment a Group's own page is open, alongside the tiles themselves (`renderInstructionList`, `activities.js`). Same chart, donut and legend off the exact same data (`renderActivityRotationChart`/`renderActivityRotationDonut`, `activity-rotation.js`, now parameterized by a `target`/element-`ids` pair rather than hardcoded ones so the two copies can't share — and so redrawing one can't destroy — one `upsertChart` handle), just a second set of canvases (`activity-rotation-chart-gym`/`-donut-gym`/`-legend-gym`) so you can see where you stand on the rotation without leaving GYM. Builds lazily the same way the original does, behind the modal's own `hidden` until it's first opened (`upsertChart`'s `IntersectionObserver`, `charts-base.js`) — and gets the same post-load refresh once Physique/Activities data is actually in (`app.js`'s `Promise.all([physiquePromise, activitiesPromise])`), the render that turns its boot-time "No Activity Groups tracked yet" placeholder into real bars. Never rebuilt again after that — same one-build-only shape the original already has, just not kept in sync with the Indicator panel's own From/To pair afterward.
   - **Quick log:** tapping a card (or its corner tick) picks it; 📝 beside ❌ saves the picks into today's Physique row via `quickLogWorkoutLines` (`strength-plan.js`) — the same combine, sort and pricing as the form's Calculate, written straight to the sheet with an undo toast, no form. Needs a body mass on record. Cards already in today's workout take the logged green and their tick is disabled.
-  - **✏️** on a card's top-left corner opens the activity's Edit page over GYM; closing it comes back to the group.
+  - **✏️** on the figure's bottom-left corner (the tick on its bottom-right) opens the activity's Edit page over GYM; closing it comes back to the group.
   - Every figure shows the **muscle worked picked out in red**. 23 are **animated loops**; the remaining 11 are stills carrying **the start and the finish side by side**.
   - Under each name, at plain weight: the **muscle group** it trains (muted) and its **sets × reps · rest** (in the text colour, read mid-set) — both straight from the `Activity` sheet, so the modal can't disagree with the plan table.
   - Animated and still differ by nothing but file extension — a browser loops a GIF in a plain `<img>`, so there is no `<video>` element and no fallback path. Which file a row gets is simply what its `Image` cell on the `Activity` tab points at.

@@ -21,7 +21,7 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/health/activity/guide/</loc>
+    <loc>https://ainlamyae.github.io/ledger/health/activity/gym/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -151,24 +151,49 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/</loc>
+    <loc>https://ainlamyae.github.io/ledger/track/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/application/</loc>
+    <loc>https://ainlamyae.github.io/ledger/track/application/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/application/log/</loc>
+    <loc>https://ainlamyae.github.io/ledger/track/application/log/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/car-service/</loc>
+    <loc>https://ainlamyae.github.io/ledger/track/car-service/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/track/travel/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/track/travel/log/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/track/work-time/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/track/work-time/log/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/other/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://ainlamyae.github.io/ledger/other/contact/</loc>
@@ -187,26 +212,6 @@
   </url>
   <url>
     <loc>https://ainlamyae.github.io/ledger/other/settings/add/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://ainlamyae.github.io/ledger/other/travel/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://ainlamyae.github.io/ledger/other/travel/log/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://ainlamyae.github.io/ledger/other/work-time/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://ainlamyae.github.io/ledger/other/work-time/log/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

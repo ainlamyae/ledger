@@ -114,7 +114,7 @@ async function initTimeSheet(forceRefresh = false) {
     document.getElementById('log-today-btn').addEventListener('click', () => {
       openTimesheetForm(isoFromDate(new Date()));
     });
-    // other/work-time/<date>/ opens that day's Edit, logged or not.
+    // track/work-time/<date>/ opens that day's Edit, logged or not.
     registerRecordRoute('work-time', (slug, sub) => {
       if (sub || !/^\d{4}-\d{2}-\d{2}$/.test(slug)) return null;
       openTimesheetForm(slug);
@@ -265,10 +265,10 @@ function populateTimesheetCompanyOptions() {
 function checkTimesheetReminder() {
   const today = isoFromDate(new Date());
   if (isWeekend(today) || entriesForLastCompany(allTimeEntries).some((e) => e.date === today)) {
-    setPageBadge('other', 'work-time', null);
+    setPageBadge('track', 'work-time', null);
     return;
   }
-  setPageBadge('other', 'work-time', { text: 'Log', title: "Today's hours aren't logged", record: today });
+  setPageBadge('track', 'work-time', { text: 'Log', title: "Today's hours aren't logged", record: today });
   if ('Notification' in window && Notification.permission === 'granted'
     && localStorage.getItem('ledger_last_reminder_notified') !== today) {
     new Notification('Ledger', { body: 'Work Time: log today' });

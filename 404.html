@@ -7,11 +7,11 @@
 
 <!-- Served for any address without a file of its own, e.g. a row's Edit
      (<wrapper>/<block>/<record>/[<view>/], router.js). The app root is the folder
-     holding the section (health, finance or other, index.html's nav). -->
+     holding the section (health, finance, track or other, index.html's nav). -->
 <script>
     (function () {
         const parts = location.pathname.split('/').filter(Boolean);
-        const at = parts.findIndex((p) => ['health', 'finance', 'other'].includes(p));
+        const at = parts.findIndex((p) => ['health', 'finance', 'track', 'other'].includes(p));
         const base = document.createElement('base');
         base.href = `/${parts.slice(0, Math.max(at, 0)).map((p) => `${p}/`).join('')}`;
         document.head.appendChild(base);

@@ -14,9 +14,9 @@ function applyChartTheme() {
   };
 }
 
-// .9rem in px, against the page's base size (which steps with screen width).
+// The type scale's Small (--text-small, .8rem) in px, as table text is.
 function chartFontSize() {
-  return 0.9 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return 0.8 * parseFloat(getComputedStyle(document.documentElement).fontSize);
 }
 
 // Every reference mark in Health Indicators — the per-column caps, State Trend's target

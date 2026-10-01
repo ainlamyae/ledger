@@ -8,25 +8,27 @@ All styling lives in `assets/style/styles.css`. Pages and scripts carry no inlin
 
 | Use | Values |
 |---|---|
+| Palette | Apple's system colours, light / dark: blue `#007AFF` / `#0A84FF`, green `#34C759` / `#30D158`, red `#FF3B30` / `#FF453A`, gray `#8E8E93`; page `#F2F2F7` / true black, cards `#FFFFFF` / `#1C1C1E`, lines `#C6C6C8` / `#38383A` |
 | Text | Six colours only: text, muted gray, white, red (bad), green (good), blue (links) |
 | Charts | Their own palette, `--chart-*` tokens read by `chartColor` / `seriesColor` (`charts-base.js`) |
 | Row tints | **Green** — today's row, or anything logged today · **Indigo** — a Work Time day off. No row is faded |
-| Table lines | One colour, **navy** (`--color-nav`): row lines, the solid line above a Total, the dashed line above a Desire or Ideal/day |
-| Backgrounds | Page **off-white** (`--color-bg`); cards, tiles, inputs, buttons, menus and GYM figures **white** (`--color-surface`) |
+| Table lines | One colour, the line **gray** (`--color-border`), as iOS separators: a .5px hairline between rows; 1px under the header, above a Total and at group breaks; 1px dashed above a Desire or Ideal/day |
+| Backgrounds | Page **off-white** (`--color-bg`) under two soft blue/violet washes (`--bg-wash-1`/`-2`, fixed to the screen); cards, inputs, buttons and GYM figures **white** (`--color-surface`); page tiles Apple-style **tinted** capsules (12% of `--color-primary` under blue text, `border-radius: 999px`; dimmed and shrunk while pressed), so they stand out on a card and on the page alike — content is always solid |
+| Glass | The floating layer only, like Apple's Liquid Glass: header, phone tab bar and action bar, sticky form actions, sidebar, account menu and (wide screens) dialogs. Translucent `--glass-bg` / `--glass-bg-strong`, blurred by `--glass-blur`, a `--glass-border` rim and `--glass-highlight` top edge; text on it is `--glass-text`. Solid again when blur is unsupported or the device asks for reduced transparency |
 
 ## Typography
 
 One font family — the device's `system-ui` — for page text, fields, Tune's formulas and charts.
 
-| Size | Used for |
-|---|---|
-| .7rem | Badges, formulas, footer strip, the plan's small cells |
-| .8rem | Table cells, word buttons, labels, hints, menus |
-| .9rem | Breadcrumb, sidebar, cards, tiles, chart text |
-| 15px | Every input, select and textarea, at every width |
-| 1.1rem | Headings, form titles, emoji buttons |
-| 1.25rem | Header title |
-| 1.4rem | Phone bottom-bar emoji, landing title, flags |
+Four sizes, as tokens — every `font-size` is one of them — on one 15px base at every width. One weight for bold (600), no italic, no all-caps.
+
+| Token | Size | Used for |
+|---|---|---|
+| `--text-small` | .8rem | Table cells (every width), word buttons, labels, hints, menus, badges, formulas, footer, card labels, sidebar section names, chart text |
+| `--text-body` | 1rem | Text, card values, tiles, breadcrumb, sidebar links, status lines |
+| `--text-title` | 1.1rem | Every heading (header title, panel and form titles, `h1`–`h4`), emoji buttons |
+| `--text-display` | 1.4rem | Phone bottom-bar emoji, landing title, flags |
+| `--input-font-size` | 15px (16px on touch) | Every input, select and textarea — 16px keeps iOS from zooming |
 
 ## Spacing and tokens
 
@@ -37,8 +39,8 @@ One font family — the device's `system-ui` — for page text, fields, Tune's f
 | Line height | 1.2 text and controls · 1.5 paragraphs |
 | Weight | One bold: 600 |
 | Disabled | One opacity: .5 |
-| Animation | .2s hover and colour · .3s open and close |
-| Borders | 1px borders · 2px emphasis lines |
+| Animation | .2s hover and colour · .3s open and close · one Apple-like spring curve on all of them (`--ease-spring`, `cubic-bezier(.2, .8, .2, 1)`) |
+| Borders | 1px borders · .5px table hairlines |
 
 Each look is written once: every field starts from one base rule, and cards, Total/target rows, notes, dropdowns and field rows are single rules shared by several selectors.
 

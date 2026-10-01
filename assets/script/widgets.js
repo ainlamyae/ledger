@@ -630,7 +630,7 @@ async function initWeatherWidget(location) {
   }
 }
 
-// The section pages (/health/, /finance/, /other/) hide the bulbs row — it
+// The section pages (/health/, /finance/, /track/, /other/) hide the bulbs row — it
 // belongs to the dashboard as a whole rather than to any one wrapper — and a
 // clock ticking every second behind a hidden row, with prayer-time and forecast
 // requests behind it, is work nobody can see. Checked at both entry points

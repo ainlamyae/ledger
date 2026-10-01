@@ -641,10 +641,10 @@ async function loadDashboard(forceRefresh = false) {
     // category split (everything lands under 'Other') and the plan tables, not
     // every chart on the page. The rejection still surfaces via the list below.
     // Which blocks this page shows, so only their data is read. A section page
-    // (/health/, /finance/, /other/) loads its own blocks alone; the home page
+    // (/health/, /finance/, /track/, /other/) loads its own blocks alone; the home page
     // loads the glance cards (Health status, Finance summary), plus every block
-    // when Show blocks is on. Car Service (Other) is drawn from Transactions, so
-    // Other loads those too. The home page also reads Transactions and Work Time for
+    // when Show blocks is on. Car Service (Track) is drawn from Transactions, so
+    // Track loads those too. The home page also reads Transactions and Work Time for
     // its tiles' badges (Car Service's days left, Work Time's Log).
     const section = window.ledgerSectionPage?.section ?? null;
     const home = section === null;
@@ -661,11 +661,7 @@ async function loadDashboard(forceRefresh = false) {
       renderSummaryCards(report);
       renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
       renderSpendingBreakdownCharts(report.categoryComparison);
-      // Off for now, with its section in index.html commented out to match — the
-      // per-category Type donuts are wanted again later, so nothing is deleted.
-      // `report.typeBreakdown` is still parsed and cached either way; this call and
-      // that section are the whole switch.
-      // renderTypeBreakdownCharts(report.typeBreakdown);
+      renderTypeBreakdownCharts(report.typeBreakdown);
       renderExpenseBreakdownTrendChart(report.categoryTrend);
       renderSavingsTrendChart(report.savingsTrend);
       renderFinanceGlanceNetWorthChart(report.savingsTrend);
@@ -699,15 +695,15 @@ async function loadDashboard(forceRefresh = false) {
           renderInstructionList();
         }),
       ] : []),
-      ...((shows('finance') || shows('other') || home) ? [initTransactions(forceRefresh)] : []),
-      ...(home && !shows('other') ? [initTimeSheet(forceRefresh)] : []),
+      ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
+      ...(home && !shows('track') ? [initTimeSheet(forceRefresh)] : []),
       ...(shows('finance') ? [initAccountManager(forceRefresh), initBreakdown(forceRefresh)] : []),
-      ...(shows('other') ? [
+      ...(shows('track') ? [
         initTimeSheet(forceRefresh),
-        initContacts(forceRefresh),
         settingsPromise.then(() => initTravel(forceRefresh)),
         initApplications(forceRefresh),
       ] : []),
+      ...(shows('other') ? [initContacts(forceRefresh)] : []),
       // Other's Settings block (saving a setting from anywhere loads it on its own).
       ...(shows('other') ? [initSettingsPanel(forceRefresh)] : []),
     ];
@@ -876,7 +872,7 @@ function updateWidgetsButtonUI() {
 }
 
 // Shows/hides the Time/Date/Azan/Weather row per widgetsVisible. Section pages
-// (/health/, /finance/, /other/) hide that row themselves — see
+// (/health/, /finance/, /track/, /other/) hide that row themselves — see
 // section-page.js's showOnly — and want it hidden regardless of this setting,
 // so this leaves it alone there rather than fighting that call.
 function applyWidgetsVisibility() {
@@ -1089,7 +1085,7 @@ function bootDashboard() {
   if (typeof APP_VERSION !== 'undefined') document.getElementById('footer-version').textContent = `v${APP_VERSION}`;
 }
 
-// A section page (/health/, /finance/, /other/) builds this markup from
+// A section page (/health/, /finance/, /track/, /other/) builds this markup from
 // index.html after its own load event has already fired, so a load listener
 // there would never run: it starts the page itself instead, once every script
 // index.html asks for has arrived.

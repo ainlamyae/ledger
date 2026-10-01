@@ -1,6 +1,6 @@
 // Section pages as a hub and pages instead of a stack of collapsible blocks.
 //
-// /health/ (and /finance/, /other/) is the section's hub: its glance cards, then
+// /health/ (and /finance/, /track/, /other/) is the section's hub: its glance cards, then
 // one tile per block. /health/physique/ is that block alone, as a page under a
 // breadcrumb. Moving between them rewrites the address without reloading
 // (router.js owns the history entries), and the blocks themselves are unchanged:
@@ -43,7 +43,7 @@ const QUICK_ACTIONS = {
 
 function buildQuickActions(section) {
   const actions = QUICK_ACTIONS[section.id];
-  const grid = document.querySelector(`#${section.id} > .page-tiles`);
+  const grid = document.querySelector(`#${section.id} > .card > .page-tiles`);
   if (!actions || !grid) return;
   // Last in the tile row, after the page tiles, styled as the one action among them.
   actions.forEach((action) => {
@@ -84,7 +84,14 @@ function buildPageTiles(section) {
     tile.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
     grid.appendChild(tile);
   });
-  group.insertBefore(grid, section.panels[0] || null);
+  // A section's tiles sit in one card titled with its name, on the home page and
+  // on the section's own hub alike.
+  const card = document.createElement('div');
+  card.className = 'card';
+  const heading = document.createElement('h3');
+  heading.textContent = section.label;
+  card.append(heading, grid);
+  group.insertBefore(card, section.panels[0] || null);
   renderPageBadges();
 }
 

@@ -231,17 +231,17 @@ const TYPE_BREAKDOWN_PERIODS = [
 
 const typeBreakdownCharts = {};
 
-// Heading + 4 period donuts + legend, built from scratch so the panels follow whatever
+// One card: heading + 4 period donuts + legend, built from scratch so the panels follow whatever
 // categories Insight defines rather than a hardcoded list.
 function buildTypeBreakdownSection(category) {
   const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
   const section = document.createElement('div');
-  section.className = 'type-breakdown-category';
+  section.className = 'panel-section card type-breakdown-category';
   section.id = `type-breakdown-${slug}-section`;
 
   const heading = document.createElement('h3');
-  heading.textContent = category;
+  heading.textContent = `${category} by Type`;
   section.appendChild(heading);
 
   const grid = document.createElement('div');
@@ -278,10 +278,6 @@ function buildTypeBreakdownSection(category) {
 // One donut per category per period: that category's Types as a share of its total.
 // Only categories with a named Type get a panel. The gap between the category total and
 // the sum of its named Types becomes an "Untyped" slice.
-//
-// CURRENTLY UNCALLED, deliberately: the call in app.js's reportPromise and the
-// "Spending Breakdown by Type" section in index.html are both commented out, and this
-// is kept whole so uncommenting those two is all it takes to bring the wall back.
 function renderTypeBreakdownCharts(typeBreakdown) {
   // By absolute lifelong spend, so the biggest movers surface first whatever their sign.
   const orderedCategories = Object.keys(typeBreakdown)
@@ -294,6 +290,7 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
   const container = document.getElementById('type-breakdown-container');
   container.innerHTML = '';
+  container.hidden = orderedCategories.length === 0;
 
   orderedCategories.forEach((category) => {
     const data = typeBreakdown[category];

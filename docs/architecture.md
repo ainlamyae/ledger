@@ -49,7 +49,7 @@ flowchart TD
 
 ## Section pages
 
-Each panel group is reachable at an address of its own — `/health/`, `/finance/`, `/other/` — showing that one group and nothing else. They are real paths, so a refresh, a bookmark or a shared link lands on the same page instead of falling back to the dashboard.
+Each panel group is reachable at an address of its own — `/health/`, `/finance/`, `/track/`, `/other/` — showing that one group and nothing else. They are real paths, so a refresh, a bookmark or a shared link lands on the same page instead of falling back to the dashboard.
 
 - **The markup still lives in `index.html` alone.** Each of those directories holds an identical stub (`<base href="../">`, the theme bootstrap, the stylesheet, and `section-page.js`). The loader fetches `index.html`, replays its head, its body and its scripts into the stub, then hides everything outside the group the address names. A panel added to `index.html`, or moved from one group to another, appears on the right section page with nothing to keep in sync — there is no generated copy of the dashboard anywhere.
 - **The list of sections is the `<nav>` markup.** `section-page.js` matches the first path segment below the app root against each nav link's `href` and reads the group id off its `data-section`. A fourth group needs a nav link, a `<section>`, and a copy of the stub — no change to the loader, which enumerates nothing.
@@ -242,7 +242,8 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 2. Entity modules init concurrently via `Promise.allSettled`, each reading its own range — but only the modules the page shows (`loadDashboard`, `app.js`):
    - `/health/`: Settings, Activity, Physique, Nutrition, the Settings block.
    - `/finance/`: Settings, the report (Statement/Account/Breakdown), Transaction, Account, Breakdown.
-   - `/other/`: Settings, Work Time, Contact, Travel, Application, the Settings block, and Transaction (Car Service is drawn from it).
+   - `/track/`: Settings, Work Time, Travel, Application, and Transaction (Car Service is drawn from it).
+   - `/other/`: Settings, Contact, the Settings block.
    - Home: Settings, Activity, Physique and the report — only what the glance cards need; the blocks are reached through tiles.
    Saving a BMR-affecting setting on a page without Physique loads it first, so every stored BMR is still rewritten.
 3. The wellness/finance/timesheet/travel chart files render canvases lazily (`upsertChart`, `charts-base.js`, builds a chart only once its `.chart-box` scrolls into view); `app.js` renders summary cards; each module renders its table.

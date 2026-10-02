@@ -853,6 +853,18 @@ html[data-widgets-pref="hidden"] .widget-cards {
     display: none;
 }
 
+/* The "Hide blocks" preference — the home page's detailed panels start hidden
+   (SHOW_BLOCKS defaults off), stamped before first paint by index.html's early
+   head script and kept in sync by app.js's applyBlocksVisibility. Only the
+   .panel bodies are hidden: each section's wrapper heading and its summary tiles
+   (Health's today-glance, Finance's Net Worth / cash-flow cards) stay on screen,
+   so the home page is a fast overview rather than a blank page. Section pages
+   never set this attribute (the script guards on it), so their one block's panels
+   are unaffected. */
+html[data-blocks-pref="hidden"] #dashboard .panel-group .panel {
+    display: none;
+}
+
 .panel-group-title {
     margin: 0 0 .25rem;
     text-align: center;

@@ -68,6 +68,7 @@ async function initTransactions(forceRefresh = false) {
     }).observe(document.getElementById('tx-modal'), { attributes: true, attributeFilter: ['hidden'] });
     document.getElementById('tx-search').addEventListener('input', resetTransactionsPageAndRender);
     document.getElementById('tx-category-filter').addEventListener('change', resetTransactionsPageAndRender);
+    document.getElementById('tx-payee-filter').addEventListener('input', resetTransactionsPageAndRender);
     document.getElementById('export-date-from').addEventListener('input', resetTransactionsPageAndRender);
     document.getElementById('export-date-to').addEventListener('input', resetTransactionsPageAndRender);
 
@@ -200,12 +201,16 @@ function populateCategoryFilter() {
 function getFilteredTransactions() {
   const search = document.getElementById('tx-search').value.trim().toLowerCase();
   const category = document.getElementById('tx-category-filter').value;
+  // Substring, not exact, so typing part of a payee still narrows before one is
+  // picked from the autocomplete list (and a picked full payee matches too).
+  const payee = document.getElementById('tx-payee-filter').value.trim().toLowerCase();
   const dateFrom = document.getElementById('export-date-from').value;
   const dateTo = document.getElementById('export-date-to').value;
   const advancedFilters = getExportFilters();
 
   const filtered = allTransactions
     .filter((t) => !category || t.category === category)
+    .filter((t) => !payee || t.payee.toLowerCase().includes(payee))
     .filter((t) => {
       if (!search) return true;
       return (

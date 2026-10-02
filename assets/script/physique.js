@@ -215,8 +215,12 @@ async function refreshPhysique(forceRefresh = false) {
   // state landed by then (see nutritionDataLoaded's own load-order comment,
   // nutrition.js), and re-rendering an empty table here would show the
   // "no ingredients yet" empty state rather than just doing nothing.
-  if (nutritionDataLoaded) renderNutritionList();
-  else updateNutritionLogButtonLabel();
+  if (nutritionDataLoaded) {
+    // Today's logged days just changed, so the memoized Uses counts are stale —
+    // drop them so renderNutritionList recounts against current Physique.
+    nutritionUsageCounts = null;
+    renderNutritionList();
+  } else updateNutritionLogButtonLabel();
   logPhysiqueDataGaps();
   checkHealthReminder();
 }

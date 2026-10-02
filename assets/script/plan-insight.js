@@ -73,9 +73,56 @@ function gatherPlanSnapshot() {
     ? null
     : Math.round(adaptedPlateauKg(detail.kcal, coefficients, adaptFraction) * 10) / 10;
 
+  // The rest of the Formula Playground's figure set, computed the same way its own render
+  // functions do (same inputs, same rounding) so the Health Plan and the Tune modal can't
+  // quote different numbers for the same plan.
+  //
+  // Both BMR equations side by side like the playground's field table, not just the one in
+  // force. Mifflin reads age, so it's null on a Katch plan with no birth date.
+  const mifflinBmr = age === null ? null : Math.round(mifflinStJeorBmr(bodyMassKg, heightCm, age, sex));
+  const katchBmr = Math.round(katchMcArdleBmr(lbmKg));
+  // The stored calibration (bmr-calibration.js), shown as-is like the Status card — null
+  // until one has been saved, in which case the line is simply dropped.
+  const calibratedBmr = calibratedBmrKcal();
+  const bmiDes = heightCm ? Math.round((targetKg / ((heightCm / 100) ** 2)) * 10) / 10 : null;
+  const maintenanceKcal = Math.round(detail.bmr + detail.activityKcal);
+  const deficitVsBmrPct = detail.bmr ? Math.round(((detail.bmr - detail.kcal) / detail.bmr) * 1000) / 10 : null;
+
+  // Macro bands — floor/ceiling pairs, exactly as renderFiber/Fat/CarbFields compute them
+  // off the same rounded intake (formula-render.js).
+  const fiberPerKcalMin = getSetting('FIBER_G_PER_1000_KCAL_MIN', FIBER_G_PER_1000_KCAL_MIN_DEFAULT);
+  const fiberPerKgMax = getSetting('FIBER_G_PER_KG_MAX', FIBER_G_PER_KG_MAX_DEFAULT);
+  const fatPctMin = getSetting('FAT_PCT_OF_KCAL_MIN', FAT_PCT_OF_KCAL_MIN_DEFAULT);
+  const fatPctMax = getSetting('FAT_PCT_OF_KCAL_MAX', FAT_PCT_OF_KCAL_MAX_DEFAULT);
+  const carbPctMin = getSetting('CARB_PCT_OF_KCAL_MIN', CARB_PCT_OF_KCAL_MIN_DEFAULT);
+  const carbPctMax = getSetting('CARB_PCT_OF_KCAL_MAX', CARB_PCT_OF_KCAL_MAX_DEFAULT);
+
+  // Skeletal-muscle / glycogen knobs: the Formula Playground's own defaults (hard-coded in
+  // its boxes, not Settings-backed), repeated here as the same constants so m_musc/m_gly/
+  // ΔM_gly match what Tune shows. Kept together so they read as one block, like its rows.
+  const glySkeletalPct = 45;
+  const glyPerKgMuscle = 14;
+  const glyLiverG = 100;
+  const glyWaterRatio = 3;
+  const muscleKg = Math.round((lbmKg * (glySkeletalPct / 100)) * 10) / 10;
+  const glycogenG = Math.round(glyPerKgMuscle * muscleKg + glyLiverG);
+  const glycogenSwingKg = Math.round((glycogenG * (1 + glyWaterRatio)) / 100) / 10;
+
   return {
     bodyMassKg, rawBodyMassKg, heightCm, age, sex, targetKg, met, tau, kappa,
     formula: coefficients.formula,
+    mifflinBmr, katchBmr, calibratedBmr, bmiDes, maintenanceKcal, deficitVsBmrPct,
+    fiberPerKcalMin, fiberPerKgMax, fatPctMin, fatPctMax, carbPctMin, carbPctMax,
+    fiberMinG: Math.round(fiberPerKcalMin * (detail.kcal / 1000)),
+    fiberMaxG: Math.round(fiberPerKgMax * bodyMassKg),
+    fatMinG: Math.round((fatPctMin / 100) * detail.kcal / KCAL_PER_G_FAT),
+    fatMaxG: Math.round((fatPctMax / 100) * detail.kcal / KCAL_PER_G_FAT),
+    carbMinG: Math.round((carbPctMin / 100) * detail.kcal / KCAL_PER_G_CARB),
+    carbMaxG: Math.round((carbPctMax / 100) * detail.kcal / KCAL_PER_G_CARB),
+    muscle: {
+      skeletalPct: glySkeletalPct, perKgMuscle: glyPerKgMuscle, liverG: glyLiverG,
+      waterRatio: glyWaterRatio, muscleKg, glycogenG, swingKg: glycogenSwingKg,
+    },
     tefPercent: Math.round((1 - coefficients.tefDivisor) * 1000) / 10,
     tefKcal: Math.round(detail.tefKcal),
     adaptPct: Math.round(adaptFraction * 1000) / 10,
@@ -131,37 +178,44 @@ function planSubstitutedLines(p) {
   // Only when it changes something: at f = 0 there is no divisor to explain, and printing
   // "/ 1" invites the model to reason about a term the plan doesn't use.
   const byF = p.tefPercent > 0 ? `, all / (1 − ${p.tefPercent}/100)` : '';
-  const lines = [
-    // The smoothed mass is what every line below substitutes, so it's stated as its own
-    // line first — otherwise a model comparing it against the trajectory in RECENT LOGGING
-    // would read the difference from the last weigh-in as an inconsistency.
-    `m_bar (7-day rolling average, the mass every line below uses): ${p.bodyMassKg} kg; latest single weigh-in was ${p.rawBodyMassKg} kg`,
-    katch
-      ? `BMR (Katch-McArdle, from lean mass): 370 + 21.6 × ${p.lbmKg} = ${p.bmr} kcal/day`
-      : `BMR (Mifflin-St Jeor): 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.bmr} kcal/day`,
-    `Ea: ${p.met} × ${p.bodyMassKg} × ${p.tau} × ${p.kappa} / 200 = ${p.activityKcal} kcal/day`,
-    // Spelled out rather than left for the model to divide: the sustainable band it's
-    // asked to judge the plan against is written in percent, and this is the same figure
-    // the playground shows beside the Δm box.
-    `dm%: 100 × ${p.weeklyFatLossKg} / ${p.bodyMassKg} = ${p.weeklyFatLossPct} %/week`,
-    p.sleepDeprivationEffectKcal > 0
-      ? `D: (${p.weeklyFatLossKg} × 7700 / 7) / eta = ${p.rawDeficitKcal} / eta = ${p.deficitKcal} kcal/day — eta is the Sleep Efficiency Factor for ${p.planSleepHours}h of assumed sleep against an ${p.sleepTargetHours}h target, so short sleep adds ${p.sleepDeprivationEffectKcal} kcal/day to the raw rate the weekly target alone implies`
-      : `D: ${p.weeklyFatLossKg} × 7700 / 7 = ${p.deficitKcal} kcal/day`,
-    p.tefPercent > 0
-      ? `Ein: (${p.bmr} + ${p.activityKcal} − ${p.deficitKcal}) / (1 − ${p.tefPercent}/100) = ${p.intakeKcal} kcal/day, of which TEF (digestion) is ${p.tefKcal} kcal/day`
-      : `Ein: ${p.bmr} + ${p.activityKcal} − ${p.deficitKcal} = ${p.intakeKcal} kcal/day`,
-    katch
-      ? `A: 370 + 21.6 × (lean-mass terms in h)${byF} = ${p.a} kcal/day`
-      : `A: 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma}${byF} = ${p.a} kcal/day`,
-    katch
-      ? `B: 21.6 × (lean-mass kg term) + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`
-      : `B: 10 + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`,
-  ];
-
-  // Two journeys, two arrival dates, and m_inf only exists in one of them: with the
-  // percentage pinned nothing holds Ein still, so there is no intake plateau to level off
-  // at — quoting one would invite the model to reason about a plateau this plan can't have.
+  const hM = Math.round((p.heightCm / 100) * 100) / 100;
   const proportional = p.projection.journey === 'pct';
+
+  // Ordered to match the Formula Playground's (Tune) own substituted trace, top to bottom,
+  // so the two read the same way. Every figure is computed in gatherPlanSnapshot by the same
+  // wellness-math functions the playground uses, off the same rounded intake.
+  const lines = [];
+
+  lines.push(`LBM: ${p.sex === 'male' ? `0.407 × ${p.bodyMassKg} + 0.267 × ${p.heightCm} − 19.2` : `0.252 × ${p.bodyMassKg} + 0.473 × ${p.heightCm} − 48.3`} = ${p.lbmKg} kg (${p.leanPercent}% of body mass)`);
+
+  // Both BMR equations side by side, plus the calibrated figure when one's been saved — the
+  // plan runs on whichever PLAN INPUTS names (its value is what D, Ein, A and B below use).
+  if (p.mifflinBmr !== null) lines.push(`BMR (Mifflin-St Jeor): 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.mifflinBmr} kcal/day`);
+  lines.push(`BMR (Katch-McArdle, from lean mass): 370 + 21.6 × ${p.lbmKg} = ${p.katchBmr} kcal/day`);
+  if (p.calibratedBmr !== null) lines.push(`BMR_cal (calibrated — back-solved from logged intake/activity/weight change): ${p.calibratedBmr} kcal/day`);
+
+  lines.push(`Ea (AEE): ${p.met} × ${p.bodyMassKg} × ${p.tau} × ${p.kappa} / 200 = ${p.activityKcal} kcal/day`);
+
+  lines.push(p.sleepDeprivationEffectKcal > 0
+    ? `D: (${p.weeklyFatLossKg} × 7700 / 7) / eta = ${p.rawDeficitKcal} / eta = ${p.deficitKcal} kcal/day — eta is the Sleep Efficiency Factor for ${p.planSleepHours}h assumed sleep against an ${p.sleepTargetHours}h target, so short sleep adds ${p.sleepDeprivationEffectKcal} kcal/day (SD) to the raw rate`
+    : `D: ${p.weeklyFatLossKg} × 7700 / 7 = ${p.deficitKcal} kcal/day`);
+
+  lines.push(p.tefPercent > 0
+    ? `Ein (TEI): (${p.bmr} + ${p.activityKcal} − ${p.deficitKcal}) / (1 − ${p.tefPercent}/100) = ${p.intakeKcal} kcal/day`
+    : `Ein (TEI): ${p.bmr} + ${p.activityKcal} − ${p.deficitKcal} = ${p.intakeKcal} kcal/day`);
+
+  lines.push(`TEF: ${p.tefPercent}% × ${p.intakeKcal} = ${p.tefKcal} kcal/day`);
+  lines.push(`dm (Δm): ${p.deficitKcal} × 7 / 7700 = ${p.weeklyFatLossKg} kg/week`);
+
+  lines.push(katch
+    ? `A: 370 + 21.6 × (lean-mass terms in h)${byF} = ${p.a} kcal/day`
+    : `A: 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma}${byF} = ${p.a} kcal/day`);
+  lines.push(katch
+    ? `B: 21.6 × (lean-mass kg term) + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`
+    : `B: 10 + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`);
+
+  // m_inf only exists on the constant-intake journey: with the percentage pinned nothing
+  // holds Ein still, so there is no intake plateau to level off at.
   if (!proportional) lines.push(`m_inf: (${p.intakeKcal} − ${p.a}) / ${p.b} = ${p.equilibriumKg} kg`);
 
   if (p.projection.status === 'ok' && proportional) {
@@ -175,17 +229,34 @@ function planSubstitutedLines(p) {
   } else if (p.projection.status === 'reached') {
     lines.push('t: already at the target body mass');
   }
-  // The adaptation caveat, next to the plateau it qualifies. Reported, not planned with:
-  // nothing above was computed from it, which is exactly why the model has to be told that
-  // m_inf is the optimistic figure and this is where the mass tends to actually stall.
-  if (p.adaptedPlateau !== null && p.adaptPct > 0) {
-    lines.push(`BMR_adapt: ${p.bmr} × (1 − ${p.adaptPct}/100) = ${p.adaptedBmr} kcal/day by the arrival date, and m_inf_adapt = ${p.adaptedPlateau} kg — the plateau once metabolic adaptation is allowed for, i.e. ${Math.round((p.adaptedPlateau - p.equilibriumKg) * 10) / 10} kg above the m_inf above. Refeeds and diet breaks push this back toward the un-adapted figure.`);
+
+  if (p.bmiDes !== null) lines.push(`BMI_des: ${p.targetKg} / (${hM})² = ${p.bmiDes} kg/m²`);
+  lines.push(`dm%: 100 × ${p.weeklyFatLossKg} / ${p.bodyMassKg} = ${p.weeklyFatLossPct} %/week`);
+  if (p.deficitVsBmrPct !== null) lines.push(`D_bmr%: (${p.bmr} − ${p.intakeKcal}) / ${p.bmr} × 100 = ${p.deficitVsBmrPct} %`);
+
+  // The adaptation caveat — reported, not planned with: nothing above used it, which is why
+  // the model has to be told m_inf is the optimistic figure and this is where mass tends to
+  // actually stall.
+  if (p.adaptPct > 0) {
+    const whenNote = p.projection.status === 'ok' ? ' by the arrival date' : ' at the adaptation ceiling';
+    lines.push(`BMR_adp: ${p.bmr} × (1 − ${p.adaptPct}/100) = ${p.adaptedBmr} kcal/day${whenNote}`);
+    if (p.adaptedPlateau !== null) {
+      lines.push(`m_inf_adp: adapted plateau ${p.adaptedPlateau} kg — ${Math.round((p.adaptedPlateau - p.equilibriumKg) * 10) / 10} kg above m_inf, the usual overshoot. Refeeds and diet breaks push it back toward the un-adapted figure.`);
+    }
   }
 
   lines.push(
-    `LBM: ${p.sex === 'male' ? `0.407 × ${p.bodyMassKg} + 0.267 × ${p.heightCm} − 19.2` : `0.252 × ${p.bodyMassKg} + 0.473 × ${p.heightCm} − 48.3`} = ${p.lbmKg} kg (${p.leanPercent}% of body mass)`,
+    `m_musc: ${p.muscle.skeletalPct}% × ${p.lbmKg} = ${p.muscle.muscleKg} kg`,
+    `m_gly: ${p.muscle.perKgMuscle} × ${p.muscle.muscleKg} + ${p.muscle.liverG} = ${p.muscle.glycogenG} g`,
+    `ΔM_gly: ${p.muscle.glycogenG} × (1 + ${p.muscle.waterRatio}) / 1000 = ${p.muscle.swingKg} kg`,
     `P_min: ${p.proteinPerKgMin} × ${p.lbmKg} = ${p.proteinMinG} g/day`,
     `P_max: ${p.proteinPerKgMax} × ${p.lbmKg} = ${p.proteinMaxG} g/day`,
+    `F_min: ${p.fiberPerKcalMin} × (${p.intakeKcal} / 1000) = ${p.fiberMinG} g/day`,
+    `F_max: ${p.fiberPerKgMax} × ${p.bodyMassKg} = ${p.fiberMaxG} g/day`,
+    `G_min: (${p.fatPctMin}% × ${p.intakeKcal}) / 9 = ${p.fatMinG} g/day`,
+    `G_max: (${p.fatPctMax}% × ${p.intakeKcal}) / 9 = ${p.fatMaxG} g/day`,
+    `C_min: (${p.carbPctMin}% × ${p.intakeKcal}) / 4 = ${p.carbMinG} g/day`,
+    `C_max: (${p.carbPctMax}% × ${p.intakeKcal}) / 4 = ${p.carbMaxG} g/day`,
   );
   return lines;
 }
@@ -204,7 +275,8 @@ function planRatePinDescription(p) {
 
 function planInputLines(p) {
   return [
-    `m (body mass used by the plan, a 7-day rolling average): ${p.bodyMassKg} kg`,
+    `m (latest single weigh-in): ${p.rawBodyMassKg} kg`,
+    `m_bar (7-day rolling average — the mass every figure below is evaluated at): ${p.bodyMassKg} kg`,
     `m_g (target body mass): ${p.targetKg} kg`,
     `h (height): ${p.heightCm} cm`,
     `a (age): ${p.age} years${p.formula === 'katch' ? ' (unused — the Katch-McArdle BMR equation does not read age)' : ''}`,
@@ -236,15 +308,17 @@ function formatPlanInsightPrompt(data) {
   }
 
   return [
+    // PLAN INPUTS first — the person's own numbers lead, then the model they feed, then the
+    // figures that come out of it (in the same order the Tune panel lists them).
+    'PLAN INPUTS:',
+    ...planInputLines(plan),
+    '',
     'THE PLAN — the formulas this app derives the targets from:',
     // The playground's own text, not a paraphrase: one definition of the model,
     // shown on screen and sent to the model.
     FORMULA_EXPRESSION,
     '',
-    'PLAN INPUTS:',
-    ...planInputLines(plan),
-    '',
-    'WHAT THOSE INPUTS PRODUCE (each line is the substituted arithmetic):',
+    'WHAT THOSE INPUTS PRODUCE (each line is the substituted arithmetic, in the same order as the Tune panel):',
     ...planSubstitutedLines(plan),
     '',
     'RECENT LOGGING — what is actually being done, over the selected period:',

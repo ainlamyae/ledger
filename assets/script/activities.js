@@ -21,6 +21,11 @@ let activitiesDataLoaded = false;
 let activityListenersAttached = false;
 let activitiesSheetId = null;
 let editingActivityRow = null;
+// The entry being edited, kept alongside editingActivityRow so Update knows the
+// OLD name to sweep Physique for after Save rewrites the row (null in Add/
+// Duplicate mode — there's nothing already logged under this row to propagate
+// from). Mirrors nutrition.js's nutritionFormEntry.
+let editingActivityEntry = null;
 
 async function fetchActivitiesSheetId() {
   const metadata = await getSpreadsheetMetadata();
@@ -61,6 +66,7 @@ async function initActivities(forceRefresh = false) {
     document.getElementById('add-activity-btn').addEventListener('click', () => openActivityForm(null));
     document.getElementById('activity-cancel-btn').addEventListener('click', closeActivityForm);
     document.getElementById('activity-log-btn').addEventListener('click', logActivityFromForm);
+    onAsyncClick('activity-update-btn', updateActivityAndPropagate);
     onFormSubmit('activity-form', submitActivityForm);
     // Live, not just on open — pasting a new path should preview it before Save,
     // same as the Instruction modal's own figures do once saved.
@@ -396,6 +402,10 @@ function renderActivityPlanTables() {
 
 function openActivityForm(activity, duplicate = false) {
   editingActivityRow = (activity && !duplicate) ? activity.row : null;
+  editingActivityEntry = (activity && !duplicate) ? activity : null;
+  // Only meaningful once there's a saved row (and an old name/MET) to propagate
+  // FROM — an Add or Duplicate has nothing on the Physique sheet to find yet.
+  document.getElementById('activity-update-btn').hidden = !editingActivityEntry;
   document.getElementById('activity-modal-title').textContent =
     duplicate ? 'Duplicate Activity' : (activity ? 'Edit Activity' : 'Add Activity');
 
@@ -520,11 +530,15 @@ function renderActivityDatalist(datalistId, key) {
 function closeActivityForm() {
   document.getElementById('activity-modal').hidden = true;
   editingActivityRow = null;
+  editingActivityEntry = null;
 }
 
-async function submitActivityForm(event) {
-  event.preventDefault();
-
+// Reads and validates every field of the Add/Edit Activity form, shared by
+// Save (submitActivityForm) and Update (updateActivityAndPropagate) so the two
+// can't drift on what counts as a valid activity. Shows its own field error and
+// returns { ok: false } on the first problem found. Mirrors nutrition.js's
+// readNutritionFormFields.
+function readActivityFormFields() {
   const name = activityFieldValue('name');
   const category = activityFieldValue('category');
   const group = activityFieldValue('group');
@@ -532,7 +546,7 @@ async function submitActivityForm(event) {
 
   if (!name || !category || !group) {
     showFieldError('activity-form-error', 'Category, Group and Name are all required — Group is the sub-table this row renders into.');
-    return;
+    return { ok: false };
   }
 
   // Name is the join key for the note lines, the MET lookup, the muscle-group
@@ -542,20 +556,20 @@ async function submitActivityForm(event) {
     && a.name.toLowerCase() === name.toLowerCase());
   if (clash) {
     showFieldError('activity-form-error', `"${clash.name}" is already in the plan — Name is what every logged line matches on, so it has to be unique. Edit that row, or give this one a different name.`);
-    return;
+    return { ok: false };
   }
 
   const met = metRaw ? evaluateNumberExpression(metRaw) : null;
   if (metRaw && met === null) {
     showFieldError('activity-form-error', 'MET must be a number (e.g. 5 or 3.8), or blank to use the default.');
-    return;
+    return { ok: false };
   }
 
   const weeklyTargetRaw = activityFieldValue('weekly-target');
   const weeklyTarget = weeklyTargetRaw ? evaluateNumberExpression(weeklyTargetRaw) : null;
   if (weeklyTargetRaw && weeklyTarget === null) {
     showFieldError('activity-form-error', 'Weekly Target must be a number (e.g. 7), or blank to leave this Group out of Activity Rotation.');
-    return;
+    return { ok: false };
   }
 
   // Column E is one cell holding both halves, split on its LAST comma — so the
@@ -565,7 +579,7 @@ async function submitActivityForm(event) {
   const amount = activityFieldValue('amount');
   const amountAndRest = [amount, rest].filter(Boolean).join(', ');
 
-  const values = [[
+  const values = [
     category,
     group,
     name,
@@ -576,19 +590,155 @@ async function submitActivityForm(event) {
     activityFieldValue('muscle-group'),
     activityFieldValue('weight'),
     weeklyTarget !== null ? weeklyTarget : '',
-  ]];
+  ];
+
+  return { ok: true, name, met, values };
+}
+
+// Persists `values` (from readActivityFormFields) to editingActivityRow if it's
+// set, else appends a new row — the sheet write shared by Save and Update.
+async function saveActivityFormFields(values) {
+  if (editingActivityRow !== null) {
+    await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:J${editingActivityRow}`, [values]);
+  } else {
+    await appendValues(ACTIVITIES_RANGE, [values]);
+  }
+}
+
+async function submitActivityForm(event) {
+  event.preventDefault();
+
+  const fields = readActivityFormFields();
+  if (!fields.ok) return;
 
   try {
-    if (editingActivityRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:J${editingActivityRow}`, values);
-    } else {
-      await appendValues(ACTIVITIES_RANGE, values);
-    }
+    await saveActivityFormFields(fields.values);
     closeActivityForm();
     await initActivities(true);
   } catch (err) {
     showFieldError('activity-form-error', err.message);
   }
+}
+
+// --- Update: propagate an edited activity into Physique -------------------
+//
+// Ordinary Calculate reuses a day's already-priced Workout as-is, so it never
+// re-checks an unchanged day against the Activity Plan — a renamed or re-MET'd
+// exercise otherwise leaves every past day quietly wrong (priced at the old
+// MET, or falling to 'Other' once the name no longer matches) until someone
+// notices. This button is the one path that reaches back and fixes them,
+// entirely locally (no Groq/USDA call): find every Workout line still under the
+// activity's OLD name, rename it to the new name, and reprice that whole day's
+// Duration and Calories Out at the new MET — the same combine + highest-burn-
+// first pass bulk Calculate runs (recalculatePhysiqueDay, physique.js).
+
+// Rebuilds one Workout note line under the activity's new name, keeping
+// whatever quantity/unit it already had — the same "<quantity> <name>" shape
+// Log Workout and Calculate both write. Null when the line doesn't parse as a
+// workout note line at all (a blank or hand-typed line left exactly as-is).
+function renamedWorkoutLine(line, newName) {
+  const [parsed] = parseWorkoutNoteLines(line);
+  if (!parsed) return null;
+  return `${workoutNoteQuantityForLine(parsed)} ${newName}`;
+}
+
+async function updateActivityAndPropagate() {
+  if (editingActivityRow === null || !editingActivityEntry) return;
+  const oldName = editingActivityEntry.name;
+
+  const fields = readActivityFormFields();
+  if (!fields.ok) return;
+
+  clearFieldError('activity-form-error');
+  try {
+    await saveActivityFormFields(fields.values);
+  } catch (err) {
+    showFieldError('activity-form-error', err.message);
+    return;
+  }
+
+  // Refresh the catalogue first so exerciseMet() below reads the just-saved MET
+  // when it reprices each day, and Physique so the sweep sees current days.
+  await initActivities(true);
+  await refreshPhysique();
+
+  const newName = fields.name;
+  // A day's own recorded body mass is preferred where it has one, falling back
+  // to the latest logged — the same choice bulk Calculate makes. Null only when
+  // no day has ever recorded one, in which case a day can still be renamed but
+  // not repriced (there's nothing to price calories against).
+  const latestBodyMassKg = physiqueBodyMassKgFromLog();
+  const candidates = allPhysiqueEntries.filter((p) => p.workout.trim());
+  showFieldError('activity-form-error', `Checking ${candidates.length} Physique day${candidates.length === 1 ? '' : 's'}…`);
+
+  let linesRenamed = 0;
+  const edits = candidates.map((p) => {
+    let mentions = false;
+    const newLines = p.workout.split('\n').map((raw) => {
+      const line = raw.trim();
+      const [parsed] = parseWorkoutNoteLines(line);
+      if (!parsed || parsed.name.toLowerCase() !== oldName.toLowerCase()) return raw;
+      mentions = true;
+      const rebuilt = renamedWorkoutLine(line, newName);
+      if (!rebuilt || rebuilt === line) return raw;
+      linesRenamed += 1;
+      return rebuilt;
+    });
+    if (!mentions) return null;
+
+    const newWorkoutText = newLines.join('\n');
+    const textChanged = newWorkoutText !== p.workout;
+    const bodyMassKg = p.bodyMass ?? latestBodyMassKg;
+
+    // MET-only edit (name unchanged) on a day with no body mass to price
+    // against has nothing to do — skip it rather than write the row back
+    // unchanged.
+    if (!textChanged && bodyMassKg === null) return null;
+
+    const values = physiqueRowValues(p);
+    if (bodyMassKg !== null) {
+      const { text: combined } = combineWorkoutText(newWorkoutText);
+      const { minutes, calories, perLine } = estimateWorkoutActivity(combined, bodyMassKg);
+      const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
+      values[12] = sortedPerLine.map((l) => `${l.quantity} ${l.name}`).join('\n');
+      values[13] = minutes;
+      values[14] = calories;
+    } else {
+      // Rename only — leave the stale Duration/Calories Out for a later
+      // Calculate (once a body mass exists) to reprice.
+      values[12] = newWorkoutText;
+    }
+
+    return { row: p.row, values, snapshot: physiqueRowValues(p) };
+  }).filter(Boolean);
+
+  if (!edits.length) {
+    closeActivityForm();
+    alert(`Saved "${newName}" — no Physique day mentions "${oldName}" yet.`);
+    return;
+  }
+
+  let done = 0;
+  const succeeded = [];
+  await Promise.allSettled(edits.map(async (e) => {
+    try {
+      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${e.row}:O${e.row}`, [e.values]);
+      succeeded.push({ row: e.row, values: e.snapshot });
+    } finally {
+      done += 1;
+      showFieldError('activity-form-error', `Updating ${done}/${edits.length} Physique days…`);
+    }
+  }));
+
+  closeActivityForm();
+  await refreshPhysique(true);
+
+  const dayCount = `${succeeded.length} Physique day${succeeded.length === 1 ? '' : 's'}`;
+  const renameNote = linesRenamed ? ` (${linesRenamed} line${linesRenamed === 1 ? '' : 's'} renamed)` : '';
+  showUndoToast(
+    `"${newName}" updated — ${dayCount} repriced${renameNote}.`,
+    () => restorePhysiqueSnapshots(succeeded),
+  );
 }
 
 // Deleting the catalogue row doesn't touch a workout already logged against

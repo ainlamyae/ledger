@@ -2903,16 +2903,28 @@ td .btn {
         margin-right: .15rem;
     }
 
+    /* Full-screen overlay — no gap around the card. */
     .modal {
-        padding: .5rem;
+        padding: 0;
+        align-items: stretch;
     }
 
-    /* Full width of the viewport minus .modal's own gutter — a fixed 320px cap
-       left 70-110px unused on any phone wider than an iPhone SE, which is the
-       space the denser forms in here need. */
+    /* Full-screen form card: fills the entire viewport so there is no
+       background page visible or scrollable behind it.
+       overscroll-behavior: contain stops the card's own rubber-band from
+       chaining out to the page when the user reaches the top or bottom. */
     .modal-card {
         max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
         padding: .85rem;
+        padding-top: calc(.85rem + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(.85rem + env(safe-area-inset-bottom, 0px));
+        overscroll-behavior: contain;
+    }
+
+    body.modal-open {
+        overflow: hidden;
     }
 
     .modal-card h2 {

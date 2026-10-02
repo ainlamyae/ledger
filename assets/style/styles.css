@@ -1234,6 +1234,12 @@ td {
     text-align: right;
 }
 
+#breakdown-table th:last-child,
+#breakdown-table td:last-child {
+    width: 1%;
+    white-space: nowrap;
+}
+
 /* Overrides the base `table { width: 100% }` above: every Physique column is
    a short date/time/number, so stretching the table to the panel's full
    width just hands the auto layout algorithm leftover space to spread out

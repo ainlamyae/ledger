@@ -165,9 +165,13 @@ function setupModalFocusManagement() {
     new MutationObserver(() => {
       if (!modal.hidden) {
         lastFocused = document.activeElement;
-      } else if (lastFocused) {
-        lastFocused.focus();
-        lastFocused = null;
+        document.body.classList.add('modal-open');
+      } else {
+        if (lastFocused) {
+          lastFocused.focus();
+          lastFocused = null;
+        }
+        if (!getOpenModal()) document.body.classList.remove('modal-open');
       }
     }).observe(modal, { attributes: true, attributeFilter: ['hidden'] });
   });

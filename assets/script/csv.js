@@ -248,6 +248,26 @@ function exportTransactionsCSV() {
   downloadTextFile(`transactions-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
 }
 
+const PHYSIQUE_CSV_HEADER = ['Date', 'Body Mass', 'Bedtime', 'Wake', 'Calories In', 'Protein (g)', 'Fiber (g)', 'Fat (g)', 'Carbohydrate (g)', 'TEF', 'Workout', 'Duration (min)', 'Calories Out'];
+
+function exportPhysiqueCSV() {
+  const rows = getFilteredPhysiqueEntries()
+    .filter((p) => p.date)
+    .map((p) => [
+      p.date, p.bodyMass ?? '', p.bedtime ?? '', p.wakeTime ?? '',
+      p.caloriesIn ?? '', p.proteinIn ?? '', p.fiber ?? '', p.fat ?? '',
+      p.carbohydrate ?? '', p.tef ?? '', p.workout, p.duration ?? '', p.caloriesOut ?? '',
+    ]);
+
+  if (rows.length === 0) {
+    alert('No Physique entries match the selected filters.');
+    return;
+  }
+
+  const csv = [PHYSIQUE_CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
+  downloadTextFile(`physique-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
+}
+
 function parseCSV(text) {
   const rows = [];
   let row = [];

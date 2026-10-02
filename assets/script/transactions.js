@@ -39,6 +39,7 @@ async function initTransactions(forceRefresh = false) {
   accountOptions = lists.accountOptions;
   categoryOptions = lists.categoryOptions;
 
+  populateAccountFilter();
   populateCategoryFilter();
   await refreshTransactions(forceRefresh);
 
@@ -66,16 +67,12 @@ async function initTransactions(forceRefresh = false) {
         refreshTransactions(true);
       }
     }).observe(document.getElementById('tx-modal'), { attributes: true, attributeFilter: ['hidden'] });
-    document.getElementById('tx-search').addEventListener('input', resetTransactionsPageAndRender);
-    document.getElementById('tx-category-filter').addEventListener('change', resetTransactionsPageAndRender);
+    document.getElementById('tx-account-filter').addEventListener('change', resetTransactionsPageAndRender);
     document.getElementById('tx-payee-filter').addEventListener('input', resetTransactionsPageAndRender);
+    document.getElementById('tx-category-filter').addEventListener('change', resetTransactionsPageAndRender);
+    document.getElementById('tx-description-filter').addEventListener('input', resetTransactionsPageAndRender);
     document.getElementById('export-date-from').addEventListener('input', resetTransactionsPageAndRender);
     document.getElementById('export-date-to').addEventListener('input', resetTransactionsPageAndRender);
-
-    document.getElementById('tx-advanced-filters-toggle').addEventListener('click', () => {
-      const panel = document.getElementById('tx-advanced-filters');
-      panel.hidden = !panel.hidden;
-    });
 
     setupTransactionSorting();
     setupBulkActions();
@@ -177,8 +174,26 @@ async function refreshAccountOptions() {
   categoryOptions = [...new Set((valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))];
 
   setCached('lists', { transactionsSheetId, accountOptions, categoryOptions });
+  populateAccountFilter();
   populateCategoryFilter();
   syncExportAccountOptions();
+}
+
+function populateAccountFilter() {
+  const select = document.getElementById('tx-account-filter');
+  select.innerHTML = '';
+
+  const allOption = document.createElement('option');
+  allOption.value = '';
+  allOption.textContent = 'All Accounts';
+  select.appendChild(allOption);
+
+  accountOptions.forEach((account) => {
+    const option = document.createElement('option');
+    option.value = account;
+    option.textContent = account;
+    select.appendChild(option);
+  });
 }
 
 function populateCategoryFilter() {
@@ -199,27 +214,21 @@ function populateCategoryFilter() {
 }
 
 function getFilteredTransactions() {
-  const search = document.getElementById('tx-search').value.trim().toLowerCase();
-  const category = document.getElementById('tx-category-filter').value;
+  const account = document.getElementById('tx-account-filter').value;
   // Substring, not exact, so typing part of a payee still narrows before one is
   // picked from the autocomplete list (and a picked full payee matches too).
   const payee = document.getElementById('tx-payee-filter').value.trim().toLowerCase();
+  const category = document.getElementById('tx-category-filter').value;
+  const description = document.getElementById('tx-description-filter').value.trim().toLowerCase();
   const dateFrom = document.getElementById('export-date-from').value;
   const dateTo = document.getElementById('export-date-to').value;
   const advancedFilters = getExportFilters();
 
   const filtered = allTransactions
-    .filter((t) => !category || t.category === category)
+    .filter((t) => !account || t.account === account)
     .filter((t) => !payee || t.payee.toLowerCase().includes(payee))
-    .filter((t) => {
-      if (!search) return true;
-      return (
-        t.payee.toLowerCase().includes(search) ||
-        t.description.toLowerCase().includes(search) ||
-        t.account.toLowerCase().includes(search) ||
-        t.category.toLowerCase().includes(search)
-      );
-    })
+    .filter((t) => !category || t.category === category)
+    .filter((t) => !description || t.description.toLowerCase().includes(description))
     .filter((t) => (!dateFrom || t.date >= dateFrom) && (!dateTo || t.date <= dateTo))
     .filter((t) => transactionMatchesExportFilters(t, advancedFilters));
 

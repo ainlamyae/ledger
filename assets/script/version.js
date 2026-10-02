@@ -1,2 +1,2 @@
 // Written by scripts/hooks/pre-commit; do not edit.
-const APP_VERSION = '3.3.9';
+const APP_VERSION = '3.4.0';

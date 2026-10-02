@@ -24,8 +24,8 @@ Four sizes, as tokens — every `font-size` is one of them — on one 15px base 
 
 | Token | Size | Used for |
 |---|---|---|
-| `--text-small` | .8rem | Table cells (every width), word buttons, labels, hints, menus, badges, formulas, footer, card labels, sidebar section names, chart text |
-| `--text-body` | .9rem | Text, card values, tiles, breadcrumb, sidebar links, status lines |
+| `--text-small` | .8rem | Card content (`--card-text-size`, set on `.card`), table cells (every width), word buttons, labels, hints, menus, badges, formulas, footer, card labels, sidebar section names, chart text |
+| `--text-body` | .9rem | Text, tiles, breadcrumb, sidebar links, status lines |
 | `--text-title` | 1.1rem | Every heading (header title, panel and form titles, `h1`–`h4`), emoji buttons |
 | `--text-display` | 1.4rem | Phone bottom-bar emoji, landing title, flags |
 | `--input-font-size` | 15px (16px on touch) | Every input, select and textarea — 16px keeps iOS from zooming |

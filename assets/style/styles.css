@@ -85,8 +85,8 @@ textarea {
     --text-body: .9rem;
     --text-title: 1.1rem;
     --text-display: 1.4rem;
-    /* Every card's own text (glance cards and widgets alike). */
-    --card-text-size: var(--text-body);
+    /* Every card's own text (glance cards and widgets alike): 12px. */
+    --card-text-size: var(--text-small);
     /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
     --chart-good: var(--color-income);
     --chart-good-high: #166534;
@@ -670,6 +670,10 @@ kbd {
     border-radius: var(--radius-lg);
     padding: var(--space-m);
     box-shadow: var(--shadow-card);
+}
+
+.card {
+    font-size: var(--card-text-size);
 }
 
 .card h3 {
@@ -1556,14 +1560,7 @@ th.sortable:hover {
     font-size: var(--text-small);
 }
 
-/* Below 820px the cards' row and value text shrinks (.8rem), so the Status card's
-   longer rows ("108~132 g" etc.) fit; the cards keep the same padding as on a
-   laptop, so their text never sits on the edge. */
-@media (max-width: 820px) {
-    .today-glance-cards .body-mass-progress-meter-stats > * > * {
-        font-size: var(--card-text-size);
-    }
-}
+
 
 .chart-box.chart-box-map {
     height: auto;
@@ -1794,7 +1791,6 @@ td .btn {
 .instruction-activities li {
     position: relative;
     cursor: pointer;
-    font-size: var(--text-body);
 }
 
 /* A fixed height with object-fit: contain, not a fixed aspect ratio. The figures
@@ -2286,7 +2282,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 }
 
 .body-mass-progress-meter-stat-label {
-    font-size: var(--text-body);
+    font-size: var(--card-text-size);
     color: var(--color-text-muted);
 }
 
@@ -2294,7 +2290,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
    like every other card's figures. */
 .body-mass-progress-meter-target,
 .body-mass-progress-meter-pct {
-    font-size: var(--text-body);
+    font-size: var(--card-text-size);
     color: var(--color-text);
 }
 

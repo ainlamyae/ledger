@@ -9,6 +9,10 @@
      (<wrapper>/<block>/<record>/[<view>/], router.js). The app root is the folder
      holding the section (health, finance, track or other, index.html's nav). -->
 <script>
+    // GYM's old address (…/activity/gym/<group>/) is now Workouts.
+    if (location.pathname.includes('/activity/gym/')) {
+        location.replace(location.href.replace('/activity/gym/', '/activity/workouts/'));
+    }
     (function () {
         const parts = location.pathname.split('/').filter(Boolean);
         const at = parts.findIndex((p) => ['health', 'finance', 'track', 'other'].includes(p));

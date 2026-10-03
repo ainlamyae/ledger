@@ -414,7 +414,7 @@ header .btn:hover {
 .account-menu-name,
 .page-tile-title {
     font-weight: 600;
-    font-size: var(--text-body);
+    font-size: var(--text-small);
 }
 
 .account-menu-email {
@@ -2506,7 +2506,7 @@ html.home-hub .page-tiles,
 
 @media (max-width: 820px) {
     :is(#insight-mode-actions, #financial-insight-mode-actions) {
-        grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
     }
 }
 
@@ -2607,34 +2607,26 @@ html.home-hub .page-tiles,
         display: none;
     }
 
-    /* The copyright line lives in a slim strip at the very bottom of the screen,
-       under the bottom bar (and above the home indicator), always in view; the
-       bars and the account circle sit just above it. */
+    /* The bars and the account circle sit just above the copyright strip. */
     :root {
-        --phone-footer-height: 1.3rem;
         --bottom-bar-bottom: var(--phone-footer-height);
     }
 
+    /* 10px lower than centred, nearer the home indicator; the bars above don't move. */
     html .site-footer {
+        transform: translateY(10px);
+    }
+
+    /* Solid under the status bar, so iOS doesn't blur the page scrolling past. */
+    body::before {
+        content: "";
         position: fixed;
+        top: 0;
         left: 0;
         right: 0;
-        bottom: 0;
+        height: env(safe-area-inset-top, 0px);
         z-index: 9;
-        box-sizing: border-box;
-        height: calc(var(--phone-footer-height) + env(safe-area-inset-bottom, 0px));
-        padding: 0 var(--space-s) env(safe-area-inset-bottom, 0px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: var(--text-small);
-        line-height: 1.2;
-        white-space: nowrap;
-        border-top: none;
         background: var(--color-bg);
-        /* 10px lower than centred in its strip, nearer the screen's edge; the bars
-           above don't move. */
-        transform: translateY(10px);
     }
 
     /* The page clears the bar and the strip under it. */
@@ -2712,14 +2704,10 @@ html.home-hub .page-tiles,
         display: flex;
     }
 
-    /* On the home page Ledger is the current tab; the sections it scrolls past
-       aren't marked as well. */
-    html.home-hub .nav a[data-section].active {
-        color: var(--glass-text-muted);
-    }
-
-    html.home-hub .nav a[data-section].active::before {
-        content: none;
+    /* One colour for every tab; the current page isn't marked. */
+    .nav a:hover,
+    .nav a.active {
+        color: var(--glass-text);
     }
 
     /* Each tab fills the bar's height (--bottom-bar-height), the action bar's too. */
@@ -2911,13 +2899,37 @@ html.home-hub .page-tiles,
     }
 }
 
+/* The copyright line: a slim strip fixed at the very bottom of the screen, on
+   every screen size. */
+:root {
+    --phone-footer-height: 1.3rem;
+}
+
 .site-footer {
-    flex-shrink: 0;
-    text-align: center;
-    padding: var(--space-l);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9;
+    box-sizing: border-box;
+    height: calc(var(--phone-footer-height) + env(safe-area-inset-bottom, 0px));
+    padding: 0 var(--space-s) env(safe-area-inset-bottom, 0px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--color-text-muted);
     font-size: var(--text-small);
-    border-top: 1px solid var(--color-border);
+    line-height: 1.2;
+    white-space: nowrap;
+    /* Half see-through at the top, solid at the screen's edge. */
+    background: linear-gradient(color-mix(in srgb, var(--color-bg) 50%, transparent), var(--color-bg));
+}
+
+/* The page clears the strip on a wide screen (the phone's .container already does). */
+@media (min-width: 1180px) {
+    body {
+        padding-bottom: var(--phone-footer-height);
+    }
 }
 
 /* A spaced em dash between the footer's two parts: typeset as a real
@@ -3221,7 +3233,7 @@ html.home-hub .page-tiles,
     display: none;
 }
 
-/* Name-only tiles, as many a row as fit: 3 on a phone, up to 7 on a laptop. */
+/* Name-only tiles, as many a row as fit: 4 on a phone, up to 7 on a laptop. */
 
 html.section-pages[data-page="hub"] .panel-group > .panel[data-route] {
     display: none;
@@ -3300,15 +3312,17 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     align-items: center;
     /* The large button size, the same as the phone's action-bar buttons. */
     min-height: 42px;
-    padding: var(--space-s) var(--space-s);
+    /* Narrow sides, so a long one-word label ("Transaction") fits four a row. */
+    padding: var(--space-s) var(--space-xs);
     text-align: center;
-    /* Apple's "tinted" button: a light wash of the blue under blue text, which
-       stands out on a white card and on the page alike, in both themes. */
-    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    /* Apple's neutral "gray" button: a see-through wash of the system gray
+       (#8e8e93) under ordinary text, so it reads on a white card and on the page
+       alike, light and dark. */
+    background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
     /* A capsule, as iOS 26 / macOS Tahoe buttons and the glass bottom bar are. */
     border-radius: 999px;
     box-shadow: var(--shadow-card);
-    color: var(--color-primary);
+    color: var(--color-text);
     text-decoration: none;
     transition: transform .2s var(--ease-spring), box-shadow .2s var(--ease-spring), opacity .2s var(--ease-spring);
 }
@@ -3353,10 +3367,12 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     color: #fff;
 }
 
+/* Four a row on a phone, down to a 375px-wide one (5rem each plus the gaps). */
 @media (max-width: 820px) {
     html.section-pages[data-page="hub"] .page-tiles,
-    html.home-hub .page-tiles {
-        grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+    html.home-hub .page-tiles,
+    .page-tiles.instruction-groups {
+        grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
     }
 }
 
@@ -3372,7 +3388,8 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         flex-direction: column;
         position: fixed;
         top: 0;
-        bottom: 0;
+        /* Ends at the copyright strip, which runs under it as under the page. */
+        bottom: var(--phone-footer-height);
         left: 0;
         width: 13rem;
         padding: 3.5rem var(--space-s) 4.5rem;
@@ -3415,8 +3432,9 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         color: var(--color-text-muted) !important;
     }
 
+    /* White on the blue bar, as a selected page link. */
     .side-nav-section.active {
-        color: var(--color-primary) !important;
+        color: #fff !important;
     }
 
     /* A dialog floats as glass here only: below 1180px it's a full-screen form
@@ -3458,21 +3476,19 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         width: 13rem;
         box-sizing: border-box;
         padding: var(--space-l) var(--space-l);
-        background: var(--color-surface);
         color: var(--color-text);
     }
 
     .header-actions {
         position: fixed;
         left: 0;
-        bottom: 0;
+        /* Just above the copyright strip. */
+        bottom: var(--phone-footer-height);
         z-index: 6;
         width: 13rem;
         box-sizing: border-box;
         padding: var(--space-m) var(--space-l);
         margin: 0;
-        background: var(--color-surface);
-        border-top: 1px solid var(--color-border);
     }
 
     header .btn {
@@ -3726,6 +3742,25 @@ html.section-pages .panel.page-active:hover {
         margin-left: auto;
         width: 42px;
         border-radius: 50%;
+    }
+}
+
+/* The bottom bars: lighter glass than the rest. */
+@media (max-width: 1179px) {
+    .nav,
+    html[data-action-bar] .action-bar,
+    html[data-action-bar] .app-form .modal-actions.action-bar {
+        --glass-bg: color-mix(in srgb, var(--color-surface) 40%, transparent);
+        --glass-blur: blur(12px) saturate(180%);
+    }
+}
+
+@media (max-width: 1179px) and (prefers-reduced-transparency: reduce) {
+    .nav,
+    html[data-action-bar] .action-bar,
+    html[data-action-bar] .app-form .modal-actions.action-bar {
+        --glass-bg: var(--color-surface);
+        --glass-blur: none;
     }
 }
 

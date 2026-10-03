@@ -13,7 +13,9 @@
 - From/To pairs keep 30px fields, a 16px gap on a phone, and `--space-s` after them.
 - The footer reads `© 2026 ALI — Ledger v3.3.6`, its two parts joined by a spaced em dash, a real character so search engines and AI read the break: the copyright with its owner first (ALI links to the author's site; the year is the current one), then the product and its version (Ledger links home; the version is stamped per commit).
   - The same facts are in `index.html`'s head for machines: `<meta name="author" content="ALI">` and a schema.org `WebApplication` JSON-LD block (name, URL, description, author and copyright holder ALI, copyright year). It carries no version — that changes every commit and only `version.js` is stamped.
-- On a phone the copyright line sits in a slim strip under the bottom bar; short pages fit without scrolling.
+- The copyright line sits in a slim strip fixed at the bottom of the screen at every width (`--phone-footer-height`), half see-through at its top and solid at the screen edge; on a phone it is under the bottom bar and 10px lower, nearer the home indicator. Short pages fit without scrolling.
+- On a phone a solid strip in the page colour covers the status-bar area (`env(safe-area-inset-top)`), so iOS Safari has nothing to blur as the page scrolls under it.
+- Every search box reads `🔍 Search`, as on iOS; what it searches is its hover title.
 - The last-load timestamp (`setLastUpdated`, "Updated 11:00:44") lives in the account menu, under the email and above Refresh data — not in the header, at any width.
 
 ## Layout and interaction
@@ -26,7 +28,7 @@
   - No top bar: the header box is `display: contents`, its logo hidden; the breadcrumb's **Ledger** goes home.
   - The account avatar and menu (or a round 🔑 sign-in button) sit bottom-left over the bottom bar.
   - Health / Finance / Track / Other become a fixed bottom tab bar; page content gets bottom padding to clear it.
-  - The tab bar and the page's action bar are pills floating `--bottom-bar-inset` off the edges, with half-circle ends and ❌ as a round button. No tab is marked active.
+  - The tab bar and the page's action bar are pills floating `--bottom-bar-inset` off the edges, with half-circle ends and ❌ as a round button. Lighter glass than the rest (40% opacity, 12px blur). No tab is marked active or changes colour on hover.
 - **Wide screens (≥1180px):** a sidebar replaces the top bar (see [Hubs, Pages & Addresses](navigation.md)). There is no intermediate top-bar state — the layout is bottom-bar-or-sidebar with nothing in between.
 
 ### Fields and alignment

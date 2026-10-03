@@ -406,22 +406,22 @@ function openTransferForm() {
   document.getElementById('transfer-modal').hidden = false;
 }
 
-// The From/To selects' own current balance, read off to the right of each —
-// same account list the selects themselves are populated from, so it can
-// never name a balance for an account that isn't actually selectable.
-// balanceText (a closed/non-numeric account, e.g. "Closed") is shown as-is,
-// same convention the Account tab's own balance column uses.
-function accountBalanceLabel(name) {
+// "Institution Type: Balance" after an account select (Transfer, Log), a negative
+// balance in red; a closed account's text ("Closed") is shown as-is.
+function renderAccountBalanceLabel(el, name) {
+  el.textContent = '';
   const account = allAccounts.find((a) => a.name === name);
-  if (!account) return '';
-  return account.balanceText !== null ? account.balanceText : formatCurrency(account.balance);
+  if (!account) return;
+  const label = [account.institution, account.type].filter(Boolean).join(' ');
+  const balance = document.createElement('span');
+  balance.textContent = account.balanceText !== null ? account.balanceText : formatCurrency(account.balance);
+  if (account.balanceText === null && account.balance < 0) balance.className = 'expense';
+  el.append(label ? `${label}: ` : '', balance);
 }
 
 function syncTransferBalances() {
-  document.getElementById('transfer-from-balance').textContent =
-    accountBalanceLabel(document.getElementById('transfer-from').value);
-  document.getElementById('transfer-to-balance').textContent =
-    accountBalanceLabel(document.getElementById('transfer-to').value);
+  renderAccountBalanceLabel(document.getElementById('transfer-from-balance'), document.getElementById('transfer-from').value);
+  renderAccountBalanceLabel(document.getElementById('transfer-to-balance'), document.getElementById('transfer-to').value);
 }
 
 function closeTransferForm() {

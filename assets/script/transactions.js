@@ -61,6 +61,7 @@ async function initTransactions(forceRefresh = false) {
     // box and its note are re-checked whenever the account changes — not only
     // when the form opens.
     document.getElementById('tx-account').addEventListener('change', syncUpdateBalanceBox);
+    document.getElementById('tx-account').addEventListener('change', syncTxAccountBalance);
     document.getElementById('tx-update-balance').addEventListener('change', (e) => {
       updateBalanceWanted = e.target.checked;
     });
@@ -430,6 +431,11 @@ async function syncUpdateBalanceBox() {
   if (!target.writable) note.textContent = target.reason;
 }
 
+// The chosen account's institution, type and balance after it, as Transfer's From/To.
+function syncTxAccountBalance() {
+  renderAccountBalanceLabel(document.getElementById('tx-account-balance'), document.getElementById('tx-account').value);
+}
+
 function openTransactionForm(transaction, duplicate = false) {
   editingRow = (transaction && !duplicate) ? transaction.row : null;
   editingOriginal = editingRow ? { account: transaction.account, amount: transaction.amount } : null;
@@ -442,6 +448,7 @@ function openTransactionForm(transaction, duplicate = false) {
   document.getElementById('tx-amount').value = transaction ? transaction.amount : '';
 
   populateSelect(document.getElementById('tx-account'), accountOptions, transaction ? transaction.account : '');
+  syncTxAccountBalance();
   document.getElementById('tx-category').value = transaction ? transaction.category : '';
 
   // A duplicate is a new row (like Add), not an in-place edit, so "Save & Add

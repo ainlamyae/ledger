@@ -10,7 +10,7 @@
 - **Export Transactions** and **Export Physique** (CSV, every row) live in Other › Settings.
 - Notifications for Work Time and Car Service: account menu → **Enable notifications**.
 - iPhone Safari never zooms on a tapped field (`maximum-scale=1.0`, 16px touch fields); pinch-zoom still works.
-- From/To pairs keep 30px fields, a 16px gap on a phone, and `--space-s` after them.
+- From/To pairs keep 30px fields and `--space-s` after them. Every pair of fields side by side (From/To, a form's pairs, filter rows) is `--field-pair-gap` apart: 8px, 16px at ≤1179px.
 - The footer reads `© 2026 ALI — Ledger v3.3.6`, its two parts joined by a spaced em dash, a real character so search engines and AI read the break: the copyright with its owner first (ALI links to the author's site; the year is the current one), then the product and its version (Ledger links home; the version is stamped per commit).
   - The same facts are in `index.html`'s head for machines: `<meta name="author" content="ALI">` and a schema.org `WebApplication` JSON-LD block (name, URL, description, author and copyright holder ALI, copyright year). It carries no version — that changes every commit and only `version.js` is stamped.
 - The copyright line sits in a slim strip fixed at the bottom of the screen at every width (`--phone-footer-height`), half see-through at its top and solid at the screen edge; on a phone it is under the bottom bar and 10px lower, nearer the home indicator. Short pages fit without scrolling.

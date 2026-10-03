@@ -473,7 +473,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="physique-search" placeholder="Search date, consumption, breakdown, workout...">
+                <input type="text" id="physique-search" placeholder="🔍 Search" title="Search date, consumption, breakdown, workout" aria-label="Search">
             </div>
 
             <div class="table-responsive">
@@ -518,7 +518,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="nutrition-search" placeholder="Search group or ingredient name...">
+                <input type="text" id="nutrition-search" placeholder="🔍 Search" title="Search group or ingredient name" aria-label="Search">
             </div>
 
             <div class="table-responsive">
@@ -1574,7 +1574,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="breakdown-search" placeholder="Search category or type...">
+                <input type="text" id="breakdown-search" placeholder="🔍 Search" title="Search category or type" aria-label="Search">
             </div>
 
             <div class="table-responsive">
@@ -1808,7 +1808,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="travel-search" placeholder="Search country, city, port, via, reason, detail...">
+                <input type="text" id="travel-search" placeholder="🔍 Search" title="Search country, city, port, via, reason, detail" aria-label="Search">
             </div>
 
             <div class="table-responsive">
@@ -1839,7 +1839,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="applications-search" placeholder="Search type, app number, status...">
+                <input type="text" id="applications-search" placeholder="🔍 Search" title="Search type, app number, status" aria-label="Search">
             </div>
 
             <div id="applications-list"></div>
@@ -1861,7 +1861,7 @@
             </div>
 
             <div class="filters">
-                <input type="text" id="contacts-search" placeholder="Search name, tags, phone, email...">
+                <input type="text" id="contacts-search" placeholder="🔍 Search" title="Search name, tags, phone, email" aria-label="Search">
             </div>
 
             <div class="table-responsive">
@@ -2359,7 +2359,8 @@
                         <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Unit</th></tr>
                         </thead>
                         <tbody>
-                        <tr title="The L_p-day rolling average body-mass (the reading itself is the Body Mass field above); Desire is the Body Mass target under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td>kg</td></tr>
+                        <tr title="This day's body-mass reading; Desire is the Body Mass target ± the glycogen swing"><td>m</td><td id="physique-mass-reading">—</td><td id="physique-mass-reading-desire">—</td><td>kg</td></tr>
+                        <tr title="The L_p-day rolling average body-mass; Desire is the Body Mass target under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td>kg</td></tr>
                         <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta">—</td><td id="physique-mass-delta-desire">—</td><td>kg</td></tr>
                         <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the Body Mass target"><td>BMI</td><td id="physique-mass-bmi">—</td><td id="physique-mass-bmi-desire">—</td><td>kg/m²</td></tr>
                         <tr><td>BMR_mif</td><td id="physique-bmr-mif">—</td><td>—</td><td>kcal</td></tr>

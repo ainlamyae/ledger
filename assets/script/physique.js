@@ -152,10 +152,11 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   document.getElementById('physique-mass-delta-prime').textContent = privacyMode ? maskDigits(dmPrimeText) : dmPrimeText;
 
   // The Mass figures Save will store (the saved ones while Body Mass is unchanged).
-  // m̄ (m_avg), Δm (m_d) and BMI as stored, each its own row — the Unit column
-  // carries the unit (m is the Body Mass field above).
+  // m, m̄ (m_avg), Δm (m_d) and BMI as stored, each its own row — the Unit column
+  // carries the unit.
   const mass = document.getElementById('physique-is-pattern').checked ? {} : physiqueMassForSave(day.date, day.bodyMass);
   [
+    ['mass-reading', day.bodyMass ?? undefined],
     ['mass-mean', mass.m_avg],
     ['mass-delta', mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? mass.m_d : undefined],
     ['mass-bmi', mass.BMI],
@@ -193,6 +194,9 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const desiredKgPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) / 1000 : null;
   const desiredGPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
 
+  // The target ± glycogen swing, as the Progress meter shows it.
+  const swingKg = glycogenSwingKg(day.bodyMass, heightCm, getSettingString('SEX', null));
+  setDesire('physique-mass-reading-desire', swingKg === null ? healthyMassKg : `${healthyMassKg} ± ${Math.round(swingKg * 10) / 10}`);
   setDesire('physique-mass-mean-desire', healthyMassKg);
   setDesire('physique-mass-delta-desire', desiredKgPerDay);
   setDesire('physique-mass-bmi-desire', heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null);

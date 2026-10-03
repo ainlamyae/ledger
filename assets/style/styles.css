@@ -2631,10 +2631,23 @@ html.home-hub .page-tiles,
         line-height: 1.2;
         white-space: nowrap;
         border-top: none;
-        background: var(--color-bg);
+        /* Fades in from the page above to solid at the screen's edge. */
+        background: linear-gradient(transparent, var(--color-bg));
         /* 10px lower than centred in its strip, nearer the screen's edge; the bars
            above don't move. */
         transform: translateY(10px);
+    }
+
+    /* Solid under the status bar, so iOS doesn't blur the page scrolling past. */
+    body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: env(safe-area-inset-top, 0px);
+        z-index: 9;
+        background: var(--color-bg);
     }
 
     /* The page clears the bar and the strip under it. */
@@ -2712,14 +2725,10 @@ html.home-hub .page-tiles,
         display: flex;
     }
 
-    /* On the home page Ledger is the current tab; the sections it scrolls past
-       aren't marked as well. */
-    html.home-hub .nav a[data-section].active {
-        color: var(--glass-text-muted);
-    }
-
-    html.home-hub .nav a[data-section].active::before {
-        content: none;
+    /* One colour for every tab; the current page isn't marked. */
+    .nav a:hover,
+    .nav a.active {
+        color: var(--glass-text);
     }
 
     /* Each tab fills the bar's height (--bottom-bar-height), the action bar's too. */
@@ -3730,6 +3739,25 @@ html.section-pages .panel.page-active:hover {
         margin-left: auto;
         width: 42px;
         border-radius: 50%;
+    }
+}
+
+/* The bottom bars: lighter glass than the rest. */
+@media (max-width: 1179px) {
+    .nav,
+    html[data-action-bar] .action-bar,
+    html[data-action-bar] .app-form .modal-actions.action-bar {
+        --glass-bg: color-mix(in srgb, var(--color-surface) 40%, transparent);
+        --glass-blur: blur(12px) saturate(180%);
+    }
+}
+
+@media (max-width: 1179px) and (prefers-reduced-transparency: reduce) {
+    .nav,
+    html[data-action-bar] .action-bar,
+    html[data-action-bar] .app-form .modal-actions.action-bar {
+        --glass-bg: var(--color-surface);
+        --glass-blur: none;
     }
 }
 

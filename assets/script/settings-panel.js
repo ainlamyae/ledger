@@ -84,7 +84,7 @@ function truncateSettingValue(value) {
     : value;
 }
 
-// Keys holding a bearer credential (GROQ_API_KEY, USDA_FDC_API_KEY today)
+// Keys holding a bearer credential (GROQ_API_KEY, OPENROUTER_API_KEY, USDA_FDC_API_KEY)
 // rather than a plain preference. Masked by default independent of the
 // privacy toggle below: that toggle is for hiding amounts from someone
 // glancing at the screen, not for keeping a credential off it during

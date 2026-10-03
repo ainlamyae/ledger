@@ -620,6 +620,7 @@ async function loadDashboard(forceRefresh = false) {
       updateBulbsButtonUI();
       applyBulbsVisibility();
       applySettingsToWidgets();
+      renderInsightAgeBadges();
       // Same 0/1 convention, but DEFAULT 0 (hidden) — the home page deliberately
       // starts without its blocks, showing them only once asked.
     });

@@ -1,48 +1,87 @@
-const GROQ_API = 'https://api.groq.com/openai/v1/chat/completions';
-// A stronger model needs far fewer hand-written rules to get food/portion
-// estimates right (see the trimmed prompt below). Its own run-to-run variance
-// no longer matters for determinism — Calculate keeps a line's saved
-// figures while the line is unchanged (physique.js), so a repeat stays consistent.
-const GROQ_MODEL = 'openai/gpt-oss-120b';
-const GROQ_SEED = 42;
-// Groq's vision-capable model — used only for the food-photo/physique scan
-// path where image_url content is required. Llama 4 Scout (the previous
-// model here) was deprecated on Groq for free/dev-tier usage; Qwen 3.8 27B
-// is Groq's current vision model, so a scan click stopped erroring with
-// "model does not exist / no access" once this switched over.
-const GROQ_VISION_MODEL = 'qwen/qwen3.8-27b';
+// One chat call for every AI feature, sent to whichever provider AI_PROVIDER names.
+// Each provider's key and models live in Settings, never in the code:
+// <PROVIDER>_MODELS is JSON, e.g. {"text": "openai/gpt-oss-120b", "vision": "qwen/qwen3.8-27b"}.
+const AI_PROVIDERS = {
+  groq: {
+    name: 'Groq',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    keySetting: 'GROQ_API_KEY',
+    modelsSetting: 'GROQ_MODELS',
+    // The free tier allows 1000 output tokens a minute; no thinking spends them.
+    visionExtras: { max_tokens: 900, reasoning_effort: 'none' },
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    keySetting: 'OPENROUTER_API_KEY',
+    modelsSetting: 'OPENROUTER_MODELS',
+    visionExtras: {},
+    // Optional attribution OpenRouter shows on its dashboard.
+    headers: () => ({ 'HTTP-Referer': location.origin, 'X-Title': 'Ledger' }),
+  },
+};
+const AI_SEED = 42;
 
-// The free-text chat call every Health Insight mode makes: same model, key
-// guard and error shape all three used to hand-roll separately. Returns the
-// assistant's raw text — callers own any parsing, which is why the JSON-response
-// extraction path below stays its own function.
-async function groqChatText(systemPrompt, userMessage, temperature = 0.4) {
-  const apiKey = getSettingString('GROQ_API_KEY', null);
-  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
+function aiProvider() {
+  const id = getSettingString('AI_PROVIDER', 'groq').trim().toLowerCase();
+  const provider = AI_PROVIDERS[id];
+  if (!provider) throw new Error(`AI_PROVIDER must be ${Object.keys(AI_PROVIDERS).join(' or ')}, not "${id}".`);
+  return provider;
+}
 
-  const res = await fetch(GROQ_API, {
+// `role` is a key of the provider's models JSON: "text" or "vision".
+function aiModel(provider, role) {
+  const raw = getSettingString(provider.modelsSetting, null);
+  const example = `{"text": "<model id>", "vision": "<model id>"}`;
+  if (!raw) throw new Error(`Add a ${provider.modelsSetting} setting first, e.g. ${example}.`);
+  let models;
+  try { models = JSON.parse(raw); } catch { throw new Error(`${provider.modelsSetting} isn't valid JSON, e.g. ${example}.`); }
+  if (!models?.[role]) throw new Error(`${provider.modelsSetting} has no "${role}" model, e.g. ${example}.`);
+  return models[role];
+}
+
+// POSTs one chat completion and returns { content, provider }.
+async function aiChat(role, body) {
+  const provider = aiProvider();
+  const apiKey = getSettingString(provider.keySetting, null);
+  if (!apiKey) throw new Error(`Add a ${provider.keySetting} setting first (Settings panel).`);
+  const model = aiModel(provider, role);
+
+  const res = await fetch(provider.url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      ...(provider.headers ? provider.headers() : {}),
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
+      model,
+      ...(role === 'vision' ? provider.visionExtras : {}),
+      ...body,
     }),
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `Groq API error ${res.status}`);
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `${provider.name} API error ${res.status}`);
   }
 
   const data = await res.json();
-  return data.choices[0].message.content;
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== 'string') throw new Error(`${provider.name} returned no message.`);
+  return { content, provider };
+}
+
+// The free-text chat call every Insight mode makes. Returns the raw text.
+async function aiChatText(systemPrompt, userMessage, temperature = 0.4) {
+  const { content } = await aiChat('text', {
+    temperature,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMessage },
+    ],
+  });
+  return content;
 }
 
 // Deliberately does NOT ask the model to rewrite/standardize the user's
@@ -52,7 +91,7 @@ async function groqChatText(systemPrompt, userMessage, temperature = 0.4) {
 // touched by this response now; "query" below is used purely as an internal
 // USDA search term (calorie-estimator.js prefers the user's own text for the
 // Nutrition table match/lookup whenever the split lines up 1:1).
-const GROQ_EXTRACT_SYSTEM_PROMPT = `You are a nutrition estimator for a personal health log. The user gives you a freeform
+const AI_EXTRACT_SYSTEM_PROMPT = `You are a nutrition estimator for a personal health log. The user gives you a freeform
 description of food ingredients and amounts (e.g. "2 eggs, 1 slice toast, 1 tbsp butter").
 
 Split it into individual food items. For each item, provide:
@@ -71,42 +110,23 @@ Do not calculate the total calories or protein yourself — that happens outside
 Respond with ONLY a JSON object, no other text, in exactly this shape:
 {"items": [{"query": "<generic food name>", "grams": <number>, "count": <number or null>, "kcalPer100gFallback": <number>, "proteinPer100gFallback": <number>}, ...]}`;
 
-async function groqExtractIngredients(notesText) {
-  const apiKey = getSettingString('GROQ_API_KEY', null);
-  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
-
-  const res = await fetch(GROQ_API, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      temperature: 0,
-      seed: GROQ_SEED,
-      messages: [
-        { role: 'system', content: GROQ_EXTRACT_SYSTEM_PROMPT },
-        { role: 'user', content: notesText },
-      ],
-    }),
+async function aiExtractIngredients(notesText) {
+  const { content, provider } = await aiChat('text', {
+    temperature: 0,
+    seed: AI_SEED,
+    messages: [
+      { role: 'system', content: AI_EXTRACT_SYSTEM_PROMPT },
+      { role: 'user', content: notesText },
+    ],
   });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `Groq API error ${res.status}`);
-  }
-
-  const data = await res.json();
-  const content = data.choices[0].message.content;
-  console.debug('[groq] raw response content:', content);
+  console.debug('[ai] raw response content:', content);
 
   const fail = (reason) => {
     const snippet = content.length > 300 ? `${content.slice(0, 300)}…` : content;
-    throw new Error(`Groq returned an unexpected response (${reason}): ${snippet}`);
+    throw new Error(`${provider.name} returned an unexpected response (${reason}): ${snippet}`);
   };
 
-  // Not using response_format: json_object — Groq's server-side JSON-mode
+  // Not using response_format: json_object — a server-side JSON-mode
   // validator can hard-reject valid-enough output (e.g. if the model adds a
   // stray word around the object) with a generic "Failed to generate JSON"
   // error before we ever see the content. Parsing it ourselves is more
@@ -166,30 +186,17 @@ async function groqExtractIngredients(notesText) {
 // Reads a photographed Nutrition Facts label. `nutrients` is [{ name, unit }], the
 // only names the model may use. Returns { name, serving, servingGrams, calories,
 // nutrients: [{ name, amount, unit, percentDV }] }, per serving as printed.
-async function groqReadNutritionLabel(base64Image, mimeType, nutrients) {
-  const apiKey = getSettingString('GROQ_API_KEY', null);
-  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
-
+async function aiReadNutritionLabel(base64Image, mimeType, nutrients) {
   const names = nutrients.map((n) => `- ${n.name}`).join('\n');
-  const res = await fetch(GROQ_API, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: GROQ_VISION_MODEL,
-      temperature: 0,
-      // The free tier allows 1000 output tokens a minute; no thinking spends them.
-      max_tokens: 900,
-      reasoning_effort: 'none',
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-          {
-            type: 'text',
-            text: `This is a food product's Nutrition Facts label (it may be bilingual English/French, e.g. Canadian).
+  const { content, provider } = await aiChat('vision', {
+    temperature: 0,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+        {
+          type: 'text',
+          text: `This is a food product's Nutrition Facts label (it may be bilingual English/French, e.g. Canadian).
 Read only what is printed; never guess a nutrient that isn't on the label.
 
 For every nutrient line, give its printed amount and unit for one serving, and its printed % Daily Value.
@@ -199,69 +206,45 @@ Skip any printed line that matches none of them.
 
 Respond with ONLY a JSON object, no other text, in exactly this shape:
 {"name": "<product name if visible, else null>", "serving": "<serving size as printed, e.g. 1 cup (250 mL) or 2 biscuits (30 g)>", "servingGrams": <grams in one serving if printed, else null>, "calories": <number or null>, "nutrients": [{"name": "<one of the names above>", "amount": <number or null>, "unit": "<g, mg or µg, or null>", "percentDV": <number or null>}]}`,
-          },
-        ],
-      }],
-    }),
+        },
+      ],
+    }],
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `Groq API error ${res.status}`);
-  }
-
-  const content = (await res.json()).choices[0].message.content;
   const start = content.indexOf('{');
   const end = content.lastIndexOf('}');
   let parsed = null;
   try { parsed = start === -1 ? null : JSON.parse(content.slice(start, end + 1)); } catch { parsed = null; }
   if (!parsed || !Array.isArray(parsed.nutrients)) {
     const snippet = content.length > 300 ? `${content.slice(0, 300)}…` : content;
-    throw new Error(`Groq returned an unexpected response: ${snippet}`);
+    throw new Error(`${provider.name} returned an unexpected response: ${snippet}`);
   }
   return parsed;
 }
 
-// Sends a food photo to the Groq vision model and returns a plain ingredient
+// Sends a food photo to the vision model and returns a plain ingredient
 // list in the same format the Consumption textarea expects (one item per line,
 // e.g. "250g chicken breast" or "2 eggs"), ready to be appended directly.
-async function groqAnalyzeFoodImage(base64Image, mimeType) {
-  const apiKey = getSettingString('GROQ_API_KEY', null);
-  if (!apiKey) throw new Error('Add a GROQ_API_KEY setting first (Settings panel).');
-
-  const res = await fetch(GROQ_API, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: GROQ_VISION_MODEL,
-      temperature: 0,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-          {
-            type: 'text',
-            text: `You are a nutrition assistant. Identify every food item visible in this image and estimate realistic portion sizes.
+async function aiAnalyzeFoodImage(base64Image, mimeType) {
+  const { content } = await aiChat('vision', {
+    temperature: 0,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+        {
+          type: 'text',
+          text: `You are a nutrition assistant. Identify every food item visible in this image and estimate realistic portion sizes.
 
 Return ONLY a plain list, one item per line:
 - Weighed items: "<grams>g <food name>"  →  e.g. "250g chicken breast"
 - Countable items: "<count> <food name>"  →  e.g. "2 eggs"
 
 No headings, no explanations, no bullet points — just the list.`,
-          },
-        ],
-      }],
-    }),
+        },
+      ],
+    }],
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `Groq API error ${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.choices[0].message.content.trim();
+  return content.trim();
 }

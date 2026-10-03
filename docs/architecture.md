@@ -29,12 +29,12 @@ flowchart TD
     App -- "pick / confirm spreadsheet file" --> Picker
     Picker -. "picked file ID" .-> App
 
-    Groq["Groq chat-completions API<br/>api.groq.com<br/>Calculate ingredient extraction<br/>Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Finance Insight reports<br/>Food photo scan (vision — qwen/qwen3.6-27b)"]
+    Groq["AI chat-completions API<br/>Groq (api.groq.com) or OpenRouter (openrouter.ai), per AI_PROVIDER<br/>Calculate ingredient extraction<br/>Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Finance Insight reports<br/>Food photo + label scan (the "vision" model)"]
     USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup<br/>+ full nutrient panel (Pull Micronutrients)"]
     Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
 
-    App -. "opt-in, user's own GROQ_API_KEY<br/>(Settings tab)" .-> Groq
+    App -. "opt-in, user's own GROQ_API_KEY or OPENROUTER_API_KEY<br/>(Settings tab)" .-> Groq
     App -. "opt-in, user's own USDA_FDC_API_KEY<br/>(Settings tab)" .-> USDA
     App -. "no key, unauthenticated" .-> Meteo
     App -. "no key, unauthenticated" .-> BDC
@@ -42,7 +42,7 @@ flowchart TD
 
 - Every Sheets call carries the user's own OAuth token, scoped by `drive.file` to the one spreadsheet they picked.
 - `config.js` values (Client ID, template ID, Picker key) are visible to everyone and are **not** secrets.
-- Groq/USDA are opt-in and see only typed ingredient text or the aggregated Insight summary.
+- The AI provider (Groq or OpenRouter) and USDA are opt-in and see only typed ingredient text or the aggregated Insight summary.
 - Open-Meteo/BigDataCloud are key-less and see only coordinates or a typed city name.
 
 ![System architecture diagram — layered view of the browser SPA, Google Identity Services, Sheets/Drive/Picker APIs, the user's own spreadsheet, and the opt-in Groq/USDA/Open-Meteo/BigDataCloud APIs](assets/images/system-architecture.png)
@@ -125,7 +125,7 @@ flowchart TD
     Calc --> CalcCategory{"handleCalculateClick():<br/>entry category?"}
 
     CalcCategory -- Food --> Split["splitNotesIntoSegments()<br/>deterministic, no AI — recovers<br/>each item's OWN typed name"]
-    Split --> Groq["groqExtractIngredients()"] --> Items["items[]: query (Groq's own<br/>search phrasing, never shown/<br/>stored), grams, count,<br/>kcal/protein fallback"]
+    Split --> Groq["aiExtractIngredients()"] --> Items["items[]: query (Groq's own<br/>search phrasing, never shown/<br/>stored), grams, count,<br/>kcal/protein fallback"]
     Items --> PerItem["Per item — resolved fresh,<br/>never cached:"]
     PerItem --> NutCheck{"Match in Nutrition table,<br/>by the user's OWN typed name<br/>— never Groq's query?"}
     NutCheck -- "count or weight match" --> Trusted["Use table row directly<br/>— no USDA/Groq-name call"]
@@ -164,7 +164,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 4 | `sheets.js` | Sheets API v4 wrapper; `USER_ENTERED` by default, `RAW` for Settings writes |
 | 5 | `cache.js` | Numeric-expression evaluator; deletes the `ledger_cache_*` keys earlier versions stored |
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
-| 7 | `groq.js` | Groq chat client; tolerant JSON parsing; never rewrites the user's own Notes; vision call (`groqAnalyzeFoodImage`) for food-photo scanning via `qwen/qwen3.6-27b` |
+| 7 | `ai.js` | AI chat client for Groq or OpenRouter (`AI_PROVIDER`), models from `GROQ_MODELS`/`OPENROUTER_MODELS`; tolerant JSON parsing; never rewrites the user's own Notes; vision calls (`aiAnalyzeFoodImage`, `aiReadNutritionLabel`) for photo scans |
 | 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
 | 9 | `nutrient-targets.js` | Ideal/day reference amounts (mostly FDA Daily Values) and gap-severity thresholds for the Micronutrients mode, overridable via a `MICRONUTRIENT_DAILY_TARGETS_JSON` Setting |
 | 10 | `nutrition.js` | Nutrition table, Group column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry`, Log into today's Physique Consumption |
@@ -197,12 +197,12 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 37 | `protein-source-rotation-insight.js` | Protein mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
 | 38 | `plan-insight.js` | Plan mode: the Tune's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
 | 39 | `fat-loss-pattern-insight.js` | Pattern mode: the BMR_cal periods plus macro/activity-type averages, and the pattern-finding prompt |
-| 40 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
+| 40 | `insight-panel.js` | The panel itself: mode table, load buttons, AI call, per-mode save/restore |
 | 41 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Group |
 | 42 | `formula-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
 | 43 | `formula-render.js` | Tune's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
 | 44 | `formula-playground.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
-| 45 | `financial-insight.js` | Finance Insight panel: net worth/cash flow/category-spend/account snapshot, Groq call |
+| 45 | `financial-insight.js` | Finance Insight panel: net worth/cash flow/category-spend/account snapshot, AI call |
 | 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
 | 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 | 48 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |

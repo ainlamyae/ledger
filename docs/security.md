@@ -11,7 +11,7 @@
   - With location granted, coordinates or a typed city go to Open-Meteo and BigDataCloud.
   - No account, no financial data, no server of ours involved.
   - Avoidable entirely by denying location and not setting a custom city.
-- **Groq / USDA are opt-in** and only run once you set the keys:
+- **The AI provider (Groq or OpenRouter) and USDA are opt-in** and only run once you set the keys:
   - Calculate sends the typed ingredient text only.
   - The USDA lookup sends the ingredient name only.
   - Physique's **Scan** sends the meal photo you pick; Nutrition's **Scan** sends the label photo you pick (resized to 1600px, as JPEG) and the list of nutrient names it may fill.
@@ -22,7 +22,7 @@
   - Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
   - Pattern Insight sends the profile block plus period averages over Tune's L_p days (body mass and its change, intake, macros, activity by type, energy balance and BMR offset).
   - Nothing is sent until that panel's Send to AI is clicked.
-- `GROQ_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Setting` tab and are never committed. The Settings panel masks any key ending `_API_KEY`/`_TOKEN`/`_SECRET` by default — independent of Privacy mode below, which is for amounts, not credentials — with a per-row reveal button that resets on reload.
+- `GROQ_API_KEY`, `OPENROUTER_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Setting` tab and are never committed. The Settings panel masks any key ending `_API_KEY`/`_TOKEN`/`_SECRET` by default — independent of Privacy mode below, which is for amounts, not credentials — with a per-row reveal button that resets on reload.
 - **Privacy mode** is display-only and doesn't change what's stored.
 
 ---

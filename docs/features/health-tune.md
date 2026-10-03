@@ -10,20 +10,21 @@
 - Variable order: `σ`, `h`, `a`, `m`, `L_p`, `m̄`, the same order as Insight profiles and the Plan prompt.
 - `m̄` is the `L_p`-day rolling average body mass everywhere: `m̄ = (1/L_p) × Σ m(t−i), i = 0…L_p−1`, re-smoothed live as `L_p` is typed.
 - Four cards, always open: **Plan Choices**, **Variables**, **Equations** and **Calculations** (live arithmetic, incl. BMR_cal's Periods table).
+- Variable names stay short; the unit column carries the rest (e.g. "fat floor" with `% of TEI`, "weekly metabolic adaptation", "adapted plateau").
 - Save also updates `GLYCOGEN_SWING_KG` (the `± 1.9 kg` swing).
 
 ## Health — Tune
 
 It is the **Tune** block, above Indicator in the Health wrapper; expanding it reloads its boxes from the sheet.
 
-An **Equations** card under the **Variables** card shows the model's full equation list — `FORMULA_EXPRESSION`, the same text the Plan prompt sends to the AI.
+An **Equations** card under the **Variables** card shows the model's full equation list — `FORMULA_EXPRESSION`, the same text the Plan prompt sends to the AI — in the Calculations card's font: headings dark, equations gray.
 
 The substituted arithmetic under the last row (C_max) — LBM, BMR, AEE, D, TEI, … down to C_max — sits in a **Calculations** card under the Equations card. Both BMR equations are listed (the active one first), and below the lines comes BMR_cal's own working over Tune's n_p × L_p: the **Periods** table and its D / ΔM / Offset / BMR_cal lines, drawn by the same functions so the two can't differ.
 
 **Update**, between Reset and Save, saves n_p / L_p and recomputes every day's stored BMR (BMR_cal included) in one request.
 
 - Every term of the calorie-target and forecast algebra, with your own numbers substituted in — not a black box you have to trust.
-- **All the plan's choices sit together in one card at the top, titled Plan Choices** (`.formula-choices`; every Tune card is `.card.formula-card`): Solve for, Basal metabolic rate (which every figure in the app runs on), Which stays fixed as you lose body mass, and Which stays fixed on the desired activity — then the Equations dropdown and the variable list below it.
+- **All the plan's choices sit together in one card at the top, titled Plan Choices** (`.formula-choices`; every Tune card is `.card.formula-card`): Solve for, Basal metabolic rate (drives every deficit and desired calorie figure), Which stays fixed as you lose body mass, and Which stays fixed on the desired activity — then the Variables, Equations and Calculations cards.
 - **Solve for** any one of Calories, Healthy body mass, Activity or Weekly fat loss; the rest are inputs and the picked one is computed. Activity and Weekly fat loss also let you type either E_in or `t` and compute whichever you didn't touch.
 - **Weekly fat loss %** is the fifth radio and the odd one out — named for what it *holds*, not what it solves. `Δm%` is the typed input; the kilograms, `E_in`, `t` and the arrival date are all computed from it, and `t` follows the proportional journey a fixed share implies. Same arithmetic as Calories otherwise, so the two share one branch: the only differences are where `Δm` came from and which journey `t` is measured along.
   - Picking it **ticks the fat-loss % pin**, since holding the percentage and pinning it are one decision — otherwise the plan you just built here would be saved as a fixed-kilogram one and the app would immediately stop doing what the modal showed. Not the reverse: the pin governs the saved plan and applies in every mode.

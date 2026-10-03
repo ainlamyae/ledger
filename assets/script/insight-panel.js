@@ -268,7 +268,7 @@ function renderInsightPreviewLines(text) {
 
 // The three modes only ever differed by system prompt and by whether the
 // question is appended or already inlined in the prompt body; the call itself is
-// groq.js's groqChatText.
+// ai.js's aiChatText.
 function insightUserMessage(mode, data, ctx) {
   const prompt = mode.formatPrompt(data, ctx);
   if (mode.appendQuestion && ctx.question && ctx.question.trim()) {
@@ -338,7 +338,7 @@ async function runInsightGeneration() {
     // pass — what was shown is exactly what gets sent.
     const ctx = { from, to, question: textarea.value };
     const systemPrompt = typeof mode.systemPrompt === 'function' ? mode.systemPrompt(insightLoaded.data) : mode.systemPrompt;
-    const text = await groqChatText(systemPrompt, insightUserMessage(mode, insightLoaded.data, ctx));
+    const text = await aiChatText(systemPrompt, insightUserMessage(mode, insightLoaded.data, ctx));
     body.innerHTML = '';
     renderInsightText(body, text);
 
@@ -351,6 +351,7 @@ async function runInsightGeneration() {
         [mode.generatedAtKeys[0]]: generatedAt,
       });
       renderInsightGeneratedAt(generatedAt);
+      renderInsightAgeBadges();
     } catch (saveErr) {
       showFieldError('insight-status', `Generated, but couldn't save it: ${saveErr.message}`);
     }
@@ -365,6 +366,25 @@ async function runInsightGeneration() {
     modeButtons.forEach((b) => { b.disabled = false; });
     btn.textContent = originalLabel;
   }
+}
+
+// A red "<days>d" badge on each mode tile last generated over 30 days ago.
+const INSIGHT_STALE_DAYS = 30;
+
+function renderInsightAgeBadges() {
+  const today = dateFromIso(isoFromDate(new Date()));
+  document.querySelectorAll('#insight-mode-actions [data-insight-mode]').forEach((btn) => {
+    btn.querySelector(':scope > .page-badge')?.remove();
+    const stamp = getSettingStringAny(INSIGHT_MODES[btn.dataset.insightMode].generatedAtKeys, null);
+    if (!stamp) return;
+    const days = Math.round((today - dateFromIso(stamp.slice(0, 10))) / 86400000);
+    if (!(days > INSIGHT_STALE_DAYS)) return;
+    const badge = document.createElement('span');
+    badge.className = 'page-badge';
+    badge.textContent = `${days}d`;
+    badge.title = `Last generated ${days} days ago (${stamp})`;
+    btn.appendChild(badge);
+  });
 }
 
 function renderInsightGeneratedAt(timestamp) {

@@ -766,17 +766,16 @@ function instructionPrescription(activity) {
   return [activity.weight, prescription].filter(Boolean).join(' · ');
 }
 
-// GYM: one tile per Group (Insight's tile style), and under them the chosen
+// Workouts: one tile per Group (Insight's tile style), and under them the chosen
 // group's activities — figure, name, muscle group, then load, sets x reps and rest.
-// Each group is a page of its own, …/activity/gym/<group>/ (registerFormSubView,
-// router.js); GYM's own address shows just the tiles. Figures come from the
+// Each group is a page of its own, …/activity/workouts/<group>/ (registerFormSubView,
+// router.js); Workouts' own address shows just the tiles. Figures come from the
 // sheet's Image column.
 let guideGroupSlug = null;
 
 function guideGroups() {
-  // The gym's: every strength activity (Sets x Reps, as the plan's strength tables
-  // tell them apart), pictured or not. NEAT and Cardio stay out.
-  return groupInOrder(sortActivitiesByRotation(allActivities).filter((a) => a.quantity.sets !== undefined), 'group');
+  // Every activity, pictured or not: the strength days, then Cardio and NEAT.
+  return groupInOrder(sortActivitiesByRotation(allActivities), 'group');
 }
 
 // The group a page slug names, or null.
@@ -801,8 +800,8 @@ function renderInstructionList() {
   tiles.innerHTML = '';
   body.innerHTML = '';
   const groups = guideGroups();
-  // As Insight's modes: the tiles alone on GYM's page, a group's list alone on
-  // its own (the breadcrumb's GYM goes back to the tiles).
+  // As Insight's modes: the tiles alone on Workouts' page, a group's list alone on
+  // its own (the breadcrumb's Workouts goes back to the tiles).
   document.getElementById('instruction-groups-card').hidden = guideGroupSlug !== null;
   // Empty on the tiles view; hidden so its top margin adds no gap between the cards.
   body.hidden = guideGroupSlug === null;

@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | Save | 💾 | | Complete (USDA) | 🧲 |
 | Add | ➕ | | Norm | 📏 |
-| Log | 📝 | | GYM | 💪 |
+| Log | 📝 | | Workouts | 💪 |
 | Update | 🔄 | | Send to AI | 🤖 |
 | Scan | 📷 | | Reset | ♻️ |
 | Calculate | 🧮 | | Today (Physique) | 📍 |
@@ -25,7 +25,7 @@ Colour marks **word buttons** only; emoji buttons (`.btn-icon`, `.row-action-btn
 | Colour | Role | Examples |
 |---|---|---|
 | Blue | Add or save | Save & Add Another, Transfer's commit |
-| Gray | Opens an editor without committing | Today, GYM tiles |
+| Gray | Opens an editor without committing | Today, Workouts tiles |
 | Red | Destructive, text labels only | The export filter's remove |
 | Default | Everything else | |
 

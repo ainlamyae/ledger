@@ -2344,7 +2344,11 @@ function renderWellnessProjectionChart(entries) {
     meterFill.classList.toggle('danger', isWrongDirection);
     if (!isWrongDirection) meterWrap.style.setProperty('--fill-pct', `${Math.round(pct)}`);
 
-    const currentText = `${lastBodyMass} kg`;
+    // The reading, then m̄ (the rolling average, as the Status card reads it) in brackets.
+    const mBar = storedMassAsOf(isoFromDate(new Date()))?.m_avg ?? planBodyMassKg(entries);
+    const currentText = Number.isFinite(mBar)
+      ? `${lastBodyMass} (${Math.round(mBar * 10) / 10}) kg`
+      : `${lastBodyMass} kg`;
     meterCallout.textContent = privacyMode ? maskDigits(currentText) : currentText;
     meterCallout.classList.toggle('danger', isWrongDirection);
 

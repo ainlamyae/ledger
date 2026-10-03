@@ -119,7 +119,7 @@ function applyWorkoutLines(lines) {
   if (messages.length) showFieldError('physique-form-error', messages.join(' '));
 }
 
-// The fast path (GYM's 📝): the same appended lines, priced the way the
+// The fast path (Workouts' 📝): the same appended lines, priced the way the
 // form's Calculate prices them, saved straight to today's row with no form to
 // review. Undo writes the day back as it was (or clears a row this created).
 async function quickLogWorkoutLines(lines) {
@@ -211,16 +211,16 @@ function initWorkoutPlan() {
   const instructionModal = document.getElementById('activity-instruction-modal');
   document.getElementById('activity-instruction-btn').addEventListener('click', () => {
     // Opens on its group tiles, or straight onto a group when its address was loaded
-    // (…/gym/push-day/); a group is a page of its own under GYM's address.
-    const sub = takeInitialFormSub('gym');
+    // (…/workouts/push-day/); a group is a page of its own under Workouts' address.
+    const sub = takeInitialFormSub('workouts');
     guideGroupSlug = sub && guideGroupName(sub) !== null ? sub : null;
     renderInstructionList();
     instructionModal.hidden = false;
   });
-  registerFormSubView('gym', showGuideGroup, guideGroupName);
+  registerFormSubView('workouts', showGuideGroup, guideGroupName);
   document.getElementById('guide-log-btn').addEventListener('click', logGuideTicks);
-  // ❌ goes back one level: from a group's page to GYM's tiles, from the tiles
-  // out of GYM.
+  // ❌ goes back one level: from a group's page to Workouts' tiles, from the tiles
+  // out of Workouts.
   document.getElementById('activity-instruction-close-btn').addEventListener('click', () => {
     if (guideGroupSlug !== null) showGuideGroup(null);
     else instructionModal.hidden = true;

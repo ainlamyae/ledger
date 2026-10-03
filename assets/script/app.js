@@ -718,6 +718,8 @@ async function loadDashboard(forceRefresh = false) {
       // (each exercise's Group and Weekly Target) both loaded.
       Promise.all([physiquePromise, activitiesPromise]).then(() => {
         renderActivityRotationChart(wellnessDateRange());
+        renderActivityPlanTables();
+        renderInstructionList();
       }),
       initContacts(forceRefresh),
       // Its own read of the Breakdown tab rather than a share of loadReport's: that

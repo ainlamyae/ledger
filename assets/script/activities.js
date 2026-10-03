@@ -345,6 +345,19 @@ function syncActivityPlanColumnWidths() {
   });
 }
 
+// Sort activities by rotation completion: least done (biggest gap) first.
+// Groups with no Weekly Target (untracked) fall to the end in sheet order.
+// Shared by the plan tables and the Instructions modal.
+function sortActivitiesByRotation(activities) {
+  const rotationRows = computeActivityRotationRows(wellnessDateRange());
+  const groupRank = new Map(rotationRows.map((r, i) => [r.name, i]));
+  return [...activities].sort((a, b) => {
+    const ra = groupRank.has(a.group) ? groupRank.get(a.group) : Infinity;
+    const rb = groupRank.has(b.group) ? groupRank.get(b.group) : Infinity;
+    return ra - rb;
+  });
+}
+
 function renderActivityPlanTables() {
   const container = document.getElementById('activity-plan-tables');
   container.innerHTML = '';
@@ -357,10 +370,12 @@ function renderActivityPlanTables() {
     return;
   }
 
-  const strengthCols = activityPlanColumnVisibility(allActivities.filter((a) => a.quantity.sets !== undefined));
-  const amountCols = activityPlanColumnVisibility(allActivities.filter((a) => a.quantity.sets === undefined));
+  const sorted = sortActivitiesByRotation(allActivities);
 
-  groupInOrder(allActivities, 'category').forEach((categoryRows, category) => {
+  const strengthCols = activityPlanColumnVisibility(sorted.filter((a) => a.quantity.sets !== undefined));
+  const amountCols = activityPlanColumnVisibility(sorted.filter((a) => a.quantity.sets === undefined));
+
+  groupInOrder(sorted, 'category').forEach((categoryRows, category) => {
     const heading = document.createElement('h3');
     heading.textContent = category;
     container.appendChild(heading);
@@ -781,7 +796,7 @@ function renderInstructionList() {
   const body = document.getElementById('instruction-body');
   body.innerHTML = '';
 
-  groupInOrder(allActivities.filter((a) => a.image), 'group').forEach((rows, group) => {
+  groupInOrder(sortActivitiesByRotation(allActivities).filter((a) => a.image), 'group').forEach((rows, group) => {
     const heading = document.createElement('h3');
     heading.textContent = group;
 

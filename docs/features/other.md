@@ -6,6 +6,7 @@
 
 - **Settings** (`/other/settings/`): the one Settings page, every key, alphabetical. **Value** is a multi-line box, trimmed on save.
   - Values that live elsewhere are not Settings: walking MET is the Activity sheet's **Walk** row; BMR_cal comes from Physique's Derived cell. Obsolete keys are deleted on load.
+  - **AI provider**: `AI_PROVIDER` is `groq` (default) or `openrouter`. Each provider has its own key (`GROQ_API_KEY`, `OPENROUTER_API_KEY`) and its own models JSON (`GROQ_MODELS`, `OPENROUTER_MODELS`), with a `"text"` model (Calculate, Insight) and a `"vision"` model (photo and label Scan), e.g. `{"text": "openai/gpt-oss-120b", "vision": "qwen/qwen3.8-27b"}`. No model is built into the code; a missing or invalid JSON shows an error saying which setting to fix.
 
 ## Other
 

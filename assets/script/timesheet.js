@@ -260,15 +260,19 @@ function populateTimesheetCompanyOptions() {
   });
 }
 
-// A weekday with nothing logged for today: a "Log" badge opening today's day, and
-// (once allowed in the account menu) one Chrome notification a day.
+// A weekday with nothing logged for today: a red "<days>d" badge (days since the
+// last logged day, like the other badges) opening today's day, and (once allowed
+// in the account menu) one Chrome notification a day. A logged holiday counts.
 function checkTimesheetReminder() {
   const today = isoFromDate(new Date());
-  if (isWeekend(today) || entriesForLastCompany(allTimeEntries).some((e) => e.date === today)) {
+  const entries = entriesForLastCompany(allTimeEntries).filter((e) => e.date <= today);
+  if (isWeekend(today) || !entries.length || entries.some((e) => e.date === today)) {
     setPageBadge('track', 'work-time', null);
     return;
   }
-  setPageBadge('track', 'work-time', { text: 'Log', title: "Today's hours aren't logged", record: today });
+  const last = entries.reduce((max, e) => (e.date > max ? e.date : max), '');
+  const days = Math.round((dateFromIso(today) - dateFromIso(last)) / 86400000);
+  setPageBadge('track', 'work-time', { text: `${days}d`, title: `Today's hours aren't logged; last logged ${days} days ago (${last})`, record: today });
   if ('Notification' in window && Notification.permission === 'granted'
     && localStorage.getItem('ledger_last_reminder_notified') !== today) {
     new Notification('Ledger', { body: 'Work Time: log today' });

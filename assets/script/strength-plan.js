@@ -17,7 +17,7 @@ function planRowsByName() {
   const map = new Map();
   document.querySelectorAll('.workout-day table tbody tr').forEach((tr) => {
     const box = tr.querySelector('.workout-check');
-    if (box) map.set(tr.children[1].textContent.trim(), { day: tr.closest('table').dataset.day, box, tr });
+    if (box) map.set(tr.querySelector('.workout-name-cell').textContent.trim(), { box, tr });
   });
   return map;
 }
@@ -155,7 +155,7 @@ async function quickLogWorkoutLines(lines) {
 function logWorkout() {
   const logged = loggedWorkoutQuantities();
   const added = [...document.querySelectorAll('.workout-check:checked')]
-    .map((box) => ({ name: box.closest('tr').children[1].textContent.trim(), box }))
+    .map((box) => ({ name: box.closest('tr').querySelector('.workout-name-cell').textContent.trim(), box }))
     .filter(({ name }) => !logged.has(name))
     .map(({ name, box }) => `${workoutNoteQuantityForBox(box)} ${name}`);
 

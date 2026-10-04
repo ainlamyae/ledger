@@ -138,6 +138,8 @@ function renderPageBadges() {
   document.querySelectorAll('.page-tile[data-route]').forEach((tile) => {
     placeBadge(tile, tile.dataset.section, tile.dataset.route);
   });
+  // The loop above clears Insight's tiles too; their age badges go back on.
+  renderInsightAgeBadges();
   const sectionId = window.ledgerSectionPage?.section;
   const crumb = sectionId && document.querySelector(`#${sectionId} > .page-crumb`);
   if (!crumb) return;

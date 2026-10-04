@@ -162,13 +162,10 @@ function activityMuscleGroups() {
   return groups;
 }
 
-// --- Activity Plan tables ------------------------------------------------
+// --- Activity Plan table ------------------------------------------------
 //
-// Rebuilt from the sheet in the shape strength-plan.js already reads: a
-// `.workout-day` block per Group, each holding a table whose data-day is the
-// group name and whose checkbox carries the quantity attributes. Because both
-// the displayed cell and those attributes now come from one cell, they can no
-// longer drift apart — which they had, on 24 of 34 rows.
+// One table in the shape strength-plan.js reads: each row's checkbox carries the
+// quantity attributes, from the same cell it displays.
 
 function groupInOrder(items, key) {
   const groups = new Map();
@@ -225,36 +222,22 @@ function activityPlanColumnVisibility(activities) {
   };
 }
 
-function makeActivityTable(group, rows, columnVisibility) {
-  // A rep/hold group gets the Sets x Reps + Rest pair; an amount-based one
-  // (steps, minutes) has no sets and no rest to show.
-  const isStrength = rows.some((a) => a.quantity.sets !== undefined);
-
+// One table for every activity, Category and Group as its first columns.
+function makeActivityTable(rows, columnVisibility) {
   const table = document.createElement('table');
-  // table-compact: same dense/no-border look every other data table in the
-  // app shares (styles.css) — the default padding/row-border read as loose
-  // once these tables carry their own checkbox/actions columns.
-  table.className = `table-compact ${isStrength ? 'workout-table-strength' : 'workout-table-neat'}`;
-  table.dataset.day = group;
+  table.className = 'table-compact workout-table-strength';
 
-  // The checkbox column is first and unlabelled, same as every other
-  // selectable table in the app (Nutrition, Physique). The row actions column
-  // is last and unlabelled too. strength-plan.js reads a ticked row's name
-  // from children[1] (Name never moves) and its quantity from the
-  // "workout-quantity-cell" class rather than a fixed index — the column's
-  // position among Muscle Group/Load/Rest shifts with columnVisibility, so
-  // only a class survives that the way workout-muscle-group-cell already
-  // does below.
-  //
-  // Every column between Name and the actions column gets a shared
-  // "workout-meta-cell" class, and Muscle Group/quantity their own class on
-  // top — nth-child can't target these reliably on mobile any more now that a
-  // table's own column count depends on columnVisibility, so mobile's
-  // font-size/hide rules key off these classes instead of position.
-  const headers = [{ label: '', className: 'workout-check-col' }, { label: isStrength ? 'Exercise/Machine' : 'Activity' }];
+  // strength-plan.js finds a row's name by workout-name-cell and its quantity by
+  // workout-quantity-cell. Mobile rules key off the classes, not positions.
+  const headers = [
+    { label: '', className: 'workout-check-col' },
+    { label: 'Category' },
+    { label: 'Group' },
+    { label: 'Activity' },
+  ];
   if (columnVisibility.muscleGroup) headers.push({ label: 'Muscle Group', className: 'workout-meta-cell workout-muscle-group-cell' });
   if (columnVisibility.weight) headers.push({ label: 'Load', className: 'workout-meta-cell' });
-  headers.push({ label: isStrength ? 'Sets x Reps' : 'Amount', className: 'workout-meta-cell workout-quantity-cell' });
+  headers.push({ label: 'Amount', className: 'workout-meta-cell workout-quantity-cell' });
   if (columnVisibility.rest) headers.push({ label: 'Rest', className: 'workout-meta-cell' });
   headers.push({ label: '' });
 
@@ -269,27 +252,32 @@ function makeActivityTable(group, rows, columnVisibility) {
   thead.appendChild(headRow);
 
   const tbody = document.createElement('tbody');
-  rows.forEach((activity) => {
+  rows.forEach((activity, i) => {
     const tr = document.createElement('tr');
+    // A line where the Group changes, as Breakdown does per Category.
+    if (i > 0 && activity.group !== rows[i - 1].group) tr.classList.add('workout-group-start');
 
     const checkCell = document.createElement('td');
     checkCell.className = 'workout-check-cell';
     checkCell.appendChild(makeActivityCheckbox(activity));
     tr.appendChild(checkCell);
 
-    const cells = [makeCell(activity.name)];
+    const nameCell = makeCell(activity.name);
+    nameCell.className = 'workout-name-cell';
+    tr.append(makeCell(activity.category), makeCell(activity.group), nameCell);
+
+    const cells = [];
     if (columnVisibility.muscleGroup) {
-      cells.push(makeCell(truncateMuscleGroup(activity.muscleGroup), activity.muscleGroup));
+      const muscleCell = makeCell(truncateMuscleGroup(activity.muscleGroup), activity.muscleGroup);
+      muscleCell.classList.add('workout-muscle-group-cell');
+      cells.push(muscleCell);
     }
     if (columnVisibility.weight) cells.push(makeCell(activity.weight));
     const quantityCell = makeCell(activity.amount);
     quantityCell.classList.add('workout-quantity-cell');
     cells.push(quantityCell);
     if (columnVisibility.rest) cells.push(makeCell(activity.rest));
-    // Cells 1..n-1 are the same conditionally-shown group the headers above
-    // are classed for (cells[0] is the Name column, never classed).
-    cells.slice(1).forEach((cell) => cell.classList.add('workout-meta-cell'));
-    if (columnVisibility.muscleGroup) cells[1].classList.add('workout-muscle-group-cell');
+    cells.forEach((cell) => cell.classList.add('workout-meta-cell'));
     tr.append(...cells);
 
     const actionsCell = document.createElement('td');
@@ -340,39 +328,20 @@ function renderActivityPlanTables() {
   }
 
   const sorted = sortActivitiesByRotation(allActivities);
+  // Category, then Group, in rotation order; one table for all of them.
+  const rows = [...groupInOrder(sorted, 'category').values()]
+    .flatMap((categoryRows) => [...groupInOrder(categoryRows, 'group').values()].flat());
 
-  const strengthCols = activityPlanColumnVisibility(sorted.filter((a) => a.quantity.sets !== undefined));
-  const amountCols = activityPlanColumnVisibility(sorted.filter((a) => a.quantity.sets === undefined));
+  const day = document.createElement('div');
+  day.className = 'workout-day';
+  const wrap = document.createElement('div');
+  wrap.className = 'table-responsive';
+  wrap.appendChild(makeActivityTable(rows, activityPlanColumnVisibility(rows)));
+  day.appendChild(wrap);
+  container.appendChild(day);
 
-  groupInOrder(sorted, 'category').forEach((categoryRows, category) => {
-    const heading = document.createElement('h3');
-    heading.textContent = category;
-    container.appendChild(heading);
-
-    groupInOrder(categoryRows, 'group').forEach((rows, group) => {
-      const day = document.createElement('div');
-      day.className = 'workout-day';
-
-      // A category whose only group repeats its own name (NEAT, Cardio) would
-      // just print the heading twice.
-      if (group && group !== category) {
-        const groupHeading = document.createElement('h4');
-        groupHeading.textContent = group;
-        day.appendChild(groupHeading);
-      }
-
-      const wrap = document.createElement('div');
-      wrap.className = 'table-responsive';
-      const isStrength = rows.some((a) => a.quantity.sets !== undefined);
-      wrap.appendChild(makeActivityTable(group, rows, isStrength ? strengthCols : amountCols));
-      day.appendChild(wrap);
-
-      container.appendChild(day);
-    });
-  });
-
-  // The tables were just rebuilt from scratch, so today's ticks and tints went
-  // with them — put them back. Matters most after an edit here: the plan
+  // The table was just rebuilt from scratch, so today's ticks and tints went
+  // with it — put them back. Matters most after an edit here: the plan
   // shouldn't look like nothing was logged just because a row was renamed.
   renderWorkoutPlanProgress();
 }

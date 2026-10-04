@@ -8,6 +8,7 @@ ledger/
 ├── health/index.html             # One-group pages: identical stubs, no markup of
 ├── finance/index.html            #   their own — section-page.js builds each from
 ├── other/index.html              #   index.html and shows that group alone
+├── <group>/<block>/[<button>/]index.html # Copies of the stub above, one per address (see router.js)
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
 ├── sw.js                         # App-shell offline cache (never live sheet data)
 ├── assets/
@@ -30,7 +31,7 @@ ledger/
 │       ├── widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
 │       ├── wellness-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
-│       ├── wellness-charts.js    # Health Indicator chart renderers
+│       ├── wellness-charts.js    # Indicator chart renderers
 │       ├── finance-charts.js     # Financial Indicator chart renderers
 │       ├── timesheet-charts.js   # Work Time chart renderers
 │       ├── travel-charts.js      # Travel chart renderers (incl. world map)
@@ -55,13 +56,14 @@ ledger/
 │       ├── fat-loss-pattern-insight.js # Insight Patterns mode
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
-│       ├── formula-fields.js     # Formula Playground field descriptors + input utils
-│       ├── formula-render.js     # Formula Playground substituted-formula renderers
-│       ├── formula-playground.js # Health Formula Playground modal lifecycle
+│       ├── formula-fields.js     # Tune field descriptors + input utils
+│       ├── formula-render.js     # Tune substituted-formula renderers
+│       ├── formula-playground.js # Tune block lifecycle
 │       ├── bmr-calibration.js    # Calibrate BMR modal — back-solves BMR from logged data
 │       ├── financial-insight.js  # Financial Insight panel
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration
+│       ├── router.js             # Block/button addresses (<group>/<block>/<button>/)
 │       └── section-page.js       # Loaded only by the section stubs above
 ├── scripts/
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template

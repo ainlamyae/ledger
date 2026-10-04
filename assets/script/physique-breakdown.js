@@ -91,7 +91,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
   const targetRow = document.createElement('tr');
   targetRow.className = 'calc-breakdown-target';
   targetRow.append(
-    makeCell('Desire', 'Workout duration/burn goal — from the Health Formula Playground and Settings, not today\'s Workout'),
+    makeCell('Desire', 'Workout duration/burn goal — from Tune and Settings, not today\'s Workout'),
     makeCell(''),
     makeCell(''),
     makeCell(String(desireMin)),
@@ -632,7 +632,7 @@ async function bulkCombineAndSortPhysique() {
   }
 
   const summaryEl = document.getElementById('physique-bulk-summary');
-  const snapshots = eligible.map((p) => ({ row: p.row, values: physiqueRowValues(p) }));
+  const snapshots = eligible.map((p) => ({ row: p.row, values: physiqueDayCopy(p) }));
 
   let done = 0;
   let combinedTotal = 0;
@@ -642,9 +642,9 @@ async function bulkCombineAndSortPhysique() {
     try {
       const { text, combinedCount } = combineAndSortConsumptionText(p.consumption);
       if (text !== p.consumption) {
-        const values = physiqueRowValues(p);
-        values[4] = text;
-        await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${p.row}:O${p.row}`, [values]);
+        const day = physiqueDayCopy(p);
+        day.consumption = text;
+        await writePhysiqueRow(p.row, day);
         changedCount += 1;
         combinedTotal += combinedCount;
         succeeded.push(snapshots[i]);

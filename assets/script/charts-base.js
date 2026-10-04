@@ -75,6 +75,9 @@ const WEEKLY_AVG_COLOR = '#7c3aed';
 // in both themes.
 const CALIBRATED_BMR_COLOR = '#0891b2';
 
+// Amber, for BMR_kat beside BMR_mif's default mark, so the two equations read apart.
+const KATCH_BMR_COLOR = '#d97706';
+
 // A continuous exponential moving average, not a fixed weekly bucket: each day blends
 // today's own reading into yesterday's already-smoothed value, rather than every column
 // in a calendar week sharing one fit that resets at the boundary — the reset is what

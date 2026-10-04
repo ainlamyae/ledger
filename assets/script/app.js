@@ -132,7 +132,7 @@ function parseTypeBreakdown(insightRows) {
   return breakdown;
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'breakdown-modal', 'timesheet-modal', 'nutrition-modal', 'formula-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'breakdown-modal', 'timesheet-modal', 'nutrition-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -748,6 +748,9 @@ async function loadDashboard(forceRefresh = false) {
     console.error('Failed to load dashboard:', err);
     showDashboardError(err.message);
   }
+  // A Tune opened before the data arrived was seeded from nothing; reseed it.
+  if (!document.getElementById('health-tune-panel').classList.contains('collapsed')) openFormulaPlayground();
+  routerDataLoaded();
 }
 
 // Each panel's <h2> toggles its own content.
@@ -793,8 +796,19 @@ function setupPanelToggles() {
     heading.setAttribute('tabindex', '0');
     setPanelCollapsed(panel, heading, true);
 
+    // One block open at a time, so the address names the open one.
     const toggle = () => {
-      setPanelCollapsed(panel, heading, !panel.classList.contains('collapsed'));
+      const expanding = panel.classList.contains('collapsed');
+      if (expanding) {
+        panels.forEach((other) => {
+          const otherHeading = other.querySelector('h2');
+          if (other !== panel && otherHeading && !other.classList.contains('collapsed')) {
+            setPanelCollapsed(other, otherHeading, true);
+          }
+        });
+      }
+      setPanelCollapsed(panel, heading, !expanding);
+      routerPanelToggled(panel);
     };
 
     heading.addEventListener('click', () => {
@@ -927,6 +941,7 @@ function applyBlocksVisibility() {
     document.documentElement.removeAttribute('data-blocks-pref');
   } else {
     document.documentElement.setAttribute('data-blocks-pref', 'hidden');
+    document.querySelectorAll('#main-nav a.active').forEach((link) => link.classList.remove('active'));
   }
 }
 
@@ -1002,12 +1017,15 @@ function setupScrollSpy() {
     .map((link) => document.getElementById(link.dataset.section))
     .filter(Boolean);
 
+  // With blocks hidden the home page is short, so nothing is highlighted.
+  const setActive = (id) => {
+    const blocksShown = !document.documentElement.hasAttribute('data-blocks-pref');
+    navLinks.forEach((link) => link.classList.toggle('active', blocksShown && link.dataset.section === id));
+  };
+
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      navLinks.forEach((link) => link.classList.remove('active'));
-      const activeLink = navLinks.find((link) => link.dataset.section === entry.target.id);
-      if (activeLink) activeLink.classList.add('active');
+      if (entry.isIntersecting) setActive(entry.target.id);
     });
   }, { rootMargin: '-50% 0px -50% 0px' });
 
@@ -1017,10 +1035,7 @@ function setupScrollSpy() {
   // the viewport's center line, so the observer never fires for it near the
   // top of the page. Force the first nav link active once the user scrolls back up.
   window.addEventListener('scroll', () => {
-    if (window.scrollY < sections[0].offsetTop) {
-      navLinks.forEach((link) => link.classList.remove('active'));
-      navLinks[0].classList.add('active');
-    }
+    if (window.scrollY < sections[0].offsetTop) setActive(navLinks[0].dataset.section);
   });
 }
 
@@ -1028,7 +1043,7 @@ function setupScrollSpy() {
 // on purpose — a token check that raises a sign-in popup to look something up
 // would be worse than the problem it solves.
 const AUTH_GATED_SELECTOR = [
-  '.panel-header-btn',            // every panel's Log / Add, plus Tune
+  '.panel-header-btn',            // every panel's Log / Add
   '.row-action-btn',              // ✏️ / 📋 / 🗑️ on every table row
   '#physique-bulk-combine-btn',
   '#physique-bulk-calc-btn',
@@ -1038,6 +1053,7 @@ const AUTH_GATED_SELECTOR = [
   '#contacts-bulk-merge-btn',
   '#contacts-bulk-delete-btn',
   '#import-csv-btn',
+  '#formula-save-btn',            // Tune's Save
 ].join(', ');
 
 // Reads the sheet but never writes it, so it has no business prompting: the
@@ -1116,6 +1132,7 @@ function bootDashboard() {
   setupScrollSpy();
   setupHeaderAutoHide();
   setupPanelToggles();
+  initRouter();
   setupThemeToggle();
   setupPrivacyToggle();
   setupWidgetsToggle();

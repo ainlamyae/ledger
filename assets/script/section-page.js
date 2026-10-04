@@ -13,7 +13,15 @@
 // home: that markup.
 
 (function () {
-  const SLUG = location.pathname.replace(/\/+$/, '').split('/').pop();
+  // Pinned absolute, so the router's pushState can't shift relative URLs.
+  const base = document.querySelector('base');
+  base.href = base.href;
+
+  // Path below the app root: "<wrapper>/<block>/<button>" (see router.js).
+  const [SLUG, ...ROUTE] = location.pathname
+    .slice(new URL(base.href).pathname.length)
+    .split('/')
+    .filter(Boolean);
 
   // index.html's scripts register their start-up step here instead of on
   // window.load / DOMContentLoaded: they arrive long after this page's own
@@ -24,6 +32,7 @@
 
   window.ledgerSectionPage = {
     slug: SLUG,
+    route: ROUTE,
     section: null,
     onBoot(step) {
       bootSteps.push(step);
@@ -112,10 +121,8 @@
       row.hidden = true;
     });
 
-    const title = document.querySelector(`#${sectionId} .panel-group-title`);
-    if (title) document.title = `${title.textContent.trim()} — Ledger`;
-
-    const url = `${location.origin}${location.pathname}`;
+    // The wrapper's own address, even on a deeper block/button page.
+    const url = new URL(`${SLUG}/`, base.href).href;
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) canonical.href = url;
     const ogUrl = document.querySelector('meta[property="og:url"]');

@@ -929,7 +929,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
     const targetRow = document.createElement('tr');
     targetRow.className = 'calc-breakdown-target';
     targetRow.append(
-      makeCell('Desire', `${calorieTarget.full} calorie target, current protein/fiber band floors (${formatProteinTargetBand(proteinBand)} / ${formatProteinTargetBand(fiberBand)} full range), Fat/Carbohydrate FDA Daily Values and the TEF that target's own digestion costs — from the Health Formula Playground and Settings, not today's Consumption`),
+      makeCell('Desire', `${calorieTarget.full} calorie target, current protein/fiber band floors (${formatProteinTargetBand(proteinBand)} / ${formatProteinTargetBand(fiberBand)} full range), Fat/Carbohydrate FDA Daily Values and the TEF that target's own digestion costs — from Tune and Settings, not today's Consumption`),
       makeCell(''),
       makeCell(String(desireCalories)),
       makeCell(String(proteinBand.min)),

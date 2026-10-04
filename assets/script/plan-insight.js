@@ -74,7 +74,7 @@ function gatherPlanSnapshot() {
     : Math.round(adaptedPlateauKg(detail.kcal, coefficients, adaptFraction) * 10) / 10;
 
   // The rest of the Formula Playground's figure set, computed the same way its own render
-  // functions do (same inputs, same rounding) so the Health Plan and the Tune modal can't
+  // functions do (same inputs, same rounding) so the Health Plan and Health Tune can't
   // quote different numbers for the same plan.
   //
   // Both BMR equations side by side like the playground's field table, not just the one in
@@ -190,8 +190,8 @@ function planSubstitutedLines(p) {
 
   // Both BMR equations side by side, plus the calibrated figure when one's been saved — the
   // plan runs on whichever PLAN INPUTS names (its value is what D, Ein, A and B below use).
-  if (p.mifflinBmr !== null) lines.push(`BMR (Mifflin-St Jeor): 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.mifflinBmr} kcal/day`);
-  lines.push(`BMR (Katch-McArdle, from lean mass): 370 + 21.6 × ${p.lbmKg} = ${p.katchBmr} kcal/day`);
+  if (p.mifflinBmr !== null) lines.push(`BMR_mif (Mifflin-St Jeor): 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.mifflinBmr} kcal/day`);
+  lines.push(`BMR_kat (Katch-McArdle, from lean mass): 370 + 21.6 × ${p.lbmKg} = ${p.katchBmr} kcal/day`);
   if (p.calibratedBmr !== null) lines.push(`BMR_cal (calibrated — back-solved from logged intake/activity/weight change): ${p.calibratedBmr} kcal/day`);
 
   lines.push(`Ea (AEE): ${p.met} × ${p.bodyMassKg} × ${p.tau} × ${p.kappa} / 200 = ${p.activityKcal} kcal/day`);
@@ -309,7 +309,7 @@ function formatPlanInsightPrompt(data) {
 
   return [
     // PLAN INPUTS first — the person's own numbers lead, then the model they feed, then the
-    // figures that come out of it (in the same order the Tune panel lists them).
+    // figures that come out of it (in the same order the Health Tune panel lists them).
     'PLAN INPUTS:',
     ...planInputLines(plan),
     '',

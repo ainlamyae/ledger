@@ -162,12 +162,6 @@ header h1 {
     transition: color .25s ease;
 }
 
-/* The stacked icon is only for the phone tab bar (below 640px); in the desktop
-   header these links are text-only, exactly as before. */
-.nav .nav-icon {
-    display: none;
-}
-
 .nav a:hover,
 .nav a.active {
     color: #fff;
@@ -2770,47 +2764,29 @@ td .btn {
         padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    /* Stacked icon-over-label, filling a tall row: each tab is now a ~56px
-       block (comfortably past the 44px minimum touch target) instead of a
-       ~30px text sliver, so it's actually hittable with a thumb. */
+    /* A ~56px block per tab (past the 44px touch minimum). Label size matches
+       the form action buttons (.modal-actions .btn). */
     .nav a {
         flex: 1;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: .15rem;
         min-height: 56px;
         padding: .4rem .25rem;
-        font-size: .7rem;
+        font-size: .85rem;
         font-weight: 600;
         line-height: 1.1;
         color: rgba(255, 255, 255, .68);
     }
 
-    .nav .nav-icon {
-        display: block;
-        width: 26px;
-        height: 26px;
-    }
-
-    .nav .nav-icon svg {
-        display: block;
-        width: 100%;
-        height: 100%;
-    }
-
     /* The color change alone (.nav a.active, above) reads fine in a row of
        text links, but a tab bar's active item needs a stronger tell at a
        glance — the accent every other "selected" state in the app already
-       uses: on the icon, plus a top edge rather than a full underline so it
+       uses: a top edge rather than a full underline so it
        doesn't compete with the label's own text. */
     .nav a.active {
         color: #fff;
-    }
-
-    .nav a.active .nav-icon {
-        color: var(--color-primary);
     }
 
     .nav a.active::before {

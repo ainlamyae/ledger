@@ -132,6 +132,7 @@ async function refreshTransactions(forceRefresh = false) {
   }));
   transactionsDataLoaded = true;
   renderTransactions();
+  renderCarService();
   populateAutocompleteOptions();
   syncExportAccountOptions();
 }

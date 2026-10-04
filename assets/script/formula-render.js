@@ -608,10 +608,10 @@ function renderWeeklyLossPctField() {
 // rounded LBM the LBM box shows, which is why it multiplies out exactly.
 function formulaBmrRow(bmr, { bodyMassKg, heightCm, age, sex, formula }) {
   if (formula === 'katch') {
-    return ['BMR', `370 + 21.6 × ${bmrLeanBodyMassKg(bodyMassKg, heightCm, sex)}  =  ${Math.round(bmr)} kcal/day — Katch-McArdle, from lean mass`];
+    return ['BMR_kat', `370 + 21.6 × ${bmrLeanBodyMassKg(bodyMassKg, heightCm, sex)}  =  ${Math.round(bmr)} kcal/day — Katch-McArdle, from lean mass`];
   }
   const sigma = sex === 'male' ? '+ 5' : '− 161';
-  return ['BMR', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day`];
+  return ['BMR_mif', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day`];
 }
 
 // The A and B lines, which move under both switches: Katch replaces BMR's mass-free terms
@@ -778,7 +778,7 @@ function renderCorrectionFields(plan) {
   const { pctPerWeek, pctCap } = readAdaptationInputs();
 
   if (plan === null) {
-    ['formula-bmr-mifflin', 'formula-bmr-katch', 'formula-bmr-cal', 'formula-activity-kcal', 'formula-maintenance', 'formula-deficit', bmrEl, plateauEl].forEach((id) => setComputedField(id, '—'));
+    ['formula-bmr-mifflin', 'formula-bmr-katch', 'formula-activity-kcal', 'formula-maintenance', 'formula-deficit', bmrEl, plateauEl].forEach((id) => setComputedField(id, '—'));
     renderSleepDeprivationField(null);
     return [];
   }
@@ -792,12 +792,6 @@ function renderCorrectionFields(plan) {
   // mifflin/-katch (both equations, always) are set earlier in renderFormulaPreview itself,
   // independent of `bmr` here (whichever equation is actually ACTIVE, feeding the rest of
   // this plan) — nothing to redo for them on this pass.
-  // Always shown regardless of the chosen basis (formula-bmr-basis below), same "reference,
-  // not what Balance/Δm actually run on" idea as BMR_adp — so plain BMR and BMR_cal can be
-  // compared side by side here, whichever one is actually selected. Blank until a calibration
-  // has been saved (calibratedOffsetKcalRaw, wellness-math.js), same as the Status card's row.
-  const bmrCalOffset = calibratedOffsetKcalRaw();
-  setComputedField('formula-bmr-cal', bmrCalOffset === null ? '—' : String(Math.round(bmr + bmrCalOffset)));
   setComputedField('formula-activity-kcal', String(Math.round(activityKcal)));
   setComputedField('formula-maintenance', String(Math.round(bmr + activityKcal)));
   setComputedField('formula-deficit', String(Math.round(deficit)));
@@ -892,6 +886,9 @@ function renderFormulaPreview() {
   // since bmrNeedsAge('katch') let the "invalid" check above pass without it.
   setComputedField('formula-bmr-mifflin', age === null ? '—' : String(Math.round(bmrKcal(bodyMassKg, heightCm, age, sex, 'mifflin'))));
   setComputedField('formula-bmr-katch', String(Math.round(bmrKcal(bodyMassKg, heightCm, age, sex, 'katch'))));
+  // Live over n_p × L_p, on the plain active equation (whatever basis is picked below).
+  const calibration = tuneBmrCalibration();
+  setComputedField('formula-bmr-cal', calibration?.result.ok ? String(Math.round(bmr + calibration.result.offsetKcal)) : '—');
 
   // Everything maintenanceAffineCoefficients and projectTargetDays need except τ, which is
   // the one member of the set a mode can solve for. Spread with the mode's own τ at each

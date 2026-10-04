@@ -1,6 +1,6 @@
 
 function loadFormulaInputsFromSettings() {
-  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS].forEach((field) => {
+  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS, ...CALIBRATION_FORMULA_FIELDS].forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
   });
   // Seeded from the same places the charts read, so the figure shown on open
@@ -89,8 +89,6 @@ function openFormulaPlayground() {
   loadFormulaInputsFromSettings();
   applySolveForMode('DELTA_M');
   renderFormulaPreview();
-  // No autofocus, same as every other modal here.
-  document.getElementById('formula-modal').hidden = false;
 }
 
 // Eᵢₙ as the playground currently shows it — computed in most modes, typed in the
@@ -217,6 +215,17 @@ async function saveFormulaSettings() {
     if (value !== null) overrides[field.key] = value;
   });
 
+  // The BMR_cal window, and the calibration it measures when there's enough logged.
+  const calibration = tuneBmrCalibration();
+  if (calibration) {
+    overrides[BMR_CALIBRATION_PERIOD_COUNT_KEY] = calibration.periodCount;
+    overrides[BMR_CALIBRATION_PERIOD_DAYS_KEY] = calibration.periodDays;
+    if (calibration.result.ok) {
+      overrides[BMR_CALIBRATED_KCAL_KEY] = calibration.result.bmrCal;
+      overrides[BMR_CALIBRATED_OFFSET_KEY] = calibration.result.offsetKcal;
+    }
+  }
+
   const saveBtn = document.getElementById('formula-save-btn');
   const statusEl = document.getElementById('formula-status');
   const originalLabel = saveBtn.textContent;
@@ -228,7 +237,7 @@ async function saveFormulaSettings() {
   try {
     await saveSettingValues(overrides);
     // saveSettingValues has already refreshed currentSettings, so re-rendering
-    // here is what makes the charts behind the modal agree with it immediately.
+    // here is what makes the charts agree with it immediately.
     applySettingsToWidgets();
     renderWellnessCharts(physiqueAsWellnessEntries());
     loadFormulaInputsFromSettings();
@@ -267,7 +276,10 @@ async function saveFormulaSettings() {
       : 'BMR stays on Mifflin-St Jeor.';
     const tefSaved = formulaNumber('formula-tef-pct');
     const tefNote = tefSaved ? ` The thermic effect of food is counted at ${tefSaved}% of intake, which lifts every target accordingly.` : '';
-    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${fatNote}${carbNote}${micronutrientNote} ${modelNote}${tefNote}`);
+    const calibrationNote = !calibration ? '' : calibration.result.ok
+      ? ` BMR_cal is now ${calibration.result.bmrCal} kcal/day (${withExplicitSign(calibration.result.offsetKcal)} kcal from the equation), over ${calibration.periodCount} × ${calibration.periodDays} days.`
+      : ' The saved BMR_cal was left alone — this window has too little logged to measure.';
+    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${fatNote}${carbNote}${micronutrientNote} ${modelNote}${tefNote}${calibrationNote}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {
@@ -277,9 +289,14 @@ async function saveFormulaSettings() {
 }
 
 function initFormulaPlayground() {
-  // A sibling of the <h2>, not a child of it — the h2 is the collapse toggle, so
-  // a button inside it would close the panel on the way to opening the modal.
-  document.getElementById('formula-playground-btn').addEventListener('click', openFormulaPlayground);
+  // Reseeds from the sheet each time the Health Tune block is expanded.
+  const panel = document.getElementById('health-tune-panel');
+  let wasCollapsed = true;
+  new MutationObserver(() => {
+    const collapsed = panel.classList.contains('collapsed');
+    if (wasCollapsed && !collapsed) openFormulaPlayground();
+    wasCollapsed = collapsed;
+  }).observe(panel, { attributes: true, attributeFilter: ['class'] });
 
   // Δm is left out here and wired with Δm% below: both have to record which of the pair
   // is the known BEFORE the render, and a plain render-only listener firing first would
@@ -296,6 +313,7 @@ function initFormulaPlayground() {
     ...FAT_FORMULA_FIELDS.map((f) => f.inputId),
     ...CARB_FORMULA_FIELDS.map((f) => f.inputId),
     ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
+    ...CALIBRATION_FORMULA_FIELDS.map((f) => f.inputId),
     'formula-body-mass-smooth', 'formula-height', 'formula-age',
     'formula-glycogen-skeletal-frac', 'formula-glycogen-per-kg-muscle', 'formula-glycogen-liver',
     'formula-glycogen-water-ratio'].forEach((id) => {
@@ -432,9 +450,6 @@ function initFormulaPlayground() {
     loadFormulaInputsFromSettings();
     clearFieldError('formula-status');
     renderFormulaPreview();
-  });
-  document.getElementById('formula-close-btn').addEventListener('click', () => {
-    document.getElementById('formula-modal').hidden = true;
   });
   document.getElementById('formula-save-btn').addEventListener('click', saveFormulaSettings);
 }

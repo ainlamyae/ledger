@@ -1,6 +1,6 @@
 // Calibrate: measures how wrong the equation's BMR actually is, from logged data over a
-// trailing window (a week to months of history, typed in as a start date), rather than trying
-// to predict BMR from height/age/sex (or lean mass) alone. Beside Tune in the Health Indicator
+// trailing window (a number of chunk-sized periods ending yesterday), rather than trying
+// to predict BMR from height/age/sex (or lean mass) alone. In the Health Tune
 // header. Local only, no AI — every number in the trace is one this app already tracks.
 //
 // The core idea is two INDEPENDENT estimates of the same day's energy deficit, compared:
@@ -21,7 +21,8 @@
 // match what was actually measured, per the "keep slope, shift level" design.
 
 const BMR_CALIBRATION_WINDOW_DAYS = 7;
-const BMR_CALIBRATION_CHUNK_DAYS_DEFAULT = 7;
+const BMR_CALIBRATION_PERIOD_DAYS_DEFAULT = 10;
+const BMR_CALIBRATION_PERIOD_COUNT_DEFAULT = 3;
 
 // One ISO date, `days` away from `dateIso` — UTC arithmetic throughout (parseIsoDateUTC),
 // never a local Date object, so this can't drift a day off depending on the machine's
@@ -59,13 +60,15 @@ function weightedMean(items, weightFn, valueFn) {
 //
 // The window runs from `startDateIso` (null defaults to BMR_CALIBRATION_WINDOW_DAYS days back)
 // through the latest ELIGIBLE day, rounded UP to whole `chunkDays`-long periods — a picked
-// start of "10 days back" with the default 7-day chunk becomes 2 full periods, never a partial
+// start of "10 days back" with a 7-day chunk becomes 2 full periods, never a partial
 // one, since every period needs a complete span to average and mass-smooth on its own. Priced
 // one PERIOD at a time (each its own average intake/activity, its own D, its own mass-based
 // ΔM), then combined with a recency weight per period (weekRecencyWeight) rather than one flat
 // average over the whole span — the size of the chunk only changes how many days each period
 // covers, never the "weigh each period, not each day" shape of the calculation.
-function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_CHUNK_DAYS_DEFAULT, endDateIso = null) {
+//
+// With `numChunks`, the window is exactly that many periods ending ON endDateIso instead.
+function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_PERIOD_DAYS_DEFAULT, endDateIso = null, numChunks = null) {
   const eligible = (p) => p.caloriesIn !== null && p.caloriesOut !== null;
 
   // Anchored on the latest ELIGIBLE day, not today — the same "end the window at the latest
@@ -79,11 +82,11 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     return { ok: false, reason: 'No day has both Calories In and Calories Out logged yet.', days: [], weeks: [], eligibleCount: 0 };
   }
 
-  const windowEnd = latestEligible.date;
+  const windowEnd = numChunks ? endDateIso : latestEligible.date;
   const requestedSpanDays = startDateIso
     ? Math.round((parseIsoDateUTC(windowEnd) - parseIsoDateUTC(startDateIso)) / 86400000) + 1
     : BMR_CALIBRATION_WINDOW_DAYS;
-  const numWeeks = Math.max(1, Math.ceil(requestedSpanDays / chunkDays));
+  const numWeeks = numChunks || Math.max(1, Math.ceil(requestedSpanDays / chunkDays));
   const windowDays = numWeeks * chunkDays;
   const windowStart = isoDatePlusDays(windowEnd, -(windowDays - 1));
   const byDate = new Map(allPhysiqueEntries.filter((p) => p.date).map((p) => [p.date, p]));
@@ -123,10 +126,11 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     let deficit = null;
     if (p && p.caloriesIn !== null) {
       tef = p.tef !== null ? p.tef : Math.round(p.caloriesIn * (1 - divisor));
-      if (haveProfile && m !== null) {
-        const maintenanceForDay = bmrKcal(m, heightCmEarly, ageEarly, sexEarly, formulaEarly);
+      // The day's stored plain BMR (Physique's BMR column), not recomputed here.
+      const maintenanceForDay = haveProfile ? pickBmrForBasis(bmrFiguresForDate(date), 'bmr') : null;
+      if (maintenanceForDay !== null) {
         const activity = p.caloriesOut ?? 0;
-        const sleepHours = physiqueSleepHours(p);
+        const sleepHours = p.sleep ?? physiqueSleepHours(p);
         const balance = dailyEnergyBalanceKcal(p.caloriesIn, maintenanceForDay, activity, tef, sleepHours, sleepTarget);
         deficit = Math.round(balance.balance);
         if (sleepHours !== null) sd = Math.round(balance.deprivationKcal);
@@ -198,10 +202,10 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
   const deficitActual = weightedMean(weeks, (w) => w.weight, (w) => w.deficit);
   const deltaMActual = weightedMean(weeks, (w) => w.weight, (w) => w.deltaMKcal);
   if (avgIntake === null || avgActivity === null) {
-    return { ok: false, reason: 'No week in this window has both Calories In and Calories Out logged.', days, weeks, eligibleCount, chunkDays };
+    return { ok: false, reason: 'No period in this window has both Calories In and Calories Out logged.', days, weeks, eligibleCount, chunkDays };
   }
   if (deltaMActual === null) {
-    return { ok: false, reason: 'Not enough weigh-ins logged around this window to measure any week\'s mass change.', days, weeks, eligibleCount, chunkDays };
+    return { ok: false, reason: 'Not enough weigh-ins logged around this window to measure any period\'s mass change.', days, weeks, eligibleCount, chunkDays };
   }
 
   const heightCm = heightCmEarly;
@@ -219,7 +223,7 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
 
   const offsetKcal = weightedMean(weeks, (w) => w.weight, (w) => w.offset);
   if (offsetKcal === null) {
-    return { ok: false, reason: 'No single week has both a D figure and a measurable ΔM to compare.', days, weeks, eligibleCount, chunkDays };
+    return { ok: false, reason: 'No single period has both a D figure and a measurable ΔM to compare.', days, weeks, eligibleCount, chunkDays };
   }
 
   const bodyMassNowKg = planBodyMassKg(wellnessEntries);
@@ -315,24 +319,32 @@ function renderBmrCalibrationSubstituted(result) {
   });
 }
 
-// The typed chunk length, clamped to something sane — a blank/zero/negative/non-numeric box
-// falls back to the 7-day default rather than passing NaN or 0 through to date arithmetic.
-function bmrCalibrationChunkDays() {
-  const raw = Number(document.getElementById('bmr-calibration-chunk-days').value);
-  return (Number.isFinite(raw) && raw >= 1) ? Math.round(raw) : BMR_CALIBRATION_CHUNK_DAYS_DEFAULT;
+// A typed box's whole number, or `fallback` when it's blank/zero/negative/non-numeric —
+// never NaN or 0 into the date arithmetic.
+function periodInputValue(inputId, fallback) {
+  const raw = Number(document.getElementById(inputId).value);
+  return (Number.isFinite(raw) && raw >= 1) ? Math.round(raw) : fallback;
+}
+
+function bmrCalibrationPeriodDays() {
+  return periodInputValue('bmr-calibration-period-days', BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
+}
+
+function bmrCalibrationPeriodCount() {
+  return periodInputValue('bmr-calibration-period-count', BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);
+}
+
+// Ends yesterday: today is usually still being logged. Shared with Tune's BMR_cal.
+function bmrCalibrationForWindow(periodCount, periodDays) {
+  return computeBmrCalibration(null, periodDays, isoDateFromDays(-1), periodCount);
 }
 
 function refreshBmrCalibration() {
   clearFieldError('bmr-calibration-status');
-  const startDateIso = document.getElementById('bmr-calibration-start-date').value || null;
-  const result = computeBmrCalibration(startDateIso, bmrCalibrationChunkDays());
+  const result = bmrCalibrationForWindow(bmrCalibrationPeriodCount(), bmrCalibrationPeriodDays());
   renderBmrCalibrationDays(result.days, result.chunkDays);
   renderBmrCalibrationWeeks(result.weeks);
   renderBmrCalibrationSubstituted(result);
-  // Snaps the box to whatever start actually got used — rounding up to whole weeks can push
-  // it a few days earlier than what was typed/picked, and the box should show the real
-  // boundary the numbers below it were priced on, not the raw pick.
-  if (result.windowStart) document.getElementById('bmr-calibration-start-date').value = result.windowStart;
 
   const saveBtn = document.getElementById('bmr-calibration-save-btn');
   if (!result.ok) {
@@ -344,7 +356,14 @@ function refreshBmrCalibration() {
   return result;
 }
 
+// Opens on Tune's n_p / L_p while Tune is expanded, the saved setting otherwise.
 function openBmrCalibrationForm() {
+  const tuneOpen = !document.getElementById('health-tune-panel').classList.contains('collapsed');
+  [['bmr-calibration-period-count', CALIBRATION_FORMULA_FIELDS[0]],
+    ['bmr-calibration-period-days', CALIBRATION_FORMULA_FIELDS[1]]].forEach(([id, field]) => {
+    const tuneValue = tuneOpen ? document.getElementById(field.inputId).value.trim() : '';
+    document.getElementById(id).value = tuneValue || formulaFieldValue(field);
+  });
   refreshBmrCalibration();
   document.getElementById('bmr-calibration-modal').hidden = false;
 }
@@ -361,12 +380,47 @@ async function saveBmrCalibration() {
   if (!result) return;
 
   try {
+    const periodCount = bmrCalibrationPeriodCount();
+    const periodDays = bmrCalibrationPeriodDays();
     await saveSettingValues({
       [BMR_CALIBRATED_KCAL_KEY]: result.bmrCal,
       [BMR_CALIBRATED_OFFSET_KEY]: result.offsetKcal,
+      [BMR_CALIBRATION_PERIOD_COUNT_KEY]: periodCount,
+      [BMR_CALIBRATION_PERIOD_DAYS_KEY]: periodDays,
     });
+    // An open Tune moves to the window just saved; a closed one reseeds on expand.
+    if (!document.getElementById('health-tune-panel').classList.contains('collapsed')) {
+      document.getElementById('formula-cal-period-count').value = periodCount;
+      document.getElementById('formula-cal-period-days').value = periodDays;
+      renderFormulaPreview();
+    }
     showFieldError('bmr-calibration-status', `Saved — BMR_cal is ${result.bmrCal} kcal/day (${withExplicitSign(result.offsetKcal)} kcal from the equation). Pick "BMR_cal" under Tune's BMR basis to actually use it.`);
     renderWellnessCharts(physiqueAsWellnessEntries());
+  } catch (err) {
+    showFieldError('bmr-calibration-status', err.message);
+  }
+}
+
+// Update: saves this n_p / L_p and rewrites every day's stored BMR cell (its BMR_cal
+// over the new window) in the Physique sheet, in one request.
+async function updateStoredBmrCalibration() {
+  const periodCount = bmrCalibrationPeriodCount();
+  const periodDays = bmrCalibrationPeriodDays();
+  if (!confirm(`Recompute BMR_cal for every day in the Physique sheet, over ${periodCount} × ${periodDays} days?`)) return;
+
+  const unchanged = getSetting(BMR_CALIBRATION_PERIOD_COUNT_KEY, null) === periodCount
+    && getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, null) === periodDays;
+  try {
+    // A changed window is saved, and saving it recomputes; an unchanged one is forced.
+    const days = unchanged
+      ? await recomputeStoredPhysiqueBmr([], { force: true })
+      : await saveSettingValues({
+        [BMR_CALIBRATION_PERIOD_COUNT_KEY]: periodCount,
+        [BMR_CALIBRATION_PERIOD_DAYS_KEY]: periodDays,
+      });
+    if (days === null) throw new Error('Writing the BMR column failed — see the console.');
+    refreshBmrCalibration();
+    showFieldError('bmr-calibration-status', `Updated — BMR_cal recomputed over ${periodCount} × ${periodDays} days for ${days} days in the Physique sheet.`);
   } catch (err) {
     showFieldError('bmr-calibration-status', err.message);
   }
@@ -376,9 +430,8 @@ function initBmrCalibration() {
   document.getElementById('bmr-calibration-btn').addEventListener('click', openBmrCalibrationForm);
   document.getElementById('bmr-calibration-refresh-btn').addEventListener('click', refreshBmrCalibration);
   document.getElementById('bmr-calibration-close-btn').addEventListener('click', closeBmrCalibrationForm);
-  // 'change', not 'input': a date box has nothing complete to recompute from until a whole
-  // date is actually picked/typed.
-  document.getElementById('bmr-calibration-start-date').addEventListener('change', refreshBmrCalibration);
-  document.getElementById('bmr-calibration-chunk-days').addEventListener('input', refreshBmrCalibration);
+  document.getElementById('bmr-calibration-period-count').addEventListener('input', refreshBmrCalibration);
+  document.getElementById('bmr-calibration-period-days').addEventListener('input', refreshBmrCalibration);
   onAsyncClick('bmr-calibration-save-btn', saveBmrCalibration);
+  onAsyncClick('bmr-calibration-update-btn', updateStoredBmrCalibration);
 }

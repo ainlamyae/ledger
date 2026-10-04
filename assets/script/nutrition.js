@@ -1029,21 +1029,21 @@ async function updateNutritionEntryAndPropagate() {
 
     if (!textTouched && !breakdownTouched) return null;
 
-    const values = physiqueRowValues(p);
-    values[4] = newLines.join('\n');
+    const day = physiqueDayCopy(p);
+    day.consumption = newLines.join('\n');
     if (breakdownTouched) {
       const tef = estimateTefBreakdown(newBreakdown);
       const dayMacros = sumBreakdownMacros(newBreakdown);
-      values[5] = breakdownToJson(newBreakdown);
-      values[6] = Math.round(newBreakdown.reduce((sum, i) => sum + i.calories, 0));
-      values[7] = Math.round(newBreakdown.reduce((sum, i) => sum + i.protein, 0) * 10) / 10;
-      if (dayMacros.fiber !== null) values[8] = dayMacros.fiber;
-      if (dayMacros.fat !== null) values[9] = dayMacros.fat;
-      if (dayMacros.carbohydrate !== null) values[10] = dayMacros.carbohydrate;
-      if (tef) values[11] = tef.tefKcal;
+      day.breakdown = breakdownToJson(newBreakdown);
+      day.caloriesIn = Math.round(newBreakdown.reduce((sum, i) => sum + i.calories, 0));
+      day.proteinIn = Math.round(newBreakdown.reduce((sum, i) => sum + i.protein, 0) * 10) / 10;
+      if (dayMacros.fiber !== null) day.fiber = dayMacros.fiber;
+      if (dayMacros.fat !== null) day.fat = dayMacros.fat;
+      if (dayMacros.carbohydrate !== null) day.carbohydrate = dayMacros.carbohydrate;
+      if (tef) day.tef = tef.tefKcal;
     }
 
-    return { row: p.row, values, snapshot: physiqueRowValues(p) };
+    return { row: p.row, day, snapshot: physiqueDayCopy(p) };
   }).filter(Boolean);
 
   if (!edits.length) {
@@ -1057,7 +1057,7 @@ async function updateNutritionEntryAndPropagate() {
   const succeeded = [];
   await Promise.allSettled(edits.map(async (e) => {
     try {
-      await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${e.row}:O${e.row}`, [e.values]);
+      await writePhysiqueRow(e.row, e.day);
       succeeded.push({ row: e.row, values: e.snapshot });
     } finally {
       done += 1;

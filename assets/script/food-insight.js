@@ -271,7 +271,7 @@ function renderFoodInsightPreview(rows, from, to) {
   const idealRow = document.createElement('tr');
   idealRow.className = 'insight-food-ideal-row';
   idealRow.append(
-    makeCell('Ideal/day', `${calorieTarget.full} calorie target, current protein/fiber bands and Fat/Carbohydrate FDA Daily Values — from the Health Formula Playground and Settings, not this range's data`),
+    makeCell('Ideal/day', `${calorieTarget.full} calorie target, current protein/fiber bands and Fat/Carbohydrate FDA Daily Values — from Tune and Settings, not this range's data`),
     makeCell(''),
     makeCell(String(Math.round(calorieTarget.kcal))),
     makeCell(formatProteinTargetBand(proteinBand)),

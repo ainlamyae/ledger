@@ -52,6 +52,12 @@ const ADAPT_FORMULA_FIELDS = [
   { key: ADAPT_PCT_CAP_KEY, inputId: 'formula-adapt-cap', fallback: () => ADAPT_PCT_CAP_DEFAULT },
 ];
 
+// The BMR_cal window (n_p × L_p days ending yesterday), shared with the Calibrate form.
+const CALIBRATION_FORMULA_FIELDS = [
+  { key: BMR_CALIBRATION_PERIOD_COUNT_KEY, inputId: 'formula-cal-period-count', fallback: () => BMR_CALIBRATION_PERIOD_COUNT_DEFAULT },
+  { key: BMR_CALIBRATION_PERIOD_DAYS_KEY, inputId: 'formula-cal-period-days', fallback: () => BMR_CALIBRATION_PERIOD_DAYS_DEFAULT },
+];
+
 // The lean-mass protein band: its own pair of fields, kept out of FORMULA_FIELDS on
 // purpose. Those are read unconditionally and a blank one invalidates the whole calorie
 // preview — but protein feeds nothing in the calorie identities, so an empty p_min
@@ -345,6 +351,16 @@ function formulaNumber(inputId) {
   const raw = document.getElementById(inputId).value.trim();
   const num = Number(raw);
   return (raw === '' || Number.isNaN(num)) ? null : num;
+}
+
+// Tune's n_p × L_p window and what Calibrate measures over it; null while either box is invalid.
+function tuneBmrCalibration() {
+  const periodCount = formulaNumber('formula-cal-period-count');
+  const periodDays = formulaNumber('formula-cal-period-days');
+  if (!(periodCount >= 1) || !(periodDays >= 1)) return null;
+  const n = Math.round(periodCount);
+  const d = Math.round(periodDays);
+  return { periodCount: n, periodDays: d, result: bmrCalibrationForWindow(n, d) };
 }
 
 // Writes a computed answer into a box, masked like every other derived figure

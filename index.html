@@ -1236,8 +1236,8 @@
                  sign does the work, so -10 on WV takes WV's Balance down ten and
                  a deposit puts it back. Ticked by default — a transaction and the
                  balance it moves are one act, and doing them separately is how
-                 the two drift apart. Offered for a new row only, and turned off
-                 with a reason where the sheet computes that Balance itself; see
+                 the two drift apart. On an edit, the old amount is reversed first.
+                 Turned off with a reason where the sheet computes that Balance itself; see
                  openTransactionForm. -->
             <label class="checkbox-inline-label" id="tx-update-balance-label" title="Add this amount to the selected account's Balance on the Account tab">
                 <input type="checkbox" id="tx-update-balance" checked>

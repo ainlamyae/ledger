@@ -6,6 +6,8 @@ let accountOptions = [];
 let categoryOptions = [];
 let transactionsSheetId = null;
 let editingRow = null;
+// Account and amount the edited row had when opened, to reverse on save.
+let editingOriginal = null;
 let currentPage = 1;
 let listenersAttached = false;
 let txSort = { key: null, dir: 1 };
@@ -424,6 +426,7 @@ async function syncUpdateBalanceBox() {
 
 function openTransactionForm(transaction, duplicate = false) {
   editingRow = (transaction && !duplicate) ? transaction.row : null;
+  editingOriginal = editingRow ? { account: transaction.account, amount: transaction.amount } : null;
 
   const title = duplicate ? 'Duplicate Transaction' : (transaction ? 'Edit Transaction' : 'Log a Transaction');
   document.getElementById('tx-modal-title').textContent = title;
@@ -439,23 +442,11 @@ function openTransactionForm(transaction, duplicate = false) {
   // Another" should be offered just like it is for a brand-new transaction.
   document.getElementById('tx-save-add-btn').hidden = !!transaction && !duplicate;
 
-  // Same test, for the same reason: the box adds the amount to a balance, which
-  // is only unambiguous for a row that didn't exist before. On an edit the
-  // balance would need the difference between the old amount and the new one —
-  // and nothing at all if the amount wasn't what changed — so rather than guess,
-  // the box is off the form and the Account panel stays the place to fix a
-  // balance by hand.
-  const newRow = !editingRow;
-  document.getElementById('tx-update-balance-label').hidden = !newRow;
-  document.getElementById('tx-update-balance-note').hidden = true;
-  if (newRow) {
-    updateBalanceWanted = true;
-    document.getElementById('tx-update-balance').checked = true;
-    // Not awaited: the form opens on the figures it already has, and the box
-    // corrects itself a moment later if this account's balance turns out to be
-    // the sheet's own formula.
-    syncUpdateBalanceBox();
-  }
+  // On an edit, save reverses the old amount and applies the new one.
+  updateBalanceWanted = true;
+  document.getElementById('tx-update-balance').checked = true;
+  // Not awaited: the box corrects itself once the account is checked.
+  syncUpdateBalanceBox();
 
   // One word on the button, the rate in the tooltip — where it can also stay
   // truthful about a TAX_RATE_PCT that isn't 13.
@@ -470,6 +461,7 @@ function openTransactionForm(transaction, duplicate = false) {
 function closeTransactionForm() {
   document.getElementById('tx-modal').hidden = true;
   editingRow = null;
+  editingOriginal = null;
 }
 
 async function submitTransactionForm(event) {
@@ -485,7 +477,8 @@ async function submitTransactionForm(event) {
 
   const account = document.getElementById('tx-account').value;
   const balanceBox = document.getElementById('tx-update-balance');
-  const updateBalance = !editingRow && balanceBox.checked && !balanceBox.disabled;
+  const updateBalance = balanceBox.checked && !balanceBox.disabled;
+  const original = editingOriginal;
 
   const values = [[
     document.getElementById('tx-date').value,
@@ -509,12 +502,26 @@ async function submitTransactionForm(event) {
     // duplicate row. Both outcomes are said out loud instead, since the tick box
     // promised something and this is whether it happened.
     if (updateBalance) {
-      try {
-        const result = await addToAccountBalance(account, amount);
-        if (!result.writable) alert(`Transaction saved. ${account}'s balance was left as it is: ${result.reason}`);
-      } catch (err) {
-        console.error('Failed to update account balance:', err);
-        alert(`Transaction saved, but ${account}'s balance couldn't be updated: ${err.message}`);
+      // [account, change] pairs: a new row adds its amount; an edit nets old vs new.
+      const changes = [];
+      if (!original) {
+        changes.push([account, amount]);
+      } else if (original.account === account) {
+        changes.push([account, Math.round((amount - original.amount) * 100) / 100]);
+      } else {
+        if (original.account) changes.push([original.account, -original.amount]);
+        changes.push([account, amount]);
+      }
+
+      for (const [name, change] of changes) {
+        if (!change) continue;
+        try {
+          const result = await addToAccountBalance(name, change);
+          if (!result.writable) alert(`Transaction saved. ${name}'s balance was left as it is: ${result.reason}`);
+        } catch (err) {
+          console.error('Failed to update account balance:', err);
+          alert(`Transaction saved, but ${name}'s balance couldn't be updated: ${err.message}`);
+        }
       }
     }
 

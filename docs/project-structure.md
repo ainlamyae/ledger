@@ -35,6 +35,13 @@ ledger/
 │       ├── wellness-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
 │       ├── wellness-charts.js    # Indicator chart renderers
 │       ├── finance-charts.js     # Finance Indicator chart renderers
+│       ├── market-data.js        # Stock prices/news: Twelve Data, Alpha Vantage, Finnhub; IndexedDB cache, rate limits
+│       ├── market-math.js        # Indicators, trailing stop, risk measures and the verdict (pure)
+│       ├── portfolio-math.js     # Average-cost holdings and gain series (pure)
+│       ├── market-charts.js      # Range buttons and price/gain line charts
+│       ├── market.js             # Finance Watch List page (Watchlist tab)
+│       ├── portfolio.js          # Finance Portfolio page (Trade tab)
+│       ├── stock-analysis.js     # Finance Market page: picker, chart, signals, news, AI read with Chart history (Analysis tab)
 │       ├── timesheet-charts.js   # Work Time chart renderers
 │       ├── travel-charts.js      # Travel chart renderers (incl. world map)
 │       ├── transactions.js       # Transaction Log

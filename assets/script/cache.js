@@ -49,6 +49,7 @@ async function clearCacheAndReload() {
     Object.keys(localStorage)
       .filter((key) => key.startsWith('ledger_cache_'))
       .forEach((key) => localStorage.removeItem(key));
+    await clearMarketCache();
 
     const ownFiles = [
       location.href,

@@ -371,20 +371,25 @@ async function runInsightGeneration() {
 // A red "<days>d" badge on each mode tile last generated over 30 days ago.
 const INSIGHT_STALE_DAYS = 30;
 
-function renderInsightAgeBadges() {
+// `stamp` is the tile's saved "YYYY-MM-DD HH:mm"; shared with Finance's Snapshot.
+function placeInsightAgeBadge(btn, stamp) {
+  btn.querySelector(':scope > .page-badge')?.remove();
+  if (!stamp) return;
   const today = dateFromIso(isoFromDate(new Date()));
+  const days = Math.round((today - dateFromIso(stamp.slice(0, 10))) / 86400000);
+  if (!(days > INSIGHT_STALE_DAYS)) return;
+  const badge = document.createElement('span');
+  badge.className = 'page-badge';
+  badge.textContent = `${days}d`;
+  badge.title = `Last generated ${days} days ago (${stamp})`;
+  btn.appendChild(badge);
+}
+
+function renderInsightAgeBadges() {
   document.querySelectorAll('#insight-mode-actions [data-insight-mode]').forEach((btn) => {
-    btn.querySelector(':scope > .page-badge')?.remove();
-    const stamp = getSettingStringAny(INSIGHT_MODES[btn.dataset.insightMode].generatedAtKeys, null);
-    if (!stamp) return;
-    const days = Math.round((today - dateFromIso(stamp.slice(0, 10))) / 86400000);
-    if (!(days > INSIGHT_STALE_DAYS)) return;
-    const badge = document.createElement('span');
-    badge.className = 'page-badge';
-    badge.textContent = `${days}d`;
-    badge.title = `Last generated ${days} days ago (${stamp})`;
-    btn.appendChild(badge);
+    placeInsightAgeBadge(btn, getSettingStringAny(INSIGHT_MODES[btn.dataset.insightMode].generatedAtKeys, null));
   });
+  placeInsightAgeBadge(document.getElementById('financial-insight-load-btn'), getSettingString('FINANCIAL_INSIGHT_LAST_GENERATED_AT', null));
 }
 
 function renderInsightGeneratedAt(timestamp) {

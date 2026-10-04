@@ -136,9 +136,22 @@ async function refreshTransactions(forceRefresh = false) {
   }));
   transactionsDataLoaded = true;
   renderTransactions();
+  updateTransactionStaleBadge();
   renderCarService();
   populateAutocompleteOptions();
   syncExportAccountOptions();
+}
+
+// A red "<days>d" badge on the Transaction tile once the newest logged date is
+// over 30 days old, counting up (same badge as Insight's tiles).
+const TRANSACTION_STALE_DAYS = 30;
+
+function updateTransactionStaleBadge() {
+  const last = allTransactions.reduce((max, t) => (/^\d{4}-\d{2}-\d{2}/.test(t.date) && t.date > max ? t.date : max), '');
+  const days = last ? Math.round((dateFromIso(isoFromDate(new Date())) - dateFromIso(last.slice(0, 10))) / 86400000) : 0;
+  setPageBadge('finance', 'transaction', days > TRANSACTION_STALE_DAYS
+    ? { text: `${days}d`, title: `Last transaction logged ${days} days ago (${last.slice(0, 10)})` }
+    : null);
 }
 
 // Fills the Payee/Description datalists with previously used values so the

@@ -49,6 +49,7 @@
 | `ledger_consented` | `auth.js` | `'1'` once consent completes; controls `prompt` on next sign-in; cleared on sign-out |
 | `ledger_spreadsheet_id` | `drive.js` | The chosen spreadsheet's Drive file ID — every Sheets call targets it |
 | `ledger_last_reminder_notified` | `timesheet.js` | Today's date once the OS notification fired |
+| `ledger_last_car_service_notified` | `car-service.js` | Today's date once the car-service notification fired (one per day) |
 | `ledger_widget_manual_location` | `widgets.js` | `{lat, lon, label}` from the location picker; overrides auto-detect and Settings |
 | `ledger_widget_second_clock_location` | `widgets.js` | `{label, timezone}` for the second clock |
 

@@ -2488,12 +2488,16 @@ td .btn {
 /* The Edit Ingredient form's Micronutrients disclosure (assets/script/nutrition.js)
    — collapsed by default since the full USDA panel can run to 20+ entries,
    which would otherwise dwarf the rest of the form. */
-#nutrition-micronutrients-details {
+#nutrition-micronutrients-details,
+#formula-expression-details,
+#formula-substituted-details {
     margin-bottom: .6rem;
     font-size: .85rem;
 }
 
-#nutrition-micronutrients-details summary {
+#nutrition-micronutrients-details summary,
+#formula-expression-details summary,
+#formula-substituted-details summary {
     cursor: pointer;
     color: var(--color-text-muted);
 }

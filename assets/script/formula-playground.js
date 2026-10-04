@@ -289,6 +289,8 @@ async function saveFormulaSettings() {
 }
 
 function initFormulaPlayground() {
+  // The equation list, shown in the "Equations" dropdown above the variables.
+  document.getElementById('formula-expression').textContent = FORMULA_EXPRESSION;
   // Reseeds from the sheet each time the Health Tune block is expanded.
   const panel = document.getElementById('health-tune-panel');
   let wasCollapsed = true;

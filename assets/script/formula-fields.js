@@ -258,17 +258,10 @@ function applySolveForMode(mode) {
   });
 }
 
-// No longer rendered in the Formula Playground itself (`openFormulaPlayground`
-// used to set `#formula-expression`'s textContent from this) — the substituted
-// trace below already shows the live arithmetic, and this plain-symbol version
-// sat above it saying the same thing a second way. Kept as a live string, not a
-// comment, because `formatPlanInsightPrompt` (plan-insight.js) still sends it to
-// the AI verbatim as "one definition of the model" — a paraphrase there could
-// drift from what the app actually computes. Broken into named terms rather
-// than one long line for that reader's sake: each is a separate published
-// formula with its own source. No blank lines between the blocks — the
-// four-space indent on every formula line is what separates it from the
-// heading above it, so the spacers only added height.
+// Shown in Tune's collapsed "Equations" dropdown (initFormulaPlayground), and sent
+// verbatim to the AI by formatPlanInsightPrompt (plan-insight.js), so both read the
+// one definition of the model. The four-space indent sets each formula off from its
+// heading.
 const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass
     m̄     =  (1/7) × Σ m(t−i),  i = 0…6
 Lean body mass — Boer (1984)

@@ -84,13 +84,11 @@ function openFormulaPlayground() {
   // saved decision, and opening the modal on the other one would misdescribe every figure
   // behind it until something was touched. lastExplicitBmrFormula resets to the real saved
   // equation every open too, same "fresh look, no carried-over session state" rule the
-  // dual-known fields (TAU/DELTA_M) follow above — and the equation radio shows "BMR_cal"
-  // instead whenever that's the saved basis, so the two fieldsets open already agreeing.
+  // dual-known fields (TAU/DELTA_M) follow above — and the radio shows "BMR_cal" / "BMR_adp"
+  // instead whenever that's the saved basis.
   lastExplicitBmrFormula = bmrFormula();
   const equationRadioValue = BMR_BASIS_RADIO_VALUES.includes(bmrBasis()) ? bmrBasis() : bmrFormula();
   document.querySelector(`input[name="formula-bmr-formula"][value="${equationRadioValue}"]`).checked = true;
-  // Both fieldsets show the same four choices, so they open on the same one.
-  document.querySelector(`input[name="formula-bmr-basis"][value="${equationRadioValue}"]`).checked = true;
   loadFormulaInputsFromSettings();
   applySolveForMode('DELTA_M');
   renderFormulaPreview();
@@ -259,19 +257,19 @@ async function saveFormulaSettings() {
     }
     const activityNote = activityPinned
       ? `Activity burn is pinned at ${activityKcalToPin} kcal/day — the activity tile and chart now show the minutes that takes, rising as your body mass falls.`
-      : 'Activity time (τ) is what stays fixed on the activity target; the calorie burn it implies falls as your body mass does.';
+      : 'Activity time (τ) is what stays fixed on the desired activity; the calorie burn it implies falls as your body mass does.';
     const proteinNote = protein === null
       ? 'The protein band was left alone — it needs body mass, height and both per-kg ends.'
-      : `Protein target is now ${protein.minG}–${protein.maxG} g/day, from ${protein.perKgMin}–${protein.perKgMax} g per kg of ${protein.lbmKg} kg lean mass.`;
+      : `Desired protein is now ${protein.minG}–${protein.maxG} g/day, from ${protein.perKgMin}–${protein.perKgMax} g per kg of ${protein.lbmKg} kg lean mass.`;
     const fiberNote = fiber === null
       ? ' The fiber band was left alone — it needs body mass, Eᵢₙ and both coefficients.'
-      : ` Fiber target is now ${fiber.minG}–${fiber.maxG} g/day, from ${fiber.perKcalMin} g per 1,000 kcal and ${fiber.perKgMax} g per kg body mass.`;
+      : ` Desired fiber is now ${fiber.minG}–${fiber.maxG} g/day, from ${fiber.perKcalMin} g per 1,000 kcal and ${fiber.perKgMax} g per kg body mass.`;
     const fatNote = fat === null
       ? ' The fat band was left alone — it needs Eᵢₙ and both percentages.'
-      : ` Fat target is now ${fat.minG}–${fat.maxG} g/day, from ${fat.pctMin}–${fat.pctMax}% of ${fat.einKcal} kcal at ${KCAL_PER_G_FAT} kcal/g.`;
+      : ` Desired fat is now ${fat.minG}–${fat.maxG} g/day, from ${fat.pctMin}–${fat.pctMax}% of ${fat.einKcal} kcal at ${KCAL_PER_G_FAT} kcal/g.`;
     const carbNote = carb === null
       ? ' The carb band was left alone — it needs Eᵢₙ and both percentages.'
-      : ` Carb target is now ${carb.minG}–${carb.maxG} g/day, from ${carb.pctMin}–${carb.pctMax}% of ${carb.einKcal} kcal at ${KCAL_PER_G_CARB} kcal/g.`;
+      : ` Desired carbohydrate is now ${carb.minG}–${carb.maxG} g/day, from ${carb.pctMin}–${carb.pctMax}% of ${carb.einKcal} kcal at ${KCAL_PER_G_CARB} kcal/g.`;
     const micronutrientNote = Object.keys(micronutrientPatch).length > 0
       ? ' The Micronutrients table’s Protein/Fiber/Fat/Carb floors now match these too.'
       : '';
@@ -279,10 +277,10 @@ async function saveFormulaSettings() {
     // choices that move every calorie figure in the app at once, so a save that changed one
     // shouldn't leave you guessing which numbers just moved and why.
     const modelNote = currentBmrFormula() === 'katch'
-      ? 'BMR now comes from Katch-McArdle (370 + 21.6 × LBM), so age no longer enters the target.'
+      ? 'BMR now comes from Katch-McArdle (370 + 21.6 × LBM), so age no longer enters the desired intake.'
       : 'BMR stays on Mifflin-St Jeor.';
     const tefSaved = formulaNumber('formula-tef-pct');
-    const tefNote = tefSaved ? ` The thermic effect of food is counted at ${tefSaved}% of intake, which lifts every target accordingly.` : '';
+    const tefNote = tefSaved ? ` The thermic effect of food is counted at ${tefSaved}% of intake, which lifts every desired figure accordingly.` : '';
     const calibrationNote = !calibration ? '' : calibration.result.ok
       ? ` BMR_cal is now ${calibration.result.bmrCal} kcal/day (${withExplicitSign(calibration.result.offsetKcal)} kcal from the equation), over ${calibration.periodCount} × ${calibration.periodDays} days.`
       : ' The saved BMR_cal was left alone — this window has too little logged to measure.';
@@ -341,38 +339,14 @@ function initFormulaPlayground() {
   // Switching BMR equations re-derives everything: the figure, A and B, the plateau and the
   // arrival date, and (under Katch) whether a blank age is even a problem — so it goes
   // through the same full render a typed input does, not a cosmetic swap of one line.
-  //
-  // Picking "BMR_cal" here is a second entry point to the SAME choice the "Which BMR..."
-  // fieldset below offers — mirror the checked radio down there too, so neither fieldset
-  // ever shows a basis that isn't actually the one in effect (currentBmrBasis,
-  // formula-fields.js, gives the equation radio's own "bmr_cal" priority regardless, but a
-  // stale-looking lower radio would still read as a bug). Picking Mifflin/Katch explicitly
-  // here records it as lastExplicitBmrFormula and, if the lower fieldset was showing
-  // "BMR_cal", reverts it to Plain — an explicit equation choice up here means "not
-  // calibrated" the same way it would if made down there.
+  // The one place the BMR is picked: Mifflin/Katch (plain), BMR_cal or BMR_adp on top of
+  // the last equation picked.
   document.querySelectorAll('input[name="formula-bmr-formula"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       clearFieldError('formula-status');
       const value = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
-      // The lower fieldset mirrors this one; an explicit equation means plain BMR on it.
+      // An explicit equation means plain BMR on it.
       if (!BMR_BASIS_RADIO_VALUES.includes(value)) lastExplicitBmrFormula = value;
-      document.querySelector(`input[name="formula-bmr-basis"][value="${value}"]`).checked = true;
-      renderFormulaPreview();
-    });
-  });
-
-  // Same shape: switching the basis re-derives Eᵢₙ, D and every figure built from BMR, so
-  // it goes through the same full render a typed input does. Kept in sync with the equation
-  // fieldset's own "BMR_cal" radio the same way, in the other direction: picking "BMR_cal"
-  // here checks it up there too; picking Plain or BMR_adp here, when the equation fieldset was
-  // showing "BMR_cal", reverts that radio back to whichever equation was last explicit.
-  document.querySelectorAll('input[name="formula-bmr-basis"]').forEach((radio) => {
-    radio.addEventListener('change', () => {
-      clearFieldError('formula-status');
-      const value = document.querySelector('input[name="formula-bmr-basis"]:checked').value;
-      // Mirrors the equation fieldset: BMR_mif / BMR_kat pick that equation, plain.
-      if (!BMR_BASIS_RADIO_VALUES.includes(value)) lastExplicitBmrFormula = value;
-      document.querySelector(`input[name="formula-bmr-formula"][value="${value}"]`).checked = true;
       renderFormulaPreview();
     });
   });

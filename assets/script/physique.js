@@ -150,6 +150,14 @@ async function initPhysique(forceRefresh = false) {
 
     document.getElementById('add-physique-btn').addEventListener('click', () => openPhysiqueForm(null));
     document.getElementById('today-physique-btn').addEventListener('click', () => openPhysiqueForm(todaysPhysiqueDay()));
+    // health/physique/<date>/ opens that day's Edit; …/<date>/micronutrients/ its 🧬 view.
+    registerRecordRoute('physique', (slug, sub) => {
+      const p = allPhysiqueEntries.find((e) => e.date === slug);
+      if (!p || (sub && sub !== 'micronutrients')) return null;
+      if (sub) openPhysiqueMicronutrients(p);
+      else openPhysiqueForm(p);
+      return p.date;
+    });
     document.getElementById('health-reminder-log-btn').addEventListener('click', () => openPhysiqueForm(todaysPhysiqueDay()));
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
     document.getElementById('physique-micro-close-btn').addEventListener('click', () => {
@@ -918,11 +926,14 @@ function renderPhysiqueList() {
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openPhysiqueForm(p) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
+        routeRecordEdit('physique', { slug: p.date, label: p.date });
+        openPhysiqueForm(p);
+      } }),
       // How a pattern becomes a real day: duplicate it, and the copy opens
       // dated today with the template's contents intact.
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openPhysiqueForm(p, true) }),
-      makeRowActionButton({ emoji: '🧬', title: 'Micronutrients', onClick: () => openPhysiqueMicronutrients(p) }),
+      makeRowActionButton({ emoji: '🧬', title: 'Micronutrients', onClick: () => openPhysiqueMicronutrients(p, true) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deletePhysiqueEntry(p) }),
     );
     tr.appendChild(actionsCell);
@@ -970,7 +981,9 @@ function updatePhysiqueBulkActionsUI() {
 // just narrowed to this one day by aggregating over [p.date, p.date]. Total and
 // per-day average always end up equal for a single day, so the table collapses
 // Health Insight's four columns down to three: Nutrient, Amount, Ideal / day.
-function openPhysiqueMicronutrients(p) {
+// `routed`: give it the day's address (…/<date>/micronutrients/) as it opens.
+function openPhysiqueMicronutrients(p, routed = false) {
+  if (routed) routeRecordEdit('physique', { slug: p.date, label: p.date }, { slug: 'micronutrients', label: 'Micronutrients' });
   document.getElementById('physique-micro-title').textContent = formTitleWithDate('Micronutrients', p.date);
 
   const data = aggregateMicronutrientIntake(p.date, p.date);

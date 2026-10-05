@@ -4,9 +4,26 @@
 // the specific brand/product actually bought) is recorded here, it's reused
 // instead of being re-guessed every time.
 
-// A2:L — Classification, Name, Amount, Calories, Protein, Fiber, Fat,
-// Carbohydrate, TEF, Verification, Percent, Micronutrients.
-const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A2:L`;
+// Read with its header row: columns are found by name (NUTRITION_COLUMNS), so a
+// column added, removed or moved on the sheet can't shift what lands where.
+const NUTRITION_RANGE = `'${CONFIG.SHEETS.NUTRITION}'!A1:Z`;
+const NUTRITION_COLUMNS = [
+  { key: 'classification', header: 'Classification' },
+  { key: 'name', header: 'Name' },
+  { key: 'amount', header: 'Amount' },
+  { key: 'calories', header: 'Calories' },
+  { key: 'protein', header: 'Protein' },
+  { key: 'fiber', header: 'Fiber' },
+  { key: 'fat', header: 'Fat' },
+  { key: 'carb', header: 'Carbohydrate' },
+  { key: 'tef', header: 'TEF' },
+  { key: 'proteinPercent', header: 'Percent' },
+  { key: 'micronutrients', header: 'Micronutrients' },
+];
+const NUTRITION_DEFAULT_COLUMNS = Object.fromEntries(NUTRITION_COLUMNS.map(({ key }, i) => [key, i]));
+// key -> 0-based column, from the header row (refreshNutrition). `legacyVerified`
+// is the old Verification column, read only while the sheet still has it.
+let nutritionColumnIndex = NUTRITION_DEFAULT_COLUMNS;
 const N_PAGE_SIZE = 25;
 
 // Left lowercase by titleCaseIngredientName unless one leads the name —
@@ -85,14 +102,10 @@ let editingNutritionRow = null;
 // without holding onto it. null in Add mode (nothing saved yet to fall back on).
 let nutritionFormEntry = null;
 let selectedNutritionRows = new Set();
-// Holds the micronutrient panel bundled with whichever USDA candidate 🔍 Look
-// Up last applied — the search response already carries every candidate's
-// full nutrient panel, so applying one is free, no second lookup. Deferred to
-// Save rather than written immediately (Edit mode used to write straight to
-// the sheet on pull) so browsing candidates before picking one doesn't fire a
-// write per click. Cleared whenever the form opens or closes so a stale pull
-// can't leak into the next ingredient.
-let pendingIngredientMicronutrients = null;
+// The panel entries the top rows already show (Protein, Fiber, Fat, Carb, Energy),
+// kept aside while the form is open so Save can write them back in step with
+// those rows rather than listing them twice.
+let nutritionFormPanelExtras = {};
 // One-shot hook for a caller that needs to know once the form's Save actually
 // lands — currently just calorie-estimator.js's ✏️ button, which uses it to
 // fold the corrected numbers back into today's already-drawn Consumption
@@ -123,6 +136,13 @@ async function initNutrition(forceRefresh = false) {
     nutritionListenersAttached = true;
 
     document.getElementById('add-nutrition-btn').addEventListener('click', () => openNutritionForm(null));
+    // health/nutrition/<name>/ opens that ingredient's Edit.
+    registerRecordRoute('nutrition', (slug, sub) => {
+      const n = allNutritionEntries.find((e) => routeSlug(e.name) === slug);
+      if (!n || sub) return null;
+      openNutritionForm(n);
+      return n.name;
+    });
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
     onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-pull-micros-single-btn').addEventListener('click', pullMicronutrientsForForm);
@@ -165,47 +185,43 @@ function setupNutritionSorting() {
 }
 
 async function refreshNutrition(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('nutrition');
+  // A new key: the cached copy now includes the header row.
+  let values = forceRefresh ? null : getCached('nutritionWithHeader');
   if (!values) {
     const resp = await getValues(NUTRITION_RANGE, VALUE_PARAMS);
     values = resp.values || [];
-    setCached('nutrition', values);
+    setCached('nutritionWithHeader', values);
   }
 
-  allNutritionEntries = values
+  nutritionColumnIndex = nutritionColumnsFromHeader(values[0] || []);
+  const cell = (row, key) => (nutritionColumnIndex[key] === undefined ? undefined : row[nutritionColumnIndex[key]]);
+  const numberOrNull = (v) => (v !== undefined && v !== '' ? Number(v) : null);
+
+  allNutritionEntries = values.slice(1)
     .map((row, i) => ({
       row: i + 2,
-      // Column A: free-text grouping for the ingredient (e.g. "Dairy",
-      // "Poultry"). Never written by the app's own fallback — a row it banks
-      // is left blank for you to classify.
-      classification: (row[0] || '').trim(),
-      name: (row[1] || '').trim(),
-      amount: row[2] || '',
-      calories: (row[3] !== undefined && row[3] !== '') ? Number(row[3]) : null,
-      protein: (row[4] !== undefined && row[4] !== '') ? Number(row[4]) : null,
-      // Columns F-I: hand-typed Fiber/Fat/Carbohydrate (g) and TEF (kcal) for
-      // this row's own Amount — null means "not typed", which is what tells
-      // resolvedNutritionMacros to fall back to the 🧬 Micronutrients-derived
-      // estimate/TEF formula instead of trusting a real number.
-      fiber: (row[5] !== undefined && row[5] !== '') ? Number(row[5]) : null,
-      fat: (row[6] !== undefined && row[6] !== '') ? Number(row[6]) : null,
-      carb: (row[7] !== undefined && row[7] !== '') ? Number(row[7]) : null,
-      tef: (row[8] !== undefined && row[8] !== '') ? Number(row[8]) : null,
-      // Column J: blank means computed by the USDA/AI fallback, "1" means
-      // you've checked it against the label on your own purchased
-      // ingredient — never written by the app itself, only by hand here.
-      verified: String(row[9] || '').trim() === '1',
-      // Column K: blank means "not tracked" — protein-rotation.js's Protein
-      // Source Rotation chart only includes rows with a number here: what
-      // % of your (live, body-mass/activity-driven) protein target this
-      // ingredient should cover, e.g. 10 for "turkey = 10% of my protein".
-      proteinPercent: (row[10] !== undefined && row[10] !== '') ? Number(row[10]) : null,
-      // Column L: JSON object of the full USDA nutrient panel (macros AND
-      // micros), scaled to this row's own Amount — written only by Pull
-      // Micronutrients below, never by hand. Kept as the raw string here;
-      // parsed on demand (parseMicronutrients) so a malformed cell can't
-      // break the whole list render.
-      micronutrients: (row[11] || '').trim(),
+      // Every cell as read, so a write keeps columns this app doesn't know about.
+      cells: row,
+      // Free-text grouping (e.g. "Dairy"); a row the app banks is left blank.
+      classification: (cell(row, 'classification') || '').trim(),
+      name: (cell(row, 'name') || '').trim(),
+      amount: cell(row, 'amount') || '',
+      calories: numberOrNull(cell(row, 'calories')),
+      protein: numberOrNull(cell(row, 'protein')),
+      // Typed Fiber/Fat/Carbohydrate (g) and TEF (kcal); null falls back to the
+      // Micronutrients-derived estimate (resolvedNutritionMacros).
+      fiber: numberOrNull(cell(row, 'fiber')),
+      fat: numberOrNull(cell(row, 'fat')),
+      carb: numberOrNull(cell(row, 'carb')),
+      tef: numberOrNull(cell(row, 'tef')),
+      // The old Verification column, while the sheet still has it: "1" reads as
+      // Amount–Carbohydrates locked (nutritionLockedNames).
+      verified: String(cell(row, 'legacyVerified') || '').trim() === '1',
+      // Blank means "not tracked" by Protein Source Rotation; a number is the % of
+      // your protein target this ingredient should cover.
+      proteinPercent: numberOrNull(cell(row, 'proteinPercent')),
+      // JSON: the six top values, then the micronutrients, each with its lock tick.
+      micronutrients: (cell(row, 'micronutrients') || '').trim(),
     }))
     .filter((n) => n.name);
 
@@ -214,6 +230,57 @@ async function refreshNutrition(forceRefresh = false) {
   // — drop them and let renderNutritionList recount against current Physique.
   nutritionUsageCounts = null;
   renderNutritionList();
+}
+
+// Header row -> { key: column }. Without a recognisable Name header the columns
+// are taken in NUTRITION_COLUMNS order.
+function nutritionColumnsFromHeader(headerRow) {
+  const names = headerRow.map((h) => String(h ?? '').trim().toLowerCase());
+  const index = {};
+  NUTRITION_COLUMNS.forEach(({ key, header }) => {
+    const i = names.indexOf(header.toLowerCase());
+    if (i !== -1) index[key] = i;
+  });
+  const legacy = names.indexOf('verification');
+  if (legacy !== -1) index.legacyVerified = legacy;
+  return index.name === undefined ? NUTRITION_DEFAULT_COLUMNS : index;
+}
+
+// Column letter(s) for a 0-based index.
+function nutritionColumnLetter(i) {
+  let letters = '';
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
+  return letters;
+}
+
+// An entry's cells in the sheet's own column order; columns this app doesn't know
+// (including an old Verification) keep what was read.
+function nutritionRowCells(entry) {
+  const cells = [...(entry.cells || [])];
+  NUTRITION_COLUMNS.forEach(({ key }) => {
+    const i = nutritionColumnIndex[key];
+    if (i === undefined) return;
+    while (cells.length < i) cells.push('');
+    const value = entry[key];
+    cells[i] = value === null || value === undefined ? '' : value;
+  });
+  return cells;
+}
+
+// The A1 range for one key's cell on `row`.
+function nutritionCellRange(key, row) {
+  const ref = `${nutritionColumnLetter(nutritionColumnIndex[key])}${row}`;
+  return `'${CONFIG.SHEETS.NUTRITION}'!${ref}`;
+}
+
+async function writeNutritionRow(row, entry) {
+  const cells = nutritionRowCells(entry);
+  await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${row}:${nutritionColumnLetter(cells.length - 1)}${row}`, [cells]);
+}
+
+async function appendNutritionRow(entry) {
+  const cells = nutritionRowCells(entry);
+  await appendValues(`'${CONFIG.SHEETS.NUTRITION}'!A:${nutritionColumnLetter(cells.length - 1)}`, [cells]);
 }
 
 // Fiber/Fat/Carb grams read straight off this row's pulled 🧬 Micronutrients
@@ -264,11 +331,11 @@ function resolvedNutritionMacros(n) {
   };
 }
 
-// How many nutrients Pull Micronutrients has banked for this row — 0 for
-// "never pulled", the same count the Micronutrients cell itself displays.
+// Non-zero micronutrients (not the top values): what the Micro cell shows and sorts by.
 function micronutrientCount(n) {
-  const parsed = parseMicronutrients(n.micronutrients);
-  return parsed ? Object.keys(parsed).length : 0;
+  const parsed = parseMicronutrients(n.micronutrients) || {};
+  return Object.entries(parsed)
+    .filter(([name, info]) => !NUTRITION_TOP_PANEL_KEYS.has(name) && Number(info.amount) !== 0).length;
 }
 
 // null before the Uses count has first run (Physique not loaded yet — see
@@ -285,7 +352,7 @@ function nutritionUsageCount(n) {
 // tooltip saying whether it's yours or an estimate (custom typed/estimated
 // tooltip text for TEF, since its estimate is a formula rather than a raw
 // 🧬 Micronutrients read).
-function nutritionMacroCell(value, isTyped, typedTooltip = 'Typed by you.', estimateTooltip = 'Estimated from 🧬 Micronutrients — select this row and click 🧬 Pull Micronutrients below if it hasn\'t been pulled yet.') {
+function nutritionMacroCell(value, isTyped, typedTooltip = 'Typed by you.', estimateTooltip = 'Estimated from 🧬 Micronutrients — select this row and click Complete below if it hasn\'t been pulled yet.') {
   if (value === null) return makeCell('—', 'Not typed — and nothing to estimate from yet.');
   return makeCell(String(value), isTyped ? typedTooltip : estimateTooltip);
 }
@@ -306,7 +373,6 @@ function getFilteredNutritionEntries() {
     if (key === 'fiber' || key === 'fat' || key === 'carb' || key === 'tef') {
       return ((resolvedNutritionMacros(a)[key] ?? 0) - (resolvedNutritionMacros(b)[key] ?? 0)) * dir;
     }
-    if (key === 'verified') return ((a.verified ? 1 : 0) - (b.verified ? 1 : 0)) * dir;
     return String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * dir;
   });
 }
@@ -318,21 +384,85 @@ function parseMicronutrients(raw) {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object') ? parsed : null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    // Readers look nutrients up by USDA name: the top rows are handed back under it
+    // (Calories and TEF aren't nutrients), the old lock list is dropped.
+    const nutrients = {};
+    Object.entries(parsed).forEach(([name, info]) => {
+      if (name === NUTRITION_LOCK_KEY || !info || typeof info !== 'object') return;
+      const top = NUTRITION_TOP_ROWS.find((r) => r.name === name);
+      if ((top && !top.panel) || info.amount === null) return;
+      nutrients[top ? top.panel : name] = { amount: info.amount, unit: info.unit };
+    });
+    return Object.keys(nutrients).length ? nutrients : null;
   } catch {
     return null;
   }
 }
 
+// Form rows: a ticked row is locked and Complete never overwrites it. "_locked"
+// is the old lock list, still read from cells saved before per-entry ticks.
+const NUTRITION_LOCK_KEY = '_locked';
+const NUTRITION_TOP_ROWS = [
+  { name: 'Calories', unit: 'kcal', key: 'calories', inputId: 'nutrition-calories', lockId: 'nutrition-lock-calories' },
+  { name: 'Protein', unit: 'g', key: 'protein', inputId: 'nutrition-protein', lockId: 'nutrition-lock-protein', panel: 'Protein' },
+  { name: 'Dietary Fiber', unit: 'g', key: 'fiber', inputId: 'nutrition-fiber', lockId: 'nutrition-lock-fiber', panel: 'Fiber, total dietary' },
+  { name: 'Fat', unit: 'g', key: 'fat', inputId: 'nutrition-fat', lockId: 'nutrition-lock-fat', panel: 'Total lipid (fat)' },
+  { name: 'Carbohydrates', unit: 'g', key: 'carb', inputId: 'nutrition-carb', lockId: 'nutrition-lock-carb', panel: 'Carbohydrate, by difference' },
+  { name: 'TEF', unit: 'kcal', key: 'tef', inputId: 'nutrition-tef', lockId: 'nutrition-lock-tef' },
+];
+// The values an old "Verified" ✓ vouched for — the label's own figures, not TEF.
+const NUTRITION_LABEL_ROWS = ['Calories', 'Protein', 'Dietary Fiber', 'Fat', 'Carbohydrates'];
+const NUTRITION_TOP_PANEL_KEYS = new Set([...NUTRITION_TOP_ROWS.map((r) => r.panel).filter(Boolean), 'Energy']);
+
+// A row's locked names: each entry's own `locked` flag. Older cells carried one
+// "_locked" list instead, and before that an old Verified meant Amount–Carbohydrates.
+function nutritionLockedNames(n) {
+  let raw = null;
+  try { raw = JSON.parse(n.micronutrients || 'null'); } catch { raw = null; }
+  if (raw && typeof raw === 'object') {
+    const flagged = Object.entries(raw).filter(([, info]) => info && typeof info === 'object' && 'locked' in info);
+    if (flagged.length) return new Set(flagged.filter(([, info]) => info.locked).map(([name]) => name));
+    if (Array.isArray(raw[NUTRITION_LOCK_KEY])) return new Set(raw[NUTRITION_LOCK_KEY]);
+  }
+  return new Set(n.verified ? NUTRITION_LABEL_ROWS : []);
+}
+
+// The six top values as the form shows them: typed Calories/Protein, and
+// Fiber/Fat/Carb/TEF typed or estimated (resolvedNutritionMacros).
+function nutritionTopValues(n) {
+  const macros = resolvedNutritionMacros(n);
+  return {
+    Calories: n.calories, Protein: n.protein,
+    'Dietary Fiber': macros.fiber, Fat: macros.fat, Carbohydrates: macros.carb, TEF: macros.tef,
+  };
+}
+
+// The Micronutrients cell: the six top values first, by their form name, then the
+// micronutrients; every entry carries its own `locked` tick. `top` maps row name ->
+// amount (null when blank); the panel's own copies of the top values are dropped.
+function nutritionColumnL(top, panel, locked) {
+  const out = {};
+  NUTRITION_TOP_ROWS.forEach((row) => {
+    out[row.name] = { amount: top[row.name] ?? null, unit: row.unit, locked: locked.has(row.name) };
+  });
+  Object.entries(panel || {}).forEach(([name, info]) => {
+    if (NUTRITION_TOP_PANEL_KEYS.has(name)) return;
+    out[name] = { amount: info.amount, unit: info.unit, locked: locked.has(name) };
+  });
+  const empty = Object.values(out).every((e) => e.amount === null && !e.locked);
+  return empty ? '' : JSON.stringify(out);
+}
+
 function micronutrientsCell(n) {
   const parsed = parseMicronutrients(n.micronutrients);
-  if (!parsed) return makeCell('—', 'Not pulled yet — select this row and click 🧬 Pull Micronutrients below');
+  if (!parsed) return makeCell('—', 'Not pulled yet — select this row and click Complete below');
 
   const names = Object.keys(parsed).sort((a, b) => a.localeCompare(b));
   const tooltip = names
     .map((name) => `${name}: ${parsed[name].amount} ${parsed[name].unit}`)
     .join('\n');
-  return makeCell(`${names.length} nutrients`, tooltip);
+  return makeCell(String(micronutrientCount(n)), tooltip);
 }
 
 // "—" (with a hint to run it) before 📊 Count Uses has computed anything this
@@ -369,7 +499,7 @@ function renderNutritionList() {
     const message = allNutritionEntries.length === 0
       ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add" in the panel heading to add one yourself.'
       : 'No ingredients match your search.';
-    tbody.appendChild(renderEmptyRow(15, message));
+    tbody.appendChild(renderEmptyRow(14, message));
   }
 
   // Computed once per render, not per row — todaysUsedNutritionRows walks
@@ -412,7 +542,6 @@ function renderNutritionList() {
       nutritionMacroCell(macros.fat, macros.typed.fat),
       nutritionMacroCell(macros.carb, macros.typed.carb),
       nutritionMacroCell(macros.tef, macros.typed.tef, 'Typed by you.', 'Estimated: Protein (typed) plus Carb/Fat (typed or from 🧬 Micronutrients) at the Atwater/TEF-share rates set in Settings.'),
-      makeCell(n.verified ? '✅' : '', n.verified ? 'Verified against the label on your own purchased ingredient' : 'From the USDA/AI fallback — not yet checked against a real label'),
       makeCell(n.proteinPercent !== null ? `${n.proteinPercent}%` : '—', 'Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover'),
       micronutrientsCell(n),
       usesCell(n),
@@ -420,7 +549,10 @@ function renderNutritionList() {
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openNutritionForm(n) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
+        routeRecordEdit('nutrition', { slug: routeSlug(n.name), label: n.name });
+        openNutritionForm(n);
+      } }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteNutritionEntry(n) }),
     );
     tr.appendChild(actionsCell);
@@ -515,7 +647,6 @@ function renderNutritionPagination(totalPages) {
 
 function openNutritionForm(entry, onSaved = null) {
   editingNutritionRow = entry ? entry.row : null;
-  pendingIngredientMicronutrients = null;
   nutritionFormSaveCallback = onSaved;
   nutritionFormEntry = entry || null;
 
@@ -542,10 +673,11 @@ function openNutritionForm(entry, onSaved = null) {
   document.getElementById('nutrition-fat').value = macros.fat ?? '';
   document.getElementById('nutrition-carb').value = macros.carb ?? '';
   document.getElementById('nutrition-tef').value = macros.tef ?? '';
-  document.getElementById('nutrition-verified').checked = entry ? entry.verified : false;
+  const locked = entry ? nutritionLockedNames(entry) : new Set();
+  NUTRITION_TOP_ROWS.forEach((row) => { document.getElementById(row.lockId).checked = locked.has(row.name); });
   document.getElementById('nutrition-protein-percent').value = (entry && entry.proteinPercent !== null) ? entry.proteinPercent : '';
 
-  renderNutritionMicronutrientsDetails(entry);
+  renderNutritionMicroRows(entry ? parseMicronutrients(entry.micronutrients) : null, locked);
 
   updateNutritionFormLogButtonLabel();
   clearFieldError('nutrition-form-error');
@@ -591,37 +723,70 @@ function logNutritionFromForm() {
   physiqueField('consumption').value = consumption;
 }
 
-// The ingredient form's collapsed-by-default Micronutrients disclosure —
-// hidden entirely when there's nothing pulled yet, open state left alone once
-// expanded across renders within one 🔍 Look Up's refresh. Prefers whatever
-// pendingIngredientMicronutrients holds (a candidate applied this session,
-// not yet saved) over the row's own saved panel, since that's the fresher
-// figure Save is about to commit.
-function renderNutritionMicronutrientsDetails(entry) {
-  const parsed = pendingIngredientMicronutrients ?? (entry ? parseMicronutrients(entry.micronutrients) : null);
-  renderMicronutrientsList(parsed);
+// The pulled micronutrient rows, appended to the form's fields table under its
+// divider: lock tick, name, typeable box, unit. Top-row panel entries are held
+// aside in nutritionFormPanelExtras instead of listed twice.
+function renderNutritionMicroRows(panel, locked) {
+  const box = document.getElementById('nutrition-fields');
+  box.querySelectorAll('.nutrition-micro-row').forEach((el) => el.remove());
+  nutritionFormPanelExtras = {};
+  const shown = [];
+  Object.keys(panel || {}).sort((a, b) => a.localeCompare(b)).forEach((name) => {
+    if (NUTRITION_TOP_PANEL_KEYS.has(name)) nutritionFormPanelExtras[name] = { ...panel[name] };
+    else shown.push(name);
+  });
+  // Zero amounts go last; each half stays alphabetical.
+  shown.sort((a, b) => (Number(panel[a].amount) === 0) - (Number(panel[b].amount) === 0));
+  document.getElementById('nutrition-micro-divider').hidden = shown.length === 0;
+
+  shown.forEach((name) => {
+    const label = document.createElement('label');
+    label.className = 'formula-row nutrition-micro-row';
+    const lock = document.createElement('input');
+    lock.type = 'checkbox';
+    lock.dataset.lockName = name;
+    lock.checked = locked.has(name);
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'formula-name';
+    nameSpan.textContent = name;
+    const value = document.createElement('input');
+    value.type = 'text';
+    value.dataset.microName = name;
+    value.dataset.unit = panel[name].unit;
+    value.value = panel[name].amount;
+    const unit = document.createElement('span');
+    unit.className = 'formula-unit';
+    unit.textContent = panel[name].unit;
+    label.append(lock, nameSpan, value, unit);
+    box.appendChild(label);
+  });
 }
 
-function renderMicronutrientsList(parsed) {
-  const details = document.getElementById('nutrition-micronutrients-details');
-  const list = document.getElementById('nutrition-micronutrients-list');
-  list.innerHTML = '';
+// Every ticked row's name (top rows and micronutrients).
+function nutritionFormLockedNames() {
+  return new Set([...document.querySelectorAll('#nutrition-fields input[type="checkbox"][data-lock-name]:checked')]
+    .map((box) => box.dataset.lockName));
+}
 
-  if (!parsed) {
-    details.hidden = true;
-    return;
-  }
+// The micronutrient panel as the form shows it: the typed micro rows, plus the
+// top-row panel entries kept as they were (their own columns hold the typed figures).
+// A micronutrient box's number at full precision (USDA amounts run to 4 decimals);
+// an arithmetic expression falls back to the shared evaluator.
+function microAmountValue(raw) {
+  const text = raw.trim();
+  if (!text) return null;
+  const plain = Number(text);
+  return Number.isFinite(plain) ? plain : evaluateNumberExpression(text);
+}
 
-  Object.keys(parsed).sort((a, b) => a.localeCompare(b)).forEach((name) => {
-    const li = document.createElement('li');
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = name;
-    const valueSpan = document.createElement('span');
-    valueSpan.textContent = `${parsed[name].amount} ${parsed[name].unit}`;
-    li.append(nameSpan, valueSpan);
-    list.appendChild(li);
+function readNutritionFormPanel() {
+  const panel = {};
+  document.querySelectorAll('#nutrition-fields .nutrition-micro-row input[type="text"]').forEach((input) => {
+    const value = microAmountValue(input.value);
+    if (value !== null) panel[input.dataset.microName] = { amount: value, unit: input.dataset.unit };
   });
-  details.hidden = false;
+  Object.entries(nutritionFormPanelExtras).forEach(([name, info]) => { panel[name] = { ...info }; });
+  return panel;
 }
 
 // Classifications already in use, most-used first — same idea as the Health
@@ -647,19 +812,14 @@ function renderNutritionClassificationOptions() {
 function closeNutritionForm() {
   document.getElementById('nutrition-modal').hidden = true;
   editingNutritionRow = null;
-  pendingIngredientMicronutrients = null;
+  nutritionFormPanelExtras = {};
   nutritionFormSaveCallback = null;
   nutritionFormEntry = null;
 }
 
-// The Add/Edit Ingredient form's own 🧬 Pull Micronutrients button — same
-// name, same icon, same job as the bulk one on the Nutrition table (see
-// pullNutritionFromUsda), just applied to whatever's currently typed rather
-// than a saved row. Amount is read, never written: fill it in with a real
-// gram figure first, the same way a row needs one before the bulk button can
-// touch it. Deferred to Save (pendingIngredientMicronutrients) rather than
-// written immediately — there's no row to write into yet in Add mode, and
-// Edit mode stays consistent with it rather than writing early.
+// The Add/Edit Ingredient form's own Complete button — the same job as the bulk
+// one on the Nutrition table (pullNutritionFromUsda), on whatever's typed. Amount
+// is read, never written; the result lands in the form and is saved by Save.
 async function pullMicronutrientsForForm() {
   const btn = document.getElementById('nutrition-pull-micros-single-btn');
   const name = document.getElementById('nutrition-name').value.trim();
@@ -685,36 +845,34 @@ async function pullMicronutrientsForForm() {
     return;
   }
 
-  // "Verified against the label on my own purchased ingredient" means the typed
-  // macros are ground truth from a real package — the USDA/AI pull is less
-  // trustworthy than what's already in the fields, so we bank the micronutrient
-  // panel (the whole point of the button) but leave Calories/Protein/Fiber/Fat/
-  // Carb exactly as the user entered them rather than overwriting them.
-  const isVerified = document.getElementById('nutrition-verified').checked;
-
-  if (!isVerified) {
-    document.getElementById('nutrition-calories').value = String(result.calories);
-    document.getElementById('nutrition-protein').value = result.protein !== null ? String(result.protein) : '';
-
-    // Fiber/Fat/Carb straight into their own fields too, same as Calories/
-    // Protein just above — the panel already carries these (nutrientPanelFromCandidate),
-    // so leaving the fields themselves blank and making Save rely on the JSON
-    // panel alone (computedNutritionMacros' fallback) meant the numbers were
-    // "in" the row without ever actually being visible or hand-correctable here.
-    const nutrients = result.nutrients || {};
-    const macroField = (nutrientName, fieldId) => {
-      const nutrient = nutrients[nutrientName];
-      document.getElementById(fieldId).value = nutrient ? String(nutrient.amount) : '';
-    };
-    macroField('Fiber, total dietary', 'nutrition-fiber');
-    macroField('Total lipid (fat)', 'nutrition-fat');
-    macroField('Carbohydrate, by difference', 'nutrition-carb');
+  // Ticked rows are kept as typed; every other row takes the USDA figure. TEF has no
+  // USDA figure, so an unticked one gets the estimate from the new Protein/Carb/Fat.
+  const locked = nutritionFormLockedNames();
+  const nutrients = result.nutrients || {};
+  NUTRITION_TOP_ROWS.forEach((row) => {
+    if (locked.has(row.name) || row.name === 'TEF') return;
+    let value = null;
+    if (row.name === 'Calories') value = result.calories;
+    else if (row.name === 'Protein') value = result.protein;
+    else if (row.panel) value = nutrients[row.panel] ? nutrients[row.panel].amount : null;
+    document.getElementById(row.inputId).value = value !== null && value !== undefined ? String(value) : '';
+  });
+  if (!locked.has('TEF')) {
+    const box = (id) => evaluateNumberExpression(document.getElementById(id).value.trim());
+    const { tef } = resolvedNutritionMacros({
+      protein: box('nutrition-protein'), fiber: box('nutrition-fiber'), fat: box('nutrition-fat'),
+      carb: box('nutrition-carb'), tef: null, micronutrients: '',
+    });
+    document.getElementById('nutrition-tef').value = tef ?? '';
   }
 
-  pendingIngredientMicronutrients = result.nutrients;
-  renderMicronutrientsList(pendingIngredientMicronutrients);
+  // The new panel, except ticked micronutrient rows keep their own values.
+  const current = readNutritionFormPanel();
+  const merged = { ...nutrients };
+  locked.forEach((name) => { if (current[name]) merged[name] = current[name]; });
+  renderNutritionMicroRows(merged, locked);
 
-  if (!isVerified && result.protein === null) {
+  if (!locked.has('Protein') && result.protein === null) {
     showFieldError('nutrition-form-error', `"${result.description}" has no protein figure in USDA — fill Protein in yourself before saving.`);
   }
 }
@@ -778,21 +936,14 @@ function normalizeIngredientForm() {
   // Protein % is a share of total protein intake, not a per-Amount figure —
   // it doesn't move when Amount does.
 
-  // Micronutrients: whatever's already pending from a 🧬 Pull Micronutrients
-  // this session, else the entry's own saved panel (if editing one) — either
-  // way scaled and pushed into pendingIngredientMicronutrients so Save
-  // actually writes the normalized panel instead of leaving the un-normalized
-  // one on the sheet.
-  const currentPanel = pendingIngredientMicronutrients
-    ?? (nutritionFormEntry ? parseMicronutrients(nutritionFormEntry.micronutrients) : null);
-  if (currentPanel) {
-    const scaled = {};
-    Object.entries(currentPanel).forEach(([name, info]) => {
-      scaled[name] = { amount: Math.round(info.amount * factor * 10000) / 10000, unit: info.unit };
-    });
-    pendingIngredientMicronutrients = scaled;
-    renderMicronutrientsList(scaled);
-  }
+  // Micronutrient rows and the held top-row panel entries scale the same way.
+  document.querySelectorAll('#nutrition-fields .nutrition-micro-row input[type="text"]').forEach((input) => {
+    const value = microAmountValue(input.value);
+    if (value !== null) input.value = String(Math.round(value * factor * 10000) / 10000);
+  });
+  Object.values(nutritionFormPanelExtras).forEach((info) => {
+    info.amount = Math.round(info.amount * factor * 10000) / 10000;
+  });
 }
 
 // Reads and validates every hand-editable field of the Add/Edit Ingredient
@@ -806,7 +957,6 @@ function readNutritionFormFields() {
   const amount = document.getElementById('nutrition-amount').value.trim();
   const calories = evaluateNumberExpression(document.getElementById('nutrition-calories').value);
   const protein = evaluateNumberExpression(document.getElementById('nutrition-protein').value);
-  const verified = document.getElementById('nutrition-verified').checked;
   const proteinPercentRaw = document.getElementById('nutrition-protein-percent').value.trim();
   const proteinPercent = proteinPercentRaw ? evaluateNumberExpression(proteinPercentRaw) : null;
 
@@ -847,34 +997,23 @@ function readNutritionFormFields() {
   const carb = carbResult.value;
   const tef = tefResult.value;
 
-  // Every hand-editable field (A-K) is one contiguous range now that
-  // Micronutrients (L) sits at the very end rather than splitting the row in
-  // two. L itself is only ever included here when 🔍 Look Up applied a fresh
-  // candidate this session (pendingIngredientMicronutrients) — otherwise the
-  // write is scoped to A:K so an Edit save can't blank out a panel pulled in
-  // an earlier session.
-  const rowData = [
-    classification, name, amount, calories, protein,
-    fiber !== null ? fiber : '', fat !== null ? fat : '', carb !== null ? carb : '', tef !== null ? tef : '',
-    verified ? '1' : '', proteinPercent !== null ? proteinPercent : '',
-  ];
-  if (pendingIngredientMicronutrients) rowData.push(JSON.stringify(pendingIngredientMicronutrients));
+  // Micronutrients carries the panel and the ticked rows' names.
+  const panel = readNutritionFormPanel();
+  const top = nutritionTopValues({ calories, protein, fiber, fat, carb, tef, micronutrients: JSON.stringify(panel) });
+  const micronutrients = nutritionColumnL(top, panel, nutritionFormLockedNames());
 
-  return { ok: true, classification, name, amount, calories, protein, fiber, fat, carb, tef, verified, proteinPercent, rowData };
+  return { ok: true, classification, name, amount, calories, protein, fiber, fat, carb, tef, proteinPercent, micronutrients };
 }
 
-// Persists `fields.rowData` (from readNutritionFormFields) to `editingNutritionRow`
+// Persists the form's fields (readNutritionFormFields) to `editingNutritionRow`
 // if it's set, else appends a new row — the actual sheet write shared by Save
 // and Update, which differ only in what runs after it lands.
 async function saveNutritionFormFields(fields) {
-  if (editingNutritionRow) {
-    await ensureNutritionColumns();
-    const lastCol = pendingIngredientMicronutrients ? 'L' : 'K';
-    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${editingNutritionRow}:${lastCol}${editingNutritionRow}`, [fields.rowData]);
-  } else {
-    if (fields.fiber !== null || fields.fat !== null || fields.carb !== null || fields.tef !== null || pendingIngredientMicronutrients) await ensureNutritionColumns();
-    await appendValues(NUTRITION_RANGE, [fields.rowData]);
-  }
+  await ensureNutritionColumns();
+  const existing = allNutritionEntries.find((n) => n.row === editingNutritionRow);
+  const entry = { ...fields, cells: existing ? existing.cells : [] };
+  if (editingNutritionRow) await writeNutritionRow(editingNutritionRow, entry);
+  else await appendNutritionRow(entry);
 }
 
 async function submitNutritionForm(event) {
@@ -1105,9 +1244,6 @@ async function mergeSelectedNutritionEntries() {
   if (!merged.amount) merged.amount = (others.find((o) => o.amount) || {}).amount || '';
   if (merged.calories === null) merged.calories = (others.find((o) => o.calories !== null) || {}).calories ?? null;
   if (merged.protein === null) merged.protein = (others.find((o) => o.protein !== null) || {}).protein ?? null;
-  // A row verified against a real label stays verified even if it's merged
-  // with unverified fallback duplicates — never the other way around.
-  merged.verified = merged.verified || others.some((o) => o.verified);
   if (merged.proteinPercent === null) merged.proteinPercent = (others.find((o) => o.proteinPercent !== null) || {}).proteinPercent ?? null;
   if (merged.fiber === null) merged.fiber = (others.find((o) => o.fiber !== null) || {}).fiber ?? null;
   if (merged.fat === null) merged.fat = (others.find((o) => o.fat !== null) || {}).fat ?? null;
@@ -1122,11 +1258,7 @@ async function mergeSelectedNutritionEntries() {
       if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
       if (merged.fiber !== null || merged.fat !== null || merged.carb !== null || merged.tef !== null) await ensureNutritionColumns();
 
-      await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!A${target.row}:K${target.row}`, [[
-        merged.classification, merged.name, merged.amount, merged.calories, merged.protein,
-        merged.fiber !== null ? merged.fiber : '', merged.fat !== null ? merged.fat : '', merged.carb !== null ? merged.carb : '', merged.tef !== null ? merged.tef : '',
-        merged.verified ? '1' : '', merged.proteinPercent !== null ? merged.proteinPercent : '',
-      ]]);
+      await writeNutritionRow(target.row, { ...merged, cells: target.cells });
 
       const deleteRequests = others
         .map((o) => o.row)
@@ -1170,7 +1302,7 @@ async function capitalizeSelectedNutritionNames() {
   for (let i = 0; i < changed.length; i++) {
     const { n, newName } = changed[i];
     btn.textContent = `Capitalizing ${i + 1} of ${changed.length}…`;
-    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!B${n.row}:B${n.row}`, [[newName]]);
+    await updateValues(nutritionCellRange('name', n.row), [[newName]]);
   }
   btn.textContent = originalLabel;
 
@@ -1189,19 +1321,19 @@ async function ensureNutritionColumns() {
   const metadata = await getSpreadsheetMetadata();
   const sheet = metadata.sheets.find((s) => s.properties.title === CONFIG.SHEETS.NUTRITION);
   const columnCount = sheet ? sheet.properties.gridProperties.columnCount : 0;
-  if (columnCount >= 12) return;
+  if (columnCount >= NUTRITION_COLUMNS.length) return;
 
   const sheetId = findSheetId(metadata, CONFIG.SHEETS.NUTRITION);
   nutritionSheetId = sheetId;
   await batchUpdate([{
-    appendDimension: { sheetId, dimension: 'COLUMNS', length: 12 - columnCount },
+    appendDimension: { sheetId, dimension: 'COLUMNS', length: NUTRITION_COLUMNS.length - columnCount },
   }]);
 
   const headers = [['F1', 'Fiber'], ['G1', 'Fat'], ['H1', 'Carbohydrate'], ['I1', 'TEF']];
   await Promise.all(headers.map(([cell, label]) => updateValues(`'${CONFIG.SHEETS.NUTRITION}'!${cell}`, [[label]])));
 }
 
-// The one 🧬 Pull Micronutrients job, shared byte-for-byte by the bulk button
+// The one Complete job, shared byte-for-byte by the bulk button
 // and the Add/Edit Ingredient form's own button — same name, same icon, same
 // work: given a Name and an Amount that already carries a real gram figure,
 // look up USDA's top match and scale its Calories/Protein/full nutrient panel
@@ -1249,18 +1381,29 @@ function nutrientPanelFromCandidate(candidate, grams) {
   return nutrients;
 }
 
-// Bulk wrapper: resolves and writes straight to this existing row's own
-// Calories/Protein (D:E) and, when USDA had nutrient detail, Micronutrients
-// (L) — Amount, Fiber/Fat/Carb/TEF and Verified are never part of either
-// write, so nothing else about the row moves.
+// Bulk Complete for one saved row: the same rule as the form — ticked values are kept.
 async function pullMicronutrientsForEntry(n) {
   const result = await pullNutritionFromUsda(n.name, n.amount);
   if (!result.applied) return result;
 
-  await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!D${n.row}:E${n.row}`, [[result.calories, result.protein !== null ? result.protein : '']]);
-  if (result.nutrients) {
-    await updateValues(`'${CONFIG.SHEETS.NUTRITION}'!L${n.row}:L${n.row}`, [[JSON.stringify(result.nutrients)]]);
-  }
+  const locked = nutritionLockedNames(n);
+  const calories = locked.has('Calories') ? n.calories : result.calories;
+  const protein = locked.has('Protein') ? n.protein : result.protein;
+  const old = parseMicronutrients(n.micronutrients) || {};
+  const merged = result.nutrients ? { ...result.nutrients } : { ...old };
+  locked.forEach((name) => { if (old[name]) merged[name] = old[name]; });
+  // Ticked top values stay; the rest come from this pull, TEF re-estimated.
+  const before = nutritionTopValues(n);
+  const keep = (name) => (locked.has(name) ? before[name] : null);
+  const top = nutritionTopValues({
+    calories, protein, fiber: keep('Dietary Fiber'), fat: keep('Fat'), carb: keep('Carbohydrates'), tef: keep('TEF'),
+    micronutrients: JSON.stringify(merged),
+  });
+  const writes = NUTRITION_TOP_ROWS
+    .filter((row) => !locked.has(row.name))
+    .map((row) => ({ range: nutritionCellRange(row.key, n.row), values: [[top[row.name] ?? '']] }));
+  writes.push({ range: nutritionCellRange('micronutrients', n.row), values: [[nutritionColumnL(top, merged, locked)]] });
+  await batchUpdateValues(writes);
   return { applied: true };
 }
 
@@ -1383,10 +1526,6 @@ function findNutritionEntry(name) {
 // callers still bank the same five-cell row as before and the sheet's grid
 // only needs widening (ensureNutritionColumns) when one of the three is set.
 async function addNutritionEntry({ name, amount, calories, protein, fiber, fat, carb }) {
-  const hasMacros = fiber !== undefined || fat !== undefined || carb !== undefined;
-  if (hasMacros) await ensureNutritionColumns();
-  const row = hasMacros
-    ? ['', name, amount, calories, protein, fiber ?? '', fat ?? '', carb ?? '']
-    : ['', name, amount, calories, protein];
-  await appendValues(NUTRITION_RANGE, [row]);
+  if (fiber !== undefined || fat !== undefined || carb !== undefined) await ensureNutritionColumns();
+  await appendNutritionRow({ classification: '', name, amount, calories, protein, fiber, fat, carb });
 }

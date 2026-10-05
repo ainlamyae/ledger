@@ -53,23 +53,26 @@ ledger/
 │       ├── micronutrient-insight.js # Insight Micronutrients mode
 │       ├── activity-insight.js   # Insight Activity mode
 │       ├── protein-source-rotation-insight.js # Insight Protein Sources mode
-│       ├── plan-insight.js       # Insight Health Plan mode
+│       ├── plan-insight.js       # Insight Plan mode
 │       ├── fat-loss-pattern-insight.js # Insight Patterns mode
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
 │       ├── formula-fields.js     # Tune field descriptors + input utils
 │       ├── formula-render.js     # Tune substituted-formula renderers
 │       ├── formula-playground.js # Tune block lifecycle
-│       ├── bmr-calibration.js    # Calibrate BMR modal — back-solves BMR from logged data
+│       ├── bmr-calibration.js    # BMR calibration — back-solves BMR_cal from logged data (Tune)
 │       ├── financial-insight.js  # Financial Insight panel
 │       ├── gate.js               # Pre-login flow
 │       ├── app.js                # Orchestration
-│       ├── router.js             # Block/button addresses (<group>/<block>/<button>/)
+│       ├── router.js             # Block/button/row addresses (<group>/<block>/<button or row>/)
 │       └── section-page.js       # Loaded only by the section stubs above
 ├── scripts/
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template
+│   ├── serve.py                       # Local server with GitHub Pages' 404.html fallback
+│   ├── build_sitemap.py               # sitemap.xml from the address stub folders
 │   ├── fetch_activity_images.mjs      # Still exercise guides → assets/images/activities
 │   └── fetch_activity_animations.mjs  # Animated exercise loops → assets/images/activities
+├── 404.html                      # Fallback page: row Edit addresses (see router.js)
 ├── LICENSE
 └── README.md
 ```

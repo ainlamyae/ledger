@@ -642,8 +642,8 @@ kbd {
     grid-column: 1 / -1;
 }
 
-/* Each row is a plain wrapper in the markup, but lays out as if its icon/day/
-   month/year spans were direct children of the #widget-date grid above — that
+/* Each row is a plain wrapper in the markup, but lays out as if its icon/year/
+   month/day spans were direct children of the #widget-date grid above — that
    shared grid (not each row sizing its own columns) is what lines the three
    calendars' days, months, and years up under each other. */
 .widget-date-row {
@@ -1053,25 +1053,8 @@ td {
 /* One line per week in the Physique table (renderPhysiqueList, physique.js),
    plus one line under the Pattern rows that always float to the top —
    both mark "a new group of rows starts here" the same way. */
-#physique-table tr.physique-week-start td,
-#car-service-body tr.car-service-history-start td {
+#physique-table tr.physique-week-start td {
     border-top: 2px solid var(--color-text);
-}
-
-/* Same idea, for the Calibrate BMR form's day-by-day table (bmr-calibration.js) — one line
-   per 7-row block, since its "week" is a fixed run of 7 consecutive days ending at the last
-   fully-logged one, not a calendar week starting on Sunday. */
-#bmr-calibration-days-body tr.bmr-calibration-week-start td {
-    border-top: 2px solid var(--color-text);
-}
-
-/* table (global, above) is width: 100% — stretched across the full modal width, that spreads
-   these short numeric columns apart with far more gap than their content needs. Shrinking the
-   table itself back to its content width is what actually closes that gap; table-compact's
-   own tighter padding alone isn't enough once the table is forced wider than its content. */
-#bmr-calibration-days table,
-#bmr-calibration-weeks table {
-    width: auto;
 }
 
 /* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
@@ -1120,9 +1103,14 @@ td {
 }
 
 /* Car Service: every cell on one line; .table-responsive scrolls sideways instead. */
-#car-service-table th,
-#car-service-table td {
+.car-service-table th,
+.car-service-table td {
     white-space: nowrap;
+}
+
+/* Content width, left-aligned, rather than the global table's full width. */
+.car-service-table {
+    width: auto;
 }
 
 /* Column widths from what the columns actually hold, rather than the even split
@@ -1951,6 +1939,24 @@ td .btn {
     display: none;
 }
 
+/* Tune-style rows inside a form (the ingredient form): one line each — tick, name,
+   box, unit — rather than the form's own stacked label/field. */
+.app-form .formula-row {
+    display: grid;
+    margin-bottom: .2rem;
+}
+
+/* Form row names at the form's label size; Tune keeps its smaller ones. */
+.app-form .formula-name {
+    font-size: .85rem;
+}
+
+.app-form .formula-row input[type="checkbox"] {
+    display: inline-block;
+    width: auto;
+    margin: 0;
+}
+
 /* One height for every single-line control, because they don't agree on their
    own: a date or time input carries a picker indicator in its shadow DOM and a
    select carries an arrow, so each computes an intrinsic height a pixel or two
@@ -2485,40 +2491,24 @@ td .btn {
     font-weight: 600;
 }
 
-/* The Edit Ingredient form's Micronutrients disclosure (assets/script/nutrition.js)
-   — collapsed by default since the full USDA panel can run to 20+ entries,
-   which would otherwise dwarf the rest of the form. */
-#nutrition-micronutrients-details,
+/* Tune's collapsed Equations and Calculations dropdowns, and Insight's prompt template. */
 #formula-expression-details,
-#formula-substituted-details {
+#formula-substituted-details,
+#insight-prompt-details {
     margin-bottom: .6rem;
     font-size: .85rem;
 }
 
-#nutrition-micronutrients-details summary,
 #formula-expression-details summary,
-#formula-substituted-details summary {
+#formula-substituted-details summary,
+#insight-prompt-details summary {
     cursor: pointer;
     color: var(--color-text-muted);
 }
 
-.micronutrients-list {
-    list-style: none;
-    margin: .5rem 0 0;
-    padding: 0;
-    max-height: 12rem;
-    overflow-y: auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: .2rem .75rem;
-}
-
-.micronutrients-list li {
-    display: flex;
-    justify-content: space-between;
-    gap: .5rem;
-    border-bottom: 1px solid var(--color-border);
-    padding-bottom: .15rem;
+/* Prompts are paragraphs, so they wrap. */
+#insight-prompt-template {
+    white-space: pre-wrap;
 }
 
 .insight-question-label {
@@ -2540,26 +2530,6 @@ td .btn {
     background: var(--color-surface);
     color: var(--color-text);
     resize: vertical;
-}
-
-.insight-patterns-days-label {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    margin-bottom: .75rem;
-    font-size: .85rem;
-    color: var(--color-text-muted);
-}
-
-.insight-patterns-days-label input {
-    width: 4.5rem;
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .35rem .5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
 }
 
 #insight-food-table {
@@ -2962,6 +2932,10 @@ td .btn {
         font-size: .8rem;
     }
 
+    .app-form .formula-name {
+        font-size: .8rem;
+    }
+
     /* Horizontal only — the vertical padding is already at the floor where the
        box still reads as a tap target. */
     .app-form input,
@@ -3043,6 +3017,7 @@ td .btn {
 /* A plain break between the calorie-solve rows and the journey block below —
    no symbol, box or unit to give it, so a formula-row would sit oddly here. */
 .formula-divider {
+    grid-column: 1 / -1;
     margin: .6rem 0;
     border: none;
     border-top: 1px solid var(--color-border);
@@ -3108,6 +3083,12 @@ td .btn {
 
 .formula-inputs {
     margin-bottom: 1rem;
+    /* One grid for every row (each row is a subgrid of it), so the symbol, name and
+       unit columns take their longest text's width; scrolls sideways when too wide. */
+    display: grid;
+    grid-template-columns: max-content max-content 8.45rem max-content;
+    column-gap: .6rem;
+    overflow-x: auto;
 }
 
 /* One variable per line: symbol, what it is, its box, its unit — the same four
@@ -3119,9 +3100,9 @@ td .btn {
        (it used to be minmax(0, 9rem)) dumped every spare pixel into the name,
        which on a full-width modal left a several-hundred-pixel gap between a
        label like "body mass" and its own box. */
-    grid-template-columns: 3.9rem minmax(0, 1fr) 8.45rem minmax(0, 1fr);
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     align-items: center;
-    gap: .6rem;
     /* No divider between rows, and no padding either: the boxed inputs already mark
        where one variable ends and the next begins, so the rules were 14 lines of ink
        doing nothing but adding height — and the padding was the same mistake in
@@ -3142,16 +3123,13 @@ td .btn {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: .72rem;
     color: var(--color-text-muted);
-    overflow-wrap: anywhere;
+    white-space: nowrap;
 }
 
 .formula-unit {
     color: var(--color-text-muted);
     opacity: .85;
-    /* Like .formula-name: the column is a share of the leftover width, so on a
-       narrow phone it can end up thinner than "equivalents" is long, and a word
-       that can't break would push the row past the screen. */
-    overflow-wrap: anywhere;
+    white-space: nowrap;
 }
 
 /* The list runs to thirty variables, so each row's height is paid thirty times: the boxes
@@ -3161,7 +3139,7 @@ td .btn {
    line-height is already generous enough to keep the digits off the border, and thirty
    rows × two paddings is most of a screen of nothing. Horizontal padding stays: that one
    isn't whitespace around the field, it's what keeps the text off its own left edge. */
-.formula-row input,
+.formula-row input:not([type="checkbox"]),
 .formula-row select {
     width: 100%;
     /* Every box is exactly its column, whatever type it is. A date input carries
@@ -3206,20 +3184,13 @@ td .btn {
    and unit, which split what's left and wrap inside their own cell if a label
    really is too long for the screen. */
 @media (max-width: 560px) {
+    /* Same shared grid on a phone, with a narrower box column and gap. */
+    .formula-inputs {
+        grid-template-columns: max-content max-content 8.1rem max-content;
+        column-gap: .3rem;
+    }
+
     .formula-row {
-        /* The box column fits "female" plus the native dropdown arrow, and a
-           native date field's mm/dd/yyyy plus its picker icon, at the app-wide
-           16px field size — that size is what keeps iOS from zooming the page
-           on focus, so the column gives way to it rather than the field
-           shrinking. Sized for the widest control so all twenty match. */
-        /* Name gets nearly twice the unit's share rather than an equal one: the
-           units are "kg" and "days" while the names run to "weekly fat loss, as
-           a share of body mass", so an even split wrapped every name to three
-           lines and left the width it needed sitting empty to the right of the
-           unit. The long units ("metabolic equivalents") take two lines now,
-           which is the cheaper wrap — there are two of them, not twenty. */
-        grid-template-columns: 3rem minmax(0, 1.75fr) 8.1rem minmax(0, 1fr);
-        gap: .3rem;
         font-size: .7rem;
     }
 
@@ -3233,7 +3204,7 @@ td .btn {
         line-height: 1.3;
     }
 
-    .formula-row input,
+    .formula-row input:not([type="checkbox"]),
     .formula-row select,
     .formula-fixed {
         padding: 0 .25rem;
@@ -3241,7 +3212,7 @@ td .btn {
 
     /* Right-aligned so each value sits against its own unit rather than
        stranded at the far side of the box. */
-    .formula-row input,
+    .formula-row input:not([type="checkbox"]),
     .formula-fixed {
         text-align: right;
     }

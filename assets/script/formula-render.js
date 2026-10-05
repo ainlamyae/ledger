@@ -89,19 +89,37 @@ function renderFormulaSubstituted(rows, plan = null) {
     console.error('Deficit vs. BMR failed to render', err);
   }
 
-  // LBM leads (it sits with the profile, ahead of everything `rows` itself starts with),
-  // then `rows` — which now carries Δm%, TEF and BMI_g inline, at the legend's own
-  // positions — then D_bmr% (the one box that compares E_in against BMR, so it sits right
-  // after the rows that produce both), then the adaptation pair, then glycogen, protein,
-  // fiber, fat and carb: the same order the legend lists them in, and the same order the
-  // eye travels down the sheet.
-  [...lbmRows, ...(rows ?? []), ...deficitBmrRows, ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows].forEach(([label, value]) => {
+  const allRows = [...lbmRows, ...(rows ?? []), ...deficitBmrRows, ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows];
+  sortRowsByTuneOrder(allRows).forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
     strong.textContent = `${label}: `;
     p.append(strong, document.createTextNode(privacyMode ? maskDigits(value) : value));
     el.appendChild(p);
   });
+}
+
+// Lines without a row of their own, placed just before the row they lead into
+// (A, B, m∞ come before the adaptation pair, as in the Equations list).
+const CALCULATION_ANCHORS = { A: 'λ', B: 'λ', 'm∞': 'λ' };
+
+// The Calculations lines in the order of Tune's own rows. A line with neither a row
+// nor an anchor stays right after the line it followed. Stable for equal ranks.
+function sortRowsByTuneOrder(allRows) {
+  const order = [...document.querySelectorAll('#health-tune-panel .formula-row .formula-sym')]
+    .map((el) => el.textContent.trim());
+  const rankOf = (label) => order.indexOf(label);
+  let previous = -1;
+  return allRows
+    .map((row, i) => {
+      let rank = rankOf(row[0]);
+      if (rank === -1 && CALCULATION_ANCHORS[row[0]]) rank = rankOf(CALCULATION_ANCHORS[row[0]]) - 0.5;
+      if (rank === -1) rank = previous + 0.001;
+      previous = rank;
+      return { row, rank, i };
+    })
+    .sort((x, y) => x.rank - y.rank || x.i - y.i)
+    .map((x) => x.row);
 }
 
 // Sets the date box itself — a real ISO date or blank, never status text: an
@@ -611,7 +629,18 @@ function formulaBmrRow(bmr, { bodyMassKg, heightCm, age, sex, formula }) {
     return ['BMR_kat', `370 + 21.6 × ${bmrLeanBodyMassKg(bodyMassKg, heightCm, sex)}  =  ${Math.round(bmr)} kcal/day — Katch-McArdle, from lean mass`];
   }
   const sigma = sex === 'male' ? '+ 5' : '− 161';
-  return ['BMR_mif', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day`];
+  return ['BMR_mif', `10 × ${bodyMassKg} + 6.25 × ${heightCm} − 5 × ${age} ${sigma}  =  ${Math.round(bmr)} kcal/day — Mifflin-St Jeor`];
+}
+
+// Both BMR lines: the active equation first, then the other one (Mifflin needs an age).
+function formulaBmrRows(bmr, profile) {
+  const other = profile.formula === 'katch' ? 'mifflin' : 'katch';
+  const rows = [formulaBmrRow(bmr, profile)];
+  if (other === 'katch' || profile.age !== null) {
+    const otherBmr = bmrKcal(profile.bodyMassKg, profile.heightCm, profile.age, profile.sex, other);
+    rows.push(formulaBmrRow(otherBmr, { ...profile, formula: other }));
+  }
+  return rows;
 }
 
 // The A and B lines, which move under both switches: Katch replaces BMR's mass-free terms
@@ -889,6 +918,9 @@ function renderFormulaPreview() {
   // Live over n_p × L_p, on the plain active equation (whatever basis is picked below).
   const calibration = tuneBmrCalibration();
   setComputedField('formula-bmr-cal', calibration?.result.ok ? String(Math.round(bmr + calibration.result.offsetKcal)) : '—');
+  // The same window's working, under Calculations.
+  renderBmrCalibrationWeeks(calibration ? calibration.result.weeks : [], 'formula-cal-weeks-body');
+  renderBmrCalibrationSubstituted(calibration ? calibration.result : { ok: false }, 'formula-cal-substituted');
 
   // Everything maintenanceAffineCoefficients and projectTargetDays need except τ, which is
   // the one member of the set a mode can solve for. Spread with the mode's own τ at each
@@ -897,7 +929,7 @@ function renderFormulaPreview() {
   const profile = {
     heightCm, age, sex, met, kappa, formula, tef, bodyMassKg,
   };
-  const bmrRow = formulaBmrRow(bmr, { bodyMassKg, heightCm, age, sex, formula });
+  const bmrRows = formulaBmrRows(bmr, { bodyMassKg, heightCm, age, sex, formula });
 
   noteEl.textContent = '';
   saveBtn.disabled = false;
@@ -932,7 +964,7 @@ function renderFormulaPreview() {
     const bRounded = Math.round(b * 100) / 100;
     const eqRounded = Math.round(((detail.kcal - a) / b) * 10) / 10;
     const rows = [
-      bmrRow,
+      ...bmrRows,
       ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(detail.activityKcal)} kcal/day`],
       ...renderSleepDeprivationField(detail),
       ...renderWeeklyLossPctField(),
@@ -1061,7 +1093,7 @@ function renderFormulaPreview() {
       rows.push(['τ', `solved numerically so that m(t=${days}) = ${targetKg} kg`]);
     }
     rows.push(
-      bmrRow,
+      ...bmrRows,
       ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ...renderSleepDeprivationField(sleepInfo),
       ...renderWeeklyLossPctField(),
@@ -1116,7 +1148,7 @@ function renderFormulaPreview() {
     //
     // SD is still computable, though — D at the current mass (below) is a fixed, already-
     // realized deficit, not a target being solved forward, so the REVERSE sleep question
-    // applies (sleepDeprivationKcal, same as DELTA_M and the Calibrate form's own SD column):
+    // applies (sleepDeprivationKcal, same as DELTA_M and the BMR_cal calculation):
     // how much of that fixed deficit ISN'T real fat loss because of short sleep.
     const currentActivityKcal = withFormulaOverrides(preview, () => activityTargetKcal(bodyMassKg));
     const currentDeficit = bmr + currentActivityKcal - einKcal * coefficients.tefDivisor;
@@ -1183,7 +1215,7 @@ function renderFormulaPreview() {
   // D here is REVERSE-solved from a fixed Eᵢₙ, not built forward from a target rate — so the
   // FORWARD sleep question ("how much bigger does the raw target need to be") doesn't apply
   // (that's what every other mode's δ answers, sleepAdjustedDeficitKcal). What still applies
-  // is the REVERSE one, the same shape dailyEnergyBalanceKcal/the Calibrate form's own SD
+  // is the REVERSE one, the same shape dailyEnergyBalanceKcal/the BMR_cal calculation's SD
   // column use: this fixed deficit already happened, and short sleep just makes less of it
   // real fat loss — sleepDeprivationKcal reports that shortfall directly off the deficit
   // already computed above, sign-agnostic (it only reads the magnitude).
@@ -1215,7 +1247,7 @@ function renderFormulaPreview() {
     renderFormulaDaysField(proj);
 
     renderFormulaSubstituted([
-      bmrRow,
+      ...bmrRows,
       ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
       ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
       ...renderTefField(),
@@ -1252,7 +1284,7 @@ function renderFormulaPreview() {
     ['m∞', `(${targetKg} − ${bodyMassKg}×${decayRounded}) / (1 − ${decayRounded})  =  ${eqRounded} kg`],
     ['TEI', `${Math.round(a)} + ${bRounded} × ${eqRounded}  =  ${Math.round(einForDisplay)} kcal/day`],
     ...renderTefField(),
-    bmrRow,
+    ...bmrRows,
     ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
     ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
     ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],

@@ -88,7 +88,7 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 |---|---|---|
 | A — Date | Date | ISO. One row per date — saving onto a date already logged **merges** into that row rather than adding a second (see below). **Blank marks a reusable pattern row** — excluded from every chart and Insight mode, always sorted to the top, and exempt from the one-row-per-date rule |
 | B — Body Mass | Number | kg |
-| C — BMR | Text (JSON) | The day's four BMR figures, kcal: `{"BMR_mif","BMR_kat","BMR_cal","BMR_adp"}` — Mifflin-St Jeor and Katch-McArdle at that day's own weigh-in (else the latest earlier one) and age on that date; `BMR_cal` = the active equation plus the offset Calibrate measures over the n_p × L_p days ending the day before (absent in the first n_p × L_p days of data, or when that window has too little logged); `BMR_adp` = the active equation × (1 − λt), t = days since the first weigh-in. A key is left out when its inputs are missing. **Computed on save, read everywhere** — the Status card, the BMR / Calorie Balance / State Trend charts, the per-day target line, Deprivation and Calibrate's daily D all read it instead of recalculating |
+| C — BMR | Text (JSON) | The day's four BMR figures, kcal: `{"BMR_mif","BMR_kat","BMR_cal","BMR_adp"}` — Mifflin-St Jeor and Katch-McArdle at that day's own weigh-in (else the latest earlier one) and age on that date; `BMR_cal` = the active equation plus the offset measured over the n_p × L_p days ending the day before (absent in the first n_p × L_p days of data, or when that window has too little logged); `BMR_adp` = the active equation × (1 − λt), t = days since the first weigh-in. A key is left out when its inputs are missing. **Computed on save, read everywhere** — the Status card, the BMR / Calorie Balance / State Trend charts, the per-day target line, Deprivation and the BMR_cal calculation's daily D all read it instead of recalculating |
 | D — Bed | Time | `HH:MM` |
 | E — Wake | Time | `HH:MM`. The table shows the **Sleep** column instead of these two, with the raw clock times on hover and on Edit |
 | F — Sleep | Number | hours, wake minus bed, wrapping past midnight. **Stored, not recalculated per render** — written on every save from Bed/Wake |
@@ -106,7 +106,7 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 | R — AEE | Number | kcal. Hidden on the form, same as Duration |
 
 - **Columns are found by their header name in row 1, not by position** (`PHYSIQUE_COLUMNS`, `physique.js`), so the order can change on the sheet without the app writing into the wrong cell. The older names (Bedtime, Wake-up Time, Calories In, Protein In, Fiber, Activity Duration, Calories Out) are still recognised. Columns the app doesn't know are kept as they are on every write.
-- **When BMR is written:** on every save of a day; on load, for any day whose cell is blank, or that has no `BMR_cal` yet but now has enough history (once written, a day's `BMR_cal` is kept, including when the day is re-saved); for every day at once when a setting it depends on changes (height, birth date, sex, BMR equation or basis, λ / λt_max, n_p / L_p, sleep target, TEF %); and for every day at once from Calibrate BMR's **Update** button. Each of these is a single batch request.
+- **When BMR is written:** on every save of a day; on load, for any day whose cell is blank, or that has no `BMR_cal` yet but now has enough history (once written, a day's `BMR_cal` is kept, including when the day is re-saved); for every day at once when a setting it depends on changes (height, birth date, sex, BMR equation or basis, λ / λt_max, n_p / L_p, sleep target, TEF %); and for every day at once from Tune's **Update** button. Each of these is a single batch request.
 - **Sleep and Deprivation are filled in once for days saved before they existed**: on load, any blank Sleep/Deprivation cell that can be computed is written in a single batch request; after that, every save keeps them current.
 
 - Every numeric field accepts an arithmetic expression (`30+15`).
@@ -125,7 +125,7 @@ One row per **day**, rather than one row per logged event. **This is the tab eve
 
 ## `Nutrition`
 
-One row per ingredient. Data starts at row 2. Not in the template by default — add the tab and header row.
+One row per ingredient. Data starts at row 2. **Columns are found by their header name in row 1, not by position**, so the order can change on the sheet. The old J — Verification column was removed; its ✓s became locked entries in Micronutrients. Not in the template by default — add the tab and header row.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -138,9 +138,8 @@ One row per ingredient. Data starts at row 2. Not in the template by default —
 | G — Fat | Number | grams. Same as Fiber |
 | H — Carbohydrate | Number | grams. Same as Fiber |
 | I — TEF | Number | kcal. Same as Fiber, except its estimate (when you haven't typed one) is the Atwater/TEF-share formula over this row's own Protein plus whichever Fat/Carbohydrate this same resolution just settled on, not a raw Micronutrients read |
-| J — Verification | Text | `1` = you checked it against a real label. Only ever set by hand — never by Calculate or the USDA lookup |
-| K — Percent | Number | Blank excludes the ingredient from Protein Source Rotation; a number is its % share of your protein target |
-| L — Micronutrients | Text (JSON) | Full USDA nutrient panel (macros and micros), scaled to this row's own Amount — written only by 🧬 Pull Micronutrients (form or bulk table action), never by hand |
+| J — Percent | Number | Blank excludes the ingredient from Protein Source Rotation; a number is its % share of your protein target |
+| K — Micronutrients | Text (JSON) | One object per form row, each `{amount, unit, locked}`: first the six top values under their form names — `Calories` (kcal), `Protein`, `Dietary Fiber`, `Fat`, `Carbohydrates` (g), `TEF` (kcal; `amount` is `null` when blank) — then every micronutrient from the USDA panel, scaled to this row's own Amount. `locked: true` is a ticked row, which **Complete** never overwrites. Readers get Protein/Fiber/Fat/Carbohydrates back under their USDA names (Calories and TEF are left out). Cells saved before this carried a `"_locked"` name list instead, which still reads |
 
 - **Fiber/Fat/Carbohydrate/TEF resolve typed-over-estimated** (`resolvedNutritionMacros`, `nutrition.js`): your own saved figure when there is one, otherwise Fiber/Fat/Carbohydrate read off the pulled Micronutrients panel and TEF computed from Atwater/TEF-share — same fallback order the Physique breakdown table uses per-ingredient. The Edit Ingredient form pre-fills all four from this same resolution, so opening a row, reviewing the estimate and hitting Save is what "confirms" it as a typed figure from then on.
 - **Protein/100kcal** used to be a computed Density column; removed in favor of the Fiber/Fat/Carbohydrate/TEF columns above.

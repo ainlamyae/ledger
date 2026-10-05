@@ -504,7 +504,7 @@ function safeFormatCalendarDateParts(date, calendar) {
   }
 }
 
-// Renders each calendar's day/month/year into their own column so the three
+// Renders each calendar's year/month/day into their own column so the three
 // rows (Gregorian/Shamsi/Ghamari) line up under each other.
 function renderDateWidgetRow(elementId, icon, date, calendar) {
   const { day, month, year } = safeFormatCalendarDateParts(date, calendar);
@@ -527,7 +527,8 @@ function renderDateWidgetRow(elementId, icon, date, calendar) {
   yearEl.className = 'widget-date-year';
   yearEl.textContent = year;
 
-  el.append(iconEl, dayEl, monthEl, yearEl);
+  // Year, month, day: the app's date order.
+  el.append(iconEl, yearEl, monthEl, dayEl);
 }
 
 function renderDateWidget(date = new Date()) {

@@ -83,9 +83,10 @@ function openFormulaPlayground() {
   // dual-known fields (TAU/DELTA_M) follow above — and the equation radio shows "BMR_cal"
   // instead whenever that's the saved basis, so the two fieldsets open already agreeing.
   lastExplicitBmrFormula = bmrFormula();
-  const equationRadioValue = bmrBasis() === 'bmr_cal' ? 'bmr_cal' : bmrFormula();
+  const equationRadioValue = BMR_BASIS_RADIO_VALUES.includes(bmrBasis()) ? bmrBasis() : bmrFormula();
   document.querySelector(`input[name="formula-bmr-formula"][value="${equationRadioValue}"]`).checked = true;
-  document.querySelector(`input[name="formula-bmr-basis"][value="${bmrBasis()}"]`).checked = true;
+  // Both fieldsets show the same four choices, so they open on the same one.
+  document.querySelector(`input[name="formula-bmr-basis"][value="${equationRadioValue}"]`).checked = true;
   loadFormulaInputsFromSettings();
   applySolveForMode('DELTA_M');
   renderFormulaPreview();
@@ -339,14 +340,9 @@ function initFormulaPlayground() {
     radio.addEventListener('change', () => {
       clearFieldError('formula-status');
       const value = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
-      if (value === 'bmr_cal') {
-        document.querySelector('input[name="formula-bmr-basis"][value="bmr_cal"]').checked = true;
-      } else {
-        lastExplicitBmrFormula = value;
-        if (document.querySelector('input[name="formula-bmr-basis"]:checked').value === 'bmr_cal') {
-          document.querySelector('input[name="formula-bmr-basis"][value="bmr"]').checked = true;
-        }
-      }
+      // The lower fieldset mirrors this one; an explicit equation means plain BMR on it.
+      if (!BMR_BASIS_RADIO_VALUES.includes(value)) lastExplicitBmrFormula = value;
+      document.querySelector(`input[name="formula-bmr-basis"][value="${value}"]`).checked = true;
       renderFormulaPreview();
     });
   });
@@ -360,11 +356,9 @@ function initFormulaPlayground() {
     radio.addEventListener('change', () => {
       clearFieldError('formula-status');
       const value = document.querySelector('input[name="formula-bmr-basis"]:checked').value;
-      if (value === 'bmr_cal') {
-        document.querySelector('input[name="formula-bmr-formula"][value="bmr_cal"]').checked = true;
-      } else if (document.querySelector('input[name="formula-bmr-formula"]:checked').value === 'bmr_cal') {
-        document.querySelector(`input[name="formula-bmr-formula"][value="${lastExplicitBmrFormula}"]`).checked = true;
-      }
+      // Mirrors the equation fieldset: BMR_mif / BMR_kat pick that equation, plain.
+      if (!BMR_BASIS_RADIO_VALUES.includes(value)) lastExplicitBmrFormula = value;
+      document.querySelector(`input[name="formula-bmr-formula"][value="${value}"]`).checked = true;
       renderFormulaPreview();
     });
   });

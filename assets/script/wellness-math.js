@@ -450,7 +450,7 @@ function bmrBasis() {
   return (raw === 'bmr_adp' || raw === 'bmr_cal') ? raw : BMR_BASIS_DEFAULT;
 }
 
-// The Calibrate form's output (bmr-calibration.js): an empirically back-solved BMR from
+// The saved BMR calibration (bmr-calibration.js, saved by Tune): an empirically back-solved BMR from
 // actual logged intake/activity/weight-change, rather than the height/age/sex (or lean-mass)
 // equation. Stored as TWO numbers, not one — the calibrated figure itself (KCAL, shown as-is
 // in the Status card and the Caloric Intake chart), and the OFFSET from what the equation
@@ -459,7 +459,7 @@ function bmrBasis() {
 // mass changes, i.e. its slope — and just shifts the whole line by this constant OFFSET, per
 // the "keep the equation's slope, shift the level" choice: a single measured point can't
 // imply a slope of its own, so borrowing the equation's is the only option that doesn't
-// require new data. Both keys are written together by saveBmrCalibration.
+// require new data. Both keys are written together by Tune's Save.
 const BMR_CALIBRATED_KCAL_KEY = 'BMR_CALIBRATED_KCAL';
 const BMR_CALIBRATED_OFFSET_KEY = 'BMR_CALIBRATED_OFFSET_KCAL';
 // The calibration window: n_p periods of L_p days, ending yesterday.

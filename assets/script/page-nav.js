@@ -36,8 +36,7 @@ function onPageLinkClick(event, sectionId, panel) {
 // the home page it goes to the form's address instead.
 const QUICK_ACTIONS = {
   health: [
-    { label: 'Today', buttonId: 'today-physique-btn', className: 'btn-secondary', href: () => `physique/${isoFromDate(new Date())}/` },
-    { label: 'Log', buttonId: 'add-physique-btn', className: 'btn-primary', href: () => 'physique/log/' },
+    { label: 'Today', buttonId: 'today-physique-btn', className: 'btn-primary', href: () => `physique/${isoFromDate(new Date())}/` },
   ],
 };
 

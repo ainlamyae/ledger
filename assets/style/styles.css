@@ -1555,7 +1555,8 @@ th.sortable:hover {
         padding: .35rem .35rem;
     }
 
-    .today-glance-cards .widget-row {
+    .today-glance-cards .widget-row,
+    .today-glance-cards .body-mass-progress-meter-stats > * > * {
         font-size: .8rem;
     }
 
@@ -2255,19 +2256,19 @@ td .btn {
 }
 
 .body-mass-progress-meter-stat-label {
-    font-size: 1.1rem;
+    font-size: .95rem;
     color: var(--color-text-muted);
 }
 
 /* The "→ 70 kg" / "→ 2027-01-27" target trailing "to go". */
 .body-mass-progress-meter-target {
-    font-size: 1.1rem;
+    font-size: .95rem;
     font-weight: 700;
     color: var(--color-text);
 }
 
 .body-mass-progress-meter-pct {
-    font-size: 1.1rem;
+    font-size: .95rem;
     font-weight: 700;
     color: var(--color-text);
 }

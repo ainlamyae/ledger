@@ -47,6 +47,13 @@
 - **Block visibility** — the account menu's **Show blocks** / **Hide blocks** item (just above dark mode) toggles the three section blocks (Health/Finance/Other) on the home page, persisted to a `SHOW_BLOCKS` Setting (same 0/1 convention) — but **defaulting to hidden**. While hidden, `loadDashboard` skips every per-section fetch/render entirely, so `/` loads fast with just the nav and bulb row; the first **Show blocks** of a session triggers the deferred load, and toggling back off/on afterward is instant (CSS only, straight off the cache). Like widget visibility it's pre-painted from the cached setting (`data-blocks-pref` on `<html>`) to avoid a flash, and left alone on the three section pages — each always shows its one block regardless.
 - **No service worker** — the page's HTML/CSS/JS always come from the server. The old offline shell cache (`sw.js`) served cached scripts ahead of the network while section pages fetch `index.html` fresh, so an update ran new markup against old scripts; `sw.js` is now a stub that clears every cache and unregisters itself in browsers that still have it, and `index.html` removes any leftover registration on load.
 
+## Hub and pages
+
+- **A section page is a hub, and each block is a page** (`page-nav.js`, `router.js`'s `showSectionPage`). `/health/`, `/finance/` and `/other/` show the section's glance cards (and reminder banners), then one **tile** per block with a one-line description. `/health/physique/` shows that block alone, opened, under a breadcrumb (`‹ Health / Physique`); its heading is a title, not a fold toggle.
+- Tiles, the breadcrumb and the sidebar switch views in place — one history entry, no reload — so Back and Forward move between hub and pages, and a reload or shared link lands on the same view. Forms and row addresses open over their page as before (`/health/physique/log/`, `/health/physique/2026-10-05/`).
+- **Wide screens (≥ 1180px)** get a left sidebar listing every section and page, the current one marked; a link in another section loads that section. **Phones** use the bottom tab bar to pick a section and the hub's tiles (two a row) to pick a page.
+- The home page keeps its overview: glance cards, and every block as a collapsible panel when Show blocks is on; clicking a block there opens its page.
+
 ## Button roles
 
 - **Blue** — add or save (Add/Log buttons, Save, Save & Add Another, bank).

@@ -1,4 +1,4 @@
-// Insight's Patterns mode: the BMR_cal Periods table, widened with
+// Insight's Pattern mode: the BMR_cal Periods table, widened with
 // each period's macro and activity-type averages, sent to AI to spot which habits line up
 // with more fat lost (ΔM) and a higher real BMR (Offset). insight-panel.js drives it.
 
@@ -39,7 +39,7 @@ function meanOfPresent(values) {
 
 // computeBmrCalibration's own periods (so m/Δm/ΔM/D/Offset match Tune's Periods
 // exactly), plus period averages of the columns that form doesn't show.
-function gatherFatLossPatterns(fromIso, toIso, chunkDays) {
+function gatherFatLossPattern(fromIso, toIso, chunkDays) {
   const result = computeBmrCalibration(fromIso, chunkDays, toIso);
   const byDate = new Map(allPhysiqueEntries.filter((p) => p.date).map((p) => [p.date, p]));
 
@@ -86,8 +86,8 @@ function gatherFatLossPatterns(fromIso, toIso, chunkDays) {
 }
 
 function renderFatLossPatternPreview(data) {
-  renderInsightLines(document.getElementById('insight-patterns-profile'), formatProfileLines(gatherProfileSnapshot(), data.bodyMassTargetKg));
-  const tbody = document.getElementById('insight-patterns-body');
+  renderInsightLines(document.getElementById('insight-pattern-profile'), formatProfileLines(gatherProfileSnapshot(), data.bodyMassTargetKg));
+  const tbody = document.getElementById('insight-pattern-body');
   tbody.innerHTML = '';
 
   if (!data.periods.length) {
@@ -131,7 +131,7 @@ function formatFatLossPatternPrompt(data) {
 }
 
 // A function of chunkDays, not a fixed string — the period length is user-editable
-// (Patterns' days box), so the prompt has to name whatever length is actually in the table.
+// (Pattern's days box), so the prompt has to name whatever length is actually in the table.
 function formatFatLossPatternSystemPrompt(chunkDays) {
   return `You are a data-minded personal health coach. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
@@ -142,7 +142,7 @@ Your job: find which habits line up with (1) MORE fat lost — the most negative
 Write a short plain-text report with exactly these sections, each starting on its own line as "Label: text". Do not use markdown syntax (no #, *, -, backticks, bold) — plain text only. Within a section, put each distinct point on its own line.
 
 Best periods: which period(s) had the most fat loss and which had the highest Offset, with their figures.
-Patterns: the habits that line up with more fat loss and with a higher Offset, quoting the numbers on both sides, and how confident each is.
+Pattern: the habits that line up with more fat loss and with a higher Offset, quoting the numbers on both sides, and how confident each is.
 Do this: 2-4 concrete changes, each on its own numbered line ("1. ", "2. ", …), naming the target figure.
 Caveats: 1-2 lines on what the data can't tell yet and what to log to make it clearer.
 

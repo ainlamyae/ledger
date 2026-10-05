@@ -3134,8 +3134,8 @@ td .btn {
     font-size: .8rem;
 }
 
-/* Patterns' period length row: Tune's row without the symbol column. */
-#insight-patterns-period {
+/* Pattern's period length row: Tune's row without the symbol column. */
+#insight-pattern-period {
     grid-template-columns: max-content 8.45rem max-content;
 }
 

@@ -1101,13 +1101,13 @@
             </div>
 
             <div class="insight-mode-actions" id="insight-mode-actions">
+                <button type="button" class="btn" data-insight-mode="plan" data-route="plan" data-route-view aria-pressed="false">Plan</button>
                 <button type="button" class="btn" data-insight-mode="wellness" data-route="wellness" data-route-view aria-pressed="false">Wellness</button>
                 <button type="button" class="btn" data-insight-mode="food" data-route="food" data-route-view aria-pressed="false">Food</button>
-                <button type="button" class="btn" data-insight-mode="micronutrients" data-route="micronutrients" data-route-view aria-pressed="false">Micronutrients</button>
+                <button type="button" class="btn" data-insight-mode="micronutrient" data-route="micronutrient" data-route-view aria-pressed="false">Micronutrient</button>
                 <button type="button" class="btn" data-insight-mode="activity" data-route="activity" data-route-view aria-pressed="false">Activity</button>
-                <button type="button" class="btn" data-insight-mode="protein" data-route="protein-sources" data-route-view aria-pressed="false">Protein Sources</button>
-                <button type="button" class="btn" data-insight-mode="plan" data-route="plan" data-route-view aria-pressed="false">Plan</button>
-                <button type="button" class="btn" data-insight-mode="patterns" data-route="patterns" data-route-view aria-pressed="false" title="Send the BMR_cal periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR">Patterns</button>
+                <button type="button" class="btn" data-insight-mode="protein" data-route="protein" data-route-view aria-pressed="false">Protein</button>
+                <button type="button" class="btn" data-insight-mode="pattern" data-route="pattern" data-route-view aria-pressed="false" title="Send the BMR_cal periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR">Pattern</button>
             </div>
 
             <p class="hint" id="insight-mode-status"></p>
@@ -1144,7 +1144,7 @@
                 </div>
             </div>
 
-            <div id="insight-preview-micronutrients" hidden>
+            <div id="insight-preview-micronutrient" hidden>
                 <div id="insight-micro-profile" class="insight-data-preview"></div>
                 <div class="table-responsive">
                     <table id="insight-micro-table">
@@ -1161,18 +1161,18 @@
                 </div>
             </div>
 
-            <div id="insight-preview-patterns" hidden>
+            <div id="insight-preview-pattern" hidden>
                 <!-- Tune's period length row (without its symbol), starting at Tune's value; editable here. -->
-                <div class="formula-inputs" id="insight-patterns-period">
+                <div class="formula-inputs" id="insight-pattern-period">
                     <label class="formula-row" title="How many days each period averages — starts at Tune's period length">
                         <span class="formula-name">period length</span>
-                        <input type="text" id="insight-patterns-period-days" inputmode="numeric">
+                        <input type="text" id="insight-pattern-period-days" inputmode="numeric">
                         <span class="formula-unit">days</span>
                     </label>
                 </div>
-                <div id="insight-patterns-profile" class="insight-data-preview"></div>
+                <div id="insight-pattern-profile" class="insight-data-preview"></div>
                 <div class="table-responsive">
-                    <table id="insight-patterns-table">
+                    <table id="insight-pattern-table">
                         <thead>
                         <tr>
                             <th>Period</th>
@@ -1198,7 +1198,7 @@
                             <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
                         </tr>
                         </thead>
-                        <tbody id="insight-patterns-body"></tbody>
+                        <tbody id="insight-pattern-body"></tbody>
                     </table>
                 </div>
             </div>

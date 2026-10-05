@@ -191,11 +191,11 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 32 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
 | 33 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
 | 34 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Classification** |
-| 35 | `micronutrient-insight.js` | Micronutrients mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `nutrient-targets.js`'s Ideal/day figures |
+| 35 | `micronutrient-insight.js` | Micronutrient mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `nutrient-targets.js`'s Ideal/day figures |
 | 36 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 37 | `protein-source-rotation-insight.js` | Protein Sources mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
+| 37 | `protein-source-rotation-insight.js` | Protein mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
 | 38 | `plan-insight.js` | Plan mode: the Tune's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
-| 39 | `fat-loss-pattern-insight.js` | Patterns mode: the BMR_cal periods plus macro/activity-type averages, and the pattern-finding prompt |
+| 39 | `fat-loss-pattern-insight.js` | Pattern mode: the BMR_cal periods plus macro/activity-type averages, and the pattern-finding prompt |
 | 40 | `insight-panel.js` | The panel itself: mode table, load buttons, Groq call, per-mode save/restore |
 | 41 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Classification |
 | 42 | `formula-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |

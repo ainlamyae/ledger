@@ -931,10 +931,11 @@
                 <p class="hint" id="formula-profile-note"></p>
                 <p id="formula-status" class="status" hidden></p>
 
-                <div class="panel-actions">
+                <div class="panel-actions" data-page-actions>
                     <button type="button" id="formula-reset-btn" class="btn">Reset</button>
                     <button type="button" id="formula-update-btn" class="btn" title="Save this n_p / L_p and recompute BMR_cal (and every stored BMR figure) for every day in the Physique sheet">Update</button>
                     <button type="button" id="formula-save-btn" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
                 </div>
             </div>
         </div>
@@ -1197,8 +1198,9 @@
                 <textarea id="insight-question" rows="2" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
             </label>
 
-            <div class="panel-actions">
+            <div class="panel-actions" data-page-actions>
                 <button type="button" id="insight-generate-btn" class="btn btn-ai" disabled title="Load a data set first">Send to AI</button>
+                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
             </div>
 
             <p id="insight-generated-at" class="hint" hidden></p>
@@ -1255,6 +1257,7 @@
                 <span id="physique-bulk-summary"></span>
                 <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
                 <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
+                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
 
             <div class="pagination" id="physique-pagination"></div>
@@ -1314,6 +1317,7 @@
                 <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
                 <button id="nutrition-bulk-capitalize-btn" class="btn" title="Capitalize each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field">Capitalize Names</button>
                 <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">Complete</button>
+                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
 
@@ -1501,8 +1505,9 @@
                 <textarea id="financial-insight-question" rows="2" placeholder="e.g. Should I move cash into investments?"></textarea>
             </label>
 
-            <div class="panel-actions">
+            <div class="panel-actions" data-page-actions>
                 <button type="button" id="financial-insight-generate-btn" class="btn btn-ai" disabled title="Load your financial data first">Send to AI</button>
+                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
             </div>
 
             <p id="financial-insight-generated-at" class="hint" hidden></p>
@@ -1570,6 +1575,7 @@
                 <span id="tx-bulk-summary"></span>
                 <button id="tx-bulk-edit-btn" class="btn" title="Edit Selected" aria-label="Edit Selected">✏️</button>
                 <button id="tx-bulk-delete-btn" class="btn" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
+                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
 
             <div class="pagination" id="tx-pagination"></div>
@@ -1876,6 +1882,7 @@
                 <button id="contacts-bulk-export-outlook-btn" class="btn" title="Export Selected for Outlook" aria-label="Export Selected for Outlook">📧</button>
                 <button id="contacts-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
                 <button id="contacts-bulk-delete-btn" class="btn" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
+                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
 
             <div class="pagination" id="contacts-pagination"></div>

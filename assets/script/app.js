@@ -36,6 +36,17 @@ function formatCurrency(value) {
   return privacyMode ? maskDigits(formatted) : formatted;
 }
 
+// A stock's own currency: "$1,234.56" for CAD, "US$1,234.56" for USD.
+const MONEY_FORMATS = new Map();
+
+function formatMoney(value, currency = 'CAD', { mask = true } = {}) {
+  if (!MONEY_FORMATS.has(currency)) {
+    MONEY_FORMATS.set(currency, new Intl.NumberFormat('en-CA', { style: 'currency', currency }));
+  }
+  const formatted = MONEY_FORMATS.get(currency).format(value);
+  return mask && privacyMode ? maskDigits(formatted) : formatted;
+}
+
 // Shared by the Transactions, Accounts, and Time Log tables for the "no
 // rows to show" case, so an empty sheet (or filter with no matches) doesn't
 // just render a blank table.
@@ -698,7 +709,12 @@ async function loadDashboard(forceRefresh = false) {
       ] : []),
       ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
       ...(home && !shows('track') ? [initTimeSheet(forceRefresh)] : []),
-      ...(shows('finance') ? [initAccountManager(forceRefresh), initBreakdown(forceRefresh)] : []),
+      ...(shows('finance') ? [
+        initAccountManager(forceRefresh),
+        initBreakdown(forceRefresh),
+        initWatchlist(forceRefresh).then(() => initStockAnalysisLog()),
+        initTrades(forceRefresh),
+      ] : []),
       ...(shows('track') ? [
         initTimeSheet(forceRefresh),
         settingsPromise.then(() => initTravel(forceRefresh)),
@@ -986,6 +1002,8 @@ const AUTH_GATED_SELECTOR = [
   '#contacts-bulk-delete-btn',
   '#import-csv-btn',
   '#formula-save-btn',            // Tune's Save
+  '#portfolio-write-mv-btn',
+  '#analysis-generate-btn',       // saves its read to the Analysis tab
 ].join(', ');
 
 // Reads the sheet but never writes it, so it has no business prompting: the
@@ -1068,6 +1086,7 @@ function bootDashboard() {
   initProteinRotationPanel();
   initActivityRotationPanel();
   initFinancialInsight();
+  initStockAnalysis();
   initWorkoutPlan();
   setupScrollSpy();
   // A section page has routed already (routeDashboard, before this boot step).

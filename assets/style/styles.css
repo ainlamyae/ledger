@@ -1153,7 +1153,8 @@ td:has(.btn) {
 /* Physique's Derived table: one line closing each group (mass, BMR, the
    energy-balance inputs) before the next one starts, same idiom as
    physique-week-start/breakdown-category-start above. */
-#physique-derived-table tr.physique-derived-group-end td {
+#physique-derived-table tr.physique-derived-group-end td,
+#market-signal-table tr.physique-derived-group-end td {
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -2522,12 +2523,16 @@ html.home-hub .page-tiles,
 }
 
 /* Insight's prompt template. */
-#insight-prompt-details {
+#insight-prompt-details,
+#analysis-prompt-details,
+#analysis-descriptive-details {
     margin-bottom: var(--space-s);
     font-size: var(--text-small);
 }
 
 #insight-prompt-details summary,
+#analysis-prompt-details summary,
+#analysis-descriptive-details summary,
 #physique-derived-details summary,
 #physique-consumption-details summary,
 #physique-workout-details summary {
@@ -2549,7 +2554,8 @@ html.home-hub .page-tiles,
 }
 
 /* Prompts are paragraphs, so they wrap. */
-#insight-prompt-template {
+#insight-prompt-template,
+#analysis-prompt-template {
     white-space: pre-wrap;
 }
 
@@ -2726,8 +2732,8 @@ html.home-hub .page-tiles,
         justify-content: center;
         min-height: var(--bottom-bar-height);
         padding: 0 var(--space-xs);
-        /* Larger labels; the bar's own height (--bottom-bar-height) is unchanged. */
-        font-size: var(--text-title);
+        /* Body-size labels; the bar's own height (--bottom-bar-height) is unchanged. */
+        font-size: var(--text-body);
         font-weight: 600;
         line-height: 1.2;
     }

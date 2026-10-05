@@ -207,6 +207,7 @@ function signOut() {
   // A different person may sign in next on this browser — don't hand them
   // the previous user's spreadsheet selection.
   clearActiveSpreadsheetId();
+  clearMarketCache();
   authChangeHandler(null);
 }
 

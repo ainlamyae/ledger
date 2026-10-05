@@ -206,6 +206,19 @@ function showSectionPage(panel) {
     if (heading) setPanelCollapsed(p, heading, !active);
   });
   updatePageNav(panel);
+  runPageShow(panel);
+}
+
+// A block's on-open work (Market's price fetch): runs when its page is shown, never
+// on the section's own load.
+const pageShows = new Map(); // block slug -> fn(panel)
+
+function registerPageShow(blockSlug, show) {
+  pageShows.set(blockSlug, show);
+}
+
+function runPageShow(panel) {
+  if (panel && dashboardDataLoaded) pageShows.get(panel.dataset.route)?.(panel);
 }
 
 // A tile, sidebar link or breadcrumb: one history step, no reload.
@@ -440,7 +453,11 @@ function setFormSubView(subSlug, label) {
 }
 
 // Called once loadDashboard (app.js) has finished: forms need their data first.
+let dashboardDataLoaded = false;
+
 function routerDataLoaded() {
+  dashboardDataLoaded = true;
+  if (window.ledgerSectionPage && document.documentElement.dataset.page === 'block') runPageShow(currentRoutedPanel());
   if (!initialFormRoute) return;
   const { panel, button, record, sub } = initialFormRoute;
   initialFormRoute = null;

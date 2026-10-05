@@ -397,13 +397,13 @@ const INSIGHT_SECTION_LABELS = ['Overview', 'Going well', 'Needs attention', 'In
 // running together in a single wall of text. Still never innerHTML — this is
 // untrusted model output; the section label is the one bit of markup we add,
 // and it's built from a fixed known string, not from parsing the model's text.
-function renderInsightText(container, text) {
+function renderInsightText(container, text, labels = INSIGHT_SECTION_LABELS) {
   text.split('\n').forEach((rawLine) => {
     const line = rawLine.trim();
     if (!line) return;
 
     const p = document.createElement('p');
-    const label = INSIGHT_SECTION_LABELS.find((l) => line.startsWith(`${l}:`));
+    const label = labels.find((l) => line.startsWith(`${l}:`));
     if (label) {
       const strong = document.createElement('strong');
       strong.textContent = `${label}:`;

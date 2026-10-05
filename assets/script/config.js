@@ -26,5 +26,8 @@ const CONFIG = {
     SETTINGS: 'Setting',
     TRAVEL: 'Travel',
     APPLICATIONS: 'Application',
+    WATCHLIST: 'Watchlist',
+    TRADES: 'Trade',
+    STOCK_ANALYSIS: 'Analysis',
   },
 };

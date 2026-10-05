@@ -1576,6 +1576,226 @@
             <div class="pagination" id="breakdown-pagination"></div>
         </div>
 
+        <!-- Watchlist prices (market.js; market-data.js loads them when this page opens). -->
+        <div class="panel" id="market-panel" data-route="market">
+            <div class="panel-header">
+                <h2>Market</h2>
+                <button id="add-watchlist-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a stock to the watchlist" aria-label="Add">➕</button>
+            </div>
+
+            <p class="hint" id="market-status"></p>
+
+            <div class="panel-section card">
+                <h3 id="market-chart-title">Price</h3>
+                <div class="pagination" id="market-range"></div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="market-price-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="watchlist-table" class="table-compact">
+                    <thead>
+                    <tr>
+                        <th class="sortable" data-sort="symbol">Symbol</th>
+                        <th class="sortable" data-sort="name">Name</th>
+                        <th class="num">Close</th>
+                        <th class="num" title="Change since the previous close">1d</th>
+                        <th class="num" title="Change over about one month (21 trading days)">1m</th>
+                        <th class="num" title="Change over about one year (252 trading days)">1y</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="watchlist-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Buy/sell log at average cost (portfolio.js, portfolio-math.js). -->
+        <div class="panel" id="portfolio-panel" data-route="portfolio">
+            <div class="panel-header">
+                <h2>Portfolio</h2>
+                <button id="add-trade-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a buy, sell or split" aria-label="Log">📝</button>
+            </div>
+
+            <p class="hint" id="portfolio-status"></p>
+
+            <div class="cards">
+                <div class="card"><h3>Market Value (CAD)</h3><div class="value" id="portfolio-value">—</div></div>
+                <div class="card"><h3>Cost Basis (CAD)</h3><div class="value" id="portfolio-cost">—</div></div>
+                <div class="card"><h3>Unrealized (CAD)</h3><div class="value" id="portfolio-unrealized">—</div></div>
+                <div class="card"><h3>Realized (CAD)</h3><div class="value" id="portfolio-realized">—</div></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Gain / Loss (CAD)</h3>
+                <div class="pagination" id="portfolio-range"></div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="portfolio-gain-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="portfolio-gain-legend"></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Market Value vs Cost (CAD)</h3>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="portfolio-value-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="portfolio-value-legend"></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Holdings</h3>
+                <div class="table-responsive">
+                    <table id="holdings-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Symbol</th>
+                            <th class="num">Shares</th>
+                            <th class="num" title="Average cost per share, fees included (ACB)">Avg Cost</th>
+                            <th class="num">Close</th>
+                            <th class="num">Market Value</th>
+                            <th class="num" title="Market value minus cost, in the stock's own currency">Unrealized</th>
+                            <th class="num">%</th>
+                            <th class="num" title="Gain or loss locked in by sells, in the stock's own currency">Realized</th>
+                        </tr>
+                        </thead>
+                        <tbody id="holdings-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>By Account</h3>
+                <div class="table-responsive">
+                    <table id="portfolio-accounts-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th class="num" title="Today's value of the stocks logged under this account, in CAD">Holdings</th>
+                            <th class="num" title="The Account page's Market Value">Market Value</th>
+                            <th class="num" title="Market Value minus Holdings — usually cash">Difference</th>
+                        </tr>
+                        </thead>
+                        <tbody id="portfolio-accounts-body"></tbody>
+                    </table>
+                </div>
+                <div class="panel-actions">
+                    <button type="button" id="portfolio-write-mv-btn" class="btn btn-secondary" hidden title="Write each account's Holdings into its Market Value (blank or number cells only; formulas are left alone)">Update Market Value</button>
+                </div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Trades</h3>
+                <div class="table-responsive">
+                    <table id="trades-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th class="sortable" data-sort="date">Date</th>
+                            <th class="sortable" data-sort="account">Account</th>
+                            <th class="sortable" data-sort="symbol">Symbol</th>
+                            <th class="sortable" data-sort="action">Action</th>
+                            <th class="num">Qty</th>
+                            <th class="num">Price</th>
+                            <th class="num">Fees</th>
+                            <th class="num" title="CAD per one unit of the trade's currency on that day">FX</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="trades-body"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="trades-pagination"></div>
+            </div>
+
+            <p class="hint">Average cost (ACB) per account and symbol, fees included; CAD figures use each trade's own FX rate. The superficial-loss rule isn't applied.</p>
+        </div>
+
+        <!-- One stock's rule-based signals, news and AI read (stock-analysis.js, market-math.js). -->
+        <div class="panel" id="stock-analysis-panel" data-route="analysis">
+            <div class="panel-header">
+                <h2>Analysis</h2>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="analysis-symbol" list="analysis-symbol-options" placeholder="Symbol, e.g. AAPL or SHOP.TO" aria-label="Symbol" autocomplete="off">
+                <datalist id="analysis-symbol-options"></datalist>
+            </div>
+
+            <p class="hint" id="analysis-status"></p>
+
+            <div class="cards">
+                <div class="card"><h3>Verdict</h3><div class="value" id="analysis-verdict">—</div></div>
+                <div class="card"><h3>Close</h3><div class="value" id="analysis-close">—</div></div>
+                <div class="card"><h3 title="Close minus MARKET_ATR_MULT × ATR14">Stop</h3><div class="value" id="analysis-stop">—</div></div>
+                <div class="card"><h3 title="Shares so a stop-out loses MARKET_RISK_PCT of your investment accounts">Position Size</h3><div class="value" id="analysis-shares">—</div></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3 id="analysis-chart-title">Chart</h3>
+                <div class="pagination" id="analysis-range"></div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="analysis-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="analysis-legend"></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Signals</h3>
+                <div class="table-responsive">
+                    <table id="market-signal-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Signal</th>
+                            <th class="num">Value</th>
+                            <th>Rule</th>
+                            <th>Read</th>
+                        </tr>
+                        </thead>
+                        <tbody id="market-signal-body"></tbody>
+                    </table>
+                </div>
+                <details id="analysis-descriptive-details">
+                    <summary>Descriptive (weak evidence)</summary>
+                    <div class="table-responsive">
+                        <table id="analysis-descriptive-table" class="table-compact">
+                            <tbody id="analysis-descriptive-body"></tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+
+            <div class="panel-section card">
+                <h3>News</h3>
+                <div id="analysis-news" class="insight-data-preview"></div>
+            </div>
+
+            <label class="insight-question-label" for="analysis-question">Ask a question (optional)
+                <textarea id="analysis-question" rows="3" placeholder="e.g. Is now a good entry, or should I wait for a pullback?"></textarea>
+            </label>
+            <label class="checkbox-inline-label">
+                <input type="checkbox" id="analysis-include-position">
+                Include my position (shares and average cost)
+            </label>
+
+            <details id="analysis-prompt-details" hidden>
+                <summary>Prompt template</summary>
+                <div class="table-responsive">
+                    <pre id="analysis-prompt-template"></pre>
+                </div>
+            </details>
+
+            <div class="panel-actions" data-page-actions>
+                <button type="button" id="analysis-generate-btn" class="btn btn-icon" disabled title="Send to AI (pick a stock first)" aria-label="Send to AI">🤖</button>
+                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
+            </div>
+
+            <p id="analysis-generated-at" class="hint" hidden></p>
+            <div id="analysis-body" class="insight-body"></div>
+            <p id="analysis-form-error" class="status" hidden></p>
+        </div>
+
         <div class="panel" id="financial-insight-panel" data-route="insight">
             <h2>Insight</h2>
 
@@ -2081,6 +2301,103 @@
     </div>
 </div>
 
+<div id="watchlist-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="watchlist-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="watchlist-modal-title">Add to Watchlist</h2>
+
+        <form id="watchlist-form" class="app-form">
+            <label>Symbol
+                <input type="text" id="watchlist-symbol" list="watchlist-symbol-options" placeholder="e.g. AAPL, or SHOP.TO for the TSX" autocomplete="off">
+                <datalist id="watchlist-symbol-options"></datalist>
+            </label>
+            <label>Name
+                <input type="text" id="watchlist-name" placeholder="optional — filled from the search">
+            </label>
+            <div class="form-row">
+                <label>Exchange
+                    <input type="text" id="watchlist-exchange" placeholder="e.g. NASDAQ, TSX">
+                </label>
+                <label>Currency
+                    <select id="watchlist-currency">
+                        <option>USD</option>
+                        <option>CAD</option>
+                    </select>
+                </label>
+            </div>
+            <label>Notes
+                <input type="text" id="watchlist-notes" placeholder="Optional">
+            </label>
+
+            <p id="watchlist-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
+                <button type="button" id="watchlist-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="trade-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="trade-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="trade-modal-title">Log a Trade</h2>
+
+        <form id="trade-form" class="app-form">
+            <div class="form-row">
+                <label>Date
+                    <input type="date" id="trade-date">
+                </label>
+                <label>Action
+                    <select id="trade-action">
+                        <option>Buy</option>
+                        <option>Sell</option>
+                        <option>Split</option>
+                    </select>
+                </label>
+            </div>
+            <label>Account
+                <select id="trade-account"></select>
+            </label>
+            <label>Symbol
+                <input type="text" id="trade-symbol" list="trade-symbol-options" placeholder="e.g. AAPL or SHOP.TO" autocomplete="off">
+                <datalist id="trade-symbol-options"></datalist>
+            </label>
+            <div class="form-row">
+                <label><span id="trade-quantity-label">Quantity</span>
+                    <input type="text" id="trade-quantity" inputmode="decimal" placeholder="shares">
+                </label>
+                <label>Price
+                    <input type="text" id="trade-price" inputmode="decimal" placeholder="per share">
+                </label>
+            </div>
+            <div class="form-row">
+                <label>Fees
+                    <input type="text" id="trade-fees" inputmode="decimal" placeholder="0">
+                </label>
+                <label>Currency
+                    <select id="trade-currency">
+                        <option>USD</option>
+                        <option>CAD</option>
+                    </select>
+                </label>
+            </div>
+            <label>FX to CAD
+                <input type="text" id="trade-fx" inputmode="decimal" placeholder="CAD per 1 USD that day — filled on save if blank">
+            </label>
+            <label>Notes
+                <input type="text" id="trade-notes" placeholder="Optional">
+            </label>
+
+            <p id="trade-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
+                <button type="button" id="trade-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="transfer-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="transfer-modal-title" hidden>
     <div class="modal-card">
         <h2 id="transfer-modal-title">Transfer Funds</h2>
@@ -2151,6 +2468,13 @@
                     <option>OPENROUTER_API_KEY</option>
                     <option>OPENROUTER_MODELS</option>
                     <option>USDA_FDC_API_KEY</option>
+                    <option>TWELVE_DATA_API_KEY</option>
+                    <option>ALPHA_VANTAGE_API_KEY</option>
+                    <option>FINNHUB_API_KEY</option>
+                    <option>MARKET_RISK_PCT</option>
+                    <option>MARKET_ATR_MULT</option>
+                    <option>MARKET_RISK_FREE_PCT</option>
+                    <option>PORTFOLIO_WRITE_MARKET_VALUE</option>
                 </datalist>
             </label>
             <!-- Multi-line, since some values are long (a JSON target list, an API key). -->
@@ -2782,12 +3106,19 @@
 <script src="assets/script/wellness-math.js"></script>
 <script src="assets/script/wellness-charts.js"></script>
 <script src="assets/script/finance-charts.js"></script>
+<script src="assets/script/market-data.js"></script>
+<script src="assets/script/market-math.js"></script>
+<script src="assets/script/portfolio-math.js"></script>
+<script src="assets/script/market-charts.js"></script>
 <script src="assets/script/timesheet-charts.js"></script>
 <script src="assets/script/travel-charts.js"></script>
 <script src="assets/script/transactions.js"></script>
 <script src="assets/script/car-service.js"></script>
 <script src="assets/script/accounts.js"></script>
 <script src="assets/script/breakdown.js"></script>
+<script src="assets/script/market.js"></script>
+<script src="assets/script/portfolio.js"></script>
+<script src="assets/script/stock-analysis.js"></script>
 <script src="assets/script/timesheet.js"></script>
 <script src="assets/script/csv.js"></script>
 <script src="assets/script/activities.js"></script>

@@ -30,6 +30,41 @@ function onPageLinkClick(event, sectionId, panel) {
   navigateSectionPage(panel);
 }
 
+// The actions used most, one tap from the section's hub (and from its part of the
+// home page): each stands in for a block's own header button. On the section page
+// it clicks that button, so the form opens exactly as it does from the block; from
+// the home page it goes to the form's address instead.
+const QUICK_ACTIONS = {
+  health: [
+    { label: 'Today', buttonId: 'today-physique-btn', className: 'btn-secondary', href: () => `physique/${isoFromDate(new Date())}/` },
+    { label: 'Log', buttonId: 'add-physique-btn', className: 'btn-primary', href: () => 'physique/log/' },
+  ],
+};
+
+function buildQuickActions(section) {
+  const actions = QUICK_ACTIONS[section.id];
+  if (!actions) return;
+  const row = document.createElement('div');
+  row.className = 'quick-actions';
+  actions.forEach((action) => {
+    const source = document.getElementById(action.buttonId);
+    const link = document.createElement('a');
+    link.className = `btn ${action.className} quick-action`;
+    link.textContent = action.label;
+    if (source?.title) link.title = source.title;
+    link.href = `${section.href}${action.href()}`;
+    link.addEventListener('click', (event) => {
+      if (window.ledgerSectionPage?.section !== section.id || !source) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+      event.preventDefault();
+      source.click();
+    });
+    row.appendChild(link);
+  });
+  const group = document.getElementById(section.id);
+  group.insertBefore(row, group.querySelector(':scope > .page-tiles') || section.panels[0] || null);
+}
+
 function buildPageTiles(section) {
   const group = document.getElementById(section.id);
   const grid = document.createElement('nav');
@@ -116,13 +151,17 @@ function initPageNav() {
   // Home: every section's tiles under its glance cards; each opens that page.
   if (!window.ledgerSectionPage) {
     document.documentElement.classList.add('home-hub');
-    sections.forEach(buildPageTiles);
+    sections.forEach((s) => {
+      buildPageTiles(s);
+      buildQuickActions(s);
+    });
     return;
   }
   const section = sections.find((s) => s.id === window.ledgerSectionPage.section);
   if (!section) return;
   document.documentElement.classList.add('section-pages');
   buildPageTiles(section);
+  buildQuickActions(section);
   buildPageCrumb(section);
   buildFormCrumb();
 }

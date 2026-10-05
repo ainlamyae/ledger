@@ -1946,9 +1946,23 @@ td .btn {
     margin-bottom: .2rem;
 }
 
-/* Form row names at the form's label size; Tune keeps its smaller ones. */
-.app-form .formula-name {
+/* Name takes the leftover width; tick, box and unit stay fixed at the right. */
+.app-form .formula-inputs {
+    grid-template-columns: max-content minmax(0, 1fr) 5.07rem 2.5rem;
+    overflow-x: visible;
+}
+
+/* Name and unit match the form's labels; Tune keeps its own look. */
+.app-form .formula-name,
+.app-form .formula-unit {
+    font-family: inherit;
     font-size: .85rem;
+    color: var(--color-text-muted);
+    opacity: 1;
+}
+
+.app-form .formula-name {
+    white-space: normal;
 }
 
 .app-form .formula-row input[type="checkbox"] {
@@ -2932,7 +2946,8 @@ td .btn {
         font-size: .8rem;
     }
 
-    .app-form .formula-name {
+    .app-form .formula-name,
+    .app-form .formula-unit {
         font-size: .8rem;
     }
 

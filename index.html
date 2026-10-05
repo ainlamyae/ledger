@@ -1330,6 +1330,28 @@
             <div class="pagination" id="nutrition-pagination"></div>
         </div>
 
+        <!-- The Setting tab's health keys only (isHealthSettingKey, settings-panel.js):
+             the same rows, form and Edit/Delete as Other's Settings block. -->
+        <div class="panel" data-route="settings">
+            <div class="panel-header">
+                <h2>Settings</h2>
+                <button id="health-add-setting-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add a setting">Add</button>
+            </div>
+
+            <div class="table-responsive">
+                <table id="health-settings-table">
+                    <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="health-settings-body"></tbody>
+                </table>
+            </div>
+        </div>
+
     </section>
 
     <div style="height:.5rem"></div>
@@ -2122,7 +2144,6 @@
                     <option>SLEEP_TARGET_HOURS</option>
                     <option>FIBER_TARGET_G</option>
                     <option>ACTIVITY_TARGET_MIN</option>
-                    <option>ACTIVITY_MET_DEFAULT</option>
                     <option>PROTEIN_TARGET_G</option>
                     <option>PROTEIN_TARGET_G_PER_KG</option>
                     <option>PROTEIN_TARGET_G_PER_KG_MIN</option>

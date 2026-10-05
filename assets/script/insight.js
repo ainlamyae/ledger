@@ -119,7 +119,7 @@ function aggregateWindow(dates) {
         byDate.set(e.date, (byDate.get(e.date) || 0) + mins);
 
         // Every entry gets a burn figure via charts.js's activityEntryKcal — its
-        // own amount2, else its minutes at ACTIVITY_MET. A plain Activity row used
+        // own amount2, else its minutes at the Walk MET (activityMet). A plain Activity row used
         // to contribute nothing, understating what the AI was told was burned.
         const kcal = activityEntryKcal(e, bodyMassKg);
         activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);

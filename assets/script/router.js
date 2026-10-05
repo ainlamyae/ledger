@@ -162,6 +162,9 @@ function updateFormPage() {
   root.dataset.formPage = '1';
   if (current !== top.modal) {
     top.modal.classList.add('form-page');
+    // The breadcrumb lives inside the form's wrapper, above its card.
+    const crumb = document.getElementById('form-crumb');
+    if (crumb) top.modal.insertBefore(crumb, top.modal.firstChild);
     window.scrollTo(0, 0);
   }
   updateFormCrumb(top.panel, top.steps);

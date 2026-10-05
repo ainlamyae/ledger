@@ -84,6 +84,9 @@ th.sortable:focus-visible {
 html {
     font-size: 15px;
     scroll-behavior: smooth;
+    /* Stops iOS Safari enlarging text in wide blocks (Car Service's Basis). */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body {

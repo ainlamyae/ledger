@@ -29,4 +29,4 @@
 - **Holdings**: each in its own currency (`US$` or `$`); the % is unrealized against cost.
 - **By Account**: holdings per account (CAD) against the Account page's Market Value; the difference is usually cash.
 - **Update Market Value** appears only with `PORTFOLIO_WRITE_MARKET_VALUE` = 1. After a confirm, it writes each account's holdings into Account column E, skipping any cell that holds a formula and naming the ones it skipped.
-- Prices load when the page opens, like [Market](finance-market.md). Everything here follows Privacy mode.
+- Prices load when the page opens, like [Watch List](finance-watchlist.md). Everything here follows Privacy mode.

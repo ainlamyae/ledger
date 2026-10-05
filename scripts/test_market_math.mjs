@@ -177,6 +177,18 @@ test('verdict notes', () => {
   assert.equal(both[1], "don't chase last week's spike");
 });
 
+test('trailingStopSeries', () => {
+  const c = [...range(1, 30), 25, 24, 23];
+  const bars = c.map((x, i) => ({ d: day(i), o: x, h: x + 1, l: x - 1, c: x, v: 0 }));
+  const stops = M.trailingStopSeries(bars, 2, 22);
+  assert.equal(stops[20], null);
+  const atr = M.atrSeries(bars, 14);
+  close(stops[21], 22 - 2 * atr[21]);
+  close(stops.at(-1), 30 - 2 * atr.at(-1)); // keeps the 22-day high after a drop
+  const crashed = M.computeSignals({ bars: [...bars, { d: day(40), o: 5, h: 6, l: 4, c: 5, v: 0 }], equity: 100000 });
+  assert.equal(crashed.shares, null); // close below the stop
+});
+
 test('computeSignals', () => {
   const N = 300;
   const p = [100], q = [100];
@@ -193,9 +205,9 @@ test('computeSignals', () => {
   assert.equal(s.checks.relative, true);
   assert.equal(s.verdict.label, 'Favourable');
   close(s.beta.value, 2, 1e-9);
-  close(s.stop, s.close - 2.5 * s.atr);
-  assert.equal(s.shares, Math.floor(1000 / (2.5 * s.atr)));
-  close(s.riskAmount, s.shares * 2.5 * s.atr);
+  close(s.stop, Math.max(...p.slice(-22)) - 4 * s.atr); // default MARKET_ATR_MULT
+  assert.equal(s.shares, Math.floor(1000 / (s.close - s.stop)));
+  close(s.riskAmount, s.shares * (s.close - s.stop));
   assert.notEqual(s.sharpe.value, null);
   assert.notEqual(s.vol63.value, null);
   const short = M.computeSignals({ bars: bars.slice(0, 30) });

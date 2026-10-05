@@ -1,4 +1,4 @@
-// Analysis: one stock's rule-based signals (market-math.js), its chart with the lines
+// Market page: one stock's rule-based signals (market-math.js), its chart with the lines
 // those rules use, Finnhub headlines, and an AI read of all three. Each read is
 // appended to the Analysis tab, so past verdicts stay as a track record.
 
@@ -13,26 +13,29 @@ let analysisSymbol = null;
 let analysisRangeSlug = '1y';
 let analysisLoaded = null; // { symbol, signals, bars, currency, news, benchmark, monthly }
 let analysisChart = null;
+let analysisChartToken = 0;
 let analysisLoadToken = 0;
-const analysisHiddenSeries = new Set(['SMA50 (50-day average close)', 'Bollinger upper (SMA20 + 2σ)', 'Bollinger lower (SMA20 − 2σ)', 'Benchmark (rebased to the first close)']);
+const analysisHiddenSeries = new Set(); // legend toggles; every line starts on
 let analysisListenersAttached = false;
 
-const MARKET_ANALYSIS_SYSTEM_PROMPT = `You explain a pre-computed, rule-based signal summary for one stock to a long-term swing investor (holding 1 week to 6 months, low risk preferred).
+const MARKET_ANALYSIS_SYSTEM_PROMPT = `You explain a pre-computed, rule-based signal summary for one stock to a long-term investor (holding weeks to months, not day trading; low risk preferred).
 
 Rules:
 - Use only the numbers supplied. Never invent a price, target, level, earnings figure or headline. If a figure is n/a, say it needs more price history.
 - The Verdict is computed by fixed rules: restate it exactly. You may explain why caution is warranted, but never change it.
 - Cite every headline you use with its date and source in brackets, e.g. [2026-10-08, Reuters]. Call headlines older than 30 days stale. If no headlines are supplied, say so.
-- Evidence: the trend filter (close vs 200-day / 10-month average) mainly reduces drawdowns; 12-1 month momentum and nearness to the 52-week high have the strongest research support among price signals, yet none is close to 95% reliable. RSI, MACD and Bollinger Bands are descriptive only.
+- Evidence: the trend filter (close vs 200-day / 10-month average) mainly reduces drawdowns; 12-1 month momentum and nearness to the 52-week high have the strongest research support among price signals, yet none is close to 95% reliable. The trailing stop is a risk-control habit, not a proven edge.
+- Exit conditions, as the app defines them: a close below the trailing stop, or a close below the 200-day average. Entry is only considered while the trend check passes.
+- "Chart history" is the chart's lines as text (month-end closes, 200-day average, trailing stop, market index rebased to the stock's price). Use it to describe the trend's direction and duration, recent stop hits and the stock against the market; ignore day-to-day noise.
 - Never promise or predict ("will rise"); speak in terms of risk and conditions.
 - Plain text, no markdown, no asterisks. One point per line. Under 300 words.
 
 Write exactly these sections, each starting on its own line with the label and a colon:
-Overview: one or two lines on where the stock stands.
-Signals: what the four checks say.
+Overview: one or two lines on where the stock stands and how the last year went (from Chart history).
+Signals: what the four checks say, plus the trend's direction and how long it has held.
 News: what the headlines suggest for risk, with citations.
 Risk: volatility, drawdown, beta, any high-volatility or spike caution.
-Levels: only the supplied Close, Stop, SMA200 / 10-month average and 52-week high; when to consider buying, holding or exiting in terms of those levels.
+Levels: only the supplied Close, Trailing stop, SMA200 / 10-month average and 52-week high, with their distance from the close; when to consider buying, holding or exiting in terms of those levels.
 Verdict: the supplied verdict, restated, with one line on what would change it.
 If a question is included, add a last section "Answer:" answering it.`;
 
@@ -59,7 +62,7 @@ function latestAnalysis(symbol) {
   return allStockAnalyses.filter((a) => a.symbol === symbol).at(-1) || null;
 }
 
-// The Analysis tile's red badge: the oldest of the watchlist's latest reads, once over 30 days.
+// The Market tile's red badge: the oldest of the watchlist's latest reads, once over 30 days.
 function updateAnalysisAgeBadge() {
   const today = dateFromIso(isoFromDate(new Date()));
   let oldest = null;
@@ -69,7 +72,7 @@ function updateAnalysisAgeBadge() {
     const days = Math.round((today - dateFromIso(last.date.slice(0, 10))) / 86400000);
     if (oldest === null || days > oldest.days) oldest = { days, symbol: w.symbol, date: last.date };
   });
-  setPageBadge('finance', 'analysis', oldest && oldest.days > ANALYSIS_STALE_DAYS
+  setPageBadge('finance', 'market', oldest && oldest.days > ANALYSIS_STALE_DAYS
     ? { text: `${oldest.days}d`, title: `${oldest.symbol} last analyzed ${oldest.days} days ago (${oldest.date})` }
     : null);
 }
@@ -78,9 +81,9 @@ function initStockAnalysis() {
   if (analysisListenersAttached) return;
   analysisListenersAttached = true;
   analysisRangeSlug = readMarketPref('ledger_analysis_range', '1y');
-  const input = document.getElementById('analysis-symbol');
-  input.addEventListener('change', () => {
-    const symbol = input.value.trim().toUpperCase();
+  const select = document.getElementById('analysis-symbol');
+  select.addEventListener('change', () => {
+    const symbol = select.value;
     if (symbol) {
       analysisSymbol = symbol;
       writeMarketPref('ledger_market_symbol', symbol);
@@ -90,34 +93,27 @@ function initStockAnalysis() {
   document.getElementById('analysis-include-position').addEventListener('change', renderAnalysisPrompt);
   document.getElementById('analysis-question').addEventListener('input', renderAnalysisPrompt);
   document.getElementById('analysis-generate-btn').addEventListener('click', runStockAnalysis);
-  registerPageShow('analysis', () => {
-    analysisSymbol = analysisSymbol || readMarketPref('ledger_market_symbol', null) || allWatchlist[0]?.symbol || null;
+  registerPageShow('market', () => {
+    const saved = analysisSymbol || readMarketPref('ledger_market_symbol', null);
+    analysisSymbol = allWatchlist.some((w) => w.symbol === saved) ? saved : allWatchlist[0]?.symbol || null;
     if (analysisSymbol) loadStockAnalysis();
     else renderAnalysisRange();
   });
 }
 
-// Watchlist and traded symbols, for the picker.
+// The picker lists the watchlist.
 function syncAnalysisSymbolOptions() {
-  const list = document.getElementById('analysis-symbol-options');
-  if (!list) return;
-  list.innerHTML = '';
-  const traded = typeof allTrades !== 'undefined' ? allTrades.map((t) => t.symbol) : [];
-  [...new Set([...allWatchlist.map((w) => w.symbol), ...traded])].forEach((symbol) => {
-    const option = document.createElement('option');
-    option.value = symbol;
-    option.label = allWatchlist.find((w) => w.symbol === symbol)?.name || '';
-    list.appendChild(option);
-  });
-}
-
-// From Market's 🔬: open this page on the stock.
-function openStockAnalysis(symbol) {
-  analysisSymbol = symbol;
-  writeMarketPref('ledger_market_symbol', symbol);
-  const panel = routedPanel('analysis');
-  if (window.ledgerSectionPage && panel) navigateSectionPage(panel);
-  else if (panel) location.href = routeUrl(panel);
+  const select = document.getElementById('analysis-symbol');
+  if (!select) return;
+  select.innerHTML = '';
+  if (!allWatchlist.length) {
+    select.appendChild(new Option('Add stocks on Watch List first', ''));
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  allWatchlist.forEach((w) => select.appendChild(new Option(w.name ? `${w.symbol} — ${w.name}` : w.symbol, w.symbol)));
+  if (analysisSymbol) select.value = analysisSymbol;
 }
 
 function analysisBenchmark(symbol) {
@@ -147,7 +143,7 @@ async function loadStockAnalysis() {
     try {
       news = await getCompanyNews(symbol, 30, { onWait });
     } catch (err) {
-      problems.push(marketErrorText(err));
+      if (!isCanadianSymbol(symbol)) problems.push(marketErrorText(err));
     }
     const currency = daily.currency || symbolCurrency(symbol);
     let equity = investmentEquityCad();
@@ -160,7 +156,7 @@ async function loadStockAnalysis() {
       benchmarkBars: benchmark,
       monthlyBars: monthly,
       riskFreePct: getSetting('MARKET_RISK_FREE_PCT', 0),
-      atrMult: getSetting('MARKET_ATR_MULT', 2.5),
+      atrMult: getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT),
       riskPct: getSetting('MARKET_RISK_PCT', 1),
       equity,
     });
@@ -209,7 +205,8 @@ function renderAnalysisCards() {
   document.getElementById('analysis-stop').textContent = signals.stop !== null ? formatMoney(signals.stop, currency, { mask: false }) : '—';
   const shares = document.getElementById('analysis-shares');
   shares.textContent = signals.shares !== null ? (privacyMode ? maskDigits(String(signals.shares)) : String(signals.shares)) : '—';
-  shares.title = signals.riskAmount !== null ? `Risking ${formatMoney(signals.riskAmount, currency)} if the stop is hit` : 'Needs investment accounts with a Market Value';
+  shares.title = signals.riskAmount !== null ? `Risking ${formatMoney(signals.riskAmount, currency)} if the stop is hit`
+    : signals.stop !== null && signals.close <= signals.stop ? 'Close is at or below the trailing stop' : 'Needs investment accounts with a Market Value';
 }
 
 // One table row: [name (definition), value, rule, read].
@@ -245,14 +242,14 @@ function renderSignalTable() {
 
   signalRow(tbody, 'Volatility 3m', 'Annualized standard deviation of daily log returns, last 63 days', or(s.vol63, fmtPct(s.vol63.value)), 'Risk', undefined);
   signalRow(tbody, 'Volatility 1y', 'Same, last 252 days', or(s.vol252, fmtPct(s.vol252.value)), '3m above 1.25× 1y: size down', undefined);
-  signalRow(tbody, 'ATR14', "Wilder's average true range, 14 days", money(s.atr), 'Sets the stop', undefined);
+  signalRow(tbody, 'ATR14', "Wilder's average true range, 14 days", money(s.atr), 'Sets the stop distance', undefined);
   signalRow(tbody, 'Max drawdown 1y', 'Largest fall from a peak in the last year', or(s.mdd1y, fmtPct(s.mdd1y.value)), 'Risk', undefined);
   signalRow(tbody, 'Sharpe 1y', 'Excess return per unit of volatility, annualized', or(s.sharpe, fmtNum(s.sharpe.value)), 'Risk', undefined);
   signalRow(tbody, 'Sortino 1y', 'Excess return per unit of downside volatility, annualized', or(s.sortino, fmtNum(s.sortino.value)), 'Risk', undefined);
   signalRow(tbody, `Beta vs ${analysisBenchmark(symbol)}`, 'How much the stock moves per 1% market move', or(s.beta, fmtNum(s.beta.value)), 'Risk', undefined, true);
 
-  const k = getSetting('MARKET_ATR_MULT', 2.5);
-  signalRow(tbody, 'Stop', `Close − ${k} × ATR14`, money(s.stop), 'Exit if the close falls below', undefined);
+  const k = getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT);
+  signalRow(tbody, 'Trailing stop', `Highest close of the last 22 days − ${k} × ATR14 (chandelier exit). A risk-control habit for long holds, not a proven edge`, money(s.stop), s.stop !== null && s.close <= s.stop ? 'Close is at or below it: exit signal' : 'Exit if the close falls below', s.stop === null ? undefined : s.close > s.stop ? undefined : false);
   signalRow(tbody, 'Position size', `Shares so a stop-out loses ${getSetting('MARKET_RISK_PCT', 1)}% of your investment accounts`,
     s.shares === null ? null : (privacyMode ? maskDigits(String(s.shares)) : String(s.shares)), s.riskAmount === null ? '' : `Risk ${formatMoney(s.riskAmount, currency)}`, undefined, true);
 
@@ -287,7 +284,9 @@ function renderNews() {
   const { news, symbol } = analysisLoaded;
   if (!news.length) {
     const p = document.createElement('p');
-    p.textContent = getSettingString('FINNHUB_API_KEY', null) ? `No Finnhub headlines for ${symbol} in the last 30 days.` : 'Add a FINNHUB_API_KEY setting to see headlines.';
+    if (!getSettingString('FINNHUB_API_KEY', null)) p.textContent = 'Add a FINNHUB_API_KEY setting to see headlines.';
+    else if (isCanadianSymbol(symbol)) p.textContent = "Finnhub's free plan has no news for TSX stocks.";
+    else p.textContent = `No Finnhub headlines for ${symbol} in the last 30 days.`;
     box.appendChild(p);
     return;
   }
@@ -304,28 +303,59 @@ function renderNews() {
 }
 
 function renderAnalysisRange() {
-  renderRangeButtons('analysis-range', PORTFOLIO_RANGES, analysisRangeSlug, (slug) => {
+  const canadian = analysisSymbol && isCanadianSymbol(analysisSymbol);
+  renderRangeButtons('analysis-range', MARKET_RANGES, analysisRangeSlug, (slug) => {
     analysisRangeSlug = slug;
     writeMarketPref('ledger_analysis_range', slug);
     drawAnalysisChart();
-  });
+  }, canadian ? new Set(['1d']) : new Set());
+}
+
+// 1d/1w: Twelve Data intraday, close only (the other lines are daily).
+async function drawIntradayAnalysisChart(range) {
+  const { currency, symbol } = analysisLoaded;
+  const token = ++analysisChartToken;
+  try {
+    const result = await getIntradayBars(symbol, range.intraday);
+    let bars = result.bars;
+    if (range.slug === '1d' && bars.length) {
+      const lastDay = bars.at(-1).d.slice(0, 10);
+      bars = bars.filter((b) => b.d.startsWith(lastDay));
+    }
+    if (token !== analysisChartToken) return;
+    const series = [
+      { label: `${symbol} (close)`, data: bars.map((b) => b.c), color: chartColor('--chart-blue'), order: 1 },
+    ];
+    const draw = () => {
+      analysisChart = marketLineChart(analysisChart, 'analysis-chart', bars.map((b) => b.d),
+        series.map((s) => ({ ...s, hidden: analysisHiddenSeries.has(s.label) })), { money: result.currency || currency, intraday: true });
+      renderSeriesLegend('analysis-legend', series, analysisHiddenSeries, draw);
+    };
+    draw();
+  } catch (err) {
+    if (token === analysisChartToken) setMarketStatus('analysis-status', marketErrorText(err));
+  }
 }
 
 // Overlays come from the daily bars only; older month-end bars (TSX) show the close alone.
 function drawAnalysisChart() {
   renderAnalysisRange();
   if (!analysisLoaded) return;
-  const { bars, monthly, currency, signals, symbol, benchmark } = analysisLoaded;
-  document.getElementById('analysis-chart-title').textContent = symbol;
-  const range = marketRange(analysisRangeSlug);
+  const { bars, monthly, currency, symbol, benchmark } = analysisLoaded;
+  const entry = allWatchlist.find((w) => w.symbol === symbol);
+  document.getElementById('analysis-chart-title').textContent = entry?.name ? `${symbol} — ${entry.name}` : symbol;
+  let range = marketRange(analysisRangeSlug);
+  if (range.slug === '1d' && isCanadianSymbol(symbol)) range = marketRange('1w');
+  if (range.intraday && !isCanadianSymbol(symbol)) {
+    drawIntradayAnalysisChart(range);
+    return;
+  }
+  ++analysisChartToken;
   const shown = barsForRange(bars, monthly, range);
   const closes = bars.map((b) => b.c);
   const byDate = (series) => new Map(bars.map((b, i) => [b.d, series[i]]));
   const sma200 = byDate(smaSeries(closes, 200));
-  const sma50 = byDate(smaSeries(closes, 50));
-  const bb = bollingerSeries(closes, 20, 2);
-  const upper = byDate(bb.upper);
-  const lower = byDate(bb.lower);
+  const stops = byDate(trailingStopSeries(bars, getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)));
   const high52 = byDate(bars.map((_, i) => (i >= 251 ? Math.max(...bars.slice(i - 251, i + 1).map((b) => b.h)) : null)));
   const pick = (map) => shown.map((b) => map.get(b.d) ?? null);
   const benchByDate = new Map((benchmark || []).map((b) => [b.d, b.c]));
@@ -336,11 +366,8 @@ function drawAnalysisChart() {
     { label: `${symbol} (close)`, data: shown.map((b) => b.c), color: chartColor('--chart-blue'), order: 1 },
     { label: 'SMA200 (200-day average close)', data: pick(sma200), color: targetMarkColor() },
     { label: '52-week high (highest high, 252 days)', data: pick(high52), color: chartColor('--chart-good'), dash: true },
-    { label: `Stop (close − ${getSetting('MARKET_ATR_MULT', 2.5)} × ATR14)`, data: shown.map(() => signals.stop), color: chartColor('--chart-bad'), dash: true },
-    { label: 'SMA50 (50-day average close)', data: pick(sma50), color: chartColor('--chart-neutral'), dash: true },
-    { label: 'Bollinger upper (SMA20 + 2σ)', data: pick(upper), color: chartColor('--chart-neutral', 0.6), width: 1 },
-    { label: 'Bollinger lower (SMA20 − 2σ)', data: pick(lower), color: chartColor('--chart-neutral', 0.6), width: 1 },
-    { label: 'Benchmark (rebased to the first close)', data: rebased, color: chartColor('--chart-purple') },
+    { label: `Trailing stop (highest close of 22 days − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14)`, data: pick(stops), color: chartColor('--chart-bad'), dash: true },
+    { label: `${analysisBenchmark(symbol)} (market, rebased to the first close)`, data: rebased, color: chartColor('--chart-purple') },
   ];
   const draw = () => {
     analysisChart = marketLineChart(analysisChart, 'analysis-chart', shown.map((b) => b.d),
@@ -351,6 +378,65 @@ function drawAnalysisChart() {
 }
 
 // --- AI ---------------------------------------------------------------------
+
+// The chart's lines as text, so the AI reads what the chart shows.
+function analysisChartHistory() {
+  const { symbol, bars, benchmark } = analysisLoaded;
+  const k = getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT);
+  const closes = bars.map((b) => b.c);
+  const sma = smaSeries(closes, 200);
+  const stops = trailingStopSeries(bars, k);
+  const t = bars.length - 1;
+  const pct = (v) => (Number.isFinite(v) ? `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%` : 'n/a');
+  const n = (v) => (Number.isFinite(v) ? v.toFixed(2) : 'n/a');
+  const benchName = analysisBenchmark(symbol);
+  const lines = ['Chart history:'];
+
+  if (sma[t] !== null) {
+    const monthAgo = t >= 21 ? sma[t - 21] : null;
+    lines.push(`Close vs SMA200: ${pct(closes[t] / sma[t] - 1)}; SMA200 ${monthAgo !== null ? (sma[t] > monthAgo ? 'rising' : 'falling') : 'n/a'} over the last month (${n(monthAgo)} -> ${n(sma[t])})`);
+    let i = t;
+    const above = closes[t] > sma[t];
+    while (i > 0 && sma[i - 1] !== null && (closes[i - 1] > sma[i - 1]) === above) i--;
+    lines.push(sma[i - 1] === null || i === 0
+      ? `Close has been ${above ? 'above' : 'below'} SMA200 for all ${t - i + 1} days it can be computed`
+      : `Close crossed ${above ? 'above' : 'below'} SMA200 on ${bars[i].d.slice(0, 10)}, ${t - i} trading days ago`);
+  } else {
+    lines.push('SMA200: n/a (needs 200 daily closes)');
+  }
+
+  if (stops[t] !== null) {
+    lines.push(`Close vs trailing stop: ${pct(closes[t] / stops[t] - 1)}`);
+    const hits = [];
+    for (let i = Math.max(1, t - 251); i <= t; i++) {
+      if (stops[i] !== null && stops[i - 1] !== null && closes[i] < stops[i] && closes[i - 1] >= stops[i - 1]) hits.push(bars[i].d.slice(0, 10));
+    }
+    lines.push(`Closes below the trailing stop in the last year: ${hits.length ? `${hits.length} (latest ${hits.at(-1)})` : 'none'}`);
+  }
+
+  const benchByDate = new Map((benchmark || []).map((b) => [b.d, b.c]));
+  const back = (days) => (t >= days ? bars[t - days] : null);
+  const perf = [63, 126, 252].map((days) => {
+    const then = back(days);
+    if (!then) return null;
+    const stock = closes[t] / then.c - 1;
+    const b0 = benchByDate.get(then.d);
+    const b1 = benchByDate.get(bars[t].d);
+    return `${days === 63 ? '3m' : days === 126 ? '6m' : '12m'} ${pct(stock)} vs ${benchName} ${b0 && b1 ? pct(b1 / b0 - 1) : 'n/a'}`;
+  }).filter(Boolean);
+  if (perf.length) lines.push(`Return: ${perf.join('; ')}`);
+
+  // Month-ends of the last year: the chart's shape.
+  const monthEnds = bars.map((b, i) => i).filter((i) => i === t || bars[i + 1].d.slice(0, 7) !== bars[i].d.slice(0, 7)).slice(-13);
+  const firstBench = benchByDate.get(bars[monthEnds[0]].d);
+  lines.push(`Month-ends (date | close | SMA200 | trailing stop | ${benchName} rebased to the first close):`);
+  monthEnds.forEach((i) => {
+    const b = benchByDate.get(bars[i].d);
+    const rebased = firstBench && b ? (b / firstBench) * closes[monthEnds[0]] : null;
+    lines.push(`${bars[i].d.slice(0, 10)} | ${n(closes[i])} | ${n(sma[i])} | ${n(stops[i])} | ${n(rebased)}`);
+  });
+  return lines;
+}
 
 function analysisUserMessage() {
   const { symbol, signals: s, currency, bars, news } = analysisLoaded;
@@ -374,8 +460,10 @@ function analysisUserMessage() {
     `5-day move: ${s.spike === null ? 'n/a' : s.spike ? 'spike (above 2 sigma)' : 'normal'}`,
     '',
     'Levels:',
-    `Close: ${money(s.close)}; Stop: ${money(s.stop)}; 52-week high: ${s.high52.value === null ? 'n/a' : money(s.close / s.high52.value)}`,
+    `Close: ${money(s.close)}; Trailing stop (highest close of 22 days − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14): ${money(s.stop)}; 52-week high: ${s.high52.value === null ? 'n/a' : money(s.close / s.high52.value)}`,
     `Last 5 closes: ${bars.slice(-5).map((b) => `${b.d.slice(0, 10)} ${b.c.toFixed(2)}`).join(', ')}`,
+    '',
+    ...analysisChartHistory(),
   ];
   if (document.getElementById('analysis-include-position').checked) {
     const held = [...currentHoldings().values()].filter((h) => h.symbol === symbol && h.shares > 0);
@@ -421,10 +509,8 @@ function renderSavedAnalysis() {
 }
 
 // A price in Levels that isn't one of the supplied figures (±0.5%) gets flagged.
-function auditAnalysisLevels(text) {
-  const { signals: s, bars } = analysisLoaded;
-  const known = [s.close, s.stop, s.trend.sma, s.high52.value ? s.close / s.high52.value : null, ...bars.slice(-5).map((b) => b.c)]
-    .filter((v) => Number.isFinite(v));
+function auditAnalysisLevels(text, message) {
+  const known = (message.match(/\d+\.\d{2}/g) || []).map(Number);
   const levels = text.split('\n').find((l) => l.trim().startsWith('Levels:')) || '';
   const odd = (levels.match(/\d+\.\d{2}/g) || []).map(Number).filter((v) => !known.some((k) => Math.abs(v - k) <= k * 0.005));
   return odd;
@@ -438,10 +524,11 @@ async function runStockAnalysis() {
   btn.textContent = '🤖…';
   clearFieldError('analysis-form-error');
   try {
-    const text = await aiChatText(MARKET_ANALYSIS_SYSTEM_PROMPT, analysisUserMessage(), 0.2);
+    const message = analysisUserMessage();
+    const text = await aiChatText(MARKET_ANALYSIS_SYSTEM_PROMPT, message, 0.2);
     const stamp = localTimestamp(new Date());
     renderAnalysisReport(text, stamp);
-    const odd = auditAnalysisLevels(text);
+    const odd = auditAnalysisLevels(text, message);
     if (odd.length) showFieldError('analysis-form-error', `Levels mentions ${odd.join(', ')}, which isn't in the data sent — check it.`);
     try {
       await ensureSheetTab(CONFIG.SHEETS.STOCK_ANALYSIS, ANALYSIS_HEADERS);

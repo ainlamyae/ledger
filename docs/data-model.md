@@ -166,6 +166,7 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 ## `Watchlist` (created by the app)
 
 - Columns A–E: Symbol, Name, Exchange, Currency, Notes. Symbol is `AAPL`, `SHOP.TO` (TSX) or `XYZ.V` (TSXV).
+- Listed on the Watch List page; its rows are also Market's stock picker.
 
 ## `Trade` (created by the app)
 
@@ -174,7 +175,7 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 
 ## `Analysis` (created by the app)
 
-- Columns A–G: Date, Symbol, Verdict, Score, Close, Stop, Report. Append-only; the newest row per Symbol is the one shown.
+- Columns A–G: Date, Symbol, Verdict, Score, Close, Stop (the trailing stop), Report. Append-only; the newest row per Symbol is the one shown.
 
 ## `Setting` (optional, user-managed)
 

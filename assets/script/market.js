@@ -1,5 +1,5 @@
-// Market: the Watchlist tab, each stock's latest moves, and one price chart with
-// 1d…All ranges. Prices load when this page opens (registerPageShow), not with Finance.
+// Watch List page: the Watchlist tab and each stock's latest moves. Prices load
+// when this page opens (registerPageShow), not with Finance; a row opens Market.
 
 const WATCHLIST_HEADERS = ['Symbol', 'Name', 'Exchange', 'Currency', 'Notes'];
 const WATCHLIST_RANGE = () => `'${CONFIG.SHEETS.WATCHLIST}'!A2:E`;
@@ -10,10 +10,7 @@ let editingWatchlistRow = null;
 let watchlistListenersAttached = false;
 let watchlistSort = { key: null, dir: 1 };
 let editWatchlist = null;
-let marketPriceChart = null;
 const marketBars = new Map(); // symbol -> daily result from getDailyBars
-let marketSymbol = null;
-let marketRangeSlug = '1y';
 
 function readMarketPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
@@ -24,20 +21,18 @@ function writeMarketPref(key, value) {
 }
 
 async function initWatchlist(forceRefresh = false) {
-  marketRangeSlug = readMarketPref('ledger_market_range', '1y');
-  marketSymbol = readMarketPref('ledger_market_symbol', null);
   await refreshWatchlist();
 
   if (watchlistListenersAttached) return;
   watchlistListenersAttached = true;
   document.getElementById('add-watchlist-btn').addEventListener('click', () => openWatchlistForm());
-  editWatchlist = routedRowEdit('market', () => allWatchlist, (w) => w.symbol, openWatchlistForm);
+  editWatchlist = routedRowEdit('watchlist', () => allWatchlist, (w) => w.symbol, openWatchlistForm);
   document.getElementById('watchlist-cancel-btn').addEventListener('click', closeWatchlistForm);
   onFormSubmit('watchlist-form', submitWatchlistForm);
   makeSortableHeaders('#watchlist-table', watchlistSort, renderWatchlist);
   document.getElementById('watchlist-symbol').addEventListener('input', debounceSymbolSearch);
   document.getElementById('watchlist-symbol').addEventListener('change', fillWatchlistFromSearch);
-  registerPageShow('market', loadMarketPrices);
+  registerPageShow('watchlist', loadWatchlistPrices);
 }
 
 async function refreshWatchlist() {
@@ -55,7 +50,6 @@ async function refreshWatchlist() {
       notes: row[4] || '',
     })).filter((w) => w.symbol);
   }
-  if (!marketSymbol || !allWatchlist.some((w) => w.symbol === marketSymbol)) marketSymbol = allWatchlist[0]?.symbol || null;
   renderWatchlist();
   syncAnalysisSymbolOptions();
 }
@@ -75,12 +69,7 @@ function renderWatchlist() {
   }
   sortedWatchlist().forEach((w) => {
     const tr = document.createElement('tr');
-    tr.classList.toggle('today-row', w.symbol === marketSymbol);
-    tr.title = `Show ${w.symbol} on the chart`;
-    tr.addEventListener('click', (event) => {
-      if (event.target.closest('button')) return;
-      selectMarketSymbol(w.symbol);
-    });
+    tr.classList.toggle('today-row', w.symbol === analysisSymbol);
     const bars = marketBars.get(w.symbol)?.bars || [];
     const close = makeCell(bars.length ? formatMoney(bars.at(-1).c, w.currency, { mask: false }) : '—');
     close.classList.add('num');
@@ -93,7 +82,7 @@ function renderWatchlist() {
     const actions = document.createElement('td');
     actions.className = 'workout-actions-cell';
     actions.append(
-      makeRowActionButton({ emoji: '🔬', title: 'Analyze', onClick: () => openStockAnalysis(w.symbol) }),
+      makeRowActionButton({ emoji: '🔬', title: 'Open on Market', onClick: () => selectMarketSymbol(w.symbol) }),
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editWatchlist(w) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteWatchlistEntry(w) }),
     );
@@ -102,26 +91,22 @@ function renderWatchlist() {
   });
 }
 
+// 🔬: open Market on that stock.
 function selectMarketSymbol(symbol) {
-  marketSymbol = symbol;
+  analysisSymbol = symbol;
   writeMarketPref('ledger_market_symbol', symbol);
-  renderWatchlist();
-  drawMarketChart();
+  const panel = routedPanel('market');
+  if (window.ledgerSectionPage && panel) navigateSectionPage(panel);
+  else if (panel) location.href = routeUrl(panel);
 }
 
-// The page opened: every watchlist symbol's daily bars (cache first), then the chart.
-async function loadMarketPrices() {
-  if (!allWatchlist.length) {
-    setMarketStatus('market-status', '');
-    renderMarketRangeButtons();
-    return;
-  }
-  drawMarketChart();
+// Close and changes for each watchlist row (cache first).
+async function loadWatchlistPrices() {
   const problems = [];
   for (const [i, w] of allWatchlist.entries()) {
     try {
       const result = await getDailyBars(w.symbol, {
-        onWait: (s, name) => setMarketStatus('market-status', `Waiting for ${name}'s per-minute limit (${s} s)… ${i + 1}/${allWatchlist.length}`),
+        onWait: (s, name) => setMarketStatus('watchlist-status', `Waiting for ${name}'s per-minute limit (${s} s)… ${i + 1}/${allWatchlist.length}`),
       });
       marketBars.set(w.symbol, result);
       if (result.error) problems.push(marketErrorText(result.error));
@@ -129,65 +114,8 @@ async function loadMarketPrices() {
       problems.push(marketErrorText(err));
     }
     renderWatchlist();
-    if (w.symbol === marketSymbol) drawMarketChart();
   }
-  setMarketStatus('market-status', [...new Set(problems)].join(' '));
-}
-
-function renderMarketRangeButtons() {
-  const canadian = marketSymbol && isCanadianSymbol(marketSymbol);
-  renderRangeButtons('market-range', MARKET_RANGES, marketRangeSlug, (slug) => {
-    marketRangeSlug = slug;
-    writeMarketPref('ledger_market_range', slug);
-    drawMarketChart();
-  }, canadian ? new Set(['1d']) : new Set());
-}
-
-async function drawMarketChart() {
-  renderMarketRangeButtons();
-  const title = document.getElementById('market-chart-title');
-  if (!marketSymbol) {
-    title.textContent = 'Price';
-    return;
-  }
-  const entry = allWatchlist.find((w) => w.symbol === marketSymbol);
-  title.textContent = entry?.name ? `${marketSymbol} — ${entry.name}` : marketSymbol;
-  const range = marketRange(marketRangeSlug);
-  const symbol = marketSymbol;
-  try {
-    let bars;
-    let currency = entry?.currency || symbolCurrency(symbol);
-    if (range.intraday && !isCanadianSymbol(symbol)) {
-      const result = await getIntradayBars(symbol, range.intraday);
-      bars = result.bars;
-      if (range.slug === '1d' && bars.length) {
-        const lastDay = bars.at(-1).d.slice(0, 10);
-        bars = bars.filter((b) => b.d.startsWith(lastDay));
-      }
-      currency = result.currency || currency;
-    } else {
-      const daily = marketBars.get(symbol) || await getDailyBars(symbol);
-      marketBars.set(symbol, daily);
-      const monthly = daily.partial && ['2y', '5y', '10y', 'all'].includes(range.slug) ? await getMonthlyBars(symbol).catch(() => null) : null;
-      bars = barsForRange(daily.bars, monthly, range);
-      if (daily.partial && rangeStartDate(range) && daily.bars[0]?.d > rangeStartDate(range) && !monthly) {
-        setMarketStatus('market-status', `${symbol}: Alpha Vantage's free plan gives the last ~100 trading days; older days build up as you come back.`);
-      }
-    }
-    if (symbol !== marketSymbol) return;
-    const change = bars.length > 1 ? bars.at(-1).c / bars[0].c - 1 : null;
-    const token = change !== null && change < 0 ? '--chart-bad' : '--chart-good';
-    const color = chartColor(token);
-    marketPriceChart = marketLineChart(marketPriceChart, 'market-price-chart', bars.map((b) => b.d), [{
-      label: `${symbol} (close)`,
-      data: bars.map((b) => b.c),
-      color,
-      fill: true,
-      fillColor: chartColor(token, 0.1),
-    }], { money: currency, intraday: !!range.intraday && !isCanadianSymbol(symbol) });
-  } catch (err) {
-    setMarketStatus('market-status', marketErrorText(err));
-  }
+  setMarketStatus('watchlist-status', [...new Set(problems)].join(' '));
 }
 
 // --- Watchlist form ---------------------------------------------------------
@@ -217,7 +145,7 @@ function debounceSymbolSearch() {
 }
 
 function fillWatchlistFromSearch() {
-  const symbol = document.getElementById('watchlist-symbol').value.trim().toUpperCase();
+  const symbol = normalizeSymbol(document.getElementById('watchlist-symbol').value);
   const hit = lastSymbolResults.find((r) => r.symbol === symbol);
   document.getElementById('watchlist-currency').value = hit?.currency === 'CAD' || isCanadianSymbol(symbol) ? 'CAD' : 'USD';
   if (!hit) return;
@@ -244,9 +172,9 @@ function closeWatchlistForm() {
 }
 
 async function submitWatchlistForm() {
-  const symbol = document.getElementById('watchlist-symbol').value.trim().toUpperCase();
+  const symbol = normalizeSymbol(document.getElementById('watchlist-symbol').value);
   if (!/^[A-Z0-9.\-^=/]{1,15}$/.test(symbol)) {
-    showFieldError('watchlist-form-error', 'Enter a symbol, e.g. AAPL or SHOP.TO.');
+    showFieldError('watchlist-form-error', 'Enter a symbol, e.g. AAPL, SHOP.TO or TSE: AC.');
     return;
   }
   if (allWatchlist.some((w) => w.symbol === symbol && w.row !== editingWatchlistRow)) {
@@ -272,8 +200,7 @@ async function submitWatchlistForm() {
       stayOnSavedForm('watchlist-modal', { slug: routeSlug(saved.symbol), label: saved.symbol });
     }
     showFormSaved('watchlist-form-error');
-    if (!editingRow) selectMarketSymbol(symbol);
-    loadMarketPrices();
+    loadWatchlistPrices();
   } catch (err) {
     showFieldError('watchlist-form-error', err.message);
   }
@@ -286,11 +213,9 @@ async function deleteWatchlistEntry(entry) {
       deleteDimension: { range: { sheetId: watchlistSheetId, dimension: 'ROWS', startIndex: entry.row - 1, endIndex: entry.row } },
     }]);
     await refreshWatchlist();
-    drawMarketChart();
     showUndoToast(`${entry.symbol} removed.`, async () => {
       await appendValues(WATCHLIST_RANGE(), [[entry.symbol, entry.name, entry.exchange, entry.currency, entry.notes]], 'RAW');
       await refreshWatchlist();
-      drawMarketChart();
     });
   }, "Couldn't remove the stock");
 }

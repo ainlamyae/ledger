@@ -1576,22 +1576,14 @@
             <div class="pagination" id="breakdown-pagination"></div>
         </div>
 
-        <!-- Watchlist prices (market.js; market-data.js loads them when this page opens). -->
-        <div class="panel" id="market-panel" data-route="market">
+        <!-- Watchlist stocks and their latest moves (market.js); prices load when this page opens. -->
+        <div class="panel" id="watchlist-panel" data-route="watchlist">
             <div class="panel-header">
-                <h2>Market</h2>
+                <h2>Watch List</h2>
                 <button id="add-watchlist-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a stock to the watchlist" aria-label="Add">➕</button>
             </div>
 
-            <p class="hint" id="market-status"></p>
-
-            <div class="panel-section card">
-                <h3 id="market-chart-title">Price</h3>
-                <div class="pagination" id="market-range"></div>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="market-price-chart"></canvas>
-                </div>
-            </div>
+            <p class="hint" id="watchlist-status"></p>
 
             <div class="table-responsive">
                 <table id="watchlist-table" class="table-compact">
@@ -1609,6 +1601,89 @@
                     <tbody id="watchlist-body"></tbody>
                 </table>
             </div>
+        </div>
+
+        <!-- One stock's chart, rule-based signals, news and AI read (stock-analysis.js, market-math.js). -->
+        <div class="panel" id="stock-analysis-panel" data-route="market">
+            <div class="panel-header">
+                <h2>Market</h2>
+            </div>
+
+            <div class="filters">
+                <select id="analysis-symbol" aria-label="Stock"></select>
+            </div>
+
+            <p class="hint" id="analysis-status"></p>
+
+            <div class="cards">
+                <div class="card"><h3>Verdict</h3><div class="value" id="analysis-verdict">—</div></div>
+                <div class="card"><h3>Close</h3><div class="value" id="analysis-close">—</div></div>
+                <div class="card"><h3 title="Trailing stop: highest close of the last 22 days minus MARKET_ATR_MULT × ATR14">Stop</h3><div class="value" id="analysis-stop">—</div></div>
+                <div class="card"><h3 title="Shares so a stop-out loses MARKET_RISK_PCT of your investment accounts">Position Size</h3><div class="value" id="analysis-shares">—</div></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3 id="analysis-chart-title">Chart</h3>
+                <div class="pagination" id="analysis-range"></div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="analysis-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="analysis-legend"></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Signals</h3>
+                <div class="table-responsive">
+                    <table id="market-signal-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Signal</th>
+                            <th class="num">Value</th>
+                            <th>Rule</th>
+                            <th>Read</th>
+                        </tr>
+                        </thead>
+                        <tbody id="market-signal-body"></tbody>
+                    </table>
+                </div>
+                <details id="analysis-descriptive-details">
+                    <summary>Descriptive (weak evidence)</summary>
+                    <div class="table-responsive">
+                        <table id="analysis-descriptive-table" class="table-compact">
+                            <tbody id="analysis-descriptive-body"></tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+
+            <div class="panel-section card">
+                <h3>News</h3>
+                <div id="analysis-news" class="insight-data-preview"></div>
+            </div>
+
+            <label class="insight-question-label" for="analysis-question">Ask a question (optional)
+                <textarea id="analysis-question" rows="3" placeholder="e.g. Is now a good entry, or should I wait for a pullback?"></textarea>
+            </label>
+            <label class="checkbox-inline-label">
+                <input type="checkbox" id="analysis-include-position">
+                Include my position (shares and average cost)
+            </label>
+
+            <details id="analysis-prompt-details" hidden>
+                <summary>Prompt template</summary>
+                <div class="table-responsive">
+                    <pre id="analysis-prompt-template"></pre>
+                </div>
+            </details>
+
+            <div class="panel-actions" data-page-actions>
+                <button type="button" id="analysis-generate-btn" class="btn btn-icon" disabled title="Send to AI (pick a stock first)" aria-label="Send to AI">🤖</button>
+                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
+            </div>
+
+            <p id="analysis-generated-at" class="hint" hidden></p>
+            <div id="analysis-body" class="insight-body"></div>
+            <p id="analysis-form-error" class="status" hidden></p>
         </div>
 
         <!-- Buy/sell log at average cost (portfolio.js, portfolio-math.js). -->
@@ -1710,90 +1785,6 @@
             </div>
 
             <p class="hint">Average cost (ACB) per account and symbol, fees included; CAD figures use each trade's own FX rate. The superficial-loss rule isn't applied.</p>
-        </div>
-
-        <!-- One stock's rule-based signals, news and AI read (stock-analysis.js, market-math.js). -->
-        <div class="panel" id="stock-analysis-panel" data-route="analysis">
-            <div class="panel-header">
-                <h2>Analysis</h2>
-            </div>
-
-            <div class="filters">
-                <input type="text" id="analysis-symbol" list="analysis-symbol-options" placeholder="Symbol, e.g. AAPL or SHOP.TO" aria-label="Symbol" autocomplete="off">
-                <datalist id="analysis-symbol-options"></datalist>
-            </div>
-
-            <p class="hint" id="analysis-status"></p>
-
-            <div class="cards">
-                <div class="card"><h3>Verdict</h3><div class="value" id="analysis-verdict">—</div></div>
-                <div class="card"><h3>Close</h3><div class="value" id="analysis-close">—</div></div>
-                <div class="card"><h3 title="Close minus MARKET_ATR_MULT × ATR14">Stop</h3><div class="value" id="analysis-stop">—</div></div>
-                <div class="card"><h3 title="Shares so a stop-out loses MARKET_RISK_PCT of your investment accounts">Position Size</h3><div class="value" id="analysis-shares">—</div></div>
-            </div>
-
-            <div class="panel-section card">
-                <h3 id="analysis-chart-title">Chart</h3>
-                <div class="pagination" id="analysis-range"></div>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="analysis-chart"></canvas>
-                </div>
-                <div class="donut-legend" id="analysis-legend"></div>
-            </div>
-
-            <div class="panel-section card">
-                <h3>Signals</h3>
-                <div class="table-responsive">
-                    <table id="market-signal-table" class="table-compact">
-                        <thead>
-                        <tr>
-                            <th>Signal</th>
-                            <th class="num">Value</th>
-                            <th>Rule</th>
-                            <th>Read</th>
-                        </tr>
-                        </thead>
-                        <tbody id="market-signal-body"></tbody>
-                    </table>
-                </div>
-                <details id="analysis-descriptive-details">
-                    <summary>Descriptive (weak evidence)</summary>
-                    <div class="table-responsive">
-                        <table id="analysis-descriptive-table" class="table-compact">
-                            <tbody id="analysis-descriptive-body"></tbody>
-                        </table>
-                    </div>
-                </details>
-            </div>
-
-            <div class="panel-section card">
-                <h3>News</h3>
-                <div id="analysis-news" class="insight-data-preview"></div>
-            </div>
-
-            <label class="insight-question-label" for="analysis-question">Ask a question (optional)
-                <textarea id="analysis-question" rows="3" placeholder="e.g. Is now a good entry, or should I wait for a pullback?"></textarea>
-            </label>
-            <label class="checkbox-inline-label">
-                <input type="checkbox" id="analysis-include-position">
-                Include my position (shares and average cost)
-            </label>
-
-            <details id="analysis-prompt-details" hidden>
-                <summary>Prompt template</summary>
-                <div class="table-responsive">
-                    <pre id="analysis-prompt-template"></pre>
-                </div>
-            </details>
-
-            <div class="panel-actions" data-page-actions>
-                <button type="button" id="analysis-generate-btn" class="btn btn-icon" disabled title="Send to AI (pick a stock first)" aria-label="Send to AI">🤖</button>
-                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
-            </div>
-
-            <p id="analysis-generated-at" class="hint" hidden></p>
-            <div id="analysis-body" class="insight-body"></div>
-            <p id="analysis-form-error" class="status" hidden></p>
         </div>
 
         <div class="panel" id="financial-insight-panel" data-route="insight">

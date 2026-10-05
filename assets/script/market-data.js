@@ -4,7 +4,7 @@
 
 const MARKET_PROVIDERS = {
   td: { name: 'Twelve Data', keySetting: 'TWELVE_DATA_API_KEY', perMinute: 8, perDay: 800 },
-  av: { name: 'Alpha Vantage', keySetting: 'ALPHA_VANTAGE_API_KEY', perMinute: 5, perDay: 25 },
+  av: { name: 'Alpha Vantage', keySetting: 'ALPHA_VANTAGE_API_KEY', perMinute: 5, perDay: 25, minGapMs: 1500 },
   fh: { name: 'Finnhub', keySetting: 'FINNHUB_API_KEY', perMinute: 50, perDay: Infinity },
 };
 const MARKET_DB_NAME = 'ledger-market';
@@ -22,6 +22,17 @@ class MarketDataError extends Error {
 }
 
 // --- Symbols ----------------------------------------------------------------
+
+// Accepts Google-style "TSE: AC" / "TSXV:XYZ" / "NASDAQ:AAPL" too.
+function normalizeSymbol(input) {
+  const text = String(input || '').trim().toUpperCase().replace(/\s+/g, '');
+  const match = text.match(/^([A-Z]+):(.+)$/);
+  if (!match) return text;
+  const [, exchange, ticker] = match;
+  if (['TSE', 'TSX'].includes(exchange)) return `${ticker}.TO`;
+  if (['TSXV', 'CVE'].includes(exchange)) return `${ticker}.V`;
+  return ticker;
+}
 
 function isCanadianSymbol(symbol) {
   return /\.(TO|V)$/i.test(symbol);
@@ -136,7 +147,12 @@ async function takeMarketSlot(provider, onWait) {
     const now = Date.now();
     const stamps = marketMinuteStamps[provider].filter((t) => now - t < 60000);
     marketMinuteStamps[provider] = stamps;
-    if (stamps.length < limits.perMinute) break;
+    const gapMs = limits.minGapMs && stamps.length ? limits.minGapMs - (now - stamps.at(-1)) : 0;
+    if (stamps.length < limits.perMinute && gapMs <= 0) break;
+    if (stamps.length < limits.perMinute) {
+      await new Promise((resolve) => setTimeout(resolve, gapMs));
+      continue;
+    }
     const waitMs = 60000 - (now - stamps[0]) + 250;
     onWait?.(Math.ceil(waitMs / 1000), limits.name);
     await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 1000)));
@@ -213,7 +229,10 @@ function checkAlphaVantage(body, symbol) {
   if (body?.['Error Message']) throw new MarketDataError('not-found', 'av', `${symbol}: not found on Alpha Vantage.`);
   const info = body?.Information || body?.Note;
   if (info) {
-    if (/rate limit|per day|requests per/i.test(info) && !/premium/i.test(info)) {
+    if (/per second|more sparingly/i.test(info)) {
+      throw new MarketDataError('rate-minute', 'av', 'Alpha Vantage allows 1 request per second; reload in a moment.');
+    }
+    if (/requests per day|daily rate limit/i.test(info)) {
       markDayExhausted('av');
       throw new MarketDataError('rate-day', 'av', "Alpha Vantage's 25 calls for today are used up; resets 00:00 UTC.");
     }
@@ -377,6 +396,7 @@ const marketNewsCache = new Map();
 // Finnhub headlines, newest first: [{ date, source, headline, url }].
 async function getCompanyNews(symbol, days = 30, { onWait } = {}) {
   symbol = symbol.trim().toUpperCase();
+  if (isCanadianSymbol(symbol)) throw new MarketDataError('unsupported', 'fh', "Finnhub's free plan has no news for TSX stocks.");
   const cacheKey = `${symbol}:${days}`;
   const hit = marketNewsCache.get(cacheKey);
   if (hit && Date.now() - hit.at < 60 * 60 * 1000) return hit.items;
@@ -384,7 +404,7 @@ async function getCompanyNews(symbol, days = 30, { onWait } = {}) {
   const from = localIso(new Date(Date.now() - days * 86400000));
   const params = new URLSearchParams({ symbol, from, to, token: marketKey('fh') });
   const body = await marketFetch('fh', `https://finnhub.io/api/v1/company-news?${params}`, onWait);
-  if (!Array.isArray(body)) throw new MarketDataError('unsupported', 'fh', body?.error || `No Finnhub news for ${symbol}.`);
+  if (!Array.isArray(body)) throw new MarketDataError('unsupported', 'fh', body?.error ? `Finnhub: ${body.error}` : `No Finnhub news for ${symbol}.`);
   const items = body
     .map((n) => ({ date: localIso(new Date(n.datetime * 1000)), source: n.source, headline: n.headline, url: n.url }))
     .sort((a, b) => b.date.localeCompare(a.date));

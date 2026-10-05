@@ -95,6 +95,20 @@ function atrSeries(bars, n = 14) {
   return out;
 }
 
+// 4 ATRs suits holds of weeks to months; 2.5 stopped out QQQ 15 times in a year.
+const MARKET_ATR_MULT_DEFAULT = 4;
+
+// Trailing stop: highest close of the last `lookback` days − k × ATR14 (chandelier exit).
+function trailingStopSeries(bars, k = MARKET_ATR_MULT_DEFAULT, lookback = 22) {
+  const atrs = atrSeries(bars, 14);
+  return bars.map((_, i) => {
+    if (atrs[i] === null || i < lookback - 1) return null;
+    let high = -Infinity;
+    for (let j = i - lookback + 1; j <= i; j++) high = Math.max(high, bars[j].c);
+    return high - k * atrs[i];
+  });
+}
+
 // Population sigma, as Bollinger defined it.
 function bollingerSeries(closes, n = 20, k = 2) {
   const mid = smaSeries(closes, n);
@@ -239,7 +253,7 @@ function mmMomentum(bars, monthlyBars) {
   return monthly.value !== null ? monthly : daily;
 }
 
-function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atrMult = 2.5, riskPct = 1, equity }) {
+function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atrMult = MARKET_ATR_MULT_DEFAULT, riskPct = 1, equity }) {
   const closes = bars.map((b) => b.c);
   const trend = trendFilter(bars, monthlyBars);
   const momentum = mmMomentum(bars, monthlyBars);
@@ -253,7 +267,9 @@ function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atr
   const atrs = atrSeries(bars, 14);
   const atr = atrs.length ? atrs[atrs.length - 1] : null;
   const close = closes.length ? closes[closes.length - 1] : null;
-  const risk = atr !== null ? atrMult * atr : null;
+  const stops = trailingStopSeries(bars, atrMult);
+  const stop = stops.length ? stops[stops.length - 1] : null;
+  const risk = close !== null && stop !== null && close > stop ? close - stop : null;
   const shares = equity && risk ? Math.floor((equity * riskPct) / 100 / risk) : null;
   const checks = {
     trend: trend.value,
@@ -276,7 +292,7 @@ function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atr
     beta: betaVs(bars, benchmarkBars || []),
     spike: spike,
     close: close,
-    stop: close !== null && risk !== null ? close - risk : null,
+    stop: stop,
     shares: shares,
     riskAmount: shares !== null ? shares * risk : null,
     checks: checks,

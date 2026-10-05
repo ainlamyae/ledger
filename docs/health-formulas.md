@@ -231,7 +231,7 @@ slope       = baseSlope × sleepRatio
 > - Its consumers treat it as kg per day. They agree only if you log daily.
 > - Unreachable on the target-based path, which never uses it.
 
-**Progress meters** (rendered above the chart heading):
+**Progress meters** (a full-width card under the Status glance cards):
 
 ```
 bar %       = clamp( (startBodyMass − lastBodyMass) / (startBodyMass − target) × 100, 0, 100 )
@@ -284,12 +284,12 @@ sort key  = classification group gap, then targetG − actualG within it, both d
 
 ## Today at a Glance
 
-- Card order: Status (m̄/BMR/TEI/TEF/AEE/SD/D/Δm/t — today's whole energy budget, read top to bottom), Intake Macros (Protein/Fiber/Fat/Carb), Physical Activity (Cardio/NEAT/Strength), Sleep (Duration/Window).
+- Card order: Status (m/BMI/BMR/TEI/TEF/AEE/SD/D/Δm — today's whole energy budget, read top to bottom), Intake Macros (Protein/Fiber/Fat/Carb), Physical Activity (Cardio/NEAT/Strength), Sleep (Window/Duration).
 - Sums today's entries per category; Fiber/Fat/Carb each read the day's own persisted Physique figure (`fiberG`/`fatG`/`carbG`).
-- Green/red by `withinCalorieTarget` (TEI), `withinProteinBand`/`withinFiberBand`/`withinFatBand`/`withinCarbBand` (macros), `kcal ≥ getActivityTargetKcal(latest body mass)` (AEE), and (Status) which side of `BODY_MASS_TARGET_KG`/the balance target `bodyMassTargetIsDownward`/`targetBalanceKcal` call for (m̄ and D).
+- Green/red by `withinCalorieTarget` (TEI), `withinProteinBand`/`withinFiberBand`/`withinFatBand`/`withinCarbBand` (macros), `kcal ≥ getActivityTargetKcal(latest body mass)` (AEE), and (Status) which side of `BODY_MASS_TARGET_KG`/the balance target `bodyMassTargetIsDownward`/`targetBalanceKcal` call for (m, BMI and D).
 - Carb's under-band case reads grey, not red — same as its chart's bar coloring.
 - Status's **AEE** sums `activityEntryKcal` per entry rather than just the logged minutes, so it agrees with the Activity/Calorie Balance charts. Physical Activity's Cardio/NEAT/Strength split that same set of entries by the `Activity` sheet's Category column (prefix-matched), each unscored (`N min (-N kcal)`, `0 min (0 kcal)` rather than `—` for a bucket with nothing logged — that's a real zero, not a missing reading).
-- Status is the per-day form of `dailyEnergyBalanceKcal` (`setStatusEnergyTile`): **BMR** is Mifflin at the smoothed mass; **TEI** is intake vs. the calorie target with a `<`/`>` per the target kind; **TEF** is `calTarget.kcal × (1 − tefDivisor())`; **SD** is the sleep-deprivation effect vs. `0`; **D** is intake − BMR − AEE − TEF (+SD) against `targetBalanceKcal(planBodyMassKg(entries))`, the same arithmetic the Calorie Balance chart plots for one day; **m̄** is `planBodyMassKg` vs. `BODY_MASS_TARGET_KG`; **Δm** is `D ÷ GENERIC_KCAL_PER_KG_FAT` against `-weeklyFatLossKgAt ÷ 7` — negated the same way `targetBalanceKcal` negates it for D, so a positive (cut) `WEEKLY_FAT_LOSS_KG` reads as a negative target mass change, matching Δm's own actual-value sign convention (negative = losing); **t** is `calcProjection`'s day count and ETA — "Reached" once there, `—` when no projection can be drawn.
+- Status is the per-day form of `dailyEnergyBalanceKcal` (`setStatusEnergyTile`): **BMR** is Mifflin at the smoothed mass; **TEI** is intake vs. the calorie target with a `<`/`>` per the target kind; **TEF** is `calTarget.kcal × (1 − tefDivisor())`; **SD** is the sleep-deprivation effect vs. `0`; **D** is intake − BMR − AEE − TEF (+SD) against `targetBalanceKcal(planBodyMassKg(entries))`, the same arithmetic the Calorie Balance chart plots for one day; **BMI** is `planBodyMassKg` vs. `BODY_MASS_TARGET_KG`, rescaled by height; **Δm** is `D ÷ GENERIC_KCAL_PER_KG_FAT` against `-weeklyFatLossKgAt ÷ 7` — negated the same way `targetBalanceKcal` negates it for D, so a positive (cut) `WEEKLY_FAT_LOSS_KG` reads as a negative target mass change, matching Δm's own actual-value sign convention (negative = losing).
 - Sleep's Duration is colored by `sleepStatusColor` (the chart's own red→amber→green gradient), not a flat two-colour split; Window is `sleepBedMin`-`sleepWakeMin` as one `HH:MM-HH:MM` range.
 
 ## Sleep

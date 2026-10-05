@@ -28,6 +28,26 @@ const NUTRIENT_DISPLAY_NAME = {
   'PUFA 22:6 n-3 (DHA)': 'PUFA 22:6 n-3 (DHA, Omega-3)',
 };
 
+// True on the last Nutrition Facts line when other nutrients follow it: that row
+// carries the rule separating the label's lines from the rest (both micronutrient
+// tables, here and Physique's 🧬 view).
+function endsNutritionFactsLines(nutrients, i) {
+  return nutrients[i].factsLine && i + 1 < nutrients.length && !nutrients[i + 1].factsLine;
+}
+
+// True on the row just above the first nutrient past the Nutrition Facts lines with
+// no daily target, when a targeted one sits above it: the rule between the
+// nutrients judged against a goal and the reference-only ones.
+function endsTargetedNutrients(nutrients, i) {
+  const next = nutrients[i + 1];
+  return !!next && !next.factsLine && next.ideal === null && !nutrients[i].factsLine && nutrients[i].ideal !== null;
+}
+
+// One table row's class for either rule; both draw the same line.
+function nutrientSectionEnd(nutrients, i) {
+  return endsNutritionFactsLines(nutrients, i) || endsTargetedNutrients(nutrients, i);
+}
+
 // Every date in [from, to] that actually has a Calculate-derived breakdown —
 // the denominator for each nutrient's per-day average. Deliberately the same
 // "was Calculate actually run that day" bar aggregateFoodIntake's own source
@@ -101,13 +121,17 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
   // (nutrient-targets.js) re-parses a Setting value on every call, and this
   // loop runs over the whole nutrient list.
   const targets = nutrientDailyTargets();
+  // The Nutrition Facts lines lead, in label order and under the label's names
+  // (Saturated, Omega-3, Sodium, …), as in the ingredient form (NUTRITION_FACTS_ORDER, nutrition.js).
+  const factsRanks = nutritionFactsRanks([...totals.keys()]);
   const nutrients = [...totals.entries()]
     .map(([name, v]) => {
       const perDay = daysLogged > 0 ? Math.round((v.total / daysLogged) * 1000) / 1000 : null;
       const target = targets[name] || null;
       return {
         name,
-        displayName: NUTRIENT_DISPLAY_NAME[name] || name,
+        displayName: factsRanks.get(name)?.label || NUTRIENT_DISPLAY_NAME[name] || name,
+        factsLine: factsRanks.has(name),
         unit: v.unit,
         total: Math.round(v.total * 1000) / 1000,
         perDay,
@@ -119,10 +143,14 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
     })
     // Zero eaten with no target (or a zero one) says nothing; a zero against a real target is a gap.
     .filter((n) => n.total !== 0 || (n.ideal !== null && n.ideal !== 0))
-    // Nutrients with a known target lead (alphabetical), then everything
-    // without one (alphabetical) — so the rows worth judging against a goal
-    // aren't scattered through dozens of reference-only ones.
+    // The Nutrition Facts lines first, in label order. Then nutrients with a known
+    // target (alphabetical), then everything without one (alphabetical) — so the
+    // rows worth judging against a goal aren't scattered through dozens of
+    // reference-only ones.
     .sort((a, b) => {
+      const aRank = factsRanks.get(a.name)?.rank ?? Infinity;
+      const bRank = factsRanks.get(b.name)?.rank ?? Infinity;
+      if (aRank !== bRank) return aRank - bRank;
       const aHasIdeal = a.ideal !== null;
       const bHasIdeal = b.ideal !== null;
       if (aHasIdeal !== bHasIdeal) return aHasIdeal ? -1 : 1;
@@ -290,10 +318,11 @@ function renderMicronutrientInsightPreview(data) {
     return;
   }
 
-  data.nutrients.forEach((n) => {
+  data.nutrients.forEach((n, i) => {
     const tr = document.createElement('tr');
     if (n.severity === 'severe') tr.classList.add('nutrient-gap-severe');
     else if (n.severity === 'mild') tr.classList.add('nutrient-gap-mild');
+    if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
     tr.append(
       makeCell(n.displayName),
       makeCell(`${n.total} ${n.unit}`),

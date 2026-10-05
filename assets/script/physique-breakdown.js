@@ -254,17 +254,11 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
   const messages = [];
   const workout = physiqueField('workout').value.trim();
   if (!workout) {
-    // An empty Workout is a real answer — zero burn — not "nothing to show", so rather
-    // than hide the table we render it with a Total of 0, the Desire (goal) and the full
-    // Remain, the same "0 so far, not unknown" read the Physical Activity tile uses. The
-    // goals are computed at Body Mass, so without one there's genuinely nothing to show.
-    // Display only: the hidden duration/burn fields are left untouched, exactly as before.
-    const emptyBodyMassKg = physiqueBodyMassKg();
-    if (emptyBodyMassKg === null) {
-      hidePhysiqueActivityBreakdown();
-      return messages;
-    }
-    renderPhysiqueActivityBreakdown([], 0, 0, emptyBodyMassKg);
+    // No table for an empty Workout, the same as Consumption's: a fresh Log shouldn't
+    // open on a 0 Total against the day's Desire before anything is typed. The table
+    // appears once there's a workout to price. Display only: the hidden duration/burn
+    // fields are left untouched.
+    hidePhysiqueActivityBreakdown();
     return messages;
   }
 

@@ -48,6 +48,7 @@
 
 ## Hub and pages
 
+- **Every section page starts with the same breadcrumb, top-left**: `Health` on the hub (in place of the old centred section title), `‹ Health / Physique` on a page, `‹ Health / Physique / Log` on a form page.
 - **A section page is a hub, and each block is a page** (`page-nav.js`, `router.js`'s `showSectionPage`). `/health/`, `/finance/` and `/other/` show the section's glance cards (and reminder banners), then one **tile** per block — just its name, as many a row as fit (3 on a phone, up to 7 on a laptop). `/health/physique/` shows that block alone, opened, under a breadcrumb (`‹ Health / Physique`); its heading is a title, not a fold toggle.
 - **Quick actions:** the Health hub (and Health's part of the home page) carries **Today** as its first tile, in the primary colour, before Tune (`QUICK_ACTIONS`, `page-nav.js`). On the hub it clicks Physique's own Today, so today's entry (or a new one dated today) opens exactly as it does from the Physique page (`/health/physique/2026-10-05/`), and closing it returns to the hub; on the home page it goes to that address.
 - Tiles, the breadcrumb and the sidebar switch views in place — one history entry, no reload — so Back and Forward move between hub and pages, and a reload or shared link lands on the same view.

@@ -781,8 +781,10 @@ function setupPanelToggles() {
     heading.setAttribute('tabindex', '0');
     setPanelCollapsed(panel, heading, true);
 
-    // One block open at a time, so the address names the open one.
+    // One block open at a time, so the address names the open one. On a section
+    // page a block is a page of its own (page-nav.js), so its heading doesn't fold it.
     const toggle = () => {
+      if (window.ledgerSectionPage) return;
       const expanding = panel.classList.contains('collapsed');
       if (expanding) {
         panels.forEach((other) => {
@@ -1117,6 +1119,9 @@ function bootDashboard() {
   setupScrollSpy();
   setupHeaderAutoHide();
   setupPanelToggles();
+  // Before the router reads the address: it builds the tiles and breadcrumb the
+  // hub/page views show (page-nav.js).
+  initPageNav();
   initRouter();
   setupThemeToggle();
   setupPrivacyToggle();

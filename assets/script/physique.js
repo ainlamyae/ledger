@@ -598,8 +598,15 @@ const PHYSIQUE_BMR_SETTING_KEYS = ['HEIGHT_CM', 'BIRTH_DATE', 'SEX', BMR_FORMULA
 // `force` skips the changed-keys check (Calibrate's Update). Resolves to the
 // number of days rewritten, or null when the write failed.
 async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
-  if (!physiqueDataLoaded || physiqueBatchRunning) return 0;
+  if (physiqueBatchRunning) return 0;
   if (!force && !changedKeys.some((key) => PHYSIQUE_BMR_SETTING_KEYS.includes(key))) return 0;
+  // A page that doesn't show Physique (e.g. Other's Settings) never loaded it, but a
+  // changed height/sex/BMR setting still has to rewrite every day's stored BMR.
+  if (!physiqueDataLoaded) {
+    await initActivities();
+    await initPhysique();
+  }
+  if (!physiqueDataLoaded || physiqueBatchRunning) return 0;
   if (physiqueColumnIndex.bmr === undefined && physiqueColumnIndex.deprivation === undefined) return 0;
 
   ignoreStoredBmr = true;

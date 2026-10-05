@@ -1415,8 +1415,8 @@ function renderWellnessSleepChart(entries) {
               const i = items[0]?.dataIndex;
               if (i === undefined || bedAvg[i] === null) return '';
               const lines = [
-                `7-Day Avg Bed: ${formatClockTime24(sleepAxisClockMin(bedAvg[i]))}`,
-                `7-Day Avg Wake: ${formatClockTime24(sleepAxisClockMin(wakeAvg[i]))}`,
+                `7-Day Average Bed: ${formatClockTime24(sleepAxisClockMin(bedAvg[i]))}`,
+                `7-Day Average Wake: ${formatClockTime24(sleepAxisClockMin(wakeAvg[i]))}`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -3085,7 +3085,7 @@ function renderWellnessEnergyBalanceChart(entries) {
               }
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) {
-                lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal/day`);
+                lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
               }
               return privacyMode ? lines.map(maskDigits) : lines;
             },

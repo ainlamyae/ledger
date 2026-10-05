@@ -256,12 +256,27 @@ function estimateTefBreakdown(breakdown) {
 // row (food-insight.js's Food mode ingredient table) — that row already
 // carries its own {name, grams, count} totalled over the whole picked range,
 // so this reuses micronutrientScaleFactor directly instead of re-parsing an
-// amount string. Null on an ingredient with no 🧬 Micronutrients pulled, same
-// "not measured" rather than a confident zero. Returns {carbohydrate, fat, tef}
+// amount string. Null when neither its Nutrition row nor its logged Breakdown has
+// any of these, same "not measured" rather than a confident zero. Returns {fiber,
+// carbohydrate, fat, tef}
 // rather than writing onto the row (unlike estimateTefBreakdown's per-Physique-
 // day rows): a Food mode row is a fresh aggregate rebuilt on every render, so
 // there's nothing to persist it onto.
 function estimateMacrosForFoodRow(row) {
+  // Each macro from the ingredient's Nutrition row when it has one (scaled to the
+  // amount eaten, typed-over-estimated as below), otherwise from the logged
+  // Breakdown's own figures (aggregateFoodIntake's breakdownMacros) — so a food with
+  // no Nutrition row, or a row missing one macro, still shows what Calculate saved.
+  const fromBreakdown = {};
+  Object.entries(row.breakdownMacros || {}).forEach(([macro, value]) => {
+    fromBreakdown[macro] = macro === 'tef' ? Math.round(value) : Math.round(value * 100) / 100;
+  });
+  const fromTable = estimateMacrosFromNutritionRow(row) || {};
+  const result = { ...fromBreakdown, ...fromTable };
+  return Object.keys(result).length ? result : null;
+}
+
+function estimateMacrosFromNutritionRow(row) {
   const entry = findNutritionEntry(row.name);
   if (!entry) return null;
 

@@ -24,7 +24,7 @@ ledger/
 │       ├── ui-helpers.js         # Shared table/modal/busy-button helpers
 │       ├── groq.js               # Groq chat client
 │       ├── usda.js               # USDA FoodData Central client
-│       ├── nutrient-targets.js   # Ideal/day targets for Micronutrients mode
+│       ├── nutrient-targets.js   # Ideal/day targets for Micronutrient mode
 │       ├── nutrition.js          # Nutrition table, Classification, USDA lookup
 │       ├── calorie-estimator.js  # Calculate for food
 │       ├── activity-estimator.js # Calculate for workouts
@@ -50,11 +50,11 @@ ledger/
 │       ├── applications.js       # Applications cards
 │       ├── insight.js            # Insight shared helpers + Wellness mode
 │       ├── food-insight.js       # Insight Food mode
-│       ├── micronutrient-insight.js # Insight Micronutrients mode
+│       ├── micronutrient-insight.js # Insight Micronutrient mode
 │       ├── activity-insight.js   # Insight Activity mode
-│       ├── protein-source-rotation-insight.js # Insight Protein Sources mode
+│       ├── protein-source-rotation-insight.js # Insight Protein mode
 │       ├── plan-insight.js       # Insight Plan mode
-│       ├── fat-loss-pattern-insight.js # Insight Patterns mode
+│       ├── fat-loss-pattern-insight.js # Insight Pattern mode
 │       ├── insight-panel.js      # Insight panel shell
 │       ├── protein-rotation.js   # Protein Source Rotation
 │       ├── formula-fields.js     # Tune field descriptors + input utils

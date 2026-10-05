@@ -27,11 +27,20 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
         const key = String(item.name || '').trim().toLowerCase();
         if (!key) return;
         if (!byName.has(key)) {
-          byName.set(key, { name: item.name.trim(), calories: 0, protein: 0, grams: 0, count: 0 });
+          byName.set(key, { name: item.name.trim(), calories: 0, protein: 0, grams: 0, count: 0, breakdownMacros: {} });
         }
         const agg = byName.get(key);
         agg.calories += item.calories || 0;
         agg.protein += item.protein || 0;
+        // The Breakdown's own Fiber/Fat/Carbohydrate/TEF (Calculate's USDA figures), summed
+        // where an item carries them: the stand-in for a food with no Nutrition row, or a
+        // macro its row lacks (estimateMacrosForFoodRow, micronutrient-insight.js).
+        ['fiber', 'fat', 'carbohydrate', 'tef'].forEach((macro) => {
+          const value = Number(item[macro]);
+          if (item[macro] !== undefined && item[macro] !== null && Number.isFinite(value)) {
+            agg.breakdownMacros[macro] = (agg.breakdownMacros[macro] || 0) + value;
+          }
+        });
         const { grams, count } = parseBreakdownAmount(item.amount);
         if (grams !== null) agg.grams += grams;
         if (count !== null) agg.count += count;
@@ -66,6 +75,7 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
         // reference Amount, which needs the numbers, not "350g, ×2" text.
         grams,
         count,
+        breakdownMacros: agg.breakdownMacros,
       };
     })
     .sort((a, b) => b.calories - a.calories);

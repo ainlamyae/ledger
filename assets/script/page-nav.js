@@ -225,7 +225,14 @@ function updateFormCrumb(panel, steps) {
   if (panel) {
     crumb.append(separator(), link(routedHeadingText(panel), pageHref(section, panel), () => closeFormPages(panel)));
   }
-  steps.forEach((step) => {
+  // Every level above the current one is a link: a row's date over its 🧬 view
+  // goes back to that day's page.
+  steps.forEach((step, i) => {
+    if (i < steps.length - 1 && panel) {
+      const href = `${pageHref(section, panel)}${steps.slice(0, i + 1).map((s) => `${s.slug}/`).join('')}`;
+      crumb.append(separator(), link(step.label, href, () => openFormStep(panel, step)));
+      return;
+    }
     const current = document.createElement('span');
     current.className = 'page-crumb-current';
     current.textContent = step.label;

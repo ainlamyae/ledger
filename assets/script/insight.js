@@ -52,10 +52,11 @@ function gatherProfileSnapshot() {
 // the one panel whose subject is the journey rather than today's body.
 function formatProfileLines(p, bodyMassTargetKg = null) {
   const targetSuffix = bodyMassTargetKg !== null ? ` (desired: ${bodyMassTargetKg} kg)` : '';
+  // Tune's order: sex, height, age, then body mass.
   return [
-    `Age: ${p.age !== null ? p.age : 'not set'}`,
     `Sex: ${p.sex !== null ? p.sex : 'not set'}`,
     `Height: ${p.heightCm !== null ? `${p.heightCm} cm` : 'not set'}`,
+    `Age: ${p.age !== null ? p.age : 'not set'}`,
     `Current body mass: ${p.bodyMassKg !== null ? `${p.bodyMassKg} kg${targetSuffix}` : 'not logged'}`,
     `BMI: ${p.bmi !== null ? p.bmi : 'not available (needs height and a logged body mass)'}`,
   ];

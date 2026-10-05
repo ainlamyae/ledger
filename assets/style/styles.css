@@ -1139,12 +1139,14 @@ td:has(.btn) {
    (renderBreakdownList, breakdown.js), so each category's rows read as a
    visual group, and one line closing the table under its last row — the
    compact look's per-row border is off, so without this the table would
-   otherwise just stop. */
-#breakdown-table tr.breakdown-category-start td {
+   otherwise just stop. Activity's table does the same where the Group changes. */
+#breakdown-table tr.breakdown-category-start td,
+.workout-table-strength tr.workout-group-start td {
     border-top: 1px solid var(--color-border);
 }
 
-#breakdown-table tbody tr:last-child td {
+#breakdown-table tbody tr:last-child td,
+.workout-table-strength tbody tr:last-child td {
     border-bottom: 1px solid var(--color-border);
 }
 

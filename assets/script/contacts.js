@@ -63,12 +63,8 @@ function setupContactsSorting() {
 }
 
 async function refreshContacts(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('contacts');
-  if (!values) {
-    const resp = await getValues(CONTACTS_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('contacts', values);
-  }
+  const resp = await getValues(CONTACTS_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allContacts = values
     .map((row, i) => ({

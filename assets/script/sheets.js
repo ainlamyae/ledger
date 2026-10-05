@@ -1,9 +1,16 @@
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const VALUE_PARAMS = { valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING' };
 
+// Sheets allows 60 reads per minute per user, and a full dashboard load fires
+// ~18 at once with nothing cached, so a few Refresh clicks inside a minute
+// can run out. A 429 only ever means "wait and resend", so back off and retry
+// (2s, 4s, 8s, 16s, 32s with jitter, ~62s total, past the per-minute window)
+// before reporting it.
+const QUOTA_RETRY_LIMIT = 5;
+
 // `retrying` is set only by the 401 path below — the recursive call renews the
 // token first and gets exactly one more attempt, so a dead token can't loop.
-async function sheetsRequest(path, options = {}, retrying = false) {
+async function sheetsRequest(path, options = {}, retrying = false, quotaAttempt = 0) {
   const token = getAccessToken();
   if (!token) throw new Error('Not signed in');
 
@@ -27,7 +34,16 @@ async function sheetsRequest(path, options = {}, retrying = false) {
   // Renew once, in place, and re-send the identical request.
   if (res.status === 401 && !retrying) {
     const fresh = await ensureAccessToken();
-    if (fresh) return sheetsRequest(path, options, true);
+    if (fresh) return sheetsRequest(path, options, true, quotaAttempt);
+  }
+
+  if (res.status === 429 && quotaAttempt < QUOTA_RETRY_LIMIT) {
+    const retryAfter = Number(res.headers.get('Retry-After'));
+    const delayMs = retryAfter > 0
+      ? retryAfter * 1000
+      : 2000 * 2 ** quotaAttempt + Math.random() * 1000;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return sheetsRequest(path, options, retrying, quotaAttempt + 1);
   }
 
   if (!res.ok) {

@@ -21,32 +21,13 @@
 | `'Application'!A2:E` | `applications.js` | Application header + status-update rows |
 | `Settings!A2:C` | `app.js`, `settings-panel.js` | Personal overrides; `app.js` reads A/B, the panel reads and writes all three |
 
-**Client-side cache (`localStorage` via `cache.js`, 5-minute TTL unless noted):**
-
-| Cache key | Set by | Contents |
-|---|---|---|
-| `ledger_cache_report` | `app.js` | Aggregated report for the summary cards and finance charts |
-| `ledger_cache_lists` | `transactions.js` | Transaction sheet ID + dropdown options |
-| `ledger_cache_transactions` | `transactions.js` | Raw `Transaction!A2:F` rows |
-| `ledger_cache_accounts-meta` / `account-list` | `accounts.js` | `Account` sheet ID / rows |
-| `ledger_cache_timesheet` | `timesheet.js` | Raw `eTimeSheet!A2:H` rows |
-| `ledger_cache_nutritionWithHeader` | `nutrition.js` | Raw `'Nutrition'!A1:Z` rows, header first |
-| `ledger_cache_breakdown` | `breakdown.js` | Raw `'Breakdown'!A2:F200` rows |
-| `ledger_cache_physiqueWithHeader` | `physique.js` | Raw `'Physique'!A1:Z` rows, header first (renamed from `ledger_cache_physique`, which held no header) |
-| `ledger_cache_contacts` | `contacts.js` | Raw `'Contact'!A2:U` rows |
-| `ledger_cache_travel` | `travel.js` | Raw `'Travel'!A2:H` rows |
-| `ledger_cache_applications` | `applications.js` | Raw `'Application'!A2:E` rows |
-| `ledger_cache_settings` | `app.js` | Parsed `Setting` key-value map |
-| `ledger_cache_settings-panel-meta` / `setting-list` | `settings-panel.js` | `Setting` sheet ID / raw rows |
-| `ledger_cache_widget_location` | `widgets.js` | Auto-detected `{lat, lon, label}` — 6-hour TTL |
-| `ledger_cache_widget_weather_<lat>_<lon>` | `widgets.js` | Open-Meteo response — 30-minute TTL |
-
-**Auth, file selection and widget preferences (`localStorage`, separate from the cache):**
+**Auth, file selection and widget preferences (`localStorage`; no sheet data is stored):**
 
 | Key | Set by | Contents |
 |---|---|---|
 | `ledger_token` | `auth.js` | `{ token, expiresAt }` — enables silent refresh |
 | `ledger_consented` | `auth.js` | `'1'` once consent completes; controls `prompt` on next sign-in; cleared on sign-out |
+| `ledger_widget_detected_location` | `widgets.js` | `{lat, lon, label}` from the last "Use my location" |
 | `ledger_spreadsheet_id` | `drive.js` | The chosen spreadsheet's Drive file ID — every Sheets call targets it |
 | `ledger_last_reminder_notified` | `timesheet.js` | Today's date once the OS notification fired |
 | `ledger_last_car_service_notified` | `car-service.js` | Today's date once the car-service notification fired (one per day) |

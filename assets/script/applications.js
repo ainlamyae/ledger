@@ -59,12 +59,8 @@ function parseApplications(rows) {
 }
 
 async function refreshApplications(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('applications');
-  if (!values) {
-    const resp = await getValues(APPLICATIONS_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('applications', values);
-  }
+  const resp = await getValues(APPLICATIONS_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allApplications = parseApplications(values);
   renderApplicationsList();

@@ -40,12 +40,8 @@ function setupTravelSorting() {
 }
 
 async function refreshTravel(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('travel');
-  if (!values) {
-    const resp = await getValues(TRAVEL_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('travel', values);
-  }
+  const resp = await getValues(TRAVEL_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allTravel = values
     .map((row, i) => ({

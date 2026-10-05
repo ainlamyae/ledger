@@ -2,14 +2,13 @@
 
 [← Back to README](../README.md)
 
-- `index.html` is served `no-cache, no-store, must-revalidate`, so the shell is never stale.
-- Sheets responses are cached in `localStorage` for 5 minutes, keyed per data set.
-- Every write refreshes only the affected cache entry, so the UI updates without a reload.
-- **Refresh** clears the cache and re-fetches everything.
-- **Clear Cache** also purges Cache Storage and unregisters service workers, then reloads.
-- **A cache write failure never blocks the data it was caching.** `setCached` catches its own `localStorage.setItem` (most commonly `QuotaExceededError` — Nutrition rows carrying a large banked Micronutrients JSON blob can push the origin over its ~5-10MB quota) and just skips that write with a console warning, since every caller already has the real, freshly-fetched data in memory regardless of whether the warm-start for next time succeeded.
+The app caches nothing: no service worker, no stored copy of sheet data.
 
-> After changing a sheet's column layout, expect up to 5 minutes of stale reads until the cache expires — or use Clear Cache. Writes always bypass the cache.
+- Every page load and every **Refresh** reads the sheets directly, so a change in the sheet (a value, a column layout) shows on the next load.
+- Every write re-reads only the affected data, so the UI updates without a reload.
+- `sw.js` is kept only as a retired stub: browsers that installed the old offline worker pick it up, and it deletes its caches and unregisters itself. `index.html` also removes any leftover registration on load.
+- `cache.js` deletes any `ledger_cache_*` keys earlier versions left in `localStorage`.
+- One full load reads about 18 ranges. Google's Sheets limit is 60 reads per minute per user, so several Refresh clicks inside a minute can hit it; `sheetsRequest` (`sheets.js`) then waits and retries (2s doubling to 32s, about a minute in total) before reporting "Quota exceeded".
 
 ---
 

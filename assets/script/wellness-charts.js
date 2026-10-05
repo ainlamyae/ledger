@@ -191,7 +191,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const isCut = getCalorieTargetKind(entries) === 'max';
 
   // m — the latest raw weigh-in (bodyMassKg, already computed above), against the same
-  // healthy-mass target as m̄ below. Shown for comparison only, same as the Formula
+  // healthy-mass target BMI uses. Shown for comparison only, same as the Formula
   // Playground's read-only m row: water and glycogen move this one day to day, which is
   // exactly why every plan figure below reads m̄ instead.
   const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
@@ -204,22 +204,11 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     mEl.classList.add(mGood ? 'income' : 'expense');
   }
 
-  // m̄ — the 7-day rolling average body mass (planBodyMassKg / smoothedBodyMassKg), the
-  // same smoothed mass every plan identity runs on, shown against the plan's healthy body
-  // mass (BODY_MASS_TARGET_KG). A water-heavy morning doesn't move it the way the raw
-  // weigh-in would.
+  // m̄ — the 7-day rolling average body mass; BMI below reads it.
   const mBar = planBodyMassKg(entries);
-  const mBarEl = document.getElementById('today-status-mbar-value');
-  mBarEl.classList.remove('income', 'expense');
-  const mBarText = mBar !== null ? `${mBar} / ${healthyMassKg} kg` : '—';
-  mBarEl.textContent = privacyMode ? maskDigits(mBarText) : mBarText;
-  if (mBar !== null) {
-    const mBarGood = bodyMassTargetIsDownward(entries) ? mBar <= healthyMassKg : mBar >= healthyMassKg;
-    mBarEl.classList.add(mBarGood ? 'income' : 'expense');
-  }
 
-  // BMI — the same m̄/target pair as above, rescaled by height (computeBmi is a fixed
-  // linear rescale of mass, so "good" tracks mBar's direction check exactly). Needs
+  // BMI — m̄ against the healthy-mass target, rescaled by height (computeBmi is a fixed
+  // linear rescale of mass, so "good" follows the target's direction). Needs
   // only height, so it survives a profile missing birth date or sex.
   const bmiEl = document.getElementById('today-status-bmi-value');
   bmiEl.classList.remove('income', 'expense');
@@ -351,19 +340,6 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     ? `${dmActual}${dmTarget !== null ? ` / ${dmTarget}` : ''} g`
     : '—';
   document.getElementById('today-status-deltam-value').textContent = privacyMode ? maskDigits(dmText) : dmText;
-
-  // Goal — the projected arrival at the healthy body mass: calcProjection's own day count
-  // and ETA (the same figures State Trend & Forecast's time-progress meter shows), the
-  // date written YYYY-MM-DD like every date in the app.
-  const proj = calcProjection(entries);
-  let goalText = '—';
-  if (proj?.status === 'reached') {
-    goalText = 'Reached';
-  } else if (proj?.status === 'ok' && proj.etaDate) {
-    const d = proj.etaDate;
-    goalText = `${proj.daysToTarget} days (${isoFromDate(d)})`;
-  }
-  document.getElementById('today-status-goal-value').textContent = privacyMode ? maskDigits(goalText) : goalText;
 }
 
 // `target` is a number, or a preformatted string for Protein's band — both interpolate

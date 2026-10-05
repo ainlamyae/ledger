@@ -226,7 +226,6 @@
             <div class="card">
                 <h3>Status</h3>
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
-                <div class="widget-row"><span>m̄</span><span id="today-status-mbar-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
                 <div class="widget-row"><span>BMR_mif</span><span id="today-status-bmr-mif-value">—</span></div>
                 <div class="widget-row"><span>BMR_kat</span><span id="today-status-bmr-kat-value">—</span></div>
@@ -238,7 +237,6 @@
                 <div class="widget-row widget-row-divider"><span>SD</span><span id="today-status-deprivation-value">—</span></div>
                 <div class="widget-row"><span>D</span><span id="today-status-balance-value">—</span></div>
                 <div class="widget-row"><span>Δm</span><span id="today-status-deltam-value">—</span></div>
-                <div class="widget-row"><span>t</span><span id="today-status-goal-value">—</span></div>
             </div>
             <div class="today-glance-stack">
                 <div class="card">
@@ -256,9 +254,48 @@
                 </div>
                 <div class="card">
                     <h3>Sleep</h3>
-                    <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
                     <div class="widget-row"><span>Window</span><span id="today-sleep-window-value">—</span></div>
+                    <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
                 </div>
+            </div>
+            <div class="card body-mass-progress-meter" id="body-mass-progress-meter" hidden>
+                <h3>Progress</h3>
+                <div class="body-mass-progress-meter-track-wrap">
+                    <span class="body-mass-progress-meter-callout" id="body-mass-progress-meter-callout"></span>
+                    <div class="body-mass-progress-meter-track">
+                        <div class="body-mass-progress-meter-fill" id="body-mass-progress-meter-fill"></div>
+                    </div>
+                </div>
+                <div class="body-mass-progress-meter-stats">
+                    <span class="body-mass-progress-meter-stat">
+                        <span id="body-mass-progress-meter-done" class="body-mass-progress-meter-pct"></span>
+                        <span class="body-mass-progress-meter-stat-label">done</span>
+                    </span>
+                    <span class="body-mass-progress-meter-stat">
+                        <span id="body-mass-progress-meter-remaining" class="body-mass-progress-meter-pct"></span>
+                        <span class="body-mass-progress-meter-stat-label">to go</span>
+                        <span id="body-mass-progress-meter-target" class="body-mass-progress-meter-target"></span>
+                    </span>
+                </div>
+
+                <div class="body-mass-progress-meter time-progress-meter" id="time-progress-meter" hidden>
+                    <div class="body-mass-progress-meter-track">
+                        <div class="body-mass-progress-meter-fill" id="time-progress-meter-fill"></div>
+                    </div>
+                    <div class="body-mass-progress-meter-stats">
+                        <span class="body-mass-progress-meter-stat">
+                            <span id="time-progress-meter-elapsed" class="body-mass-progress-meter-pct"></span>
+                            <span class="body-mass-progress-meter-stat-label">elapsed</span>
+                        </span>
+                        <span class="body-mass-progress-meter-stat">
+                            <span id="time-progress-meter-remaining" class="body-mass-progress-meter-pct"></span>
+                            <span class="body-mass-progress-meter-stat-label">to go</span>
+                            <span id="time-progress-meter-eta" class="body-mass-progress-meter-target"></span>
+                        </span>
+                    </div>
+                </div>
+
+                <p id="body-mass-projection-eta" class="body-mass-eta"></p>
             </div>
         </div>
 
@@ -921,45 +958,6 @@
             </div>
 
             <div class="body-mass-projection-wrap">
-                <div class="body-mass-progress-meter" id="body-mass-progress-meter" hidden>
-                    <div class="body-mass-progress-meter-track-wrap">
-                        <span class="body-mass-progress-meter-callout" id="body-mass-progress-meter-callout"></span>
-                        <div class="body-mass-progress-meter-track">
-                            <div class="body-mass-progress-meter-fill" id="body-mass-progress-meter-fill"></div>
-                        </div>
-                    </div>
-                    <div class="body-mass-progress-meter-stats">
-                        <span class="body-mass-progress-meter-stat">
-                            <span id="body-mass-progress-meter-done" class="body-mass-progress-meter-pct"></span>
-                            <span class="body-mass-progress-meter-stat-label">done</span>
-                        </span>
-                        <span class="body-mass-progress-meter-stat">
-                            <span id="body-mass-progress-meter-remaining" class="body-mass-progress-meter-pct"></span>
-                            <span class="body-mass-progress-meter-stat-label">to go</span>
-                            <span id="body-mass-progress-meter-target" class="body-mass-progress-meter-target"></span>
-                        </span>
-                    </div>
-
-                    <div class="body-mass-progress-meter time-progress-meter" id="time-progress-meter" hidden>
-                        <div class="body-mass-progress-meter-track">
-                            <div class="body-mass-progress-meter-fill" id="time-progress-meter-fill"></div>
-                        </div>
-                        <div class="body-mass-progress-meter-stats">
-                            <span class="body-mass-progress-meter-stat">
-                                <span id="time-progress-meter-elapsed" class="body-mass-progress-meter-pct"></span>
-                                <span class="body-mass-progress-meter-stat-label">elapsed</span>
-                            </span>
-                            <span class="body-mass-progress-meter-stat">
-                                <span id="time-progress-meter-remaining" class="body-mass-progress-meter-pct"></span>
-                                <span class="body-mass-progress-meter-stat-label">to go</span>
-                                <span id="time-progress-meter-eta" class="body-mass-progress-meter-target"></span>
-                            </span>
-                        </div>
-                    </div>
-
-                    <p id="body-mass-projection-eta" class="body-mass-eta"></p>
-                </div>
-
                 <!-- Governs every chart from here down — State Trend & Forecast, Body Mass,
                      Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Dietary
                      Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep and Protein Source

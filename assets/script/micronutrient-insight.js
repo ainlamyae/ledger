@@ -65,9 +65,12 @@ function micronutrientScaleFactor(entry, row) {
 // how much of that ingredient was actually eaten. `contributing`/`missing`
 // name which ingredients did and didn't make it in, so the caller can be
 // upfront about coverage instead of presenting a silently partial total.
-function aggregateMicronutrientIntake(from, to) {
-  const rows = aggregateFoodIntake(from, to);
-  const daysLogged = countMicronutrientLoggedDays(from, to);
+// `breakdowns`: as aggregateFoodIntake's, each counted as one day.
+function aggregateMicronutrientIntake(from, to, breakdowns = null) {
+  const rows = aggregateFoodIntake(from, to, breakdowns);
+  const daysLogged = breakdowns
+    ? breakdowns.filter((b) => b.length).length
+    : countMicronutrientLoggedDays(from, to);
 
   const totals = new Map();
   const contributing = new Set();

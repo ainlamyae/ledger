@@ -150,13 +150,13 @@ async function initPhysique(forceRefresh = false) {
 
     document.getElementById('add-physique-btn').addEventListener('click', () => openPhysiqueForm(null));
     document.getElementById('today-physique-btn').addEventListener('click', () => openPhysiqueForm(todaysPhysiqueDay()));
-    // health/physique/<date>/ opens that day's Edit; …/<date>/micronutrients/ its 🧬 view.
+    // health/physique/<date or pattern-N>/ opens that row's Edit; …/micronutrients/ its 🧬 view.
     registerRecordRoute('physique', (slug, sub) => {
-      const p = allPhysiqueEntries.find((e) => e.date === slug);
+      const p = allPhysiqueEntries.find((e) => physiqueRouteStep(e).slug === slug);
       if (!p || (sub && sub !== 'micronutrients')) return null;
       if (sub) openPhysiqueMicronutrients(p);
       else openPhysiqueForm(p);
-      return p.date;
+      return physiqueRouteStep(p).label;
     });
     document.getElementById('health-reminder-log-btn').addEventListener('click', () => openPhysiqueForm(todaysPhysiqueDay()));
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
@@ -927,7 +927,7 @@ function renderPhysiqueList() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
-        routeRecordEdit('physique', { slug: p.date, label: p.date });
+        routeRecordEdit('physique', physiqueRouteStep(p));
         openPhysiqueForm(p);
       } }),
       // How a pattern becomes a real day: duplicate it, and the copy opens
@@ -983,10 +983,13 @@ function updatePhysiqueBulkActionsUI() {
 // Health Insight's four columns down to three: Nutrient, Amount, Ideal / day.
 // `routed`: give it the day's address (…/<date>/micronutrients/) as it opens.
 function openPhysiqueMicronutrients(p, routed = false) {
-  if (routed) routeRecordEdit('physique', { slug: p.date, label: p.date }, { slug: 'micronutrients', label: 'Micronutrients' });
+  if (routed) routeRecordEdit('physique', physiqueRouteStep(p), { slug: 'micronutrients', label: 'Micronutrients' });
   document.getElementById('physique-micro-title').textContent = formTitleWithDate('Micronutrients', p.date);
 
-  const data = aggregateMicronutrientIntake(p.date, p.date);
+  // A Pattern has no date to look up, so it reads its own Breakdown.
+  const data = p.date
+    ? aggregateMicronutrientIntake(p.date, p.date)
+    : aggregateMicronutrientIntake(null, null, [parsePhysiqueBreakdown(p.breakdown)]);
 
   const tbody = document.getElementById('physique-micro-body');
   tbody.innerHTML = '';
@@ -1373,6 +1376,13 @@ async function restorePhysiqueSnapshots(snapshots) {
   } catch (err) {
     alert(`Failed to restore: ${err.message}`);
   }
+}
+
+// A row's address step: its date, or pattern-<n> by sheet order for a Pattern.
+function physiqueRouteStep(entry) {
+  if (entry.date) return { slug: entry.date, label: entry.date };
+  const n = allPhysiqueEntries.filter((e) => !e.date).indexOf(entry) + 1;
+  return { slug: `pattern-${n}`, label: `Pattern ${n}` };
 }
 
 function physiquePatternLabel(entry) {

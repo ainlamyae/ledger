@@ -66,29 +66,23 @@
     } catch (e) {}
 </script>
 <script>
-    // App-shell offline support (sw.js) — never the live sheet data, just the
-    // static page itself. Registered here rather than from app.js so it's one
-    // inline block section-page.js's adoptHead() already duplicates onto
-    // /health/, /finance/ and /other/ too (the same mechanism that repeats the
-    // theme script above onto those pages), and 'sw.js' resolves correctly
-    // from all of them via their own <base href="../">.
+    // There's no service worker any more: it served its saved copy of every
+    // script first, while section-page.js always fetches index.html fresh, so
+    // any update ran new markup against old scripts ("document.getElementById(...)
+    // is null"). This removes one a browser still has from before, along with
+    // its cached files, and reloads once so the page comes straight from the
+    // server. sw.js itself is now a stub that does the same from the worker's
+    // side, for a tab the old worker still answers with an old index.html.
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
-        // A new service worker taking control mid-session means a shell update
-        // just landed — the HTML/JS already parsed into this tab came from the
-        // OLD shell, and can be a version behind whatever the new one expects
-        // (a DOM node one script reaches for that a newer HTML already removed,
-        // or vice versa). That mismatch used to fail silently: the dashboard
-        // just sat on its placeholder dashes forever with nothing in the UI to
-        // explain why. Reloading once picks up the new shell as a consistent
-        // set instead of running the old one against it; the flag stops a
-        // second reload from firing if something about the update loops.
-        let reloadedForUpdate = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (reloadedForUpdate) return;
-            reloadedForUpdate = true;
+        navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+            if (!registrations.length) return;
+            await Promise.all(registrations.map((reg) => reg.unregister()));
+            if ('caches' in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((key) => caches.delete(key)));
+            }
             window.location.reload();
-        });
+        }).catch(() => {});
     }
 </script>
 </head>
@@ -130,7 +124,6 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                 </div>
                 <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
-                <button id="clear-cache-btn" class="account-menu-item">Clear cache</button>
                 <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
@@ -226,17 +219,19 @@
             <div class="card">
                 <h3>Status</h3>
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
-                <div class="widget-row widget-row-divider"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
+                <div class="widget-row"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
+                <div class="widget-row"><span>m̄</span><span id="today-status-mbar-value">—</span></div>
+                <div class="widget-row widget-row-divider" title="Changed mass: the slope of the smoothed body-mass trend at the latest weigh-in, the same Δm (Changed Mass) the Body Mass chart shows"><span>Δm</span><span id="today-status-changed-mass-value">—</span></div>
                 <div class="widget-row"><span>BMR_mif</span><span id="today-status-bmr-mif-value">—</span></div>
                 <div class="widget-row"><span>BMR_kat</span><span id="today-status-bmr-kat-value">—</span></div>
                 <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
-                <div class="widget-row"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
+                <div class="widget-row widget-row-divider"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
                 <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
                 <div class="widget-row"><span>TEF</span><span id="today-status-digestion-value">—</span></div>
                 <div class="widget-row"><span>AEE</span><span id="today-status-activity-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>SD</span><span id="today-status-deprivation-value">—</span></div>
                 <div class="widget-row"><span>D</span><span id="today-status-balance-value">—</span></div>
-                <div class="widget-row"><span>Δm</span><span id="today-status-deltam-value">—</span></div>
+                <div class="widget-row" title="Calculated change: today's energy balance D as fat mass (D / ρ), against the planned daily loss — not measured on the scale (that is Δm under BMI)"><span>Δm′</span><span id="today-status-deltam-value">—</span></div>
             </div>
             <div class="today-glance-stack">
                 <div class="card">
@@ -258,7 +253,7 @@
                     <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
                 </div>
             </div>
-            <div class="card body-mass-progress-meter" id="body-mass-progress-meter" hidden>
+            <div class="card body-mass-progress-meter" id="body-mass-progress-meter">
                 <h3>Progress</h3>
                 <div class="body-mass-progress-meter-track-wrap">
                     <span class="body-mass-progress-meter-callout" id="body-mass-progress-meter-callout"></span>
@@ -268,27 +263,27 @@
                 </div>
                 <div class="body-mass-progress-meter-stats">
                     <span class="body-mass-progress-meter-stat">
-                        <span id="body-mass-progress-meter-done" class="body-mass-progress-meter-pct"></span>
+                        <span id="body-mass-progress-meter-done" class="body-mass-progress-meter-pct">—</span>
                         <span class="body-mass-progress-meter-stat-label">done</span>
                     </span>
                     <span class="body-mass-progress-meter-stat">
-                        <span id="body-mass-progress-meter-remaining" class="body-mass-progress-meter-pct"></span>
+                        <span id="body-mass-progress-meter-remaining" class="body-mass-progress-meter-pct">—</span>
                         <span class="body-mass-progress-meter-stat-label">to go</span>
                         <span id="body-mass-progress-meter-target" class="body-mass-progress-meter-target"></span>
                     </span>
                 </div>
 
-                <div class="body-mass-progress-meter time-progress-meter" id="time-progress-meter" hidden>
+                <div class="body-mass-progress-meter time-progress-meter" id="time-progress-meter">
                     <div class="body-mass-progress-meter-track">
                         <div class="body-mass-progress-meter-fill" id="time-progress-meter-fill"></div>
                     </div>
                     <div class="body-mass-progress-meter-stats">
                         <span class="body-mass-progress-meter-stat">
-                            <span id="time-progress-meter-elapsed" class="body-mass-progress-meter-pct"></span>
+                            <span id="time-progress-meter-elapsed" class="body-mass-progress-meter-pct">—</span>
                             <span class="body-mass-progress-meter-stat-label">elapsed</span>
                         </span>
                         <span class="body-mass-progress-meter-stat">
-                            <span id="time-progress-meter-remaining" class="body-mass-progress-meter-pct"></span>
+                            <span id="time-progress-meter-remaining" class="body-mass-progress-meter-pct">—</span>
                             <span class="body-mass-progress-meter-stat-label">to go</span>
                             <span id="time-progress-meter-eta" class="body-mass-progress-meter-target"></span>
                         </span>
@@ -373,10 +368,18 @@
                         <input type="text" id="formula-body-mass" inputmode="decimal" readonly>
                         <span class="formula-unit">kg</span>
                     </label>
-                    <!-- Directly under m, and the box that actually drives the sheet. -->
-                    <label class="formula-row" title="The mean of every weigh-in in the 7 days ending at your latest one — m̄(t) = (1/7) × Σ m(t−i). Water and glycogen move the scale by more than a week of fat loss does, and the decay model assumes clean mass, so every formula here reads this rather than the day's reading. Editable: type a figure to see the whole plan at another mass.">
+                    <!-- L_p sits here, above m̄, because it is m̄'s window as well as the length
+                         of each BMR_cal period below (n_p × L_p). -->
+                    <label class="formula-row" title="How many days m̄ averages, and how many days each BMR_cal period averages">
+                        <span class="formula-sym">L_p</span>
+                        <span class="formula-name">period length</span>
+                        <input type="text" id="formula-cal-period-days" inputmode="numeric">
+                        <span class="formula-unit">days</span>
+                    </label>
+                    <!-- Under m and L_p, and the box that actually drives the sheet. -->
+                    <label class="formula-row" title="The mean of every weigh-in in the L_p days ending at your latest one — m̄(t) = (1/L_p) × Σ m(t−i). Water and glycogen move the scale by more than a week of fat loss does, and the decay model assumes clean mass, so every formula here reads this rather than the day's reading. Follows L_p as you type it. Editable: type a figure to see the whole plan at another mass.">
                         <span class="formula-sym">m̄</span>
-                        <span class="formula-name">7-day rolling average body mass</span>
+                        <span class="formula-name">rolling average body mass over L_p</span>
                         <input type="text" id="formula-body-mass-smooth" inputmode="decimal">
                         <span class="formula-unit">kg</span>
                     </label>
@@ -451,12 +454,6 @@
                         <span class="formula-name">number of periods</span>
                         <input type="text" id="formula-cal-period-count" inputmode="numeric">
                         <span class="formula-unit">periods</span>
-                    </label>
-                    <label class="formula-row" title="How many days each period averages">
-                        <span class="formula-sym">L_p</span>
-                        <span class="formula-name">period length</span>
-                        <input type="text" id="formula-cal-period-days" inputmode="numeric">
-                        <span class="formula-unit">days</span>
                     </label>
                     <label class="formula-row" title="BMR (whichever equation is active below) plus the offset Calibrate measures over the n_p × L_p days ending yesterday — recalculated live from your logged data, and saved with Save. Blank when that window doesn't have enough logged to measure.">
                         <span class="formula-sym">BMR_cal</span>
@@ -2254,7 +2251,7 @@
                         <th title="Fat (g) — this ingredient's own typed Fat if it has one, else read from its pulled 🧬 Micronutrients">Fat</th>
                         <th title="Carbohydrate (g) — this ingredient's own typed Carb if it has one, else read from its pulled 🧬 Micronutrients">Carb</th>
                         <th title="Estimated Thermic Effect of Food (kcal) — this ingredient's own typed TEF if it has one, else Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default (tune under Settings: TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT)">TEF</th>
-                        <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time">Source</th>
+                        <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time" aria-label="Source"></th>
                     </tr>
                     </thead>
                     <tbody id="physique-calc-breakdown-body"></tbody>

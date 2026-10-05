@@ -123,14 +123,14 @@ function carSeasonalChangeovers(records, today) {
   if (lastMonth >= 9) {
     const springYear = Number(last.date.slice(0, 4)) + 1;
     return [
-      { date: springDate(springYear), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C, on your average spring date — TD' },
-      { date: `${springYear}-11-01`, label: 'Tire Changeover to Winter', basis: 'by 1 Nov, at +7 °C or below, before 1 Dec — TD' },
+      { date: springDate(springYear), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C — TD' },
+      { date: `${springYear}-11-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, before 1 Dec — TD' },
     ];
   }
   const fallYear = last ? Number(last.date.slice(0, 4)) : year;
   return [
-    { date: `${fallYear}-11-01`, label: 'Tire Changeover to Winter', basis: 'by 1 Nov, at +7 °C or below, before 1 Dec — TD' },
-    { date: springDate(fallYear + 1), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C, on your average spring date — TD' },
+    { date: `${fallYear}-11-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, before 1 Dec — TD' },
+    { date: springDate(fallYear + 1), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C — TD' },
   ];
 }
 

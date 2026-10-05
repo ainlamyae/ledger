@@ -190,13 +190,8 @@ function setDefaultTimesheetDateRange() {
 // from Start/End/Break, and Day only matters when appending a brand-new row
 // that has no formula to backfill it.
 async function refreshTimeSheet(forceRefresh = false) {
-  let values = forceRefresh ? null : getCached('timesheet');
-
-  if (!values) {
-    const resp = await getValues(TIMESHEET_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('timesheet', values);
-  }
+  const resp = await getValues(TIMESHEET_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allTimeEntries = values
     .map((row, i) => ({

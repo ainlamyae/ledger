@@ -85,12 +85,8 @@ async function initActivities(forceRefresh = false) {
     });
   }
 
-  let values = forceRefresh ? null : getCached('activities');
-  if (!values) {
-    const resp = await getValues(ACTIVITIES_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('activities', values);
-  }
+  const resp = await getValues(ACTIVITIES_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allActivities = values
     .map((row, i) => {

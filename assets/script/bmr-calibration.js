@@ -93,7 +93,8 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
   const byDate = new Map(allPhysiqueEntries.filter((p) => p.date).map((p) => [p.date, p]));
 
   const wellnessEntries = physiqueAsWellnessEntries();
-  const massAsOf = (dateIso) => smoothedBodyMassKg(wellnessEntries.filter((e) => e.date <= dateIso));
+  // Smoothed over this window's own period length, so each period's m̄ spans one period.
+  const massAsOf = (dateIso) => smoothedBodyMassKg(wellnessEntries.filter((e) => e.date <= dateIso), chunkDays);
 
   // Read early (not just at the validation check below) so TEF/SD — informational columns in
   // the day table, not part of the arithmetic below — can still be shown per day even in a
@@ -174,8 +175,8 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
       : null;
 
     // massEndW doubles as "this period's own mass" for the Daily table's m column too: it's
-    // already the 7-day-smoothed average (BODY_MASS_SMOOTHING_WINDOW_DAYS, fixed regardless of
-    // chunkDays) ending exactly on this period's last day.
+    // already the chunkDays-smoothed average (m̄ over one period length) ending exactly on
+    // this period's last day.
     const deltaMassW = (massStartW !== null && massEndW !== null) ? massEndW - massStartW : null;
     const deltaMKcalW = deltaMassW === null ? null : (deltaMassW * GENERIC_KCAL_PER_KG_FAT) / chunkDays;
 

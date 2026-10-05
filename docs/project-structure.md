@@ -10,7 +10,7 @@ ledger/
 ├── other/index.html              #   index.html and shows that group alone
 ├── <group>/<block>/[<button>/]index.html # Copies of the stub above, one per address (see router.js)
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
-├── sw.js                         # App-shell offline cache (never live sheet data)
+├── sw.js                         # Retired service worker: clears old caches, unregisters itself
 ├── assets/
 │   ├── images/                   # Social preview, touch icon
 │   │   └── activities/            # One figure per movement — animated .gif or two-position .jpg
@@ -20,7 +20,7 @@ ledger/
 │       ├── auth.js               # Sign-in/out, token storage, silent refresh
 │       ├── drive.js              # Template copy link, Picker, active-file storage
 │       ├── sheets.js             # Sheets API wrapper
-│       ├── cache.js              # localStorage cache + hard refresh
+│       ├── cache.js              # Numeric-expression evaluator; clears old cache keys
 │       ├── ui-helpers.js         # Shared table/modal/busy-button helpers
 │       ├── groq.js               # Groq chat client
 │       ├── usda.js               # USDA FoodData Central client

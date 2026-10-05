@@ -28,13 +28,8 @@ let accountBalanceCells = null;
 let accountsDataLoaded = false;
 
 async function initAccountManager(forceRefresh = false) {
-  let meta = forceRefresh ? null : getCached('accounts-meta');
-
-  if (!meta) {
-    const spreadsheet = await getSpreadsheetMetadata();
-    meta = { accountsSheetId: findSheetId(spreadsheet, CONFIG.SHEETS.ACCOUNTS) };
-    setCached('accounts-meta', meta);
-  }
+  const spreadsheet = await getSpreadsheetMetadata();
+  const meta = { accountsSheetId: findSheetId(spreadsheet, CONFIG.SHEETS.ACCOUNTS) };
 
   accountsSheetId = meta.accountsSheetId;
 
@@ -85,13 +80,8 @@ async function refreshAccountsList(forceRefresh = false) {
   // list is exactly when that map stops being trustworthy.
   accountBalanceCells = null;
 
-  let values = forceRefresh ? null : getCached('account-list');
-
-  if (!values) {
-    const resp = await getValues(ACCOUNTS_RANGE, VALUE_PARAMS);
-    values = resp.values || [];
-    setCached('account-list', values);
-  }
+  const resp = await getValues(ACCOUNTS_RANGE, VALUE_PARAMS);
+  const values = resp.values || [];
 
   allAccounts = values.map((row, i) => {
     const balanceNum = Number(row[3]);

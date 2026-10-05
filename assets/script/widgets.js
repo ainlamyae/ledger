@@ -189,12 +189,20 @@ function setSecondClockManual(city) {
   localStorage.setItem(SECOND_CLOCK_MANUAL_KEY, JSON.stringify(city));
 }
 
-async function getUserLocation(forceRefresh = false) {
-  if (!forceRefresh) {
-    const cached = getCached('widget_location', 6 * 60 * 60 * 1000);
-    if (cached) return cached;
-  }
+// The location "Use my location" last detected — remembered like the manual
+// one, so the widgets keep using it on later visits without asking again.
+const DETECTED_LOCATION_KEY = 'ledger_widget_detected_location';
 
+function getDetectedLocation() {
+  try {
+    const raw = localStorage.getItem(DETECTED_LOCATION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getUserLocation() {
   if (!('geolocation' in navigator)) return null;
 
   const position = await new Promise((resolve) => {
@@ -218,7 +226,11 @@ async function getUserLocation(forceRefresh = false) {
   }
 
   const location = { lat, lon, label };
-  setCached('widget_location', location);
+  try {
+    localStorage.setItem(DETECTED_LOCATION_KEY, JSON.stringify(location));
+  } catch {
+    // Not remembered; still used for this visit.
+  }
   return location;
 }
 
@@ -248,14 +260,14 @@ async function geocodeLocation(query) {
 // Never calls navigator.geolocation itself — that's a real permission
 // prompt and should only ever happen from an explicit click on "Use my
 // location" (see setupLocationPicker), not silently on every page load.
-// Manual override beats a previously-detected (cached) location, which
+// Manual override beats a previously-detected location, which
 // beats the Settings-tab default city, which beats the hardcoded fallback.
 function resolveLocation() {
   const manual = getManualLocation();
   if (manual) return manual;
 
-  const cachedDetected = getCached('widget_location', 6 * 60 * 60 * 1000);
-  if (cachedDetected) return cachedDetected;
+  const detected = getDetectedLocation();
+  if (detected) return detected;
 
   return sheetDefaultLocation || DEFAULT_LOCATION;
 }
@@ -340,7 +352,7 @@ function setupLocationPicker() {
     showStatus('Detecting your location…');
     clearManualLocation();
 
-    const detected = await getUserLocation(true);
+    const detected = await getUserLocation();
     if (detected) {
       applyLocation(detected);
       statusEl.hidden = true;
@@ -556,17 +568,11 @@ function initPrayerWidget(location) {
 }
 
 async function fetchWeather(lat, lon) {
-  const cacheKey = `widget_weather_${lat.toFixed(2)}_${lon.toFixed(2)}`;
-  const cached = getCached(cacheKey, 30 * 60 * 1000);
-  if (cached) return cached;
-
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=3`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('Weather request failed');
 
-  const data = await res.json();
-  setCached(cacheKey, data);
-  return data;
+  return res.json();
 }
 
 function renderWeather(data) {

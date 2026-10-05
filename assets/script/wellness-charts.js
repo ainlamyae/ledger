@@ -204,8 +204,21 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     mEl.classList.add(mGood ? 'income' : 'expense');
   }
 
-  // m̄ — the 7-day rolling average body mass; BMI below reads it.
+  // m̄ — the L_p-day rolling average body mass; BMI below reads it. Against the same
+  // target, with the glycogen/water swing beside it: a reading within that band of the
+  // target is water, not a miss. The swing is taken at the latest reading, as the
+  // Progress card's "→ target ± swing" is, so the two show the same figure.
   const mBar = planBodyMassKg(entries);
+  const mBarEl = document.getElementById('today-status-mbar-value');
+  mBarEl.classList.remove('income', 'expense');
+  const swingKg = glycogenSwingKg(bodyMassKg, heightCm, getSettingString('SEX', null));
+  const swingText = swingKg === null ? '' : ` ± ${Math.round(swingKg * 10) / 10}`;
+  const mBarText = mBar !== null ? `${mBar} / ${healthyMassKg}${swingText} kg` : '—';
+  mBarEl.textContent = privacyMode ? maskDigits(mBarText) : mBarText;
+  if (mBar !== null) {
+    const mBarGood = bodyMassTargetIsDownward(entries) ? mBar <= healthyMassKg : mBar >= healthyMassKg;
+    mBarEl.classList.add(mBarGood ? 'income' : 'expense');
+  }
 
   // BMI — m̄ against the healthy-mass target, rescaled by height (computeBmi is a fixed
   // linear rescale of mass, so "good" follows the target's direction). Needs
@@ -219,6 +232,31 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   if (bmi !== null && targetBmi !== null) {
     const bmiGood = bodyMassTargetIsDownward(entries) ? bmi <= targetBmi : bmi >= targetBmi;
     bmiEl.classList.add(bmiGood ? 'income' : 'expense');
+  }
+
+  // Δm (Changed Mass) — the Body Mass chart's figure for the latest weigh-in: the slope of
+  // the same smoothed trend (computeBodyMassTrend over every reading), in g/day. Green when
+  // it moves toward the target, red when away.
+  const changedEl = document.getElementById('today-status-changed-mass-value');
+  changedEl.classList.remove('income', 'expense');
+  const trendMap = computeBodyMassTrend(bodyMassByDateMap(
+    entries.filter((e) => e.category === 'Body Mass' && e.amount !== null),
+  ));
+  const trendDates = [...trendMap.keys()].sort();
+  const changedGPerDay = trendDates.length
+    ? computeBodyMassTrendSlopeGramsPerDay(trendMap).get(trendDates[trendDates.length - 1]) ?? null
+    : null;
+  // Against the desired rate: Tune's weekly fat loss Δm as g/day, signed the way the
+  // Δm′ row below signs it (a loss is negative), so the pair compare directly.
+  const desiredWeeklyLossKg = weeklyFatLossKgAt(planBodyMassKg(entries));
+  const desiredGPerDay = desiredWeeklyLossKg !== null ? Math.round((-desiredWeeklyLossKg / 7) * 1000) : null;
+  const changedText = changedGPerDay !== null
+    ? `${withExplicitSign(changedGPerDay)}${desiredGPerDay !== null ? ` / ${withExplicitSign(desiredGPerDay)}` : ''} g/day`
+    : '—';
+  changedEl.textContent = privacyMode ? maskDigits(changedText) : changedText;
+  if (changedGPerDay !== null && changedGPerDay !== 0) {
+    const changedGood = bodyMassTargetIsDownward(entries) ? changedGPerDay < 0 : changedGPerDay > 0;
+    changedEl.classList.add(changedGood ? 'income' : 'expense');
   }
 
   // Intake — the one positive contribution to Balance, shown against its target
@@ -893,8 +931,10 @@ function renderWellnessBodyMassChart(entries) {
                 }
               }
 
+              // g/day like Δm and Calorie Trend Slope above, so all three rates compare
+              // directly (the slope itself is kg per week).
               if (slopePerWeek[i] !== null) {
-                lines.push(`7-Day Trend: ${withExplicitSign(Math.round(slopePerWeek[i] * 100) / 100)} kg/week`);
+                lines.push(`7-Day Trend: ${withExplicitSign(Math.round((slopePerWeek[i] * 1000) / 7))} g/day`);
               }
 
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -2235,18 +2275,23 @@ function renderWellnessProjectionChart(entries) {
   const timeEta = document.getElementById('time-progress-meter-eta');
   const etaEl = document.getElementById('body-mass-projection-eta');
   const plateauNote = document.getElementById('body-mass-plateau-note');
-  meterWrap.hidden = true;
+  // Never hidden: the card is in the page from the first paint with "—" in it, like
+  // the Status cards beside it, and this only fills it in (or back to "—" when there
+  // isn't enough logged to measure progress). Hiding it until the data arrived made it
+  // pop in after everything else and shift the page under it.
   meterWrap.style.removeProperty('--fill-pct');
+  meterFill.style.width = '0%';
+  meterFill.classList.remove('danger');
   meterCallout.textContent = '';
   meterCallout.classList.remove('danger');
-  meterDone.textContent = '';
-  meterRemaining.textContent = '';
+  meterDone.textContent = '—';
+  meterRemaining.textContent = '—';
   meterTarget.textContent = '';
   meterRemaining.classList.remove('danger');
-  timeWrap.hidden = true;
   timeWrap.style.removeProperty('--fill-pct');
-  timeElapsed.textContent = '';
-  timeRemaining.textContent = '';
+  timeFill.style.width = '0%';
+  timeElapsed.textContent = '—';
+  timeRemaining.textContent = '—';
   timeEta.textContent = '';
   etaEl.textContent = '';
   plateauNote.textContent = '';
@@ -2275,7 +2320,6 @@ function renderWellnessProjectionChart(entries) {
     const remainingKg = Math.round(Math.abs(lastBodyMass - bodyMassTarget) * 10) / 10;
     const isWrongDirection = proj.status === 'wrong-direction';
 
-    meterWrap.hidden = false;
     meterFill.style.width = `${pct}%`;
     meterFill.classList.toggle('danger', isWrongDirection);
     if (!isWrongDirection) meterWrap.style.setProperty('--fill-pct', `${Math.round(pct)}`);
@@ -2300,7 +2344,7 @@ function renderWellnessProjectionChart(entries) {
     const targetSwingKg = glycogenSwingKg(lastBodyMass, getSetting('HEIGHT_CM', null), getSettingString('SEX', null));
     const targetText = targetSwingKg === null
       ? `→ ${bodyMassTarget} kg`
-      : `→ ${bodyMassTarget} kg ± ${Math.round(targetSwingKg * 10) / 10} kg`;
+      : `→ ${bodyMassTarget} ± ${Math.round(targetSwingKg * 10) / 10} kg`;
     meterTarget.textContent = privacyMode ? maskDigits(targetText) : targetText;
   }
 
@@ -2341,7 +2385,6 @@ function renderWellnessProjectionChart(entries) {
 
     if (totalDays > 0) {
       const timePct = Math.max(0, Math.min(100, (daysElapsed / totalDays) * 100));
-      timeWrap.hidden = false;
       timeFill.style.width = `${timePct}%`;
       timeWrap.style.setProperty('--fill-pct', `${Math.round(timePct)}`);
 

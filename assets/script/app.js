@@ -653,10 +653,21 @@ async function loadDashboard(forceRefresh = false) {
     // allSettled, not all: a missing or unreadable Activities tab should cost the
     // category split (everything lands under 'Other') and the plan tables, not
     // every chart on the page. The rejection still surfaces via the list below.
-    const activitiesPromise = initActivities(forceRefresh);
-    const physiquePromise = Promise.allSettled([settingsPromise, activitiesPromise])
-      .then(() => initPhysique(forceRefresh));
-    const reportPromise = loadReport(forceRefresh).then((report) => {
+    // Which blocks this page shows, so only their data is read. A section page
+    // (/health/, /finance/, /other/) loads its own blocks alone; the home page
+    // loads the glance cards (Health status, Finance summary), plus every block
+    // when Show blocks is on. Car Service (Other) is drawn from Transactions, so
+    // Other loads those too.
+    const section = window.ledgerSectionPage?.section ?? null;
+    const shows = (id) => loadBlocks && (section === null || section === id);
+    const needsHealth = section === null || section === 'health';
+    const needsReport = section === null || section === 'finance';
+
+    const activitiesPromise = needsHealth ? initActivities(forceRefresh) : Promise.resolve();
+    const physiquePromise = needsHealth
+      ? Promise.allSettled([settingsPromise, activitiesPromise]).then(() => initPhysique(forceRefresh))
+      : Promise.resolve();
+    const reportPromise = needsReport ? loadReport(forceRefresh).then((report) => {
       currentReport = report;
       renderSummaryCards(report);
       renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
@@ -669,45 +680,39 @@ async function loadDashboard(forceRefresh = false) {
       renderExpenseBreakdownTrendChart(report.categoryTrend);
       renderSavingsTrendChart(report.savingsTrend);
       renderReconciliationStatus(report.missingAmount);
-      setLastUpdated();
-    });
+    }) : Promise.resolve();
 
-    // Detail-only modules — each renders solely into a .panel the blocks toggle
-    // hides, so when the blocks are hidden none of them (nor their fetches) run,
-    // and that's the saving. Nutrition is here too: the today-glance macros come
-    // off Physique, not the Nutrition catalogue, so nothing on the always-visible
-    // summary needs it. (Health Insight and Financial Insight aren't in either
-    // list — neither computes until its own load action is clicked.)
-    const nutritionPromise = loadBlocks ? initNutrition(forceRefresh) : Promise.resolve();
-    const detailPromises = loadBlocks ? [
-      initTransactions(forceRefresh),
-      initAccountManager(forceRefresh),
-      initTimeSheet(forceRefresh),
-      nutritionPromise,
-      // Protein Source Rotation needs Physique (actual servings eaten),
-      // Nutrition (live per-serving calories/protein), and settings (protein
-      // target) all loaded — refresh only once all three are in.
-      Promise.all([physiquePromise, nutritionPromise]).then(() => {
-        renderProteinRotationChart(wellnessDateRange());
-        // Needs both tabs: the grams come from each food's Nutrition row.
-        convertPhysiqueBreakdownAmountsToGrams();
-      }),
-      // Activity Rotation needs Physique (logged Workout notes) and Activities
-      // (each exercise's Group and Weekly Target) both loaded.
-      Promise.all([physiquePromise, activitiesPromise]).then(() => {
-        renderActivityRotationChart(wellnessDateRange());
-        renderActivityPlanTables();
-        renderInstructionList();
-      }),
-      initContacts(forceRefresh),
-      // Its own read of the Breakdown tab rather than a share of loadReport's: that
-      // one keeps only what the charts derived from those rows, while the panel
-      // needs each row's own sheet row number to edit it.
-      initBreakdown(forceRefresh),
-      initSettingsPanel(forceRefresh),
-      settingsPromise.then(() => initTravel(forceRefresh)),
-      initApplications(forceRefresh),
-    ] : [];
+    const nutritionPromise = shows('health') ? initNutrition(forceRefresh) : Promise.resolve();
+    const detailPromises = [
+      ...(shows('health') ? [
+        nutritionPromise,
+        // Protein Source Rotation needs Physique (actual servings eaten),
+        // Nutrition (live per-serving calories/protein), and settings
+        // (protein target) all loaded — refresh only once all three are in.
+        Promise.all([physiquePromise, nutritionPromise]).then(() => {
+          renderProteinRotationChart(wellnessDateRange());
+          // Needs both tabs: the grams come from each food's Nutrition row.
+          convertPhysiqueBreakdownAmountsToGrams();
+        }),
+        // Activity Rotation needs Physique (logged Workout notes) and Activities
+        // (each exercise's Group and Weekly Target) both loaded.
+        Promise.all([physiquePromise, activitiesPromise]).then(() => {
+          renderActivityRotationChart(wellnessDateRange());
+          renderActivityPlanTables();
+          renderInstructionList();
+        }),
+      ] : []),
+      ...((shows('finance') || shows('other')) ? [initTransactions(forceRefresh)] : []),
+      ...(shows('finance') ? [initAccountManager(forceRefresh), initBreakdown(forceRefresh)] : []),
+      ...(shows('other') ? [
+        initTimeSheet(forceRefresh),
+        initContacts(forceRefresh),
+        settingsPromise.then(() => initTravel(forceRefresh)),
+        initApplications(forceRefresh),
+      ] : []),
+      // Both Health and Other have a Settings block.
+      ...((shows('health') || shows('other')) ? [initSettingsPanel(forceRefresh)] : []),
+    ];
 
     const results = await Promise.allSettled([
       settingsPromise,
@@ -717,7 +722,8 @@ async function loadDashboard(forceRefresh = false) {
       ...detailPromises,
     ]);
 
-    console.info(`[sheets] dashboard load: ${sheetsRequestCount - requestsBefore} requests`);
+    setLastUpdated();
+    console.info(`[sheets] ${section || 'home'} load: ${sheetsRequestCount - requestsBefore} requests`);
     const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
     if (errors.length) {
       console.error('Failed to load dashboard data:', errors);

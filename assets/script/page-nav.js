@@ -149,4 +149,44 @@ function initPageNav() {
   document.documentElement.classList.add('section-pages');
   buildPageTiles(section);
   buildPageCrumb(section);
+  buildFormCrumb();
+}
+
+// "‹ Health / Physique / Log" over a form page: the section goes back to the hub,
+// the block back to its page, each closing the form (router.js's closeFormPages).
+function buildFormCrumb() {
+  const crumb = document.createElement('nav');
+  crumb.id = 'form-crumb';
+  crumb.className = 'page-crumb form-crumb';
+  crumb.setAttribute('aria-label', 'Breadcrumb');
+  // Before the first form, so it sits right above whichever form is the page.
+  document.body.insertBefore(crumb, document.querySelector('body > .modal'));
+}
+
+function updateFormCrumb(panel, steps) {
+  const crumb = document.getElementById('form-crumb');
+  const section = pageNavSections().find((s) => s.id === window.ledgerSectionPage?.section);
+  if (!crumb || !section) return;
+  crumb.textContent = '';
+  const link = (text, href, onClick) => {
+    const a = document.createElement('a');
+    a.href = href;
+    a.textContent = text;
+    a.addEventListener('click', (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+      event.preventDefault();
+      onClick();
+    });
+    return a;
+  };
+  crumb.append(link(`‹ ${section.label}`, section.href, () => closeFormPages(null)));
+  if (panel) {
+    crumb.append(' / ', link(routedHeadingText(panel), pageHref(section, panel), () => closeFormPages(panel)));
+  }
+  steps.forEach((step) => {
+    const current = document.createElement('span');
+    current.className = 'page-crumb-current';
+    current.textContent = step.label;
+    crumb.append(' / ', current);
+  });
 }

@@ -50,7 +50,8 @@
 ## Hub and pages
 
 - **A section page is a hub, and each block is a page** (`page-nav.js`, `router.js`'s `showSectionPage`). `/health/`, `/finance/` and `/other/` show the section's glance cards (and reminder banners), then one **tile** per block with a one-line description. `/health/physique/` shows that block alone, opened, under a breadcrumb (`‹ Health / Physique`); its heading is a title, not a fold toggle.
-- Tiles, the breadcrumb and the sidebar switch views in place — one history entry, no reload — so Back and Forward move between hub and pages, and a reload or shared link lands on the same view. Forms and row addresses open over their page as before (`/health/physique/log/`, `/health/physique/2026-10-05/`).
+- Tiles, the breadcrumb and the sidebar switch views in place — one history entry, no reload — so Back and Forward move between hub and pages, and a reload or shared link lands on the same view.
+- **Forms are pages too** (`router.js`'s `updateFormPage`): Log, Add, Today, a row's Edit or 🧬 view and Activity's Guide take the page's place under their own breadcrumb (`‹ Health / Physique / Log`) instead of covering it — the section name returns to the hub and the block name to its page, both closing the form, as do Back, ✕, Cancel and Escape, which also return to where the page was scrolled. On a phone the form clears the bottom tab bar and its action bar pins just above it. Dialogs that aren't pages (keyboard shortcuts, confirmations) and forms on the home page stay overlays.
 - **Wide screens (≥ 1180px)** get a left sidebar listing every section and page, the current one marked; a link in another section loads that section. **Phones** use the bottom tab bar to pick a section and the hub's tiles (two a row) to pick a page.
 - The home page keeps its overview: glance cards, and every block as a collapsible panel when Show blocks is on; clicking a block there opens its page.
 

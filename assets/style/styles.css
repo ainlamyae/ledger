@@ -3135,6 +3135,17 @@ td .btn {
     grid-template-columns: max-content 8.45rem max-content;
 }
 
+/* Settings (Health and Other): the actions column (👁️ ✏️ 🗑️) is as wide as its
+   buttons on one line, rather than squeezed by the Key/Value columns until the
+   buttons stacked. Key stays on one line too; Value takes the rest. */
+#settings-table td:last-child,
+#health-settings-table td:last-child,
+#settings-table td:first-child,
+#health-settings-table td:first-child {
+    white-space: nowrap;
+    width: 1%;
+}
+
 /* Pattern's Periods table: ~20 columns, so the global `table { width: 100% }`
    squeezed every one of them into the panel and wrapped Period's date range
    ("2026-08-07 → 2026-08-16") into a narrow column. Sized to its content instead,

@@ -2261,16 +2261,15 @@ td .btn {
     color: var(--color-text-muted);
 }
 
-/* The "→ 70 kg" / "→ 2027-01-27" target trailing "to go". */
+/* The "→ 70 ± 1.9 kg" / "→ 2027-01-27" target trailing "left" / "ahead". Regular weight,
+   like every other card's figures. */
 .body-mass-progress-meter-target {
     font-size: .95rem;
-    font-weight: 700;
     color: var(--color-text);
 }
 
 .body-mass-progress-meter-pct {
     font-size: .95rem;
-    font-weight: 700;
     color: var(--color-text);
 }
 

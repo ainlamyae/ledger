@@ -2333,6 +2333,8 @@ function renderWellnessProjectionChart(entries) {
 
     const doneText = `${doneKg} kg`;
     meterDone.textContent = privacyMode ? maskDigits(doneText) : doneText;
+    // "lost" on a cut, "gained" on a bulk: the target's side of the first weigh-in.
+    document.getElementById('body-mass-progress-meter-done-label').textContent = totalDelta > 0 ? 'lost' : 'gained';
 
     const remainingText = `${remainingKg} kg`;
     meterRemaining.textContent = privacyMode ? maskDigits(remainingText) : remainingText;

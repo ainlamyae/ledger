@@ -84,25 +84,37 @@ function buildPageTiles(section) {
   group.insertBefore(grid, section.panels[0] || null);
 }
 
-// "‹ Health / Physique" over a page, the section name going back to the hub; on
-// the hub itself just "Health", in the same place and style, in place of the
-// section's centred title.
+// The full trail from the home page: "Ledger / Health / Physique" over a page,
+// each level a link back to itself; "Ledger / Health" on the hub, in place of the
+// section's centred title. "Ledger" opens the home page.
+function crumbHomeLink() {
+  const home = document.createElement('a');
+  home.href = routerRoot;
+  home.textContent = 'Ledger';
+  return home;
+}
+
+function crumbSeparator(className = '') {
+  const span = document.createElement('span');
+  if (className) span.className = className;
+  span.textContent = '/';
+  return span;
+}
+
 function buildPageCrumb(section) {
   const group = document.getElementById(section.id);
   const crumb = document.createElement('nav');
   crumb.className = 'page-crumb';
   crumb.setAttribute('aria-label', 'Breadcrumb');
+  // On the hub the section is the current level, so its link and separator hide.
   const back = document.createElement('a');
   back.className = 'page-crumb-back';
   back.href = section.href;
-  back.textContent = `‹ ${section.label}`;
+  back.textContent = section.label;
   back.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
-  const separator = document.createElement('span');
-  separator.className = 'page-crumb-back';
-  separator.textContent = '/';
   const current = document.createElement('span');
   current.className = 'page-crumb-current';
-  crumb.append(back, separator, current);
+  crumb.append(crumbHomeLink(), crumbSeparator(), back, crumbSeparator('page-crumb-back'), current);
   group.insertBefore(crumb, group.firstChild);
 }
 
@@ -178,7 +190,7 @@ function initPageNav() {
   buildFormCrumb();
 }
 
-// "‹ Health / Physique / Log" over a form page: the section goes back to the hub,
+// "Ledger / Health / Physique / Log" over a form page: the section goes back to the hub,
 // the block back to its page, each closing the form (router.js's closeFormPages).
 function buildFormCrumb() {
   const crumb = document.createElement('nav');
@@ -195,13 +207,9 @@ function updateFormCrumb(panel, steps) {
   const section = pageNavSections().find((s) => s.id === window.ledgerSectionPage?.section);
   if (!crumb || !section) return;
   crumb.textContent = '';
-  // Built from the same pieces as the page breadcrumb (buildPageCrumb): a "‹ Section"
-  // link, "/" separators, links for the levels above, the current level last.
-  const separator = () => {
-    const span = document.createElement('span');
-    span.textContent = '/';
-    return span;
-  };
+  // Built from the same pieces as the page breadcrumb (buildPageCrumb): "Ledger",
+  // "/" separators, links for the levels above, the current level last.
+  const separator = () => crumbSeparator();
   const link = (text, href, onClick) => {
     const a = document.createElement('a');
     a.href = href;
@@ -213,7 +221,7 @@ function updateFormCrumb(panel, steps) {
     });
     return a;
   };
-  crumb.append(link(`‹ ${section.label}`, section.href, () => closeFormPages(null)));
+  crumb.append(crumbHomeLink(), separator(), link(section.label, section.href, () => closeFormPages(null)));
   if (panel) {
     crumb.append(separator(), link(routedHeadingText(panel), pageHref(section, panel), () => closeFormPages(panel)));
   }

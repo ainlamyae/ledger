@@ -358,6 +358,27 @@
                 <p class="formula-where">where,</p>
 
                 <div class="formula-inputs">
+                    <label class="formula-row">
+                        <span class="formula-sym">σ</span>
+                        <span class="formula-name">sex</span>
+                        <select id="formula-sex">
+                            <option value="male">male</option>
+                            <option value="female">female</option>
+                        </select>
+                        <span class="formula-unit"></span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">h</span>
+                        <span class="formula-name">height</span>
+                        <input type="text" id="formula-height" inputmode="decimal">
+                        <span class="formula-unit">cm</span>
+                    </label>
+                    <label class="formula-row">
+                        <span class="formula-sym">a</span>
+                        <span class="formula-name">age</span>
+                        <input type="text" id="formula-age" inputmode="decimal">
+                        <span class="formula-unit">years</span>
+                    </label>
                     <!-- The raw reading, and readonly because it's a measurement rather than a
                          knob: it's here to be compared against the smoothed figure below, which is
                          the one every identity on this sheet is evaluated at. Type your what-ifs
@@ -382,27 +403,6 @@
                         <span class="formula-name">rolling average body mass over L_p</span>
                         <input type="text" id="formula-body-mass-smooth" inputmode="decimal">
                         <span class="formula-unit">kg</span>
-                    </label>
-                    <label class="formula-row">
-                        <span class="formula-sym">h</span>
-                        <span class="formula-name">height</span>
-                        <input type="text" id="formula-height" inputmode="decimal">
-                        <span class="formula-unit">cm</span>
-                    </label>
-                    <label class="formula-row">
-                        <span class="formula-sym">a</span>
-                        <span class="formula-name">age</span>
-                        <input type="text" id="formula-age" inputmode="decimal">
-                        <span class="formula-unit">years</span>
-                    </label>
-                    <label class="formula-row">
-                        <span class="formula-sym">σ</span>
-                        <span class="formula-name">sex</span>
-                        <select id="formula-sex">
-                            <option value="male">male</option>
-                            <option value="female">female</option>
-                        </select>
-                        <span class="formula-unit"></span>
                     </label>
                     <label class="formula-row">
                         <span class="formula-sym">m_des</span>

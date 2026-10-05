@@ -1,4 +1,4 @@
-// Financial Insight — the same preview/question/Send-to-AI flow as Health
+// Finance's Insight — the same preview/question/Send-to-AI flow as Health
 // Insight (insight-panel.js), reusing its renderInsightLines/renderInsightText
 // helpers (insight.js) and groqChatText (groq.js), but for money instead of
 // health: net worth and cash flow, average spending by category over four
@@ -11,7 +11,7 @@
 // custom range would add.
 //
 // currentReport (app.js) and allAccounts (accounts.js) are already loaded for
-// the Financial Indicators charts and Account Summary table by the time this
+// Finance's Indicator charts and Account Summary table by the time this
 // panel is ever visible, so the preview renders straight from them — nothing
 // extra to fetch. Still, nothing is computed until "Financial Snapshot" is
 // clicked, same as Health Insight's mode buttons.

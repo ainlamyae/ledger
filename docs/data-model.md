@@ -45,7 +45,7 @@ One Google Sheet per user, cloned from the template, with these tabs.
 
 - Category columns are matched by name; `Income`/`Expenses` are excluded even if `Breakdown` lists them.
 - `Saved`/`Cumulative` are always the last two columns, so inserting a category doesn't break them.
-- The summary cards' quarter average is the mean of the **3 rows before** the active month. Still computed for both Income and Expenditure — Income's is a tooltip and a Financial Insight figure rather than a second number on the card.
+- The summary cards' quarter average is the mean of the **3 rows before** the active month. Still computed for both Income and Expenditure — Income's is a tooltip and a Finance Insight figure rather than a second number on the card.
 
 ## `Breakdown` (formula-driven)
 

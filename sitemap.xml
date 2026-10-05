@@ -136,12 +136,12 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/finance/financial-indicator/</loc>
+    <loc>https://ainlamyae.github.io/ledger/finance/indicator/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/finance/financial-insight/</loc>
+    <loc>https://ainlamyae.github.io/ledger/finance/insight/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>

@@ -930,8 +930,9 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
     const dailyTargets = nutrientDailyTargets();
 
     const desireCalories = Math.round(calorieTarget.kcal);
-    const desireFat = dailyTargets['Total lipid (fat)'].amount;
-    const desireCarb = dailyTargets['Carbohydrate, by difference'].amount;
+    // Null when the Setting's target list leaves the nutrient out: shown as —.
+    const desireFat = dailyTargets['Total lipid (fat)']?.amount ?? null;
+    const desireCarb = dailyTargets['Carbohydrate, by difference']?.amount ?? null;
     // TEF the calorie target itself would produce at the current thermic rate — the same
     // `calTarget.kcal × (1 − tefDivisor())` the Playground's "energy spent digesting" field
     // and the Status TEF row show. Blank when TEF isn't being counted (rate 0, the default),
@@ -945,8 +946,8 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(String(desireCalories)),
       makeCell(String(proteinBand.min)),
       makeCell(String(fiberBand.min)),
-      makeCell(String(desireFat)),
-      makeCell(String(desireCarb)),
+      makeCell(desireFat === null ? '—' : String(desireFat)),
+      makeCell(desireCarb === null ? '—' : String(desireCarb)),
       makeCell(desireTef > 0 ? String(desireTef) : '—'),
       makeCell(''),
     );
@@ -963,8 +964,8 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(String(desireCalories - totalCalories)),
       makeCell((proteinBand.min - totalProtein).toFixed(1)),
       makeCell((fiberBand.min - (totalFiber || 0)).toFixed(1)),
-      makeCell((desireFat - (totalFat || 0)).toFixed(1)),
-      makeCell((desireCarb - (totalCarbohydrate || 0)).toFixed(1)),
+      makeCell(desireFat === null ? '—' : (desireFat - (totalFat || 0)).toFixed(1)),
+      makeCell(desireCarb === null ? '—' : (desireCarb - (totalCarbohydrate || 0)).toFixed(1)),
       makeCell(desireTef > 0 ? String(Math.round(desireTef - (totalTef || 0))) : '—'),
       makeCell(''),
     );

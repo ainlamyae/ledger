@@ -289,13 +289,13 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     ));
   }
 
-  // BMR row — the plain figure above as a signed expenditure, same sign convention as
-  // the Calorie Balance tooltip's own BMR line.
-  // Labelled with the active equation's key (BMR_mif / BMR_kat), as stored.
-  document.getElementById('today-status-maintenance-label').textContent = BMR_EQUATION_KEYS[bmrFormula()];
-  const maintenanceEl = document.getElementById('today-status-maintenance-value');
-  const maintenanceText = maintenanceKcal !== null ? `${-maintenanceKcal} kcal` : '—';
-  maintenanceEl.textContent = privacyMode ? maskDigits(maintenanceText) : maintenanceText;
+  // BMR_mif and BMR_kat rows: both stored equations as signed expenditures, whichever
+  // one Tune has selected.
+  ['mif', 'kat'].forEach((key) => {
+    const value = todayBmrFigures[`BMR_${key}`];
+    const text = maintenanceKcal !== null && value !== undefined ? `${-value} kcal` : '—';
+    document.getElementById(`today-status-bmr-${key}-value`).textContent = privacyMode ? maskDigits(text) : text;
+  });
 
   // BMR_adp — always shown regardless of which basis Balance/Δm actually run on, so all
   // three can be compared here at once. The stored BMR × (1 − λt) for today.
@@ -354,14 +354,14 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
 
   // Goal — the projected arrival at the healthy body mass: calcProjection's own day count
   // and ETA (the same figures State Trend & Forecast's time-progress meter shows), the
-  // date written D-M-YYYY.
+  // date written YYYY-MM-DD like every date in the app.
   const proj = calcProjection(entries);
   let goalText = '—';
   if (proj?.status === 'reached') {
     goalText = 'Reached';
   } else if (proj?.status === 'ok' && proj.etaDate) {
     const d = proj.etaDate;
-    goalText = `${proj.daysToTarget} days (${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()})`;
+    goalText = `${proj.daysToTarget} days (${isoFromDate(d)})`;
   }
   document.getElementById('today-status-goal-value').textContent = privacyMode ? maskDigits(goalText) : goalText;
 }
@@ -2500,8 +2500,7 @@ function renderWellnessProjectionChart(entries) {
   // a week gap 7x the width of a one-day gap.
   const firstDateMs = parseIsoDateUTC(allLabels[0]);
   const dayOffset = (dateStr) => Math.round((parseIsoDateUTC(dateStr) - firstDateMs) / 86400000);
-  const offsetToDateLabel = (offset) =>
-    new Date(firstDateMs + offset * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const offsetToDateLabel = (offset) => new Date(firstDateMs + offset * 86400000).toISOString().slice(0, 10);
 
   // No raw per-reading series: Body Mass already plots every reading, this is the trend.
   const datasets = [

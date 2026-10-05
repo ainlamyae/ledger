@@ -1,8 +1,6 @@
-// Health Insight's Patterns mode: the Calibrate BMR Periods table, widened with
+// Insight's Patterns mode: the BMR_cal Periods table, widened with
 // each period's macro and activity-type averages, sent to AI to spot which habits line up
 // with more fat lost (ΔM) and a higher real BMR (Offset). insight-panel.js drives it.
-
-const FAT_LOSS_PATTERN_CHUNK_DAYS_DEFAULT = 14;
 
 // Column label, then how to read it off a period row. Shared by the table and the prompt.
 const FAT_LOSS_PATTERN_COLUMNS = [
@@ -10,6 +8,10 @@ const FAT_LOSS_PATTERN_COLUMNS = [
   ['m', (r) => fixedOrDash(r.m, 1)],
   ['Δm', (r) => fixedOrDash(r.deltaMass, 1)],
   ['ΔM (kcal)', (r) => fixedOrDash(r.deltaMKcal, 0)],
+  ['BMR_mif', (r) => fixedOrDash(r.bmr.BMR_mif, 0)],
+  ['BMR_kat', (r) => fixedOrDash(r.bmr.BMR_kat, 0)],
+  ['BMR_cal', (r) => fixedOrDash(r.bmr.BMR_cal, 0)],
+  ['BMR_adp', (r) => fixedOrDash(r.bmr.BMR_adp, 0)],
   ['SD', (r) => fixedOrDash(r.sd, 0)],
   ['TEI', (r) => fixedOrDash(r.tei, 0)],
   ['Protein', (r) => fixedOrDash(r.protein, 0)],
@@ -35,9 +37,9 @@ function meanOfPresent(values) {
   return present.length ? present.reduce((s, v) => s + v, 0) / present.length : null;
 }
 
-// computeBmrCalibration's own periods (so m/Δm/ΔM/D/Offset match the Calibrate form
+// computeBmrCalibration's own periods (so m/Δm/ΔM/D/Offset match Tune's Periods
 // exactly), plus period averages of the columns that form doesn't show.
-function gatherFatLossPatterns(fromIso, toIso, chunkDays = FAT_LOSS_PATTERN_CHUNK_DAYS_DEFAULT) {
+function gatherFatLossPatterns(fromIso, toIso, chunkDays) {
   const result = computeBmrCalibration(fromIso, chunkDays, toIso);
   const byDate = new Map(allPhysiqueEntries.filter((p) => p.date).map((p) => [p.date, p]));
 
@@ -56,6 +58,8 @@ function gatherFatLossPatterns(fromIso, toIso, chunkDays = FAT_LOSS_PATTERN_CHUN
       m: w.massEnd,
       deltaMass: w.deltaMass,
       deltaMKcal: w.deltaMKcal,
+      // Average of each day's stored BMR cell (Physique's BMR column), per key.
+      bmr: Object.fromEntries(BMR_JSON_ORDER.map((key) => [key, meanOfPresent(days.map((d) => bmrFiguresForDate(d.date)[key]))])),
       sd: meanOfPresent(days.map((d) => d.sd)),
       tei: w.avgIntake,
       protein: meanOfPresent(logged.map((p) => p.proteinIn)),
@@ -117,6 +121,7 @@ function formatFatLossPatternPrompt(data) {
     'COLUMNS:',
     'm: smoothed body mass (kg) at the period end. Δm: change in body mass over the period (kg, negative = lost).',
     `ΔM (kcal): Δm × 7700 / ${data.chunkDays} — measured daily energy balance from real mass change (negative = deficit / fat lost).`,
+    'BMR_mif / BMR_kat: basal metabolic rate by Mifflin-St Jeor / Katch-McArdle; BMR_cal: calibrated (equation + measured offset); BMR_adp: adapted by days on the diet — each the period average of the daily stored figure (kcal/day).',
     'SD: sleep-deprivation energy effect (kcal/day). TEI: total energy intake (kcal/day).',
     'Protein, Dietary Fiber, Fat, Carbohydrate: grams/day.',
     'TEF: thermic effect of food (kcal/day). AEE: total activity energy expenditure (kcal/day), split into Cardio, NEAT and Strength (kcal/day).',

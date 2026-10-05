@@ -18,8 +18,8 @@
   - Food Insight sends the classification-grouped ingredient list plus your question — no real vitamin/mineral data, just the model's own inference from the ingredient names.
   - Micronutrients Insight sends real, USDA-measured nutrient totals (from ingredients you've priced via Nutrition's Pull Micronutrients) and their Ideal/day reference figures — the one mode that does send vitamin/mineral data, because unlike Food Insight it's measured, not inferred.
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
-  - Health Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
-  - Patterns Insight sends the profile block plus 14-day period averages (body mass and its change, intake, macros, activity by type, energy balance and BMR offset).
+  - Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
+  - Patterns Insight sends the profile block plus period averages over Tune's L_p days (body mass and its change, intake, macros, activity by type, energy balance and BMR offset).
   - Nothing is sent until that panel's Send to AI is clicked.
 - `GROQ_API_KEY` and `USDA_FDC_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Setting` tab and are never committed. The Settings panel masks any key ending `_API_KEY`/`_TOKEN`/`_SECRET` by default — independent of Privacy mode below, which is for amounts, not credentials — with a per-row reveal button that resets on reload.
 - **Privacy mode** is display-only and doesn't change what's stored.

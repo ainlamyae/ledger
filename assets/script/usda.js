@@ -40,7 +40,7 @@ async function usdaLookupKcalCandidates(query) {
         proteinPer100g: protein ? protein.value : null,
         nutrients: (food.foodNutrients || [])
           .filter((n) => n.nutrientName && Number.isFinite(n.value))
-          .map((n) => ({ name: n.nutrientName, unit: String(n.unitName || '').toUpperCase(), amountPer100g: n.value })),
+          .map((n) => ({ name: n.nutrientName, unit: standardUnit(n.unitName), amountPer100g: n.value })),
       };
     })
     .filter(Boolean);

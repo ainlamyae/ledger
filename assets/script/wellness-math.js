@@ -58,15 +58,17 @@ const CARB_TARGET_G_DEFAULT = 275;
 // referencing it: charts.js loads first, so that const is still in its dead zone.
 const ACTIVITY_MET_FALLBACK = 3.5;
 
-// Either key works, so an already-filled row isn't ignored over a naming preference.
-const ACTIVITY_MET_SETTING_KEYS = ['ACTIVITY_MET', 'ACTIVITY_MET_DEFAULT'];
+// Tune's MET box while its preview runs (withFormulaOverrides) — a what-if, never
+// saved to the Setting tab.
+const ACTIVITY_MET_PREVIEW_KEY = 'ACTIVITY_MET_PREVIEW';
 
+// The walking activity's MET, from the Activity sheet's Walk row (exerciseMet,
+// activities.js) — the one place that number is maintained, so there's no Setting
+// for it to drift from. Tune's typed what-if wins during its own preview only.
 function activityMet() {
-  for (const key of ACTIVITY_MET_SETTING_KEYS) {
-    const met = getSetting(key, null);
-    if (met !== null) return met;
-  }
-  return ACTIVITY_MET_FALLBACK;
+  const preview = currentSettings[ACTIVITY_MET_PREVIEW_KEY];
+  if (typeof preview === 'number' && Number.isFinite(preview)) return preview;
+  return typeof exerciseMet === 'function' ? exerciseMet('Walk') : ACTIVITY_MET_FALLBACK;
 }
 
 // Energy density of body fat, shared by the projection, the calorie target and Calorie
@@ -456,18 +458,29 @@ function bmrBasis() {
   return (raw === 'bmr_adp' || raw === 'bmr_cal') ? raw : BMR_BASIS_DEFAULT;
 }
 
-// The saved BMR calibration (bmr-calibration.js, saved by Tune): an empirically back-solved BMR from
-// actual logged intake/activity/weight-change, rather than the height/age/sex (or lean-mass)
-// equation. Stored as TWO numbers, not one — the calibrated figure itself (KCAL, shown as-is
-// in the Status card and the Caloric Intake chart), and the OFFSET from what the equation
-// said at calibration time (KCAL, signed, possibly negative). Everything that turns a raw
-// bmrKcal() into a plan figure keeps running the equation's own shape — how BMR moves as body
-// mass changes, i.e. its slope — and just shifts the whole line by this constant OFFSET, per
-// the "keep the equation's slope, shift the level" choice: a single measured point can't
-// imply a slope of its own, so borrowing the equation's is the only option that doesn't
-// require new data. Both keys are written together by Tune's Save.
-const BMR_CALIBRATED_KCAL_KEY = 'BMR_CALIBRATED_KCAL';
-const BMR_CALIBRATED_OFFSET_KEY = 'BMR_CALIBRATED_OFFSET_KCAL';
+// The current BMR calibration: an empirically back-solved BMR from actual logged
+// intake/activity/weight-change, rather than the height/age/sex (or lean-mass) equation.
+// Read from the Physique sheet itself — the latest day whose stored BMR cell carries a
+// BMR_cal (physique.js keeps those current) — not from a Setting copy that could drift
+// from it. Two numbers come out of that day: the calibrated figure itself (shown as-is in
+// the Status card and the Caloric Intake chart), and its OFFSET from that day's equation
+// BMR (signed, possibly negative). Everything that turns a raw bmrKcal() into a plan figure
+// keeps running the equation's own shape — how BMR moves as body mass changes, i.e. its
+// slope — and just shifts the whole line by this constant OFFSET, per the "keep the
+// equation's slope, shift the level" choice: a single measured point can't imply a slope of
+// its own, so borrowing the equation's is the only option that doesn't require new data.
+function latestStoredCalibration() {
+  if (typeof physiqueDatedAscending !== 'function') return null;
+  const equationKey = BMR_EQUATION_KEYS[bmrFormula()];
+  const days = physiqueDatedAscending();
+  for (let i = days.length - 1; i >= 0; i--) {
+    const figures = days[i].bmr;
+    if (figures && Number.isFinite(figures.BMR_cal) && Number.isFinite(figures[equationKey])) {
+      return { bmrCal: figures.BMR_cal, offsetKcal: figures.BMR_cal - figures[equationKey] };
+    }
+  }
+  return null;
+}
 // The calibration window: n_p periods of L_p days, ending yesterday.
 const BMR_CALIBRATION_PERIOD_COUNT_KEY = 'BMR_CALIBRATION_PERIOD_COUNT';
 const BMR_CALIBRATION_PERIOD_DAYS_KEY = 'BMR_CALIBRATION_PERIOD_DAYS';
@@ -476,7 +489,7 @@ const BMR_CALIBRATION_PERIOD_DAYS_KEY = 'BMR_CALIBRATION_PERIOD_DAYS';
 // a calibration has actually been saved, same "nothing to show yet" convention as every other
 // optional setting here.
 function calibratedBmrKcal() {
-  return getSetting(BMR_CALIBRATED_KCAL_KEY, null);
+  return latestStoredCalibration()?.bmrCal ?? null;
 }
 
 // 0 outside 'bmr_cal' (nothing to shift by) or before a calibration has ever been saved
@@ -484,7 +497,7 @@ function calibratedBmrKcal() {
 // currentAdaptationFraction's own "0 unless bmr_adp" guard below.
 function currentCalibratedOffsetKcal() {
   if (bmrBasis() !== 'bmr_cal') return 0;
-  return getSetting(BMR_CALIBRATED_OFFSET_KEY, 0);
+  return latestStoredCalibration()?.offsetKcal ?? 0;
 }
 
 // The saved offset regardless of which basis is currently active — unlike
@@ -494,7 +507,7 @@ function currentCalibratedOffsetKcal() {
 // Balance/Δm actually run on", the same convention λt/BMR_adp already follow, so the three
 // bases can be compared side by side. Null before any calibration has ever been saved.
 function calibratedOffsetKcalRaw() {
-  return getSetting(BMR_CALIBRATED_OFFSET_KEY, null);
+  return latestStoredCalibration()?.offsetKcal ?? null;
 }
 
 // The single choke point every consumer of a raw bmrKcal() figure routes through before
@@ -590,7 +603,7 @@ function getActivityTargetMin(bodyMassKg) {
 }
 
 // The single rule every activity kcal figure goes through. A Calculate-derived amount2
-// wins (it used the real per-exercise MET); otherwise minutes at ACTIVITY_MET.
+// wins (it used the real per-exercise MET); otherwise minutes at the Walk MET (activityMet).
 function activityEntryKcal(entry, bodyMassKg) {
   if (entry.amount2 !== null) return entry.amount2;
   const mins = toActivityMinutes(entry.amount, entry.unit);

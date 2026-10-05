@@ -14,22 +14,30 @@ async function initSettingsPanel(forceRefresh = false) {
   settingsSheetId = meta.settingsSheetId;
   settingsSheetMissing = settingsSheetId === null;
 
-  document.getElementById('add-setting-btn').disabled = settingsSheetMissing;
+  SETTING_TABLES.forEach(({ addButtonId }) => {
+    document.getElementById(addButtonId).disabled = settingsSheetMissing;
+  });
 
   if (settingsSheetMissing) {
-    const tbody = document.getElementById('settings-body');
-    tbody.innerHTML = '';
-    tbody.appendChild(renderEmptyRow(3, `No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to use this panel.`));
+    SETTING_TABLES.forEach(({ bodyId }) => {
+      const tbody = document.getElementById(bodyId);
+      tbody.innerHTML = '';
+      tbody.appendChild(renderEmptyRow(3, `No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to use this panel.`));
+    });
   } else {
     await refreshSettingsList(forceRefresh);
+    await removeRetiredSettings();
   }
 
   if (!settingPanelListenersAttached) {
     settingPanelListenersAttached = true;
-    document.getElementById('add-setting-btn').addEventListener('click', () => openSettingForm());
+    SETTING_TABLES.forEach(({ addButtonId }) => {
+      document.getElementById(addButtonId).addEventListener('click', () => openSettingForm());
+    });
     document.getElementById('setting-cancel-btn').addEventListener('click', closeSettingForm);
     onFormSubmit('setting-form', submitSettingForm);
-    // other/settings/<key in lowercase>/ opens that setting's Edit.
+    // <section>/settings/<key in lowercase>/ opens that setting's Edit (both blocks
+    // share the slug "settings", in different sections).
     registerRecordRoute('settings', (slug, sub) => {
       const setting = allSettingRows.find((s) => settingRouteSlug(s) === slug);
       if (!setting || sub) return null;
@@ -37,6 +45,28 @@ async function initSettingsPanel(forceRefresh = false) {
       return setting.key;
     });
   }
+}
+
+// The Setting tab is shown twice: in full under Other, and its health keys alone
+// under Health. One list of rows and one form serve both.
+const SETTING_TABLES = [
+  { bodyId: 'settings-body', addButtonId: 'add-setting-btn', includes: () => true },
+  { bodyId: 'health-settings-body', addButtonId: 'health-add-setting-btn', includes: (key) => isHealthSettingKey(key) },
+];
+
+// Keys read by the Health section: the profile, every intake/activity/sleep
+// target, Tune's BMR/TEF/adaptation figures, the micronutrient targets, workout
+// timing, the USDA key Nutrition's Complete uses, and the Health Insight modes'
+// saved reports. Shared keys (GROQ_API_KEY, the SHOW_* toggles) stay under Other.
+const HEALTH_SETTING_KEY_PATTERN = new RegExp('^(?:' + [
+  'BIRTH_DATE$', 'SEX$', 'HEIGHT_CM$', 'BODY_MASS_', 'WEEKLY_FAT_LOSS_',
+  'CALORIE_', 'PROTEIN_', 'FIBER_', 'FAT_', 'CARB_', 'ACTIVITY_', 'SLEEP_', 'PLAN_',
+  'BMR_', 'TEF_', 'MICRONUTRIENT_', 'KCAL_PER_MET', 'WORKOUT_', 'USDA_',
+  'INSIGHT_', 'WELLNESS_INSIGHT_', 'FOOD_INSIGHT_',
+].join('|') + ')', 'i');
+
+function isHealthSettingKey(key) {
+  return HEALTH_SETTING_KEY_PATTERN.test(key.trim());
 }
 
 // A setting's address segment: its key in lowercase, underscores kept
@@ -103,14 +133,22 @@ function makeSecretRevealButton(key, revealed) {
 }
 
 function renderSettingsList() {
-  const tbody = document.getElementById('settings-body');
+  SETTING_TABLES.forEach((table) => renderSettingsTable(table));
+}
+
+function renderSettingsTable({ bodyId, includes }) {
+  const tbody = document.getElementById(bodyId);
   tbody.innerHTML = '';
 
-  if (allSettingRows.length === 0) {
+  // Alphabetical by key, not the sheet's row order, so a key is found where you'd look.
+  const rows = allSettingRows
+    .filter((setting) => includes(setting.key))
+    .sort((a, b) => a.key.localeCompare(b.key));
+  if (rows.length === 0) {
     tbody.appendChild(renderEmptyRow(3, 'No settings yet — add your first one above.'));
   }
 
-  allSettingRows.forEach((setting) => {
+  rows.forEach((setting) => {
     const tr = document.createElement('tr');
 
     const isSecret = isSecretSettingKey(setting.key);
@@ -281,6 +319,28 @@ async function saveSettingValues(values) {
   currentSettings = await loadSettings(true);
   // Stored per-day BMR/Deprivation follow a changed profile or BMR setting.
   return recomputeStoredPhysiqueBmr(changedKeys);
+}
+
+// Keys the app no longer reads, because their real source is elsewhere: the walking
+// MET is the Activity sheet's Walk row, and BMR_cal is each Physique day's stored BMR
+// cell. A copy left in the Setting tab would only be a stale duplicate, so any row
+// still holding one is deleted on load (once; nothing writes them any more).
+const RETIRED_SETTING_KEYS = ['ACTIVITY_MET', 'ACTIVITY_MET_DEFAULT', 'BMR_CALIBRATED_KCAL', 'BMR_CALIBRATED_OFFSET_KCAL'];
+
+async function removeRetiredSettings() {
+  const rows = allSettingRows
+    .filter((setting) => RETIRED_SETTING_KEYS.includes(setting.key.trim()))
+    .map((setting) => setting.row)
+    // Bottom-up, so each deletion leaves the rows still to delete where they were.
+    .sort((a, b) => b - a);
+  if (!rows.length || settingsSheetId === null) return;
+  await batchUpdate(rows.map((row) => ({
+    deleteDimension: {
+      range: { sheetId: settingsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
+    },
+  })));
+  console.info(`[settings] removed retired keys: ${RETIRED_SETTING_KEYS.join(', ')}`);
+  await refreshSettingsList(true);
 }
 
 async function deleteSetting(row) {

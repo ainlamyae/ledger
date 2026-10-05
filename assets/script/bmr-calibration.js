@@ -15,8 +15,8 @@
 // newest (weekRecencyWeight) — so a long window can draw on months of data without letting
 // six-week-old numbers outvote last week's.
 //
-// Saved as an OFFSET from what the equation says right now (see BMR_CALIBRATED_OFFSET_KEY,
-// wellness-math.js), not a raw replacement BMR — applyBmrBasis/maintenanceAffineCoefficients
+// Applied as an OFFSET from what the equation says (latestStoredCalibration, wellness-math.js:
+// the latest Physique day's stored BMR_cal minus its equation BMR), not a raw replacement BMR — applyBmrBasis/maintenanceAffineCoefficients
 // add that offset to whatever the equation says at any body mass, so the app keeps the
 // equation's own slope (how BMR moves as you gain/lose) and just shifts the whole line to
 // match what was actually measured, per the "keep slope, shift level" design.

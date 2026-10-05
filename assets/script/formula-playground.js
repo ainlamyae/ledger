@@ -220,15 +220,12 @@ async function saveFormulaSettings() {
     if (value !== null) overrides[field.key] = value;
   });
 
-  // The BMR_cal window, and the calibration it measures when there's enough logged.
+  // The BMR_cal window. The calibration it measures isn't saved here: each day's BMR_cal
+  // lives in Physique's BMR column, and the app reads the latest one from there.
   const calibration = tuneBmrCalibration();
   if (calibration) {
     overrides[BMR_CALIBRATION_PERIOD_COUNT_KEY] = calibration.periodCount;
     overrides[BMR_CALIBRATION_PERIOD_DAYS_KEY] = calibration.periodDays;
-    if (calibration.result.ok) {
-      overrides[BMR_CALIBRATED_KCAL_KEY] = calibration.result.bmrCal;
-      overrides[BMR_CALIBRATED_OFFSET_KEY] = calibration.result.offsetKcal;
-    }
   }
 
   const saveBtn = document.getElementById('formula-save-btn');
@@ -240,6 +237,8 @@ async function saveFormulaSettings() {
   statusEl.classList.remove('status-ok');
 
   try {
+    // The MET box is a preview-only what-if; the Activity sheet's Walk row is its home.
+    delete overrides[ACTIVITY_MET_PREVIEW_KEY];
     await saveSettingValues(overrides);
     // saveSettingValues has already refreshed currentSettings, so re-rendering
     // here is what makes the charts agree with it immediately.

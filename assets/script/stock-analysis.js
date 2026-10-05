@@ -4,7 +4,7 @@
 
 const ANALYSIS_HEADERS = ['Date', 'Symbol', 'Verdict', 'Score', 'Close', 'Stop', 'Report'];
 const ANALYSIS_RANGE = () => `'${CONFIG.SHEETS.STOCK_ANALYSIS}'!A2:G`;
-const ANALYSIS_LABELS = ['Overview', 'Signals', 'News', 'Risk', 'Levels', 'Verdict', 'Answer'];
+const ANALYSIS_LABELS = ['Overview', 'Signals', 'News', 'Risk', 'Levels', 'Verdict', 'Answer', 'Alerts'];
 const ANALYSIS_DISCLAIMER = 'Not financial advice. A rules-based summary of past prices and recent headlines; no signal here is anywhere near 95% reliable.';
 const ANALYSIS_STALE_DAYS = 30;
 
@@ -35,9 +35,16 @@ Overview: one or two lines on where the stock stands and how the last year went 
 Signals: what the four checks say, plus the trend's direction and how long it has held.
 News: what the headlines suggest for risk, with citations.
 Risk: volatility, drawdown, beta, any high-volatility or spike caution.
-Levels: only the supplied Close, Trailing stop, SMA200 / 10-month average and 52-week high, with their distance from the close; when to consider buying, holding or exiting in terms of those levels.
+Levels: only the supplied Close, Trailing stop (for a holder), Entry stop (for a buy today), long-term average and 52-week high, with the supplied distances; when to consider buying, holding or exiting in terms of those levels.
 Verdict: the supplied verdict, restated, with one line on what would change it.
-If a question is included, add a last section "Answer:" answering it.`;
+If a question is included, add a section "Answer:" answering it.
+End with exactly one line in this machine-read format (the app turns it into price alerts):
+Alerts: below=<price or none>; above=<price or none>; belowAvg=<yes or no>; aboveAvg=<yes or no>; belowStop=<yes or no>
+- below: a warning price UNDER today's Close (a fall to it means exit or stay out); above: a price OVER today's Close (a rise to it is a buy or breakout signal). A below at or over the Close, or an above at or under it, would fire at once: never suggest one.
+- When the trailing stop is already broken (above the Close), it can't be a below level: use the Entry stop or the long-term average if they are under the Close, else none.
+- Use only prices that appear in the supplied data (Close, Trailing stop, Entry stop, the average, the 52-week high, month-end values), with 2 decimals and no currency, or none.
+- belowAvg / belowStop: yes to be warned of the exit conditions, but only if not already met (close still above that level); aboveAvg: yes to be told when the trend turns back up, only if the close is under the average now.
+- Example: Alerts: below=20.16; above=none; belowAvg=yes; aboveAvg=no; belowStop=yes`;
 
 async function initStockAnalysisLog() {
   if (!(await sheetTabExists(CONFIG.SHEETS.STOCK_ANALYSIS))) {
@@ -72,9 +79,11 @@ function updateAnalysisAgeBadge() {
     const days = Math.round((today - dateFromIso(last.date.slice(0, 10))) / 86400000);
     if (oldest === null || days > oldest.days) oldest = { days, symbol: w.symbol, date: last.date };
   });
-  setPageBadge('finance', 'market', oldest && oldest.days > ANALYSIS_STALE_DAYS
-    ? { text: `${oldest.days}d`, title: `${oldest.symbol} last analyzed ${oldest.days} days ago (${oldest.date})` }
-    : null);
+  const stale = oldest && oldest.days > ANALYSIS_STALE_DAYS ? `${oldest.symbol} last analyzed ${oldest.days} days ago (${oldest.date})` : null;
+  // A met alert outranks the age badge, which moves into the hover.
+  const alert = watchlistAlertBadge();
+  if (alert) setPageBadge('finance', 'market', { text: alert.text, title: stale ? `${alert.title}\n${stale}` : alert.title });
+  else setPageBadge('finance', 'market', stale ? { text: `${oldest.days}d`, title: stale } : null);
 }
 
 function initStockAnalysis() {
@@ -93,6 +102,11 @@ function initStockAnalysis() {
   document.getElementById('analysis-include-position').addEventListener('change', renderAnalysisPrompt);
   document.getElementById('analysis-question').addEventListener('input', renderAnalysisPrompt);
   document.getElementById('analysis-generate-btn').addEventListener('click', runStockAnalysis);
+  document.getElementById('analysis-apply-alerts-btn').addEventListener('click', applySuggestedAlerts);
+  document.getElementById('market-alert-btn').addEventListener('click', () => {
+    const entry = allWatchlist.find((w) => w.symbol === analysisSymbol);
+    if (entry) openWatchlistForm(entry);
+  });
   registerPageShow('market', () => {
     const saved = analysisSymbol || readMarketPref('ledger_market_symbol', null);
     analysisSymbol = allWatchlist.some((w) => w.symbol === saved) ? saved : allWatchlist[0]?.symbol || null;
@@ -205,8 +219,12 @@ function renderAnalysisCards() {
   document.getElementById('analysis-stop').textContent = signals.stop !== null ? formatMoney(signals.stop, currency, { mask: false }) : '—';
   const shares = document.getElementById('analysis-shares');
   shares.textContent = signals.shares !== null ? (privacyMode ? maskDigits(String(signals.shares)) : String(signals.shares)) : '—';
-  shares.title = signals.riskAmount !== null ? `Risking ${formatMoney(signals.riskAmount, currency)} if the stop is hit`
-    : signals.stop !== null && signals.close <= signals.stop ? 'Close is at or below the trailing stop' : 'Needs investment accounts with a Market Value';
+  shares.title = signals.riskAmount !== null ? `If you buy today: risking ${formatMoney(signals.riskAmount, currency)} at the entry stop ${formatMoney(signals.entryStop, currency, { mask: false })}`
+    : 'Needs investment accounts with a Market Value';
+  const stopCard = document.getElementById('analysis-stop');
+  stopCard.title = signals.stop !== null && signals.close <= signals.stop
+    ? `Trailing stop, already broken: close is below it (exit signal for a holder). Entry stop if buying today: ${signals.entryStop !== null ? formatMoney(signals.entryStop, currency, { mask: false }) : 'n/a'}`
+    : `Trailing stop for a holder. Entry stop if buying today: ${signals.entryStop !== null ? formatMoney(signals.entryStop, currency, { mask: false }) : 'n/a'}`;
 }
 
 // One table row: [name (definition), value, rule, read].
@@ -250,7 +268,8 @@ function renderSignalTable() {
 
   const k = getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT);
   signalRow(tbody, 'Trailing stop', `Highest close of the last 22 days − ${k} × ATR14 (chandelier exit). A risk-control habit for long holds, not a proven edge`, money(s.stop), s.stop !== null && s.close <= s.stop ? 'Close is at or below it: exit signal' : 'Exit if the close falls below', s.stop === null ? undefined : s.close > s.stop ? undefined : false);
-  signalRow(tbody, 'Position size', `Shares so a stop-out loses ${getSetting('MARKET_RISK_PCT', 1)}% of your investment accounts`,
+  signalRow(tbody, 'Entry stop', `Close − ${k} × ATR14: where a buy made today would exit; Position size uses it`, money(s.entryStop), 'If you buy today', undefined);
+  signalRow(tbody, 'Position size', `Shares so a stop-out at the entry stop loses ${getSetting('MARKET_RISK_PCT', 1)}% of your investment accounts`,
     s.shares === null ? null : (privacyMode ? maskDigits(String(s.shares)) : String(s.shares)), s.riskAmount === null ? '' : `Risk ${formatMoney(s.riskAmount, currency)}`, undefined, true);
 
   signalRow(tbody, '5-day move', 'Last 5 days against 2σ of normal 5-day moves (short-term reversal: Jegadeesh 1990)',
@@ -443,6 +462,8 @@ function analysisUserMessage() {
   const money = (v) => (v === null || !Number.isFinite(v) ? 'n/a' : `${v.toFixed(2)} ${currency}`);
   const read = (pass) => (pass === true ? 'pass' : pass === false ? 'fail' : 'n/a');
   const val = (result, text) => (result.value === null ? `n/a (needs ${result.needs}, have ${result.have})` : text);
+  // The close's distance from a level, so the AI needn't work it out.
+  const gap = (level) => (level === null || !Number.isFinite(level) ? '' : ` (close is ${Math.abs(s.close - level).toFixed(2)} ${s.close >= level ? 'above' : 'below'} it)`);
   const lines = [
     `Stock: ${symbol} (${currency}), as of ${bars.at(-1)?.d.slice(0, 10)}`,
     '',
@@ -460,7 +481,11 @@ function analysisUserMessage() {
     `5-day move: ${s.spike === null ? 'n/a' : s.spike ? 'spike (above 2 sigma)' : 'normal'}`,
     '',
     'Levels:',
-    `Close: ${money(s.close)}; Trailing stop (highest close of 22 days − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14): ${money(s.stop)}; 52-week high: ${s.high52.value === null ? 'n/a' : money(s.close / s.high52.value)}`,
+    `Close: ${money(s.close)}`,
+    `Trailing stop, for a holder (highest close of 22 days − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14): ${money(s.stop)}${gap(s.stop)}${s.stop !== null && s.close <= s.stop ? ' — already broken: exit signal for a holder' : ''}`,
+    `Entry stop, if buying today (close − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14): ${money(s.entryStop)}${gap(s.entryStop)}`,
+    `${s.trend.basis} (long-term average): ${money(s.trend.sma)}${gap(s.trend.sma)}`,
+    `52-week high: ${s.high52.value === null ? 'n/a' : `${money(s.close / s.high52.value)}${gap(s.close / s.high52.value)}`}`,
     `Last 5 closes: ${bars.slice(-5).map((b) => `${b.d.slice(0, 10)} ${b.c.toFixed(2)}`).join(', ')}`,
     '',
     ...analysisChartHistory(),
@@ -496,6 +521,76 @@ function renderAnalysisReport(text, stamp) {
   const at = document.getElementById('analysis-generated-at');
   at.hidden = !stamp;
   at.textContent = stamp ? `Last generated ${stamp}` : '';
+  renderSuggestedAlerts(text);
+}
+
+let suggestedAlerts = null; // { symbol, alerts } from the shown report
+
+// The report's Alerts line; a price not in the data sent is dropped, never applied.
+function renderSuggestedAlerts(text) {
+  const hint = document.getElementById('analysis-alerts-hint');
+  const btn = document.getElementById('analysis-apply-alerts-btn');
+  suggestedAlerts = null;
+  hint.hidden = true;
+  btn.hidden = true;
+  const parsed = text ? parseAlertLine(text) : null;
+  if (!parsed || !analysisLoaded) return;
+  const { symbol } = analysisLoaded;
+  const known = (analysisUserMessage().match(/\d+\.\d{2}/g) || []).map(Number);
+  const { close, stop, trend } = analysisLoaded.signals;
+  const notes = [];
+  const dropped = ['below', 'above'].filter((k) => parsed[k] !== null && !known.some((v) => Math.abs(parsed[k] - v) <= v * 0.005));
+  if (dropped.length) notes.push(`Left out ${dropped.join(' and ')}: not a price in the data sent.`);
+  dropped.forEach((k) => { parsed[k] = null; });
+  // A rule already met would fire at once, so it isn't a warning.
+  const money = (v) => formatMoney(v, analysisLoaded.currency, { mask: false });
+  if (parsed.below !== null && parsed.below >= close) {
+    notes.push(`Left out below ${money(parsed.below)}: it's not under today's close ${money(close)}.`);
+    parsed.below = null;
+  }
+  if (parsed.above !== null && parsed.above <= close) {
+    notes.push(`Left out above ${money(parsed.above)}: it's not over today's close ${money(close)}.`);
+    parsed.above = null;
+  }
+  if (parsed.belowStop && stop !== null && close <= stop) {
+    notes.push('Left out below the trailing stop: the close is already under it.');
+    parsed.belowStop = false;
+  }
+  if (parsed.belowAvg && trend.sma !== null && close <= trend.sma) {
+    notes.push('Left out below the average: the close is already under it.');
+    parsed.belowAvg = false;
+  }
+  if (parsed.aboveAvg && trend.sma !== null && close >= trend.sma) {
+    notes.push('Left out above the average: the close is already over it.');
+    parsed.aboveAvg = false;
+  }
+  const labels = alertLabels(parseAlerts(parsed)).map((l) => l.label);
+  const entry = allWatchlist.find((w) => w.symbol === symbol);
+  if (labels.length && entry) {
+    suggestedAlerts = { symbol, alerts: parsed };
+    btn.hidden = false;
+    btn.title = `Set ${symbol}'s alerts to ${labels.join(' · ')} on Watch List (replaces its current alerts)`;
+    notes.unshift(`Suggested alerts: ${labels.join(' · ')}. 📌 applies them to ${symbol} on Watch List, replacing its current alerts.`);
+  }
+  hint.textContent = notes.join(' ');
+  hint.hidden = !notes.length;
+}
+
+async function applySuggestedAlerts() {
+  if (!suggestedAlerts) return;
+  const entry = allWatchlist.find((w) => w.symbol === suggestedAlerts.symbol);
+  if (!entry) return;
+  const previous = entry.alerts ? { ...entry.alerts } : null;
+  const btn = document.getElementById('analysis-apply-alerts-btn');
+  btn.disabled = true;
+  try {
+    await saveWatchlistAlerts(entry, { ...suggestedAlerts.alerts, dismissed: [] });
+    showUndoToast(`Alerts set for ${entry.symbol}.`, () => saveWatchlistAlerts(entry, previous));
+  } catch (err) {
+    showFieldError('analysis-form-error', `Couldn't save the alerts: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function renderSavedAnalysis() {
@@ -505,6 +600,7 @@ function renderSavedAnalysis() {
   else {
     document.getElementById('analysis-body').innerHTML = '';
     document.getElementById('analysis-generated-at').hidden = true;
+    renderSuggestedAlerts(null);
   }
 }
 

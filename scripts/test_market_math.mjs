@@ -186,7 +186,42 @@ test('trailingStopSeries', () => {
   close(stops[21], 22 - 2 * atr[21]);
   close(stops.at(-1), 30 - 2 * atr.at(-1)); // keeps the 22-day high after a drop
   const crashed = M.computeSignals({ bars: [...bars, { d: day(40), o: 5, h: 6, l: 4, c: 5, v: 0 }], equity: 100000 });
-  assert.equal(crashed.shares, null); // close below the stop
+  assert.ok(crashed.stop > crashed.close); // trailing stop already broken
+  assert.ok(crashed.entryStop < crashed.close); // entry stop stays under the close
+});
+
+test('checkAlerts', () => {
+  const up = toBars(range(1, 250)); // close 250, SMA200 150.5
+  const r = M.checkAlerts({ below: 260, above: 300, belowAvg: true, aboveAvg: true, belowStop: true }, up);
+  const by = Object.fromEntries(r.map((x) => [x.rule, x]));
+  assert.equal(by.below.met, true);
+  assert.equal(by.below.label, '<260.00');
+  assert.equal(by.above.met, false);
+  assert.equal(by.belowAvg.met, false);
+  assert.equal(by.aboveAvg.met, true);
+  close(by.aboveAvg.level, 150.5);
+  assert.equal(by.belowStop.met, false);
+  const crash = toBars([...range(1, 250), 100]);
+  assert.equal(M.checkAlerts({ belowStop: true }, crash)[0].met, true);
+  const short = toBars(range(1, 30));
+  assert.equal(M.checkAlerts({ belowAvg: true }, short)[0].met, null); // needs history
+  const monthly = Array.from({ length: 12 }, (_, i) => ({ d: `2025-${String(i + 1).padStart(2, '0')}-28`, o: 50, h: 50, l: 50, c: 50, v: 0 }));
+  const fb = M.checkAlerts({ belowAvg: true }, short, monthly)[0];
+  assert.equal(fb.basis, '10-month SMA');
+  assert.equal(fb.met, true); // close 30 under the 50 average
+  assert.equal(M.checkAlerts({}, up).length, 0);
+});
+
+test('parseAlertLine', () => {
+  const a = M.parseAlertLine('Verdict: Mixed\nAlerts: below=20.16; above=none; belowAvg=yes; aboveAvg=no; belowStop=yes');
+  assert.equal(a.below, 20.16);
+  assert.equal(a.above, null);
+  assert.equal(a.belowAvg, true);
+  assert.equal(a.aboveAvg, false);
+  assert.equal(a.belowStop, true);
+  assert.equal(M.parseAlertLine('alerts: below=$1,234.5; belowStop=no').below, 1234.5);
+  assert.equal(M.parseAlertLine('Alerts: below=none; above=none; belowAvg=no; aboveAvg=no; belowStop=no'), null);
+  assert.equal(M.parseAlertLine('Overview: no alert line'), null);
 });
 
 test('computeSignals', () => {
@@ -206,8 +241,9 @@ test('computeSignals', () => {
   assert.equal(s.verdict.label, 'Favourable');
   close(s.beta.value, 2, 1e-9);
   close(s.stop, Math.max(...p.slice(-22)) - 4 * s.atr); // default MARKET_ATR_MULT
-  assert.equal(s.shares, Math.floor(1000 / (s.close - s.stop)));
-  close(s.riskAmount, s.shares * (s.close - s.stop));
+  close(s.entryStop, s.close - 4 * s.atr);
+  assert.equal(s.shares, Math.floor(1000 / (4 * s.atr))); // sized on the entry stop
+  close(s.riskAmount, s.shares * 4 * s.atr);
   assert.notEqual(s.sharpe.value, null);
   assert.notEqual(s.vol63.value, null);
   const short = M.computeSignals({ bars: bars.slice(0, 30) });

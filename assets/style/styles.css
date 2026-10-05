@@ -2906,6 +2906,12 @@ html.home-hub .page-tiles,
         grid-template-columns: minmax(0, 1fr);
     }
 
+    /* Market's and Portfolio's four short figures stay two by two. */
+    #stock-analysis-panel > .cards,
+    #portfolio-panel > .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     /* Half of a phone this narrow is under 190px, which a date picker fills to
        the edge — back to one field per line. */
     .form-row {

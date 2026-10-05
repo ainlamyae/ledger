@@ -20,7 +20,7 @@
 | `'Travel'!A2:H` | `travel.js` | Travel rows |
 | `'Application'!A2:E` | `applications.js` | Application header + status-update rows |
 | `Settings!A2:C` | `app.js`, `settings-panel.js` | Personal overrides; `app.js` reads A/B, the panel reads and writes all three |
-| `'Watchlist'!A2:E` | `market.js` | Watchlist stocks (tab created on the first save) |
+| `'Watchlist'!A2:F` | `market.js` | Watchlist stocks and their alerts (tab created on the first save) |
 | `'Trade'!A2:J` | `portfolio.js` | Buys, sells and splits (tab created on the first save) |
 | `'Analysis'!A2:G` | `stock-analysis.js` | Saved AI reads, one row per run (tab created on the first save) |
 | `'Account'!E3:E100` | `portfolio.js` | Market Value, written only by the opt-in Update Market Value (`PORTFOLIO_WRITE_MARKET_VALUE` = 1) |

@@ -1595,6 +1595,7 @@
                         <th class="num" title="Change since the previous close">1d</th>
                         <th class="num" title="Change over about one month (21 trading days)">1m</th>
                         <th class="num" title="Change over about one year (252 trading days)">1y</th>
+                        <th title="Alert rules: gray while waiting, red when met on the latest close">Alert</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -1607,6 +1608,7 @@
         <div class="panel" id="stock-analysis-panel" data-route="market">
             <div class="panel-header">
                 <h2>Market</h2>
+                <button id="market-alert-btn" class="btn btn-icon panel-header-btn" title="Set alerts for this stock" aria-label="Alerts">🔔</button>
             </div>
 
             <div class="filters">
@@ -1678,11 +1680,13 @@
 
             <div class="panel-actions" data-page-actions>
                 <button type="button" id="analysis-generate-btn" class="btn btn-icon" disabled title="Send to AI (pick a stock first)" aria-label="Send to AI">🤖</button>
+                <button type="button" id="analysis-apply-alerts-btn" class="btn btn-icon" hidden title="Apply the AI's suggested alerts to this stock on Watch List" aria-label="Apply suggested alerts">📌</button>
                 <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
             </div>
 
             <p id="analysis-generated-at" class="hint" hidden></p>
             <div id="analysis-body" class="insight-body"></div>
+            <p id="analysis-alerts-hint" class="hint" hidden></p>
             <p id="analysis-form-error" class="status" hidden></p>
         </div>
 
@@ -2317,6 +2321,29 @@
             </div>
             <label>Notes
                 <input type="text" id="watchlist-notes" placeholder="Optional">
+            </label>
+
+            <!-- Alerts, checked on each day's close (checkAlerts, market-math.js); stored as JSON in column F. -->
+            <p class="hint" id="watchlist-alert-levels">Alerts: a red badge on Watch List and Market when a rule is met on a day's close.</p>
+            <div class="form-row">
+                <label>Alert: close below
+                    <input type="number" id="watchlist-alert-below" inputmode="decimal" min="0" step="0.01" placeholder="e.g. 20.16">
+                </label>
+                <label>Alert: close above
+                    <input type="number" id="watchlist-alert-above" inputmode="decimal" min="0" step="0.01" placeholder="Optional">
+                </label>
+            </div>
+            <label class="checkbox-inline-label" title="SMA200, or the 10-month average while daily history is short — the verdict's Trend check">
+                <input type="checkbox" id="watchlist-alert-below-avg">
+                Alert: close below the long-term average
+            </label>
+            <label class="checkbox-inline-label" title="A possible entry: the Trend check turns to Pass">
+                <input type="checkbox" id="watchlist-alert-above-avg">
+                Alert: close above the long-term average
+            </label>
+            <label class="checkbox-inline-label" title="Highest close of 22 days minus MARKET_ATR_MULT × ATR14">
+                <input type="checkbox" id="watchlist-alert-below-stop">
+                Alert: close below the trailing stop
             </label>
 
             <p id="watchlist-form-error" class="status" hidden></p>

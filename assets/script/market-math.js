@@ -269,7 +269,9 @@ function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atr
   const close = closes.length ? closes[closes.length - 1] : null;
   const stops = trailingStopSeries(bars, atrMult);
   const stop = stops.length ? stops[stops.length - 1] : null;
-  const risk = close !== null && stop !== null && close > stop ? close - stop : null;
+  // Trailing stop: for a holder. Entry stop: where a buy made today would exit; sizes it.
+  const risk = close !== null && atr !== null ? atrMult * atr : null;
+  const entryStop = risk !== null ? close - risk : null;
   const shares = equity && risk ? Math.floor((equity * riskPct) / 100 / risk) : null;
   const checks = {
     trend: trend.value,
@@ -293,11 +295,60 @@ function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atr
     spike: spike,
     close: close,
     stop: stop,
+    entryStop: entryStop,
     shares: shares,
     riskAmount: shares !== null ? shares * risk : null,
     checks: checks,
     verdict: verdictFromChecks(checks, { vol63: vol63.value, vol252: vol252.value, spike: spike }),
   };
+}
+
+// Watchlist alerts on the latest daily close. rules: { below, above, belowAvg, aboveAvg, belowStop }.
+// Each result: { rule, label, met (null = can't tell yet), close, level, date, basis }.
+function checkAlerts(rules, bars, monthlyBars = null, atrMult = MARKET_ATR_MULT_DEFAULT) {
+  if (!rules || !bars || !bars.length) return [];
+  const last = bars[bars.length - 1];
+  const close = last.c;
+  const date = String(last.d).slice(0, 10);
+  const fmt = (v) => v.toFixed(2);
+  const out = [];
+  const add = (rule, label, level, met, basis = null) => out.push({ rule, label, met, close, level, date, basis });
+  if (Number.isFinite(rules.below)) add('below', `<${fmt(rules.below)}`, rules.below, close < rules.below);
+  if (Number.isFinite(rules.above)) add('above', `>${fmt(rules.above)}`, rules.above, close > rules.above);
+  if (rules.belowAvg || rules.aboveAvg) {
+    const trend = trendFilter(bars, monthlyBars);
+    const sma = trend.sma;
+    if (rules.belowAvg) add('belowAvg', '<avg', sma, sma === null ? null : close < sma, trend.basis);
+    if (rules.aboveAvg) add('aboveAvg', '>avg', sma, sma === null ? null : close > sma, trend.basis);
+  }
+  if (rules.belowStop) {
+    const stops = trailingStopSeries(bars, atrMult);
+    const stop = stops[stops.length - 1];
+    add('belowStop', '<stop', stop, stop === null ? null : close < stop);
+  }
+  return out;
+}
+
+// The AI's last "Alerts: below=…; above=…; belowAvg=yes; …" line, or null.
+function parseAlertLine(text) {
+  const line = String(text || '').split('\n').reverse().find((l) => /^\s*alerts\s*:/i.test(l));
+  if (!line) return null;
+  const pairs = Object.fromEntries(line.replace(/^\s*alerts\s*:/i, '').split(';')
+    .map((p) => p.split('=').map((x) => x.trim().toLowerCase()))
+    .filter((p) => p.length === 2 && p[0]));
+  const price = (v) => {
+    const n = Number(String(v || '').replace(/[^0-9.]/g, ''));
+    return v && v !== 'none' && n > 0 ? Math.round(n * 100) / 100 : null;
+  };
+  const yes = (v) => v === 'yes' || v === 'true';
+  const out = {
+    below: price(pairs.below),
+    above: price(pairs.above),
+    belowAvg: yes(pairs.belowavg),
+    aboveAvg: yes(pairs.aboveavg),
+    belowStop: yes(pairs.belowstop),
+  };
+  return out.below !== null || out.above !== null || out.belowAvg || out.aboveAvg || out.belowStop ? out : null;
 }
 
 function verdictFromChecks(checks, { vol63, vol252, spike } = {}) {

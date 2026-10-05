@@ -709,10 +709,15 @@ async function loadDashboard(forceRefresh = false) {
       ] : []),
       ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
       ...(home && !shows('track') ? [initTimeSheet(forceRefresh)] : []),
+      // Watchlist alerts badge the Watch List and Market tiles, here and on home;
+      // the price check runs in the background once the keys (settings) are in.
+      ...((shows('finance') || home) ? [initWatchlist(forceRefresh).then(() => {
+        settingsPromise.then(() => checkWatchlistAlerts()).catch(() => {});
+        return initStockAnalysisLog();
+      })] : []),
       ...(shows('finance') ? [
         initAccountManager(forceRefresh),
         initBreakdown(forceRefresh),
-        initWatchlist(forceRefresh).then(() => initStockAnalysisLog()),
         initTrades(forceRefresh),
       ] : []),
       ...(shows('track') ? [
@@ -1004,6 +1009,7 @@ const AUTH_GATED_SELECTOR = [
   '#formula-save-btn',            // Tune's Save
   '#portfolio-write-mv-btn',
   '#analysis-generate-btn',       // saves its read to the Analysis tab
+  '#analysis-apply-alerts-btn',   // writes the AI's alerts to the Watchlist tab
 ].join(', ');
 
 // Reads the sheet but never writes it, so it has no business prompting: the

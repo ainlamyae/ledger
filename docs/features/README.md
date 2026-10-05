@@ -19,7 +19,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 | Page | Covers |
 |---|---|
 | [Finance](finance.md) | Summary cards, Indicator (incl. Spending Breakdown by Type), Transactions (income confetti), Account, Transfer, Breakdown, Insight |
-| [Finance — Watch List](finance-watchlist.md) | Watchlist stocks, latest moves, symbol search |
+| [Finance — Watch List](finance-watchlist.md) | Watchlist stocks, latest moves, symbol search, price alerts |
 | [Finance — Market](finance-market.md) | One stock's chart 1d…All, verdict and signals, news, AI read |
 | [Finance — Portfolio](finance-portfolio.md) | Trade log, average cost (ACB), gain/loss in CAD, By Account |
 | [Time Tracker](time-tracker.md) | Work Time logging, badge, charts, overtime |

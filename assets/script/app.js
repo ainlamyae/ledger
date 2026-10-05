@@ -674,8 +674,7 @@ async function loadDashboard(forceRefresh = false) {
       renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
       renderSpendingBreakdownCharts(report.categoryComparison);
       renderTypeBreakdownCharts(report.typeBreakdown);
-      renderExpenseBreakdownTrendChart(report.categoryTrend);
-      renderSavingsTrendChart(report.savingsTrend);
+      renderFinanceTrendCharts(report);
       renderFinanceGlanceNetWorthChart(report.savingsTrend);
       renderReconciliationStatus(report.missingAmount);
     }) : Promise.resolve();

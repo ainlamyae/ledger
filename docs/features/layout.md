@@ -10,6 +10,7 @@
 - **Export Transactions** and **Export Physique** (CSV, every row) live in Other › Settings.
 - Notifications for Work Time and Car Service: account menu → **Enable notifications**.
 - iPhone Safari never zooms on a tapped field (`maximum-scale=1.0`, 16px touch fields); pinch-zoom still works.
+- Range-button rows (Health Indicator, Health Insight, Finance Indicator) are Market's `.pagination` row of `.btn`, current one `.btn-primary`, with `.panel-range`: nothing above, `--space-s` below — the same spacing the From/To row had. Work Time still uses From/To.
 - From/To pairs keep 30px fields and `--space-s` after them. Every pair of fields side by side (From/To, a form's pairs, filter rows) is `--field-pair-gap` apart: 8px, 16px at ≤1179px.
 - The footer reads `© 2026 ALI — Ledger v3.3.6`, its two parts joined by a spaced em dash, a real character so search engines and AI read the break: the copyright with its owner first (ALI links to the author's site; the year is the current one), then the product and its version (Ledger links home; the version is stamped per commit).
   - The same facts are in `index.html`'s head for machines: `<meta name="author" content="ALI">` and a schema.org `WebApplication` JSON-LD block (name, URL, description, author and copyright holder ALI, copyright year). It carries no version — that changes every commit and only `version.js` is stamped.
@@ -44,6 +45,7 @@
 - Sheet tab names live only in `CONFIG.SHEETS` (`config.js`), so renaming a tab is one line.
 - Charts live in the panel of the data they describe: Work Analytics in Work Time, Travel Insights in Travel, Protein Source Rotation in Indicator.
 - `.table-compact` is the one dense-table look, shared by every table of short figures; per-table widths stay scoped to their own id.
+- Every table is as wide as its columns' text (`table { width: fit-content; max-width: 100% }`), not the panel's full width, so columns carry no spare gaps; a table wider than the panel scrolls sideways.
 - A form for one calendar day appends ` — {date}` to its title (`formTitleWithDate`, `ui-helpers.js`): *Edit Physique — 2026-08-23*. A dateless Pattern keeps the bare title.
 
 ### Stacking order

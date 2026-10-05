@@ -332,13 +332,11 @@
                 <h2>Indicator</h2>
             </div>
 
+            <!-- Market's range row (renderRangeButtons), ending today; governs every chart below. -->
+            <div class="pagination panel-range" id="wellness-range"></div>
+
             <div class="body-mass-projection-wrap">
-                <!-- Governs every chart from here down — State Trend & Forecast, Body Mass,
-                     Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Dietary
-                     Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep and Protein Source
-                     Rotation — so it sits right above State Trend & Forecast's own heading
-                     rather than under one chart's label, which would read as belonging to that
-                     chart alone. -->
+                <!-- From/To replaced by the range buttons above (wellness-charts.js).
                 <div class="export-date-range">
                     <label>From
                         <input type="date" id="wellness-date-from">
@@ -347,6 +345,7 @@
                         <input type="date" id="wellness-date-to">
                     </label>
                 </div>
+                -->
 
                 <!-- State Trend & Forecast chart — temporarily hidden; re-enable by uncommenting
                 <div class="body-mass-projection-header">
@@ -444,6 +443,7 @@
                 </div>
 
                 <div class="donut-legend" id="protein-rotation-legend"></div>
+                <div class="donut-legend" id="protein-rotation-ingredient-legend"></div>
             </div>
 
             <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
@@ -536,7 +536,9 @@
                         <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
                         <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
                         <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
+                        <!-- Uses column retired (nutrition.js keeps its code commented).
                         <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
+                        -->
                         <th></th>
                     </tr>
                     </thead>
@@ -574,6 +576,7 @@
             <h2>Insight</h2>
             <p class="hint" id="insight-hint"></p>
 
+            <!-- From/To replaced by the range buttons below (insight-panel.js).
             <div class="export-date-range">
                 <label>From
                     <input type="date" id="insight-date-from">
@@ -582,6 +585,9 @@
                     <input type="date" id="insight-date-to">
                 </label>
             </div>
+            -->
+            <!-- Indicator's range row (WELLNESS_RANGES), ending today. -->
+            <div class="pagination panel-range" id="insight-range"></div>
 
             <!-- The modes, in one card titled Insight, as a hub's tiles are. -->
             <div class="card insight-mode-actions">
@@ -1371,7 +1377,12 @@
         </div>
 
         <div class="panel" data-route="indicator">
-        <h2>Indicator</h2>
+        <div class="panel-header">
+            <h2>Indicator</h2>
+        </div>
+
+        <!-- Market's range row: window for Net Worth and Expenditure Trend (finance-charts.js). -->
+        <div class="pagination panel-range" id="finance-trend-range"></div>
 
         <div class="panel-section card">
             <h3>Cumulative Net Worth</h3>
@@ -2095,10 +2106,20 @@
                 <button id="add-setting-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a setting" aria-label="Add">➕</button>
             </div>
 
+            <!-- Tabs: the Market range row's buttons, each its own address (settings-panel.js). -->
+            <div class="pagination" id="settings-tabs">
+                <button type="button" class="btn" data-route="ai" data-route-view aria-pressed="false">AI &amp; Keys</button>
+                <button type="button" class="btn" data-route="responses" data-route-view aria-pressed="false">AI Responses</button>
+                <button type="button" class="btn" data-route="health" data-route-view aria-pressed="false">Health</button>
+                <button type="button" class="btn" data-route="display" data-route-view aria-pressed="false">Display</button>
+                <button type="button" class="btn" data-route="all" data-route-view aria-pressed="false">All</button>
+            </div>
+
             <div class="table-responsive">
                 <table id="settings-table" class="table-compact">
                     <thead>
                     <tr>
+                        <th>Note</th>
                         <th>Key</th>
                         <th>Value</th>
                         <th></th>

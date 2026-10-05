@@ -400,24 +400,55 @@ function setTodayGlanceTile(idPrefix, value, target, unit, tone) {
 // Read straight off the inputs rather than from state initDateRangeControl hands back,
 // so it can't matter whether a chart renders before or after that wiring runs — an
 // unfilled pair simply reads as "use the default", which is what it means.
-function wellnessDateRange() {
-  const from = document.getElementById('wellness-date-from').value;
-  const to = document.getElementById('wellness-date-to').value;
-  if (from && to) return { from, to };
+// From/To inputs retired for the range buttons below.
+// function wellnessDateRange() {
+//   const from = document.getElementById('wellness-date-from').value;
+//   const to = document.getElementById('wellness-date-to').value;
+//   if (from && to) return { from, to };
+//
+//   const fallback = lastNDates(WELLNESS_METRICS_DAYS);
+//   return { from: fallback[0], to: fallback[fallback.length - 1] };
+// }
 
-  const fallback = lastNDates(WELLNESS_METRICS_DAYS);
-  return { from: fallback[0], to: fallback[fallback.length - 1] };
+// Fixed lengths ending today, Market's notation (rangeStartDate, market-charts.js).
+// Shared by Indicator and Insight.
+const WELLNESS_RANGES = [
+  { slug: '1w', label: '1w', days: 7 },
+  { slug: '1m', label: '1m', months: 1 },
+  { slug: '3m', label: '3m', months: 3 },
+  { slug: '1y', label: '1y', months: 12 },
+  { slug: 'all', label: 'All' },
+];
+let wellnessRangeSlug = '1m';
+
+// {from, to} for a range slug; All starts at the first logged Physique day.
+function healthRangeDates(slug) {
+  const range = WELLNESS_RANGES.find((r) => r.slug === slug);
+  const to = localIso();
+  let from = rangeStartDate(range);
+  if (!from) {
+    const dates = physiqueAsWellnessEntries().map((e) => e.date).filter(Boolean).sort();
+    from = dates[0] || lastNDates(WELLNESS_METRICS_DAYS)[0];
+  }
+  return { from, to };
+}
+
+function wellnessDateRange() {
+  return healthRangeDates(wellnessRangeSlug);
 }
 
 // One control for the panel. Every chart under State Trend & Forecast redraws on a
-// change, Protein Source Rotation included — it used to carry a second From/To pair of
-// its own, so the panel showed two windows at once.
+// change, Protein Source Rotation and Activity Rotation included.
 function initWellnessRangeControl() {
-  initDateRangeControl('wellness-date-from', 'wellness-date-to', WELLNESS_METRICS_DAYS, () => {
+  // initDateRangeControl('wellness-date-from', 'wellness-date-to', WELLNESS_METRICS_DAYS, () => { … });
+  const pick = (slug) => {
+    wellnessRangeSlug = slug;
+    renderRangeButtons('wellness-range', WELLNESS_RANGES, wellnessRangeSlug, pick);
     renderWellnessCharts(physiqueAsWellnessEntries());
     renderProteinRotationChart(wellnessDateRange());
     renderActivityRotationChart(wellnessDateRange());
-  });
+  };
+  renderRangeButtons('wellness-range', WELLNESS_RANGES, wellnessRangeSlug, pick);
 }
 
 // The date list built from that range, clipped to what this particular metric has

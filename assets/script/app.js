@@ -15,28 +15,6 @@ let privacyMode = false;
 // pattern as privacyMode/SHOW_AMOUNTS above.
 let widgetsVisible = true;
 
-// The three section blocks (Health/Finance/Other) are HIDDEN by default on the
-// home page so it loads fast: loadDashboard skips every per-section fetch while
-// they're hidden. "Show blocks" (the menu item just above dark mode) flips
-// SHOW_BLOCKS and triggers that deferred load. Unlike SHOW_WIDGETS this defaults
-// OFF, and section pages (/health/, /finance/, /other/) always show their one
-// block regardless (applyBlocksVisibility leaves them alone). Seeded from the
-// cached setting — synchronously, like index.html's pre-paint guess — so the
-// very first loadDashboard can decide to skip before the real Settings fetch
-// even returns; the fetched value then corrects it.
-let blocksVisible = (function () {
-  try {
-    const cached = JSON.parse(localStorage.getItem('ledger_cache_settings') || 'null');
-    return Number(cached && cached.data && cached.data.SHOW_BLOCKS) === 1;
-  } catch (e) {
-    return false;
-  }
-}());
-// Whether the heavy per-section load has actually run this session, so toggling
-// blocks off then back on just re-shows the already-built DOM (instant, straight
-// off the cache) instead of refetching every section again.
-let blocksLoaded = false;
-
 // Replaces every digit with '*', so masked values keep their currency
 // symbol, sign, and separators (e.g. "$1,234.56" -> "$*,***.**").
 function maskDigits(str) {
@@ -619,28 +597,12 @@ async function loadDashboard(forceRefresh = false) {
       applySettingsToWidgets();
       // Same 0/1 convention, but DEFAULT 0 (hidden) — the home page deliberately
       // starts without its blocks, showing them only once asked.
-      blocksVisible = getSetting('SHOW_BLOCKS', 0) === 1;
-      updateBlocksButtonUI();
-      applyBlocksVisibility();
     });
 
-    // Whether to load the detailed blocks at all. They're hidden by default on
-    // the home page (SHOW_BLOCKS), and while hidden every detail-only module below
-    // — the big tables and the secondary charts — is skipped entirely, which is
-    // the home page's load saving. The section SUMMARY TILES (Health's
-    // today-glance, Finance's Net Worth / cash-flow cards) stay on screen either
-    // way: they come from the always-loaded core just below, not from these.
-    // Section pages (window.ledgerSectionPage) always load — they exist to show
-    // one block — and an explicit forceRefresh (Refresh, or the first Show blocks
-    // of a session) does too. Decided off the cached blocksVisible first, then
-    // re-checked against the freshly fetched setting so a stale "hidden" guess
-    // that's really "shown" still loads.
-    let loadBlocks = Boolean(window.ledgerSectionPage) || blocksVisible || forceRefresh;
-    if (!loadBlocks) {
-      await settingsPromise;
-      loadBlocks = blocksVisible;
-    }
-    blocksLoaded = loadBlocks;
+    // The blocks themselves load only on a section page, which shows them. The
+    // home page is an overview — each section's glance cards and page tiles
+    // (page-nav.js) — so it reads just what those cards need.
+    const loadBlocks = Boolean(window.ledgerSectionPage);
 
     // The core, always loaded whether the blocks are shown or not — it's what
     // populates the always-visible summary tiles. Physique feeds Health's
@@ -908,47 +870,6 @@ function setupWidgetsToggle() {
   });
 }
 
-// Reflects the current blocksVisible on the menu item's label — same
-// standalone-from-setup shape as updateWidgetsButtonUI.
-function updateBlocksButtonUI() {
-  const btn = document.getElementById('blocks-toggle-btn');
-  btn.textContent = blocksVisible ? 'Hide blocks' : 'Show blocks';
-}
-
-// Shows/hides the three section blocks per blocksVisible, via the same
-// <html data-blocks-pref> attribute index.html's pre-paint script stamps from
-// the cached setting (styles.css hides .panel-group off it) — so a live toggle
-// and the pre-paint guess stay in one mechanism, and the home page never flashes
-// the blocks before settings load. Section pages (/health/ etc.) are left alone:
-// section-page.js already shows exactly one block there, which must stay visible
-// no matter what this preference says.
-function applyBlocksVisibility() {
-  if (window.ledgerSectionPage) return;
-  if (blocksVisible) {
-    document.documentElement.removeAttribute('data-blocks-pref');
-  } else {
-    document.documentElement.setAttribute('data-blocks-pref', 'hidden');
-    document.querySelectorAll('#main-nav a.active').forEach((link) => link.classList.remove('active'));
-  }
-}
-
-function setupBlocksToggle() {
-  updateBlocksButtonUI();
-
-  document.getElementById('blocks-toggle-btn').addEventListener('click', () => {
-    blocksVisible = !blocksVisible;
-    updateBlocksButtonUI();
-    applyBlocksVisibility();
-    // Same best-effort persistence as SHOW_WIDGETS above.
-    saveSettingValues({ SHOW_BLOCKS: blocksVisible ? 1 : 0 }).catch((err) => {
-      console.error('Failed to save SHOW_BLOCKS setting:', err);
-    });
-    // First reveal this session has to fetch the per-section data the initial
-    // load skipped; once loaded, re-showing is just the CSS attribute above.
-    if (blocksVisible && !blocksLoaded) loadDashboard();
-  });
-}
-
 // A phone screen now has a fixed bar at both the top (header) and the bottom
 // (.nav, styles.css's phone breakpoint) — sliding the top one out of view on
 // the way down the page, and back in on the way up, gives the content the
@@ -1004,10 +925,8 @@ function setupScrollSpy() {
     .map((link) => document.getElementById(link.dataset.section))
     .filter(Boolean);
 
-  // With blocks hidden the home page is short, so nothing is highlighted.
   const setActive = (id) => {
-    const blocksShown = !document.documentElement.hasAttribute('data-blocks-pref');
-    navLinks.forEach((link) => link.classList.toggle('active', blocksShown && link.dataset.section === id));
+    navLinks.forEach((link) => link.classList.toggle('active', link.dataset.section === id));
   };
 
   const observer = new IntersectionObserver((entries) => {
@@ -1126,7 +1045,6 @@ function bootDashboard() {
   setupThemeToggle();
   setupPrivacyToggle();
   setupWidgetsToggle();
-  setupBlocksToggle();
   setupKeyboardShortcuts();
   applyChartTheme();
   initWidgets();

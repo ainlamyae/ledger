@@ -74,7 +74,7 @@ The exercise catalogue — one row per movement, and the single source for what 
 | F — Image | Text | URL or repo-relative path to the Instruction modal's figure. Blank means label-only. Also previewed live under the Edit/Add Activity form's own Image field, so a path can be checked before Save — `renderActivityImagePreview` in `activities.js`, hidden again if the path 404s |
 | G — MET | Number | Metabolic equivalent for the burn formula |
 | H — Muscle Group | Text | Drives the neglected-muscle Insight, and shown under each Instruction modal figure's name. The reported groups are whatever this column names, so a new one needs no code change |
-| I — Weight | Text | Freeform, e.g. `45 lbs` or `20kg`. Shown in the Instruction modal, leading the Sets x Reps/Rest line (`45 lbs · 3 x 15 · 60 sec rest`) rather than trailing it, and as its own column in the plan table when any row in the group has one |
+| I — Weight | Text | The exercise's load, shown as **Load** in the app (the sheet's header can stay Weight: columns are read by position). Freeform, e.g. `45 lbs` or `20kg`. Shown in the Instruction modal, leading the Sets x Reps/Rest line (`45 lbs · 3 x 15 · 60 sec rest`) rather than trailing it, and as its own column in the plan table when any row in the group has one |
 | J — Weekly Target | Number | Blank excludes the Group from Activity Rotation; a number is the desired sessions/week for this row's Group. Shared by every row in the Group (typed once, copied down); when rows disagree, the max wins |
 
 - Both the displayed cell and the checkbox's quantity attributes are built from column E, so they can no longer disagree — they had, on 24 of 34 rows, which made Log a Workout and a later Recalculate differ by up to ~15% on the same exercise.

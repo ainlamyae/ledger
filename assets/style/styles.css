@@ -184,6 +184,12 @@ header h1 {
     display: none;
 }
 
+/* The Ledger tab: only in the phone's bottom tab bar (below), where the header's
+   logo is gone; the logo is the way home everywhere else. */
+.nav .nav-home {
+    display: none;
+}
+
 .nav a {
     position: relative;
     display: block;
@@ -2721,6 +2727,20 @@ td .btn {
         /* Lifts the bar off the content it floats over so it reads as a layer,
            not a strip fused to the last panel. */
         box-shadow: 0 -2px 12px rgba(0, 0, 0, .22);
+    }
+
+    .nav .nav-home {
+        display: flex;
+    }
+
+    /* On the home page Ledger is the current tab; the sections it scrolls past
+       aren't marked as well. */
+    html.home-hub .nav a[data-section].active {
+        color: rgba(255, 255, 255, .68);
+    }
+
+    html.home-hub .nav a[data-section].active::before {
+        content: none;
     }
 
     /* Each tab fills the bar's height (--bottom-bar-height), the action bar's too. */

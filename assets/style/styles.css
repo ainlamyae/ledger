@@ -43,6 +43,26 @@ textarea {
     --shadow-dropdown: 0 4px 16px rgba(0,0,0,.15);
     --transition-colors: background-color .2s ease, color .2s ease, border-color .2s ease;
     --input-font-size: 16px;
+    /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
+    --chart-good: var(--color-income);
+    --chart-good-high: var(--color-income-high);
+    --chart-good-light: #4ade80;
+    --chart-bad: var(--color-expense);
+    --chart-warn: var(--color-ai);
+    --chart-orange: var(--color-ai-hover);
+    --chart-neutral: #9ca3af;
+    --chart-blue: var(--color-primary);
+    --chart-purple: var(--color-other);
+    --chart-cyan: #0891b2;
+    --chart-indigo: #6366f1;
+    --chart-point-border: #ffffff;
+    /* Generated category palettes (seriesColor): evenly spaced hues at these. */
+    --chart-series-saturation: 65%;
+    --chart-series-lightness: 55%;
+    --chart-series-light: 62%;
+    --chart-series-shade-step: 9%;
+    --chart-ring-saturation: 45%;
+    --chart-ring-lightness: 42%;
 }
 
 :root[data-theme="dark"] {
@@ -64,10 +84,21 @@ textarea {
 body,
 .card,
 .widget-card,
-.landing-feature,
 .modal-card,
 .btn {
     transition: var(--transition-colors);
+}
+
+/* A section page before it has read its address (section-page.js): hidden, so it
+   never shows the whole section before the page asked for. */
+html[data-routing] .container,
+html[data-routing] .site-footer {
+    visibility: hidden;
+}
+
+/* A page's whole message when it can't run: no JavaScript, or a failed load. */
+.page-note {
+    margin: 2rem;
 }
 
 :focus-visible {
@@ -172,15 +203,6 @@ header h1 {
 
 .header-actions {
     flex-shrink: 0;
-}
-
-#accounts,
-#transactions,
-#timesheet {
-    scroll-margin-top: 65px;
-}
-
-.header-actions {
     display: flex;
     align-items: center;
     gap: .5rem;
@@ -224,6 +246,24 @@ header .btn:hover {
     width: 28px;
     height: 28px;
     border-radius: 50%;
+}
+
+/* Signed out: the sign-in button in the avatar's own shape and size. */
+#signin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: .8rem;
+    line-height: 1;
+}
+
+#signin-btn[hidden] {
+    display: none;
 }
 
 .account-avatar[hidden] {
@@ -604,12 +644,6 @@ kbd {
     color: var(--color-text-muted);
 }
 
-.widget-sub {
-    font-size: .8rem;
-    font-weight: 400;
-    color: var(--color-text-muted);
-}
-
 .widget-row {
     display: flex;
     flex-wrap: wrap;
@@ -753,6 +787,8 @@ kbd {
 .autocomplete-suggestions--pinned {
     position: fixed;
     top: auto;
+    /* Just above the on-screen keyboard (--keyboard-height, physique-breakdown.js). */
+    bottom: var(--keyboard-height, 0px);
     left: 0;
     right: 0;
     margin: 0;
@@ -804,16 +840,6 @@ kbd {
     color: var(--color-text);
 }
 
-.location-picker-status {
-    margin-top: .5rem !important;
-}
-
-.grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-}
-
 .panel {
     background: var(--color-surface);
     border-radius: var(--radius-lg);
@@ -823,9 +849,6 @@ kbd {
 }
 
 .panel-group {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: .6rem;
     display: flex;
     flex-direction: column;
     gap: .5rem;
@@ -837,6 +860,11 @@ kbd {
 .panel-group[hidden],
 .widget-cards[hidden] {
     display: none;
+}
+
+/* The home page's sections, stacked; a section page shows one alone. */
+html:not(.section-pages) .panel-group + .panel-group {
+    margin-top: .5rem;
 }
 
 /* The "Hide widgets" preference, applied before the row itself even exists in
@@ -857,18 +885,10 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 }
 
 
+/* Never shown: the sidebar or the bottom tab bar names the sections. Kept for
+   the page titles, which read it (routeTitle). */
 .panel-group-title {
-    margin: 0 0 .25rem;
-    text-align: center;
-}
-
-.panel-group-title a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.panel-group-title a:hover {
-    text-decoration: underline;
+    display: none;
 }
 
 .panel-group .panel {
@@ -962,6 +982,8 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 
 .panel.panel-enter {
     animation: panel-enter .45s ease both;
+    /* Staggered, one block after another (--enter-index, app.js). */
+    animation-delay: calc(var(--enter-index, 0) * 70ms);
 }
 
 .panel-actions {
@@ -1289,6 +1311,21 @@ td {
 
 th {
     color: var(--color-text-muted);
+}
+
+/* A value coloured along a gradient (setGradientColor, wellness-charts.js). */
+.gradient-value {
+    color: var(--gradient-color);
+}
+
+/* Activity Plan tables sharing one set of column widths (syncActivityPlanColumnWidths). */
+#workout-plan-panel col {
+    width: var(--col-width);
+}
+
+/* A table row with no data behind it (a period nothing was logged in). */
+tr.row-empty {
+    opacity: .5;
 }
 
 .empty-state {
@@ -1683,6 +1720,7 @@ th.sortable:hover {
 }
 
 .donut-legend-swatch {
+    background: var(--swatch-color);
     width: 12px;
     height: 12px;
     border-radius: 3px;
@@ -2189,6 +2227,7 @@ td .btn {
 .body-mass-progress-meter-callout {
     position: absolute;
     top: 0;
+    left: calc(var(--meter-pct, 0) * 1%);
     transform: translateX(-50%);
     background: color-mix(in srgb, var(--color-income) calc(var(--fill-pct, 0) * 1%), var(--color-expense));
     color: #fff;
@@ -2226,6 +2265,8 @@ td .btn {
    and growing the bar reveals more of it rather than re-stretching a fresh
    red-to-green run into whatever sliver is currently filled. */
 .body-mass-progress-meter-fill {
+    /* --meter-pct: how far along (wellness-charts.js). */
+    width: calc(var(--meter-pct, 0) * 1%);
     height: 100%;
     border-radius: 999px;
     /* One colour per 20% band, warm to green as the goal nears. */
@@ -2451,7 +2492,6 @@ td .btn {
     .workout-actions-cell .btn {
         padding: .15rem .2rem;
         font-size: .72rem;
-        margin-right: 0;
     }
 }
 
@@ -2496,17 +2536,32 @@ td .btn {
 
 /* Which data set to load. Doubles as the load trigger, so the label is the
    action; aria-pressed marks the one on screen. */
-.insight-mode-actions {
-    display: flex;
+/* Health's and Finance's Insight: their modes as the hub's tiles, each opening its
+   own page (data-insight-mode, insight-panel.js / financial-insight.js). The tiles
+   page shows only the tiles. */
+:is(#insight-mode-actions, #financial-insight-mode-actions) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
     gap: .5rem;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
+    margin-bottom: 0;
 }
 
-.insight-mode-actions .btn.active {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    font-weight: 600;
+:is(#insight-mode-actions, #financial-insight-mode-actions) .page-tile {
+    border: none;
+    font: inherit;
+    cursor: pointer;
+}
+
+:is(#insight-panel, #financial-insight-panel):not([data-insight-mode]) > :not(.panel-header):not(.insight-mode-actions):not(.panel-actions),
+:is(#insight-panel, #financial-insight-panel):not([data-insight-mode]) .panel-actions .btn-ai,
+:is(#insight-panel, #financial-insight-panel)[data-insight-mode] > .insight-mode-actions {
+    display: none;
+}
+
+@media (max-width: 820px) {
+    :is(#insight-mode-actions, #financial-insight-mode-actions) {
+        grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+    }
 }
 
 /* Tune's collapsed Equations and Calculations dropdowns, and Insight's prompt template. */
@@ -2628,12 +2683,6 @@ td .btn {
     margin-top: 1rem;
 }
 
-@media (max-width: 900px) {
-    .grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 @media (max-width: 800px) {
     html {
         font-size: 14.5px;
@@ -2645,8 +2694,7 @@ td .btn {
 
     .cards,
     .widget-cards,
-    .donut-grid,
-    .grid {
+    .donut-grid {
         gap: .6rem;
     }
 }
@@ -2656,31 +2704,15 @@ td .btn {
         font-size: 14px;
     }
 
-    /* position: sticky (the desktop/base rule) cannot be slid out of view once
-       scrolled: past the point where it first "sticks", a sticky element is
-       permanently clamped to top:0 by its own positioning algorithm — margin,
-       transform, anything — the clamp always wins, so it never actually moves.
-       Fixed has no such clamp and answers to `top` directly. Because it's
-       fixed rather than sticky it no longer reserves its own space in the
-       page's flow, hence the body padding-top below. */
+    /* No top bar on a phone: the header's box goes, the tab bar (.nav) and the
+       account avatar (.header-actions) stay, both pinned to the bottom. The
+       breadcrumb's Ledger link replaces the logo. */
     header {
-        position: fixed;
-        left: 0;
-        right: 0;
-        top: 0;
-        padding: .5rem .75rem;
-        gap: .35rem;
-        transition: top .25s ease;
+        display: contents;
     }
 
-    /* Compensates for header now being fixed (out of flow) — without this the
-       page's own content would render up under it starting from the very
-       first paint, not just after a scroll. A generous fixed estimate of the
-       mobile header's own height rather than a measured one: a few extra
-       pixels of gap below it is invisible, where too little would clip the
-       first panel under the header. */
-    body {
-        padding-top: 3.5rem;
+    header h1 {
+        display: none;
     }
 
     .container {
@@ -2691,33 +2723,25 @@ td .btn {
         padding: 1rem 1rem calc(1rem + 4rem + env(safe-area-inset-bottom, 0px));
     }
 
-    /* A phone now has a fixed bar at both ends of the screen (this header,
-       and .nav below) — sliding this one out of view while scrolling down,
-       and back in on the way up (setupHeaderAutoHide, app.js), gives a
-       full-height screen back to the content instead of two bars permanently
-       eating into it. Bottom .nav stays put: it's the primary navigation, and
-       thumb reach means it should never require a scroll-up to reach.
-       A generous fixed amount rather than the header's exact measured height:
-       once it's off-screen a few extra pixels doesn't matter. */
-    header.header-hidden {
-        top: -6rem;
-    }
-
-    header h1 {
-        font-size: 1rem;
-    }
-
-    .logo-text {
-        display: none;
-    }
-
-    .logo-icon {
-        width: 1.5rem;
-        height: 1.5rem;
-    }
-
+    /* Bottom left, over the tab bar or the page's action bar that replaces it. */
     .header-actions {
-        gap: .35rem;
+        position: fixed;
+        left: 0;
+        bottom: env(safe-area-inset-bottom, 0px);
+        z-index: 21;
+        justify-content: center;
+        width: 3.25rem;
+        height: 56px;
+        margin: 0;
+    }
+
+    .account-menu-dropdown {
+        top: auto;
+        bottom: calc(100% + 1.25rem);
+        right: auto;
+        left: 0;
+        max-height: calc(100dvh - 6rem);
+        overflow-y: auto;
     }
 
     .last-updated {
@@ -2734,13 +2758,7 @@ td .btn {
         padding: .35rem .45rem;
     }
 
-    /* A bottom tab bar below this width: a phone's header has no room for a
-       3-item nav beside the logo and account actions without crowding all
-       three, and the thumb-reach a fixed bottom bar gives is the native
-       mobile pattern anyway (iOS/Android tab bars, most app-shaped sites).
-       Taken clean out of the header's flexbox by position: fixed, so the
-       logo and header-actions lay out exactly as they would if .nav didn't
-       exist there at all. */
+    /* The section links as a bottom tab bar, in thumb reach. */
     .nav {
         position: fixed;
         left: 0;
@@ -2748,6 +2766,7 @@ td .btn {
         bottom: 0;
         z-index: 10;
         margin-left: 0;
+        padding-left: 3.25rem;
         gap: 0;
         justify-content: space-between;
         background: var(--color-nav);
@@ -2773,7 +2792,6 @@ td .btn {
         justify-content: center;
         min-height: 56px;
         padding: .4rem .25rem;
-        font-size: .85rem;
         font-weight: 600;
         line-height: 1.1;
         color: rgba(255, 255, 255, .68);
@@ -2796,12 +2814,6 @@ td .btn {
         right: 0;
         height: 2px;
         background: var(--color-primary);
-    }
-
-    #accounts,
-    #transactions,
-    #timesheet {
-        scroll-margin-top: 50px;
     }
 
     .gate {
@@ -2941,7 +2953,6 @@ td .btn {
     }
 
     .modal-card h2 {
-        margin-bottom: .6rem;
         font-size: 1.05rem;
     }
 
@@ -3361,10 +3372,13 @@ html.section-pages[data-page="block"] .panel-group > :not(.page-active):not(.pag
     display: none;
 }
 
-/* The breadcrumb tops every section page, hub included ("Health" alone there),
-   in place of the section's centred title. */
-html.section-pages .panel-group-title {
+/* The breadcrumb already ends in the block's name; its buttons stay at the right. */
+html.section-pages[data-page="block"] .panel.page-active > .panel-header > h2 {
     display: none;
+}
+
+html.section-pages[data-page="block"] .panel.page-active > .panel-header > .panel-header-actions {
+    margin-left: auto;
 }
 
 html.section-pages[data-page="hub"] .page-crumb-back {
@@ -3440,10 +3454,10 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     font-weight: 700;
 }
 
-/* Today on the Health hub (page-nav.js's QUICK_ACTIONS): the first tile, in the
-   primary colour so the one action stands out among the pages. */
+/* Today on the Health hub (page-nav.js's QUICK_ACTIONS): the last tile, gray
+   like Physique's own Today button (.btn-secondary). */
 .page-tile.quick-tile {
-    background: var(--color-primary);
+    background: var(--color-muted);
     color: #fff;
 }
 
@@ -3469,7 +3483,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         bottom: 0;
         left: 0;
         width: 13rem;
-        padding: 4.5rem .6rem 1rem;
+        padding: 3.5rem .6rem 4.5rem;
         overflow-y: auto;
         background: var(--color-surface);
         border-right: 1px solid var(--color-border);
@@ -3515,14 +3529,67 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     .side-nav-page {
         padding-left: 1rem !important;
     }
+
+    /* No top bar: Ledger tops the sidebar, the account avatar sits in its
+       bottom-left corner, and the sidebar replaces the section links. */
+    header {
+        display: contents;
+    }
+
+    #main-nav {
+        display: none;
+    }
+
+    header h1 {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 6;
+        width: 13rem;
+        box-sizing: border-box;
+        padding: 1rem 1.2rem;
+        background: var(--color-surface);
+        color: var(--color-text);
+    }
+
+    .header-actions {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        z-index: 6;
+        width: 13rem;
+        box-sizing: border-box;
+        padding: .75rem 1.2rem;
+        margin: 0;
+        background: var(--color-surface);
+        border-top: 1px solid var(--color-border);
+    }
+
+    .last-updated {
+        order: 1;
+        color: var(--color-text-muted);
+    }
+
+    header .btn {
+        color: var(--color-text);
+        border-color: var(--color-border);
+    }
+
+    .account-menu-dropdown {
+        top: auto;
+        bottom: calc(100% + .5rem);
+        right: auto;
+        left: 0;
+        max-height: calc(100vh - 5rem);
+        overflow-y: auto;
+    }
 }
 
 /* --- Form pages (router.js's updateFormPage) ---------------------------------
    On a section page an open routed form (Log, Add, a row's Edit or view, Guide)
    takes the page's place instead of covering it, and looks like a block page:
-   the section's bordered wrapper (.panel-group) holding the breadcrumb and one
-   white rounded card (.panel), at the page container's width and padding. The
-   form element itself plays the wrapper and its card the panel. */
+   the breadcrumb over one white rounded card (.panel), at the page container's
+   width and padding. The form element plays the section, its card the panel. */
 html.section-pages[data-form-page] #dashboard {
     display: none;
 }
@@ -3545,10 +3612,8 @@ html.section-pages[data-form-page] .modal.form-page {
     box-sizing: border-box;
     width: min(calc(1000px - 2 * var(--form-page-gutter)), calc(100% - 2 * var(--form-page-gutter)));
     margin: var(--form-page-gutter) auto;
-    padding: .6rem;
+    padding: 0;
     background: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
     /* .modal centers its card as an overlay; a page lines up from the left. */
     align-items: stretch;
     justify-content: flex-start;
@@ -3559,13 +3624,20 @@ html.section-pages[data-form-page] .modal.form-page .form-crumb {
     justify-content: flex-start;
 }
 
+/* The breadcrumb names the form; its own title would repeat it. */
+html.section-pages[data-form-page] .modal.form-page .modal-card > h2 {
+    display: none;
+}
+
 html.section-pages[data-form-page] .modal.form-page .modal-card {
     max-width: none;
     max-height: none;
     overflow: visible;
-    padding: .65rem;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
+    /* On the page background, like a block page. */
+    padding: 0;
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 /* The footer stays at the bottom of the screen under a short form, as it does
@@ -3606,8 +3678,6 @@ html.section-pages[data-form-page] body.modal-open {
 
 @media (max-width: 820px) {
     html.section-pages[data-form-page] .modal.form-page .modal-card {
-        padding: .65rem .65rem 0;
-        border-radius: var(--radius-lg);
         height: auto;
         /* At least the screen between the breadcrumb and the tab bar, so a short
            form's action bar still lands at the bottom, as it did full-screen. */
@@ -3652,9 +3722,16 @@ html.section-pages[data-form-page] body.modal-open {
 
 /* The open page sits still: the blocks' fade-in leaves a transform on them, and a
    transformed ancestor would pin a "fixed" bottom bar to the block, not the screen. */
-html.section-pages .panel.page-active {
+html.section-pages .panel.page-active,
+html.section-pages .panel.page-active:hover {
     animation: none;
     transform: none;
+    /* A page sits on the page background; only its small cards are white. No fade
+       from the card's white on opening. */
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    transition: none;
 }
 
 /* --- One bottom bar at a time (page-nav.js's updateActionBar) -------------------
@@ -3738,5 +3815,13 @@ html.section-pages .panel.page-active {
     html[data-action-bar] .action-bar > .btn-ai {
         position: sticky;
         right: calc(2.75rem + .4rem);
+    }
+}
+
+/* Room at the left for the account avatar (.header-actions), pinned there. */
+@media (max-width: 640px) {
+    html[data-action-bar] .action-bar,
+    html[data-action-bar] .app-form .modal-actions.action-bar {
+        padding-left: 3.25rem;
     }
 }

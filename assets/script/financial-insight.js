@@ -25,6 +25,13 @@ function initFinancialInsight() {
 
   document.getElementById('financial-insight-load-btn').addEventListener('click', refreshFinancialInsightPreview);
   document.getElementById('financial-insight-generate-btn').addEventListener('click', runFinancialInsightGeneration);
+  // Back to /finance/insight/: the tile again.
+  registerViewReset(document.getElementById('financial-insight-panel'), () => {
+    delete document.getElementById('financial-insight-panel').dataset.insightMode;
+    financialInsightLoaded = null;
+    document.getElementById('financial-insight-status').textContent = '';
+    clearFieldError('financial-insight-form-error');
+  });
 }
 
 function gatherFinancialInsightData() {
@@ -204,6 +211,8 @@ function refreshFinancialInsightPreview() {
   const statusEl = document.getElementById('financial-insight-status');
   const btn = document.getElementById('financial-insight-generate-btn');
   clearFieldError('financial-insight-form-error');
+  // Snapshot's page, even while its data is still loading.
+  document.getElementById('financial-insight-panel').dataset.insightMode = 'snapshot';
 
   if (!currentReport || !accountsDataLoaded) {
     statusEl.textContent = 'Still loading your accounts — try again in a moment.';

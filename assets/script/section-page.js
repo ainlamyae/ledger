@@ -29,6 +29,9 @@
   // order once every script — including the async Google ones, which window.load
   // would also have waited for — has finished loading.
   const bootSteps = [];
+  // Run first, as soon as the app's own scripts have: the page's view from its address,
+  // so it never shows the whole section before the right page.
+  const routeSteps = [];
 
   window.ledgerSectionPage = {
     slug: SLUG,
@@ -37,7 +40,13 @@
     onBoot(step) {
       bootSteps.push(step);
     },
+    onRoute(step) {
+      routeSteps.push(step);
+    },
   };
+
+  // Content stays hidden until the route steps have run (styles.css).
+  document.documentElement.dataset.routing = '';
 
   // Resolved against the live document's <base>, never against the parsed
   // document: DOMParser gives its document THIS page's URL as the base, so
@@ -55,16 +64,19 @@
     return script;
   }
 
-  function appendScript(node, parent, pending) {
+  // `ordered` collects the in-order scripts alone: the app's own, not Google's async ones.
+  function appendScript(node, parent, pending, ordered) {
     const script = reviveScript(node);
     if (script.src) {
-      pending.push(new Promise((resolve) => {
+      const loaded = new Promise((resolve) => {
         // error resolves too: a script that 404s should leave the page half-built
         // with a console error, exactly as it would on the home page, rather than
         // hanging before the boot steps run.
         script.addEventListener('load', resolve, { once: true });
         script.addEventListener('error', resolve, { once: true });
-      }));
+      });
+      pending.push(loaded);
+      if (!script.async) ordered.push(loaded);
     }
     parent.appendChild(script);
   }
@@ -132,8 +144,7 @@
   function showLoadError(message) {
     document.body.innerHTML = '';
     const note = document.createElement('p');
-    note.className = 'status status-error';
-    note.style.margin = '2rem';
+    note.className = 'status status-error page-note';
     note.textContent = `Couldn't load this page: ${message}. `;
     const home = document.createElement('a');
     home.href = '.';
@@ -164,13 +175,19 @@
 
     const scripts = adoptBody(source);
     showOnly(link.dataset.section);
-    scripts.forEach((node) => appendScript(node, document.body, pending));
+    const ordered = [];
+    scripts.forEach((node) => appendScript(node, document.body, pending, ordered));
+
+    await Promise.all(ordered);
+    routeSteps.forEach((step) => step());
+    delete document.documentElement.dataset.routing;
 
     await Promise.all(pending);
     bootSteps.forEach((step) => step());
   }
 
   build().catch((err) => {
+    delete document.documentElement.dataset.routing;
     console.error('Section page failed to load:', err);
     showLoadError(err.message);
   });

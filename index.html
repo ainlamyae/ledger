@@ -289,6 +289,390 @@
             <button id="health-reminder-log-btn" class="btn btn-primary">Log</button>
         </div>
 
+        <div class="panel" data-route="indicator">
+            <div class="panel-header">
+                <h2>Indicator</h2>
+            </div>
+
+            <div class="body-mass-projection-wrap">
+                <!-- Governs every chart from here down — State Trend & Forecast, Body Mass,
+                     Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Dietary
+                     Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep and Protein Source
+                     Rotation — so it sits right above State Trend & Forecast's own heading
+                     rather than under one chart's label, which would read as belonging to that
+                     chart alone. -->
+                <div class="export-date-range">
+                    <label>From
+                        <input type="date" id="wellness-date-from">
+                    </label>
+                    <label>To
+                        <input type="date" id="wellness-date-to">
+                    </label>
+                </div>
+
+                <!-- State Trend & Forecast chart — temporarily hidden; re-enable by uncommenting
+                <div class="body-mass-projection-header">
+                    <h4>State Trend &amp; Forecast</h4>
+                </div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="wellness-projection-chart"></canvas>
+                </div>
+                -->
+                <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
+            </div>
+
+            <div class="body-mass-projection-wrap">
+                <div class="body-mass-projection-header">
+                    <h4>Body Mass</h4>
+                </div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="wellness-body-mass-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="body-mass-projection-wrap">
+                <div class="body-mass-projection-header">
+                    <h4>Calorie Balance</h4>
+                </div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="wellness-energy-balance-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="donut-grid wellness-metrics-grid">
+                <div class="donut-item">
+                    <h4 id="wellness-calories-label">Caloric Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-calories-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Protein Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-protein-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Dietary Fiber Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-fiber-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Fat Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-fat-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Carbohydrate Intake</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-carb-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Physical Activity</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-activity-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-item">
+                    <h4>Sleep</h4>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="wellness-sleep-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Was its own "Protein Source Rotation" panel, moved in last so every
+                 Health chart is in one place and they collapse together. The wrap is
+                 what makes its heading one of the set, not a style of its own. -->
+            <div class="body-mass-projection-wrap">
+                <h4>Protein Source Rotation</h4>
+
+                <div class="protein-rotation-charts">
+                    <div class="chart-box">
+                        <canvas id="protein-rotation-chart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="protein-rotation-donut"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-legend" id="protein-rotation-legend"></div>
+            </div>
+
+            <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
+                 (sessions done vs. desired per Group this window) and one rotational
+                 donut (reference weekly split, last 4 weeks, last week). -->
+            <div class="body-mass-projection-wrap">
+                <h4>Activity Rotation</h4>
+
+                <div class="protein-rotation-charts">
+                    <div class="chart-box">
+                        <canvas id="activity-rotation-chart"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="activity-rotation-donut"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-legend" id="activity-rotation-legend"></div>
+            </div>
+        </div>
+
+        <div class="panel" data-route="physique">
+            <div class="panel-header">
+                <h2>Physique</h2>
+                <button id="physique-export-csv-btn" class="btn panel-header-btn">Export CSV</button>
+                <button id="today-physique-btn" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
+                <button id="add-physique-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="physique-search" placeholder="Search date, consumption, breakdown, workout...">
+            </div>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="physique-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="physique-date-to">
+                </label>
+            </div>
+
+            <div class="table-responsive">
+                <table id="physique-table" class="table-compact">
+                    <thead>
+                    <tr>
+                        <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
+                        <th class="sortable" data-sort="date">Date</th>
+                        <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
+                        <th title="Sleep — hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">S</th>
+                        <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
+                        <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
+                        <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
+                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
+                        <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
+                        <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Carb</th>
+                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
+                        <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
+                        <th class="sortable" data-sort="caloriesOut" title="AEE — Activity Energy Expenditure (Calories Out)">AEE</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="physique-body"></tbody>
+                </table>
+            </div>
+
+            <div class="panel-actions" id="physique-bulk-actions" hidden>
+                <span id="physique-bulk-summary"></span>
+                <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
+                <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
+                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
+            </div>
+
+            <div class="pagination" id="physique-pagination"></div>
+        </div>
+
+        <div class="panel" data-route="nutrition">
+            <div class="panel-header">
+                <h2>Nutrition</h2>
+                <button type="button" id="log-nutrition-btn" class="btn btn-primary panel-header-btn" title="Log the ticked ingredients as today's Consumption">Log</button>
+                <button id="add-nutrition-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="nutrition-search" placeholder="Search classification or ingredient name...">
+            </div>
+
+            <div class="table-responsive">
+                <table id="nutrition-table" class="table-compact">
+                    <thead>
+                    <tr>
+                        <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
+                        <th class="sortable" data-sort="classification">Classification</th>
+                        <th class="sortable" data-sort="name">Name</th>
+                        <th class="sortable" data-sort="amount">Amount</th>
+                        <th class="sortable" data-sort="calories" title="Calories">Cal</th>
+                        <th class="sortable" data-sort="protein" title="Protein (g)">Pro</th>
+                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">DF</th>
+                        <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
+                        <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
+                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
+                        <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
+                        <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click Complete to fill this in. Shows and sorts by how many micronutrients are non-zero.">Micro</th>
+                        <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="nutrition-body"></tbody>
+                </table>
+            </div>
+
+            <div class="panel-actions" id="nutrition-bulk-actions" hidden>
+                <span id="nutrition-bulk-summary"></span>
+                <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
+                <button id="nutrition-bulk-capitalize-btn" class="btn" title="Capitalize each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field">Capitalize Names</button>
+                <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">Complete</button>
+                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
+            </div>
+            <p id="nutrition-pull-status" class="status" hidden></p>
+
+            <div class="pagination" id="nutrition-pagination"></div>
+        </div>
+
+        <div class="panel" id="workout-plan-panel" data-route="activity">
+            <div class="panel-header">
+                <h2>Activity</h2>
+                <!-- Three buttons on one phone heading line, so each label is cut to a
+                     word and carries the full wording in its tooltip. -->
+                <button type="button" id="activity-instruction-btn" data-route="guide" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
+                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
+                <button type="button" id="add-activity-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
+            </div>
+
+            <!-- Rebuilt from the Activity sheet tab by activities.js -->
+            <div id="activity-plan-tables"></div>
+        </div>
+
+        <div class="panel" id="insight-panel" data-route="insight">
+            <h2>Insight</h2>
+            <p class="hint" id="insight-hint"></p>
+
+            <div class="export-date-range">
+                <label>From
+                    <input type="date" id="insight-date-from">
+                </label>
+                <label>To
+                    <input type="date" id="insight-date-to">
+                </label>
+            </div>
+
+            <div class="insight-mode-actions" id="insight-mode-actions">
+                <button type="button" class="page-tile" data-insight-mode="plan" data-route="plan" data-route-view aria-pressed="false"><span class="page-tile-title">Plan</span></button>
+                <button type="button" class="page-tile" data-insight-mode="wellness" data-route="wellness" data-route-view aria-pressed="false"><span class="page-tile-title">Wellness</span></button>
+                <button type="button" class="page-tile" data-insight-mode="food" data-route="food" data-route-view aria-pressed="false"><span class="page-tile-title">Food</span></button>
+                <button type="button" class="page-tile" data-insight-mode="micronutrient" data-route="micronutrient" data-route-view aria-pressed="false"><span class="page-tile-title">Micronutrient</span></button>
+                <button type="button" class="page-tile" data-insight-mode="activity" data-route="activity" data-route-view aria-pressed="false"><span class="page-tile-title">Activity</span></button>
+                <button type="button" class="page-tile" data-insight-mode="protein" data-route="protein" data-route-view aria-pressed="false"><span class="page-tile-title">Protein</span></button>
+                <button type="button" class="page-tile" data-insight-mode="pattern" data-route="pattern" data-route-view aria-pressed="false" title="Send the BMR_cal periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR"><span class="page-tile-title">Pattern</span></button>
+            </div>
+
+            <label class="insight-question-label" for="insight-question">Ask a question (optional)
+                <textarea id="insight-question" rows="2" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
+            </label>
+
+            <p class="hint" id="insight-mode-status"></p>
+
+            <!-- What Send to AI sends for the loaded mode, with the data already on screen
+                 left as placeholders; Tune's Equations dropdown style. -->
+            <details id="insight-prompt-details" hidden>
+                <summary>Prompt template</summary>
+                <div class="table-responsive">
+                    <pre id="insight-prompt-template"></pre>
+                </div>
+            </details>
+
+            <div id="insight-preview-text" class="insight-data-preview" hidden></div>
+
+            <div id="insight-preview-food" hidden>
+                <div id="insight-food-profile" class="insight-data-preview"></div>
+                <div class="table-responsive">
+                    <table id="insight-food-table">
+                        <thead>
+                        <tr>
+                            <th>Ingredient</th>
+                            <th>Amount</th>
+                            <th>Calories</th>
+                            <th>Protein</th>
+                            <th title="This ingredient's own fiber grams over the picked range — its own typed Fiber if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fiber</th>
+                            <th title="This ingredient's own fat grams over the picked range — its own typed Fat if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fat</th>
+                            <th title="This ingredient's own carbohydrate grams over the picked range — its own typed Carb if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Carbohydrate</th>
+                            <th title="Estimated Thermic Effect of Food — this ingredient's own typed TEF if it has one, else its protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when neither is available">TEF</th>
+                        </tr>
+                        </thead>
+                        <tbody id="insight-food-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="insight-preview-micronutrient" hidden>
+                <div id="insight-micro-profile" class="insight-data-preview"></div>
+                <div class="table-responsive">
+                    <table id="insight-micro-table">
+                        <thead>
+                        <tr>
+                            <th>Nutrient</th>
+                            <th>Total (period)</th>
+                            <th>Avg / day</th>
+                            <th>Ideal / day</th>
+                        </tr>
+                        </thead>
+                        <tbody id="insight-micro-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="insight-preview-pattern" hidden>
+                <!-- Tune's period length row (without its symbol), starting at Tune's value; editable here. -->
+                <div class="formula-inputs" id="insight-pattern-period">
+                    <label class="formula-row" title="How many days each period averages — starts at Tune's period length">
+                        <span class="formula-name">period length</span>
+                        <input type="text" id="insight-pattern-period-days" inputmode="numeric">
+                        <span class="formula-unit">days</span>
+                    </label>
+                </div>
+                <div id="insight-pattern-profile" class="insight-data-preview"></div>
+                <div class="table-responsive">
+                    <table id="insight-pattern-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th title="Smoothed body mass (kg) at the period's last day">m</th>
+                            <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
+                            <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
+                            <th title="Basal metabolic rate by Mifflin-St Jeor — the period's average of each day's stored BMR, kcal/day">BMR_mif</th>
+                            <th title="Basal metabolic rate by Katch-McArdle — the period's average of each day's stored BMR, kcal/day">BMR_kat</th>
+                            <th title="Calibrated basal metabolic rate — the period's average of each day's stored BMR_cal, kcal/day">BMR_cal</th>
+                            <th title="Adapted basal metabolic rate by t — the period's average of each day's stored BMR_adp, kcal/day">BMR_adp</th>
+                            <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
+                            <th title="Total energy intake, kcal/day">TEI</th>
+                            <th title="Grams/day">Protein</th>
+                            <th title="Grams/day">Dietary Fiber</th>
+                            <th title="Grams/day">Fat</th>
+                            <th title="Grams/day">Carbohydrate</th>
+                            <th title="Thermic effect of food, kcal/day">TEF</th>
+                            <th title="Activity energy expenditure, kcal/day">AEE</th>
+                            <th title="Cardio share of AEE, kcal/day">Cardio</th>
+                            <th title="NEAT share of AEE, kcal/day">NEAT</th>
+                            <th title="Strength share of AEE, kcal/day">Strength</th>
+                            <th title="Equation-implied daily balance — negative is a deficit">D</th>
+                            <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
+                        </tr>
+                        </thead>
+                        <tbody id="insight-pattern-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-actions" data-page-actions>
+                <button type="button" id="insight-generate-btn" class="btn btn-ai" disabled title="Load a data set first">Send to AI</button>
+                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
+            </div>
+
+            <p id="insight-generated-at" class="hint" hidden></p>
+            <div id="insight-body" class="insight-body"></div>
+            <p id="insight-status" class="status" hidden></p>
+        </div>
+
         <div class="panel" id="health-tune-panel" data-route="tune">
             <div class="panel-header">
                 <h2>Tune</h2>
@@ -940,390 +1324,6 @@
             </div>
         </div>
 
-        <div class="panel" data-route="indicator">
-            <div class="panel-header">
-                <h2>Indicator</h2>
-            </div>
-
-            <div class="body-mass-projection-wrap">
-                <!-- Governs every chart from here down — State Trend & Forecast, Body Mass,
-                     Calorie Balance, Physical Activity, Caloric Intake, Protein Intake, Dietary
-                     Fiber Intake, Fat Intake, Carbohydrate Intake, Sleep and Protein Source
-                     Rotation — so it sits right above State Trend & Forecast's own heading
-                     rather than under one chart's label, which would read as belonging to that
-                     chart alone. -->
-                <div class="export-date-range">
-                    <label>From
-                        <input type="date" id="wellness-date-from">
-                    </label>
-                    <label>To
-                        <input type="date" id="wellness-date-to">
-                    </label>
-                </div>
-
-                <!-- State Trend & Forecast chart — temporarily hidden; re-enable by uncommenting
-                <div class="body-mass-projection-header">
-                    <h4>State Trend &amp; Forecast</h4>
-                </div>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="wellness-projection-chart"></canvas>
-                </div>
-                -->
-                <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
-            </div>
-
-            <div class="body-mass-projection-wrap">
-                <div class="body-mass-projection-header">
-                    <h4>Body Mass</h4>
-                </div>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="wellness-body-mass-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="body-mass-projection-wrap">
-                <div class="body-mass-projection-header">
-                    <h4>Calorie Balance</h4>
-                </div>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="wellness-energy-balance-chart"></canvas>
-                </div>
-            </div>
-
-            <div class="donut-grid wellness-metrics-grid">
-                <div class="donut-item">
-                    <h4 id="wellness-calories-label">Caloric Intake</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-calories-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Protein Intake</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-protein-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Dietary Fiber Intake</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-fiber-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Fat Intake</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-fat-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Carbohydrate Intake</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-carb-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Physical Activity</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-activity-chart"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-item">
-                    <h4>Sleep</h4>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-sleep-chart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Was its own "Protein Source Rotation" panel, moved in last so every
-                 Health chart is in one place and they collapse together. The wrap is
-                 what makes its heading one of the set, not a style of its own. -->
-            <div class="body-mass-projection-wrap">
-                <h4>Protein Source Rotation</h4>
-
-                <div class="protein-rotation-charts">
-                    <div class="chart-box">
-                        <canvas id="protein-rotation-chart"></canvas>
-                    </div>
-                    <div class="chart-box">
-                        <canvas id="protein-rotation-donut"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-legend" id="protein-rotation-legend"></div>
-            </div>
-
-            <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
-                 (sessions done vs. desired per Group this window) and one rotational
-                 donut (reference weekly split, last 4 weeks, last week). -->
-            <div class="body-mass-projection-wrap">
-                <h4>Activity Rotation</h4>
-
-                <div class="protein-rotation-charts">
-                    <div class="chart-box">
-                        <canvas id="activity-rotation-chart"></canvas>
-                    </div>
-                    <div class="chart-box">
-                        <canvas id="activity-rotation-donut"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-legend" id="activity-rotation-legend"></div>
-            </div>
-        </div>
-
-        <div class="panel" id="insight-panel" data-route="insight">
-            <h2>Insight</h2>
-            <p class="hint" id="insight-hint"></p>
-
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="insight-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="insight-date-to">
-                </label>
-            </div>
-
-            <div class="insight-mode-actions" id="insight-mode-actions">
-                <button type="button" class="btn" data-insight-mode="plan" data-route="plan" data-route-view aria-pressed="false">Plan</button>
-                <button type="button" class="btn" data-insight-mode="wellness" data-route="wellness" data-route-view aria-pressed="false">Wellness</button>
-                <button type="button" class="btn" data-insight-mode="food" data-route="food" data-route-view aria-pressed="false">Food</button>
-                <button type="button" class="btn" data-insight-mode="micronutrient" data-route="micronutrient" data-route-view aria-pressed="false">Micronutrient</button>
-                <button type="button" class="btn" data-insight-mode="activity" data-route="activity" data-route-view aria-pressed="false">Activity</button>
-                <button type="button" class="btn" data-insight-mode="protein" data-route="protein" data-route-view aria-pressed="false">Protein</button>
-                <button type="button" class="btn" data-insight-mode="pattern" data-route="pattern" data-route-view aria-pressed="false" title="Send the BMR_cal periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR">Pattern</button>
-            </div>
-
-            <p class="hint" id="insight-mode-status"></p>
-
-            <!-- What Send to AI sends for the loaded mode, with the data already on screen
-                 left as placeholders; Tune's Equations dropdown style. -->
-            <details id="insight-prompt-details" hidden>
-                <summary>Prompt template</summary>
-                <div class="table-responsive">
-                    <pre id="insight-prompt-template"></pre>
-                </div>
-            </details>
-
-            <div id="insight-preview-text" class="insight-data-preview" hidden></div>
-
-            <div id="insight-preview-food" hidden>
-                <div id="insight-food-profile" class="insight-data-preview"></div>
-                <div class="table-responsive">
-                    <table id="insight-food-table">
-                        <thead>
-                        <tr>
-                            <th>Ingredient</th>
-                            <th>Amount</th>
-                            <th>Calories</th>
-                            <th>Protein</th>
-                            <th title="This ingredient's own fiber grams over the picked range — its own typed Fiber if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fiber</th>
-                            <th title="This ingredient's own fat grams over the picked range — its own typed Fat if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fat</th>
-                            <th title="This ingredient's own carbohydrate grams over the picked range — its own typed Carb if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Carbohydrate</th>
-                            <th title="Estimated Thermic Effect of Food — this ingredient's own typed TEF if it has one, else its protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when neither is available">TEF</th>
-                        </tr>
-                        </thead>
-                        <tbody id="insight-food-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="insight-preview-micronutrient" hidden>
-                <div id="insight-micro-profile" class="insight-data-preview"></div>
-                <div class="table-responsive">
-                    <table id="insight-micro-table">
-                        <thead>
-                        <tr>
-                            <th>Nutrient</th>
-                            <th>Total (period)</th>
-                            <th>Avg / day</th>
-                            <th>Ideal / day</th>
-                        </tr>
-                        </thead>
-                        <tbody id="insight-micro-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="insight-preview-pattern" hidden>
-                <!-- Tune's period length row (without its symbol), starting at Tune's value; editable here. -->
-                <div class="formula-inputs" id="insight-pattern-period">
-                    <label class="formula-row" title="How many days each period averages — starts at Tune's period length">
-                        <span class="formula-name">period length</span>
-                        <input type="text" id="insight-pattern-period-days" inputmode="numeric">
-                        <span class="formula-unit">days</span>
-                    </label>
-                </div>
-                <div id="insight-pattern-profile" class="insight-data-preview"></div>
-                <div class="table-responsive">
-                    <table id="insight-pattern-table" class="table-compact">
-                        <thead>
-                        <tr>
-                            <th>Period</th>
-                            <th title="Smoothed body mass (kg) at the period's last day">m</th>
-                            <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
-                            <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
-                            <th title="Basal metabolic rate by Mifflin-St Jeor — the period's average of each day's stored BMR, kcal/day">BMR_mif</th>
-                            <th title="Basal metabolic rate by Katch-McArdle — the period's average of each day's stored BMR, kcal/day">BMR_kat</th>
-                            <th title="Calibrated basal metabolic rate — the period's average of each day's stored BMR_cal, kcal/day">BMR_cal</th>
-                            <th title="Adapted basal metabolic rate by t — the period's average of each day's stored BMR_adp, kcal/day">BMR_adp</th>
-                            <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
-                            <th title="Total energy intake, kcal/day">TEI</th>
-                            <th title="Grams/day">Protein</th>
-                            <th title="Grams/day">Dietary Fiber</th>
-                            <th title="Grams/day">Fat</th>
-                            <th title="Grams/day">Carbohydrate</th>
-                            <th title="Thermic effect of food, kcal/day">TEF</th>
-                            <th title="Activity energy expenditure, kcal/day">AEE</th>
-                            <th title="Cardio share of AEE, kcal/day">Cardio</th>
-                            <th title="NEAT share of AEE, kcal/day">NEAT</th>
-                            <th title="Strength share of AEE, kcal/day">Strength</th>
-                            <th title="Equation-implied daily balance — negative is a deficit">D</th>
-                            <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
-                        </tr>
-                        </thead>
-                        <tbody id="insight-pattern-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <label class="insight-question-label" for="insight-question">Ask a question (optional)
-                <textarea id="insight-question" rows="2" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
-            </label>
-
-            <div class="panel-actions" data-page-actions>
-                <button type="button" id="insight-generate-btn" class="btn btn-ai" disabled title="Load a data set first">Send to AI</button>
-                <button type="button" class="btn modal-close page-action-close" title="Close" aria-label="Close">❌</button>
-            </div>
-
-            <p id="insight-generated-at" class="hint" hidden></p>
-            <div id="insight-body" class="insight-body"></div>
-            <p id="insight-status" class="status" hidden></p>
-        </div>
-
-        <div class="panel" data-route="physique">
-            <div class="panel-header">
-                <h2>Physique</h2>
-                <button id="physique-export-csv-btn" class="btn panel-header-btn">Export CSV</button>
-                <button id="today-physique-btn" class="btn btn-secondary panel-header-btn" title="Open today's entry, or start one if today isn't logged yet">Today</button>
-                <button id="add-physique-btn" data-route="log" class="btn btn-primary panel-header-btn" title="Log a day's body mass, consumption and workout">Log</button>
-            </div>
-
-            <div class="filters">
-                <input type="text" id="physique-search" placeholder="Search date, consumption, breakdown, workout...">
-            </div>
-
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="physique-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="physique-date-to">
-                </label>
-            </div>
-
-            <div class="table-responsive">
-                <table id="physique-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
-                        <th title="Sleep — hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">S</th>
-                        <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
-                        <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
-                        <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
-                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
-                        <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
-                        <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Carb</th>
-                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
-                        <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
-                        <th class="sortable" data-sort="caloriesOut" title="AEE — Activity Energy Expenditure (Calories Out)">AEE</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="physique-body"></tbody>
-                </table>
-            </div>
-
-            <div class="panel-actions" id="physique-bulk-actions" hidden>
-                <span id="physique-bulk-summary"></span>
-                <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
-                <button id="physique-bulk-calc-btn" class="btn btn-ai">Calculate</button>
-                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
-            </div>
-
-            <div class="pagination" id="physique-pagination"></div>
-        </div>
-
-        <div class="panel" id="workout-plan-panel" data-route="activity">
-            <div class="panel-header">
-                <h2>Activity</h2>
-                <!-- Three buttons on one phone heading line, so each label is cut to a
-                     word and carries the full wording in its tooltip. -->
-                <button type="button" id="activity-instruction-btn" data-route="guide" class="btn panel-header-btn" title="How to run the activities in this plan">Guide</button>
-                <button type="button" id="log-workout-btn" class="btn btn-primary panel-header-btn" title="Log the ticked activities as today's workout">Log</button>
-                <button type="button" id="add-activity-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an exercise or activity to the plan">Add</button>
-            </div>
-
-            <!-- Rebuilt from the Activity sheet tab by activities.js -->
-            <div id="activity-plan-tables"></div>
-        </div>
-
-        <div class="panel" data-route="nutrition">
-            <div class="panel-header">
-                <h2>Nutrition</h2>
-                <button type="button" id="log-nutrition-btn" class="btn btn-primary panel-header-btn" title="Log the ticked ingredients as today's Consumption">Log</button>
-                <button id="add-nutrition-btn" data-route="add" class="btn btn-primary panel-header-btn" title="Add an ingredient to the catalogue">Add</button>
-            </div>
-
-            <div class="filters">
-                <input type="text" id="nutrition-search" placeholder="Search classification or ingredient name...">
-            </div>
-
-            <div class="table-responsive">
-                <table id="nutrition-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
-                        <th class="sortable" data-sort="classification">Classification</th>
-                        <th class="sortable" data-sort="name">Name</th>
-                        <th class="sortable" data-sort="amount">Amount</th>
-                        <th class="sortable" data-sort="calories" title="Calories">Cal</th>
-                        <th class="sortable" data-sort="protein" title="Protein (g)">Pro</th>
-                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">DF</th>
-                        <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
-                        <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
-                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
-                        <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
-                        <th class="sortable" data-sort="micronutrients" title="Full USDA nutrient panel (vitamins, minerals, and more), scaled to this row's own Amount — select rows below and click Complete to fill this in. Shows and sorts by how many micronutrients are non-zero.">Micro</th>
-                        <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="nutrition-body"></tbody>
-                </table>
-            </div>
-
-            <div class="panel-actions" id="nutrition-bulk-actions" hidden>
-                <span id="nutrition-bulk-summary"></span>
-                <button id="nutrition-bulk-merge-btn" class="btn" title="Merge Selected" aria-label="Merge Selected">🔗</button>
-                <button id="nutrition-bulk-capitalize-btn" class="btn" title="Capitalize each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field">Capitalize Names</button>
-                <button id="nutrition-pull-micros-btn" class="btn" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified">Complete</button>
-                <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
-            </div>
-            <p id="nutrition-pull-status" class="status" hidden></p>
-
-            <div class="pagination" id="nutrition-pagination"></div>
-        </div>
-
         <!-- The Setting tab's health keys only (isHealthSettingKey, settings-panel.js):
              the same rows, form and Edit/Delete as Other's Settings block. -->
         <div class="panel" data-route="settings">
@@ -1347,8 +1347,6 @@
         </div>
 
     </section>
-
-    <div style="height:.5rem"></div>
 
     <section id="finance" class="panel-group">
         <h2 class="panel-group-title"><a href="finance/">Finance</a></h2>
@@ -1460,9 +1458,13 @@
         <div class="panel" id="financial-insight-panel" data-route="insight">
             <h2>Insight</h2>
 
-            <div class="insight-mode-actions">
-                <button type="button" id="financial-insight-load-btn" class="btn">Financial Snapshot</button>
+            <div class="insight-mode-actions" id="financial-insight-mode-actions">
+                <button type="button" id="financial-insight-load-btn" class="page-tile" data-route="snapshot" data-route-view aria-pressed="false" title="Net worth, cash flow, spending by category and accounts"><span class="page-tile-title">Snapshot</span></button>
             </div>
+
+            <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
+                <textarea id="financial-insight-question" rows="2" placeholder="e.g. Should I move cash into investments?"></textarea>
+            </label>
 
             <p class="hint" id="financial-insight-status"></p>
 
@@ -1500,10 +1502,6 @@
                     </table>
                 </div>
             </div>
-
-            <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
-                <textarea id="financial-insight-question" rows="2" placeholder="e.g. Should I move cash into investments?"></textarea>
-            </label>
 
             <div class="panel-actions" data-page-actions>
                 <button type="button" id="financial-insight-generate-btn" class="btn btn-ai" disabled title="Load your financial data first">Send to AI</button>
@@ -1649,8 +1647,6 @@
             <div class="pagination" id="breakdown-pagination"></div>
         </div>
     </section>
-
-    <div style="height:.5rem"></div>
 
     <section id="other" class="panel-group">
         <h2 class="panel-group-title"><a href="other/">Other</a></h2>
@@ -2516,7 +2512,10 @@
 
             <div class="modal-actions">
                 <button type="button" id="nutrition-pull-micros-single-btn" class="btn" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched">Complete</button>
-                <button type="button" id="nutrition-normalize-btn" class="btn" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure">Normalize</button>
+                <!-- No `capture`: see physique-scan-input. -->
+                <input type="file" id="nutrition-scan-input" accept="image/*" hidden>
+                <button type="button" id="nutrition-scan-btn" class="btn btn-ai" title="Take a photo of the product's Nutrition Facts label — AI reads it and fills the values below (ticked rows are kept as typed)">Scan</button>
+                <button type="button" id="nutrition-normalize-btn" class="btn" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure">Norm</button>
                 <button type="button" id="nutrition-update-btn" class="btn" hidden title="Save these changes, then find every Physique day whose Consumption mentions this ingredient's OLD name and rewrite those lines (renaming them if the name changed) plus their Breakdown entries and day totals to match — for any line whose unit can't be locally rescaled (e.g. cup, tbsp), only the name is updated">Update</button>
                 <button type="button" id="nutrition-log-btn" class="btn btn-primary" title="Log this ingredient as today's Consumption">Log</button>
                 <button type="submit" class="btn btn-primary">Save</button>

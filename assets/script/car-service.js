@@ -16,19 +16,19 @@ const CAR_ODOMETER_PATTERN = /@\s*([\d,.]+)\s*km/i;
 
 // Description keyword → service type. First match wins, so specific before general.
 const CAR_SERVICE_TYPES = [
-  { type: 'oil', short: 'Oil', label: 'Oil Change', match: /oil/i, color: '#16a34a' },
-  { type: 'tireSet', short: 'New Tires', label: 'Replace Tire Set', match: /accessory tire|new tires?|tire set|tires? purchase/i, color: '#7c3aed' },
-  { type: 'changeover', short: 'Tires', label: 'Tire Changeover', match: /changeover|winter tire|tire swap/i, color: '#3b82f6' },
-  { type: 'rust', short: 'Rust', label: 'Rust Protection', match: /corrosion|undercarriage|rust/i, color: '#d97706' },
-  { type: 'rotation', short: 'Rotation', label: 'Tire Rotation + Inspection', match: /rotation/i, color: '#0891b2' },
-  { type: 'cabin', short: 'Filter', label: 'Cabin Air Filter', match: /cabin/i, color: '#7c3aed' },
-  { type: 'engineAir', short: 'Filter', label: 'Engine Air Filter', match: /engine air|air filter/i, color: '#7c3aed' },
-  { type: 'brakeFluid', short: 'Brake Fluid', label: 'Brake Fluid', match: /brake fluid/i, color: '#dc2626' },
-  { type: 'service3', short: 'Brakes', label: 'Brake Measure, Valve & Battery Check', match: /brake|valve|battery/i, color: '#dc2626' },
-  { type: 'coolant', short: 'Coolant', label: 'Coolant', match: /coolant/i, color: '#0891b2' },
-  { type: 'sparkPlugs', short: 'Plugs', label: 'Spark Plugs', match: /spark/i, color: '#d97706' },
+  { type: 'oil', short: 'Oil', label: 'Oil Change', match: /oil/i, color: '--chart-good' },
+  { type: 'tireSet', short: 'New Tires', label: 'Replace Tire Set', match: /accessory tire|new tires?|tire set|tires? purchase/i, color: '--chart-purple' },
+  { type: 'changeover', short: 'Tires', label: 'Tire Changeover', match: /changeover|winter tire|tire swap/i, color: '--chart-blue' },
+  { type: 'rust', short: 'Rust', label: 'Rust Protection', match: /corrosion|undercarriage|rust/i, color: '--chart-orange' },
+  { type: 'rotation', short: 'Rotation', label: 'Tire Rotation + Inspection', match: /rotation/i, color: '--chart-cyan' },
+  { type: 'cabin', short: 'Filter', label: 'Cabin Air Filter', match: /cabin/i, color: '--chart-purple' },
+  { type: 'engineAir', short: 'Filter', label: 'Engine Air Filter', match: /engine air|air filter/i, color: '--chart-purple' },
+  { type: 'brakeFluid', short: 'Brake Fluid', label: 'Brake Fluid', match: /brake fluid/i, color: '--chart-bad' },
+  { type: 'service3', short: 'Brakes', label: 'Brake Measure, Valve & Battery Check', match: /brake|valve|battery/i, color: '--chart-bad' },
+  { type: 'coolant', short: 'Coolant', label: 'Coolant', match: /coolant/i, color: '--chart-cyan' },
+  { type: 'sparkPlugs', short: 'Plugs', label: 'Spark Plugs', match: /spark/i, color: '--chart-orange' },
 ];
-const CAR_OTHER_TYPE = { type: 'other', short: 'Service', label: 'Other', color: '#9ca3af' };
+const CAR_OTHER_TYPE = { type: 'other', short: 'Service', label: 'Other', color: '--chart-neutral' };
 
 // What gets predicted. `resetBy` lists the types that also count as having done it.
 const CAR_SERVICE_RULES = [
@@ -274,8 +274,8 @@ function renderCarServiceChart(records, predictions, fit, today) {
       });
       pointSets.push({
         type: 'line', label: info.label, data, names, status, showLine: false,
-        pointRadius: 5, pointHoverRadius: 6, borderColor: info.color, borderWidth: 2,
-        backgroundColor: hollow ? 'transparent' : info.color, order: 0,
+        pointRadius: 5, pointHoverRadius: 6, borderColor: chartColor(info.color), borderWidth: 2,
+        backgroundColor: hollow ? 'transparent' : chartColor(info.color), order: 0,
       });
     });
   };
@@ -293,7 +293,7 @@ function renderCarServiceChart(records, predictions, fit, today) {
         },
         {
           label: 'Odometer', status: 'forecast', data: forecast,
-          borderColor: '#9ca3af', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0, order: 1,
+          borderColor: chartColor('--chart-neutral'), borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0, order: 1,
         },
         ...pointSets,
       ],
@@ -337,7 +337,7 @@ function renderCarServiceChart(records, predictions, fit, today) {
   });
 
   const legendTypes = [...new Set([...records, ...charted].map((r) => r.type))];
-  renderCategoryLegend('car-service-legend', legendTypes.map((type) => ({ name: carTypeInfo(type).label, color: carTypeInfo(type).color })));
+  renderCategoryLegend('car-service-legend', legendTypes.map((type) => ({ name: carTypeInfo(type).label, color: chartColor(carTypeInfo(type).color) })));
 }
 
 // The heading flag (like Account's "Acct>Txn") and a once-a-day Chrome notification

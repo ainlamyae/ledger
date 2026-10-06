@@ -31,7 +31,7 @@ function onPageLinkClick(event, sectionId, panel) {
 }
 
 // The actions used most, one tap from the section's hub (and from its part of the
-// home page), as the first tiles: each stands in for a block's own header button. On the section page
+// home page), as the last tiles: each stands in for a block's own header button. On the section page
 // it clicks that button, so the form opens exactly as it does from the block; from
 // the home page it goes to the form's address instead.
 const QUICK_ACTIONS = {
@@ -44,8 +44,8 @@ function buildQuickActions(section) {
   const actions = QUICK_ACTIONS[section.id];
   const grid = document.querySelector(`#${section.id} > .page-tiles`);
   if (!actions || !grid) return;
-  // First in the tile row, before the page tiles, styled as the one action among them.
-  [...actions].reverse().forEach((action) => {
+  // Last in the tile row, after the page tiles, styled as the one action among them.
+  actions.forEach((action) => {
     const source = document.getElementById(action.buttonId);
     const tile = document.createElement('a');
     tile.className = 'page-tile quick-tile';
@@ -61,7 +61,7 @@ function buildQuickActions(section) {
       event.preventDefault();
       source.click();
     });
-    grid.insertBefore(tile, grid.firstChild);
+    grid.appendChild(tile);
   });
 }
 
@@ -112,9 +112,16 @@ function buildPageCrumb(section) {
   back.href = section.href;
   back.textContent = section.label;
   back.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
+  // On a view's page (Insight's Plan) the block is a link too, back to its page.
+  const block = document.createElement('a');
+  block.className = 'page-crumb-block';
+  block.hidden = true;
+  block.addEventListener('click', (event) => onPageLinkClick(event, section.id, section.panels.find((p) => p.dataset.route === block.dataset.route)));
+  const blockSeparator = crumbSeparator('page-crumb-block');
+  blockSeparator.hidden = true;
   const current = document.createElement('span');
   current.className = 'page-crumb-current';
-  crumb.append(crumbHomeLink(), crumbSeparator(), back, crumbSeparator('page-crumb-back'), current);
+  crumb.append(crumbHomeLink(), crumbSeparator(), back, crumbSeparator('page-crumb-back'), block, blockSeparator, current);
   group.insertBefore(crumb, group.firstChild);
 }
 
@@ -160,9 +167,17 @@ function updatePageNav(panel) {
   updateActionBar();
   if (sectionId) {
     const section = pageNavSections().find((s) => s.id === sectionId);
-    document.querySelector(`#${sectionId} .page-crumb-current`).textContent = panel
-      ? routedHeadingText(panel)
-      : section.label;
+    const view = panel && currentRouteView(panel);
+    document.querySelectorAll(`#${sectionId} > .page-crumb .page-crumb-block`).forEach((el) => { el.hidden = !view; });
+    const block = document.querySelector(`#${sectionId} > .page-crumb a.page-crumb-block`);
+    if (view) {
+      block.textContent = routedHeadingText(panel);
+      block.href = pageHref(section, panel);
+      block.dataset.route = panel.dataset.route;
+    }
+    document.querySelector(`#${sectionId} .page-crumb-current`).textContent = view
+      ? view.textContent.trim()
+      : (panel ? routedHeadingText(panel) : section.label);
   }
 }
 
@@ -315,7 +330,10 @@ function onPageActionClose(event) {
     panel.querySelectorAll('tbody input[type="checkbox"]:checked').forEach((box) => box.click());
     return;
   }
-  if (window.ledgerSectionPage) navigateSectionPage(null);
+  // A view's page (Insight's Plan) closes to its block's; a block's to the hub.
+  if (!window.ledgerSectionPage) return;
+  const panel = currentRoutedPanel();
+  navigateSectionPage(panel && currentRouteView(panel) ? panel : null);
 }
 
 function initActionBars() {

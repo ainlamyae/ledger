@@ -7,6 +7,7 @@ const ACCOUNT_FIELD_IDS = [
 ];
 
 let allAccounts = [];
+let editAccount = null;
 let accountsSheetId = null;
 let editingAccountRow = null;
 // Which of those boxes were seeded with a formula rather than a value, and what
@@ -38,6 +39,7 @@ async function initAccountManager(forceRefresh = false) {
   if (!accountListenersAttached) {
     accountListenersAttached = true;
     document.getElementById('add-account-btn').addEventListener('click', () => openAccountForm());
+    editAccount = routedRowEdit('account', () => allAccounts, (a) => a.name, openAccountForm);
     document.getElementById('account-cancel-btn').addEventListener('click', closeAccountForm);
     onFormSubmit('account-form', submitAccountForm);
     setupAccountSorting();
@@ -140,7 +142,7 @@ function renderAccountsList() {
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openAccountForm(account) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editAccount(account) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteAccount(account.row) }),
     );
 

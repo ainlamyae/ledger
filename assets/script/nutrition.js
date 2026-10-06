@@ -146,6 +146,8 @@ async function initNutrition(forceRefresh = false) {
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
     onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-pull-micros-single-btn').addEventListener('click', pullMicronutrientsForForm);
+    document.getElementById('nutrition-scan-btn').addEventListener('click', () => document.getElementById('nutrition-scan-input').click());
+    document.getElementById('nutrition-scan-input').addEventListener('change', scanNutritionLabel);
     document.getElementById('nutrition-normalize-btn').addEventListener('click', normalizeIngredientForm);
     document.getElementById('nutrition-log-btn').addEventListener('click', logNutritionFromForm);
     onAsyncClick('nutrition-update-btn', updateNutritionEntryAndPropagate);
@@ -576,17 +578,12 @@ function updateNutritionBulkActionsUI() {
   updateNutritionLogButtonLabel();
 }
 
-// Mirrors log-workout-btn's Log/Log More toggle in strength-plan.js: "Log"
-// while today's Physique row has no Consumption yet, "Log More" once it
-// does — there's no per-ingredient "already logged" state to compare against
-// the way workout rows have (the same ingredient can legitimately appear
-// twice in one day at different amounts), so this reads coarser, off the
-// whole day rather than off which rows are ticked.
+// Always "Log"; the hover says whether today's Consumption already has lines.
 function updateNutritionLogButtonLabel() {
   const today = todaysPhysiqueDay();
   const hasToday = Boolean(today && today.consumption && today.consumption.trim());
   const btn = document.getElementById('log-nutrition-btn');
-  btn.textContent = hasToday ? 'Log More' : 'Log';
+  btn.textContent = 'Log';
   btn.title = hasToday
     ? "Add the ticked ingredients to today's Consumption"
     : "Log the ticked ingredients as today's Consumption";
@@ -621,8 +618,9 @@ function logSelectedNutrition() {
     .filter((part) => part.trim())
     .join('\n');
 
+  routeRecordEdit('physique', todayPhysiqueRouteStep());
   openPhysiqueForm(today);
-  if (today) document.getElementById('physique-modal-title').textContent = "Add to Today's Consumption";
+  if (today) setPhysiqueFormHint("Add to Today's Consumption");
   physiqueField('consumption').value = consumption;
 
   selectedNutritionRows.clear();
@@ -680,16 +678,13 @@ function openNutritionForm(entry, onSaved = null) {
   document.getElementById('nutrition-modal').hidden = false;
 }
 
-// The Edit/Add Ingredient form's own Log button, mirroring the activity
-// form's (logActivityFromForm, activities.js): "Log" while today's Physique
-// row has no Consumption yet, "Log More" once it does — same coarse,
-// whole-day read as the table's log-nutrition-btn (updateNutritionLogButtonLabel),
-// since one ingredient can legitimately be logged twice in a day.
+// The form's own Log button: always "Log", its hover read off the whole day like
+// the table's (updateNutritionLogButtonLabel).
 function updateNutritionFormLogButtonLabel() {
   const today = todaysPhysiqueDay();
   const hasToday = Boolean(today && today.consumption && today.consumption.trim());
   const btn = document.getElementById('nutrition-log-btn');
-  btn.textContent = hasToday ? 'Log More' : 'Log';
+  btn.textContent = 'Log';
   btn.title = hasToday
     ? "Add this ingredient to today's Consumption"
     : "Log this ingredient as today's Consumption";
@@ -713,9 +708,11 @@ function logNutritionFromForm() {
     .filter((part) => part.trim())
     .join('\n');
 
+  // Set before the close, so this form hands its history entry to the day's.
+  routeRecordEdit('physique', todayPhysiqueRouteStep());
   closeNutritionForm();
   openPhysiqueForm(today);
-  if (today) document.getElementById('physique-modal-title').textContent = "Add to Today's Consumption";
+  if (today) setPhysiqueFormHint("Add to Today's Consumption");
   physiqueField('consumption').value = consumption;
 }
 
@@ -944,14 +941,7 @@ async function pullMicronutrientsForForm() {
     else if (row.panel) value = nutrients[row.panel] ? nutrients[row.panel].amount : null;
     document.getElementById(row.inputId).value = value !== null && value !== undefined ? String(value) : '';
   });
-  if (!locked.has('TEF')) {
-    const box = (id) => evaluateNumberExpression(document.getElementById(id).value.trim());
-    const { tef } = resolvedNutritionMacros({
-      protein: box('nutrition-protein'), fiber: box('nutrition-fiber'), fat: box('nutrition-fat'),
-      carb: box('nutrition-carb'), tef: null, micronutrients: '',
-    });
-    document.getElementById('nutrition-tef').value = tef ?? '';
-  }
+  if (!locked.has('TEF')) estimateNutritionFormTef();
 
   // The new panel, except ticked micronutrient rows keep their own values.
   const current = readNutritionFormPanel();
@@ -961,6 +951,150 @@ async function pullMicronutrientsForForm() {
 
   if (!locked.has('Protein') && result.protein === null) {
     showFieldError('nutrition-form-error', `"${result.description}" has no protein figure in USDA — fill Protein in yourself before saving.`);
+  }
+}
+
+// TEF has no label or USDA figure: the estimate from the form's Protein/Carb/Fat.
+function estimateNutritionFormTef() {
+  const box = (id) => evaluateNumberExpression(document.getElementById(id).value.trim());
+  const { tef } = resolvedNutritionMacros({
+    protein: box('nutrition-protein'), fiber: box('nutrition-fiber'), fat: box('nutrition-fat'),
+    carb: box('nutrition-carb'), tef: null, micronutrients: '',
+  });
+  document.getElementById('nutrition-tef').value = tef ?? '';
+}
+
+// --- Scan: a photographed Nutrition Facts label fills the form ----------------
+
+// The names a label line may map to: the top rows, then the USDA panel names the
+// micronutrient rows use (nutrient-targets.js), plus label lines with no target.
+function nutritionLabelNames() {
+  const top = NUTRITION_TOP_ROWS.filter((r) => r.panel).map((r) => ({ name: r.name, unit: r.unit }));
+  const skip = new Set([...NUTRITION_TOP_PANEL_KEYS, 'Protein', 'Water']);
+  const micros = Object.entries(NUTRIENT_DAILY_TARGETS_DEFAULT)
+    .filter(([name]) => !skip.has(name))
+    .map(([name, t]) => ({ name, unit: t.unit }));
+  const extras = ['Fatty acids, total trans', 'Fatty acids, total monounsaturated', 'Fatty acids, total polyunsaturated',
+    'Sugars, total including NLEA', 'Fiber, soluble', 'Fiber, insoluble', 'Sugar alcohols', 'Starch']
+    .map((name) => ({ name, unit: 'g' }));
+  return [...top, ...micros, ...extras];
+}
+
+// Health Canada's Daily Values where they differ from the FDA's, for a line
+// printed only as a % DV.
+const CANADA_DAILY_VALUES = {
+  Fat: { amount: 75, unit: 'g' },
+  'Dietary Fiber': { amount: 28, unit: 'g' },
+  'Fatty acids, total saturated': { amount: 20, unit: 'g' },
+  'Sugars, total including NLEA': { amount: 100, unit: 'g' },
+  'Potassium, K': { amount: 3400, unit: 'mg' },
+};
+
+const MASS_UNIT_GRAMS = { g: 1, mg: 1e-3, 'µg': 1e-6 };
+
+function massUnit(unit) {
+  const u = String(unit || '').trim().toLowerCase();
+  if (['mcg', 'ug', 'μg', 'µg'].includes(u)) return 'µg';
+  return MASS_UNIT_GRAMS[u] ? u : null;
+}
+
+// A label line's amount in `unit`: the printed amount, or its % DV of the daily value.
+function labelLineAmount(line, unit) {
+  const amount = Number.parseFloat(line.amount);
+  const from = massUnit(line.unit) || unit;
+  if (Number.isFinite(amount) && MASS_UNIT_GRAMS[from] && MASS_UNIT_GRAMS[unit]) {
+    return amount * MASS_UNIT_GRAMS[from] / MASS_UNIT_GRAMS[unit];
+  }
+  const percent = Number.parseFloat(line.percentDV);
+  const dv = CANADA_DAILY_VALUES[line.name] || NUTRIENT_DAILY_TARGETS_DEFAULT[line.name];
+  if (!Number.isFinite(percent) || !dv || !MASS_UNIT_GRAMS[dv.unit]) return null;
+  return (percent / 100) * dv.amount * MASS_UNIT_GRAMS[dv.unit] / MASS_UNIT_GRAMS[unit];
+}
+
+// Longest side 1600px as JPEG: small enough for the API, sharp enough to read.
+async function labelPhotoBase64(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return { base64: canvas.toDataURL('image/jpeg', 0.85).split(',')[1], type: 'image/jpeg' };
+  } catch {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    return { base64, type: file.type };
+  }
+}
+
+// Fills the form from the label, as Complete does from USDA: ticked rows are kept,
+// other micronutrients already in the form stay. A blank Name and Amount take the
+// label's; a typed gram Amount rescales the label's per-serving figures to it.
+async function scanNutritionLabel(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  e.target.value = '';
+
+  const btn = document.getElementById('nutrition-scan-btn');
+  btn.disabled = true;
+  btn.textContent = 'Reading…';
+  clearFieldError('nutrition-form-error');
+
+  try {
+    const names = nutritionLabelNames();
+    const { base64, type } = await labelPhotoBase64(file);
+    const label = await groqReadNutritionLabel(base64, type, names);
+    const units = new Map(names.map((n) => [n.name, n.unit]));
+    // The model sometimes echoes a unit after the name: "Fat (g)".
+    const knownName = (name) => (units.has(name) ? name : String(name || '').replace(/\s*\([^)]*\)\s*$/, ''));
+    const lines = label.nutrients
+      .map((line) => ({ ...line, name: knownName(line.name) }))
+      .filter((line) => units.has(line.name));
+    if (!lines.length && !Number.isFinite(Number.parseFloat(label.calories))) {
+      throw new Error("couldn't find a Nutrition Facts table in that photo");
+    }
+
+    const nameField = document.getElementById('nutrition-name');
+    if (!nameField.value.trim() && label.name) nameField.value = titleCaseIngredientName(label.name);
+    const amountField = document.getElementById('nutrition-amount');
+    const labelGrams = Number.parseFloat(label.servingGrams) || parseGramsFromAmount(label.serving || '');
+    let factor = 1;
+    if (!amountField.value.trim()) {
+      if (label.serving) amountField.value = label.serving;
+    } else {
+      const typedGrams = parseGramsFromAmount(amountField.value);
+      if (typedGrams && labelGrams) factor = typedGrams / labelGrams;
+    }
+    const scaled = (value) => Number((value * factor).toFixed(4));
+
+    const locked = nutritionFormLockedNames();
+    const calories = Number.parseFloat(label.calories);
+    if (!locked.has('Calories') && Number.isFinite(calories)) {
+      document.getElementById('nutrition-calories').value = String(scaled(calories));
+    }
+    const panel = readNutritionFormPanel();
+    lines.forEach((line) => {
+      if (locked.has(line.name)) return;
+      const unit = units.get(line.name);
+      const amount = labelLineAmount(line, unit);
+      if (amount === null) return;
+      const top = NUTRITION_TOP_ROWS.find((r) => r.name === line.name);
+      if (top) document.getElementById(top.inputId).value = String(scaled(amount));
+      else panel[line.name] = { amount: scaled(amount), unit };
+    });
+    if (!locked.has('TEF')) estimateNutritionFormTef();
+    renderNutritionMicroRows(panel, locked);
+  } catch (err) {
+    console.error('[Scan Label]', err);
+    showFieldError('nutrition-form-error', `Scan failed: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan';
   }
 }
 

@@ -114,12 +114,12 @@ function activityRotationPalette(rows) {
   const barColors = rows.map((r) => {
     const n = seen.get(r.classification) || 0;
     seen.set(r.classification, n + 1);
-    return `hsl(${hueFor(r.classification)}, 65%, ${62 - (n % 4) * 9}%)`;
+    return seriesColor(hueFor(r.classification), { lightness: '--chart-series-light', shade: n % 4 });
   });
 
   return {
     barColors,
-    legend: classifications.map((name) => ({ name, color: `hsl(${hueFor(name)}, 65%, 62%)` })),
+    legend: classifications.map((name) => ({ name, color: seriesColor(hueFor(name), { lightness: '--chart-series-light' }) })),
   };
 }
 
@@ -231,8 +231,8 @@ function renderActivityRotationChart({ from, to }) {
           rotation: 90,
           pointRadius: 12,
           borderWidth: 3,
-          borderColor: '#dc2626',
-          backgroundColor: '#dc2626',
+          borderColor: chartColor('--chart-bad'),
+          backgroundColor: chartColor('--chart-bad'),
           order: 1,
         },
       ],

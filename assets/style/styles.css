@@ -851,6 +851,11 @@ html[data-widgets-pref="hidden"] .widget-cards {
     display: none;
 }
 
+/* "Hide bulbs": the home page's section glance cards, set the same way. */
+html[data-bulbs-pref="hidden"] #dashboard .panel-group > .cards {
+    display: none;
+}
+
 /* The home page is an overview: each section's glance cards and its page tiles
    (page-nav.js), never the blocks themselves — a tile opens the block's page. */
 html.home-hub #dashboard .panel-group > .panel[data-route] {

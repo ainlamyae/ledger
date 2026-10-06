@@ -14,6 +14,8 @@ let privacyMode = false;
 // clicking "Hide widgets" hides the whole row, same SHOW_WIDGETS-setting
 // pattern as privacyMode/SHOW_AMOUNTS above.
 let widgetsVisible = true;
+// The home page's section glance cards; "Hide bulbs", SHOW_BULBS.
+let bulbsVisible = true;
 
 // Replaces every digit with '*', so masked values keep their currency
 // symbol, sign, and separators (e.g. "$1,234.56" -> "$*,***.**").
@@ -612,6 +614,9 @@ async function loadDashboard(forceRefresh = false) {
       widgetsVisible = getSetting('SHOW_WIDGETS', 1) !== 0;
       updateWidgetsButtonUI();
       applyWidgetsVisibility();
+      bulbsVisible = getSetting('SHOW_BULBS', 1) !== 0;
+      updateBulbsButtonUI();
+      applyBulbsVisibility();
       applySettingsToWidgets();
       // Same 0/1 convention, but DEFAULT 0 (hidden) — the home page deliberately
       // starts without its blocks, showing them only once asked.
@@ -891,6 +896,34 @@ function setupWidgetsToggle() {
   });
 }
 
+function updateBulbsButtonUI() {
+  const btn = document.getElementById('bulbs-toggle-btn');
+  btn.textContent = bulbsVisible ? 'Hide bulbs' : 'Show bulbs';
+}
+
+// Home page only; section pages keep their cards.
+function applyBulbsVisibility() {
+  if (window.ledgerSectionPage) return;
+  if (bulbsVisible) {
+    document.documentElement.removeAttribute('data-bulbs-pref');
+  } else {
+    document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
+  }
+}
+
+function setupBulbsToggle() {
+  updateBulbsButtonUI();
+
+  document.getElementById('bulbs-toggle-btn').addEventListener('click', () => {
+    bulbsVisible = !bulbsVisible;
+    updateBulbsButtonUI();
+    applyBulbsVisibility();
+    saveSettingValues({ SHOW_BULBS: bulbsVisible ? 1 : 0 }).catch((err) => {
+      console.error('Failed to save SHOW_BULBS setting:', err);
+    });
+  });
+}
+
 function setupScrollSpy() {
   const navLinks = [...document.querySelectorAll('#main-nav a')];
 
@@ -1030,6 +1063,7 @@ function bootDashboard() {
   setupThemeToggle();
   setupPrivacyToggle();
   setupWidgetsToggle();
+  setupBulbsToggle();
   setupNotificationsButton();
   setupKeyboardShortcuts();
   applyChartTheme();

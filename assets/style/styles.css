@@ -135,6 +135,9 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    /* The phone's visible height (100vh is its tallest, address bar hidden), so a
+       short page fits without scrolling. */
+    min-height: 100dvh;
     overflow-x: hidden;
 }
 
@@ -2716,9 +2719,17 @@ td .btn {
         display: none;
     }
 
+    /* The footer below clears the fixed bottom bar, so the page's own padding is even. */
     .container {
-        /* Bottom padding clears the fixed bottom bar, home-indicator inset included. */
-        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
+        padding: 1rem;
+    }
+
+    /* The copyright line sits just on top of the fixed bottom bar: the footer's
+       own bottom padding is the bar's height and gap, plus a hair, so nothing
+       hides behind the bar and it isn't lifted a whole line above it either. */
+    html .site-footer {
+        padding-top: .5rem;
+        padding-bottom: calc(var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px) + .25rem);
     }
 
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */

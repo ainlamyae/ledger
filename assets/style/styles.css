@@ -47,7 +47,7 @@ textarea {
        the left), the gap between buttons, and the circle's size, so the account
        circle sits as far from the first button as the buttons sit from each other. */
     --bottom-bar-edge: .64rem;
-    --bottom-bar-gap: 1rem;
+    --bottom-bar-gap: .5rem;
     --bottom-bar-circle: 3rem;
     --bottom-bar-start: calc(var(--bottom-bar-edge) + var(--bottom-bar-circle) + var(--bottom-bar-gap));
     /* Every card's own text (glance cards and widgets alike); smaller at 820px. */

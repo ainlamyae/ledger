@@ -239,6 +239,9 @@ async function saveFormulaSettings() {
   try {
     // The MET box is a preview-only what-if; the Activity sheet's Walk row is its home.
     delete overrides[ACTIVITY_MET_PREVIEW_KEY];
+    // Tune's ΔM_gly becomes the swing every display reads (GLYCOGEN_SWING_KG).
+    const swing = readGlycogenSwingFormula();
+    if (swing) overrides[GLYCOGEN_SWING_KEY] = swing.swingKg;
     await saveSettingValues(overrides);
     // saveSettingValues has already refreshed currentSettings, so re-rendering
     // here is what makes the charts agree with it immediately.

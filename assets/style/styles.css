@@ -2719,17 +2719,36 @@ td .btn {
         display: none;
     }
 
-    /* The footer below clears the fixed bottom bar, so the page's own padding is even. */
-    .container {
-        padding: 1rem;
+    /* The copyright line lives in a slim strip at the very bottom of the screen,
+       under the bottom bar (and above the home indicator), always in view; the
+       bars and the account circle sit just above it. */
+    :root {
+        --phone-footer-height: 1.3rem;
+        --bottom-bar-bottom: var(--phone-footer-height);
     }
 
-    /* The copyright line sits just on top of the fixed bottom bar: the footer's
-       own bottom padding is the bar's height and gap, plus a hair, so nothing
-       hides behind the bar and it isn't lifted a whole line above it either. */
     html .site-footer {
-        padding-top: .5rem;
-        padding-bottom: calc(var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px) + .25rem);
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 9;
+        box-sizing: border-box;
+        height: calc(var(--phone-footer-height) + env(safe-area-inset-bottom, 0px));
+        padding: 0 .5rem env(safe-area-inset-bottom, 0px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .68rem;
+        line-height: 1;
+        white-space: nowrap;
+        border-top: none;
+        background: var(--color-bg);
+    }
+
+    /* The page clears the bar and the strip under it. */
+    .container {
+        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */

@@ -692,7 +692,8 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, target) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'btn btn-primary';
+  // Beside ✏️ in the breakdown row, so styled like it.
+  btn.className = 'btn row-action-btn';
   btn.textContent = '💾';
   btn.title = `Not in your Nutrition table yet — save "${row.name}" (${row.newRow.amount}, ${row.newRow.calories} kcal, ${row.newRow.protein}g protein) so it's a trusted lookup next time instead of a fresh guess`;
   btn.setAttribute('aria-label', `Save ${row.name} to Nutrition`);

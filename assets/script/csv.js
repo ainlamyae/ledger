@@ -236,13 +236,15 @@ function syncExportAccountOptions() {
   });
 }
 
-function exportTransactionsCSV() {
-  if (!confirm('Export filtered transactions to CSV?')) return;
-  const rows = getFilteredTransactions()
+async function exportTransactionsCSV() {
+  if (!confirm('Export every transaction to CSV?')) return;
+  if (!transactionsDataLoaded) await initTransactions();
+  const rows = [...allTransactions]
+    .sort((a, b) => a.date.localeCompare(b.date))
     .map((t) => [t.date, t.account, t.payee, t.category, t.amount, t.description]);
 
   if (rows.length === 0) {
-    alert('No transactions match the selected filters.');
+    alert('No transactions to export.');
     return;
   }
 
@@ -252,10 +254,16 @@ function exportTransactionsCSV() {
 
 const PHYSIQUE_CSV_HEADER = ['Date', 'Body Mass', 'Bed', 'Wake', 'Sleep (hr)', 'Deprivation (kcal)', 'TEI', 'Protein (g)', 'Dietary Fiber (g)', 'Fat (g)', 'Carbohydrate (g)', 'TEF', 'Workout', 'Duration (min)', 'AEE'];
 
-function exportPhysiqueCSV() {
-  if (!confirm('Export filtered physique entries to CSV?')) return;
-  const rows = getFilteredPhysiqueEntries()
+async function exportPhysiqueCSV() {
+  if (!confirm('Export every Physique day to CSV?')) return;
+  // Health's data, read here on demand when this page is in another section.
+  if (!physiqueDataLoaded) {
+    await initActivities();
+    await initPhysique();
+  }
+  const rows = allPhysiqueEntries
     .filter((p) => p.date)
+    .sort((a, b) => a.date.localeCompare(b.date))
     .map((p) => [
       p.date, p.bodyMass ?? '', p.bedtime ?? '', p.wakeTime ?? '', p.sleep ?? '', p.deprivation ?? '',
       p.caloriesIn ?? '', p.proteinIn ?? '', p.fiber ?? '', p.fat ?? '',
@@ -263,7 +271,7 @@ function exportPhysiqueCSV() {
     ]);
 
   if (rows.length === 0) {
-    alert('No Physique entries match the selected filters.');
+    alert('No Physique days to export.');
     return;
   }
 
@@ -344,7 +352,9 @@ function initCsvControls() {
   if (csvListenersAttached) return;
   csvListenersAttached = true;
 
-  document.getElementById('export-csv-btn').addEventListener('click', exportTransactionsCSV);
+  // Other › Settings: every row, whichever section's data is loaded already.
+  onAsyncClick('export-transactions-btn', exportTransactionsCSV);
+  onAsyncClick('export-physique-btn', exportPhysiqueCSV);
   document.getElementById('export-add-filter-btn').addEventListener('click', addExportFilterRow);
   document.getElementById('export-form').addEventListener('submit', (e) => e.preventDefault());
 

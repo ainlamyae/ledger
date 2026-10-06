@@ -162,13 +162,19 @@ async function submitTravelForm(event) {
   const rowData = TRAVEL_FIELD_IDS.map((id) => document.getElementById(`travel-${id}`).value.trim());
 
   try {
-    if (editingTravelRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.TRAVEL}'!A${editingTravelRow}:H${editingTravelRow}`, [rowData]);
+    let row = editingTravelRow;
+    if (row !== null) {
+      await updateValues(`'${CONFIG.SHEETS.TRAVEL}'!A${row}:H${row}`, [rowData]);
     } else {
-      await appendValues(TRAVEL_RANGE, [rowData]);
+      row = appendedRow(await appendValues(TRAVEL_RANGE, [rowData]));
     }
     await refreshTravel(true);
-    closeTravelForm();
+    const saved = allTravel.find((t) => t.row === row);
+    if (saved) {
+      openTravelForm(saved);
+      stayOnSavedForm('travel-modal', editTravel.step(saved));
+    }
+    showFormSaved('travel-form-error');
   } catch (err) {
     showFieldError('travel-form-error', err.message);
   }

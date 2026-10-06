@@ -225,7 +225,6 @@ async function submitSettingForm(event) {
     } else {
       await appendValues(SETTINGS_PANEL_RANGE, values, 'RAW');
     }
-    closeSettingForm();
     await refreshSettingsList(true);
     // Repairs this row's format if a previous USER_ENTERED write date-stamped
     // it, so editing a broken setting is enough to fix it.
@@ -236,6 +235,12 @@ async function submitSettingForm(event) {
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();
     await recomputeStoredPhysiqueBmr([key]);
+    const savedSetting = allSettingRows.find((r) => r.key === key);
+    if (savedSetting) {
+      openSettingForm(savedSetting);
+      stayOnSavedForm('setting-modal', { slug: settingRouteSlug(savedSetting), label: savedSetting.key });
+    }
+    showFormSaved('setting-form-error');
   } catch (err) {
     showFieldError('setting-form-error', err.message);
   }

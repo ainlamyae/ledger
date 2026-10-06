@@ -578,12 +578,12 @@ function updateNutritionBulkActionsUI() {
   updateNutritionLogButtonLabel();
 }
 
-// Always "Log"; the hover says whether today's Consumption already has lines.
+// Always 📝; the hover says whether today's Consumption already has lines.
 function updateNutritionLogButtonLabel() {
   const today = todaysPhysiqueDay();
   const hasToday = Boolean(today && today.consumption && today.consumption.trim());
   const btn = document.getElementById('log-nutrition-btn');
-  btn.textContent = 'Log';
+  btn.textContent = '📝';
   btn.title = hasToday
     ? "Add the ticked ingredients to today's Consumption"
     : "Log the ticked ingredients as today's Consumption";
@@ -678,13 +678,13 @@ function openNutritionForm(entry, onSaved = null) {
   document.getElementById('nutrition-modal').hidden = false;
 }
 
-// The form's own Log button: always "Log", its hover read off the whole day like
+// The form's own Log button: always 📝, its hover read off the whole day like
 // the table's (updateNutritionLogButtonLabel).
 function updateNutritionFormLogButtonLabel() {
   const today = todaysPhysiqueDay();
   const hasToday = Boolean(today && today.consumption && today.consumption.trim());
   const btn = document.getElementById('nutrition-log-btn');
-  btn.textContent = 'Log';
+  btn.textContent = '📝';
   btn.title = hasToday
     ? "Add this ingredient to today's Consumption"
     : "Log this ingredient as today's Consumption";
@@ -917,7 +917,7 @@ async function pullMicronutrientsForForm() {
 
   btn.disabled = true;
   const originalLabel = btn.textContent;
-  btn.textContent = 'Pulling…';
+  btn.textContent = '🧲…';
 
   const result = await pullNutritionFromUsda(name, amount);
 
@@ -1042,7 +1042,7 @@ async function scanNutritionLabel(e) {
 
   const btn = document.getElementById('nutrition-scan-btn');
   btn.disabled = true;
-  btn.textContent = 'Reading…';
+  btn.textContent = '📷…';
   clearFieldError('nutrition-form-error');
 
   try {
@@ -1094,7 +1094,7 @@ async function scanNutritionLabel(e) {
     showFieldError('nutrition-form-error', `Scan failed: ${err.message}`);
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Scan';
+    btn.textContent = '📷';
   }
 }
 
@@ -1245,13 +1245,20 @@ async function submitNutritionForm(event) {
   const { name, amount, calories, protein, fiber, fat, carb, tef } = fields;
 
   try {
+    const editingRow = editingNutritionRow;
     await saveNutritionFormFields(fields);
-    // Captured before closeNutritionForm, which clears it — closing the form
-    // on a successful save shouldn't itself be what silences the callback.
+    // Once only: the form stays open, and a second Save mustn't fold it in again.
     const onSaved = nutritionFormSaveCallback;
-    closeNutritionForm();
+    nutritionFormSaveCallback = null;
     await refreshNutrition(true);
     if (onSaved) onSaved({ name, amount, calories, protein, fiber, fat, carb, tef });
+    const saved = allNutritionEntries.find((n) => n.row === editingRow)
+      || allNutritionEntries.filter((n) => n.name === name).at(-1);
+    if (saved) {
+      openNutritionForm(saved);
+      stayOnSavedForm('nutrition-modal', { slug: routeSlug(saved.name), label: saved.name });
+    }
+    showFormSaved('nutrition-form-error');
   } catch (err) {
     showFieldError('nutrition-form-error', err.message);
   }
@@ -1655,7 +1662,7 @@ async function pullMicronutrientsForSelected() {
 
   for (let i = 0; i < rows.length; i++) {
     const n = rows[i];
-    btn.textContent = `Pulling ${i + 1} of ${rows.length}…`;
+    btn.textContent = `🧲 ${i + 1}/${rows.length}`;
     const result = await pullMicronutrientsForEntry(n);
     if (result.applied) pulled++;
     else skipped.push(`${n.name} (${result.reason})`);

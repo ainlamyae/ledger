@@ -168,9 +168,9 @@ function renderWorkoutPlanProgress() {
     box.title = quantity !== undefined ? `Already logged today: ${quantity}` : '';
   });
 
-  // Always "Log"; the hover says whether it adds to today's workout or starts it.
+  // Always 📝; the hover says whether it adds to today's workout or starts it.
   const logBtn = document.getElementById('log-workout-btn');
-  logBtn.textContent = 'Log';
+  logBtn.textContent = '📝';
   logBtn.title = logged.size
     ? "Add the newly ticked activities to today's workout"
     : "Log the ticked activities as today's workout";

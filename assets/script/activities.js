@@ -460,12 +460,12 @@ function openActivityForm(activity, duplicate = false) {
   document.getElementById('activity-modal').hidden = false;
 }
 
-// Always "Log"; the hover says whether today's workout already has lines, as
+// Always 📝; the hover says whether today's workout already has lines, as
 // logWorkout's own button does (strength-plan.js).
 function updateActivityLogButtonLabel() {
   const btn = document.getElementById('activity-log-btn');
   const hasToday = loggedWorkoutQuantities().size > 0;
-  btn.textContent = 'Log';
+  btn.textContent = '📝';
   btn.title = hasToday
     ? "Add this activity to today's workout"
     : "Log this activity as today's workout";
@@ -637,9 +637,17 @@ async function submitActivityForm(event) {
   if (!fields.ok) return;
 
   try {
+    const editingRow = editingActivityRow;
     await saveActivityFormFields(fields.values);
-    closeActivityForm();
     await initActivities(true);
+    const name = fields.values[0];
+    const saved = allActivities.find((a) => a.row === editingRow)
+      || allActivities.filter((a) => a.name === name).at(-1);
+    if (saved) {
+      openActivityForm(saved);
+      stayOnSavedForm('activity-modal', { slug: routeSlug(saved.name), label: saved.name });
+    }
+    showFormSaved('activity-form-error');
   } catch (err) {
     showFieldError('activity-form-error', err.message);
   }

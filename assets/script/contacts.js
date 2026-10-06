@@ -251,13 +251,19 @@ async function submitContactForm(event) {
   const rowData = CONTACT_FIELD_IDS.map(val);
 
   try {
-    if (editingContactRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.CONTACTS}'!A${editingContactRow}:U${editingContactRow}`, [rowData]);
+    let row = editingContactRow;
+    if (row !== null) {
+      await updateValues(`'${CONFIG.SHEETS.CONTACTS}'!A${row}:U${row}`, [rowData]);
     } else {
-      await appendValues(CONTACTS_RANGE, [rowData]);
+      row = appendedRow(await appendValues(CONTACTS_RANGE, [rowData]));
     }
     await refreshContacts(true);
-    closeContactForm();
+    const saved = allContacts.find((c) => c.row === row);
+    if (saved) {
+      openContactForm(saved);
+      stayOnSavedForm('contact-modal', editContact.step(saved));
+    }
+    showFormSaved('contact-form-error');
   } catch (err) {
     showFieldError('contact-form-error', err.message);
   }

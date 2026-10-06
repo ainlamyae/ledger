@@ -32,6 +32,15 @@ async function confirmAndDelete(message, deleteFn, errorPrefix = 'Failed to dele
 function showFieldError(elId, message) {
   const el = document.getElementById(elId);
   el.textContent = message;
+  el.classList.remove('status-ok');
+  el.hidden = false;
+}
+
+// A save never closes its form: the form's own status line says "Saved" instead.
+function showFormSaved(elId) {
+  const el = document.getElementById(elId);
+  el.textContent = 'Saved';
+  el.classList.add('status-ok');
   el.hidden = false;
 }
 
@@ -83,6 +92,10 @@ function onFormSubmit(formId, handler) {
     event.preventDefault();
     const btn = event.submitter || form.querySelector('button[type="submit"]');
     return withButtonBusy(btn, () => handler(event));
+  });
+  // "Saved" (showFormSaved) goes as soon as the form is changed again.
+  form.addEventListener('input', () => {
+    form.querySelector('.status.status-ok')?.setAttribute('hidden', '');
   });
 }
 

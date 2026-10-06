@@ -232,7 +232,7 @@ async function saveFormulaSettings() {
   const statusEl = document.getElementById('formula-status');
   const originalLabel = saveBtn.textContent;
   saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving…';
+  saveBtn.textContent = '💾…';
   clearFieldError('formula-status');
   statusEl.classList.remove('status-ok');
 

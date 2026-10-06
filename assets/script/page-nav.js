@@ -74,6 +74,8 @@ function buildPageTiles(section) {
     const tile = document.createElement('a');
     tile.className = 'page-tile';
     tile.href = pageHref(section, panel);
+    tile.dataset.section = section.id;
+    tile.dataset.route = panel.dataset.route;
     const title = document.createElement('span');
     title.className = 'page-tile-title';
     title.textContent = routedHeadingText(panel);
@@ -82,6 +84,56 @@ function buildPageTiles(section) {
     grid.appendChild(tile);
   });
   group.insertBefore(grid, section.panels[0] || null);
+  renderPageBadges();
+}
+
+// --- Badges: a block's short sign ("A<T $13", "28d", "Log") ------------------------
+// Shown on its tile's corner and after its page's breadcrumb. `badge` is { text,
+// title, record? }, or null to clear; with `record` it opens that row (today's day).
+const pageBadges = new Map(); // "<section id>/<block slug>" -> badge
+
+function setPageBadge(sectionId, route, badge) {
+  if (badge) pageBadges.set(`${sectionId}/${route}`, badge);
+  else pageBadges.delete(`${sectionId}/${route}`);
+  renderPageBadges();
+}
+
+function placeBadge(parent, sectionId, route) {
+  parent.querySelector(':scope > .page-badge')?.remove();
+  const badge = pageBadges.get(`${sectionId}/${route}`);
+  if (!badge) return;
+  const el = document.createElement('span');
+  el.className = 'page-badge';
+  el.textContent = badge.text;
+  el.title = badge.title;
+  if (badge.record) {
+    el.classList.add('page-badge-action');
+    el.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openBadgeRecord(sectionId, route, badge.record);
+    });
+  }
+  parent.appendChild(el);
+}
+
+// Today's day as a page: in place on its own section's pages, else by its address.
+function openBadgeRecord(sectionId, route, record) {
+  const panel = document.querySelector(`#${sectionId} > .panel[data-route="${route}"]`);
+  if (window.ledgerSectionPage?.section === sectionId) openRecordRoute(panel, record);
+  else location.href = routeUrl(panel, [{ slug: record }]);
+}
+
+function renderPageBadges() {
+  document.querySelectorAll('.page-tile[data-route]').forEach((tile) => {
+    placeBadge(tile, tile.dataset.section, tile.dataset.route);
+  });
+  const sectionId = window.ledgerSectionPage?.section;
+  const crumb = sectionId && document.querySelector(`#${sectionId} > .page-crumb`);
+  if (!crumb) return;
+  const panel = document.documentElement.dataset.page === 'block' ? currentRoutedPanel() : null;
+  if (panel) placeBadge(crumb, sectionId, panel.dataset.route);
+  else crumb.querySelector(':scope > .page-badge')?.remove();
 }
 
 // The full trail from the home page: "Ledger / Health / Physique" over a page,
@@ -192,6 +244,7 @@ function updatePageNav(panel) {
       ? view.textContent.trim()
       : (panel ? routedHeadingText(panel) : section.label);
   }
+  renderPageBadges();
 }
 
 // Runs once, before the router reads the address (bootDashboard, app.js).

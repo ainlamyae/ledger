@@ -43,6 +43,8 @@ textarea {
     --bottom-bar-height: 3.75rem;
     /* Their gap from the screen's edges, so all four rounded corners show. */
     --bottom-bar-inset: .4rem;
+    /* Their gap from the screen's bottom edge, a quarter less than the sides'. */
+    --bottom-bar-bottom: .3rem;
     /* Inside the bar: each end's margin (the ❌ at the right, the account circle at
        the left), the gap between buttons, and the circle's size, so the account
        circle sits as far from the first button as the buttons sit from each other. */
@@ -2679,14 +2681,14 @@ td .btn {
 
     .container {
         /* Bottom padding clears the fixed bottom bar, home-indicator inset included. */
-        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
+        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */
     .header-actions {
         position: fixed;
         left: calc(var(--bottom-bar-inset) + var(--bottom-bar-edge));
-        bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
+        bottom: calc(var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
         z-index: 21;
         justify-content: center;
         width: var(--bottom-bar-circle);
@@ -2737,7 +2739,7 @@ td .btn {
         left: var(--bottom-bar-inset);
         right: var(--bottom-bar-inset);
         /* Floats above the home indicator rather than growing to cover it. */
-        bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
+        bottom: calc(var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
         z-index: 10;
         margin-left: 0;
         padding-left: var(--bottom-bar-start);
@@ -3648,7 +3650,7 @@ html.section-pages[data-form-page] body.modal-open {
 @media (max-width: 640px) {
     html.section-pages[data-form-page] .modal.form-page {
         --form-page-gutter: 1rem;
-        margin-bottom: calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
+        margin-bottom: calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -3731,7 +3733,7 @@ html.section-pages .panel.page-active:hover {
         position: fixed;
         left: var(--bottom-bar-inset);
         right: var(--bottom-bar-inset);
-        bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
+        bottom: calc(var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
         z-index: 20;
         display: flex;
         flex-wrap: nowrap;

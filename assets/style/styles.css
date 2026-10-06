@@ -135,9 +135,6 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    /* The screen's visible height on a phone (100vh is its tallest, with the
-       address bar hidden), so a short page fits without scrolling. */
-    min-height: 100dvh;
     overflow-x: hidden;
 }
 
@@ -2689,13 +2686,8 @@ td .btn {
     }
 
     .container {
-        padding: 1rem;
-    }
-
-    /* The footer, last on every page, clears the fixed bottom bar (home-indicator
-       inset included) so the copyright line shows above it instead of under it. */
-    html .site-footer {
-        padding-bottom: calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
+        /* Bottom padding clears the fixed bottom bar, home-indicator inset included. */
+        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */
@@ -3664,7 +3656,7 @@ html.section-pages[data-form-page] body.modal-open {
 @media (max-width: 640px) {
     html.section-pages[data-form-page] .modal.form-page {
         --form-page-gutter: 1rem;
-        margin-bottom: 1rem;
+        margin-bottom: calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 }
 

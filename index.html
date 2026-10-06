@@ -2510,10 +2510,10 @@
             <p id="nutrition-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="button" id="nutrition-pull-micros-single-btn" class="btn btn-icon" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched" aria-label="Complete">🧲</button>
                 <!-- No `capture`: see physique-scan-input. -->
                 <input type="file" id="nutrition-scan-input" accept="image/*" hidden>
                 <button type="button" id="nutrition-scan-btn" class="btn btn-icon" title="Take a photo of the product's Nutrition Facts label — AI reads it and fills the values below (ticked rows are kept as typed)" aria-label="Scan">📷</button>
+                <button type="button" id="nutrition-pull-micros-single-btn" class="btn btn-icon" title="Look up the typed Name's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to Amount — Amount itself must already carry a real gram figure, and is never touched" aria-label="Complete">🧲</button>
                 <button type="button" id="nutrition-normalize-btn" class="btn btn-icon" title="Capitalize each word of Name, then rescale Amount to 100g and multiply Calories, Protein, Fiber, Fat, Carb, TEF and any pulled Micronutrients by the same factor — the gram rescale needs Amount to already carry a real gram figure" aria-label="Norm">📏</button>
                 <button type="button" id="nutrition-update-btn" class="btn btn-icon" hidden title="Save these changes, then find every Physique day whose Consumption mentions this ingredient's OLD name and rewrite those lines (renaming them if the name changed) plus their Breakdown entries and day totals to match — for any line whose unit can't be locally rescaled (e.g. cup, tbsp), only the name is updated" aria-label="Update">🔄</button>
                 <button type="button" id="nutrition-log-btn" class="btn btn-icon" title="Log this ingredient as today's Consumption" aria-label="Log">📝</button>

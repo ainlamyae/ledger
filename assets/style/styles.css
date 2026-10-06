@@ -1045,8 +1045,10 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     overflow-x: auto;
 }
 
+/* Every table sized to its columns' text; .table-responsive scrolls when wider. */
 table {
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
     border-collapse: collapse;
 }
 
@@ -1141,7 +1143,8 @@ td:has(.btn) {
    compact look's per-row border is off, so without this the table would
    otherwise just stop. Activity's table does the same where the Group changes. */
 #breakdown-table tr.breakdown-category-start td,
-.workout-table-strength tr.workout-group-start td {
+.workout-table-strength tr.workout-group-start td,
+#transactions-table tr.tx-receipt-start td {
     border-top: 1px solid var(--color-border);
 }
 
@@ -1294,8 +1297,7 @@ td:has(.btn) {
 #transactions-table td:nth-child(3),
 #breakdown-table th:last-child,
 #breakdown-table td:last-child,
-#settings-table td:last-child,
-#settings-table td:first-child {
+#settings-table td {
     white-space: nowrap;
 }
 
@@ -1305,21 +1307,6 @@ td:has(.btn) {
 #accounts-table td:last-child {
     white-space: nowrap;
     text-align: right;
-}
-
-/* Overrides the base `table { width: 100% }` above: every Physique column is
-   a short date/time/number, so stretching the table to the panel's full
-   width just hands the auto layout algorithm leftover space to spread out
-   as gaps between columns — the opposite of compact. `width: auto` alone
-   does NOT shrink-wrap here — per the CSS2.1 automatic-table-layout algorithm,
-   an auto-width table still expands to fill its containing block whenever
-   that's wider than its content, which it always is inside this app's
-   full-width panels. `fit-content` is what actually sizes the table to its
-   own content; .table-responsive's overflow-x still catches the rare case
-   where content genuinely doesn't fit. */
-#physique-table {
-    width: fit-content;
-    max-width: 100%;
 }
 
 /* Every remaining Physique column is a short date/time/number now that
@@ -2138,10 +2125,15 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-s);
 }
 
-/* Indicator's first chart sits under its From/To row by that row's own gap,
-   like every other page's. */
-.body-mass-projection-wrap:has(> .export-date-range) + .body-mass-projection-wrap {
-    margin-top: 0;
+/* A panel's range row (both Indicators): the From/To row's spacing — none above,
+   one card gap below. */
+.pagination.panel-range {
+    margin: 0 0 var(--space-s);
+}
+
+/* The plateau-note wrap takes no room while the note is empty. */
+.body-mass-projection-wrap:has(> .body-mass-plateau-note:empty) {
+    display: none;
 }
 
 .body-mass-projection-header {

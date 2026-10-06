@@ -20,32 +20,7 @@ function renderExpenseBreakdownTrendChart(months) {
   // legend index BE the dataset index.
   const legendItems = [{ name: 'Income', color: targetMarkColor() }, ...categories];
 
-  // 1.2x the SECOND-highest month, so one outlier doesn't squash the rest. Measured
-  // on whichever is taller that month, spend or income — sizing on the stack alone
-  // would draw the line off the top of the plot in any month that earned more than
-  // it spent, which is most of them.
-  //
-  // Takes a visibility test rather than measuring everything once, because this axis
-  // is PINNED: switching the biggest category off left the remaining bars in the
-  // bottom third of a plot still scaled for it. The legend recomputes this and
-  // reassigns scales.y.max on every click. Dataset 0 is the income line and 1..n are
-  // the categories in order, which is the index this is asked about.
-  const axisMaxFor = (isVisible) => {
-    const peaks = months.map((m) => {
-      const stack = categories.reduce(
-        (sum, c, ci) => sum + (isVisible(ci + 1) ? (m.categories.find((mc) => mc.name === c.name)?.value || 0) : 0),
-        0
-      );
-      return Math.max(stack, isVisible(0) ? Math.abs(m.income || 0) : 0);
-    });
-    const sortedPeaks = [...peaks].sort((a, b) => b - a);
-    const max = niceAxisMax((sortedPeaks[1] ?? sortedPeaks[0]) * 1.2);
-    // Everything switched off: hand the axis back to Chart.js rather than pinning
-    // it to zero, which has no gridlines to draw.
-    return max > 0 ? max : undefined;
-  };
-  const yMax = axisMaxFor(() => true);
-
+  // No y max: Chart.js fits the tallest month, and re-fits when a series is hidden.
   expenseBreakdownTrendChart = upsertChart(expenseBreakdownTrendChart, ctx, {
     type: 'bar',
     data: {
@@ -86,7 +61,7 @@ function renderExpenseBreakdownTrendChart(months) {
       plugins: { legend: { display: false } },
       scales: {
         x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, max: yMax, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } },
+        y: { stacked: true, beginAtZero: true, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } },
       },
     },
   });
@@ -99,10 +74,6 @@ function renderExpenseBreakdownTrendChart(months) {
     isHidden: (_, i) => !expenseBreakdownTrendChart.isDatasetVisible(i),
     onToggle: (_, i) => {
       expenseBreakdownTrendChart.setDatasetVisibility(i, !expenseBreakdownTrendChart.isDatasetVisible(i));
-      // The axis is pinned, so it has to be re-measured against what's left showing
-      // — otherwise hiding the biggest category just leaves a gap at the top.
-      expenseBreakdownTrendChart.options.scales.y.max =
-        axisMaxFor((di) => expenseBreakdownTrendChart.isDatasetVisible(di));
       expenseBreakdownTrendChart.update();
       drawLegend();
     },
@@ -563,6 +534,30 @@ function renderFinanceGlanceNetWorthChart(months) {
       },
     },
   });
+}
+
+// Statement is one row per month, so the ranges are whole months.
+const FINANCE_TREND_RANGES = [
+  { slug: '3m', label: '3m', months: 3 },
+  { slug: '6m', label: '6m', months: 6 },
+  { slug: '1y', label: '1y', months: 12 },
+  { slug: 'all', label: 'All' },
+];
+let financeTrendRangeSlug = '1y';
+
+function financeTrendMonths(months) {
+  const range = FINANCE_TREND_RANGES.find((r) => r.slug === financeTrendRangeSlug);
+  return range.months ? months.slice(-range.months) : months;
+}
+
+// Draws the range buttons and the two charts they window.
+function renderFinanceTrendCharts(report) {
+  renderRangeButtons('finance-trend-range', FINANCE_TREND_RANGES, financeTrendRangeSlug, (slug) => {
+    financeTrendRangeSlug = slug;
+    renderFinanceTrendCharts(report);
+  });
+  renderExpenseBreakdownTrendChart(financeTrendMonths(report.categoryTrend));
+  renderSavingsTrendChart(financeTrendMonths(report.savingsTrend));
 }
 
 function renderSavingsTrendChart(months) {

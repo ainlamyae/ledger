@@ -298,8 +298,11 @@ function renderTransactions() {
     tbody.appendChild(renderEmptyRow(8, message));
   }
 
-  pageItems.forEach((t) => {
+  pageItems.forEach((t, i) => {
     const tr = document.createElement('tr');
+    // A line where the receipt (payee or date) changes.
+    const prev = pageItems[i - 1];
+    if (prev && (prev.payee !== t.payee || prev.date !== t.date)) tr.classList.add('tx-receipt-start');
 
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');

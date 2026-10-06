@@ -231,7 +231,7 @@
                 <h3>Status</h3>
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
                 <div class="widget-row"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
-                <div class="widget-row widget-row-divider" title="Changed mass: the slope of the smoothed body-mass trend at the latest weigh-in, the same Δm (Changed Mass) the Body Mass chart shows"><span>Δm</span><span id="today-status-changed-mass-value">—</span></div>
+                <div class="widget-row widget-row-divider" title="Changed mass: the slope of the smoothed body-mass trend at the latest body-mass reading, the same Δm (Changed Mass) the Body Mass chart shows"><span>Δm</span><span id="today-status-changed-mass-value">—</span></div>
                 <div class="widget-row"><span>BMR_mif</span><span id="today-status-bmr-mif-value">—</span></div>
                 <div class="widget-row"><span>BMR_kat</span><span id="today-status-bmr-kat-value">—</span></div>
                 <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
@@ -762,7 +762,7 @@
                          knob: it's here to be compared against the smoothed figure below, which is
                          the one every identity on this sheet is evaluated at. Type your what-ifs
                          into m̄. -->
-                    <label class="formula-row" title="Your most recent weigh-in, exactly as logged. Shown for comparison only — the formulas below run on the smoothed mass, since a single reading carries a day's water and glycogen with it.">
+                    <label class="formula-row" title="Your most recent body-mass reading, exactly as logged. Shown for comparison only — the formulas below run on the smoothed mass, since a single reading carries a day's water and glycogen with it.">
                         <span class="formula-sym">m</span>
                         <span class="formula-name">body mass</span>
                         <input type="text" id="formula-body-mass" inputmode="decimal" readonly>
@@ -777,7 +777,7 @@
                         <span class="formula-unit">days</span>
                     </label>
                     <!-- Under m and L_p, and the box that actually drives the sheet. -->
-                    <label class="formula-row" title="The mean of every weigh-in in the L_p days ending at your latest one — m̄(t) = (1/L_p) × Σ m(t−i). Water and glycogen move the scale by more than a week of fat loss does, and the decay model assumes clean mass, so every formula here reads this rather than the day's reading. Follows L_p as you type it. Editable: type a figure to see the whole plan at another mass.">
+                    <label class="formula-row" title="The mean of every body-mass reading in the L_p days ending at your latest one — m̄(t) = (1/L_p) × Σ m(t−i). Water and glycogen move the scale by more than a week of fat loss does, and the decay model assumes clean mass, so every formula here reads this rather than the day's reading. Follows L_p as you type it. Editable: type a figure to see the whole plan at another mass.">
                         <span class="formula-sym">m̄</span>
                         <span class="formula-name">rolling average body mass over L_p</span>
                         <input type="text" id="formula-body-mass-smooth" inputmode="decimal">
@@ -1040,7 +1040,7 @@
                     <!-- Glycogen follows the journey block now, straight after LBM up with the
                          profile, since it reads that same LBM box rather than a flat guess: glycogen
                          is stored in muscle, not fat, so it has to scale with lean mass, not sit
-                         unrelated to weight/height/sex. Not read by any calorie identity — this is
+                         unrelated to body mass/height/sex. Not read by any calorie identity — this is
                          purely the explanation for why m and m̄ above don't agree from one day to the
                          next: glycogen stores pull water in with them, so a day of low carbs (or a
                          big refeed) can move the scale by kilograms with no fat gained or lost at
@@ -1135,7 +1135,7 @@
                          starts below. -->
                     <hr class="formula-divider">
                     <!-- The fiber band follows protein: a floor scaled to how much you eat (14 g per
-                         1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body weight
+                         1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body mass
                          (0.5 g/kg) — two different bases, unlike protein's single LBM, so both
                          coefficients are editable and neither rides on a box the other computes.
                          Named b_min/b_max rather than f_min/f_max: TEF's own coefficient above is
@@ -1148,7 +1148,7 @@
                     </label>
                     <label class="formula-row">
                         <span class="formula-sym">b_max</span>
-                        <span class="formula-name">dietary fiber ceiling per kg of body weight</span>
+                        <span class="formula-name">dietary fiber ceiling per kg of body mass</span>
                         <input type="text" id="formula-fiber-per-kg-max" inputmode="decimal">
                         <span class="formula-unit">g/kg/day</span>
                     </label>
@@ -1168,7 +1168,7 @@
                          starts below. -->
                     <hr class="formula-divider">
                     <!-- The fat band follows fiber, same two-different-bases shape but both ends
-                         scaled off TEI instead of one off body weight: 20-35% of total energy from
+                         scaled off TEI instead of one off body mass: 20-35% of total energy from
                          fat is the Institute of Medicine's Acceptable Macronutrient Distribution
                          Range for adults (Dietary Reference Intakes for Energy, Carbohydrate, Fiber,
                          Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also the
@@ -1270,8 +1270,8 @@
                 </details>
 
                 <fieldset class="formula-solve-for formula-pin-mode">
-                    <legend>Which stays fixed as you lose weight</legend>
-                    <label title="Holds your desired fat loss. Every new weigh-in recalculates the daily intake that delivers it, so the calorie number falls as you get lighter and the pace stays on plan.">
+                    <legend>Which stays fixed as you lose body mass</legend>
+                    <label title="Holds your desired fat loss. Every new body-mass reading recalculates the daily intake that delivers it, so the calorie number falls as you get lighter and the pace stays on plan.">
                         <input type="radio" name="formula-pin-mode" value="deficit" checked>
                         Pin desired deficit/fat loss
                     </label>
@@ -1279,14 +1279,14 @@
                         <input type="radio" name="formula-pin-mode" value="intake">
                         Pin desired daily intake
                     </label>
-                    <label title="Holds the fat loss at a percentage of your body mass, so the kilograms per week shrink as you do and every weigh-in recalculates the intake. The gentlest of the three, and the only one with no plateau to fall short of — a constant share of a falling mass always reaches it.">
+                    <label title="Holds the fat loss at a percentage of your body mass, so the kilograms per week shrink as you do and every body-mass reading recalculates the intake. The gentlest of the three, and the only one with no plateau to fall short of — a constant share of a falling mass always reaches it.">
                         <input type="radio" name="formula-pin-mode" value="pct">
                         Pin desired fat-loss %
                     </label>
                 </fieldset>
 
                 <fieldset class="formula-solve-for formula-activity-pin-mode">
-                    <legend>Which stays fixed on the desired activity as your weight changes</legend>
+                    <legend>Which stays fixed on the desired activity as your body mass changes</legend>
                     <label title="Holds τ, the desired activity minutes. The calorie burn it implies falls as you get lighter, since the same minutes move less body mass.">
                         <input type="radio" name="formula-activity-pin-mode" value="time" checked>
                         Pin desired activity time
@@ -1311,7 +1311,7 @@
                         <input type="radio" name="formula-bmr-basis" value="bmr_cal">
                         BMR_cal
                     </label>
-                    <label title="BMR discounted by days actually elapsed since your first logged weigh-in (daysSinceFirstWeighIn, wellness-math.js) — how adapted metabolism realistically is by now, not a flat guess. Switches the Status card's D/Δm, the Calorie Balance chart's per-day Maintenance, the desired calorie intake everywhere it's shown, and Physique's own maintenance figure, all at once.">
+                    <label title="BMR discounted by days actually elapsed since your first logged body-mass reading (daysSinceFirstWeighIn, wellness-math.js) — how adapted metabolism realistically is by now, not a flat guess. Switches the Status card's D/Δm, the Calorie Balance chart's per-day Maintenance, the desired calorie intake everywhere it's shown, and Physique's own maintenance figure, all at once.">
                         <input type="radio" name="formula-bmr-basis" value="bmr_adp">
                         BMR_adp
                     </label>
@@ -2232,7 +2232,8 @@
                     <input type="text" id="physique-body-mass" inputmode="decimal" placeholder="e.g. 94 (kg)">
                 </label>
             </div>
-            <p title="This day's four BMR figures as Save stores them in the BMR column — at its own weigh-in (else the latest earlier one), off the fields typed so far">BMR_mif/kat/cal/adp: <span id="physique-bmr-mif">—</span>/<span id="physique-bmr-kat">—</span>/<span id="physique-bmr-cal">—</span>/<span id="physique-bmr-adp">—</span></p>
+            <p title="This day's body-mass figures as Save stores them in the Mass column: the body-mass reading, BMI at the rolling average, the L_p-day rolling average, and the trend's change per day">m/BMI/m_avg/m_d: <span id="physique-mass-figures">—</span></p>
+            <p title="This day's four BMR figures as Save stores them in the BMR column — at its own body-mass reading (else the latest earlier one), off the fields typed so far">BMR_mif/kat/cal/adp: <span id="physique-bmr-mif">—</span>/<span id="physique-bmr-kat">—</span>/<span id="physique-bmr-cal">—</span>/<span id="physique-bmr-adp">—</span></p>
             <div class="form-row">
                 <label>Bed
                     <input type="time" id="physique-bedtime">

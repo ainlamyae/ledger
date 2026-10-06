@@ -207,7 +207,7 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     return { ok: false, reason: 'No period in this window has both Calories In and Calories Out logged.', days, weeks, eligibleCount, chunkDays };
   }
   if (deltaMActual === null) {
-    return { ok: false, reason: 'Not enough weigh-ins logged around this window to measure any period\'s mass change.', days, weeks, eligibleCount, chunkDays };
+    return { ok: false, reason: 'Not enough body-mass readings logged around this window to measure any period\'s mass change.', days, weeks, eligibleCount, chunkDays };
   }
 
   const heightCm = heightCmEarly;

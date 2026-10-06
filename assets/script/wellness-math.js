@@ -22,7 +22,7 @@ const PROTEIN_G_PER_KG_LBM_MAX_DEFAULT = 2.2;
 
 // The fiber band's two coefficients — the Formula playground opens on these. 14 g/1000 kcal
 // is the USDA/Dietary Guidelines for Americans rule of thumb (derived from the ~25g/2000kcal
-// adult reference intake); 0.5 g/kg body weight is a common upper-bound heuristic so the
+// adult reference intake); 0.5 g/kg body mass is a common upper-bound heuristic so the
 // ceiling scales with the person rather than staying a flat number regardless of size.
 const FIBER_G_PER_1000_KCAL_MIN_DEFAULT = 14;
 const FIBER_G_PER_KG_MAX_DEFAULT = 0.5;
@@ -194,7 +194,7 @@ function getProteinAbsoluteBandG() {
 // A band, not a point, because the evidence behind it is a range (1.6-2.0 g/kg).
 // Applied to TARGET body mass, not today's: scaling off current body mass would shrink the
 // target with every kg lost, exactly when protein matters most. Falls back to the
-// latest weigh-in, then to a zero-width band at the flat PROTEIN_TARGET_G.
+// latest body-mass reading, then to a zero-width band at the flat PROTEIN_TARGET_G.
 function getProteinTargetBandG(entries) {
   // The lean-mass band first: it's the most specific thing on the sheet, and the only
   // one whose grams were computed against a body-composition estimate rather than
@@ -432,14 +432,14 @@ function adaptationFraction(days, pctPerWeek, pctCap) {
   return Math.max(0, Math.min(grown, pctCap / 100));
 }
 
-// Days actually elapsed since the first logged weigh-in, as of `atIsoDate` (today when
+// Days actually elapsed since the first logged body-mass reading, as of `atIsoDate` (today when
 // omitted) — the real-world "how long have you actually been dieting" basis BMR_adp uses
 // everywhere OUTSIDE the Formula Playground itself. The Playground's own BMR_adp is
 // deliberately forward-looking instead — adaptation BY ARRIVAL at m_des, t days from now
 // (see formula-render.js/renderCorrectionFields) — a different question (how adapted will
 // you be when you get there) from the one this answers (how adapted are you right now, or
-// were you on some past logged day). Clamped to >= 0 so a date before the first weigh-in
-// can't go negative. Null with no weigh-in logged at all — there's no diet start to count from.
+// were you on some past logged day). Clamped to >= 0 so a date before the first body-mass reading
+// can't go negative. Null with no body-mass reading logged at all — there's no diet start to count from.
 function daysSinceFirstWeighIn(bodyMassEntries, atIsoDate = null) {
   if (!bodyMassEntries.length) return null;
   const firstDate = bodyMassEntries.map((e) => e.date).sort()[0];
@@ -534,7 +534,7 @@ function applyBmrBasis(bmr, atIsoDate = null) {
 // TODAY's adaptation fraction — applyBmrBasis's "just the fraction" twin, for the one
 // caller that has to scale aBmr/bBmr SEPARATELY rather than one whole BMR figure
 // (maintenanceAffineCoefficients, below) — a plain BMR value doesn't exist yet at the
-// point that needs this number. 0 under the plain 'bmr' basis, or with no weigh-in to
+// point that needs this number. 0 under the plain 'bmr' basis, or with no body-mass reading to
 // count a diet start from.
 function currentAdaptationFraction() {
   if (bmrBasis() !== 'bmr_adp') return 0;
@@ -768,7 +768,7 @@ function weeklyFatLossKgFromPct(pct, bodyMassKg) {
 
 // PINNING THE PERCENTAGE: the third way to hold a plan steady, alongside
 // CALORIE_TARGET_FIXED_KCAL. Set it and the weekly kilograms are recomputed from every
-// new weigh-in as a share of THAT mass, so the pace stays proportional to the body doing
+// new body-mass reading as a share of THAT mass, so the pace stays proportional to the body doing
 // the losing instead of being a fixed number of kilograms.
 //
 // Its own key rather than a mode flag, and blank means unset, so both pins read the same
@@ -802,7 +802,7 @@ function flatCalorieTargetKcal() {
 }
 
 // A PINNED target: one number that stays put instead of being recalculated from
-// each new weigh-in. Set it and the figure stops tracking body mass — which is
+// each new body-mass reading. Set it and the figure stops tracking body mass — which is
 // also what makes the app self-consistent, because the forecast
 // (projectTargetDays) has always solved dm/dt at a CONSTANT Eᵢₙ. A target that
 // steps down with you is a different, faster plan than the one being forecast.
@@ -839,7 +839,7 @@ function getCalorieTargetKcal(entries) {
 function calorieTargetSeries(entries, dates) {
   // A pinned target is one flat line by definition — the whole point is that it
   // didn't move as the body mass under it did. bodyMassKg stays null so the
-  // tooltip doesn't claim a weigh-in explains a figure that ignores them.
+  // tooltip doesn't claim a body-mass reading explains a figure that ignores them.
   const pinned = pinnedCalorieTargetKcal();
   if (pinned !== null) return dates.map(() => ({ kcal: pinned, bodyMassKg: null }));
 
@@ -1012,7 +1012,7 @@ function computeGlycogenZoneAnchor(trendMap, alpha = GLYCOGEN_ZONE_SMOOTHING_ALP
 }
 
 // A net change this small over ~10 days is a genuine stall rather than water, sodium or
-// cycle. Checked against the SMOOTHED line — raw weigh-ins trip a naive threshold.
+// cycle. Checked against the SMOOTHED line — raw body-mass readings trip a naive threshold.
 const PLATEAU_WINDOW_DAYS = 10;
 const PLATEAU_THRESHOLD_KG = 0.3;
 

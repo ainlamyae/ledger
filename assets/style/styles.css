@@ -1925,6 +1925,20 @@ td .btn {
     min-width: 0;
 }
 
+/* Date and time values left-aligned like every other field's: iOS Safari centres
+   them by default (Physique's Date, Bed and Wake beside a left-aligned Body Mass). */
+.app-form input[type="date"],
+.app-form input[type="time"],
+.app-form input[type="datetime-local"] {
+    text-align: left;
+}
+
+.app-form input[type="date"]::-webkit-date-and-time-value,
+.app-form input[type="time"]::-webkit-date-and-time-value,
+.app-form input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left;
+}
+
 .app-form input,
 .app-form select,
 .app-form textarea {

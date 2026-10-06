@@ -1939,9 +1939,10 @@ td .btn {
     margin-bottom: .2rem;
 }
 
-/* Name takes the leftover width; tick, box and unit stay fixed at the right. */
+/* Name and unit as wide as their longest text (the name still wraps on a screen
+   too narrow for it); nothing stretches to fill the row. The box keeps one width. */
 .app-form .formula-inputs {
-    grid-template-columns: max-content minmax(0, 1fr) 5.07rem 2.5rem;
+    grid-template-columns: max-content minmax(0, max-content) 5.07rem max-content;
     overflow-x: visible;
 }
 

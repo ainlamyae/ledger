@@ -493,10 +493,11 @@ async function submitTransactionForm(event) {
   ]];
 
   try {
+    let savedRow = editingRow;
     if (editingRow) {
       await updateValues(`${CONFIG.SHEETS.TRANSACTIONS}!A${editingRow}:F${editingRow}`, values);
     } else {
-      await appendValues(TRANSACTIONS_RANGE, values);
+      savedRow = appendedRow(await appendValues(TRANSACTIONS_RANGE, values));
     }
 
     // After the transaction row, and outside the catch below on purpose: the row
@@ -542,7 +543,12 @@ async function submitTransactionForm(event) {
       transactionsDirtyFromAdd = true;
     } else {
       await refreshTransactions(true);
-      closeTransactionForm();
+      const saved = allTransactions.find((t) => t.row === savedRow);
+      if (saved) {
+        openTransactionForm(saved);
+        stayOnSavedForm('tx-modal', editTransaction.step(saved));
+      }
+      showFormSaved('tx-form-error');
     }
   } catch (err) {
     showFieldError('tx-form-error', err.message);
@@ -624,9 +630,9 @@ async function submitBulkEditForm(event) {
         [[merged.date, merged.account, merged.payee, merged.category, merged.description, merged.amount]]);
     }));
 
-    selectedRows.clear();
+    // The rows stay ticked, so a second 💾 edits them again.
     await refreshTransactions(true);
-    closeBulkEditForm();
+    showFormSaved('tx-bulk-edit-form-error');
     showUndoToast(`${selected.length} transaction(s) updated.`, () => restoreBulkEdit(snapshots));
   } catch (err) {
     showFieldError('tx-bulk-edit-form-error', err.message);

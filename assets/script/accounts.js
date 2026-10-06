@@ -285,15 +285,21 @@ async function submitAccountForm(event) {
   ]];
 
   try {
-    if (editingAccountRow) {
-      await updateValues(`'${CONFIG.SHEETS.ACCOUNTS}'!A${editingAccountRow}:E${editingAccountRow}`, values);
+    let row = editingAccountRow;
+    if (row) {
+      await updateValues(`'${CONFIG.SHEETS.ACCOUNTS}'!A${row}:E${row}`, values);
     } else {
-      await appendValues(ACCOUNTS_RANGE, values);
+      row = appendedRow(await appendValues(ACCOUNTS_RANGE, values));
     }
-    closeAccountForm();
     await refreshAccountsList(true);
     await refreshAccountOptions();
     await refreshNetWorth();
+    const saved = allAccounts.find((a) => a.row === row);
+    if (saved) {
+      await openAccountForm(saved);
+      stayOnSavedForm('account-modal', editAccount.step(saved));
+    }
+    showFormSaved('account-form-error');
   } catch (err) {
     showFieldError('account-form-error', err.message);
   }
@@ -484,7 +490,10 @@ async function submitTransferForm(event) {
   try {
     await addToAccountBalance(from, -amount);
     await addToAccountBalance(to, amount);
-    closeTransferForm();
+    // No edit to come back to: the amount clears, so a second 💾 can't repeat it.
+    document.getElementById('transfer-amount').value = '';
+    document.getElementById('transfer-payoff').checked = false;
+    showFormSaved('transfer-form-error');
   } catch (err) {
     showFieldError('transfer-form-error', err.message);
   }

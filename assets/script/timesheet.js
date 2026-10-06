@@ -107,14 +107,6 @@ async function initTimeSheet(forceRefresh = false) {
     document.getElementById('log-today-btn').addEventListener('click', () => {
       openTimesheetForm(isoFromDate(new Date()));
     });
-    document.getElementById('timesheet-reminder-log-btn').addEventListener('click', () => {
-      const today = isoFromDate(new Date());
-      openRoutedPage('work-time', [{ slug: today, label: today }], () => openTimesheetForm(today));
-    });
-    document.getElementById('timesheet-reminder-enable-btn').addEventListener('click', async () => {
-      await Notification.requestPermission();
-      checkTimesheetReminder();
-    });
     // other/work-time/<date>/ opens that day's Edit, logged or not.
     registerRecordRoute('work-time', (slug, sub) => {
       if (sub || !/^\d{4}-\d{2}-\d{2}$/.test(slug)) return null;
@@ -261,33 +253,19 @@ function populateTimesheetCompanyOptions() {
   });
 }
 
-// A weekday with neither a logged entry nor a holiday/day-off note for
-// today means today hasn't been logged yet — surface a banner, and (once
-// the user has opted in) a real OS notification. Browsers block requesting
-// Notification permission outside a direct user gesture, so it can only be
-// offered via the banner's own button, never automatically on load.
+// A weekday with nothing logged for today: a "Log" badge opening today's day, and
+// (once allowed in the account menu) one Chrome notification a day.
 function checkTimesheetReminder() {
-  const banner = document.getElementById('timesheet-reminder-banner');
   const today = isoFromDate(new Date());
-
   if (isWeekend(today) || entriesForLastCompany(allTimeEntries).some((e) => e.date === today)) {
-    banner.hidden = true;
+    setPageBadge('other', 'work-time', null);
     return;
   }
-
-  banner.hidden = false;
-
-  const enableBtn = document.getElementById('timesheet-reminder-enable-btn');
-  if (!('Notification' in window)) {
-    enableBtn.hidden = true;
-  } else if (Notification.permission === 'granted') {
-    enableBtn.hidden = true;
-    if (localStorage.getItem('ledger_last_reminder_notified') !== today) {
-      new Notification('Ledger', { body: "You haven't logged today's hours yet." });
-      localStorage.setItem('ledger_last_reminder_notified', today);
-    }
-  } else {
-    enableBtn.hidden = false;
+  setPageBadge('other', 'work-time', { text: 'Log', title: "Today's hours aren't logged", record: today });
+  if ('Notification' in window && Notification.permission === 'granted'
+    && localStorage.getItem('ledger_last_reminder_notified') !== today) {
+    new Notification('Ledger', { body: 'Work Time: log today' });
+    localStorage.setItem('ledger_last_reminder_notified', today);
   }
 }
 
@@ -521,7 +499,9 @@ async function submitTimesheetForm(event) {
     }
 
     await refreshTimeSheet(true);
-    closeTimesheetForm();
+    openTimesheetForm(date);
+    stayOnSavedForm('timesheet-modal', { slug: date, label: date });
+    showFormSaved('timesheet-form-error');
   } catch (err) {
     showFieldError('timesheet-form-error', err.message);
   }

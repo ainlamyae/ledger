@@ -277,7 +277,13 @@ async function submitApplicationForm(event) {
       await updateValues(`'${CONFIG.SHEETS.APPLICATIONS}'!A2:E2`, [['', date, action, type, appNumber]]);
     }
     await refreshApplications(true);
-    closeApplicationForm();
+    // A new application is inserted at row 2.
+    const saved = allApplications.find((a) => a.headerRow === (editingApplicationRow ?? 2));
+    if (saved) {
+      openApplicationForm(saved);
+      stayOnSavedForm('application-modal', editApplication.step(saved));
+    }
+    showFormSaved('application-form-error');
   } catch (err) {
     showFieldError('application-form-error', err.message);
   }

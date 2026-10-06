@@ -23,8 +23,9 @@ const recordRoutes = new Map(); // block slug -> [open(recordSlug, subSlug)]: th
 let formHandoff = false;     // a form closed to hand its history entry to the next one
 
 // A step below the block: { slug, label }, from a routed button or a row.
+// An emoji button (➕) is named by its aria-label.
 function buttonStep(button) {
-  return { slug: button.dataset.route, label: button.textContent.trim() };
+  return { slug: button.dataset.route, label: button.getAttribute('aria-label') || button.textContent.trim() };
 }
 
 // Lowercase words joined by hyphens: "Chicken Breast" -> "chicken-breast".
@@ -64,12 +65,14 @@ function routedRowEdit(blockSlug, rows, label, open, subs = {}) {
     (sub ? subs[sub] : open)(row);
     return label(row);
   });
-  return (row, sub = null) => {
+  const edit = (row, sub = null) => {
     const steps = [{ slug: slugs().get(row), label: label(row) }];
     if (sub) steps.push({ slug: sub, label: subStepLabel(sub) });
     routeRecordEdit(blockSlug, ...steps);
     (sub ? subs[sub] : open)(row);
   };
+  edit.step = (row) => ({ slug: slugs().get(row), label: label(row) });
+  return edit;
 }
 
 // A block whose views (data-route-view buttons) are pages: how to leave the view.
@@ -94,16 +97,15 @@ function subStepLabel(slug) {
   return slug.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-// A form opened from outside its block's routed buttons: as a page under
-// <block>/<steps>/ on a section page; on the home page, by going to that address.
-function openRoutedPage(blockSlug, steps, open) {
-  if (window.ledgerSectionPage) {
-    routeRecordEdit(blockSlug, ...steps);
-    open();
-    return;
-  }
-  const panel = document.querySelector(`#dashboard .panel[data-route="${blockSlug}"]`);
-  location.href = routeUrl(panel, steps);
+// A form staying open after its save, now on the saved row: its address, title and
+// breadcrumb move there in place (an Add becomes that row's Edit), no history step.
+function stayOnSavedForm(modalId, step) {
+  const form = routedForms.find((f) => f.modal.id === modalId);
+  if (!form || !step?.slug) return;
+  form.steps = [step];
+  history.replaceState(history.state, '', routeUrl(form.panel, form.steps));
+  document.title = routeTitle(form.panel, form.steps);
+  updateFormCrumb(form.panel, form.steps);
 }
 
 // Called by a row's Edit (or view) just before it opens its form.

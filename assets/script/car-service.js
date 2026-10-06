@@ -343,24 +343,20 @@ function renderCarServiceChart(records, predictions, fit, today) {
 // The heading flag (like Account's "Acct>Txn") and a once-a-day Chrome notification
 // (like Work Time's), for every service due within CAR_REMINDER_DAYS or overdue.
 function updateCarServiceReminder(predictions, today) {
-  const flag = document.getElementById('car-service-flag');
   const due = predictions.filter((p) => carDaysBetween(today, p.date) <= CAR_REMINDER_DAYS);
-  flag.hidden = due.length === 0;
   if (!due.length) {
-    flag.textContent = '';
-    flag.title = '';
+    setPageBadge('other', 'car-service', null);
     return;
   }
 
   const days = carDaysBetween(today, due[0].date);
   const names = [...new Set(due.map((p) => carTypeInfo(p.type).short))].join('+');
-  flag.textContent = days < 0 ? `${names} overdue` : `${names} ${days}d`;
   const detail = due.map((p) => `${p.label} (${p.date})`).join(', ');
-  flag.title = `Car service due: ${detail}`;
+  setPageBadge('other', 'car-service', { text: `${days}d`, title: `Car service due: ${detail}` });
 
   if ('Notification' in window && Notification.permission === 'granted'
     && localStorage.getItem('ledger_last_car_service_notified') !== today) {
-    new Notification('Ledger', { body: days < 0 ? `Car service overdue: ${detail}` : `Car service in ${days} days: ${detail}` });
+    new Notification('Ledger', { body: `Car service ${days}d: ${names}` });
     localStorage.setItem('ledger_last_car_service_notified', today);
   }
 }

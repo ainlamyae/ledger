@@ -667,7 +667,7 @@ async function handlePhysiqueScanInput(e) {
 
   const btn = document.getElementById('physique-scan-btn');
   btn.disabled = true;
-  btn.textContent = 'Analyzing…';
+  btn.textContent = '📷…';
 
   try {
     const base64 = await new Promise((resolve, reject) => {
@@ -693,7 +693,7 @@ async function handlePhysiqueScanInput(e) {
     showFieldError('physique-form-error', `Scan failed: ${err.message}`);
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Scan';
+    btn.textContent = '📷';
   }
 }
 
@@ -753,7 +753,7 @@ async function calculatePhysiqueDay() {
 
   btn.disabled = true;
   const originalLabel = btn.textContent;
-  btn.textContent = 'Calculating…';
+  btn.textContent = '🧮…';
   clearFieldError('physique-form-error');
 
   const messages = runPhysiqueWorkoutCalc(true);

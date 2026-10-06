@@ -134,11 +134,11 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
 
   // The Mass figures Save will store (the saved ones while Body Mass is unchanged).
   const mass = document.getElementById('physique-is-pattern').checked ? {} : physiqueMassForSave(day.date, day.bodyMass);
-  // m_avg, m_d and BMI with their own units, as stored (m is the Body Mass field above).
+  // m̄ (m_avg), Δm (m_d) and BMI as stored, each unit once after the last value that
+  // uses it, as the BMR line below gives kcal once (m is the Body Mass field above).
   const massText = mass.m === undefined ? '—' : [
-    mass.m_avg !== undefined ? `${mass.m_avg} kg` : '—',
-    mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? `${mass.m_d} kg` : '—',
-    mass.BMI !== undefined ? `${mass.BMI} kg/m²` : '—',
+    `${mass.m_avg ?? '—'}/${mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? mass.m_d : '—'} kg`,
+    `${mass.BMI ?? '—'} kg/m²`,
   ].join('/');
   document.getElementById('physique-mass-figures').textContent = privacyMode ? maskDigits(massText) : massText;
 

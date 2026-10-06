@@ -505,7 +505,11 @@ function initRouter() {
   } else if (record) {
     // The form's own entry over the block's, now, so the address stays on the
     // row while its data loads; the form claims this entry when it opens.
-    const steps = [{ slug: record, label: record }];
+    // The address only has the row's lowercase slug ("broccoli"), not its name
+    // ("Broccoli"), until the rows load: "…" holds its place in the breadcrumb, so
+    // the name isn't shown wrong and then corrected. A date reads the same either way.
+    const label = /^\d{4}-\d{2}-\d{2}$/.test(record) ? record : '…';
+    const steps = [{ slug: record, label }];
     if (sub) steps.push({ slug: sub, label: subStepLabel(sub) });
     setRoute(panel, steps, { push: true });
     initialFormRoute = { panel, record, sub };

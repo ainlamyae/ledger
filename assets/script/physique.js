@@ -135,7 +135,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   // The Mass figures Save will store (the saved ones while Body Mass is unchanged).
   const mass = document.getElementById('physique-is-pattern').checked ? {} : physiqueMassForSave(day.date, day.bodyMass);
   const massText = mass.m === undefined ? '—'
-    : `${mass.m} kg/${mass.BMI ?? '—'}/${mass.m_avg !== undefined ? `${mass.m_avg} kg` : '—'}/${mass.m_d !== undefined ? `${mass.m_d} g/day` : '—'}`;
+    : `${mass.m} kg/${mass.BMI ?? '—'}/${mass.m_avg !== undefined ? `${mass.m_avg} kg` : '—'}/${massChangeGPerDay(mass) !== null ? `${massChangeGPerDay(mass)} g/day` : '—'}`;
   document.getElementById('physique-mass-figures').textContent = privacyMode ? maskDigits(massText) : massText;
 
   // The four BMR figures Save will store, one line; "kcal" once, after the last.
@@ -324,6 +324,17 @@ function physiqueColumnLetter(i) {
 // rewrites the days after it; a changed L_p or height rewrites every day.
 const MASS_JSON_ORDER = ['m', 'BMI', 'm_avg', 'm_d'];
 
+// m_d as g/day for display, from its stored kg/day.
+function massChangeGPerDay(mass) {
+  return mass?.m_d === undefined || mass?.m_d === null ? null : Math.round(mass.m_d * 1000);
+}
+
+// A cell written while m_d was stored in g/day: no body changes by a kilogram a day,
+// so a magnitude that large can only be grams.
+function massChangeStoredInGrams(mass) {
+  return mass?.m_d !== undefined && Math.abs(mass.m_d) >= 1;
+}
+
 // The body-mass figures stored in a BMR cell, or null when it has none yet.
 function massFiguresOf(bmr) {
   if (!bmr || bmr.m === undefined) return null;
@@ -349,7 +360,8 @@ function computePhysiqueMassFigures(date, bodyMassKg = undefined) {
   const trend = computeBodyMassTrend(bodyMassByDateMap(readings));
   const trendDates = [...trend.keys()].sort();
   const slope = trendDates.length ? computeBodyMassTrendSlopeGramsPerDay(trend).get(trendDates.at(-1)) : null;
-  if (slope !== null && slope !== undefined) figures.m_d = slope;
+  // Stored in kg/day like every other body-mass figure (the slope comes in g/day).
+  if (slope !== null && slope !== undefined) figures.m_d = Math.round(slope) / 1000;
   return figures;
 }
 
@@ -357,7 +369,9 @@ function computePhysiqueMassFigures(date, bodyMassKg = undefined) {
 function physiqueMassForSave(date, bodyMassKg) {
   if (!date) return {};
   const saved = allPhysiqueEntries.find((p) => p.date && p.date === date);
-  if (saved?.mass && (saved.bodyMass ?? null) === (bodyMassKg ?? null)) return { ...saved.mass };
+  if (saved?.mass && !massChangeStoredInGrams(saved.mass) && (saved.bodyMass ?? null) === (bodyMassKg ?? null)) {
+    return { ...saved.mass };
+  }
   return computePhysiqueMassFigures(date, bodyMassKg ?? null);
 }
 
@@ -651,7 +665,8 @@ async function backfillPhysiqueDerivedFigures() {
   // Days whose BMR cell has no body-mass figures yet get them added to it, once.
   if (physiqueColumnIndex.bmr !== undefined) {
     physiqueDatedAscending().forEach((p) => {
-      if (p.mass) return;
+      // Rewritten once if its m_d was saved in g/day, before it was stored in kg.
+      if (p.mass && !massChangeStoredInGrams(p.mass)) return;
       const figures = computePhysiqueMassFigures(p.date);
       if (!Object.keys(figures).length) return;
       const range = physiqueCellUpdate('bmr', p.row, {}).range;

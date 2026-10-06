@@ -3747,13 +3747,18 @@ html.section-pages .panel.page-active:hover {
     }
 
     /* Finger-sized: close to the 44px touch guideline. */
+    /* A long label wraps onto a second line inside its button ("Export" over
+       "Transactions") instead of stretching it: up to two lines fit the 3rem
+       height, and the narrower buttons leave more of the bar in view. */
     html[data-action-bar] .action-bar .btn {
         height: 3rem;
+        max-width: 6.5rem;
         margin: 0;
         padding: 0 .6rem;
         font-size: .85rem;
-        line-height: 1;
-        white-space: nowrap;
+        line-height: 1.1;
+        white-space: normal;
+        text-align: center;
     }
 
     html[data-action-bar] .action-bar .btn-icon,

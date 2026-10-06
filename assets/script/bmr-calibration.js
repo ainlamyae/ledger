@@ -303,7 +303,7 @@ function bmrCalibrationForWindow(periodCount, periodDays) {
 }
 
 // Tune's Update: saves n_p / L_p and rewrites every day's stored BMR cell (its BMR_cal
-// over the new window) and Mass cell (m_avg over the new L_p, with the BMI and m_d that
+// over the new window) and its body-mass figures (m_avg over the new L_p, with the BMI and m_d that
 // follow it) in the Physique sheet, in one request.
 async function updateStoredBmrCalibration() {
   const periodCount = periodInputValue('formula-cal-period-count', BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);

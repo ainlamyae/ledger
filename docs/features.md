@@ -297,7 +297,7 @@ The separate Calibrate BMR form is gone; Tune does all of it. Measures how wrong
 - **`n_p`** (number of periods, default 3) and **`L_p`** (period length, default 10 days) pick the window: that many whole periods ending yesterday, so 3 × 10 covers the last 30 days. **`BMR_cal`** below them is recomputed live.
 - **Calculations** shows the working: the **Periods** table — `Period`, `m`, `Δm`, `ΔM (kcal)` (`Δm × 7700 / L_p`), `D` (the days' average balance on the plain equation BMR), `Offset` (`D − ΔM`), `Weight` (recency, 0.1 oldest → 1.0 newest) — and the `D` / `ΔM` / `Offset` / `BMR_cal` lines.
 - **Save** stores `n_p` and `L_p` only. The calibration itself isn't a Setting: each day's `BMR_cal` lives in Physique's BMR column, and the app reads the latest one (and its offset from that day's equation BMR) straight from there (`latestStoredCalibration`, `wellness-math.js`); it doesn't switch the app onto BMR_cal — pick **BMR_cal** in Tune's BMR choice for that.
-- **Update** saves `n_p` / `L_p` and recomputes, in one request after a confirm, every day's stored BMR cell (Physique's BMR column, its `BMR_cal` over the new window) and Mass cell (`m_avg` over the new `L_p`, with the `BMI` and `m_d` that follow it).
+- **Update** saves `n_p` / `L_p` and recomputes, in one request after a confirm, every day's stored BMR cell (Physique's BMR column, its `BMR_cal` over the new window) and body-mass figures (`m_avg` over the new `L_p`, with the `BMI` and `m_d` that follow it).
 
 ## Health — Insight (AI)
 

@@ -335,8 +335,7 @@ function renderMicronutrientInsightPreview(data) {
 
   data.nutrients.forEach((n, i) => {
     const tr = document.createElement('tr');
-    if (n.severity === 'severe') tr.classList.add('nutrient-gap-severe');
-    else if (n.severity === 'mild') tr.classList.add('nutrient-gap-mild');
+    if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
     if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
     tr.append(
       makeCell(n.displayName),

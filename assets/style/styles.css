@@ -24,7 +24,6 @@ textarea {
     --color-muted: #64748b;
     --color-muted-hover: #475569;
     --color-income: #16a34a;
-    --color-income-high: #166534;
     --color-expense: #dc2626;
     --color-other: #7c3aed;
     --color-bg: #f5f7fb;
@@ -32,7 +31,6 @@ textarea {
     --color-border: #e5e7eb;
     --color-text: #1f2937;
     --color-text-muted: #6b7280;
-    --color-heading: var(--color-nav);
     --color-error-bg: #fef2f2;
     --color-error-border: #fecaca;
     --color-info-bg: #eff6ff;
@@ -45,7 +43,7 @@ textarea {
     --input-font-size: 16px;
     /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
     --chart-good: var(--color-income);
-    --chart-good-high: var(--color-income-high);
+    --chart-good-high: #166534;
     --chart-good-light: #4ade80;
     --chart-bad: var(--color-expense);
     --chart-warn: var(--color-ai);
@@ -74,7 +72,6 @@ textarea {
     --color-border: #334155;
     --color-text: #e2e8f0;
     --color-text-muted: #94a3b8;
-    --color-heading: #93c5fd;
     --color-error-bg: #422006;
     --color-error-border: #7c2d12;
     --color-info-bg: #1e3a5f;
@@ -188,7 +185,7 @@ header h1 {
 .nav a {
     position: relative;
     display: block;
-    color: rgba(255, 255, 255, .78);
+    color: #fff;
     text-decoration: none;
     font-size: .85rem;
     font-weight: 700;
@@ -210,7 +207,7 @@ header h1 {
 }
 
 .last-updated {
-    color: rgba(255, 255, 255, .65);
+    color: #fff;
     font-size: .8rem;
 }
 
@@ -456,7 +453,6 @@ header .btn:hover {
 .landing-hero h1 {
     font-size: 2.25rem;
     margin-bottom: .75rem;
-    color: var(--color-heading);
 }
 
 .landing-hero p {
@@ -1213,24 +1209,15 @@ td {
     border-bottom: 2px solid var(--color-text-muted);
 }
 
-#insight-micro-table tr.nutrient-gap-severe td,
-#physique-micro-table tr.nutrient-gap-severe td {
-    border-left: 3px solid var(--color-danger);
+/* A nutrient short of its daily target, severe or mild alike: red. */
+#insight-micro-table tr.nutrient-gap td,
+#physique-micro-table tr.nutrient-gap td {
+    border-left: 3px solid var(--color-expense);
 }
 
-#insight-micro-table tr.nutrient-gap-severe td:first-child,
-#physique-micro-table tr.nutrient-gap-severe td:first-child {
-    color: var(--color-danger);
-}
-
-#insight-micro-table tr.nutrient-gap-mild td,
-#physique-micro-table tr.nutrient-gap-mild td {
-    border-left: 3px solid #d97706;
-}
-
-#insight-micro-table tr.nutrient-gap-mild td:first-child,
-#physique-micro-table tr.nutrient-gap-mild td:first-child {
-    color: #d97706;
+#insight-micro-table tr.nutrient-gap td:first-child,
+#physique-micro-table tr.nutrient-gap td:first-child {
+    color: var(--color-expense);
 }
 
 #transactions-table th:first-child,
@@ -1311,11 +1298,6 @@ td {
 
 th {
     color: var(--color-text-muted);
-}
-
-/* A value coloured along a gradient (setGradientColor, wellness-charts.js). */
-.gradient-value {
-    color: var(--gradient-color);
 }
 
 /* Activity Plan tables sharing one set of column widths (syncActivityPlanColumnWidths). */
@@ -1441,19 +1423,13 @@ th.sortable:hover {
     text-align: right;
 }
 
-/* Same dark green the Protein Intake chart gives a day past its band's top edge —
-   still a hit, just past the point where more buys anything. */
-.income-high {
-    color: var(--color-income-high);
-    text-align: right;
-}
-
 .expense {
     color: var(--color-expense);
     text-align: right;
 }
 
-.account-closed {
+/* A value that is neither good nor bad: a closed account, carbs under their band. */
+.neutral {
     color: var(--color-text-muted);
     text-align: right;
 }
@@ -2122,12 +2098,8 @@ td .btn {
 }
 
 .timesheet-holiday-badge {
-    color: #b45309;
+    color: var(--color-text-muted);
     font-style: italic;
-}
-
-:root[data-theme="dark"] .timesheet-holiday-badge {
-    color: #fbbf24;
 }
 
 .timesheet-no-entry {
@@ -2794,7 +2766,6 @@ td .btn {
         padding: .4rem .25rem;
         font-weight: 600;
         line-height: 1.1;
-        color: rgba(255, 255, 255, .68);
     }
 
     /* The color change alone (.nav a.active, above) reads fine in a row of
@@ -2901,16 +2872,14 @@ td .btn {
 
     th,
     td {
-        padding: .5rem;
+        padding: .25rem .5rem;
         font-size: .85rem;
     }
 
-    /* .25rem/.4rem used to compute to ~20px tall — under WCAG's 24px minimum
-       tap target, and tight enough that a row with several of these side by
-       side (✏️/📋/🧬/🗑️) risked a mis-tap landing on Delete. Sized to clear
-       that floor with a little room, not just barely pass it. */
+    /* Just past WCAG's 24px minimum tap target, so a row of ✏️/📋/🧬/🗑️ can't
+       mis-tap onto Delete; no taller, so rows stay thin. */
     td .btn {
-        padding: .5rem;
+        padding: .4rem;
         font-size: .8rem;
         margin-right: .15rem;
     }
@@ -3107,7 +3076,7 @@ td .btn {
 .formula-row input.formula-pct-over,
 .formula-row input.formula-out-of-band {
     border-color: var(--color-danger);
-    color: var(--color-danger);
+    color: var(--color-expense);
     font-weight: 600;
 }
 
@@ -3397,7 +3366,13 @@ html.section-pages[data-page="hub"] .page-crumb-back {
     color: var(--color-text-muted);
 }
 
-html.section-pages .page-crumb:not(.form-crumb) {
+/* The home page's sits above the sections, so it takes their .5rem gap itself. */
+html.home-hub .page-crumb {
+    margin-bottom: .5rem;
+}
+
+html.section-pages .page-crumb:not(.form-crumb),
+html.home-hub .page-crumb {
     display: flex;
 }
 

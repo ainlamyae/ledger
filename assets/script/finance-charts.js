@@ -532,6 +532,42 @@ function renderAccountCompositionChart(accounts) {
 
 let savingsTrendChart = null;
 
+// The Finance glance's own card: the same Cumulative Net Worth line as the Indicator
+// chart below, with nothing but the line — no axis labels, no amounts, no grid. The
+// hover still names the month and amount.
+let financeGlanceNetWorthChart = null;
+
+function renderFinanceGlanceNetWorthChart(months) {
+  const ctx = document.getElementById('finance-glance-networth-chart');
+  financeGlanceNetWorthChart = upsertChart(financeGlanceNetWorthChart, ctx, {
+    type: 'line',
+    data: {
+      labels: months.map((m) => m.label),
+      datasets: [{
+        label: 'Cumulative Net Worth',
+        data: months.map((m) => m.cumulative),
+        borderColor: chartColor('--chart-blue'),
+        backgroundColor: chartColor('--chart-blue', 0.1),
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (item) => formatCurrency(item.raw) } },
+      },
+      scales: {
+        x: { display: false, grid: { display: false } },
+        y: { display: false, grid: { display: false }, beginAtZero: false },
+      },
+    },
+  });
+}
+
 function renderSavingsTrendChart(months) {
   const ctx = document.getElementById('savings-trend-chart');
 

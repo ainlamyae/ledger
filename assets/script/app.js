@@ -925,7 +925,9 @@ function setupBulbsToggle() {
 }
 
 function setupScrollSpy() {
-  const navLinks = [...document.querySelectorAll('#main-nav a')];
+  const navLinks = [...document.querySelectorAll('#main-nav a[data-section]')];
+  // The Ledger tab is current on the home page, a section's tab on its pages.
+  document.querySelector('#main-nav .nav-home')?.classList.toggle('active', !window.ledgerSectionPage);
 
   // On a section page there's one wrapper and nothing to scroll between, so its
   // nav entry is simply the active one for as long as the page is open.

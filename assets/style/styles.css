@@ -1088,11 +1088,6 @@ td:has(.btn) {
     white-space: nowrap;
 }
 
-#physique-calc-breakdown th:first-child,
-#physique-activity-breakdown th:first-child {
-    width: 100%;
-}
-
 /* Account Summary's Total row (assets/script/accounts.js) — same bold/top-border
    treatment as the other summed-last-row tables above. */
 
@@ -1155,7 +1150,6 @@ td:has(.btn) {
 #breakdown-table td:last-child,
 #settings-table td:last-child,
 #settings-table td:first-child {
-    width: 1%;
     white-space: nowrap;
 }
 
@@ -1163,7 +1157,6 @@ td:has(.btn) {
 #transactions-table td:last-child,
 #accounts-table th:last-child,
 #accounts-table td:last-child {
-    width: 1%;
     white-space: nowrap;
     text-align: right;
 }
@@ -1197,21 +1190,6 @@ td:has(.btn) {
     white-space: nowrap;
 }
 
-#physique-table th:first-child,
-#physique-table td:first-child,
-#physique-table th:last-child,
-#physique-table td:last-child {
-    width: 1%;
-}
-
-#transactions-table td:nth-child(4),
-#transactions-table td:nth-child(5) {
-    max-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 #transactions-table th:nth-child(7),
 #accounts-table th:nth-child(4),
 #accounts-table th:nth-child(5),
@@ -1221,11 +1199,6 @@ td:has(.btn) {
 
 th {
     color: var(--color-text-muted);
-}
-
-/* Activity Plan tables sharing one set of column widths (syncActivityPlanColumnWidths). */
-#workout-plan-panel col {
-    width: var(--col-width);
 }
 
 .empty-state {
@@ -1458,19 +1431,12 @@ th.sortable:hover {
     font-size: .8rem;
 }
 
-/* Below 820px two narrow columns squeeze the Status card's longer rows
-   ("108~132 g" etc.) too tight at the desktop sizing above — tighten the
-   padding and shrink the row/value text instead of dropping to one column,
-   the same trade the phone breakpoint below already made; two columns stays
-   the shape all the way from desktop down to the smallest phone. */
+/* Below 820px the cards' row and value text shrinks (.8rem), so the Status card's
+   longer rows ("108~132 g" etc.) fit; the cards keep the same padding as on a
+   laptop, so their text never sits on the edge. */
 @media (max-width: 820px) {
     :root {
         --card-text-size: .8rem;
-    }
-
-    .card,
-    .widget-card {
-        padding: var(--space-xs) var(--space-xs);
     }
 
     .today-glance-cards .body-mass-progress-meter-stats > * > * {
@@ -2314,10 +2280,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-bottom: var(--space-s);
 }
 
-/* Left, like every other column — a centred checkbox and right-aligned buttons
-   read as two more misalignments once the columns themselves line up. Width now
-   comes from the nth-child rules below, so all five columns are declared in one
-   place. */
+/* Left, like every other column. */
 .workout-check-col,
 .workout-check-cell {
     text-align: left;

@@ -195,31 +195,21 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // Playground's read-only m row: water and glycogen move this one day to day, which is
   // exactly why every plan figure below reads m̄ instead.
   const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
-  // The glycogen/water swing at the latest reading, beside the target on both m and
-  // m̄ (and the Progress card): a reading within it of the target is water, not a miss.
+  // m̄, the L_p-day rolling average every plan figure reads; BMI below reads it too.
+  const mBar = planBodyMassKg(entries);
+  // The glycogen/water swing at the latest reading, beside the target (as on the
+  // Progress card): a reading within it of the target is water, not a miss.
   const swingKg = glycogenSwingKg(bodyMassKg, heightCm, getSettingString('SEX', null));
   const swingText = swingKg === null ? '' : ` ± ${Math.round(swingKg * 10) / 10}`;
+  // One line for both: today's reading, the rolling average in brackets, the target.
   const mEl = document.getElementById('today-status-m-value');
   mEl.classList.remove('income', 'expense');
-  const mText = bodyMassKg !== null ? `${bodyMassKg} / ${healthyMassKg}${swingText} kg` : '—';
+  const averageText = mBar !== null ? ` (${mBar})` : '';
+  const mText = bodyMassKg !== null ? `${bodyMassKg}${averageText} / ${healthyMassKg}${swingText} kg` : '—';
   mEl.textContent = privacyMode ? maskDigits(mText) : mText;
   if (bodyMassKg !== null) {
     const mGood = bodyMassTargetIsDownward(entries) ? bodyMassKg <= healthyMassKg : bodyMassKg >= healthyMassKg;
     mEl.classList.add(mGood ? 'income' : 'expense');
-  }
-
-  // m̄ — the L_p-day rolling average body mass; BMI below reads it. Against the same
-  // target, with the glycogen/water swing beside it: a reading within that band of the
-  // target is water, not a miss. The swing is taken at the latest reading, as the
-  // Progress card's "→ target ± swing" is, so the two show the same figure.
-  const mBar = planBodyMassKg(entries);
-  const mBarEl = document.getElementById('today-status-mbar-value');
-  mBarEl.classList.remove('income', 'expense');
-  const mBarText = mBar !== null ? `${mBar} / ${healthyMassKg}${swingText} kg` : '—';
-  mBarEl.textContent = privacyMode ? maskDigits(mBarText) : mBarText;
-  if (mBar !== null) {
-    const mBarGood = bodyMassTargetIsDownward(entries) ? mBar <= healthyMassKg : mBar >= healthyMassKg;
-    mBarEl.classList.add(mBarGood ? 'income' : 'expense');
   }
 
   // BMI — m̄ against the healthy-mass target, rescaled by height (computeBmi is a fixed

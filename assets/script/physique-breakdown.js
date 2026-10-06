@@ -345,7 +345,7 @@ function localIngredientCalories(quantity, unit, name) {
   return tableGrams ? (entry.calories / tableGrams) * (quantity * gramsPerUnit) : null;
 }
 
-// Local-only tidy-up for a Consumption block — the Tidy button's whole job:
+// Local-only tidy-up for a Consumption block, run by Calculate and the bulk Tidy:
 // combines lines that are really the same entry typed twice (e.g. two
 // separate "38g onion" additions through the day), orders the rest by
 // calories (the same "highest first" order Calculate itself settles on), and
@@ -354,9 +354,9 @@ function localIngredientCalories(quantity, unit, name) {
 // "100g rice" and "1cup rice" stay separate rather than guessing a conversion
 // between them. A line with no parseable quantity (rare — Consumption is
 // meant to always lead with an amount) is left exactly as typed — never
-// merged, never recased. Pure text in, text out — no DOM, so both the modal's
-// own Tidy button (below) and the bulk one further down share the exact same
-// logic instead of two copies that could drift apart.
+// merged, never recased. Pure text in, text out — no DOM, so Calculate and the
+// bulk Tidy further down share the exact same logic instead of two copies that
+// could drift apart.
 function combineAndSortConsumptionText(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return { text, combinedCount: 0 };
@@ -392,23 +392,6 @@ function combineAndSortConsumptionText(text) {
   scored.sort((a, b) => (b.calories ?? -Infinity) - (a.calories ?? -Infinity));
 
   return { text: scored.map((s) => s.line).join('\n'), combinedCount };
-}
-
-// Hidden whenever running Tidy would be a no-op — the box already reads
-// exactly the way combineAndSortConsumptionText would rewrite it (same lines,
-// same order, same casing) — so the button only ever appears when clicking it
-// would actually change something.
-function syncPhysiqueCombineButtonVisibility() {
-  const field = physiqueField('consumption');
-  const btn = document.getElementById('physique-combine-btn');
-  const current = field.value.trim();
-  if (!current) {
-    btn.hidden = true;
-    return;
-  }
-  const normalizedCurrent = current.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
-  const { text } = combineAndSortConsumptionText(field.value);
-  btn.hidden = text === normalizedCurrent;
 }
 
 // Ingredient-name suggestions for the Consumption textarea, scoped to
@@ -564,7 +547,6 @@ function applyConsumptionSuggestion(name) {
   field.focus();
 
   hideConsumptionSuggestions();
-  syncPhysiqueCombineButtonVisibility();
 }
 
 // Exercise-name suggestions for the Workout textarea: the same per-line dropdown
@@ -692,25 +674,6 @@ function applyWorkoutSuggestion(name) {
   hideWorkoutSuggestions();
 }
 
-// The modal's own Tidy button — same tidy-up as the bulk action below, run
-// on just the one Consumption box being edited right now, so it can be
-// cleaned up before Calculate ever runs rather than only after saving.
-function combineAndSortPhysiqueConsumptionField() {
-  const field = physiqueField('consumption');
-  if (!field.value.trim()) {
-    showFieldError('physique-form-error', 'Fill in Consumption first.');
-    return;
-  }
-
-  const { text, combinedCount } = combineAndSortConsumptionText(field.value);
-  field.value = text;
-  clearFieldError('physique-form-error');
-  if (combinedCount > 0) {
-    showFieldError('physique-form-error', `🔗 ${combinedCount} combined.`);
-  }
-  syncPhysiqueCombineButtonVisibility();
-}
-
 // The form's own 🧬 action — same view the table row's button opens
 // (openPhysiqueMicronutrients), reachable without closing back out to the
 // row. Only meaningful for a day already on the sheet: aggregateMicronutrientIntake
@@ -811,7 +774,6 @@ async function handlePhysiqueScanInput(e) {
     consumptionField.value = consumptionField.value.trim()
       ? `${consumptionField.value.trim()}\n${ingredientText}`
       : ingredientText;
-    syncPhysiqueCombineButtonVisibility();
     await calculatePhysiqueDay();
   } catch (err) {
     console.error('[Scan Food]', err);
@@ -864,7 +826,6 @@ async function calculatePhysiqueDay() {
   const divided = applyConsumptionDivisor(physiqueField('consumption').value);
   if (divided !== null) {
     physiqueField('consumption').value = divided;
-    syncPhysiqueCombineButtonVisibility();
   }
 
   const consumption = physiqueField('consumption').value.trim();
@@ -903,13 +864,11 @@ async function calculatePhysiqueDay() {
 
       // Rebuilt from the merged breakdown rather than the fresh estimate's own
       // standardizedNotes, which only covers the lines that were re-estimated —
-      // then straight through the same tidy-up the Combine & Sort button runs,
-      // so Calculate never leaves behind a Consumption box that button would
-      // still have something to do to.
+      // then straight through the tidy-up (combine, sort, capitalize), so
+      // Calculate leaves Consumption tidy with no separate step.
       const rebuiltConsumption = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
       const { text: sortedConsumption, combinedCount } = combineAndSortConsumptionText(rebuiltConsumption);
       physiqueField('consumption').value = sortedConsumption;
-      syncPhysiqueCombineButtonVisibility();
       if (combinedCount > 0) messages.push(`🔗 ${combinedCount} combined.`);
       physiqueField('calories-in').value = calories;
       physiqueField('protein-in').value = protein.toFixed(1);

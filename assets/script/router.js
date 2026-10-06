@@ -267,18 +267,16 @@ function pendingFormPage() {
     page.id = 'form-pending';
     page.className = 'modal form-page-pending';
     page.hidden = true;
-    const card = document.createElement('div');
-    card.className = 'modal-card';
-    const note = document.createElement('p');
-    note.className = 'status';
-    note.textContent = 'Loading…';
-    card.appendChild(note);
-    page.appendChild(card);
     document.body.insertBefore(page, document.querySelector('body > .modal'));
   }
   return page;
 }
 
+// Holds the form's place while its data loads, so the block's page never shows first.
+// It shows nothing of its own — no placeholder text — and its breadcrumb only when
+// every level's real name is already known from the address (a date, Log); a name
+// that comes from the sheet (an ingredient, a GYM group) isn't guessed, so the
+// breadcrumb is drawn once, final, when the form opens.
 function showPendingFormPage(panel, steps) {
   if (!window.ledgerSectionPage) return;
   const page = pendingFormPage();
@@ -286,14 +284,18 @@ function showPendingFormPage(panel, steps) {
   page.classList.add('form-page');
   document.documentElement.dataset.formPage = '1';
   const crumb = document.getElementById('form-crumb');
-  if (crumb) page.insertBefore(crumb, page.firstChild);
-  updateFormCrumb(panel, steps);
+  if (!crumb) return;
+  page.insertBefore(crumb, page.firstChild);
+  const known = steps.every((step) => step.label !== '…');
+  page.style.visibility = known ? '' : 'hidden';
+  if (known) updateFormCrumb(panel, steps);
 }
 
 function clearPendingFormPage() {
   const page = document.getElementById('form-pending');
   if (!page || page.hidden) return false;
   page.hidden = true;
+  page.style.visibility = '';
   page.classList.remove('form-page');
   return true;
 }
@@ -394,10 +396,47 @@ function routeFromLocation() {
   const [, blockSlug, buttonSlug, subSlug] = location.href.slice(routerRoot.length).split(/[?#]/)[0].split('/');
   const panel = blockSlug ? routedPanel(blockSlug) : null;
   const button = panel && buttonSlug ? panel.querySelector(`button[data-route="${buttonSlug}"]`) : null;
-  // Any other slug under a block is one of its rows, optionally with a view below it.
+  // Any other slug under a block is one of its rows, optionally with a view below it;
+  // under a form's button, one of that form's own pages (registerFormSubView).
   const record = panel && buttonSlug && !button ? decodeURIComponent(buttonSlug) : null;
-  const sub = record && subSlug ? decodeURIComponent(subSlug) : null;
+  const sub = (record || button) && subSlug ? decodeURIComponent(subSlug) : null;
   return { panel, button, record, sub };
+}
+
+// A form's own pages under its address (GYM's groups: …/activity/gym/push-day/).
+// `show(slug)` shows that page, or the form's top level for null; switching rewrites
+// the address in place, like a view, with no history step of its own.
+const formSubViews = new Map(); // button slug -> { show(subSlug | null), label(subSlug) }
+// The sub page a direct load of a form's address asked for, taken by the form as it
+// opens so it opens straight onto that page (takeInitialFormSub).
+let initialFormSub = null;
+
+function registerFormSubView(buttonSlug, show, label) {
+  formSubViews.set(buttonSlug, { show, label });
+}
+
+function takeInitialFormSub(buttonSlug) {
+  if (!initialFormSub || initialFormSub.button !== buttonSlug) return null;
+  const { sub } = initialFormSub;
+  initialFormSub = null;
+  return sub;
+}
+
+// A form's steps with one of its own pages under it.
+function formSubSteps(button, subSlug, label) {
+  return [{ ...buttonStep(button), view: true }, { slug: subSlug, label }];
+}
+
+// Called by the form once it shows a page of its own (or its top level, for null).
+function setFormSubView(subSlug, label) {
+  const top = routedForms.at(-1);
+  if (!top) return;
+  const base = { slug: top.steps[0].slug, label: top.steps[0].label };
+  top.steps = subSlug ? [{ ...base, view: true }, { slug: subSlug, label }] : [base];
+  // Keeps the entry's own state (the form's depth), so Back still closes the form.
+  history.replaceState(history.state, '', routeUrl(top.panel, top.steps));
+  document.title = routeTitle(top.panel, top.steps);
+  updateFormCrumb(top.panel, top.steps);
 }
 
 // Called once loadDashboard (app.js) has finished: forms need their data first.
@@ -410,7 +449,13 @@ function routerDataLoaded() {
       if (!routedForms.length && !pendingFormRoute) abandonPendingFormPage();
     });
   } else {
+    // A form page's own page in the address (…/gym/push-day/): the form opens straight
+    // onto it, and claims the entry the address is already on.
+    const view = sub && formSubViews.get(button.dataset.route);
+    if (view) initialFormSub = { button: button.dataset.route, sub };
     openRoutedForm(panel, button);
+    if (view && pendingFormRoute) pendingFormRoute.steps = formSubSteps(button, sub, view.label(sub) ?? sub);
+    initialFormSub = null;
   }
 }
 
@@ -498,10 +543,14 @@ function initRouter() {
       history.pushState({ ledgerPage: true }, '', routeUrl(panel, [buttonStep(button)]));
       document.title = routeTitle(panel, [buttonStep(button)]);
     } else {
-      setRoute(panel, [buttonStep(button)], { push: true });
+      // The address stays on a form's own page (…/gym/push-day/) while it loads; its
+      // name shows as "…" until the data does.
+      setRoute(panel, sub ? formSubSteps(button, sub, '…') : [buttonStep(button)], { push: true });
     }
-    initialFormRoute = { panel, button };
-    if (!('routeView' in button.dataset)) showPendingFormPage(panel, [buttonStep(button)]);
+    initialFormRoute = { panel, button, sub };
+    if (!('routeView' in button.dataset)) {
+      showPendingFormPage(panel, sub ? formSubSteps(button, sub, '…') : [buttonStep(button)]);
+    }
   } else if (record) {
     // The form's own entry over the block's, now, so the address stays on the
     // row while its data loads; the form claims this entry when it opens.

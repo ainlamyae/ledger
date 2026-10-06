@@ -883,7 +883,7 @@ function renderWellnessBodyMassChart(entries) {
           display: !values.some((v) => v !== null),
           text: 'No body mass readings logged in this range',
           color: Chart.defaults.color,
-          font: { size: 12 },
+          font: { size: chartFontSize() },
           padding: { top: 40 },
         },
         tooltip: {
@@ -1687,7 +1687,7 @@ function renderWellnessActivityChart(entries) {
           display: !hasData,
           text: 'No activity logged yet — add a Walk, Run, or Workout entry to get started',
           color: Chart.defaults.color,
-          font: { size: 12 },
+          font: { size: chartFontSize() },
           padding: { top: 40 },
         },
         tooltip: {
@@ -3039,7 +3039,7 @@ function renderWellnessEnergyBalanceChart(entries) {
             ? 'No calories logged yet — log what you ate to see your daily balance'
             : 'Add Height, Birth Date, and Sex in Settings (and log a Body Mass) to estimate this',
           color: Chart.defaults.color,
-          font: { size: 12 },
+          font: { size: chartFontSize() },
           padding: { top: 40 },
         },
         tooltip: {

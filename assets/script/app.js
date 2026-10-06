@@ -591,6 +591,8 @@ async function loadDashboard(forceRefresh = false) {
   // Refresh re-reads everything, the tab list included (sheets.js shares one per load).
   if (forceRefresh) resetSheetReads();
   const requestsBefore = sheetsRequestCount;
+  // When this load's data reading started, after the page and sign-in were ready.
+  const dataStart = performance.now();
 
   // Wrapped end to end rather than relying solely on the Promise.allSettled
   // below: that only catches a rejection from one of the listed module
@@ -714,6 +716,9 @@ async function loadDashboard(forceRefresh = false) {
 
     setLastUpdated();
     console.info(`[sheets] ${section || 'home'} load: ${sheetsRequestCount - requestsBefore} requests`);
+    // Where a load's time goes: page and sign-in (until data reading started), then the
+    // data itself — to tell a slow sign-in from slow Sheets reads.
+    console.info(`[load] ${section || 'home'}: page + sign-in ${Math.round(dataStart)} ms, data ${Math.round(performance.now() - dataStart)} ms, total ${Math.round(performance.now())} ms`);
     const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
     if (errors.length) {
       console.error('Failed to load dashboard data:', errors);

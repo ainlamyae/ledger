@@ -628,7 +628,9 @@ async function runPhysiqueBatch(data, label) {
   physiqueBatchRunning = true;
   try {
     await batchUpdateValues(data);
-    console.info(`[physique] ${label}: ${data.length} cells`);
+    // A write here re-reads the whole Physique tab after it, so a load that writes is
+    // slower; it should only happen while something is missing or changed.
+    console.info(`[physique] ${label}: ${data.length} cells (this load writes and re-reads Physique)`);
     await refreshPhysique(true);
     return true;
   } catch (err) {

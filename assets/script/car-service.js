@@ -9,8 +9,8 @@
 //   coolant 100,000 mi ≈ 160,000 km, spark plugs 120,000 mi ≈ 193,000 km).
 // - Tire sets: replace at 6 years old (Toyota tire warranty ends at 6 years; CAA Insurance
 //   won't cover tires older than 6), sooner if the tread is worn.
-// - Winter tires: TD Insurance (+7 °C rule; Ontario discount needs them on Dec–Mar) and
-//   GTA data showing commute hours below 7 °C by 1 Nov (taylortire.ca).
+// - Winter tires: predicted on TD Insurance's hard deadline, 1 Dec (its Ontario discount
+//   needs them on December–March), with rust protection on the same day.
 
 const CAR_ODOMETER_PATTERN = /@\s*([\d,.]+)\s*km/i;
 
@@ -124,12 +124,12 @@ function carSeasonalChangeovers(records, today) {
     const springYear = Number(last.date.slice(0, 4)) + 1;
     return [
       { date: springDate(springYear), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C — TD' },
-      { date: `${springYear}-11-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, before 1 Dec — TD' },
+      { date: `${springYear}-12-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, by 1 Dec — TD' },
     ];
   }
   const fallYear = last ? Number(last.date.slice(0, 4)) : year;
   return [
-    { date: `${fallYear}-11-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, before 1 Dec — TD' },
+    { date: `${fallYear}-12-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, by 1 Dec — TD' },
     { date: springDate(fallYear + 1), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C — TD' },
   ];
 }

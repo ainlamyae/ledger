@@ -303,11 +303,12 @@ function bmrCalibrationForWindow(periodCount, periodDays) {
 }
 
 // Tune's Update: saves n_p / L_p and rewrites every day's stored BMR cell (its BMR_cal
-// over the new window) in the Physique sheet, in one request.
+// over the new window) and Mass cell (m_avg over the new L_p, with the BMI and m_d that
+// follow it) in the Physique sheet, in one request.
 async function updateStoredBmrCalibration() {
   const periodCount = periodInputValue('formula-cal-period-count', BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);
   const periodDays = periodInputValue('formula-cal-period-days', BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
-  if (!confirm(`Recompute BMR_cal for every day in the Physique sheet, over ${periodCount} × ${periodDays} days?`)) return;
+  if (!confirm(`Recompute BMR_cal over ${periodCount} × ${periodDays} days, and m_avg over ${periodDays} days, for every day in the Physique sheet?`)) return;
 
   const unchanged = getSetting(BMR_CALIBRATION_PERIOD_COUNT_KEY, null) === periodCount
     && getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, null) === periodDays;
@@ -320,7 +321,7 @@ async function updateStoredBmrCalibration() {
         [BMR_CALIBRATION_PERIOD_DAYS_KEY]: periodDays,
       });
     if (days === null) throw new Error('Writing the BMR column failed — see the console.');
-    showFieldError('formula-status', `Updated — BMR_cal recomputed over ${periodCount} × ${periodDays} days for ${days} days in the Physique sheet.`);
+    showFieldError('formula-status', `Updated — BMR_cal over ${periodCount} × ${periodDays} days and m_avg over ${periodDays} days recomputed for ${days} days in the Physique sheet.`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   }

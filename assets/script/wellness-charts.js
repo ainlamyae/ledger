@@ -540,7 +540,29 @@ const GLYCOGEN_WATER_RATIO_DEFAULT = 3; // g H2O / g glycogen
 // evaluated at the defaults rather than whatever's currently typed there. This is the
 // day-to-day swing glycogen and its bound water alone can account for, at this body —
 // the noise floor State Trend & Forecast measures its smoothing against.
+// The swing every display uses (Status, Progress, the charts, the arrival target):
+// the GLYCOGEN_SWING_KG setting, saved once and changed only by Tune's Save or by
+// editing it. It moves ~10 g per kg of body mass, so it barely changes; before it's
+// saved, it's worked out from the given body (computeGlycogenSwingKg).
+const GLYCOGEN_SWING_KEY = 'GLYCOGEN_SWING_KG';
+
 function glycogenSwingKg(bodyMassKg, heightCm, sex) {
+  const saved = getSetting(GLYCOGEN_SWING_KEY, null);
+  if (saved !== null && Number.isFinite(saved) && saved > 0) return saved;
+  return computeGlycogenSwingKg(bodyMassKg, heightCm, sex);
+}
+
+// Saves the swing once, at the latest weigh-in, when the setting doesn't exist yet
+// (app.js, after Physique loads), so it's read rather than worked out from then on.
+async function seedGlycogenSwingSetting() {
+  if (getSetting(GLYCOGEN_SWING_KEY, null) !== null) return;
+  const entries = physiqueAsWellnessEntries();
+  const swing = computeGlycogenSwingKg(latestBodyMassKg(entries), getSetting('HEIGHT_CM', null), getSettingString('SEX', null));
+  if (swing === null) return;
+  await saveSettingValues({ [GLYCOGEN_SWING_KEY]: Math.round(swing * 10) / 10 });
+}
+
+function computeGlycogenSwingKg(bodyMassKg, heightCm, sex) {
   if (bodyMassKg === null || bodyMassKg === undefined || heightCm === null || heightCm === undefined) return null;
   const lbmKg = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
   if (!Number.isFinite(lbmKg) || lbmKg <= 0) return null;

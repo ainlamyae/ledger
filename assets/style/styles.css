@@ -2689,7 +2689,8 @@ td .btn {
         position: fixed;
         left: var(--bottom-bar-inset);
         right: var(--bottom-bar-inset);
-        bottom: var(--bottom-bar-inset);
+        /* Floats above the home indicator rather than growing to cover it. */
+        bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
         z-index: 10;
         margin-left: 0;
         padding-left: 3.25rem;
@@ -2702,12 +2703,6 @@ td .btn {
         /* Lifts the bar off the content it floats over so it reads as a layer,
            not a strip fused to the last panel. */
         box-shadow: 0 -2px 12px rgba(0, 0, 0, .22);
-        /* iPhone home-indicator clearance — padding, not margin, so the bar's
-           own background still fills behind the indicator instead of leaving
-           a gap of the page's own background showing through. This pushes the
-           whole tappable row up clear of the home-indicator gesture zone,
-           which was swallowing taps aimed at links sitting flush to the edge. */
-        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     /* Each tab fills the bar's height (--bottom-bar-height), the action bar's too. */
@@ -3680,7 +3675,7 @@ html.section-pages .panel.page-active:hover {
         position: fixed;
         left: var(--bottom-bar-inset);
         right: var(--bottom-bar-inset);
-        bottom: var(--bottom-bar-inset);
+        bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
         z-index: 20;
         display: flex;
         flex-wrap: nowrap;
@@ -3690,8 +3685,8 @@ html.section-pages .panel.page-active:hover {
         margin: 0;
         /* The tab bar's own height, which this bar replaces. */
         box-sizing: border-box;
-        height: calc(var(--bottom-bar-height) + 1px + env(safe-area-inset-bottom, 0px));
-        padding: 0 .64rem env(safe-area-inset-bottom, 0px);
+        height: calc(var(--bottom-bar-height) + 1px);
+        padding: 0 .64rem;
         background: var(--color-nav);
         border-top: 1px solid rgba(255, 255, 255, .1);
         border-radius: 999px;

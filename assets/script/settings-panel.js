@@ -47,27 +47,10 @@ async function initSettingsPanel(forceRefresh = false) {
   }
 }
 
-// The Setting tab is shown twice: in full under Other, and its health keys alone
-// under Health. One list of rows and one form serve both.
+// The Setting tab's one table, under Other (a list so a second view could be added).
 const SETTING_TABLES = [
   { bodyId: 'settings-body', addButtonId: 'add-setting-btn', includes: () => true },
-  { bodyId: 'health-settings-body', addButtonId: 'health-add-setting-btn', includes: (key) => isHealthSettingKey(key) },
 ];
-
-// Keys read by the Health section: the profile, every intake/activity/sleep
-// target, Tune's BMR/TEF/adaptation figures, the micronutrient targets, workout
-// timing, the USDA key Nutrition's Complete uses, and the Health Insight modes'
-// saved reports. Shared keys (GROQ_API_KEY, the SHOW_* toggles) stay under Other.
-const HEALTH_SETTING_KEY_PATTERN = new RegExp('^(?:' + [
-  'BIRTH_DATE$', 'SEX$', 'HEIGHT_CM$', 'BODY_MASS_', 'WEEKLY_FAT_LOSS_',
-  'CALORIE_', 'PROTEIN_', 'FIBER_', 'FAT_', 'CARB_', 'ACTIVITY_', 'SLEEP_', 'PLAN_',
-  'BMR_', 'TEF_', 'GLYCOGEN_', 'MICRONUTRIENT_', 'KCAL_PER_MET', 'WORKOUT_', 'USDA_',
-  'INSIGHT_', 'WELLNESS_INSIGHT_', 'FOOD_INSIGHT_',
-].join('|') + ')', 'i');
-
-function isHealthSettingKey(key) {
-  return HEALTH_SETTING_KEY_PATTERN.test(key.trim());
-}
 
 // A setting's address segment: its key in lowercase, underscores kept
 // (BODY_MASS_TARGET_KG -> body_mass_target_kg).

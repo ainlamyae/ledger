@@ -1750,6 +1750,19 @@ td .btn {
     margin-top: .6rem;
 }
 
+/* ❌ in a row of actions sits the same gap from its neighbour as every other
+   button (the header group's and a form's), not the extra margin it had alone. */
+.panel-header-actions .header-action-close,
+.modal-actions > .modal-close {
+    margin-left: 0;
+}
+
+/* At the top of the form, under its title (page-nav.js's liftFormActions). */
+.modal-actions.modal-actions-top,
+.app-form .modal-actions.modal-actions-top {
+    margin: 0 0 .6rem;
+}
+
 /* The three read-only viewers (Instructions, Micronutrients, Keyboard
    shortcuts — no Save, nothing to scroll to) keep this floated at the top
    beside their <h2>, same as always. Every form modal instead places this

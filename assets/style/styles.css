@@ -43,6 +43,13 @@ textarea {
     --bottom-bar-height: 3.75rem;
     /* Their gap from the screen's edges, so all four rounded corners show. */
     --bottom-bar-inset: .4rem;
+    /* Inside the bar: each end's margin (the ❌ at the right, the account circle at
+       the left), the gap between buttons, and the circle's size, so the account
+       circle sits as far from the first button as the buttons sit from each other. */
+    --bottom-bar-edge: .64rem;
+    --bottom-bar-gap: 1rem;
+    --bottom-bar-circle: 3rem;
+    --bottom-bar-start: calc(var(--bottom-bar-edge) + var(--bottom-bar-circle) + var(--bottom-bar-gap));
     /* Every card's own text (glance cards and widgets alike); smaller at 820px. */
     --card-text-size: .95rem;
     /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
@@ -2662,11 +2669,11 @@ td .btn {
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */
     .header-actions {
         position: fixed;
-        left: var(--bottom-bar-inset);
+        left: calc(var(--bottom-bar-inset) + var(--bottom-bar-edge));
         bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
         z-index: 21;
         justify-content: center;
-        width: 3.25rem;
+        width: var(--bottom-bar-circle);
         /* The bottom bar's row plus its top border, so the avatar centres on it. */
         height: calc(var(--bottom-bar-height) + 1px);
         margin: 0;
@@ -2676,8 +2683,8 @@ td .btn {
        row match: the photo, its initial fallback, and the signed-out sign-in button. */
     .account-avatar,
     #signin-btn {
-        width: 3rem;
-        height: 3rem;
+        width: var(--bottom-bar-circle);
+        height: var(--bottom-bar-circle);
     }
 
     .account-avatar-fallback,
@@ -2717,7 +2724,7 @@ td .btn {
         bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
         z-index: 10;
         margin-left: 0;
-        padding-left: 3.25rem;
+        padding-left: var(--bottom-bar-start);
         gap: 0;
         justify-content: space-between;
         /* A pill: half circles at both ends, as the action bar that replaces it. */
@@ -3718,13 +3725,13 @@ html.section-pages .panel.page-active:hover {
         display: flex;
         flex-wrap: nowrap;
         align-items: center;
-        gap: 1rem;
+        gap: var(--bottom-bar-gap);
         overflow-x: auto;
         margin: 0;
         /* The tab bar's own height, which this bar replaces. */
         box-sizing: border-box;
         height: calc(var(--bottom-bar-height) + 1px);
-        padding: 0 .64rem;
+        padding: 0 var(--bottom-bar-edge);
         background: var(--color-nav);
         border-top: 1px solid rgba(255, 255, 255, .1);
         border-radius: 999px;
@@ -3781,7 +3788,7 @@ html.section-pages .panel.page-active:hover {
         position: sticky;
         right: 0;
         margin-left: auto;
-        width: 3rem;
+        width: var(--bottom-bar-circle);
         padding: 0;
         border-radius: 50%;
     }
@@ -3791,6 +3798,6 @@ html.section-pages .panel.page-active:hover {
 @media (max-width: 640px) {
     html[data-action-bar] .action-bar,
     html[data-action-bar] .app-form .modal-actions.action-bar {
-        padding-left: 3.25rem;
+        padding-left: var(--bottom-bar-start);
     }
 }

@@ -41,6 +41,8 @@ textarea {
     --input-font-size: 16px;
     /* Both phone bottom bars, the tab bar and a page's action bar: one height. */
     --bottom-bar-height: 3.75rem;
+    /* Their gap from the screen's edges, so all four rounded corners show. */
+    --bottom-bar-inset: .4rem;
     /* Every card's own text (glance cards and widgets alike); smaller at 820px. */
     --card-text-size: .95rem;
     /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
@@ -373,13 +375,8 @@ header .btn:hover {
     pointer-events: none;
 }
 
-/* Four roles, one colour each: blue adds or saves, amber spends an AI call,
-   gray opens something without itself committing anything, red destroys.
-   Anything else stays the default surface button.
-   Red is reserved for text labels — its fill is dark enough that an emoji sat
-   on it is hard to make out, so the ❌ closes and 🗑️ deletes stay default and
-   say what they are by glyph instead. Amber is light enough not to have the
-   problem, which is why the 🧮 recalculate keeps it. */
+/* Colours for word buttons only: blue saves or logs, gray opens something, red
+   destroys. An emoji button is always the default white (below). */
 .btn-primary {
     background: var(--color-primary);
     border-color: var(--color-primary);
@@ -404,18 +401,6 @@ header .btn:hover {
     background: var(--color-muted-hover);
 }
 
-/* Dark text rather than white — a yellow light enough to read as yellow
-   can't carry white text at an accessible contrast. */
-.btn-ai {
-    background: var(--color-ai);
-    border-color: var(--color-ai);
-    color: #1f2937;
-}
-
-.btn-ai:hover {
-    background: var(--color-ai-hover);
-}
-
 .btn-danger {
     background: var(--color-danger);
     border-color: var(--color-danger);
@@ -424,6 +409,21 @@ header .btn:hover {
 
 .btn-danger:hover {
     background: var(--color-danger-hover);
+}
+
+/* An emoji button is never coloured: the default white, whatever role class it gets. */
+.btn.btn-icon,
+.btn.row-action-btn,
+.btn.modal-close {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text);
+}
+
+.btn.btn-icon:hover,
+.btn.row-action-btn:hover,
+.btn.modal-close:hover {
+    background: var(--color-bg);
 }
 
 .gate {
@@ -2481,7 +2481,7 @@ td .btn {
 }
 
 :is(#insight-panel, #financial-insight-panel):not([data-insight-mode]) > :not(.panel-header):not(.insight-mode-actions):not(.panel-actions),
-:is(#insight-panel, #financial-insight-panel):not([data-insight-mode]) .panel-actions .btn-ai,
+:is(#insight-panel, #financial-insight-panel):not([data-insight-mode]) :is(#insight-generate-btn, #financial-insight-generate-btn),
 :is(#insight-panel, #financial-insight-panel)[data-insight-mode] > .insight-mode-actions {
     display: none;
 }
@@ -2645,14 +2645,14 @@ td .btn {
 
     .container {
         /* Bottom padding clears the fixed bottom bar, home-indicator inset included. */
-        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
     }
 
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */
     .header-actions {
         position: fixed;
-        left: 0;
-        bottom: env(safe-area-inset-bottom, 0px);
+        left: var(--bottom-bar-inset);
+        bottom: calc(var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
         z-index: 21;
         justify-content: center;
         width: 3.25rem;
@@ -2687,14 +2687,16 @@ td .btn {
     /* The section links as a bottom tab bar, in thumb reach. */
     .nav {
         position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        left: var(--bottom-bar-inset);
+        right: var(--bottom-bar-inset);
+        bottom: var(--bottom-bar-inset);
         z-index: 10;
         margin-left: 0;
         padding-left: 3.25rem;
         gap: 0;
         justify-content: space-between;
+        /* A pill: half circles at both ends, as the action bar that replaces it. */
+        border-radius: 999px;
         background: var(--color-nav);
         border-top: 1px solid rgba(255, 255, 255, .1);
         /* Lifts the bar off the content it floats over so it reads as a layer,
@@ -2721,25 +2723,6 @@ td .btn {
         font-size: 1.05rem;
         font-weight: 600;
         line-height: 1.1;
-    }
-
-    /* The color change alone (.nav a.active, above) reads fine in a row of
-       text links, but a tab bar's active item needs a stronger tell at a
-       glance — the accent every other "selected" state in the app already
-       uses: a top edge rather than a full underline so it
-       doesn't compete with the label's own text. */
-    .nav a.active {
-        color: #fff;
-    }
-
-    .nav a.active::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: var(--color-primary);
     }
 
     .gate {
@@ -3614,7 +3597,7 @@ html.section-pages[data-form-page] body.modal-open {
 @media (max-width: 640px) {
     html.section-pages[data-form-page] .modal.form-page {
         --form-page-gutter: 1rem;
-        margin-bottom: calc(1rem + var(--bottom-bar-height) + env(safe-area-inset-bottom, 0px));
+        margin-bottom: calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-inset) + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -3695,9 +3678,9 @@ html.section-pages .panel.page-active:hover {
     html[data-action-bar] .action-bar,
     html[data-action-bar] .app-form .modal-actions.action-bar {
         position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        left: var(--bottom-bar-inset);
+        right: var(--bottom-bar-inset);
+        bottom: var(--bottom-bar-inset);
         z-index: 20;
         display: flex;
         flex-wrap: nowrap;
@@ -3711,7 +3694,7 @@ html.section-pages .panel.page-active:hover {
         padding: 0 .64rem env(safe-area-inset-bottom, 0px);
         background: var(--color-nav);
         border-top: 1px solid rgba(255, 255, 255, .1);
-        border-radius: 0;
+        border-radius: 999px;
         box-shadow: 0 -2px 12px rgba(0, 0, 0, .22);
         scrollbar-width: none;
     }
@@ -3755,10 +3738,14 @@ html.section-pages .panel.page-active:hover {
 
     /* Every button in the bar shares the rule above; only colour differs. ❌ sits
        last, pinned at the right edge. */
+    /* ❌ round, like the sign-in button, at the bar's right end. */
     html[data-action-bar] .action-bar > .modal-close {
         position: sticky;
         right: 0;
         margin-left: auto;
+        width: 3rem;
+        padding: 0;
+        border-radius: 50%;
     }
 }
 

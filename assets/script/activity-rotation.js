@@ -180,7 +180,7 @@ function renderActivityRotationDonut(rows, barColors, toIso) {
           display: rows.length > 0 && !hasData,
           text: ['No sessions logged for a tracked', 'Group in these 4 weeks'],
           color: Chart.defaults.color,
-          font: { size: 12 },
+          font: { size: chartFontSize() },
           padding: { top: 40 },
         },
         tooltip: {
@@ -247,7 +247,7 @@ function renderActivityRotationChart({ from, to }) {
           display: !hasData,
           text: 'No Activity Groups tracked yet — open Activity, edit a row, and set its Weekly Target',
           color: Chart.defaults.color,
-          font: { size: 12 },
+          font: { size: chartFontSize() },
           padding: { top: 40 },
         },
         tooltip: {

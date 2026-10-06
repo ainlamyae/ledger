@@ -539,7 +539,7 @@
                 <h2>Activity</h2>
                 <!-- Three buttons on one phone heading line, so each label is cut to a
                      word and carries the full wording in its tooltip. -->
-                <button type="button" id="activity-instruction-btn" data-route="guide" class="btn btn-icon panel-header-btn" title="How to run the activities in this plan" aria-label="Guide">🧭</button>
+                <button type="button" id="activity-instruction-btn" data-route="gym" class="btn btn-icon panel-header-btn" title="How to run the activities in this plan" aria-label="GYM">💪</button>
                 <button type="button" id="log-workout-btn" class="btn btn-icon panel-header-btn" title="Log the ticked activities as today's workout" aria-label="Log">📝</button>
                 <button type="button" id="add-activity-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an exercise or activity to the plan" aria-label="Add">➕</button>
             </div>
@@ -572,7 +572,7 @@
             </div>
 
             <label class="insight-question-label" for="insight-question">Ask a question (optional)
-                <textarea id="insight-question" rows="2" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
+                <textarea id="insight-question" rows="4" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
             </label>
 
             <p class="hint" id="insight-mode-status"></p>
@@ -1455,7 +1455,7 @@
             </div>
 
             <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
-                <textarea id="financial-insight-question" rows="2" placeholder="e.g. Should I move cash into investments?"></textarea>
+                <textarea id="financial-insight-question" rows="4" placeholder="e.g. Should I move cash into investments?"></textarea>
             </label>
 
             <p class="hint" id="financial-insight-status"></p>
@@ -2189,7 +2189,7 @@
             </label>
             <p>Log Time: <span id="timesheet-live-duration">—</span></p>
             <label>Task
-                <textarea id="timesheet-task" rows="3" placeholder="e.g. Federal Statutory Holiday"></textarea>
+                <textarea id="timesheet-task" rows="4" placeholder="e.g. Federal Statutory Holiday"></textarea>
             </label>
 
             <p id="timesheet-form-error" class="status" hidden></p>
@@ -2229,7 +2229,7 @@
                     <input type="time" id="physique-wake-time">
                 </label>
             </div>
-            <p title="Sleep Duration from Bed and Wake, and the Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">Sleep Duration/Deprivation: <span id="physique-sleep-duration">—</span>/<span id="physique-sleep-deprivation">—</span></p>
+            <p title="Sleep Duration from Bed and Wake, and the Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">S/SD: <span id="physique-sleep-duration">—</span>/<span id="physique-sleep-deprivation">—</span></p>
             <label>Consumption
                 <div class="autocomplete-anchor">
                     <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
@@ -2237,7 +2237,7 @@
                 </div>
             </label>
             <label hidden>Breakdown
-                <textarea id="physique-breakdown" rows="3"></textarea>
+                <textarea id="physique-breakdown" rows="4"></textarea>
             </label>
 
             <div id="physique-calc-breakdown" class="table-responsive table-compact" hidden>
@@ -2322,7 +2322,6 @@
                      Library AND Take Photo — without leaving the page. -->
                 <input type="file" id="physique-scan-input" accept="image/*" hidden>
                 <button type="button" id="physique-scan-btn" class="btn btn-icon" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption" aria-label="Scan">📷</button>
-                <button type="button" id="physique-combine-btn" class="btn" title="Combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
                 <button type="button" id="physique-form-micro-btn" class="btn btn-icon" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved" aria-label="Micronutrients">🧬</button>
                 <button type="button" id="physique-calc-btn" class="btn btn-icon" title="Calculate" aria-label="Calculate">🧮</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
@@ -2359,9 +2358,13 @@
     <div class="modal-card">
         <h2 id="activity-instruction-title">Instructions on the Activities</h2>
 
+        <!-- One tile per Group (activities.js's renderInstructionList); a group's page
+             lists its activities below them. -->
+        <div class="page-tiles instruction-groups" id="instruction-groups"></div>
         <div class="instruction-body" id="instruction-body"></div>
 
         <div class="modal-actions">
+            <button type="button" id="guide-log-btn" class="btn btn-icon" title="Tick activities to log them" aria-label="Log ticked" hidden disabled>📝</button>
             <button type="button" id="activity-instruction-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         </div>
     </div>
@@ -2580,7 +2583,7 @@
                 <input type="url" id="contact-telegram2">
             </label>
             <label>Note
-                <textarea id="contact-note" rows="2"></textarea>
+                <textarea id="contact-note" rows="4"></textarea>
             </label>
 
             <p id="contact-form-error" class="status" hidden></p>

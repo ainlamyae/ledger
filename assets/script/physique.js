@@ -190,8 +190,6 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
     document.getElementById('physique-scan-btn').addEventListener('click', () => document.getElementById('physique-scan-input').click());
     document.getElementById('physique-scan-input').addEventListener('change', handlePhysiqueScanInput);
-    document.getElementById('physique-combine-btn').addEventListener('click', combineAndSortPhysiqueConsumptionField);
-    physiqueField('consumption').addEventListener('input', syncPhysiqueCombineButtonVisibility);
     setupConsumptionAutocomplete();
     setupWorkoutAutocomplete();
     document.getElementById('physique-form-micro-btn').addEventListener('click', openPhysiqueMicronutrientsFromForm);
@@ -1253,7 +1251,6 @@ function openPhysiqueForm(entry, duplicate = false) {
   estimateTefBreakdown(openedBreakdown);
   renderPhysiqueBreakdown(openedBreakdown, entry ? entry.caloriesIn : 0, entry ? entry.proteinIn : 0);
   refreshPhysiqueActivityBreakdown();
-  syncPhysiqueCombineButtonVisibility();
   updatePhysiqueSleepDuration();
 
   clearFieldError('physique-form-error');

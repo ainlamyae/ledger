@@ -4,10 +4,28 @@
     box-sizing: border-box;
 }
 
+/* Anything marked hidden stays hidden, whatever display its own rule sets. */
+[hidden] {
+    display: none !important;
+}
+
+/* Every field's look, written once: forms, filters, Export, Insight's question, the
+   clock's location box and Tune all start from this. :where() keeps it at zero
+   specificity, so each group's own rule (width, height, Tune's padding) still wins. */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+    max-width: 100%;
+    font: inherit;
+    font-size: var(--input-font-size);
+    padding: var(--space-xs) var(--space-s);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
 input,
 select,
 textarea {
-    max-width: 100%;
     font-size: var(--input-font-size);
 }
 
@@ -17,14 +35,11 @@ textarea {
     --color-nav-hover: #4279ad;
     --color-primary: #3b82f6;
     --color-primary-hover: #2563eb;
-    --color-ai: #f59e0b;
-    --color-ai-hover: #d97706;
     --color-danger: #dc2626;
     --color-danger-hover: #b91c1c;
     --color-muted: #64748b;
     --color-muted-hover: #475569;
     --color-income: #16a34a;
-    --color-expense: #dc2626;
     --color-other: #7c3aed;
     --color-bg: #f5f7fb;
     --color-surface: #ffffff;
@@ -32,13 +47,20 @@ textarea {
     --color-text: #1f2937;
     --color-text-muted: #6b7280;
     --color-error-bg: #fef2f2;
-    --color-error-border: #fecaca;
     --radius-md: 8px;
     --radius-lg: 12px;
     --shadow-card: 0 1px 3px rgba(0,0,0,.08);
     --shadow-dropdown: 0 4px 16px rgba(0,0,0,.15);
     --transition-colors: background-color .2s ease, color .2s ease, border-color .2s ease;
-    --input-font-size: 16px;
+    --input-font-size: 15px;
+    /* The six spacing steps — every margin, padding and gap uses one of these,
+       each visibly different from the next (about 3.5px apart or more). */
+    --space-xs: .2rem;
+    --space-s: .5rem;
+    --space-m: .75rem;
+    --space-l: 1rem;
+    --space-xl: 1.5rem;
+    --space-xxl: 2rem;
     /* Both phone bottom bars, the tab bar and a page's action bar: one height. */
     --bottom-bar-height: 3.75rem;
     /* Their gap from the screen's edges, so all four rounded corners show. */
@@ -49,24 +71,24 @@ textarea {
        the left), the gap between buttons, and the circle's size, so the account
        circle sits as far from the first button as the buttons sit from each other. */
     --bottom-bar-edge: .64rem;
-    --bottom-bar-gap: .5rem;
-    --bottom-bar-circle: 3rem;
+    --bottom-bar-gap: var(--space-s);
+    --bottom-bar-circle: 42px;
     --bottom-bar-start: calc(var(--bottom-bar-edge) + var(--bottom-bar-circle) + var(--bottom-bar-gap));
     /* Every card's own text (glance cards and widgets alike); smaller at 820px. */
-    --card-text-size: .95rem;
+    --card-text-size: .9rem;
     /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
     --chart-good: var(--color-income);
     --chart-good-high: #166534;
     --chart-good-light: #4ade80;
-    --chart-bad: var(--color-expense);
-    --chart-warn: var(--color-ai);
-    --chart-orange: var(--color-ai-hover);
+    --chart-bad: var(--color-danger);
+    --chart-warn: #f59e0b;
+    --chart-orange: #d97706;
     --chart-neutral: #9ca3af;
     --chart-blue: var(--color-primary);
     --chart-purple: var(--color-other);
     --chart-cyan: #0891b2;
     --chart-indigo: #6366f1;
-    --chart-point-border: #ffffff;
+    --chart-point-border: var(--color-surface);
     /* Generated category palettes (seriesColor): evenly spaced hues at these. */
     --chart-series-saturation: 65%;
     --chart-series-lightness: 55%;
@@ -86,14 +108,12 @@ textarea {
     --color-text: #e2e8f0;
     --color-text-muted: #94a3b8;
     --color-error-bg: #422006;
-    --color-error-border: #7c2d12;
 }
 
 body,
 .card,
 .widget-card,
-.modal-card,
-.btn {
+.modal-card {
     transition: var(--transition-colors);
 }
 
@@ -106,7 +126,7 @@ html[data-routing] .site-footer {
 
 /* A page's whole message when it can't run: no JavaScript, or a failed load. */
 .page-note {
-    margin: 2rem;
+    margin: var(--space-xxl);
 }
 
 :focus-visible {
@@ -116,8 +136,8 @@ html[data-routing] .site-footer {
 
 .panel h2:focus-visible,
 th.sortable:focus-visible {
-    outline-offset: -1px;
-    border-radius: 4px;
+    outline-offset: 2px;
+    border-radius: 3px;
 }
 
 html {
@@ -143,10 +163,10 @@ body {
 
 header {
     background: var(--color-nav);
-    padding: .75rem 1.5rem;
+    padding: var(--space-m) var(--space-xl);
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-l);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -157,7 +177,7 @@ header h1 {
     color: #fff;
     display: flex;
     align-items: center;
-    gap: .4rem;
+    gap: var(--space-s);
     font-size: 1.25rem;
 }
 
@@ -166,7 +186,7 @@ header h1 {
 .logo-link {
     display: flex;
     align-items: center;
-    gap: .4rem;
+    gap: var(--space-s);
     color: inherit;
     text-decoration: none;
 }
@@ -179,8 +199,8 @@ header h1 {
 
 .nav {
     display: flex;
-    gap: 1.5rem;
-    margin-left: 1.5rem;
+    gap: var(--space-xl);
+    margin-left: var(--space-xl);
     flex: 1;
     min-width: 0;
     overflow-x: auto;
@@ -189,10 +209,6 @@ header h1 {
 }
 
 .nav::-webkit-scrollbar {
-    display: none;
-}
-
-.nav[hidden] {
     display: none;
 }
 
@@ -207,10 +223,10 @@ header h1 {
     display: block;
     color: #fff;
     text-decoration: none;
-    font-size: .85rem;
-    font-weight: 700;
-    padding: .5rem .25rem;
-    transition: color .25s ease;
+    font-size: .8rem;
+    font-weight: 600;
+    padding: var(--space-s) var(--space-xs);
+    transition: color .2s ease;
 }
 
 .nav a:hover,
@@ -222,7 +238,7 @@ header h1 {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: .5rem;
+    gap: var(--space-s);
     margin-left: auto;
 }
 
@@ -235,14 +251,11 @@ header .btn {
     background: transparent;
     border-color: rgba(255, 255, 255, .35);
     color: #fff;
-    padding: .4rem .55rem;
-    font-size: 1rem;
-    line-height: 1;
+    font-size: 1.1rem;
 }
 
 header .btn:hover {
     background: var(--color-nav-hover);
-    border-color: var(--color-nav-hover);
 }
 
 .account-menu {
@@ -276,15 +289,7 @@ header .btn:hover {
     padding: 0;
     border-radius: 50%;
     font-size: .8rem;
-    line-height: 1;
-}
-
-#signin-btn[hidden] {
-    display: none;
-}
-
-.account-avatar[hidden] {
-    display: none;
+    line-height: 1.2;
 }
 
 .account-avatar-fallback {
@@ -297,7 +302,8 @@ header .btn:hover {
     font-weight: 600;
 }
 
-.account-menu-dropdown {
+.account-menu-dropdown,
+.location-picker-dropdown {
     position: absolute;
     top: calc(100% + .5rem);
     right: 0;
@@ -306,16 +312,17 @@ header .btn:hover {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
-    padding: .75rem;
-    min-width: 200px;
+    padding: var(--space-m);
+    min-width: 220px;
     z-index: 20;
 }
 
 .account-menu-info {
-    margin-bottom: .75rem;
+    margin-bottom: var(--space-m);
 }
 
-.account-menu-name {
+.account-menu-name,
+.page-tile-title {
     font-weight: 600;
     font-size: .9rem;
 }
@@ -326,26 +333,23 @@ header .btn:hover {
     word-break: break-all;
 }
 
-.account-menu-item[hidden] {
-    display: none;
-}
-
+/* The one exception to centred buttons: the account menu reads as a list, so its
+   items are left-aligned. */
 .account-menu-item {
-    display: block;
+    display: flex;
     width: 100%;
-    text-align: left;
     font: inherit;
-    font-size: .85rem;
+    font-size: .8rem;
     color: var(--color-text);
     background: none;
     border: none;
-    padding: .6rem .75rem;
-    border-radius: 6px;
+    padding: 0 var(--space-m);
+    border-radius: var(--radius-md);
     cursor: pointer;
-}
-
-.account-menu-item:hover {
-    background: var(--color-bg);
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left !important;
+    min-height: 30px;
 }
 
 .account-menu-item:disabled {
@@ -358,25 +362,31 @@ header .btn:hover {
 }
 
 .account-menu-item-divider {
-    margin-top: .25rem;
+    margin-top: var(--space-xs);
     border-top: 1px solid var(--color-border);
-    padding-top: .85rem;
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
+/* Three button sizes, the same at every screen width: 24px (row buttons in tables),
+   30px (every other button — the field height) and 42px (the phone's action bar
+   and the tiles, set in their own rules). Emoji buttons are square. Each kind
+   only picks its font; height and padding come from here. */
 .btn {
+    transition: var(--transition-colors);
     font: inherit;
-    font-size: .85rem;
-    padding: .4rem .75rem;
+    font-size: .8rem;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
     background: var(--color-surface);
     color: var(--color-text);
     cursor: pointer;
-}
-
-.btn:hover {
-    background: var(--color-bg);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 var(--space-s);
+    line-height: 1.2;
+    vertical-align: middle;
 }
 
 .btn:disabled {
@@ -388,7 +398,7 @@ header .btn:hover {
    carries an ellipsis, this takes the clicks away so a slow save can't be
    fired twice. */
 .btn[aria-busy="true"] {
-    opacity: .6;
+    opacity: .5;
     cursor: progress;
     pointer-events: none;
 }
@@ -438,22 +448,12 @@ header .btn:hover {
     color: var(--color-text);
 }
 
-.btn.btn-icon:hover,
-.btn.row-action-btn:hover,
-.btn.modal-close:hover {
-    background: var(--color-bg);
-}
-
 .gate {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2rem;
-}
-
-.gate[hidden] {
-    display: none;
+    padding: var(--space-xxl);
 }
 
 .landing {
@@ -469,20 +469,20 @@ header .btn:hover {
 /* Only #file-gate's "Connect your Ledger spreadsheet" step uses this now — the
    sign-in step itself is just a banner over the dashboard shell (gate.js). */
 .landing-hero h1 {
-    font-size: 2.25rem;
-    margin-bottom: .75rem;
+    font-size: 1.4rem;
+    margin-bottom: var(--space-m);
 }
 
 .landing-hero p {
     color: var(--color-text-muted);
     max-width: 560px;
-    margin: 0 auto 1.5rem;
-    line-height: 1.6;
+    margin: 0 auto var(--space-xl);
+    line-height: 1.5;
 }
 
 .status {
-    margin-top: 1rem;
-    color: var(--color-expense);
+    margin-top: var(--space-l);
+    color: var(--color-danger);
     font-size: .9rem;
 }
 
@@ -494,12 +494,12 @@ header .btn:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-l);
     background: var(--color-error-bg);
-    border: 1px solid var(--color-error-border);
+    border: 1px solid var(--color-danger);
     border-radius: var(--radius-md);
-    padding: .75rem 1rem;
-    margin: 0 0 1rem;
+    padding: var(--space-m) var(--space-l);
+    margin: 0 0 var(--space-l);
 }
 
 .toast {
@@ -509,20 +509,16 @@ header .btn:hover {
     transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-l);
     background: var(--color-surface);
     color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    box-shadow: 0 4px 16px rgba(0,0,0,.2);
-    padding: .75rem 1rem;
+    box-shadow: var(--shadow-dropdown);
+    padding: var(--space-m) var(--space-l);
     /* Above .modal's 100, keeping the order it had when the modal had no z-index:
        an undo toast has a countdown, so it can't be the one thing a form covers. */
     z-index: 110;
-}
-
-.toast[hidden] {
-    display: none;
 }
 
 kbd {
@@ -530,19 +526,19 @@ kbd {
     min-width: 1.4em;
     text-align: center;
     font-family: inherit;
-    font-size: .85em;
-    background: var(--color-bg);
+    font-size: .8rem;
+    background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: 4px;
-    padding: .1rem .35rem;
+    border-radius: 3px;
+    padding: var(--space-xs) var(--space-xs);
 }
 
 .shortcuts-list {
     list-style: none;
-    margin: 0 0 1rem;
+    margin: 0 0 var(--space-l);
     display: flex;
     flex-direction: column;
-    gap: .6rem;
+    gap: var(--space-s);
 }
 
 .container {
@@ -550,15 +546,16 @@ kbd {
     width: 100%;
     max-width: 1000px;
     margin: auto;
-    padding: 2rem;
+    padding: var(--space-xxl);
 }
 
-.cards {
+.cards,
+.widget-cards {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 260px));
     justify-content: start;
-    gap: .75rem;
-    margin-bottom: .75rem;
+    gap: var(--space-m);
+    margin-bottom: var(--space-m);
 }
 
 @media (max-width: 820px) {
@@ -567,30 +564,24 @@ kbd {
     }
 }
 
-.card {
+.card,
+.panel {
     background: var(--color-surface);
     border-radius: var(--radius-lg);
-    padding: .75rem;
+    padding: var(--space-m);
     box-shadow: var(--shadow-card);
 }
 
-.card h3 {
+.card h3,
+.widget-card h3 {
     color: var(--color-text-muted);
-    font-size: .85rem;
-    margin-bottom: .5rem;
+    font-size: .8rem;
+    margin-bottom: var(--space-s);
 }
 
 .card .value {
     font-size: var(--card-text-size);
     text-align: right;
-}
-
-.widget-cards {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 260px));
-    justify-content: start;
-    gap: .75rem;
-    margin-bottom: .75rem;
 }
 
 @media (max-width: 820px) {
@@ -608,24 +599,18 @@ kbd {
 .widget-card {
     background: var(--color-surface);
     border-radius: var(--radius-lg);
-    padding: .75rem;
+    padding: var(--space-m);
     box-shadow: var(--shadow-card);
     min-width: 0;
     font-size: var(--card-text-size);
-}
-
-.widget-card h3 {
-    color: var(--color-text-muted);
-    font-size: .85rem;
-    margin-bottom: .5rem;
 }
 
 .widget-clock-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: .5rem;
-    padding: .15rem 0;
+    gap: var(--space-s);
+    padding: var(--space-xs) 0;
 }
 
 .widget-clock-time-value {
@@ -643,9 +628,9 @@ kbd {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: .5rem;
+    gap: var(--space-s);
     font-size: var(--card-text-size);
-    padding: .15rem 0;
+    padding: var(--space-xs) 0;
 }
 
 /* A value that doesn't fit beside its label wraps as a whole onto its own line —
@@ -659,15 +644,15 @@ kbd {
    the five energy-balance inputs before D/Δm/t, the outcomes computed from them. */
 .widget-row-divider {
     border-bottom: 1px solid var(--color-border);
-    padding-bottom: .4rem;
-    margin-bottom: .15rem;
+    padding-bottom: var(--space-s);
+    margin-bottom: var(--space-xs);
 }
 
 #widget-date {
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     align-items: baseline;
-    gap: .3rem .5rem;
+    gap: var(--space-xs) var(--space-s);
 }
 
 #widget-date h3 {
@@ -698,8 +683,8 @@ kbd {
 .widget-forecast {
     display: flex;
     justify-content: space-between;
-    gap: .35rem;
-    margin-top: .5rem;
+    gap: var(--space-xs);
+    margin-top: var(--space-s);
     text-align: center;
 }
 
@@ -710,7 +695,7 @@ kbd {
 
 .widget-forecast-day .widget-forecast-icon {
     display: block;
-    margin: .15rem 0;
+    margin: var(--space-xs) 0;
 }
 
 .widget-forecast-day .widget-forecast-temps {
@@ -755,8 +740,8 @@ kbd {
     left: 0;
     right: 0;
     z-index: 20;
-    margin: .15rem 0 0;
-    padding: .25rem 0;
+    margin: var(--space-xs) 0 0;
+    padding: var(--space-xs) 0;
     list-style: none;
     max-height: 220px;
     overflow-y: auto;
@@ -765,10 +750,6 @@ kbd {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
-}
-
-.autocomplete-suggestions[hidden] {
-    display: none;
 }
 
 /* Narrow-viewport variant (physique.js positionConsumptionSuggestions) — pinned
@@ -789,73 +770,40 @@ kbd {
 }
 
 .autocomplete-suggestions li {
-    padding: .35rem .6rem;
-    font-size: .85rem;
+    padding: var(--space-xs) var(--space-s);
+    font-size: .8rem;
     cursor: pointer;
-}
-
-.autocomplete-suggestions li:hover,
-.autocomplete-suggestions li.active {
-    background: var(--color-bg);
-}
-
-.location-picker-dropdown {
-    position: absolute;
-    top: calc(100% + .5rem);
-    right: 0;
-    background: var(--color-surface);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-dropdown);
-    padding: .75rem;
-    min-width: 220px;
-    z-index: 20;
 }
 
 .location-picker-manual {
     display: flex;
-    gap: .4rem;
-    margin-top: .5rem;
+    gap: var(--space-s);
+    margin-top: var(--space-s);
 }
 
-.location-picker-manual input {
+.location-picker-manual input,
+.panel-header h2,
+.filters input[type="text"],
+.filters select,
+.export-filter-row .export-filter-value {
     flex: 1;
     min-width: 0;
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .4rem .5rem;
-    border-radius: 6px;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg);
-    color: var(--color-text);
 }
 
 .panel {
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    padding: .65rem;
-    box-shadow: var(--shadow-card);
     transition: var(--transition-colors), transform .2s ease, box-shadow .2s ease;
 }
 
-.panel-group {
+.panel-group,
+.today-glance-stack {
     display: flex;
     flex-direction: column;
-    gap: .5rem;
-}
-
-/* A section page hides the two wrappers it isn't, and the widget row, rather
-   than removing them — every renderer still expects its elements to exist. Both
-   set display, so [hidden] needs saying. */
-.panel-group[hidden],
-.widget-cards[hidden] {
-    display: none;
+    gap: var(--space-s);
 }
 
 /* The home page's sections, stacked; a section page shows one alone. */
 html:not(.section-pages) .panel-group + .panel-group {
-    margin-top: .5rem;
+    margin-top: var(--space-s);
 }
 
 /* The "Hide widgets" preference, applied before the row itself even exists in
@@ -880,7 +828,6 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     display: none;
 }
 
-
 /* Never shown: the sidebar or the bottom tab bar names the sections. Kept for
    the page titles, which read it (routeTitle). */
 .panel-group-title {
@@ -891,14 +838,16 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     box-shadow: none;
 }
 
-.panel:hover {
+.panel:hover,
+.page-tile:hover,
+.page-tile:focus-visible {
     transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(0,0,0,.12);
+    box-shadow: var(--shadow-dropdown);
 }
 
 .panel h2 {
-    margin: -.35rem 0 .65rem;
-    padding: .35rem 0;
+    margin: calc(-1 * var(--space-xs)) 0 var(--space-m);
+    padding: var(--space-xs) 0;
     font-size: 1.1rem;
     cursor: pointer;
 }
@@ -906,36 +855,32 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 /* Wraps a panel's h2 with an action button to its right. Excluded from the
    collapse rules below (like a bare h2 is), so the button stays reachable
    whether the panel is open or shut. */
-.panel-header {
+.panel-header,
+.panel-header-actions {
     display: flex;
     align-items: center;
-    gap: .75rem;
+    gap: var(--space-m);
     /* Activity Plan carries three buttons, which is more than a phone's heading
        line can hold — they drop to a second line rather than squeezing the
        heading to nothing or overflowing the panel. */
     flex-wrap: wrap;
 }
 
-.panel-header h2 {
-    flex: 1;
-    min-width: 0;
-}
-
 .panel-header-btn {
     flex-shrink: 0;
-    padding: .3rem .6rem;
     font-size: .8rem;
 }
 
 .panel-toggle-icon {
     display: inline-block;
-    margin-right: .5rem;
+    margin-right: var(--space-s);
     color: var(--color-text-muted);
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     transition: transform .2s ease;
 }
 
-.panel.collapsed .panel-toggle-icon {
+.panel.collapsed .panel-toggle-icon,
+.app-card.collapsed .app-card-toggle-icon {
     transform: rotate(-90deg);
 }
 
@@ -943,8 +888,8 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     max-height: 5000px;
     opacity: 1;
     overflow-y: hidden;
-    transition: max-height .35s ease, opacity .25s ease, margin .35s ease,
-        padding .35s ease, border-width .35s ease;
+    transition: max-height .3s ease, opacity .2s ease, margin .3s ease,
+        padding .3s ease, border-width .3s ease;
 }
 
 .panel.collapsed > *:not(h2):not(.panel-header) {
@@ -959,7 +904,7 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 }
 
 .panel.collapsed h2 {
-    margin-bottom: -.35rem;
+    margin-bottom: calc(-1 * var(--space-xs));
 }
 
 @keyframes panel-enter {
@@ -968,7 +913,7 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 }
 
 .panel.panel-enter {
-    animation: panel-enter .45s ease both;
+    animation: panel-enter .3s ease both;
     /* Staggered, one block after another (--enter-index, app.js). */
     animation-delay: calc(var(--enter-index, 0) * 70ms);
 }
@@ -977,44 +922,26 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    gap: .5rem;
+    gap: var(--space-s);
     flex-wrap: wrap;
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-l);
 }
 
-.panel-actions[hidden] {
-    display: none;
-}
-
-.filters {
+/* A row of fields: filters, Export's date range and filter rows. */
+.filters,
+.export-date-range,
+.export-filter-row {
     display: flex;
-    gap: .4rem;
-    margin-bottom: .6rem;
-}
-
-.filters input[type="text"],
-.filters select {
-    flex: 1;
-    min-width: 0;
-}
-
-.filters input,
-.filters select {
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .35rem .5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
+    gap: var(--space-s);
+    margin-bottom: var(--space-s);
 }
 
 .pagination {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: var(--space-l);
+    margin-top: var(--space-l);
 }
 
 .table-responsive {
@@ -1028,10 +955,11 @@ table {
 
 th,
 td {
-    padding: .25rem .75rem;
+    padding: var(--space-xs) var(--space-m);
     text-align: left;
     line-height: 1.2;
-    border-bottom: 1px solid var(--color-border);
+    /* The one colour every table line uses, row lines and summary lines alike: navy. */
+    border-bottom: 1px solid var(--color-nav);
 }
 
 /* The app's one "dense data table" look — tighter padding, no per-row border —
@@ -1044,7 +972,7 @@ td {
    scoped to their own id below, since those genuinely differ per table. */
 .table-compact th,
 .table-compact td {
-    padding: .15rem .4rem;
+    padding: var(--space-xs) var(--space-s);
     border-bottom: none;
 }
 
@@ -1053,16 +981,18 @@ td {
    renderPhysiqueActivityBreakdown) — bold and a top border set it apart from the
    per-item rows above it. */
 #physique-calc-breakdown tr.calc-breakdown-total td,
-#physique-activity-breakdown tr.calc-breakdown-total td {
+#physique-activity-breakdown tr.calc-breakdown-total td,
+#accounts-table tr.accounts-total-row td,
+#insight-food-table tr.insight-food-total-row td {
     font-weight: 600;
-    border-top: 2px solid var(--color-text-muted);
+    border-top: 2px solid var(--color-nav);
 }
 
 /* One line per week in the Physique table (renderPhysiqueList, physique.js),
    plus one line under the Pattern rows that always float to the top —
    both mark "a new group of rows starts here" the same way. */
 #physique-table tr.physique-week-start td {
-    border-top: 2px solid var(--color-text);
+    border-top: 2px solid var(--color-nav);
 }
 
 /* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
@@ -1071,10 +1001,11 @@ td {
    of the Total row's solid one — same idiom as the Food insight table's own Ideal/day row
    (#insight-food-table tr.insight-food-ideal-row below). */
 #physique-calc-breakdown tr.calc-breakdown-target td,
-#physique-activity-breakdown tr.calc-breakdown-target td {
+#physique-activity-breakdown tr.calc-breakdown-target td,
+#insight-food-table tr.insight-food-ideal-row td {
     font-weight: 600;
     color: var(--color-text-muted);
-    border-top: 2px dashed var(--color-text-muted);
+    border-top: 2px dashed var(--color-nav);
 }
 
 /* Remain — Desire − Total, sitting directly under the Desire it's derived from. No
@@ -1090,7 +1021,7 @@ td {
    label would sit against the Total row's border. */
 #physique-calc-breakdown,
 #physique-activity-breakdown {
-    margin-bottom: .5rem;
+    margin-bottom: var(--space-s);
 }
 
 /* Both Calculate tables are dense (the breakdown carries 9 columns —
@@ -1148,18 +1079,14 @@ td {
 
 /* Account Summary's Total row (assets/script/accounts.js) — same bold/top-border
    treatment as the other summed-last-row tables above. */
-#accounts-table tr.accounts-total-row td {
-    font-weight: 600;
-    border-top: 2px solid var(--color-text-muted);
-}
 
 /* Classification header above each group of ingredients in the Food insight
    preview (assets/script/food-insight.js) — spans the table, so the tint and
    weight are what separate it from the ingredient rows it heads. */
 #insight-food-table tr.insight-food-group-row td {
     font-weight: 600;
-    background: var(--color-bg);
-    border-top: 2px solid var(--color-text-muted);
+    background: var(--color-surface);
+    border-top: 2px solid var(--color-nav);
 }
 
 /* The two summary rows closing out the Food insight table — Total across
@@ -1167,10 +1094,6 @@ td {
    treatment as the other summed-last-row tables above; the average row skips
    its own top border since it reads as a continuation of the Total directly
    above it, not a new section. */
-#insight-food-table tr.insight-food-total-row td {
-    font-weight: 600;
-    border-top: 2px solid var(--color-text-muted);
-}
 
 #insight-food-table tr.insight-food-average-row td {
     font-weight: 600;
@@ -1180,11 +1103,6 @@ td {
 /* Ideal/day — a target, not a measurement, so it's set off from Total/Avg with a
    dashed top border instead of their solid one, the same idiom the wellness charts'
    own dashed target lines use. */
-#insight-food-table tr.insight-food-ideal-row td {
-    font-weight: 600;
-    color: var(--color-text-muted);
-    border-top: 2px dashed var(--color-text-muted);
-}
 
 /* Micronutrients table gap flags (assets/script/micronutrient-insight.js,
    assets/script/physique.js) — a row is flagged 'severe'/'mild' once its
@@ -1197,18 +1115,18 @@ td {
    each reads as a break. */
 #insight-micro-table tr.nutrient-facts-end td,
 #physique-micro-table tr.nutrient-facts-end td {
-    border-bottom: 2px solid var(--color-text-muted);
+    border-bottom: 2px solid var(--color-nav);
 }
 
 /* A nutrient short of its daily target, severe or mild alike: red. */
 #insight-micro-table tr.nutrient-gap td,
 #physique-micro-table tr.nutrient-gap td {
-    border-left: 3px solid var(--color-expense);
+    border-left: 2px solid var(--color-danger);
 }
 
 #insight-micro-table tr.nutrient-gap td:first-child,
 #physique-micro-table tr.nutrient-gap td:first-child {
-    color: var(--color-expense);
+    color: var(--color-danger);
 }
 
 #transactions-table th:first-child,
@@ -1216,7 +1134,11 @@ td {
 #transactions-table th:nth-child(2),
 #transactions-table td:nth-child(2),
 #transactions-table th:nth-child(3),
-#transactions-table td:nth-child(3) {
+#transactions-table td:nth-child(3),
+#breakdown-table th:last-child,
+#breakdown-table td:last-child,
+#settings-table td:last-child,
+#settings-table td:first-child {
     width: 1%;
     white-space: nowrap;
 }
@@ -1228,12 +1150,6 @@ td {
     width: 1%;
     white-space: nowrap;
     text-align: right;
-}
-
-#breakdown-table th:last-child,
-#breakdown-table td:last-child {
-    width: 1%;
-    white-space: nowrap;
 }
 
 /* Overrides the base `table { width: 100% }` above: every Physique column is
@@ -1296,14 +1212,9 @@ th {
     width: var(--col-width);
 }
 
-/* A table row with no data behind it (a period nothing was logged in). */
-tr.row-empty {
-    opacity: .5;
-}
-
 .empty-state {
     text-align: center;
-    padding: 1.5rem .5rem;
+    padding: var(--space-xl) var(--space-s);
     color: var(--color-text-muted);
     font-style: italic;
 }
@@ -1318,7 +1229,7 @@ th.sortable:hover {
 }
 
 .sort-indicator {
-    font-size: .75rem;
+    font-size: .7rem;
 }
 
 .applications-group-title {
@@ -1327,7 +1238,7 @@ th.sortable:hover {
     text-transform: uppercase;
     letter-spacing: .04em;
     color: var(--color-text-muted);
-    margin: 1rem 0 .5rem;
+    margin: var(--space-l) 0 var(--space-s);
 }
 
 .applications-group-title:first-child {
@@ -1336,50 +1247,46 @@ th.sortable:hover {
 
 .app-card {
     border: 1px solid var(--color-border);
-    border-radius: 10px;
-    margin-bottom: .6rem;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-s);
     overflow: hidden;
 }
 
 .app-card-header {
     display: flex;
     align-items: flex-start;
-    gap: .5rem;
-    padding: .6rem .75rem;
+    gap: var(--space-s);
+    padding: var(--space-s) var(--space-m);
     cursor: pointer;
 }
 
 .app-card-toggle-icon {
-    margin-top: .1rem;
-}
-
-.app-card.collapsed .app-card-toggle-icon {
-    transform: rotate(-90deg);
+    margin-top: var(--space-xs);
 }
 
 .app-card-title {
     display: flex;
     flex-direction: column;
-    gap: .15rem;
+    gap: var(--space-xs);
     flex: 1;
 }
 
 .app-card-meta {
-    font-size: .85rem;
+    font-size: .8rem;
     color: var(--color-text-muted);
 }
 
 .app-card-actions {
     display: flex;
-    gap: .25rem;
+    gap: var(--space-xs);
 }
 
 .app-card-body {
-    padding: 0 .75rem .75rem 2rem;
+    padding: 0 var(--space-m) var(--space-m) var(--space-xxl);
     max-height: 2000px;
     opacity: 1;
     overflow: hidden;
-    transition: max-height .3s ease, opacity .25s ease, padding .3s ease;
+    transition: max-height .3s ease, opacity .2s ease, padding .3s ease;
 }
 
 .app-card.collapsed .app-card-body {
@@ -1393,15 +1300,15 @@ th.sortable:hover {
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: .3rem;
+    gap: var(--space-xs);
 }
 
 .app-history li {
     display: flex;
-    gap: .75rem;
+    gap: var(--space-m);
     font-size: .9rem;
     border-bottom: 1px solid var(--color-border);
-    padding-bottom: .3rem;
+    padding-bottom: var(--space-xs);
 }
 
 .app-history-date {
@@ -1415,7 +1322,7 @@ th.sortable:hover {
 }
 
 .expense {
-    color: var(--color-expense);
+    color: var(--color-danger);
     text-align: right;
 }
 
@@ -1433,23 +1340,26 @@ th.sortable:hover {
     text-align: right;
 }
 
-.timesheet-overtime-summary {
-    font-size: .78rem;
+.timesheet-overtime-summary,
+.body-mass-eta,
+.body-mass-plateau-note {
+    font-size: .8rem;
     color: var(--color-text-muted);
     text-align: center;
-    margin: 4px 0 0;
+    margin: var(--space-xs) 0 0;
     min-height: 1.2em;
 }
 
-.timesheet-overtime-summary.warning {
-    color: var(--color-expense);
+.timesheet-overtime-summary.warning,
+.body-mass-plateau-note.warning {
+    color: var(--color-danger);
     font-weight: 600;
 }
 
 .chart-box {
     position: relative;
     height: 200px;
-    margin-top: 1rem;
+    margin-top: var(--space-l);
     min-width: 0;
 }
 
@@ -1462,7 +1372,7 @@ th.sortable:hover {
 .protein-rotation-charts {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: 1rem;
+    gap: var(--space-l);
     align-items: start;
 }
 
@@ -1497,8 +1407,8 @@ th.sortable:hover {
 .wellness-metrics-grid.donut-grid .donut-item h4 {
     text-align: left;
     color: var(--color-text);
-    font-size: 1rem;
-    margin-bottom: .25rem;
+    font-size: 1.1rem;
+    margin-bottom: var(--space-xs);
 }
 
 /* Four across only works while .container is at its full 950px; between there
@@ -1524,15 +1434,12 @@ th.sortable:hover {
    Growing each card to fill its share instead (Status is now 14 rows) padded
    every one with a band of empty space above and below its own rows. */
 .today-glance-stack {
-    display: flex;
-    flex-direction: column;
     justify-content: space-between;
-    gap: .5rem;
 }
 
 .today-glance-cards h3 {
     text-align: left;
-    font-size: .85rem;
+    font-size: .8rem;
 }
 
 /* Below 820px two narrow columns squeeze the Status card's longer rows
@@ -1547,7 +1454,7 @@ th.sortable:hover {
 
     .card,
     .widget-card {
-        padding: .35rem .35rem;
+        padding: var(--space-xs) var(--space-xs);
     }
 
     .today-glance-cards .body-mass-progress-meter-stats > * > * {
@@ -1562,10 +1469,10 @@ th.sortable:hover {
 
 .country-tiles {
     list-style: none;
-    margin-top: 1rem;
+    margin-top: var(--space-l);
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: .6rem;
+    gap: var(--space-s);
 }
 
 .country-tile {
@@ -1573,19 +1480,20 @@ th.sortable:hover {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: .2rem;
-    padding: .6rem .3rem;
+    gap: var(--space-xs);
+    padding: var(--space-s) var(--space-xs);
     border: 1px solid var(--color-border);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     text-align: center;
 }
 
 .country-tile-flag {
-    font-size: 1.7rem;
-    line-height: 1;
+    font-size: 1.4rem;
+    line-height: 1.2;
 }
 
-.country-tile-duration {
+.country-tile-duration,
+.field-balance {
     color: var(--color-text-muted);
     font-size: .8rem;
     white-space: nowrap;
@@ -1594,8 +1502,8 @@ th.sortable:hover {
 .donut-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-top: 1rem;
+    gap: var(--space-l);
+    margin-top: var(--space-l);
 }
 
 @media (max-width: 820px) {
@@ -1613,57 +1521,45 @@ th.sortable:hover {
     text-align: center;
     color: var(--color-text-muted);
     font-size: .9rem;
-    margin-bottom: .5rem;
+    margin-bottom: var(--space-s);
 }
 
-.type-breakdown-category {
-    margin-bottom: 1.5rem;
-}
-
-.type-breakdown-category:last-child {
-    margin-bottom: 0;
-}
-
-.type-breakdown-category > h3 {
-    font-size: 1rem;
-    margin-bottom: .25rem;
-}
-
+.type-breakdown-category,
 .panel-section {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-xl);
 }
 
+.type-breakdown-category:last-child,
 .panel-section:last-child {
     margin-bottom: 0;
 }
 
+.type-breakdown-category > h3,
 .panel-section > h3 {
-    font-size: 1rem;
-    margin-bottom: .25rem;
+    font-size: 1.1rem;
+    margin-bottom: var(--space-xs);
 }
 
-.chart-box-donut {
+.chart-box-donut,
+.chart-box-flush {
     margin-top: 0;
 }
 
 /* Flush under its heading like .chart-box-donut, minus the narrow-cell height. */
-.chart-box-flush {
-    margin-top: 0;
-}
 
 .donut-legend {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: .75rem 1.25rem;
-    margin-top: 1.25rem;
+    gap: var(--space-m) var(--space-l);
+    margin-top: var(--space-l);
 }
 
 .donut-legend-item {
     display: flex;
     align-items: center;
-    gap: .4rem;
-    font-size: .85rem;
+    gap: var(--space-s);
+    font-size: .8rem;
     color: var(--color-text-muted);
 }
 
@@ -1704,10 +1600,8 @@ th.sortable:hover {
 }
 
 td .btn {
-    padding: .15rem .5rem;
-    font-size: .85rem;
-    line-height: 1.2;
-    margin-right: .25rem;
+    font-size: .8rem;
+    margin-right: var(--space-xs);
 }
 
 /* Above the sticky header (z-index 10), and above every dropdown/tooltip that
@@ -1724,17 +1618,13 @@ td .btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2rem;
-}
-
-.modal[hidden] {
-    display: none;
+    padding: var(--space-xxl);
 }
 
 .modal-card {
     background: var(--color-surface);
     border-radius: var(--radius-lg);
-    padding: 1.25rem;
+    padding: var(--space-l);
     width: 100%;
     max-width: 900px; /* 10% under .container's 1000px */
     max-height: calc(100vh - 4rem);
@@ -1742,17 +1632,17 @@ td .btn {
 }
 
 .modal-card h2 {
-    margin-bottom: .6rem;
+    margin-bottom: var(--space-s);
 }
 
 /* A form's own hints sit between the last field and the actions row, where the
    .hint default 1rem reads as a gap rather than as spacing. */
 .app-form .hint {
-    margin-bottom: .5rem;
+    margin-bottom: var(--space-s);
 }
 
 .app-form .modal-actions {
-    margin-top: .6rem;
+    margin-top: var(--space-s);
 }
 
 /* ❌ in a row of actions sits the same gap from its neighbour as every other
@@ -1765,7 +1655,7 @@ td .btn {
 /* At the top of the form, under its title (page-nav.js's liftFormActions). */
 .modal-actions.modal-actions-top,
 .app-form .modal-actions.modal-actions-top {
-    margin: 0 0 .6rem;
+    margin: 0 0 var(--space-s);
 }
 
 /* The three read-only viewers (Instructions, Micronutrients, Keyboard
@@ -1780,9 +1670,7 @@ td .btn {
    it's wherever you already scrolled to finish the form. */
 .modal-close {
     float: right;
-    margin-left: .75rem;
-    padding: .3rem .45rem;
-    line-height: 1;
+    margin-left: var(--space-m);
 }
 
 /* An emoji-only button (💾 🧮 📷 🧬 ➕): white like ❌, so the emoji reads on it, and
@@ -1790,19 +1678,20 @@ td .btn {
 .btn.btn-icon,
 .btn.modal-close {
     font-size: 1.1rem;
-    line-height: 1;
+    width: 30px;
+    padding: 0;
 }
 
 .instruction-body {
-    margin-top: 1rem;
+    margin-top: var(--space-l);
 }
 
 /* The global `* { margin: 0 }` strips the gap a run-in heading needs. Grouped
    by the plan's own categories, minus the day numbers — which day you train
    them on isn't what you came to this modal to look up. */
 .instruction-body h3 {
-    margin: 1.2rem 0 .5rem;
-    font-size: .95rem;
+    margin: var(--space-l) 0 var(--space-s);
+    font-size: .9rem;
 }
 
 .instruction-body h3:first-child {
@@ -1816,11 +1705,13 @@ td .btn {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     align-items: start;
-    gap: .5rem;
+    gap: var(--space-s);
 }
 
 .instruction-activities li {
-    padding: .5rem .65rem;
+    position: relative;
+    cursor: pointer;
+    padding: var(--space-s) var(--space-m);
     font-size: .9rem;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
@@ -1832,16 +1723,19 @@ td .btn {
    every row a different height. Contain gives one tidy band and leaves every
    figure at its own proportions.
 
-   White regardless of theme: these are drawn on white, so a dark card behind
-   them would just frame a white rectangle. */
-.instruction-figure {
+   On the app's one white (--color-surface), like every card. */
+.instruction-figure,
+.activity-image-preview {
     display: block;
     width: 100%;
     height: 170px;
     object-fit: contain;
-    margin-bottom: .4rem;
-    background: #fff;
+    background: var(--color-surface);
     border-radius: var(--radius-md);
+}
+
+.instruction-figure {
+    margin-bottom: var(--space-s);
 }
 
 /* Edit Activity's own live preview under the Image field — same fixed-height/
@@ -1851,14 +1745,8 @@ td .btn {
    path 404s — see renderActivityImagePreview/the 'error' listener in
    activities.js. */
 .activity-image-preview {
-    display: block;
-    width: 100%;
-    height: 170px;
-    object-fit: contain;
-    margin-top: -.5rem;
-    margin-bottom: .75rem;
-    background: #fff;
-    border-radius: var(--radius-md);
+    margin-top: calc(-1 * var(--space-s));
+    margin-bottom: var(--space-m);
 }
 
 .instruction-activity-name {
@@ -1874,27 +1762,31 @@ td .btn {
     color: var(--color-text-muted);
 }
 
+.instruction-activity-meta.instruction-activity-prescription {
+    color: var(--color-text);
+}
+
 @media (max-width: 820px) {
     .instruction-activities {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
-
 /* Tight by design. The gaps between a label, its box and the next field are cut
    hardest — they cost height without buying anything — while the box's own
    vertical padding is only trimmed, since it sets the tap target. Horizontal
    padding is left alone: that's the gap between the border and the text you're
    reading, and it's the one that looks cramped when shaved. */
-.app-form label {
+.app-form label,
+.insight-question-label,
+.export-date-range label {
     display: block;
-    margin-bottom: .35rem;
-    font-size: .85rem;
+    font-size: .8rem;
     color: var(--color-text-muted);
 }
 
-.app-form label[hidden] {
-    display: none;
+.app-form label {
+    margin-bottom: var(--space-xs);
 }
 
 /* Pairs two short fields onto one line, so a form of one-word values doesn't
@@ -1912,7 +1804,7 @@ td .btn {
        narrower. A 0 floor lets both tracks stay exactly half at every width;
        each control is width: 100% of its own track, so they end up identical. */
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 .6rem;
+    gap: 0 var(--space-s);
 }
 
 /* Three short fields on one line instead of two — same minmax(0, 1fr) floor,
@@ -1928,32 +1820,72 @@ td .btn {
     min-width: 0;
 }
 
-/* Date and time values left-aligned like every other field's: iOS Safari centres
-   them by default (Physique's Date, Bed and Wake beside a left-aligned Body Mass). */
-.app-form input[type="date"],
-.app-form input[type="time"],
-.app-form input[type="datetime-local"] {
-    display: block;
-    text-align: left;
+.btn.row-action-btn,
+td .btn,
+.workout-actions-cell .btn {
+    height: 24px;
+}
+
+.btn.row-action-btn {
+    width: 24px;
+    padding: 0;
+}
+
+/* Every button's text is centred — word, emoji and row buttons, menu items, tiles,
+   the phone's tab bar and action bar, sign-in — one rule for all of them, so no
+   button drifts left or right. */
+button,
+.btn,
+.page-tile,
+.country-tile,
+.nav a {
+    text-align: center !important;
+}
+
+/* Every textarea is one height — four lines — whatever form it's in. Dragging its
+   corner can still make one taller while you type. */
+textarea {
+    height: 92px;
+}
+
+/* Every field's text is left-aligned, on every page and at every width — one rule
+   for all of them, so no box drifts to the centre or the right. Date and time
+   fields need it most: iOS Safari centres them by default. */
+input,
+select,
+textarea,
+.formula-fixed {
+    text-align: left !important;
+}
+
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
     /* iOS lays these out as a flex box that centres its value. */
     justify-content: flex-start;
 }
 
+.app-form input[type="date"],
+.app-form input[type="time"],
+.app-form input[type="datetime-local"] {
+    display: block;
+}
+
 /* The value's own box and the editable fields inside it (WebKit/Blink), each of
    which can carry its own centring. */
-.app-form input[type="date"]::-webkit-date-and-time-value,
-.app-form input[type="time"]::-webkit-date-and-time-value,
-.app-form input[type="datetime-local"]::-webkit-date-and-time-value {
-    text-align: left;
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left !important;
     margin: 0;
 }
 
-.app-form input[type="date"]::-webkit-datetime-edit,
-.app-form input[type="time"]::-webkit-datetime-edit,
-.app-form input[type="datetime-local"]::-webkit-datetime-edit,
-.app-form input[type="date"]::-webkit-datetime-edit-fields-wrapper,
-.app-form input[type="time"]::-webkit-datetime-edit-fields-wrapper,
-.app-form input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+input[type="date"]::-webkit-datetime-edit,
+input[type="time"]::-webkit-datetime-edit,
+input[type="datetime-local"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     text-align: left;
     justify-content: flex-start;
     padding-left: 0;
@@ -1961,31 +1893,19 @@ td .btn {
 
 .app-form input,
 .app-form select,
-.app-form textarea {
+.app-form textarea,
+.export-date-range input,
+.insight-question-label textarea {
     display: block;
     width: 100%;
-    margin-top: .1rem;
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .35rem .5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
-}
-
-/* The class+element rule above outranks the UA [hidden] rule's own specificity,
-   so an input marked hidden (the Scan file picker, triggered by its own button
-   rather than shown directly) would otherwise render anyway. */
-.app-form input[hidden] {
-    display: none;
+    margin-top: var(--space-xs);
 }
 
 /* Tune-style rows inside a form (the ingredient form): one line each — tick, name,
    box, unit — rather than the form's own stacked label/field. */
 .app-form .formula-row {
     display: grid;
-    margin-bottom: .2rem;
+    margin-bottom: var(--space-xs);
 }
 
 /* Name and unit as wide as their longest text (the name still wraps on a screen
@@ -2001,7 +1921,7 @@ td .btn {
 .app-form .formula-name,
 .app-form .formula-unit {
     font-family: inherit;
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: var(--color-text-muted);
     opacity: 1;
 }
@@ -2021,13 +1941,17 @@ td .btn {
    select carries an arrow, so each computes an intrinsic height a pixel or two
    off a plain text box. Stacked fields hid that; pairing Date with Body Mass on
    one row put two different types side by side and made it obvious.
-   Derived from the same tokens as the padding rather than pinned to a magic
-   number — 1.2em of text (at the control's own font-size), the .35rem padding
-   top and bottom, and the two 1px borders, which box-sizing: border-box counts
-   in. Checkboxes and radios are excluded: they'd stretch into 32px squares. */
+   30px, the same at every width, for forms and the filter rows alike (borders
+   included: box-sizing is border-box). Checkboxes and radios are excluded:
+   they'd stretch into 30px squares. */
 .app-form input:not([type="checkbox"]):not([type="radio"]),
-.app-form select {
-    height: calc(1.2em + .7rem + 2px);
+.app-form select,
+.filters input:not([type="checkbox"]):not([type="radio"]),
+.filters select,
+.export-date-range input,
+.export-filter-row input,
+.export-filter-row select {
+    height: 30px;
     line-height: 1.2;
     /* Nothing may floor at its own content width. Every control here is
        width: 100% of a container that's already the right size, so an intrinsic
@@ -2055,7 +1979,8 @@ td .btn {
     min-width: 45%;
 }
 
-.app-form textarea {
+.app-form textarea,
+.insight-question-label textarea {
     resize: vertical;
 }
 
@@ -2066,8 +1991,8 @@ td .btn {
 .timesheet-break-inputs {
     display: flex;
     align-items: center;
-    gap: .3rem;
-    margin-top: .1rem;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
     color: var(--color-text-muted);
 }
 
@@ -2080,7 +2005,7 @@ td .btn {
 .checkbox-inline-label {
     display: flex !important;
     align-items: center;
-    gap: .5rem;
+    gap: var(--space-s);
 }
 
 /* Transfer Funds' From/To selects, each with its account's current balance
@@ -2089,10 +2014,11 @@ td .btn {
    the select across the whole 900px modal card and stranded the balance far
    off to the right of the actual account name, a wide dead gap between the
    two that read as broken rather than as one field. */
-.select-with-balance {
+.select-with-balance,
+.body-mass-projection-header {
     display: flex;
     align-items: center;
-    gap: .5rem;
+    gap: var(--space-s);
 }
 
 .select-with-balance select {
@@ -2103,9 +2029,6 @@ td .btn {
 
 .field-balance {
     flex: 0 0 auto;
-    font-size: .85rem;
-    color: var(--color-text-muted);
-    white-space: nowrap;
 }
 
 .checkbox-inline-label input[type="checkbox"] {
@@ -2114,13 +2037,10 @@ td .btn {
     margin-top: 0 !important;
 }
 
-.timesheet-weekend {
+/* A day off — weekend or holiday alike, one tint. */
+.timesheet-off {
     background: rgba(99, 102, 241, 0.07);
     color: var(--color-text-muted);
-}
-
-.timesheet-holiday {
-    background: rgba(245, 158, 11, 0.09);
 }
 
 .timesheet-holiday-badge {
@@ -2133,7 +2053,7 @@ td .btn {
 }
 
 .body-mass-projection-wrap {
-    margin-top: 1.25rem;
+    margin-top: var(--space-l);
 }
 
 /* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
@@ -2144,28 +2064,17 @@ td .btn {
    set. Wrapping a block in .body-mass-projection-wrap is how a chart joins that set —
    which is what moving Protein Source Rotation in from its own panel needed. */
 .body-mass-projection-wrap h4 {
-    margin: 0 0 .25rem;
-    font-size: 1rem;
+    margin: 0 0 var(--space-xs);
+    font-size: 1.1rem;
     color: var(--color-text);
 }
 
 .body-mass-projection-header {
-    display: flex;
     justify-content: space-between;
-    align-items: center;
-    gap: .5rem;
 }
 
 .body-mass-projection-header h4 {
     margin: 0;
-}
-
-.body-mass-eta {
-    font-size: 0.78rem;
-    color: var(--color-text-muted);
-    text-align: center;
-    margin: 4px 0 0;
-    min-height: 1.2em;
 }
 
 /* Only a note to show (reached, no change, wrong direction, levelling off) takes
@@ -2175,7 +2084,7 @@ td .btn {
 }
 
 .body-mass-progress-meter {
-    margin-top: .75rem;
+    margin-top: var(--space-m);
 }
 
 /* The meters' own card, full width under the two glance columns. */
@@ -2198,7 +2107,7 @@ td .btn {
    body-mass one. Its track is drawn a touch lighter so the pair reads as
    "distance (primary) / time (secondary)" rather than two competing bars. */
 .time-progress-meter .body-mass-progress-meter-fill {
-    opacity: .55;
+    opacity: .5;
 }
 
 /* Padding-top clears room for the callout bubble, which is positioned absolute
@@ -2206,7 +2115,7 @@ td .btn {
    overflow:hidden for the fill's rounded corners, which would clip the bubble. */
 .body-mass-progress-meter-track-wrap {
     position: relative;
-    padding-top: 1.5rem;
+    padding-top: var(--space-xl);
 }
 
 .body-mass-progress-meter-track {
@@ -2243,16 +2152,16 @@ td .btn {
     top: 0;
     left: calc(var(--meter-pct, 0) * 1%);
     transform: translateX(-50%);
-    background: color-mix(in srgb, var(--color-income) calc(var(--fill-pct, 0) * 1%), var(--color-expense));
+    background: color-mix(in srgb, var(--color-income) calc(var(--fill-pct, 0) * 1%), var(--color-danger));
     color: #fff;
-    font-size: .72rem;
-    font-weight: 700;
-    line-height: 1;
-    padding: .25rem .45rem;
-    border-radius: 5px;
+    font-size: .7rem;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: var(--space-xs) var(--space-s);
+    border-radius: 3px;
     white-space: nowrap;
     pointer-events: none;
-    transition: background .4s ease;
+    transition: background .3s ease;
 }
 
 .body-mass-progress-meter-callout::after {
@@ -2262,15 +2171,16 @@ td .btn {
     left: 50%;
     transform: translateX(-50%);
     border: 4px solid transparent;
-    border-top-color: color-mix(in srgb, var(--color-income) calc(var(--fill-pct, 0) * 1%), var(--color-expense));
+    border-top-color: color-mix(in srgb, var(--color-income) calc(var(--fill-pct, 0) * 1%), var(--color-danger));
 }
 
-.body-mass-progress-meter-callout.danger {
-    background: var(--color-expense);
+.body-mass-progress-meter-callout.danger,
+.body-mass-progress-meter-fill.danger {
+    background: var(--color-danger);
 }
 
 .body-mass-progress-meter-callout.danger::after {
-    border-top-color: var(--color-expense);
+    border-top-color: var(--color-danger);
 }
 
 /* One continuous red-to-green gradient, sized to the TRACK's own full width
@@ -2289,11 +2199,7 @@ td .btn {
         #84cc16 60% 80%, #22c55e 80% 100%);
     background-size: calc(10000% / var(--fill-pct, 100)) 100%;
     background-position: left;
-    transition: width .4s ease;
-}
-
-.body-mass-progress-meter-fill.danger {
-    background: var(--color-expense);
+    transition: width .3s ease;
 }
 
 .body-mass-progress-meter-stats {
@@ -2301,8 +2207,8 @@ td .btn {
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: .75rem;
-    margin-top: .4rem;
+    gap: var(--space-m);
+    margin-top: var(--space-s);
 }
 
 /* Each stat is a single line, number then label — "23% there" / "16.9 kg to
@@ -2312,43 +2218,25 @@ td .btn {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: .3rem;
+    gap: var(--space-xs);
 }
 
 .body-mass-progress-meter-stat-label {
-    font-size: .95rem;
+    font-size: .9rem;
     color: var(--color-text-muted);
 }
 
 /* The "→ 70 ± 1.9 kg" / "→ 2027-01-27" target trailing "left" / "ahead". Regular weight,
    like every other card's figures. */
-.body-mass-progress-meter-target {
-    font-size: .95rem;
-    color: var(--color-text);
-}
-
+.body-mass-progress-meter-target,
 .body-mass-progress-meter-pct {
-    font-size: .95rem;
+    font-size: .9rem;
     color: var(--color-text);
 }
 
 .body-mass-progress-meter-pct.danger {
-    color: var(--color-expense);
+    color: var(--color-danger);
 }
-
-.body-mass-plateau-note {
-    font-size: .78rem;
-    color: var(--color-text-muted);
-    text-align: center;
-    margin: 4px 0 0;
-    min-height: 1.2em;
-}
-
-.body-mass-plateau-note.warning {
-    color: var(--color-expense);
-    font-weight: 600;
-}
-
 
 #account-type::-webkit-calendar-picker-indicator {
     display: none !important;
@@ -2356,8 +2244,8 @@ td .btn {
 
 .hint {
     color: var(--color-text-muted);
-    font-size: .85rem;
-    margin-bottom: 1rem;
+    font-size: .8rem;
+    margin-bottom: var(--space-l);
 }
 
 /* Several hints are filled in by script and blank until then — without this
@@ -2382,8 +2270,8 @@ td .btn {
    the margin rule itself out while collapsed removes the conflict instead of
    fighting it with specificity. */
 #workout-plan-panel:not(.collapsed) h3 {
-    font-size: 1rem;
-    margin: 1.75rem 0 .5rem;
+    font-size: 1.1rem;
+    margin: var(--space-xl) 0 var(--space-s);
 }
 
 #workout-plan-panel:not(.collapsed) h3:first-of-type {
@@ -2391,7 +2279,7 @@ td .btn {
 }
 
 .workout-day + .workout-day {
-    margin-top: 1.75rem;
+    margin-top: var(--space-xl);
 }
 
 /* .panel-actions carries a bottom margin only, which left Log Workout visually
@@ -2403,11 +2291,11 @@ td .btn {
    so an unscoped margin-top here would survive collapsing and leave a gap under
    the panel's own h2. */
 #workout-plan-panel:not(.collapsed) .panel-actions {
-    margin-top: 1.75rem;
+    margin-top: var(--space-xl);
 }
 
 .workout-day h4 {
-    margin-bottom: .5rem;
+    margin-bottom: var(--space-s);
 }
 
 /* Left, like every other column — a centred checkbox and right-aligned buttons
@@ -2428,7 +2316,6 @@ td .btn {
 }
 
 .workout-actions-cell .btn {
-    padding: .15rem .35rem;
     margin-right: 0;
 }
 
@@ -2444,6 +2331,7 @@ td .btn {
    logging lands on / already has) and drifting into separate greens would
    just look like a mistake. */
 .workout-row-logged > td,
+.instruction-activities li.instruction-logged,
 .nutrition-row-logged > td,
 .today-row > td {
     background: rgba(22, 163, 74, .13);
@@ -2472,13 +2360,13 @@ td .btn {
 @media (max-width: 820px) {
     #workout-plan-panel th,
     #workout-plan-panel td {
-        padding-left: .3rem;
-        padding-right: .3rem;
+        padding-left: var(--space-xs);
+        padding-right: var(--space-xs);
     }
 
     #workout-plan-panel td:first-child,
     #workout-plan-panel th:first-child {
-        font-size: .78rem;
+        font-size: .8rem;
     }
 
     /* Class-based, not nth-child: a table's own column count now depends on
@@ -2495,7 +2383,7 @@ td .btn {
     }
 
     .workout-meta-cell {
-        font-size: .72rem;
+        font-size: .7rem;
     }
 
     /* Three row-action buttons cost ~90px at the normal td .btn size, which
@@ -2504,8 +2392,7 @@ td .btn {
        folding into a menu, so the plan reads the same on a phone as on a
        desktop. */
     .workout-actions-cell .btn {
-        padding: .15rem .2rem;
-        font-size: .72rem;
+        font-size: .7rem;
     }
 }
 
@@ -2513,19 +2400,19 @@ td .btn {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: .5rem;
+    gap: var(--space-s);
 }
 
 .insight-data-preview {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-l);
 }
 
 .insight-data-preview p {
     margin: 0;
-    padding: .25rem .75rem;
+    padding: var(--space-xs) var(--space-m);
     font-size: .8rem;
     color: var(--color-text-muted);
-    line-height: 1.4;
+    line-height: 1.5;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -2536,8 +2423,8 @@ td .btn {
 /* Every mode's report is renderInsightText output — one <p> per line, section
    labels in <strong>. One rule set now that one panel renders all three. */
 .insight-body p {
-    margin: 0 0 1rem;
-    line-height: 1.55;
+    margin: 0 0 var(--space-l);
+    line-height: 1.5;
 }
 
 .insight-body p:last-child {
@@ -2553,14 +2440,21 @@ td .btn {
 /* Health's and Finance's Insight: their modes as the hub's tiles, each opening its
    own page (data-insight-mode, insight-panel.js / financial-insight.js). The tiles
    page shows only the tiles. */
-:is(#insight-mode-actions, #financial-insight-mode-actions) {
+:is(#insight-mode-actions, #financial-insight-mode-actions),
+html.section-pages[data-page="hub"] .page-tiles,
+html.home-hub .page-tiles,
+.page-tiles.instruction-groups {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-    gap: .5rem;
+    gap: var(--space-s);
+}
+
+:is(#insight-mode-actions, #financial-insight-mode-actions) {
     margin-bottom: 0;
 }
 
-:is(#insight-mode-actions, #financial-insight-mode-actions) .page-tile {
+:is(#insight-mode-actions, #financial-insight-mode-actions) .page-tile,
+.page-tiles.instruction-groups .page-tile {
     border: none;
     font: inherit;
     cursor: pointer;
@@ -2582,8 +2476,8 @@ td .btn {
 #formula-expression-details,
 #formula-substituted-details,
 #insight-prompt-details {
-    margin-bottom: .6rem;
-    font-size: .85rem;
+    margin-bottom: var(--space-s);
+    font-size: .8rem;
 }
 
 #formula-expression-details summary,
@@ -2599,72 +2493,19 @@ td .btn {
 }
 
 .insight-question-label {
-    display: block;
-    margin-bottom: .75rem;
-    font-size: .85rem;
-    color: var(--color-text-muted);
-}
-
-.insight-question-label textarea {
-    display: block;
-    width: 100%;
-    margin-top: .25rem;
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
-    resize: vertical;
+    margin-bottom: var(--space-m);
 }
 
 #insight-food-table {
-    margin-bottom: 1rem;
-}
-
-.export-date-range {
-    display: flex;
-    gap: .6rem;
-    margin-bottom: .6rem;
+    margin-bottom: var(--space-l);
 }
 
 .export-date-range label {
     flex: 1;
-    display: block;
-    font-size: .85rem;
-    color: var(--color-text-muted);
-}
-
-.export-date-range input {
-    display: block;
-    width: 100%;
-    margin-top: .1rem;
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .35rem .5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
 }
 
 .export-filter-row {
-    display: flex;
     align-items: center;
-    gap: .5rem;
-    margin-bottom: .5rem;
-}
-
-.export-filter-row select,
-.export-filter-row input {
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: .5rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
 }
 
 .export-filter-row .export-filter-join {
@@ -2679,22 +2520,17 @@ td .btn {
     flex: 0 0 8rem;
 }
 
-.export-filter-row .export-filter-value {
-    flex: 1;
-    min-width: 0;
-}
-
 .export-filter-row .export-filter-remove {
     flex: 0 0 auto;
-    padding: .4rem .6rem;
+    padding: var(--space-s) var(--space-s);
 }
 
 #export-add-filter-btn {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-l);
 }
 
 .export-summary-text {
-    margin-top: 1rem;
+    margin-top: var(--space-l);
 }
 
 @media (max-width: 800px) {
@@ -2703,13 +2539,13 @@ td .btn {
     }
 
     .container {
-        padding: 1.25rem;
+        padding: var(--space-l);
     }
 
     .cards,
     .widget-cards,
     .donut-grid {
-        gap: .6rem;
+        gap: var(--space-s);
     }
 }
 
@@ -2745,12 +2581,12 @@ td .btn {
         z-index: 9;
         box-sizing: border-box;
         height: calc(var(--phone-footer-height) + env(safe-area-inset-bottom, 0px));
-        padding: 0 .5rem env(safe-area-inset-bottom, 0px);
+        padding: 0 var(--space-s) env(safe-area-inset-bottom, 0px);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: .68rem;
-        line-height: 1;
+        font-size: .7rem;
+        line-height: 1.2;
         white-space: nowrap;
         border-top: none;
         background: var(--color-bg);
@@ -2761,7 +2597,7 @@ td .btn {
 
     /* The page clears the bar and the strip under it. */
     .container {
-        padding: 1rem 1rem calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
+        padding: var(--space-l) var(--space-l) calc(var(--space-l) + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 
     /* Bottom left, over the tab bar or the page's action bar that replaces it. */
@@ -2805,12 +2641,10 @@ td .btn {
 
     .btn {
         font-size: .8rem;
-        padding: .35rem .6rem;
     }
 
     header .btn {
         font-size: .9rem;
-        padding: .35rem .45rem;
     }
 
     /* The section links as a bottom tab bar, in thumb reach. */
@@ -2828,10 +2662,10 @@ td .btn {
         /* A pill: half circles at both ends, as the action bar that replaces it. */
         border-radius: 999px;
         background: var(--color-nav);
-        border-top: 1px solid rgba(255, 255, 255, .1);
+        border-top: 1px solid rgba(255, 255, 255, .35);
         /* Lifts the bar off the content it floats over so it reads as a layer,
            not a strip fused to the last panel. */
-        box-shadow: 0 -2px 12px rgba(0, 0, 0, .22);
+        box-shadow: var(--shadow-dropdown);
     }
 
     .nav .nav-home {
@@ -2856,19 +2690,19 @@ td .btn {
         align-items: center;
         justify-content: center;
         min-height: var(--bottom-bar-height);
-        padding: 0 .25rem;
+        padding: 0 var(--space-xs);
         /* Larger labels; the bar's own height (--bottom-bar-height) is unchanged. */
-        font-size: 1.05rem;
+        font-size: 1.1rem;
         font-weight: 600;
-        line-height: 1.1;
+        line-height: 1.2;
     }
 
     .gate {
-        padding: 1rem;
+        padding: var(--space-l);
     }
 
     .export-date-range {
-        gap: .5rem;
+        gap: var(--space-s);
     }
 
     .location-picker-dropdown {
@@ -2876,11 +2710,11 @@ td .btn {
     }
 
     .landing-hero h1 {
-        font-size: 1.5rem;
+        font-size: 1.4rem;
     }
 
     .panel {
-        padding: .6rem;
+        padding: var(--space-s);
     }
 
     .chart-box {
@@ -2892,7 +2726,7 @@ td .btn {
     }
 
     .donut-grid {
-        gap: .75rem;
+        gap: var(--space-m);
     }
 
     .donut-item h3,
@@ -2905,7 +2739,7 @@ td .btn {
     }
 
     .donut-legend {
-        gap: .5rem .75rem;
+        gap: var(--space-s) var(--space-m);
     }
 
     .filters {
@@ -2932,16 +2766,15 @@ td .btn {
 
     th,
     td {
-        padding: .25rem .5rem;
-        font-size: .85rem;
+        padding: var(--space-xs) var(--space-s);
+        font-size: .8rem;
     }
 
-    /* Just past WCAG's 24px minimum tap target, so a row of ✏️/📋/🧬/🗑️ can't
-       mis-tap onto Delete; no taller, so rows stay thin. */
+    /* WCAG's 24px minimum tap target (the small button size), so a row of
+       ✏️/📋/🧬/🗑️ can't mis-tap onto Delete; no taller, so rows stay thin. */
     td .btn {
-        padding: .4rem;
         font-size: .8rem;
-        margin-right: .15rem;
+        margin-right: var(--space-xs);
     }
 
     /* Full-screen overlay — no gap around the card. */
@@ -2958,8 +2791,8 @@ td .btn {
         max-width: 100%;
         max-height: 100%;
         border-radius: 0;
-        padding: .85rem;
-        padding-top: calc(.85rem + env(safe-area-inset-top, 0px));
+        padding: var(--space-m);
+        padding-top: calc(var(--space-m) + env(safe-area-inset-top, 0px));
         padding-bottom: 0;
         overscroll-behavior: contain;
     }
@@ -2982,11 +2815,11 @@ td .btn {
     }
 
     .modal-card h2 {
-        font-size: 1.05rem;
+        font-size: 1.1rem;
     }
 
     .app-form label {
-        margin-bottom: .3rem;
+        margin-bottom: var(--space-xs);
         font-size: .8rem;
     }
 
@@ -2995,7 +2828,7 @@ td .btn {
     .app-form input,
     .app-form select,
     .app-form textarea {
-        padding: .35rem .4rem;
+        padding: var(--space-xs) var(--space-s);
     }
 
     /* Pinned to the screen bottom like .nav, so no scrolling to reach it. */
@@ -3004,20 +2837,17 @@ td .btn {
         position: sticky;
         bottom: 0;
         z-index: 1;
-        gap: .4rem;
-        margin: auto -.85rem 0;
-        padding: .6rem .85rem calc(.6rem + env(safe-area-inset-bottom, 0px));
+        gap: var(--space-s);
+        margin: auto calc(-1 * var(--space-m)) 0;
+        padding: var(--space-s) var(--space-m) calc(var(--space-s) + env(safe-area-inset-bottom, 0px));
         background: var(--color-nav);
-        border-top: 1px solid rgba(255, 255, 255, .1);
-        box-shadow: 0 -2px 12px rgba(0, 0, 0, .22);
+        border-top: 1px solid rgba(255, 255, 255, .35);
+        box-shadow: var(--shadow-dropdown);
     }
 
     .modal-actions .btn {
-        height: 2.5rem;
         margin: 0;
-        padding: 0 .6rem;
-        font-size: .85rem;
-        line-height: 1;
+        font-size: .8rem;
         white-space: nowrap;
     }
 
@@ -3043,14 +2873,14 @@ td .btn {
 .site-footer {
     flex-shrink: 0;
     text-align: center;
-    padding: 1rem;
+    padding: var(--space-l);
     color: var(--color-text-muted);
     font-size: .8rem;
     border-top: 1px solid var(--color-border);
 }
 
 .site-footer .footer-divider {
-    margin: 0 .35rem;
+    margin: 0 var(--space-xs);
 }
 
 .site-footer a {
@@ -3063,8 +2893,8 @@ td .btn {
 }
 
 .formula-where {
-    margin: 0 0 .5rem;
-    font-size: .78rem;
+    margin: 0 0 var(--space-s);
+    font-size: .8rem;
     color: var(--color-text-muted);
 }
 
@@ -3072,7 +2902,7 @@ td .btn {
    no symbol, box or unit to give it, so a formula-row would sit oddly here. */
 .formula-divider {
     grid-column: 1 / -1;
-    margin: .6rem 0;
+    margin: var(--space-s) 0;
     border: none;
     border-top: 1px solid var(--color-border);
 }
@@ -3080,68 +2910,52 @@ td .btn {
 .formula-solve-for {
     display: flex;
     flex-wrap: wrap;
-    gap: .3rem .9rem;
-    margin: 0 0 1rem;
+    gap: var(--space-xs) var(--space-l);
+    margin: 0 0 var(--space-l);
     padding: 0;
     border: 0;
 }
 
 .formula-solve-for legend {
     width: 100%;
-    margin-bottom: .3rem;
+    margin-bottom: var(--space-xs);
     padding: 0;
-    font-size: .78rem;
+    font-size: .8rem;
     color: var(--color-text-muted);
 }
 
 .formula-solve-for label {
     display: flex;
     align-items: center;
-    gap: .35rem;
+    gap: var(--space-xs);
     font-size: .8rem;
 }
 
 /* Same control shape as "Solve for", but it sits at the bottom of the modal
    right above the actions, where that 1rem bottom margin reads as a gap. */
 .formula-pin-mode {
-    margin-bottom: .5rem;
-}
-
-/* The one row whose input is the current answer rather than a knob to turn:
-   readonly like ρ/ε above it, but still primary-colored like the old result
-   strip it replaces, so it keeps reading as "the answer" among its siblings.
-   .formula-field-computed gets the same look for Eᵢₙ/t/date in TAU and
-   DELTA_M — there the "answer" field stays genuinely editable (see
-   applySolveForMode), so it can't rely on :read-only alone. */
-.formula-row input:read-only,
-.formula-row input.formula-field-computed {
-    border-style: dashed;
-    background: var(--color-surface);
-    color: var(--color-text);
-    font-weight: 600;
+    margin-bottom: var(--space-s);
 }
 
 /* Δm% above the 1%/week ceiling, and BMI_g outside the healthy 18.5–24.9 band. The colour is
    the whole warning — the unit column stays `%/week` or `kg/m²` like every other row's, and
    the words are in the substituted trace. Two names for one look because they mark different
    things: a rate over a ceiling, and a goal outside a band at either end.
-   Must sit after the read-only block above: same specificity, so source order is what lets
-   a flagged figure stay red in the Solve-for mode that also makes its box readonly.
    Not an invalid value — nothing here is blocked, so no error background. */
 .formula-row input.formula-pct-over,
 .formula-row input.formula-out-of-band {
     border-color: var(--color-danger);
-    color: var(--color-expense);
+    color: var(--color-danger);
     font-weight: 600;
 }
 
 .formula-inputs {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-l);
     /* One grid for every row (each row is a subgrid of it), so the symbol, name and
        unit columns take their longest text's width; scrolls sideways when too wide. */
     display: grid;
     grid-template-columns: max-content max-content 8.45rem max-content;
-    column-gap: .6rem;
+    column-gap: var(--space-s);
     overflow-x: auto;
 }
 
@@ -3173,7 +2987,8 @@ td .btn {
 /* Contact: every column as wide as its text, one line per cell, rather than the
    global full-width table squeezing a dozen columns (name, phones, emails,
    address, …) into the panel. .table-responsive scrolls sideways when it's wider. */
-#contacts-table {
+#contacts-table,
+#insight-pattern-table {
     width: max-content;
 }
 
@@ -3185,21 +3000,11 @@ td .btn {
 /* Settings (Health and Other): the actions column (👁️ ✏️ 🗑️) is as wide as its
    buttons on one line, rather than squeezed by the Key/Value columns until the
    buttons stacked. Key stays on one line too; Value takes the rest. */
-#settings-table td:last-child,
-#health-settings-table td:last-child,
-#settings-table td:first-child,
-#health-settings-table td:first-child {
-    white-space: nowrap;
-    width: 1%;
-}
 
 /* Pattern's Periods table: ~20 columns, so the global `table { width: 100% }`
    squeezed every one of them into the panel and wrapped Period's date range
    ("2026-08-07 → 2026-08-16") into a narrow column. Sized to its content instead,
    one line per cell; .table-responsive scrolls sideways when it's wider than the panel. */
-#insight-pattern-table {
-    width: max-content;
-}
 
 #insight-pattern-table th,
 #insight-pattern-table td {
@@ -3216,7 +3021,7 @@ td .btn {
 
 .formula-name {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: .72rem;
+    font-size: .7rem;
     color: var(--color-text);
     white-space: nowrap;
 }
@@ -3242,14 +3047,8 @@ td .btn {
        the shared box column, which read as one big field among twenty small
        ones. The column is sized to hold a date comfortably below. */
     min-width: 0;
-    font: inherit;
-    font-size: var(--input-font-size);
-    padding: 0 .4rem;
-    line-height: 1.15;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
+    padding: 0 var(--space-s);
+    line-height: 1.2;
 }
 
 /* A population constant, not an input — shown so the formula reads completely,
@@ -3258,15 +3057,26 @@ td .btn {
    same line and scale as the editable values above it. Only the border and
    background are withheld — those are what mark a field as editable, and they
    do that job without the figure also having to be a different size. */
+/* Tune's boxes, date, select and read-only figures: one height, 21px, at every
+   width — compact, since the page is 59 rows of them. */
+#health-tune-panel .formula-row input:not([type="checkbox"]),
+#health-tune-panel .formula-row select,
+#health-tune-panel .formula-fixed {
+    height: 21px;
+    min-height: 0;
+}
+
+/* The read-only figure has no border; its text is centred in the 21px box. */
+#health-tune-panel .formula-fixed {
+    display: flex;
+    align-items: center;
+}
+
 .formula-fixed {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: var(--input-font-size);
-    padding: 0 .4rem;
-    line-height: 1.15;
-    /* Left, like the text inside every input above it — it used to be centred,
-       which left 7700 and 200 visibly offset from the column of editable
-       figures they sit under. */
-    text-align: left;
+    padding: 0 var(--space-s);
+    line-height: 1.2;
     color: var(--color-text-muted);
 }
 
@@ -3281,7 +3091,7 @@ td .btn {
     /* Same shared grid on a phone, with a narrower box column and gap. */
     .formula-inputs {
         grid-template-columns: max-content max-content 8.1rem max-content;
-        column-gap: .3rem;
+        column-gap: var(--space-xs);
     }
 
     .formula-row {
@@ -3289,26 +3099,19 @@ td .btn {
     }
 
     .formula-sym {
-        font-size: .78rem;
+        font-size: .8rem;
     }
 
     .formula-name,
     .formula-unit {
-        font-size: .66rem;
-        line-height: 1.3;
+        font-size: .7rem;
+        line-height: 1.2;
     }
 
     .formula-row input:not([type="checkbox"]),
     .formula-row select,
     .formula-fixed {
-        padding: 0 .25rem;
-    }
-
-    /* Right-aligned so each value sits against its own unit rather than
-       stranded at the far side of the box. */
-    .formula-row input:not([type="checkbox"]),
-    .formula-fixed {
-        text-align: right;
+        padding: 0 var(--space-xs);
     }
 
     /* The date box was the one field that ignored all of the above: a phone draws
@@ -3322,7 +3125,7 @@ td .btn {
         appearance: none;
         min-height: 0;
         height: auto;
-        line-height: 1.15;
+        line-height: 1.2;
     }
 
     /* WebKit renders the value in its own inner element, which carries a margin
@@ -3330,7 +3133,6 @@ td .btn {
        column and off the right-aligned column of figures. */
     .formula-row input[type="date"]::-webkit-date-and-time-value {
         margin: 0;
-        text-align: right;
     }
 
     /* And the picker glyph, which is sized for a full-width native field. Kept
@@ -3339,22 +3141,22 @@ td .btn {
     .formula-row input[type="date"]::-webkit-calendar-picker-indicator {
         width: .85rem;
         padding: 0;
-        margin: 0 0 0 .15rem;
-        opacity: .6;
+        margin: 0 0 0 var(--space-xs);
+        opacity: .5;
     }
 
     .formula-solve-for {
-        gap: .2rem .6rem;
-        font-size: .72rem;
+        gap: var(--space-xs) var(--space-s);
+        font-size: .7rem;
     }
 
     .formula-solve-for label {
-        font-size: .72rem;
+        font-size: .7rem;
     }
 }
 
 .formula-substituted p {
-    margin: 0 0 .35rem;
+    margin: 0 0 var(--space-xs);
     font-size: .8rem;
     color: var(--color-text-muted);
     line-height: 1.5;
@@ -3380,12 +3182,6 @@ td .btn {
 }
 
 /* Name-only tiles, as many a row as fit: 3 on a phone, up to 7 on a laptop. */
-html.section-pages[data-page="hub"] .page-tiles,
-html.home-hub .page-tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-    gap: .5rem;
-}
 
 html.section-pages[data-page="hub"] .panel-group > .panel[data-route] {
     display: none;
@@ -3415,15 +3211,15 @@ html.section-pages[data-page="hub"] .page-crumb-back {
 .page-crumb {
     flex-wrap: wrap;
     align-items: baseline;
-    gap: .35rem;
-    padding: .1rem .25rem .3rem;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-xs) var(--space-xs);
     font-size: .9rem;
     color: var(--color-text-muted);
 }
 
 /* The home page's sits above the sections, so it takes their .5rem gap itself. */
 html.home-hub .page-crumb {
-    margin-bottom: .5rem;
+    margin-bottom: var(--space-s);
 }
 
 html.section-pages .page-crumb:not(.form-crumb),
@@ -3459,33 +3255,27 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: .2rem;
+    gap: var(--space-xs);
     justify-content: center;
     align-items: center;
-    /* Past the 44px touch minimum. */
-    min-height: 3rem;
-    padding: .55rem .6rem;
+    /* The large button size, the same as the phone's action-bar buttons. */
+    min-height: 42px;
+    padding: var(--space-s) var(--space-s);
     text-align: center;
     background: var(--color-surface);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     color: var(--color-text);
     text-decoration: none;
-    transition: transform .15s ease, box-shadow .15s ease;
-}
-
-.page-tile:hover,
-.page-tile:focus-visible {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, .12);
+    transition: transform .2s ease, box-shadow .2s ease;
 }
 
 /* A block's short sign (setPageBadge, page-nav.js): on its tile's corner and after
    its page's breadcrumb. */
 .page-badge {
-    padding: .1rem .35rem;
+    padding: var(--space-xs) var(--space-xs);
     border-radius: 999px;
-    background: var(--color-expense);
+    background: var(--color-danger);
     color: #fff;
     font-size: .7rem;
     font-weight: 600;
@@ -3507,16 +3297,17 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     cursor: pointer;
 }
 
-.page-tile-title {
-    font-size: .95rem;
-    font-weight: 700;
-}
-
 /* Today on the Health hub (page-nav.js's QUICK_ACTIONS): the last tile, gray
    like Physique's own Today button (.btn-secondary). */
 .page-tile.quick-tile {
     background: var(--color-muted);
     color: #fff;
+}
+
+/* GYM's group tiles, in the hubs' tile style; the open group's tile pressed,
+   as Insight's mode tiles are. */
+.page-tiles.instruction-groups {
+    margin-bottom: var(--space-m);
 }
 
 @media (max-width: 820px) {
@@ -3541,7 +3332,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         bottom: 0;
         left: 0;
         width: 13rem;
-        padding: 3.5rem .6rem 4.5rem;
+        padding: 3.5rem var(--space-s) 4.5rem;
         overflow-y: auto;
         background: var(--color-surface);
         border-right: 1px solid var(--color-border);
@@ -3555,7 +3346,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
 
     .side-nav a {
         display: block;
-        padding: .35rem .6rem;
+        padding: var(--space-xs) var(--space-s);
         border-radius: var(--radius-md);
         color: var(--color-text);
         text-decoration: none;
@@ -3572,11 +3363,11 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     }
 
     .side-nav-section {
-        margin-top: .8rem;
-        font-weight: 700;
+        margin-top: var(--space-m);
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: .04em;
-        font-size: .75rem !important;
+        font-size: .7rem !important;
         color: var(--color-text-muted) !important;
     }
 
@@ -3585,7 +3376,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     }
 
     .side-nav-page {
-        padding-left: 1rem !important;
+        padding-left: var(--space-l) !important;
     }
 
     /* No top bar: Ledger tops the sidebar, the account avatar sits in its
@@ -3605,7 +3396,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         z-index: 6;
         width: 13rem;
         box-sizing: border-box;
-        padding: 1rem 1.2rem;
+        padding: var(--space-l) var(--space-l);
         background: var(--color-surface);
         color: var(--color-text);
     }
@@ -3617,7 +3408,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         z-index: 6;
         width: 13rem;
         box-sizing: border-box;
-        padding: .75rem 1.2rem;
+        padding: var(--space-m) var(--space-l);
         margin: 0;
         background: var(--color-surface);
         border-top: 1px solid var(--color-border);
@@ -3644,7 +3435,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
 }
 
 /* --- Form pages (router.js's updateFormPage) ---------------------------------
-   On a section page an open routed form (Log, Add, a row's Edit or view, Guide)
+   On a section page an open routed form (Log, Add, a row's Edit or view, GYM)
    takes the page's place instead of covering it, and looks like a block page:
    the breadcrumb over one white rounded card (.panel), at the page container's
    width and padding. The form element plays the section, its card the panel. */
@@ -3659,14 +3450,14 @@ html.section-pages[data-form-page] .modal.form-page-under {
 html.section-pages[data-form-page] .modal.form-page {
     /* The container's box: max 1000px wide with 2rem padding, so its content is
        936px at most, centered — the same box a block page's wrapper fills. */
-    --form-page-gutter: 2rem;
+    --form-page-gutter: var(--space-xxl);
     position: static;
     inset: auto;
     z-index: auto;
     order: 2;
     display: flex;
     flex-direction: column;
-    gap: .5rem;
+    gap: var(--space-s);
     box-sizing: border-box;
     width: min(calc(1000px - 2 * var(--form-page-gutter)), calc(100% - 2 * var(--form-page-gutter)));
     margin: var(--form-page-gutter) auto;
@@ -3720,7 +3511,7 @@ html.section-pages[data-form-page] body.modal-open {
 
 @media (max-width: 800px) {
     html.section-pages[data-form-page] .modal.form-page {
-        --form-page-gutter: 1.25rem;
+        --form-page-gutter: var(--space-l);
     }
 }
 
@@ -3729,8 +3520,8 @@ html.section-pages[data-form-page] body.modal-open {
    pinned action bar just above the tab bar. */
 @media (max-width: 640px) {
     html.section-pages[data-form-page] .modal.form-page {
-        --form-page-gutter: 1rem;
-        margin-bottom: calc(1rem + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
+        --form-page-gutter: var(--space-l);
+        margin-bottom: calc(var(--space-l) + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -3748,10 +3539,6 @@ html.section-pages[data-form-page] body.modal-open {
    header on a wide screen, spaced as they were; the group's ❌ only appears once
    it's the phone's bottom bar. */
 .panel-header-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: .75rem;
     flex-shrink: 0;
 }
 
@@ -3771,10 +3558,9 @@ html.section-pages[data-form-page] body.modal-open {
         display: none;
     }
 
+    /* Shown again in the phone's action bar (hidden on the page above). */
     html[data-action-bar] .panel-actions[data-page-actions].action-bar .page-action-close {
         display: inline-flex;
-        align-items: center;
-        justify-content: center;
     }
 }
 
@@ -3826,9 +3612,9 @@ html.section-pages .panel.page-active:hover {
         height: calc(var(--bottom-bar-height) + 1px);
         padding: 0 var(--bottom-bar-edge);
         background: var(--color-nav);
-        border-top: 1px solid rgba(255, 255, 255, .1);
+        border-top: 1px solid rgba(255, 255, 255, .35);
         border-radius: 999px;
-        box-shadow: 0 -2px 12px rgba(0, 0, 0, .22);
+        box-shadow: var(--shadow-dropdown);
         scrollbar-width: none;
     }
 
@@ -3840,29 +3626,28 @@ html.section-pages .panel.page-active:hover {
         flex: 0 0 auto;
     }
 
+    /* Shown again in the phone's action bar (hidden in the header above). */
     html[data-action-bar] .action-bar .header-action-close {
         display: inline-flex;
-        align-items: center;
-        justify-content: center;
     }
 
-    /* Finger-sized: close to the 44px touch guideline. */
-    /* A long label wraps onto a second line inside its button ("Export" over
-       "Transactions") instead of stretching it: up to two lines fit the 3rem
-       height, and the narrower buttons leave more of the bar in view. */
+    /* Finger-sized: the large button size, 42px, close to the 44px touch guideline.
+       A long label wraps onto a second line inside its button ("Export" over
+       "Transactions") instead of stretching it: up to two lines fit, and the
+       narrower buttons leave more of the bar in view. */
     html[data-action-bar] .action-bar .btn {
-        height: 3rem;
+        height: 42px;
         max-width: 6.5rem;
         margin: 0;
-        padding: 0 .6rem;
-        font-size: .85rem;
-        line-height: 1.1;
+        font-size: .8rem;
+        line-height: 1.2;
         white-space: normal;
         text-align: center;
     }
 
     html[data-action-bar] .action-bar .btn-icon,
     html[data-action-bar] .action-bar .modal-close {
+        width: 42px;
         font-size: 1.4rem;
     }
 
@@ -3870,7 +3655,7 @@ html.section-pages .panel.page-active:hover {
        the dark bar. */
     html[data-action-bar] .action-bar > span {
         color: #fff;
-        font-size: .85rem;
+        font-size: .8rem;
         white-space: nowrap;
     }
 
@@ -3881,8 +3666,7 @@ html.section-pages .panel.page-active:hover {
         position: sticky;
         right: 0;
         margin-left: auto;
-        width: var(--bottom-bar-circle);
-        padding: 0;
+        width: 42px;
         border-radius: 50%;
     }
 }
@@ -3893,4 +3677,31 @@ html.section-pages .panel.page-active:hover {
     html[data-action-bar] .app-form .modal-actions.action-bar {
         padding-left: var(--bottom-bar-start);
     }
+}
+
+/* GYM's ✏️, on the figure's top-left corner, across from the tick. */
+.instruction-edit {
+    position: absolute;
+    top: .7rem;
+    left: .85rem;
+}
+
+/* GYM's tick, on the figure's top-right corner. */
+.instruction-check {
+    position: absolute;
+    top: .8rem;
+    right: .9rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--color-income);
+}
+
+.instruction-activities li.instruction-logged {
+    cursor: default;
+}
+
+.instruction-activities li:has(.instruction-check:checked) {
+    border-color: var(--color-income);
 }

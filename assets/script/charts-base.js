@@ -2,12 +2,19 @@
 function applyChartTheme() {
   Chart.defaults.color = chartColor('--color-text-muted');
   Chart.defaults.borderColor = chartColor('--color-border');
+  // Every chart's text at .9rem, the app's own size for that band, in the px Chart.js takes.
+  Chart.defaults.font.size = chartFontSize();
 
   // privacyMode is read at call time; loadDashboard rebuilds the charts on toggle.
   Chart.defaults.scales.linear.ticks.callback = function (value) {
     const label = this.getLabelForValue(value);
     return privacyMode ? maskDigits(label) : label;
   };
+}
+
+// .9rem in px, against the page's base size (which steps with screen width).
+function chartFontSize() {
+  return 0.9 * parseFloat(getComputedStyle(document.documentElement).fontSize);
 }
 
 // Every reference mark in Health Indicators — the per-column caps, State Trend's target

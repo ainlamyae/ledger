@@ -137,7 +137,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   // m_avg, m_d and BMI with their own units, as stored (m is the Body Mass field above).
   const massText = mass.m === undefined ? '—' : [
     mass.m_avg !== undefined ? `${mass.m_avg} kg` : '—',
-    mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? `${mass.m_d} kg/day` : '—',
+    mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? `${mass.m_d} kg` : '—',
     mass.BMI !== undefined ? `${mass.BMI} kg/m²` : '—',
   ].join('/');
   document.getElementById('physique-mass-figures').textContent = privacyMode ? maskDigits(massText) : massText;

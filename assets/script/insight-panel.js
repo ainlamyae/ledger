@@ -165,6 +165,16 @@ function initInsightPanel() {
   });
 
   document.getElementById('insight-generate-btn').addEventListener('click', runInsightGeneration);
+  // Back to /health/insight/: the tiles again.
+  registerViewReset(document.getElementById('insight-panel'), clearInsightMode);
+}
+
+function clearInsightMode() {
+  delete document.getElementById('insight-panel').dataset.insightMode;
+  insightLoaded = null;
+  setInsightModeButtons(null);
+  document.getElementById('insight-mode-status').textContent = '';
+  clearFieldError('insight-status');
 }
 
 // Pattern's L_p box, starting at Tune's L_p (its box, else the saved setting); a blank
@@ -186,6 +196,8 @@ function patternChunkDays() {
 function loadInsightMode(modeKey) {
   const mode = INSIGHT_MODES[modeKey];
   if (!mode) return;
+  // The mode's page, even while its data is still loading.
+  document.getElementById('insight-panel').dataset.insightMode = modeKey;
 
   const { from, to } = getInsightDateRange();
   const statusEl = document.getElementById('insight-mode-status');

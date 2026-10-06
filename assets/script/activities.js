@@ -64,11 +64,11 @@ async function initActivities(forceRefresh = false) {
   if (!activityListenersAttached) {
     activityListenersAttached = true;
     document.getElementById('add-activity-btn').addEventListener('click', () => openActivityForm(null));
-    // health/activity/<name>/ opens that activity's Edit.
+    // health/activity/<name>/ opens that activity's Edit, …/duplicate/ its 📋.
     registerRecordRoute('activity', (slug, sub) => {
       const activity = allActivities.find((a) => routeSlug(a.name) === slug);
-      if (!activity || sub) return null;
-      openActivityForm(activity);
+      if (!activity || (sub && sub !== 'duplicate')) return null;
+      openActivityForm(activity, Boolean(sub));
       return activity.name;
     });
     document.getElementById('activity-cancel-btn').addEventListener('click', closeActivityForm);
@@ -299,7 +299,10 @@ function makeActivityTable(group, rows, columnVisibility) {
         routeRecordEdit('activity', { slug: routeSlug(activity.name), label: activity.name });
         openActivityForm(activity);
       } }),
-      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openActivityForm(activity, true) }),
+      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => {
+        routeRecordEdit('activity', { slug: routeSlug(activity.name), label: activity.name }, { slug: 'duplicate', label: 'Duplicate' });
+        openActivityForm(activity, true);
+      } }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteActivity(activity) }),
     );
     tr.appendChild(actionsCell);
@@ -344,7 +347,7 @@ function syncActivityPlanColumnWidths() {
       colgroup.innerHTML = '';
       maxWidths.forEach((w) => {
         const col = document.createElement('col');
-        col.style.width = `${Math.ceil(w)}px`;
+        col.style.setProperty('--col-width', `${Math.ceil(w)}px`);
         colgroup.appendChild(col);
       });
     });
@@ -457,13 +460,12 @@ function openActivityForm(activity, duplicate = false) {
   document.getElementById('activity-modal').hidden = false;
 }
 
-// Same Log/Log More toggle logWorkout's own button uses (strength-plan.js) —
-// "Log More" once anything is already in today's workout, regardless of
-// whether it's this particular activity, since that's the button it stands in for.
+// Always "Log"; the hover says whether today's workout already has lines, as
+// logWorkout's own button does (strength-plan.js).
 function updateActivityLogButtonLabel() {
   const btn = document.getElementById('activity-log-btn');
   const hasToday = loggedWorkoutQuantities().size > 0;
-  btn.textContent = hasToday ? 'Log More' : 'Log';
+  btn.textContent = 'Log';
   btn.title = hasToday
     ? "Add this activity to today's workout"
     : "Log this activity as today's workout";
@@ -500,6 +502,8 @@ function logActivityFromForm() {
   }
 
   const line = `${workoutNoteQuantityForForm(activityFieldValue('unit'), amount)} ${name}`;
+  // Set before the close, so this form hands its history entry to the day's.
+  routeRecordEdit('physique', todayPhysiqueRouteStep());
   closeActivityForm();
   applyWorkoutLines([line]);
 }

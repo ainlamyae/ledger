@@ -171,7 +171,7 @@ function renderTodayGlanceCards(entries) {
   setTodayGlanceTile('today-protein', floorG(protein), formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand, null, proteinOverBand);
   setTodayGlanceTile('today-fiber', floorG(fiber), formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand, null, fiberOverBand);
   setTodayGlanceTile('today-fat', floorG(fat), formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand, null, fatOverBand);
-  setTodayGlanceTile('today-carb', floorG(carb), formatProteinTargetBand(carbBand), 'g', carbInBand, null, false, carbUnderBand ? BODY_MASS_UNSCORED_COLOR : null);
+  setTodayGlanceTile('today-carb', floorG(carb), formatProteinTargetBand(carbBand), 'g', carbInBand, null, false, carbUnderBand ? chartColor('--chart-neutral') : null);
   setTodayGlanceTile('today-sleep-duration', sleepHours, sleepTarget, 'hr', null, null, false, sleepHours !== null ? sleepStatusColor(sleepHours, sleepTarget) : null);
   const windowText = sleepBedMin !== null && sleepWakeMin !== null
     ? `${formatClockTime24(sleepBedMin)}-${formatClockTime24(sleepWakeMin)}`
@@ -350,7 +350,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const deprivationEl = document.getElementById('today-status-deprivation-value');
   const deprivationText = deprivationKcal !== null ? `${deprivationKcal} / 0 kcal` : '—';
   deprivationEl.textContent = privacyMode ? maskDigits(deprivationText) : deprivationText;
-  deprivationEl.style.color = deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : '';
+  setGradientColor(deprivationEl, deprivationKcal !== null ? sleepDeprivationDotColor(deprivationKcal) : null);
 
   const balanceEl = document.getElementById('today-status-balance-value');
   balanceEl.classList.remove('income', 'income-high', 'expense');
@@ -380,6 +380,14 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   document.getElementById('today-status-deltam-value').textContent = privacyMode ? maskDigits(dmText) : dmText;
 }
 
+// A value painted along a gradient (Sleep, Deprivation): the colour goes to CSS as
+// --gradient-color (.gradient-value); null clears it.
+function setGradientColor(el, color) {
+  el.classList.toggle('gradient-value', color !== null);
+  if (color !== null) el.style.setProperty('--gradient-color', color);
+  else el.style.removeProperty('--gradient-color');
+}
+
 // `target` is a number, or a preformatted string for Protein's band — both interpolate
 // and mask alike. `note` restates it in a second unit ("(394 kcal)"), inside the same
 // string rather than its own element, so the line reads at one size and masks as one.
@@ -390,13 +398,13 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
 function setTodayGlanceTile(idPrefix, value, target, unit, isGood, note = null, isHigh = false, colorOverride = null, separator = '/') {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'income-high', 'expense');
-  el.style.color = '';
+  setGradientColor(el, null);
 
   const text = `${value !== null ? value : '—'} ${separator} ${target} ${unit}${note !== null ? ` (${note})` : ''}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
   if (value === null) return;
   if (colorOverride !== null) {
-    el.style.color = colorOverride;
+    setGradientColor(el, colorOverride);
   } else {
     el.classList.add(isGood ? (isHigh ? 'income-high' : 'income') : 'expense');
   }
@@ -463,7 +471,6 @@ let wellnessBodyMassChart = null;
 
 // For a bar that can't be scored — the first reading, or a stall too short to call.
 // Green would claim progress that isn't measured; red, a setback that isn't either.
-const BODY_MASS_UNSCORED_COLOR = '#9ca3af';
 
 // One flat reading is scale noise, not a plateau.
 const BODY_MASS_STALL_RED_AFTER_DAYS = 2;
@@ -720,7 +727,7 @@ function renderWellnessBodyMassChart(entries) {
     if (!byDate.has(d)) {
       // An empty slot, not a zero: 0 kg is impossible and would drag the axis to it.
       values.push(null);
-      barColors.push(BODY_MASS_UNSCORED_COLOR);
+      barColors.push(chartColor('--chart-neutral'));
       return;
     }
 
@@ -739,7 +746,7 @@ function renderWellnessBodyMassChart(entries) {
     detailByDate.set(d, { delta, fatKcal, bmi, smoothedChangeGPerDay });
 
     values.push(kg);
-    barColors.push(progress === null ? BODY_MASS_UNSCORED_COLOR : (progress ? '#16a34a' : '#dc2626'));
+    barColors.push(progress === null ? chartColor('--chart-neutral') : (progress ? chartColor('--chart-good') : chartColor('--chart-bad')));
     previousKg = kg;
   });
 
@@ -754,12 +761,12 @@ function renderWellnessBodyMassChart(entries) {
   // it belongs to is still trending the right way overall — gray it out rather than
   // calling it a miss. Stall-days are untouched: their red already means something else.
   dates.forEach((d, i) => {
-    if (barColors[i] !== '#dc2626') return;
+    if (barColors[i] !== chartColor('--chart-bad')) return;
     const delta = detailByDate.get(d)?.delta;
     if (!delta) return;
     const slope = slopePerWeek[i];
     if (slope === null || slope === undefined) return;
-    if ((slope < 0) === targetIsDownward) barColors[i] = BODY_MASS_UNSCORED_COLOR;
+    if ((slope < 0) === targetIsDownward) barColors[i] = chartColor('--chart-neutral');
   });
 
   // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
@@ -812,7 +819,7 @@ function renderWellnessBodyMassChart(entries) {
             type: 'line',
             label: 'Glycogen + Water Swing',
             data: zoneLowerSeries,
-            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+            backgroundColor: chartColor('--chart-warn', 0.15),
             borderWidth: 0,
             pointRadius: 0,
             pointHitRadius: 0,
@@ -831,7 +838,7 @@ function renderWellnessBodyMassChart(entries) {
               if (c === undefined || trend === null || trend === undefined) return null;
               return Math.min(trend, c - swingKg);
             }),
-            backgroundColor: 'rgba(220, 38, 38, 0.45)',
+            backgroundColor: chartColor('--chart-bad', 0.45),
             borderWidth: 0,
             pointRadius: 0,
             pointHitRadius: 0,
@@ -845,7 +852,7 @@ function renderWellnessBodyMassChart(entries) {
             type: 'line',
             label: 'Calorie-Implied Trajectory',
             data: calorieTrendSeries,
-            borderColor: '#9ca3af',
+            borderColor: chartColor('--chart-neutral'),
             borderWidth: 2,
             fill: false,
             tension: 0,
@@ -1038,9 +1045,9 @@ function renderWellnessCaloriesChart(entries) {
   // active equation's plain BMR, which the bar colour grades against.
   const BMR_CAPS = [
     { key: 'BMR_mif', color: undefined },
-    { key: 'BMR_kat', color: KATCH_BMR_COLOR },
-    { key: 'BMR_cal', color: CALIBRATED_BMR_COLOR },
-    { key: 'BMR_adp', color: WEEKLY_AVG_COLOR },
+    { key: 'BMR_kat', color: chartColor('--chart-orange') },
+    { key: 'BMR_cal', color: chartColor('--chart-cyan') },
+    { key: 'BMR_adp', color: chartColor('--chart-purple') },
   ];
   const bmrByKey = Object.fromEntries(BMR_CAPS.map(({ key }) => [key, new Map()]));
   const restingKcalByDate = new Map();
@@ -1065,7 +1072,7 @@ function renderWellnessCaloriesChart(entries) {
   // to follow, so the wash only ever communicated a fixed limit the chart doesn't have.
   // An unlogged day plots as 0 and takes the green — a missing log, not a fast, and
   // invisible at zero height anyway rather than the worst day on the chart under a floor.
-  const CALORIE_NEAR_TARGET_COLOR = '#9ca3af';
+  const CALORIE_NEAR_TARGET_COLOR = chartColor('--chart-neutral');
   const values = dates.map((d) => byDate.get(d) || 0);
   // On a "Max" target, red beyond it isn't flat — green at the target itself sliding
   // to red at that day's own Basal Metabolic Rate (restingKcalByDate, above), since
@@ -1075,16 +1082,16 @@ function renderWellnessCaloriesChart(entries) {
   // it keeps the old flat near/missed split, as does a Max day BMR can't be priced
   // for yet (no profile, or no body mass logged).
   const barColors = dates.map((d, i) => {
-    if (!byDate.has(d)) return '#16a34a';
+    if (!byDate.has(d)) return chartColor('--chart-good');
     const value = values[i];
     const dt = dayTarget(i);
-    if (withinCalorieTarget(value, dt)) return '#16a34a';
+    if (withinCalorieTarget(value, dt)) return chartColor('--chart-good');
     const bmr = target.isMax ? restingKcalByDate.get(d) : undefined;
     if (bmr === undefined || bmr === null || bmr <= dt.kcal) {
-      return calorieTargetScore(value, dt) === 'near' ? CALORIE_NEAR_TARGET_COLOR : '#dc2626';
+      return calorieTargetScore(value, dt) === 'near' ? CALORIE_NEAR_TARGET_COLOR : chartColor('--chart-bad');
     }
-    if (value >= bmr) return '#dc2626';
-    return lerpHex('#16a34a', '#dc2626', (value - dt.kcal) / (bmr - dt.kcal));
+    if (value >= bmr) return chartColor('--chart-bad');
+    return lerpHex(chartColor('--chart-good'), chartColor('--chart-bad'), (value - dt.kcal) / (bmr - dt.kcal));
   });
 
   // Fit off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins don't
@@ -1100,7 +1107,7 @@ function renderWellnessCaloriesChart(entries) {
   // miss. Only a 'missed' bar moves: 'met' is already green and 'near' is already this
   // same gray.
   barColors.forEach((color, i) => {
-    if (color !== '#dc2626') return;
+    if (color !== chartColor('--chart-bad')) return;
     const avg = weeklyAvg[i];
     if (avg === null || avg === undefined) return;
     if (withinCalorieTarget(avg, dayTarget(i))) barColors[i] = CALORIE_NEAR_TARGET_COLOR;
@@ -1259,8 +1266,8 @@ function sleepStatusColor(durationHr, targetHr) {
   const minHr = targetHr / 2;
   const ratio = Math.min(1, Math.max(0, (durationHr - minHr) / (targetHr - minHr)));
   return ratio < 0.5
-    ? lerpHex('#dc2626', '#f59e0b', ratio / 0.5)
-    : lerpHex('#f59e0b', '#16a34a', (ratio - 0.5) / 0.5);
+    ? lerpHex(chartColor('--chart-bad'), chartColor('--chart-warn'), ratio / 0.5)
+    : lerpHex(chartColor('--chart-warn'), chartColor('--chart-good'), (ratio - 0.5) / 0.5);
 }
 
 // Green at 0 kcal, sliding to red as the Deprivation Effect itself grows — driven by the
@@ -1273,9 +1280,9 @@ function sleepStatusColor(durationHr, targetHr) {
 const SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL = 60;
 
 function sleepDeprivationDotColor(deprivationEffectKcal) {
-  if (deprivationEffectKcal === null || deprivationEffectKcal === undefined) return '#16a34a';
+  if (deprivationEffectKcal === null || deprivationEffectKcal === undefined) return chartColor('--chart-good');
   const ratio = Math.min(1, Math.max(0, deprivationEffectKcal / SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL));
-  return lerpHex('#16a34a', '#dc2626', ratio);
+  return lerpHex(chartColor('--chart-good'), chartColor('--chart-bad'), ratio);
 }
 
 function renderWellnessSleepChart(entries) {
@@ -1502,21 +1509,20 @@ function shortActivityLabel(description) {
 // alphabetical position lands on — a generated one slides out from under them the
 // moment a new description is logged. Keyed on the SHORTENED label.
 const PINNED_ACTIVITY_COLORS = new Map([
-  ['neat', '#3b82f6'],
-  ['strength training', '#16a34a'],
+  ['neat', '--chart-blue'],
+  ['strength training', '--chart-good'],
 ]);
 
 // Everything else gets a generated hue from the colour circle MINUS a band around each
 // pinned one, otherwise a third activity lands on a near-identical blue and the pinning
 // buys nothing. The surviving arcs are measured end to end and the hues spread evenly
 // along that total, so they stay as far apart as the reduced range allows.
-const RESERVED_ACTIVITY_HUES = [142, 217]; // the two pinned colors above
 const RESERVED_ACTIVITY_HUE_MARGIN = 25;
 
 function unreservedActivityHues(count) {
   const allowed = [];
   let cursor = 0;
-  RESERVED_ACTIVITY_HUES
+  [...PINNED_ACTIVITY_COLORS.values()].map((token) => colorHue(chartColor(token)))
     .map((h) => [h - RESERVED_ACTIVITY_HUE_MARGIN, h + RESERVED_ACTIVITY_HUE_MARGIN])
     .sort((a, b) => a[0] - b[0])
     .forEach(([from, to]) => {
@@ -1568,11 +1574,12 @@ function renderWellnessActivityChart(entries) {
     caloriesByDate.set(e.date, (caloriesByDate.get(e.date) || 0) + kcal);
   });
 
-  const pinnedColorFor = (d) => PINNED_ACTIVITY_COLORS.get(shortActivityLabel(d).toLowerCase()) ?? null;
+  const pinned = (d) => PINNED_ACTIVITY_COLORS.get(shortActivityLabel(d).toLowerCase());
+  const pinnedColorFor = (d) => (pinned(d) ? chartColor(pinned(d)) : null);
   const generatedHues = unreservedActivityHues(descriptions.filter((d) => pinnedColorFor(d) === null).length);
   let nextGeneratedHue = 0;
   const descriptionColors = descriptions.map((d) => pinnedColorFor(d)
-    ?? `hsl(${generatedHues[nextGeneratedHue++]}, 65%, 55%)`);
+    ?? seriesColor(generatedHues[nextGeneratedHue++]));
 
   // Everything plots NEGATIVE so the chart hangs below the axis: minutes and calories
   // are both what a day spent, not what it accumulated. Only the geometry is flipped —
@@ -1595,10 +1602,10 @@ function renderWellnessActivityChart(entries) {
   // a body mass there's no target, so the dot stays neutral violet.
   const dotColor = (date, kcal) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
-    if (kcal === null || bodyMassKg === null) return '#7c3aed';
+    if (kcal === null || bodyMassKg === null) return chartColor('--chart-purple');
     const target = getActivityTargetKcal(bodyMassKg);
-    if (kcal >= target) return '#16a34a';
-    return target - kcal <= target * ACTIVITY_NEAR_TARGET_FRACTION ? '#9ca3af' : '#dc2626';
+    if (kcal >= target) return chartColor('--chart-good');
+    return target - kcal <= target * ACTIVITY_NEAR_TARGET_FRACTION ? chartColor('--chart-neutral') : chartColor('--chart-bad');
   };
 
   // Dots, not a connected line: each day's burn is independent, and a line would bridge
@@ -1613,7 +1620,7 @@ function renderWellnessActivityChart(entries) {
     pointRadius: 5,
     pointHoverRadius: 7,
     pointBackgroundColor: dates.map((date, i) => dotColor(date, caloriesData[i])),
-    pointBorderColor: '#fff',
+    pointBorderColor: chartColor('--chart-point-border'),
     pointBorderWidth: 1.5,
     order: 0,
   };
@@ -1778,11 +1785,11 @@ function renderWellnessProteinChart(entries) {
   // band itself — still a day you hit your protein, just past the point where more
   // buys anything, and read as a success rather than the neutral gray the other charts
   // give their near-miss. An unlogged day takes the plain green.
-  const PROTEIN_OVER_BAND_COLOR = '#166534';
+  const PROTEIN_OVER_BAND_COLOR = chartColor('--chart-good-high');
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
-    if (!byDate.has(d) || withinProteinBand(values[i], band)) return '#16a34a';
-    return values[i] > band.max ? PROTEIN_OVER_BAND_COLOR : '#dc2626';
+    if (!byDate.has(d) || withinProteinBand(values[i], band)) return chartColor('--chart-good');
+    return values[i] > band.max ? PROTEIN_OVER_BAND_COLOR : chartColor('--chart-bad');
   });
 
   // Zero-based and auto-topped, so the span is whatever is tallest — a bar or the band.
@@ -1791,7 +1798,7 @@ function renderWellnessProteinChart(entries) {
 
   const targetDatasets = band.max > band.min
     ? [
-      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.max, { fill: '+1', backgroundColor: chartColor('--chart-good', 0.1) }),
       bandFill(band.min),
       capFor(band.max, `${band.max} g upper target`),
       capFor(band.min, `${band.min} g target floor`),
@@ -1905,11 +1912,11 @@ function renderWellnessFiberChart(entries) {
 
   // Same three-way split as Protein Intake: under the floor is red, in the band (or
   // unlogged) is green, and past the ceiling is a darker green — still a hit, not a miss.
-  const FIBER_OVER_BAND_COLOR = '#166534';
+  const FIBER_OVER_BAND_COLOR = chartColor('--chart-good-high');
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
-    if (!byDate.has(d) || withinFiberBand(values[i], band)) return '#16a34a';
-    return values[i] > band.max ? FIBER_OVER_BAND_COLOR : '#dc2626';
+    if (!byDate.has(d) || withinFiberBand(values[i], band)) return chartColor('--chart-good');
+    return values[i] > band.max ? FIBER_OVER_BAND_COLOR : chartColor('--chart-bad');
   });
 
   const capHalf = targetCapHalf(Math.max(band.max, ...values, 1));
@@ -1917,7 +1924,7 @@ function renderWellnessFiberChart(entries) {
 
   const targetDatasets = band.max > band.min
     ? [
-      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.max, { fill: '+1', backgroundColor: chartColor('--chart-good', 0.1) }),
       bandFill(band.min),
       capFor(band.max, `${band.max} g upper target`),
       capFor(band.min, `${band.min} g target floor`),
@@ -2012,11 +2019,11 @@ function renderWellnessFatChart(entries) {
 
   // Under the floor is red, in the band (or unlogged) is green. Past the ceiling is a
   // lighter green — still inside the AMDR's own upper bound, just not the plain in-band hit.
-  const FAT_OVER_BAND_COLOR = '#4ade80';
+  const FAT_OVER_BAND_COLOR = chartColor('--chart-good-light');
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
-    if (!byDate.has(d) || withinFatBand(values[i], band)) return '#16a34a';
-    return values[i] > band.max ? FAT_OVER_BAND_COLOR : '#dc2626';
+    if (!byDate.has(d) || withinFatBand(values[i], band)) return chartColor('--chart-good');
+    return values[i] > band.max ? FAT_OVER_BAND_COLOR : chartColor('--chart-bad');
   });
 
   // Same shape as Protein/Fiber Intake's bandFill — two flat line datasets whose only job
@@ -2051,7 +2058,7 @@ function renderWellnessFatChart(entries) {
 
   const targetDatasets = band.max > band.min
     ? [
-      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.max, { fill: '+1', backgroundColor: chartColor('--chart-good', 0.1) }),
       bandFill(band.min),
       targetLine(band.max, `${band.max} g upper target`),
       targetLine(band.min, `${band.min} g target floor`),
@@ -2128,7 +2135,7 @@ function renderWellnessFatChart(entries) {
 
 // Fat's chart just above, same dashed-band-edge shape but the opposite severity read:
 // too little carbohydrate isn't a deficiency the way too little fiber or protein is, so
-// under the floor is merely unscored grey (BODY_MASS_UNSCORED_COLOR's own shade) rather
+// under the floor is merely unscored grey (chartColor('--chart-neutral')'s own shade) rather
 // than a red miss — it's over the ceiling that's flagged, since that's the end actually
 // linked to the bloating/water-retention complaint this band exists to catch. Read from
 // the same Physique-day Carbohydrate figure (carbG) physiqueAsWellnessEntries adds beside
@@ -2145,11 +2152,11 @@ function renderWellnessCarbChart(entries) {
   const byDate = new Map();
   carbEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.carbG));
 
-  const CARB_UNDER_BAND_COLOR = '#9ca3af';
+  const CARB_UNDER_BAND_COLOR = chartColor('--chart-neutral');
   const values = dates.map((d) => byDate.get(d) || 0);
   const barColors = dates.map((d, i) => {
-    if (!byDate.has(d) || withinCarbBand(values[i], band)) return '#16a34a';
-    return values[i] > band.max ? '#dc2626' : CARB_UNDER_BAND_COLOR;
+    if (!byDate.has(d) || withinCarbBand(values[i], band)) return chartColor('--chart-good');
+    return values[i] > band.max ? chartColor('--chart-bad') : CARB_UNDER_BAND_COLOR;
   });
 
   // Same shape as Fiber/Fat Intake's bandFill — two flat line datasets whose only job
@@ -2184,7 +2191,7 @@ function renderWellnessCarbChart(entries) {
 
   const targetDatasets = band.max > band.min
     ? [
-      bandFill(band.max, { fill: '+1', backgroundColor: 'rgba(22, 163, 74, 0.10)' }),
+      bandFill(band.max, { fill: '+1', backgroundColor: chartColor('--chart-good', 0.1) }),
       bandFill(band.min),
       targetLine(band.max, `${band.max} g upper target`),
       targetLine(band.min, `${band.min} g target floor`),
@@ -2269,7 +2276,6 @@ function renderWellnessProjectionChart(entries) {
   const meterRemaining = document.getElementById('body-mass-progress-meter-remaining');
   const meterTarget = document.getElementById('body-mass-progress-meter-target');
   const timeWrap = document.getElementById('time-progress-meter');
-  const timeFill = document.getElementById('time-progress-meter-fill');
   const timeElapsed = document.getElementById('time-progress-meter-elapsed');
   const timeRemaining = document.getElementById('time-progress-meter-remaining');
   const timeEta = document.getElementById('time-progress-meter-eta');
@@ -2280,7 +2286,7 @@ function renderWellnessProjectionChart(entries) {
   // isn't enough logged to measure progress). Hiding it until the data arrived made it
   // pop in after everything else and shift the page under it.
   meterWrap.style.removeProperty('--fill-pct');
-  meterFill.style.width = '0%';
+  meterWrap.style.setProperty('--meter-pct', '0');
   meterFill.classList.remove('danger');
   meterCallout.textContent = '';
   meterCallout.classList.remove('danger');
@@ -2289,7 +2295,7 @@ function renderWellnessProjectionChart(entries) {
   meterTarget.textContent = '';
   meterRemaining.classList.remove('danger');
   timeWrap.style.removeProperty('--fill-pct');
-  timeFill.style.width = '0%';
+  timeWrap.style.setProperty('--meter-pct', '0');
   timeElapsed.textContent = '—';
   timeRemaining.textContent = '—';
   timeEta.textContent = '';
@@ -2320,13 +2326,10 @@ function renderWellnessProjectionChart(entries) {
     const remainingKg = Math.round(Math.abs(lastBodyMass - bodyMassTarget) * 10) / 10;
     const isWrongDirection = proj.status === 'wrong-direction';
 
-    meterFill.style.width = `${pct}%`;
+    meterWrap.style.setProperty('--meter-pct', `${pct}`);
     meterFill.classList.toggle('danger', isWrongDirection);
     if (!isWrongDirection) meterWrap.style.setProperty('--fill-pct', `${Math.round(pct)}`);
 
-    // Same edge the fill stops at, so the bubble reads as "you are here" rather
-    // than a second, disagreeing marker.
-    meterCallout.style.left = `${pct}%`;
     const currentText = `${lastBodyMass} kg`;
     meterCallout.textContent = privacyMode ? maskDigits(currentText) : currentText;
     meterCallout.classList.toggle('danger', isWrongDirection);
@@ -2387,7 +2390,7 @@ function renderWellnessProjectionChart(entries) {
 
     if (totalDays > 0) {
       const timePct = Math.max(0, Math.min(100, (daysElapsed / totalDays) * 100));
-      timeFill.style.width = `${timePct}%`;
+      timeWrap.style.setProperty('--meter-pct', `${timePct}`);
       timeWrap.style.setProperty('--fill-pct', `${Math.round(timePct)}`);
 
       const elapsedText = `${daysElapsed} ${daysElapsed === 1 ? 'day' : 'days'}`;
@@ -2557,7 +2560,7 @@ function renderWellnessProjectionChart(entries) {
         }),
         // The zone reads as "normal noise", not a target or a warning, so it takes the
         // app's neutral highlight rather than either of those colours.
-        backgroundColor: 'rgba(245, 158, 11, 0.15)',
+        backgroundColor: chartColor('--chart-warn', 0.15),
         borderWidth: 0,
         pointRadius: 0,
         tension: 0,
@@ -2584,7 +2587,7 @@ function renderWellnessProjectionChart(entries) {
         }),
         // A real warning, so it reads noticeably stronger than the yellow zone's own
         // 0.15 neutral tint rather than matching it.
-        backgroundColor: 'rgba(220, 38, 38, 0.45)',
+        backgroundColor: chartColor('--chart-bad', 0.45),
         borderWidth: 0,
         pointRadius: 0,
         tension: 0,
@@ -2598,7 +2601,7 @@ function renderWellnessProjectionChart(entries) {
     {
       label: 'State Trend & Forecast',
       data: allLabels.map((d) => ({ x: dayOffset(d), y: trendMap.get(d) ?? null })),
-      borderColor: '#16a34a',
+      borderColor: chartColor('--chart-good'),
       borderWidth: 2,
       fill: false,
       tension: 0.3,
@@ -2613,7 +2616,7 @@ function renderWellnessProjectionChart(entries) {
         const y = calorieTrendMap.get(d);
         return { x: dayOffset(d), y: y === undefined ? null : y };
       }),
-      borderColor: '#9ca3af',
+      borderColor: chartColor('--chart-neutral'),
       borderWidth: 2,
       fill: false,
       tension: 0,
@@ -2631,7 +2634,7 @@ function renderWellnessProjectionChart(entries) {
         else if (d > lastDate) y = projMap.get(d) ?? null;
         return { x: dayOffset(d), y };
       }),
-      borderColor: '#6366f1',
+      borderColor: chartColor('--chart-indigo'),
       // The app's one dash pattern, at the width of the trend line it continues. At
       // Chart.js's default width 3 the forecast was the heaviest line on the chart
       // despite being the least certain thing on it.
@@ -2841,12 +2844,12 @@ let wellnessEnergyBalanceChart = null;
 // means no band to compare against, so it falls back to the sign alone.
 function energyBalanceColor(balance, isCut, target, weeklyAvg) {
   const towardTarget = isCut ? balance < 0 : balance > 0;
-  if (!towardTarget) return '#dc2626';
-  if (target === null) return '#16a34a';
-  if (isCut ? balance <= target : balance >= target) return '#166534';
+  if (!towardTarget) return chartColor('--chart-bad');
+  if (target === null) return chartColor('--chart-good');
+  if (isCut ? balance <= target : balance >= target) return chartColor('--chart-good-high');
   const weekOnTarget = weeklyAvg !== null && weeklyAvg !== undefined
     && (isCut ? weeklyAvg <= target : weeklyAvg >= target);
-  return weekOnTarget ? '#16a34a' : '#dc2626';
+  return weekOnTarget ? chartColor('--chart-good') : chartColor('--chart-bad');
 }
 
 // The daily deficit the weekly rate implies — the playground's D, from the same

@@ -341,7 +341,7 @@ async function loadReport() {
       const lifelongB = Math.abs(typeBreakdown[b.name]?.total?.lifelong || 0);
       return lifelongB - lifelongA;
     })
-    .map((c, i, arr) => ({ ...c, color: `hsl(${Math.round((i * 360) / arr.length)}, 65%, 55%)` }));
+    .map((c, i, arr) => ({ ...c, color: seriesColor(Math.round((i * 360) / arr.length)) }));
 
   const savingsTrend = monthlyRows
     .slice(0, activeIndex + 1)
@@ -736,7 +736,7 @@ function setupPanelToggles() {
     heading.prepend(icon);
 
     // Staggered fade/slide-in the first time the dashboard becomes visible.
-    panel.style.animationDelay = `${i * 70}ms`;
+    panel.style.setProperty('--enter-index', i);
     panel.classList.add('panel-enter');
 
     heading.setAttribute('role', 'button');
@@ -870,46 +870,6 @@ function setupWidgetsToggle() {
   });
 }
 
-// A phone screen now has a fixed bar at both the top (header) and the bottom
-// (.nav, styles.css's phone breakpoint) — sliding the top one out of view on
-// the way down the page, and back in on the way up, gives the content the
-// screen space back instead of two bars permanently claiming it. Desktop
-// keeps the header put: isMobile() is read on every scroll rather than once,
-// so resizing across the breakpoint mid-session can't leave it stuck hidden.
-function setupHeaderAutoHide() {
-  const header = document.querySelector('header');
-  const dropdown = document.getElementById('account-menu-dropdown');
-  const isMobile = () => window.matchMedia('(max-width: 640px)').matches;
-
-  let lastY = window.scrollY;
-  let ticking = false;
-
-  function update() {
-    ticking = false;
-    const y = window.scrollY;
-
-    // Never hide it near the top (nothing gained, and it'd flicker in and out
-    // right at the scroll boundary), or while its own account menu is open —
-    // that menu is the header's child, so hiding the header would yank an
-    // open dropdown off-screen out from under the user.
-    if (!isMobile() || !dropdown.hidden || y < header.offsetHeight) {
-      header.classList.remove('header-hidden');
-    } else if (y > lastY) {
-      header.classList.add('header-hidden');
-    } else if (y < lastY) {
-      header.classList.remove('header-hidden');
-    }
-    lastY = y;
-  }
-
-  window.addEventListener('scroll', () => {
-    if (!ticking) {
-      ticking = true;
-      requestAnimationFrame(update);
-    }
-  }, { passive: true });
-}
-
 function setupScrollSpy() {
   const navLinks = [...document.querySelectorAll('#main-nav a')];
 
@@ -1012,6 +972,14 @@ function setupAuthGatedActions() {
   }, true);
 }
 
+// The view the address names: block toggles, then the tiles and breadcrumb the
+// hub/page views show (page-nav.js), then the router reading the address.
+function routeDashboard() {
+  setupPanelToggles();
+  initPageNav();
+  initRouter();
+}
+
 function bootDashboard() {
   // Belt-and-suspenders alongside the head script's history.scrollRestoration
   // = 'manual' — guarantees every load starts at the top even if the browser
@@ -1036,12 +1004,8 @@ function bootDashboard() {
   initFinancialInsight();
   initWorkoutPlan();
   setupScrollSpy();
-  setupHeaderAutoHide();
-  setupPanelToggles();
-  // Before the router reads the address: it builds the tiles and breadcrumb the
-  // hub/page views show (page-nav.js).
-  initPageNav();
-  initRouter();
+  // A section page has routed already (routeDashboard, before this boot step).
+  if (!window.ledgerSectionPage) routeDashboard();
   setupThemeToggle();
   setupPrivacyToggle();
   setupWidgetsToggle();
@@ -1061,6 +1025,9 @@ function bootDashboard() {
 // the chart CDN scripts, which have nothing to do with the dashboard shell or
 // the sign-in check — that wait was the whole reason the sign-in banner used
 // to take seconds to appear after the (already-visible) shell.
-if (window.ledgerSectionPage) window.ledgerSectionPage.onBoot(bootDashboard);
+if (window.ledgerSectionPage) {
+  window.ledgerSectionPage.onRoute(routeDashboard);
+  window.ledgerSectionPage.onBoot(bootDashboard);
+}
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootDashboard);
 else bootDashboard();

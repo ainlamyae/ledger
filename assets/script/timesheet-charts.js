@@ -72,8 +72,8 @@ function renderDistributionChart(canvasId, dist) {
     data: {
       labels: dist.labels,
       datasets: [
-        { type: 'bar', label: 'Days', data: dist.percentages, counts: dist.counts, backgroundColor: 'rgba(59, 130, 246, .5)', order: 2, maxBarThickness: WORK_PATTERN_BAR_THICKNESS },
-        { type: 'line', label: 'Normal Distribution', data: dist.curve, borderColor: '#dc2626', pointRadius: 0, tension: .4, order: 1 },
+        { type: 'bar', label: 'Days', data: dist.percentages, counts: dist.counts, backgroundColor: chartColor('--chart-blue', 0.5), order: 2, maxBarThickness: WORK_PATTERN_BAR_THICKNESS },
+        { type: 'line', label: 'Normal Distribution', data: dist.curve, borderColor: chartColor('--chart-bad'), pointRadius: 0, tension: .4, order: 1 },
       ],
     },
     options: {
@@ -220,7 +220,7 @@ function renderTimesheetDailyAverageChart(entries) {
     type: 'bar',
     data: {
       labels: periods.map((p) => p.label),
-      datasets: [{ label: 'Avg Hours/Day', data: periods.map((p) => averageDailyHours(entries, p.days)), backgroundColor: '#3b82f6', maxBarThickness: WORK_PATTERN_BAR_THICKNESS }],
+      datasets: [{ label: 'Avg Hours/Day', data: periods.map((p) => averageDailyHours(entries, p.days)), backgroundColor: chartColor('--chart-blue'), maxBarThickness: WORK_PATTERN_BAR_THICKNESS }],
     },
     options: {
       responsive: true,

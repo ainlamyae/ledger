@@ -2,6 +2,7 @@ const TRANSACTIONS_RANGE = `${CONFIG.SHEETS.TRANSACTIONS}!A2:F`;
 const PAGE_SIZE = 25;
 
 let allTransactions = [];
+let editTransaction = null;
 let accountOptions = [];
 let categoryOptions = [];
 let transactionsSheetId = null;
@@ -43,6 +44,15 @@ async function initTransactions(forceRefresh = false) {
   if (!listenersAttached) {
     listenersAttached = true;
     document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionForm());
+    editTransaction = routedRowEdit('transaction', () => allTransactions, (t) => `${t.date} ${t.payee}`, (t) => openTransactionForm(t), {
+      duplicate: (t) => openTransactionForm(t, true),
+    });
+    // finance/transaction/bulk-edit/ while rows are ticked.
+    registerRecordRoute('transaction', (slug, sub) => {
+      if (slug !== 'bulk-edit' || sub || !selectedRows.size) return null;
+      openBulkEditForm();
+      return 'Bulk Edit';
+    });
     document.getElementById('tx-cancel-btn').addEventListener('click', closeTransactionForm);
     document.getElementById('tx-tax-btn').addEventListener('click', applyTaxToAmount);
     onFormSubmit('tx-form', submitTransactionForm);
@@ -84,7 +94,10 @@ function setupBulkActions() {
   });
 
   onAsyncClick('tx-bulk-delete-btn', bulkDeleteTransactions);
-  document.getElementById('tx-bulk-edit-btn').addEventListener('click', openBulkEditForm);
+  document.getElementById('tx-bulk-edit-btn').addEventListener('click', () => {
+    routeRecordEdit('transaction', { slug: 'bulk-edit', label: 'Bulk Edit' });
+    openBulkEditForm();
+  });
   document.getElementById('tx-bulk-edit-cancel-btn').addEventListener('click', closeBulkEditForm);
   onFormSubmit('tx-bulk-edit-form', submitBulkEditForm);
 }
@@ -307,8 +320,8 @@ function renderTransactions() {
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTransactionForm(t) }),
-      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openTransactionForm(t, true) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editTransaction(t) }),
+      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => editTransaction(t, 'duplicate') }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTransaction(t.row) }),
     );
 

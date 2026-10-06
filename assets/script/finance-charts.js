@@ -228,7 +228,6 @@ const TYPE_BREAKDOWN_PERIODS = [
   { key: 'lastYear', suffix: 'lastyear', label: 'Last Year' },
   { key: 'lifelong', suffix: 'lifelong', label: 'Lifelong' },
 ];
-const TYPE_BREAKDOWN_OTHER_COLOR = '#9ca3af';
 
 const typeBreakdownCharts = {};
 
@@ -303,13 +302,13 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
     // Sorted once, so the legend and all four donuts share slice order and colours.
     const types = [...data.types].sort((a, b) => Math.abs(b.lifelong) - Math.abs(a.lifelong));
-    const colors = types.map((_, i) => `hsl(${Math.round((i * 360) / types.length)}, 65%, 55%)`);
+    const colors = types.map((_, i) => seriesColor(Math.round((i * 360) / types.length)));
 
     const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     renderCategoryLegend(`type-breakdown-${slug}-legend`, [
       ...types.map((t, i) => ({ name: t.name, color: colors[i] })),
-      { name: 'Untyped', color: TYPE_BREAKDOWN_OTHER_COLOR },
+      { name: 'Untyped', color: chartColor('--chart-neutral') },
     ]);
 
     TYPE_BREAKDOWN_PERIODS.forEach(({ key, suffix }) => {
@@ -322,7 +321,7 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
       const labels = [...types.map((t) => t.name), 'Untyped'];
       const values = [...types.map((t) => t[key]), untyped];
-      const sliceColors = [...colors, TYPE_BREAKDOWN_OTHER_COLOR];
+      const sliceColors = [...colors, chartColor('--chart-neutral')];
 
       typeBreakdownCharts[canvasId] = upsertChart(typeBreakdownCharts[canvasId], ctx, {
         type: 'doughnut',
@@ -391,10 +390,10 @@ function renderAccountCompositionChart(accounts) {
   // The half-step offset pulls the hues off each other; the deeper, less saturated
   // band is what still tells the rings apart when the two counts differ enough for the
   // hues to realign anyway.
-  const TYPE_BAND = { offset: 0, saturation: 65, lightness: 55 };
-  const INSTITUTION_BAND = { offset: 0.5, saturation: 45, lightness: 42 };
+  const TYPE_BAND = { offset: 0 };
+  const INSTITUTION_BAND = { offset: 0.5, saturation: '--chart-ring-saturation', lightness: '--chart-ring-lightness' };
   const distinctColors = (count, band) => Array.from({ length: count }, (_, i) =>
-    `hsl(${Math.round(((i + band.offset) * 360) / count) % 360}, ${band.saturation}%, ${band.lightness}%)`);
+    seriesColor(Math.round(((i + band.offset) * 360) / count) % 360, band));
 
   // Both palettes and both legends are built from EVERY account, not from what's
   // currently shown: the hues are spaced by count, so recomputing them over a
@@ -543,8 +542,8 @@ function renderSavingsTrendChart(months) {
       datasets: [{
         label: 'Cumulative Savings',
         data: months.map((m) => m.cumulative),
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59, 130, 246, .1)',
+        borderColor: chartColor('--chart-blue'),
+        backgroundColor: chartColor('--chart-blue', 0.1),
         fill: true,
         tension: 0.4,
         pointRadius: 0,

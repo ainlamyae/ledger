@@ -2,6 +2,7 @@ const TRAVEL_RANGE = `'${CONFIG.SHEETS.TRAVEL}'!A2:H`;
 const TRAVEL_PAGE_SIZE = 25;
 
 let allTravel = [];
+let editTravel = null;
 let travelListenersAttached = false;
 let travelSort = { key: null, dir: 1 };
 let travelCurrentPage = 1;
@@ -18,6 +19,7 @@ async function initTravel(forceRefresh = false) {
     travelListenersAttached = true;
 
     document.getElementById('add-travel-btn').addEventListener('click', () => openTravelForm(null));
+    editTravel = routedRowEdit('travel', () => allTravel, (t) => `${t.date} ${t.countryCity}`, openTravelForm);
     document.getElementById('travel-cancel-btn').addEventListener('click', closeTravelForm);
     onFormSubmit('travel-form', submitTravelForm);
 
@@ -110,7 +112,7 @@ function renderTravelList() {
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openTravelForm(t) }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editTravel(t) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTravelEntry(t) }),
     );
     tr.appendChild(actionsCell);

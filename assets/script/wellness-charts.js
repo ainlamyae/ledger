@@ -187,16 +187,19 @@ function renderTodayGlanceCards(entries) {
 // Physical Activity / Sleep cards no longer carry mirror copies.
 function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalToday, sleepHoursToday) {
   const heightCm = getSetting('HEIGHT_CM', null);
-  const bodyMassKg = latestBodyMassKg(entries);
+  // m, m_avg, BMI and m_d as stored in today's Mass cell (physique.js), read rather
+  // than worked out; only a day saved before the column existed falls back to them.
+  const stored = storedMassAsOf(isoFromDate(new Date()));
+  const bodyMassKg = stored?.m ?? latestBodyMassKg(entries);
   const isCut = getCalorieTargetKind(entries) === 'max';
 
-  // m — the latest raw weigh-in (bodyMassKg, already computed above), against the same
+  // m — the latest raw body-mass reading (bodyMassKg, already computed above), against the same
   // healthy-mass target BMI uses. Shown for comparison only, same as the Formula
   // Playground's read-only m row: water and glycogen move this one day to day, which is
   // exactly why every plan figure below reads m̄ instead.
   const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
   // m̄, the L_p-day rolling average every plan figure reads; BMI below reads it too.
-  const mBar = planBodyMassKg(entries);
+  const mBar = stored?.m_avg ?? planBodyMassKg(entries);
   // The glycogen/water swing at the latest reading, beside the target (as on the
   // Progress card): a reading within it of the target is water, not a miss.
   const swingKg = glycogenSwingKg(bodyMassKg, heightCm, getSettingString('SEX', null));
@@ -217,7 +220,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // only height, so it survives a profile missing birth date or sex.
   const bmiEl = document.getElementById('today-status-bmi-value');
   bmiEl.classList.remove('income', 'expense');
-  const bmi = mBar !== null && heightCm !== null ? computeBmi(mBar, heightCm) : null;
+  const bmi = stored?.BMI ?? (mBar !== null && heightCm !== null ? computeBmi(mBar, heightCm) : null);
   const targetBmi = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
   const bmiText = bmi !== null && targetBmi !== null ? `${bmi} / ${targetBmi} kg/m²` : '—';
   bmiEl.textContent = privacyMode ? maskDigits(bmiText) : bmiText;
@@ -226,18 +229,21 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     bmiEl.classList.add(bmiGood ? 'income' : 'expense');
   }
 
-  // Δm (Changed Mass) — the Body Mass chart's figure for the latest weigh-in: the slope of
+  // Δm (Changed Mass) — the Body Mass chart's figure for the latest body-mass reading: the slope of
   // the same smoothed trend (computeBodyMassTrend over every reading), in g/day. Green when
   // it moves toward the target, red when away.
   const changedEl = document.getElementById('today-status-changed-mass-value');
   changedEl.classList.remove('income', 'expense');
-  const trendMap = computeBodyMassTrend(bodyMassByDateMap(
-    entries.filter((e) => e.category === 'Body Mass' && e.amount !== null),
-  ));
-  const trendDates = [...trendMap.keys()].sort();
-  const changedGPerDay = trendDates.length
-    ? computeBodyMassTrendSlopeGramsPerDay(trendMap).get(trendDates[trendDates.length - 1]) ?? null
-    : null;
+  let changedGPerDay = stored?.m_d ?? null;
+  if (changedGPerDay === null) {
+    const trendMap = computeBodyMassTrend(bodyMassByDateMap(
+      entries.filter((e) => e.category === 'Body Mass' && e.amount !== null),
+    ));
+    const trendDates = [...trendMap.keys()].sort();
+    changedGPerDay = trendDates.length
+      ? computeBodyMassTrendSlopeGramsPerDay(trendMap).get(trendDates[trendDates.length - 1]) ?? null
+      : null;
+  }
   // Against the desired rate: Tune's weekly fat loss Δm as g/day, signed the way the
   // Δm′ row below signs it (a loss is negative), so the pair compare directly.
   const desiredWeeklyLossKg = weeklyFatLossKgAt(planBodyMassKg(entries));
@@ -552,7 +558,7 @@ function glycogenSwingKg(bodyMassKg, heightCm, sex) {
   return computeGlycogenSwingKg(bodyMassKg, heightCm, sex);
 }
 
-// Saves the swing once, at the latest weigh-in, when the setting doesn't exist yet
+// Saves the swing once, at the latest body-mass reading, when the setting doesn't exist yet
 // (app.js, after Physique loads), so it's read rather than worked out from then on.
 async function seedGlycogenSwingSetting() {
   if (getSetting(GLYCOGEN_SWING_KEY, null) !== null) return;
@@ -614,7 +620,7 @@ function renderWellnessBodyMassChart(entries) {
 
   // Scored against the previous READING, not the previous day, so logging every third
   // day still leaves every bar something to compare against — the leftmost included,
-  // seeded from the last weigh-in before the window. stallStartDate is where the
+  // seeded from the last body-mass reading before the window. stallStartDate is where the
   // current run of identical readings began, so a plateau predating the window still
   // counts its full length.
   let previousKg = null;
@@ -641,12 +647,13 @@ function renderWellnessBodyMassChart(entries) {
   const trendDates = [...trendMap.keys()].sort();
   const lastTrendDate = trendDates[trendDates.length - 1];
   // Its slope at each point, read back below alongside the raw day-to-day delta, so a
-  // single noisy weigh-in doesn't read as the real trend.
+  // single noisy body-mass reading doesn't read as the real trend.
   const trendSlopeByDate = computeBodyMassTrendSlopeGramsPerDay(trendMap);
+  const storedMassByDay = storedMassByDate();
   const swingKg = lastTrendDate !== undefined ? glycogenSwingKg(byDate.get(lastTrendDate), heightCm, sex) : null;
 
   // Calorie-implied trajectory: same walk the (now-hidden) State Trend & Forecast chart
-  // built — start at the first weigh-in and advance by each day's calorie balance. Used
+  // built — start at the first body-mass reading and advance by each day's calorie balance. Used
   // here for the gray reference line, the yellow zone, and the Muscle Loss red zone.
   // Requires a full profile (height/age/sex) for BMR; omitted otherwise.
   const calorieTrendMap = new Map();
@@ -658,8 +665,8 @@ function renderWellnessBodyMassChart(entries) {
   if (haveProfile) {
     const sortedWeighInDates = [...byDate.keys()].sort();
     if (sortedWeighInDates.length >= 1) {
-      // Through the chart's own last plotted date, not just the last actual weigh-in —
-      // otherwise a day (or several) without a fresh weigh-in leaves this line flat short
+      // Through the chart's own last plotted date, not just the last actual body-mass reading —
+      // otherwise a day (or several) without a fresh body-mass reading leaves this line flat short
       // of today, disagreeing with the Status card's own Δm for a day it never reaches.
       // carryForwardBodyMassByDate below fills the gap with the last known reading.
       const calorieTrendDates = datesInRange(sortedWeighInDates[0], dates[dates.length - 1]);
@@ -737,8 +744,11 @@ function renderWellnessBodyMassChart(entries) {
 
     const fatKcal = haveProfile ? fatEnergyKcal(kg, heightCm, age, sex) : null;
     // BMI needs only height, so it survives a profile missing birth date or sex.
-    const bmi = heightCm !== null ? computeBmi(kg, heightCm) : null;
-    const smoothedChangeGPerDay = trendSlopeByDate.get(d) ?? null;
+    // BMI and Δm (Changed Mass) as stored in the day's Mass cell (physique.js), read
+    // rather than worked out; a day without one falls back to the calculation.
+    const storedMass = storedMassByDay.get(d);
+    const bmi = storedMass?.BMI ?? (heightCm !== null ? computeBmi(kg, heightCm) : null);
+    const smoothedChangeGPerDay = storedMass?.m_d ?? trendSlopeByDate.get(d) ?? null;
     detailByDate.set(d, { delta, fatKcal, bmi, smoothedChangeGPerDay });
 
     values.push(kg);
@@ -748,7 +758,7 @@ function renderWellnessBodyMassChart(entries) {
 
   // Smoothed, not flat: a bar here is an absolute level, so a flat week's mean says
   // little and its direction says everything. An EMA rather than a per-week fit, so the
-  // line has no seam at a bucket boundary — today's own weigh-in blends straight in,
+  // line has no seam at a bucket boundary — today's own body-mass reading blends straight in,
   // same as any other day.
   const trendSeries = emaSeries(values);
   const slopePerWeek = emaSlopePerSpan(trendSeries);
@@ -877,7 +887,7 @@ function renderWellnessBodyMassChart(entries) {
           padding: { top: 40 },
         },
         tooltip: {
-          // Days with no weigh-in plot as a gap; index mode would otherwise hand them
+          // Days with no body-mass reading plot as a gap; index mode would otherwise hand them
           // over as an empty row.
           filter: (item) => item.raw !== null && !item.dataset.isWeeklyAverage && !item.dataset.isStateTrendOverlay,
           callbacks: {
@@ -886,7 +896,7 @@ function renderWellnessBodyMassChart(entries) {
               const d = detailByDate.get(item.label) ?? {};
               const lines = [`m (Body Mass): ${item.parsed.y} kg`];
               // The smoothed trend's own slope, not the raw day-to-day delta a single
-              // water/glycogen-heavy weigh-in would swing — this is the one shown.
+              // water/glycogen-heavy body-mass reading would swing — this is the one shown.
               if (d.smoothedChangeGPerDay !== null && d.smoothedChangeGPerDay !== undefined) {
                 lines.push(`Δm (Changed Mass): ${withExplicitSign(d.smoothedChangeGPerDay)} g/day`);
               }
@@ -2332,7 +2342,7 @@ function renderWellnessProjectionChart(entries) {
 
     const doneText = `${doneKg} kg`;
     meterDone.textContent = privacyMode ? maskDigits(doneText) : doneText;
-    // "lost" on a cut, "gained" on a bulk: the target's side of the first weigh-in.
+    // "lost" on a cut, "gained" on a bulk: the target's side of the first body-mass reading.
     document.getElementById('body-mass-progress-meter-done-label').textContent = totalDelta > 0 ? 'lost' : 'gained';
 
     const remainingText = `${remainingKg} kg`;
@@ -2374,7 +2384,7 @@ function renderWellnessProjectionChart(entries) {
   const hasProjection = proj.status === 'ok';
   const projPoints = hasProjection ? proj.projectedPoints : [];
 
-  // The same journey in time rather than kg: elapsed since the first weigh-in against
+  // The same journey in time rather than kg: elapsed since the first body-mass reading against
   // the forecast's remaining days. A long time bar beside a short body-mass bar is itself
   // the signal that progress is slower than the effort. Needs an arrival date.
   if (hasProjection) {
@@ -2413,7 +2423,7 @@ function renderWellnessProjectionChart(entries) {
   // that helper returns every CALENDAR day in the window (what the bar charts
   // want, so an unlogged day still draws an empty column), but this chart's
   // datasets are sparse points on a linear day-offset axis with spanGaps:
-  // false (see the comment below): only real weigh-in days and real WEEKLY
+  // false (see the comment below): only real body-mass reading days and real WEEKLY
   // projected points belong in allLabels. Filling the gaps between them with
   // dateless "empty" days would put null right next to the sparse projected
   // points and spanGaps would refuse to bridge them, breaking the dashed line
@@ -2432,7 +2442,7 @@ function renderWellnessProjectionChart(entries) {
   const projMap = new Map(projPoints.map((p) => [p.date, p.bodyMass]));
   const lastDate = histLabels[histLabels.length - 1];
 
-  // Same-day weigh-ins are averaged before smoothing, rather than letting whichever
+  // Same-day body-mass readings are averaged before smoothing, rather than letting whichever
   // came last silently win.
   const bodyMassSumsByDate = new Map();
   bodyMassEntries.forEach((e) => {
@@ -2450,7 +2460,7 @@ function renderWellnessProjectionChart(entries) {
   const trendMap = computeBodyMassTrend(bodyMassByDate);
 
   // The body-mass trajectory implied by logged calories alone: start at the first
-  // weigh-in, then walk forward a day at a time adding that day's calorie balance
+  // body-mass reading, then walk forward a day at a time adding that day's calorie balance
   // (intake minus BMR, activity and TEF) converted to kg via GENERIC_KCAL_PER_KG_FAT —
   // the same balance Calorie Balance itself scores. A day with nothing logged carries
   // the running total forward flat rather than guessing. Needs a profile for BMR, same
@@ -2673,7 +2683,7 @@ function renderWellnessProjectionChart(entries) {
   // Rounded to whole kg, not just padded: a fractional min/max breaks Chart.js's own
   // round-number tick algorithm, which is what produced the clean 1 kg gridlines.
   //
-  // Raw weigh-ins are excluded since they're no longer plotted. lastBodyMass stays — the
+  // Raw body-mass readings are excluded since they're no longer plotted. lastBodyMass stays — the
   // projection starts from it. The swing band's own edges are included so the padded
   // axis can't clip the zone it's meant to fully show.
   const trendExtremes = zoneAnchorMap === null ? [] : [...zoneAnchorMap.values()].flatMap((v) => [v + swingKg, v - swingKg]);
@@ -2696,7 +2706,7 @@ function renderWellnessProjectionChart(entries) {
 
   // The EXACT date list Body Mass and Caloric Intake already share (see
   // wellnessCalorieChartDates) — clipped forward to the earliest CALORIE entry, not
-  // this chart's own earliest weigh-in, which can predate it and did: clipping to
+  // this chart's own earliest body-mass reading, which can predate it and did: clipping to
   // bodyMassEntries[0] here left this axis starting well before every bar chart's own
   // leftmost bar, with empty space where they had none. Reused directly for both the
   // axis edges and the tick list below, so this axis can't quote a different window
@@ -2708,7 +2718,7 @@ function renderWellnessProjectionChart(entries) {
     x: {
       type: 'linear',
       // Pinned to the window's own (clipped) edges, not left for Chart.js to auto-fit
-      // from whatever's actually plotted: allLabels is sparse (only weigh-ins and
+      // from whatever's actually plotted: allLabels is sparse (only body-mass readings and
       // weekly projected points), so an auto-fit axis stretched to fit just those
       // points ran a narrower — or wider — span than every category-axis chart above
       // it, which always covers the full clipped window (every calendar day, even
@@ -2795,8 +2805,8 @@ function renderWellnessProjectionChart(entries) {
 
 }
 
-// The most recent weigh-in on or before each date, carried forward — a BMR is needed
-// for every day in the window, not just the days a weigh-in lands on. Days before the
+// The most recent body-mass reading on or before each date, carried forward — a BMR is needed
+// for every day in the window, not just the days a body-mass reading lands on. Days before the
 // first reading fall back to it rather than dropping off the chart.
 function carryForwardBodyMassByDate(bodyMassByDate, dates) {
   const weighInDates = [...bodyMassByDate.keys()].sort();
@@ -2894,7 +2904,7 @@ function renderWellnessEnergyBalanceChart(entries) {
   const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
   const intakeEntries = entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
 
-  // No profile means no maintenance figure, no weigh-in means no body mass to feed it.
+  // No profile means no maintenance figure, no body-mass reading means no body mass to feed it.
   // Either way the chart shows its explanatory empty state, not a misleading partial.
   const canCompute = haveProfile && bodyMassEntries.length > 0;
   const labels = canCompute ? wellnessWindowDates(intakeEntries) : [];

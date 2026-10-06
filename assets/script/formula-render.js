@@ -351,7 +351,7 @@ function renderProteinFields() {
 }
 
 // The fiber band: a floor scaled to how much you eat (14 g/1000 kcal, the USDA/DGA rule of
-// thumb) and a ceiling scaled to body weight (0.5 g/kg) — two different bases, unlike
+// thumb) and a ceiling scaled to body mass (0.5 g/kg) — two different bases, unlike
 // protein's single LBM, so neither end rides on a box the other computes.
 //
 // Reads formula-ein directly rather than re-deriving it: by the time renderFiberFields runs

@@ -60,7 +60,7 @@ const NUTRIENT_DAILY_TARGETS_DEFAULT = {
   'Caffeine': { unit: 'mg', amount: 400, kind: 'ceiling' },
   // No alcohol target: even a "moderate" ceiling reads as an allowance, and zero has
   // no downside.
-  // NASEM 2005 indispensable-amino-acid RDA (mg/kg body weight/day),
+  // NASEM 2005 indispensable-amino-acid RDA (mg/kg body mass/day),
   // multiplied by a 70kg reference adult — an actual computation, not a
   // published fixed figure like everything else above, since amino acid
   // needs scale with body size more directly than a vitamin's. Approximate

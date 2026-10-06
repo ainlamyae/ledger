@@ -7,7 +7,7 @@ function loadFormulaInputsFromSettings() {
   // matches the one on the Caloric Intake line before anything is touched.
   //
   // Both mass boxes, from the two functions that define them: the raw one is the last
-  // weigh-in, shown only for comparison, and m̄ is planBodyMassKg — the same rolling average
+  // body-mass reading, shown only for comparison, and m̄ is planBodyMassKg — the same rolling average
   // the tile and the chart target are computed at, so the modal opens agreeing with them.
   const wellnessEntries = physiqueAsWellnessEntries();
   document.getElementById('formula-body-mass').value = latestBodyMassKg(wellnessEntries) ?? '';
@@ -255,7 +255,7 @@ async function saveFormulaSettings() {
     if (pinned) {
       intakeNote = `Daily intake is pinned at ${einKcal} kcal and no longer moves with your body mass.`;
     } else if (pctPinned) {
-      intakeNote = `Fat loss is pinned at ${pctToPin}% of body mass a week, so the kilograms per week — and the intake that delivers them — are recalculated at every weigh-in, and the forecast now follows the proportional journey.`;
+      intakeNote = `Fat loss is pinned at ${pctToPin}% of body mass a week, so the kilograms per week — and the intake that delivers them — are recalculated at every body-mass reading, and the forecast now follows the proportional journey.`;
     }
     const activityNote = activityPinned
       ? `Activity burn is pinned at ${activityKcalToPin} kcal/day — the activity tile and chart now show the minutes that takes, rising as your body mass falls.`
@@ -265,7 +265,7 @@ async function saveFormulaSettings() {
       : `Protein target is now ${protein.minG}–${protein.maxG} g/day, from ${protein.perKgMin}–${protein.perKgMax} g per kg of ${protein.lbmKg} kg lean mass.`;
     const fiberNote = fiber === null
       ? ' The fiber band was left alone — it needs body mass, Eᵢₙ and both coefficients.'
-      : ` Fiber target is now ${fiber.minG}–${fiber.maxG} g/day, from ${fiber.perKcalMin} g per 1,000 kcal and ${fiber.perKgMax} g per kg body weight.`;
+      : ` Fiber target is now ${fiber.minG}–${fiber.maxG} g/day, from ${fiber.perKcalMin} g per 1,000 kcal and ${fiber.perKgMax} g per kg body mass.`;
     const fatNote = fat === null
       ? ' The fat band was left alone — it needs Eᵢₙ and both percentages.'
       : ` Fat target is now ${fat.minG}–${fat.maxG} g/day, from ${fat.pctMin}–${fat.pctMax}% of ${fat.einKcal} kcal at ${KCAL_PER_G_FAT} kcal/g.`;
@@ -310,7 +310,7 @@ function initFormulaPlayground() {
   // Δm is left out here and wired with Δm% below: both have to record which of the pair
   // is the known BEFORE the render, and a plain render-only listener firing first would
   // let the previous known overwrite the box being typed into.
-  // formula-body-mass is NOT here: it's the raw weigh-in, readonly and read by nothing —
+  // formula-body-mass is NOT here: it's the raw body-mass reading, readonly and read by nothing —
   // m̄ below it is the box every identity is evaluated at, so it's the one that re-renders.
   //
   // m_g is left out for the same reason Δm is, and wired with BMI_g below: both have to

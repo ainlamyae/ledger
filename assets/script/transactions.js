@@ -246,14 +246,6 @@ function getFilteredTransactions() {
   });
 }
 
-// Reflects the *full* filtered set (all matches, not just the current
-// page) so it always matches what Export CSV will actually produce.
-function updateFilterSummary(filtered) {
-  const total = filtered.reduce((sum, t) => sum + t.amount, 0);
-  document.getElementById('export-summary-text').textContent =
-    `${filtered.length} transaction${filtered.length === 1 ? '' : 's'} — total ${formatCurrency(total)}`;
-}
-
 // Shared by every filter control (search, category, date range, advanced
 // filters) — a changed filter invalidates the current page/selection.
 function resetTransactionsPageAndRender() {
@@ -264,7 +256,6 @@ function resetTransactionsPageAndRender() {
 
 function renderTransactions() {
   const filtered = getFilteredTransactions();
-  updateFilterSummary(filtered);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   currentPage = Math.min(currentPage, totalPages);
 

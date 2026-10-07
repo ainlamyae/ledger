@@ -2065,6 +2065,12 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-l);
 }
 
+/* Indicator's first chart sits under its From/To row by that row's own gap,
+   like every other page's. */
+.body-mass-projection-wrap:has(> .export-date-range) + .body-mass-projection-wrap {
+    margin-top: 0;
+}
+
 /* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
    — same style as the donut-item h4s above, so every Health Indicators chart
    heading (State Trend & Forecast, Calorie Balance, Body Mass, Physical
@@ -2088,7 +2094,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 
 /* Only a note to show (reached, no change, wrong direction, levelling off) takes
    room; on track it's empty, and the card ends at its last bar. */
-.body-mass-eta:empty {
+.body-mass-eta:empty,
+.body-mass-plateau-note:empty {
     display: none;
 }
 
@@ -3015,7 +3022,6 @@ html.home-hub .page-tiles,
 }
 
 .formula-sym {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-style: italic;
     font-size: .9rem;
     color: var(--color-text);
@@ -3023,7 +3029,6 @@ html.home-hub .page-tiles,
 }
 
 .formula-name {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: .7rem;
     color: var(--color-text);
     white-space: nowrap;
@@ -3076,7 +3081,7 @@ html.home-hub .page-tiles,
 }
 
 .formula-fixed {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
     font-size: var(--input-font-size);
     padding: 0 var(--space-s);
     line-height: 1.2;

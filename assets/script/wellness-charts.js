@@ -187,7 +187,7 @@ function renderTodayGlanceCards(entries) {
 // Physical Activity / Sleep cards no longer carry mirror copies.
 function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalToday, sleepHoursToday) {
   const heightCm = getSetting('HEIGHT_CM', null);
-  // m, m_avg, BMI and m_d as stored in today's BMR cell (physique.js), read rather
+  // m, m_avg, BMI and m_d as stored in today's Derived cell (physique.js), read rather
   // than worked out; only a day saved before the column existed falls back to them.
   const stored = storedMassAsOf(isoFromDate(new Date()));
   const bodyMassKg = stored?.m ?? latestBodyMassKg(entries);
@@ -298,7 +298,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // Balance/Δm are measured against whichever the setting actually selected
   // (applyBmrBasis, wellness-math.js), not necessarily this plain figure.
   //
-  // All three read today's stored BMR cell (Physique's BMR column; the latest
+  // All three read today's stored Derived cell (Physique's Derived column; the latest
   // earlier row when today has none yet), not a fresh calculation.
   const todayBmrFigures = bmrFiguresForDate(isoFromDate(new Date()));
   let maintenanceKcal = null;
@@ -744,7 +744,7 @@ function renderWellnessBodyMassChart(entries) {
 
     const fatKcal = haveProfile ? fatEnergyKcal(kg, heightCm, age, sex) : null;
     // BMI needs only height, so it survives a profile missing birth date or sex.
-    // BMI and Δm (Changed Mass) as stored in the day's BMR cell (physique.js), read
+    // BMI and Δm (Changed Mass) as stored in the day's Derived cell (physique.js), read
     // rather than worked out; a day without one falls back to the calculation.
     const storedMass = storedMassByDay.get(d);
     const bmi = storedMass?.BMI ?? (heightCm !== null ? computeBmi(kg, heightCm) : null);
@@ -1044,8 +1044,8 @@ function renderWellnessCaloriesChart(entries) {
   const byDate = new Map();
   calorieEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
-  // Resting metabolic rate per day, as stored in that day's BMR cell (Physique's BMR
-  // column: the day's own carried-forward body mass and age), not recalculated here.
+  // Resting metabolic rate per day, as stored in that day's Derived cell (Physique's
+  // Derived column: the day's own carried-forward body mass and age), not recalculated here.
   // All four figures are drawn regardless of the BMR basis setting, so they can be
   // compared; each map skips the days its figure is missing. restingKcalByDate is the
   // active equation's plain BMR, which the bar colour grades against.
@@ -2953,7 +2953,7 @@ function renderWellnessEnergyBalanceChart(entries) {
     if (!intakeByDate.has(date)) return null;
 
     const intake = Math.round(intakeByDate.get(date));
-    // The day's stored BMR cell (Physique's BMR column); the BMR basis setting picks
+    // The day's stored Derived cell (Physique's Derived column); the BMR basis setting picks
     // which figure drives the bar, and the hover lists all four.
     const bmrFigures = bmrFiguresForDate(date);
     const maintenance = pickBmrForBasis(bmrFigures);

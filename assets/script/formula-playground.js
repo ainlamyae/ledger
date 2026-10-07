@@ -221,7 +221,7 @@ async function saveFormulaSettings() {
   });
 
   // The BMR_cal window. The calibration it measures isn't saved here: each day's BMR_cal
-  // lives in Physique's BMR column, and the app reads the latest one from there.
+  // lives in Physique's Derived column, and the app reads the latest one from there.
   const calibration = tuneBmrCalibration();
   if (calibration) {
     overrides[BMR_CALIBRATION_PERIOD_COUNT_KEY] = calibration.periodCount;

@@ -58,7 +58,7 @@ function gatherFatLossPattern(fromIso, toIso, chunkDays) {
       m: w.massEnd,
       deltaMass: w.deltaMass,
       deltaMKcal: w.deltaMKcal,
-      // Average of each day's stored BMR cell (Physique's BMR column), per key.
+      // Average of each day's stored Derived cell (Physique's Derived column), per key.
       bmr: Object.fromEntries(BMR_JSON_ORDER.map((key) => [key, meanOfPresent(days.map((d) => bmrFiguresForDate(d.date)[key]))])),
       sd: meanOfPresent(days.map((d) => d.sd)),
       tei: w.avgIntake,

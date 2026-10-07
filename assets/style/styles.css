@@ -808,6 +808,11 @@ kbd {
     gap: var(--space-s);
 }
 
+/* The section's gap alone spaces its bulbs from its tiles, as between bulbs. */
+.panel-group > .cards {
+    margin-bottom: 0;
+}
+
 /* The home page's sections, stacked; a section page shows one alone. */
 html:not(.section-pages) .panel-group + .panel-group {
     margin-top: var(--space-s);

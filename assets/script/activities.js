@@ -828,6 +828,7 @@ function renderInstructionList() {
     const logged = loggedWorkoutQuantities();
     rows.forEach((activity) => {
       const li = document.createElement('li');
+      li.className = 'card';
       // A tick in the figure's corner picks it for 📝 (logGuideTicks); a card already
       // in today's workout is tinted instead, as the plan tables' rows are.
       const isLogged = logged.has(activity.name);

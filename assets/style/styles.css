@@ -1013,7 +1013,9 @@ td:has(.btn) {
 
 /* The same line under the header row of Physique's, Nutrition's, Pattern's,
    Transaction's, Account's, Breakdown's, Work Time's, Car Service's, Travel's,
-   Contact's and Settings' tables and both Physique breakdowns. */
+   Contact's, Settings' and both Micronutrients' tables and both Physique breakdowns. */
+#physique-micro-table thead th,
+#insight-micro-table thead th,
 .car-service-table thead th,
 #travel-table thead th,
 #contacts-table thead th,
@@ -1401,29 +1403,23 @@ th.sortable:hover {
     }
 }
 
+/* Travel's two bulbs (.card), spaced like the home page's. */
 .donut-grid.travel-insights-grid {
-    grid-template-columns: 3fr 1fr;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    gap: var(--space-m);
 }
 
 @media (max-width: 820px) {
     .donut-grid.travel-insights-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
+/* Indicator's charts are bulbs (.card), one per row, spaced like the home page's. */
 .donut-grid.wellness-metrics-grid {
-    grid-template-columns: 1fr;
-}
-
-/* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
-   exactly — these tiles sit in the same Health Indicators panel as the
-   State Trend & Forecast / Calorie Balance h4s above, so every heading in
-   it shares one style instead of each chart picking its own size/color/alignment. */
-.wellness-metrics-grid.donut-grid .donut-item h4 {
-    text-align: left;
-    color: var(--color-text);
-    font-size: 1.1rem;
-    margin-bottom: var(--space-xs);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-m);
+    margin-top: var(--space-m);
 }
 
 /* Four across only works while .container is at its full 950px; between there
@@ -1477,7 +1473,6 @@ th.sortable:hover {
 
 .country-tiles {
     list-style: none;
-    margin-top: var(--space-l);
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: var(--space-s);
@@ -1524,7 +1519,6 @@ th.sortable:hover {
     min-width: 0;
 }
 
-.donut-item h3,
 .donut-item h4 {
     text-align: center;
     color: var(--color-text-muted);
@@ -1532,9 +1526,13 @@ th.sortable:hover {
     margin-bottom: var(--space-s);
 }
 
-.type-breakdown-category,
-.panel-section {
+.type-breakdown-category {
     margin-bottom: var(--space-xl);
+}
+
+/* Finance Indicator's charts are bulbs (.card), spaced like Health's. */
+.panel-section {
+    margin-bottom: var(--space-m);
 }
 
 .type-breakdown-category:last-child,
@@ -1542,8 +1540,7 @@ th.sortable:hover {
     margin-bottom: 0;
 }
 
-.type-breakdown-category > h3,
-.panel-section > h3 {
+.type-breakdown-category > h3 {
     font-size: 1.1rem;
     margin-bottom: var(--space-xs);
 }
@@ -1713,16 +1710,14 @@ td .btn {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     align-items: start;
-    gap: var(--space-s);
+    gap: var(--space-m);
 }
 
+/* Each activity is a bulb (.card), which gives its box. */
 .instruction-activities li {
     position: relative;
     cursor: pointer;
-    padding: var(--space-s) var(--space-m);
     font-size: .9rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
 }
 
 /* A fixed height with object-fit: contain, not a fixed aspect ratio. The figures
@@ -2062,7 +2057,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 }
 
 .body-mass-projection-wrap {
-    margin-top: var(--space-l);
+    margin-top: var(--space-m);
 }
 
 /* Indicator's first chart sits under its From/To row by that row's own gap,
@@ -2071,25 +2066,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: 0;
 }
 
-/* Matches .panel-section > h3 (e.g. "Average Monthly Spending by Category")
-   — same style as the donut-item h4s above, so every Health Indicators chart
-   heading (State Trend & Forecast, Calorie Balance, Body Mass, Physical
-   Activity, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake,
-   Carbohydrate Intake, Sleep, Protein Source Rotation, Activity Rotation) is visually one
-   set. Wrapping a block in .body-mass-projection-wrap is how a chart joins that set —
-   which is what moving Protein Source Rotation in from its own panel needed. */
-.body-mass-projection-wrap h4 {
-    margin: 0 0 var(--space-xs);
-    font-size: 1.1rem;
-    color: var(--color-text);
-}
-
 .body-mass-projection-header {
     justify-content: space-between;
-}
-
-.body-mass-projection-header h4 {
-    margin: 0;
 }
 
 /* Only a note to show (reached, no change, wrong direction, levelling off) takes
@@ -2739,7 +2717,6 @@ html.home-hub .page-tiles,
         gap: var(--space-m);
     }
 
-    .donut-item h3,
     .donut-item h4 {
         font-size: .8rem;
     }
@@ -3711,5 +3688,6 @@ html.section-pages .panel.page-active:hover {
 }
 
 .instruction-activities li:has(.instruction-check:checked) {
-    border-color: var(--color-income);
+    outline: 1px solid var(--color-income);
+    outline-offset: -1px;
 }

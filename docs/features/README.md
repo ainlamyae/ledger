@@ -8,7 +8,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 
 | Page | Covers |
 |---|---|
-| [Home Page & Widgets](home.md) | Glance cards, Time/Date/Azan/Weather widgets, hide toggles |
+| [Home Page & Widgets](home.md) | Glance cards, Time/Date/Azan/Weather widgets (Weather with sunrise/sunset), hide toggles |
 | [Hubs, Pages & Addresses](navigation.md) | Hubs, breadcrumb, sidebar, phone bars, badges, every address |
 | [Layout & Interaction](layout.md) | Responsive layout, content-width tables, forms, shortcuts, exports, accessibility, dark/privacy mode |
 | [Buttons](buttons.md) | Emoji actions and button roles |

@@ -31,7 +31,7 @@ flowchart TD
 
     Groq["AI chat-completions API<br/>Groq (api.groq.com) or OpenRouter (openrouter.ai), per AI_PROVIDER<br/>Calculate ingredient extraction<br/>Insight reports<br/>(Wellness / Food / Micronutrients / Activity)<br/>Finance Insight reports<br/>Food photo + label scan (the "vision" model)"]
     USDA["USDA FoodData Central<br/>api.nal.usda.gov<br/>per-100g calorie/protein cross-check<br/>+ Add Ingredient lookup<br/>+ full nutrient panel (Pull Micronutrients)"]
-    Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast + city search"]
+    Meteo["Open-Meteo<br/>api.open-meteo.com + geocoding.open-meteo.com<br/>weather forecast, sunrise/sunset + city search"]
     BDC["BigDataCloud<br/>api.bigdatacloud.net<br/>reverse geocoding"]
 
     App -. "opt-in, user's own GROQ_API_KEY or OPENROUTER_API_KEY<br/>(Settings tab)" .-> Groq

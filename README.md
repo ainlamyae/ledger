@@ -30,7 +30,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 - [Getting Started](docs/getting-started.md) — deploy your own copy.
 - [Deployment](docs/deployment.md) — GitHub Pages and the OAuth origin.
-- [Versioning](docs/versioning.md) — automatic MAJOR.MINOR.PATCH release numbers.
+- [Versioning](docs/versioning.md) — automatic MAJOR.MINOR.PATCH from commit messages (`feat:` minor, `fix:`/other patch, `feat!:` major).
 - [Configuration Reference](docs/configuration.md) — sheet ranges and localStorage entries.
 - [Stock Data Setup](docs/stock-data-setup.md) — to do: the three free API keys for Watch List, Market and Portfolio.
 - [Security & Privacy](docs/security.md) — scopes, secrets, what each external call sends.

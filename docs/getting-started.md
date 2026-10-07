@@ -58,7 +58,7 @@ Then open `http://localhost:8000`. No build step. `serve.py` is `python -m http.
 git config core.hooksPath scripts/hooks
 ```
 
-Each commit then stamps the footer's version. See [Versioning](versioning.md).
+Each commit then stamps the footer's version from its message (`feat:` bumps the minor number, anything else the patch). See [Versioning](versioning.md).
 
 ---
 

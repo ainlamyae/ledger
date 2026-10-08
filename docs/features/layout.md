@@ -12,19 +12,20 @@
 - iPhone Safari never zooms on a tapped field (`maximum-scale=1.0`, 16px touch fields); pinch-zoom still works.
 - From/To pairs keep 30px fields, a 16px gap on a phone, and `--space-s` after them.
 - On a phone the copyright line sits in a slim strip under the bottom bar; short pages fit without scrolling.
+- The last-load timestamp (`setLastUpdated`, "Updated 11:00:44") lives in the account menu, under the email and above Refresh data — not in the header, at any width.
 
 ## Layout and interaction
 
 ### Responsive layout
 
-- One layout with a breakpoint ladder (950/820/800/640/420px); no separate mobile view.
+- One layout with a breakpoint ladder (950/820/800/420px, plus the 1179/1180px nav split); no separate mobile view.
 - **Forms are pages**, not overlays (see [Hubs, Pages & Addresses](navigation.md)). Only dialogs that aren't pages (keyboard shortcuts, confirmations, forms opened on the home page) stay overlays.
-- **Phone (≤640px):**
+- **Tablet and phone (≤1179px), the same bottom-bar nav at every width in that range:**
   - No top bar: the header box is `display: contents`, its logo hidden; the breadcrumb's **Ledger** goes home.
   - The account avatar and menu (or a round 🔑 sign-in button) sit bottom-left over the bottom bar.
   - Health / Finance / Other become a fixed bottom tab bar; page content gets bottom padding to clear it.
   - The tab bar and the page's action bar are pills floating `--bottom-bar-inset` off the edges, with half-circle ends and ❌ as a round button. No tab is marked active.
-- **Wide screens (≥1180px):** a sidebar replaces the top bar (see [Hubs, Pages & Addresses](navigation.md)).
+- **Wide screens (≥1180px):** a sidebar replaces the top bar (see [Hubs, Pages & Addresses](navigation.md)). There is no intermediate top-bar state — the layout is bottom-bar-or-sidebar with nothing in between.
 
 ### Fields and alignment
 

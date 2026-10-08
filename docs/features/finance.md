@@ -43,3 +43,4 @@
 - **Delete** removes the row; the confirmation says out loud that a formula elsewhere pointing at it will lose it.
 - Figures are right-aligned as a column (`.num`), header included — `.income`/`.expense` already right-align the coloured cells, and on this tab most of a quiet month is `$0.00` cells that would otherwise be the only ones hanging off the left.
 - It reads the tab itself rather than sharing `loadReport()`'s copy: that one keeps what the charts derived, while the panel needs each row's own sheet row number to edit it.
+- **Category groups are marked with a line**, not just blank space: a 2px rule sits above the first row of a new Category (`breakdown-category-start`) and under the table's last row, so the Types under each Category read as one visual block in whatever order they're sorted.

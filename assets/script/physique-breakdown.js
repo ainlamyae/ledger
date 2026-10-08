@@ -436,26 +436,21 @@ function isMobileConsumptionViewport() {
   return window.matchMedia('(max-width: 820px)').matches;
 }
 
-// Desktop keeps the plain dropdown (CSS: right under the line you're typing).
-// On a narrow viewport with a real on-screen keyboard, pin it to the bottom
-// of the visual viewport instead — same spot Description's native datalist
-// bar shows on iPhone, just not OS-native since a <datalist> can't attach to
-// a <textarea> (see the comment above consumptionSuggestionMatches).
-function positionConsumptionSuggestions() {
-  const list = consumptionSuggestionsList();
+// Desktop keeps the plain dropdown under the line. On a phone, pin it to the
+// top of the visible area: iOS's keyboard bar (∧ ∨ Done) covered it at the bottom.
+function positionPinnedSuggestions(list) {
   if (list.hidden) return;
-
   if (!isMobileConsumptionViewport() || !window.visualViewport) {
     list.classList.remove('autocomplete-suggestions--pinned');
-    list.style.removeProperty('--keyboard-height');
+    list.style.removeProperty('--suggestions-top');
     return;
   }
-
-  const vv = window.visualViewport;
-  const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-
   list.classList.add('autocomplete-suggestions--pinned');
-  list.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+  list.style.setProperty('--suggestions-top', `${window.visualViewport.offsetTop}px`);
+}
+
+function positionConsumptionSuggestions() {
+  positionPinnedSuggestions(consumptionSuggestionsList());
 }
 
 // The line the caret's currently on, split at the caret — "prefix" is what's
@@ -504,7 +499,7 @@ function hideConsumptionSuggestions() {
   list.hidden = true;
   list.innerHTML = '';
   list.classList.remove('autocomplete-suggestions--pinned');
-  list.style.removeProperty('--keyboard-height');
+  list.style.removeProperty('--suggestions-top');
   consumptionSuggestionMatches = [];
   consumptionSuggestionIndex = -1;
 }
@@ -589,18 +584,8 @@ function setupWorkoutAutocomplete() {
   }
 }
 
-// Same placement as positionConsumptionSuggestions.
 function positionWorkoutSuggestions() {
-  const list = workoutSuggestionsList();
-  if (list.hidden) return;
-  if (!isMobileConsumptionViewport() || !window.visualViewport) {
-    list.classList.remove('autocomplete-suggestions--pinned');
-    list.style.removeProperty('--keyboard-height');
-    return;
-  }
-  const vv = window.visualViewport;
-  list.classList.add('autocomplete-suggestions--pinned');
-  list.style.setProperty('--keyboard-height', `${Math.max(0, window.innerHeight - vv.height - vv.offsetTop)}px`);
+  positionPinnedSuggestions(workoutSuggestionsList());
 }
 
 function renderWorkoutSuggestions() {
@@ -636,7 +621,7 @@ function hideWorkoutSuggestions() {
   list.hidden = true;
   list.innerHTML = '';
   list.classList.remove('autocomplete-suggestions--pinned');
-  list.style.removeProperty('--keyboard-height');
+  list.style.removeProperty('--suggestions-top');
   workoutSuggestionMatches = [];
   workoutSuggestionIndex = -1;
 }

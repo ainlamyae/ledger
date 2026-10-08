@@ -197,6 +197,7 @@ async function initPhysique(forceRefresh = false) {
     // Date and body mass move the BMR line too.
     ['bedtime', 'wake-time', 'date', 'body-mass'].forEach((id) => physiqueField(id).addEventListener('input', updatePhysiqueSleepDuration));
     document.getElementById('physique-is-pattern').addEventListener('change', updatePhysiqueSleepDuration);
+    physiqueField('body-mass').addEventListener('change', celebrateBodyMassProgress);
     onFormSubmit('physique-form', submitPhysiqueForm);
 
     ['physique-search'].forEach((id) => {
@@ -881,6 +882,21 @@ function physiqueAsWellnessEntries() {
 function todaysPhysiqueDay() {
   const today = isoFromDate(new Date());
   return allPhysiqueEntries.find((p) => p.date === today) ?? null;
+}
+
+// Confetti when today's typed body mass is closer to the target than the last earlier reading.
+let celebratedBodyMass = null;
+function celebrateBodyMassProgress() {
+  const today = isoFromDate(new Date());
+  if (document.getElementById('physique-is-pattern').checked || physiqueField('date').value !== today) return;
+  const typed = evaluateNumberExpression(physiqueField('body-mass').value.trim());
+  if (!typed || typed === celebratedBodyMass) return;
+  const previous = physiqueDatedAscending().filter((p) => p.date < today && p.bodyMass !== null).at(-1)?.bodyMass;
+  if (previous == null) return;
+  const target = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  if (Math.abs(typed - target) >= Math.abs(previous - target)) return;
+  celebratedBodyMass = typed;
+  celebrateWithConfetti();
 }
 
 // Which days came across incomplete. console only — a chart gap is otherwise

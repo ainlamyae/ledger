@@ -1,0 +1,35 @@
+# Health — Today at a Glance
+
+[← Features](README.md) · [README](../../README.md)
+
+## At a glance
+
+- **Status** card, four groups:
+  1. `m` with `m̄` in brackets vs target ± swing (`80 (80.6) / 70 ± 1.9 kg`), BMI, measured **Δm** vs desired rate (`-108 / -101 g/day`).
+  2. `BMR_mif`, `BMR_kat`, `BMR_cal`, `BMR_adp`.
+  3. TEI, TEF, AEE, SD.
+  4. D and **Δm′**, the change calculated from D (primed to tell it from measured Δm).
+- Intake Macros, Physical Activity and Sleep (Window, then Duration) stack beside Status, aligned top and bottom.
+- **Progress** card, full width below: kg and days bars marked every 10%, target as `→ 70 ± 1.9 kg`. Shows `—` from first paint; ends at its last bar unless it has a note (reached, no change, wrong direction, levelling off).
+
+## Health — Today at a glance
+
+- A **`Log`** badge on Physique while today has no Physique row yet (`checkHealthReminder`, `physique.js`, re-evaluated at the end of every `refreshPhysique`) — no weekend skip (unlike Work Time's, since people eat every day) and no Chrome notification; it opens today's entry the way the block's own **Today** button does.
+- Four cards, in this order: **Status**, **Intake Macros**, **Physical Activity**, **Sleep**. The last three mirror the Indicator charts below them by name (macros, activity buckets, sleep); **Status** is the single energy-budget ledger they all feed. Each card is a stack of label/value rows rather than one figure, and most rows read green on the right side of their target, red otherwise, grey when nothing's logged — the same target functions the chart underneath uses, so a card can't disagree with its own chart.
+- **Status** — one card that reads top to bottom as today's whole energy budget: **BMR** + **TEI** + **TEF** + **AEE** + **SD** sum to **D**, framed by the body-mass rows **m** (with **m̄** in brackets), **BMI**, the measured changed-mass **Δm** and the closing **Δm′** (calculated from D, not the scale — primed so the two aren't confused). Set by `setStatusEnergyTile` (`wellness-charts.js`), the same `dailyEnergyBalanceKcal` the Calorie Balance chart plots, just for today alone. The labels are terse on purpose (the card is narrow); each row's tooltip and this list spell them out:
+  - **m** (`80 (80.6) / 70 ± 1.9 kg`) — today's body-mass reading, then in brackets **m̄**, the L_p-day rolling average body mass (`planBodyMassKg` / `smoothedBodyMassKg`, the smoothed mass every plan identity runs on), against the healthy body mass (`BODY_MASS_TARGET_KG`) with the glycogen/water swing (the `GLYCOGEN_SWING_KG` setting — saved once from the latest reading, updated by Tune's Save — the same `± swing` the Progress card shows); one row for both, coloured by today's reading.
+  - **Δm** under **BMI** (`-108 / -101 g/day`) — changed mass: the slope of the smoothed body-mass trend at the latest body-mass reading (`computeBodyMassTrend` → `computeBodyMassTrendSlopeGramsPerDay`), the same **Δm (Changed Mass)** the Body Mass chart's hover shows, against the desired rate (Tune's weekly fat loss Δm ÷ 7, from `weeklyFatLossKgAt`, signed like **Δm′**); green toward the target, red away from it.
+  - **BMR_mif** and **BMR_kat** (`-1638 kcal`) — both equations' resting expenditure from today's stored Derived cell (the latest earlier row when today has none yet), as signed expenditures; both rows show whichever one Tune has selected.
+  - **BMR_cal**, directly under **BMR_kat** — a reference row, hidden entirely until a [BMR calibration](health-tune.md#health--bmr-calibration-in-tune) has actually been saved. The LIVE figure, not a frozen snapshot from calibration day: today's equation BMR plus the saved offset, so it moves with `m̄` the same way `BMR` does.
+  - **BMR_adp** — always shown, regardless of which basis `D`/`Δm` actually run on (`BMR_BASIS`, see [Tune](health-tune.md#health--tune)), so it reads as a plain `BMR × (1 − λt)` derivation rather than an unexplained number. `λt` itself no longer has its own row here — it's still what `BMR_adp` is computed from, just not printed a second time.
+  - **TEI** (`706 / 1335 kcal`) — Total Energy Intake, the one positive contribution to Balance, against the calorie target; green within target (a cut wants intake under the cap, a bulk over the floor — that sense colors the row, the separator is plain `/` either way).
+  - **TEF** (`-118 / -167 kcal`) — the thermic effect of food (digestion), measured where the day has one else the non-TEF share of intake, against the TEF the target itself would cost — `calTarget.kcal × (1 − tefDivisor())`.
+  - **AEE** (`0 / -358 kcal`) — Activity Energy Expenditure vs. `getActivityTargetKcal`, both shown as a burn (leading `-`) except a true zero, which reads plain `0` rather than `-0`.
+  - **SD** (`16 / 0 kcal`) — the Sleep Deprivation Effect as a signed addition to Balance, against a target of `0` (a full night costs nothing), coloured on the same green→red gradient the Sleep chart's dot uses (`sleepDeprivationDotColor`).
+  - **D** (`-1058 / -852 kcal`) — the day's net energy balance against `targetBalanceKcal(planBodyMassKg(entries))`.
+  - **Δm′** (`-137 / 100 g`) — the daily body-mass change that Balance implies (`D ÷ GENERIC_KCAL_PER_KG_FAT`, the ~7700 kcal/kg fat-equivalent) against the plan's own expected fat-loss rate (`WEEKLY_FAT_LOSS_KG ÷ 7`). Actual is a signed mass change (negative = losing); the target keeps the plan's stored sign (positive for a cut).
+- **Intake Macros** — **Pro**(tein), **DF** (dietary fiber), **Fat** and **Carb**, each shown as a **band** (`53 / 112~154 g`) from its own `get*TargetBandG` function. Protein, Fiber and Fat score the same way — under the floor is red, in the band is green, over the ceiling is a darker green rather than a miss. Carb reads the opposite way: under the floor is grey/unscored rather than a miss, and it's the ceiling that turns red — matching the Carbohydrate Intake chart's own bar coloring, since too little carbohydrate isn't the deficiency too little fiber or protein is. (Today's Intake and TEF figures live on the Status card now, not here.)
+- **Physical Activity** — **Cardio**, **NEAT** and **Strength**, the same three buckets the Physical Activity chart itself stacks by (the `Activity` sheet's own Category column, via `physiqueActivityByCategory`), matched by prefix rather than an exact string so `Strength` and `Strength Training` both land in the same row. Each reads `N min (-N kcal)`, purely informational — no target, so no green/red — and reads `0 min (0 kcal)` (no sign on a true zero) rather than `—` for a bucket nothing was logged into today. (The day's total activity burn is the Status card's **AEE** row now.)
+- **Sleep** — two rows:
+  - **Duration** — colored on the same red→amber→green gradient the Sleep chart's bars use, `sleepStatusColor`, rather than a flat green/red split.
+  - **Window** (`01:16-08:58`, that day's `sleepBedMin`/`sleepWakeMin` as one range rather than two rows). (The sleep-deprivation cost is the Status card's **SD** row now.)

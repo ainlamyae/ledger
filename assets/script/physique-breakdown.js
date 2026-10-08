@@ -84,7 +84,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
   tbody.appendChild(totalRow);
 
   // ACTIVITY_TARGET_MIN's minutes/kcal at today's body mass — same pinned-vs-flat
-  // rule the Physical Activity tile/chart use (getActivityTargetMin/Kcal, charts.js),
+  // rule the Physical Activity tile/chart use (getActivityTargetMin/Kcal, wellness-math.js),
   // so this row can't drift from what "hitting the workout goal" means elsewhere.
   const desireMin = Math.round(getActivityTargetMin(bodyMassKg));
   const desireKcal = Math.round(getActivityTargetKcal(bodyMassKg));
@@ -432,25 +432,40 @@ function setupConsumptionAutocomplete() {
   }
 }
 
-function isMobileConsumptionViewport() {
+function isPhoneSuggestionViewport() {
   return window.matchMedia('(max-width: 820px)').matches;
 }
 
-// Desktop keeps the plain dropdown under the line. On a phone, pin it to the
-// top of the visible area: iOS's keyboard bar (∧ ∨ Done) covered it at the bottom.
-function positionPinnedSuggestions(list) {
+// Desktop keeps the plain dropdown under the field. On a phone, the list sits just
+// above the caret's line (below it when there's more room there), inside the visible
+// area, so it covers neither that line nor the keyboard and its ∧ ∨ Done bar.
+function positionPinnedSuggestions(list, field) {
   if (list.hidden) return;
-  if (!isMobileConsumptionViewport() || !window.visualViewport) {
+  if (!isPhoneSuggestionViewport() || !window.visualViewport) {
     list.classList.remove('autocomplete-suggestions--pinned');
     list.style.removeProperty('--suggestions-top');
+    list.style.removeProperty('--suggestions-max-height');
     return;
   }
+  const vv = window.visualViewport;
+  const style = getComputedStyle(field);
+  const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+  const line = field.value.slice(0, field.selectionStart).split('\n').length - 1;
+  // Fixed positions, rects and vv.offsetTop are all in layout-viewport coordinates.
+  const lineTop = field.getBoundingClientRect().top + field.clientTop
+    + parseFloat(style.paddingTop) + line * lineHeight - field.scrollTop;
+  const above = lineTop - vv.offsetTop;
+  const below = vv.offsetTop + vv.height - (lineTop + lineHeight);
+  const wanted = list.scrollHeight;
+  const useAbove = above >= wanted || above >= below;
+  const height = Math.max(0, Math.min(wanted, useAbove ? above : below));
   list.classList.add('autocomplete-suggestions--pinned');
-  list.style.setProperty('--suggestions-top', `${window.visualViewport.offsetTop}px`);
+  list.style.setProperty('--suggestions-top', `${useAbove ? lineTop - height : lineTop + lineHeight}px`);
+  list.style.setProperty('--suggestions-max-height', `${height}px`);
 }
 
 function positionConsumptionSuggestions() {
-  positionPinnedSuggestions(consumptionSuggestionsList());
+  positionPinnedSuggestions(consumptionSuggestionsList(), physiqueField('consumption'));
 }
 
 // The line the caret's currently on, split at the caret — "prefix" is what's
@@ -500,6 +515,7 @@ function hideConsumptionSuggestions() {
   list.innerHTML = '';
   list.classList.remove('autocomplete-suggestions--pinned');
   list.style.removeProperty('--suggestions-top');
+  list.style.removeProperty('--suggestions-max-height');
   consumptionSuggestionMatches = [];
   consumptionSuggestionIndex = -1;
 }
@@ -545,7 +561,7 @@ function applyConsumptionSuggestion(name) {
 }
 
 // Exercise-name suggestions for the Workout textarea: the same per-line dropdown
-// as Consumption's (pinned above the keyboard on a phone), offering the Activity
+// as Consumption's (beside the caret's line on a phone), offering the Activity
 // sheet's names (allActivities, activities.js) — the names a workout line is
 // priced against. Matches what's typed after the line's amount ("36x ", "3x10 ",
 // "30min ", "10000step ", "45sec "), and accepting keeps that amount.
@@ -585,7 +601,7 @@ function setupWorkoutAutocomplete() {
 }
 
 function positionWorkoutSuggestions() {
-  positionPinnedSuggestions(workoutSuggestionsList());
+  positionPinnedSuggestions(workoutSuggestionsList(), physiqueField('workout'));
 }
 
 function renderWorkoutSuggestions() {
@@ -622,6 +638,7 @@ function hideWorkoutSuggestions() {
   list.innerHTML = '';
   list.classList.remove('autocomplete-suggestions--pinned');
   list.style.removeProperty('--suggestions-top');
+  list.style.removeProperty('--suggestions-max-height');
   workoutSuggestionMatches = [];
   workoutSuggestionIndex = -1;
 }

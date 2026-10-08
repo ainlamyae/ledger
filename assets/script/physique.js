@@ -151,7 +151,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
 }
 
 // The two activity categories physiqueAsWellnessEntries emits and every
-// activity consumer (charts.js, activity-insight.js) filters on.
+// activity consumer (wellness-charts.js, activity-insight.js) filters on.
 function isActivityCategory(category) {
   return category === 'Activity' || category === 'Activity; Calories';
 }
@@ -761,7 +761,7 @@ function checkHealthReminder() {
 
 // --- Physique as chart input --------------------------------------------
 //
-// charts.js, insight.js and protein-rotation.js all consume a per-EVENT row
+// wellness-charts.js, insight.js and protein-rotation.js all consume a per-EVENT row
 // shape ({date, category, amount, amount2, unit, notes, breakdown,
 // sleepBedMin/WakeMin, tefKcal}). Rather than rewrite six charts plus the
 // projection and energy-balance math, each Physique day is expanded back into
@@ -840,7 +840,7 @@ function physiqueAsWellnessEntries() {
         amount: p.caloriesIn, amount2: p.proteinIn, unit: 'kcal', unit2: 'g',
         notes: p.consumption, breakdown: parsePhysiqueBreakdown(p.breakdown),
         // This day's own measured TEF (column L), or null when it hasn't been
-        // calculated — charts.js falls back to the flat TEF_PERCENT_OF_INTAKE
+        // calculated — wellness-math.js falls back to the flat TEF_PERCENT_OF_INTAKE
         // estimate on null rather than treating it as a measured zero.
         tefKcal: p.tef,
         // This day's own persisted Fiber (column I) — hand-typed or last

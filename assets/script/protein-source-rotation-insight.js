@@ -1,4 +1,4 @@
-// The Health Insight panel's Protein Sources mode: how well actual eating
+// The Health Insight panel's Protein mode: how well actual eating
 // matched the per-ingredient protein-source rotation plan (protein-rotation.js)
 // — each tracked ingredient's own target share of the protein target vs. the
 // share actually eaten in the selected window. Reuses computeProteinRotationRows

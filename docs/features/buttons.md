@@ -20,9 +20,14 @@
 
 ## Button roles
 
-- **Blue** — add or save (Add/Log buttons, Save, Save & Add Another, bank).
-- **Amber** — spends an AI call (Send to AI, Calculate, Recalculate Selected).
-- **Gray** — opens a modal/editor without itself committing anything (Today, Transfer) — its own commit button inside that modal is styled blue.
-- **Red** — destructive, text labels only (the export filter's remove).
-- **Default** — everything else, including all emoji buttons (close, delete) — an emoji on a dark fill is hard to read.
-- Slow actions append `…` to the label and block re-clicks until they settle: all form saves, bulk merge/delete, every row delete, and the AI/USDA calls.
+Colour marks **word buttons** only; emoji buttons (`.btn-icon`, `.row-action-btn`, `.modal-close`) are always white, whatever role class they carry.
+
+| Colour | Role | Examples |
+|---|---|---|
+| Blue | Add or save | Save & Add Another, Transfer's commit |
+| Gray | Opens an editor without committing | Today, GYM tiles |
+| Red | Destructive, text labels only | The export filter's remove |
+| Default | Everything else | |
+
+- Slow actions show `…` and block re-clicks until they settle: form saves, bulk merge/delete, row deletes, AI and USDA calls.
+- The router names a form's breadcrumb step from the button's word (`buttonStep`), so the trail reads `… / Add`.

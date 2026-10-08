@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stamps assets/script/version.js with MAJOR.MINOR.PATCH before each commit.
+n=$(( $(git rev-list --count HEAD 2>/dev/null || echo 0) + 1 ))
+printf '// Written by scripts/hooks/pre-commit; do not edit.\nconst APP_VERSION = '\''%s.%s.%s'\'';\n' $((n / 100)) $((n / 10 % 10)) $((n % 10)) > assets/script/version.js
+git add assets/script/version.js

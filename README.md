@@ -27,6 +27,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 
 - [Getting Started](docs/getting-started.md) — deploy your own copy.
 - [Deployment](docs/deployment.md) — GitHub Pages and the OAuth origin.
+- [Versioning](docs/versioning.md) — automatic MAJOR.MINOR.PATCH release numbers.
 - [Configuration Reference](docs/configuration.md) — sheet ranges and localStorage entries.
 - [Security & Privacy](docs/security.md) — scopes, secrets, what each external call sends.
 

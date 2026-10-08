@@ -9,7 +9,7 @@
 - Missing values fill in on load; a changed profile or BMR setting rewrites all in one request. Re-saving a day keeps its BMR unless Body Mass changed.
 - **Breakdown amounts are in grams:** a unit-counted food is stored as its Nutrition weight (`1 scoop (31g)` → `31g`); `×N` remains only when no weight is known.
 - Day form order: 📷 Scan, 🧬, 🧮, 💾. **Workout** suggests Activity names line by line, keeping the amount (`36x row` → `36x Seated Row machine`).
-- **Confetti:** typing today's Body Mass closer to the target than the last earlier reading drops confetti (`confetti.js`; off under reduced motion).
+- **Confetti:** saving today's Body Mass closer to the target than the last earlier reading drops confetti (`confetti.js`; off under reduced motion).
 - The breakdown table's last column has no header; the Workout table stays hidden until there's a workout to price.
 - See [Data Model → Physique](../data-model.md#physique).
 
@@ -26,9 +26,9 @@
 - **Consumption accepts a `(<lines>)/<n>` wrapper** for logging a shared portion — a recipe split `n` ways, a fraction of a batch actually eaten — without hand-dividing every line's amount first. Calculate strips the wrapper and divides each line's own quantity by `n` (`applyConsumptionDivisor`, reusing `extractIngredientQuantity`/`extractIngredientName`) before running its normal estimate, rewriting the field to plain, already-scaled lines. A line whose quantity can't be parsed is left as typed rather than guessed at.
 - Form layout: Date + Body Mass share a row, Bed + Wake the next. The pairs use `minmax(0, 1fr)` columns and the date/time inputs drop their native appearance — a bare `1fr` floors a track at its content's min-content width, and iOS Safari otherwise sizes a picker to its own content and ignores a smaller `width: 100%`, either of which leaves the plain text box beside it looking narrower.
 - **Sleep Duration**, printed under Bed + Wake, updates live as either field is typed (`updatePhysiqueSleepDuration`) — the same live-readout pattern Work Time's own duration line uses, off the wraparound-aware `sleepDurationHours` the Sleep chart and its own Physique-derived entries already share, so a bedtime past midnight and a wake time the next morning read as one span instead of a negative one.
-- **Confetti for progress** (`celebrateBodyMassProgress`, `physique.js`; `confetti.js`) — leaving the Body Mass field on today's day drops confetti, like iMessage's celebration, when the typed value is closer to `BODY_MASS_TARGET_KG` than the latest earlier reading.
+- **Confetti for progress** (`celebrateBodyMassProgress`, `physique.js`; `confetti.js`) — saving today's day drops confetti, like iMessage's celebration, when its Body Mass is closer to `BODY_MASS_TARGET_KG` than the latest earlier reading.
   - Direction comes from the target, so it works for a cut or a bulk.
-  - Fires on `change` (leaving the field), not every keystroke, and once per value.
+  - Fires after 💾 succeeds, and only when the Body Mass is new or changed, so re-saving the same day doesn't repeat it.
   - Skipped on past days, Patterns, a first-ever reading, and under `prefers-reduced-motion`.
   - About 160 pieces fall from the top for 3 s, then fade; colours are the `--chart-*` tokens. The canvas (`.confetti-canvas`) sits above everything with `pointer-events: none`, so typing carries on.
 - **Saving onto a day already logged merges into it** rather than being refused: the first Save folds that row into the form, the second commits. Details under `Physique` below.

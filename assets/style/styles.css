@@ -2736,6 +2736,12 @@ html.home-hub .page-tiles,
         width: 100%;
     }
 
+    /* Transaction's four filters: 2×2 instead of four rows. */
+    [data-route="transaction"] > .filters {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
     .pagination {
         flex-wrap: wrap;
     }

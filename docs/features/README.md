@@ -18,7 +18,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 
 | Page | Covers |
 |---|---|
-| [Finance](finance.md) | Summary cards, Indicator, Transactions, Account, Transfer, Breakdown, Insight |
+| [Finance](finance.md) | Summary cards, Indicator, Transactions (income confetti), Account, Transfer, Breakdown, Insight |
 | [Time Tracker](time-tracker.md) | Work Time logging, badge, charts, overtime |
 | [Health — Today](health-today.md) | Status, Intake Macros, Physical Activity, Sleep and Progress cards |
 | [Health — Indicator](health-indicator.md) | Every Health chart, Protein Source Rotation by Group, Activity Rotation |

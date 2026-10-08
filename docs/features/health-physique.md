@@ -9,7 +9,7 @@
 - Missing values fill in on load; a changed profile or BMR setting rewrites all in one request. Re-saving a day keeps its BMR unless Body Mass changed.
 - **Breakdown amounts are in grams:** a unit-counted food is stored as its Nutrition weight (`31g (1 scoop)` → `31g`); `×N` remains only when no weight is known.
 - Day form order: 📷 Scan, 🧬, 🧮, 💾. **Workout** suggests Activity names line by line, keeping the amount (`36x row` → `36x Seated Row machine`).
-- **Confetti:** saving today's Body Mass closer to the target than the last earlier reading drops confetti (`confetti.js`; off under reduced motion).
+- **Confetti:** saving today's Body Mass closer to the target than the last earlier reading drops confetti (`confetti.js`, also fired by an income transaction save — see [Finance](finance.md); off under reduced motion).
 - The breakdown table's last column has no header; the Workout table stays hidden until there's a workout to price.
 - See [Data Model → Physique](../data-model.md#physique).
 

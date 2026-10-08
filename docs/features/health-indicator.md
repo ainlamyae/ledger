@@ -59,12 +59,13 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 - Last block of the **Indicator** panel — every Health chart sits in that one panel, so they collapse together and share its one From/To window.
 - The donut's two rings are fixed spans anchored to the window's **To** date (4 weeks and 1 week), not fractions of the window — so they keep meaning the same thing whatever range is picked.
-- One horizontal bar per ingredient carrying a Protein % on its Nutrition row.
-- Bar is actual protein eaten in range; a red tick marks its live target.
-- **Grouped by Classification** — one hue per group, lightness stepped within it, so a group reads as a block and its members stay distinct.
-- Groups ordered by combined remaining gap; within a group, most-left-to-eat first. `Unclassified` last.
-- A legend below shows one swatch per classification.
-- Beside the bars, a two-ring donut splits the same sources by share eaten: outer 4 weeks, inner last week.
+- One horizontal bar per Nutrition **Group** that has at least one ingredient carrying a Protein % (`groupProteinRotationRows`).
+- Bar is actual protein eaten in range from that group's tracked ingredients; a red tick marks its live target — the sum of its members' Protein % shares.
+- Hovering a bar or slice lists the ingredients the group is summed from.
+- One hue per group. Groups ordered by remaining gap, most-left-to-eat first; `Unclassified` last.
+- A legend below shows one swatch per group.
+- Beside the bars, a donut splits the same groups by share: reference Protein %, then 4 weeks, then last week.
+- The per-ingredient figures (`computeProteinRotationRows`) are unchanged — Insight's Protein mode still reads them.
 
 ## Health — Activity Rotation
 
@@ -72,7 +73,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - One bar per Activity **Group** (Leg Day, Push Day, NEAT, Cardio, …) carrying a Weekly Target — a new column on the `Activity` sheet tab, shared by every exercise row in that Group.
 - A "session" is any day whose logged Workout notes include at least one exercise from that Group — a mixed day (a lift plus a walk) counts as a session for every Group it touches, not just the dominant one.
 - Bar is sessions actually logged in range; a red tick marks the Weekly Target scaled to the window's length.
-- **Grouped by Category** (the sheet's Strength/Cardio/NEAT column) — one hue per category, lightness stepped within it, same legend/coloring convention as Protein Source Rotation's Classification grouping.
+- **Grouped by Category** (the sheet's Strength/Cardio/NEAT column) — one hue per category, lightness stepped within it, same legend/coloring convention as Protein Source Rotation's Group grouping.
 - Groups ordered by combined remaining gap (target minus actual); within a group, most sessions still owed first.
 - Beside the bars, a three-ring donut: outer ring each Group's own Weekly Target (the reference split), middle ring the last 4 weeks, inner ring the last week.
 - **A copy of this card also sits under GYM's own tiles** (`/health/activity/gym/`) — see [Health — Activity & GYM](health-activity.md#health--activity-plan).

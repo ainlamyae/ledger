@@ -14,7 +14,7 @@ function breakdownToJson(breakdown) {
 }
 
 // Grams in one unit of a Nutrition row that is counted by unit, e.g. 31 for
-// "1 scoop (31g)" or 34 for "2.94x (100g)"; null when the row is a plain weight
+// "1 scoop (31g)" or 34 for "100g (2.94x)"; null when the row is a plain weight
 // ("100g") or names no weight ("1x"). A breakdown amount is stored in grams
 // whenever this is known, so the table reads in one unit; "×N" only remains
 // for a food whose Nutrition row gives no weight to convert with.
@@ -735,7 +735,7 @@ function makeEditNewRowButton(row, breakdown, target) {
       routeRecordEdit('nutrition', { slug: routeSlug(row.name), label: row.name });
       openNutritionForm({
         row: null,
-        classification: '',
+        group: '',
         name: row.name,
         amount: row.newRow.amount,
         calories: row.newRow.calories,

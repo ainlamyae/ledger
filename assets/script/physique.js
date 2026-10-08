@@ -104,15 +104,15 @@ function updatePhysiqueSleepDuration() {
   const bed = parseClockTime(physiqueField('bedtime').value);
   const wake = parseClockTime(physiqueField('wake-time').value);
   const sleepHours = (bed !== null && wake !== null) ? sleepDurationHours(bed, wake) : null;
-  document.getElementById('physique-sleep-duration').textContent = sleepHours !== null ? `${sleepHours} hr` : '—';
   updatePhysiqueSleepDeprivation(sleepHours);
 }
 
-// Same dailyEnergyBalanceKcal the Status card's own Sleep Deprivation tile runs
-// (wellness-charts.js), just off the form's own typed fields rather than a
-// saved entry — so what's about to be saved already shows what a short night
-// is costing (or adding to) this day's balance. Falls back to '—' whenever a
-// piece it needs (profile, body mass, calories in) isn't there yet.
+// Same dailyEnergyBalanceKcal the Status card's own energy-balance tile runs
+// (wellness-charts.js setStatusEnergyTile), just off the form's own typed
+// fields rather than a saved entry — so what's about to be saved already
+// shows what a short night is costing (or adding to) this day's balance.
+// Falls back to '—' whenever a piece it needs (profile, body mass, calories
+// in) isn't there yet.
 function updatePhysiqueSleepDeprivation(sleepHours) {
   const el = document.getElementById('physique-sleep-deprivation');
   if (!el) return;
@@ -129,25 +129,79 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   };
   // A pattern has no date, so no BMR.
   const bmr = document.getElementById('physique-is-pattern').checked ? {} : physiqueBmrForSave(day.date, day.bodyMass);
-  const deprivationKcal = physiqueDeprivationKcal(day, sleepHours, bmr);
-  el.textContent = deprivationKcal !== null ? `${deprivationKcal} kcal` : '—';
+  const energy = physiqueEnergyBalance(day, sleepHours, bmr);
+  el.textContent = energy ? `${energy.deprivationKcal}` : '—';
+
+  // TEI, TEF and AEE as typed/estimated for this day, the same three
+  // dailyEnergyBalanceKcal weighs against maintenance and SD to land on D —
+  // TEF and AEE shown as the expenditures they are (negative), like the
+  // Status card's own Digestion/Activity rows. Units are the table's own
+  // Unit column, not repeated in each cell's own text.
+  const teiText = day.caloriesIn !== null ? `${day.caloriesIn}` : '—';
+  document.getElementById('physique-tei').textContent = privacyMode ? maskDigits(teiText) : teiText;
+  const tefText = energy ? `${-energy.tef}` : '—';
+  document.getElementById('physique-tef-derived').textContent = privacyMode ? maskDigits(tefText) : tefText;
+  const aeeText = `${day.caloriesOut > 0 ? '-' : ''}${day.caloriesOut}`;
+  document.getElementById('physique-aee').textContent = privacyMode ? maskDigits(aeeText) : aeeText;
+
+  // D (Balance) and Δm′, the mass change it implies (Balance ÷ ~7700 kcal/kg,
+  // GENERIC_KCAL_PER_KG_FAT) — same pair the Status card's own D/Δm′ rows show.
+  const dText = energy ? `${energy.balance}` : '—';
+  document.getElementById('physique-balance').textContent = privacyMode ? maskDigits(dText) : dText;
+  const dmPrimeText = energy ? `${Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000)}` : '—';
+  document.getElementById('physique-mass-delta-prime').textContent = privacyMode ? maskDigits(dmPrimeText) : dmPrimeText;
 
   // The Mass figures Save will store (the saved ones while Body Mass is unchanged).
+  // m̄ (m_avg), Δm (m_d) and BMI as stored, each its own row — the Unit column
+  // carries the unit (m is the Body Mass field above).
   const mass = document.getElementById('physique-is-pattern').checked ? {} : physiqueMassForSave(day.date, day.bodyMass);
-  // m̄ (m_avg), Δm (m_d) and BMI as stored, each unit once after the last value that
-  // uses it, as the BMR line below gives kcal once (m is the Body Mass field above).
-  const massText = mass.m === undefined ? '—' : [
-    `${mass.m_avg ?? '—'}/${mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? mass.m_d : '—'} kg`,
-    `${mass.BMI ?? '—'} kg/m²`,
-  ].join('/');
-  document.getElementById('physique-mass-figures').textContent = privacyMode ? maskDigits(massText) : massText;
+  [
+    ['mass-mean', mass.m_avg],
+    ['mass-delta', mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? mass.m_d : undefined],
+    ['mass-bmi', mass.BMI],
+  ].forEach(([id, value]) => {
+    const text = value !== undefined ? `${value}` : '—';
+    document.getElementById(`physique-${id}`).textContent = privacyMode ? maskDigits(text) : text;
+  });
 
-  // The four BMR figures Save will store, one line; "kcal" once, after the last.
-  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key], i, all) => {
-    const unit = i === all.length - 1 ? ' kcal' : '';
-    const text = bmr[key] !== undefined ? `${bmr[key]}${unit}` : '—';
+  // The four BMR figures Save will store, each its own row — "kcal" is the Unit
+  // column. Shown negative, same as the Status card's own BMR rows: an expenditure.
+  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key]) => {
+    const text = bmr[key] !== undefined ? `${-bmr[key]}` : '—';
     document.getElementById(`physique-bmr-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
+
+  // Desire — the plan-level target each figure is read against, the same ones the
+  // Status card's own rows pair with (wellness-charts.js setStatusEnergyTile): the
+  // Body Mass target, its BMI, the weekly fat-loss rate as a daily mass/calorie
+  // figure, the calorie target, and the Activity/Deprivation/Balance targets that
+  // follow from it. A plan figure, not a per-day one — it doesn't move as
+  // Calories In/Out are typed, only Body Mass (the Activity target's own input).
+  const setDesire = (id, value) => {
+    const target = document.getElementById(id);
+    const text = value !== null && value !== undefined ? `${value}` : '—';
+    target.textContent = privacyMode ? maskDigits(text) : text;
+  };
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const wellnessEntries = physiqueAsWellnessEntries();
+  const planMassKg = planBodyMassKg(wellnessEntries);
+  const calTarget = getCalorieTarget(wellnessEntries);
+  const digTarget = Math.round(calTarget.kcal * (1 - tefDivisor()));
+  const actTargetKcal = day.bodyMass !== null ? Math.round(getActivityTargetKcal(day.bodyMass)) : null;
+  const weeklyFatLossKg = weeklyFatLossKgAt(planMassKg);
+  const desiredKgPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) / 1000 : null;
+  const desiredGPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
+
+  setDesire('physique-mass-mean-desire', healthyMassKg);
+  setDesire('physique-mass-delta-desire', desiredKgPerDay);
+  setDesire('physique-mass-bmi-desire', heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null);
+  setDesire('physique-tei-desire', calTarget.kcal);
+  setDesire('physique-tef-desire', -digTarget);
+  setDesire('physique-aee-desire', actTargetKcal !== null ? -actTargetKcal : null);
+  setDesire('physique-sleep-deprivation-desire', 0);
+  setDesire('physique-balance-desire', targetBalanceKcal(planMassKg));
+  setDesire('physique-mass-delta-prime-desire', desiredGPerDay);
 }
 
 // The two activity categories physiqueAsWellnessEntries emits and every
@@ -492,27 +546,62 @@ function physiqueBaseBmrFigures(date, bodyMassKg) {
   return figures;
 }
 
-// The active equation's BMR plus the offset Calibrate measures over the n_p × L_p
-// days ending the day before `date`. Undefined inside the first n_p × L_p days of
-// data, or when that window has too little logged.
-function physiqueCalibratedBmr(date, plainBmr) {
+// Whichever of BMR_mif, BMR_kat and BMR_adp this day actually has — the plain
+// equations BMR_cal is measured against (as an offset) or, with nothing yet to
+// measure an offset from, averaged into a placeholder for (see
+// physiqueCalibratedBmr's 1st-week fallback below).
+function physiqueBmrEquationValues(figures) {
+  return [figures.BMR_mif, figures.BMR_kat, figures.BMR_adp].filter((v) => v !== undefined);
+}
+
+// The active equation's BMR plus the offset Calibrate measures over however many
+// full L_p-day periods are available so far, up to n_p. Ramps up rather than
+// waiting for the full n_p × L_p days to pile up: the 2nd period has only 1
+// period behind it to measure from, the 3rd has 2, and so on, capping at n_p
+// from period n_p + 1 onward — so BMR_cal starts appearing a period earlier
+// than it used to, every period, instead of staying blank until n_p periods
+// have fully elapsed.
+//
+// 1st period (no full L_p days logged yet, so no period to measure an offset
+// from at all): the plain average of whichever equations this day has, rather
+// than leaving BMR_cal undefined — so BMR_cal always has a value, from the very
+// first day, and the 1st period just happens to equal the average of the other
+// three until there's a measured offset to apply instead.
+function physiqueCalibratedBmr(date, plainBmr, figures) {
   if (plainBmr === undefined) return undefined;
   const periodCount = getSetting(BMR_CALIBRATION_PERIOD_COUNT_KEY, BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);
   const periodDays = getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
   const firstDate = physiqueDatedAscending()[0]?.date;
-  if (!firstDate) return undefined;
-  const daysOfData = Math.round((parseIsoDateUTC(date) - parseIsoDateUTC(firstDate)) / 86400000);
-  if (daysOfData < periodCount * periodDays) return undefined;
-  const result = computeBmrCalibration(null, periodDays, isoDatePlusDays(date, -1), periodCount);
+  const daysOfData = firstDate ? Math.round((parseIsoDateUTC(date) - parseIsoDateUTC(firstDate)) / 86400000) : 0;
+  const availablePeriods = firstDate ? Math.min(Math.floor(daysOfData / periodDays), periodCount) : 0;
+  if (availablePeriods < 1) {
+    const equations = physiqueBmrEquationValues(figures);
+    return equations.length ? Math.round(equations.reduce((sum, v) => sum + v, 0) / equations.length) : undefined;
+  }
+  const result = computeBmrCalibration(null, periodDays, isoDatePlusDays(date, -1), availablePeriods);
   return result.ok ? Math.round(plainBmr + result.offsetKcal) : undefined;
+}
+
+// BMR_cal is measured from real data (computeBmrCalibration's offset) rather than
+// any equation, so a thin or noisy calibration window can swing it far from what
+// every equation agrees is plausible. Clamped to within 10% of whichever of
+// BMR_mif, BMR_kat and BMR_adp are available for this day (min − 10% to max +
+// 10%), so it can't calibrate to an implausibly high or low number.
+const BMR_CAL_CLAMP_PCT = 0.10;
+function clampBmrCal(bmrCal, figures) {
+  const equations = physiqueBmrEquationValues(figures);
+  if (!equations.length) return bmrCal;
+  const lower = Math.round(Math.min(...equations) * (1 - BMR_CAL_CLAMP_PCT));
+  const upper = Math.round(Math.max(...equations) * (1 + BMR_CAL_CLAMP_PCT));
+  return Math.min(upper, Math.max(lower, bmrCal));
 }
 
 // All four figures for a day, computed fresh. `bodyMassKg` overrides the
 // carried-forward mass (a day being saved with its own new body-mass reading).
 function computePhysiqueBmrFigures(date, bodyMassKg = physiqueBodyMassAsOf(date)) {
   const figures = physiqueBaseBmrFigures(date, bodyMassKg);
-  const calibrated = physiqueCalibratedBmr(date, figures[BMR_EQUATION_KEYS[bmrFormula()]]);
-  if (calibrated !== undefined) figures.BMR_cal = calibrated;
+  const calibrated = physiqueCalibratedBmr(date, figures[BMR_EQUATION_KEYS[bmrFormula()]], figures);
+  if (calibrated !== undefined) figures.BMR_cal = clampBmrCal(calibrated, figures);
   return figures;
 }
 
@@ -542,19 +631,27 @@ function storedBmrForDate(date, basis = bmrBasis()) {
   return pickBmrForBasis(bmrFiguresForDate(date), basis);
 }
 
-// A day's SD off its own TEI, AEE, TEF and stored BMR — the same
+// A day's energy balance off its own TEI, AEE, TEF and stored BMR — the same
 // dailyEnergyBalanceKcal the Status card uses. Null without a BMR, TEI or sleep.
-function physiqueDeprivationKcal(day, sleepHours, bmrFigures) {
+function physiqueEnergyBalance(day, sleepHours, bmrFigures) {
   const maintenance = pickBmrForBasis(bmrFigures);
   if (maintenance === null || day.caloriesIn === null || sleepHours === null) return null;
-  return dailyEnergyBalanceKcal(
-    day.caloriesIn,
-    maintenance,
-    day.caloriesOut ?? 0,
-    day.tef !== null ? day.tef : Math.round(day.caloriesIn * (1 - tefDivisor())),
-    sleepHours,
-    getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT),
-  ).deprivationKcal;
+  const tef = day.tef !== null ? day.tef : Math.round(day.caloriesIn * (1 - tefDivisor()));
+  return {
+    tef,
+    ...dailyEnergyBalanceKcal(
+      day.caloriesIn,
+      maintenance,
+      day.caloriesOut ?? 0,
+      tef,
+      sleepHours,
+      getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT),
+    ),
+  };
+}
+
+function physiqueDeprivationKcal(day, sleepHours, bmrFigures) {
+  return physiqueEnergyBalance(day, sleepHours, bmrFigures)?.deprivationKcal ?? null;
 }
 
 // The BMR figures a save stores for `date`: its own body-mass reading, else the latest earlier one.
@@ -1247,6 +1344,14 @@ function openPhysiqueForm(entry, duplicate = false) {
   document.getElementById('physique-modal-title').textContent = (entry && !duplicate)
     ? formTitleWithDate(baseTitle, physiqueField('date').value)
     : baseTitle;
+
+  // Derived, Consumption and Workout start collapsed on any day but today —
+  // today's is the one actually being logged, so its boxes are left open by
+  // default.
+  const isToday = physiqueField('date').value === isoFromDate(new Date());
+  document.getElementById('physique-derived-details').open = isToday;
+  document.getElementById('physique-consumption-details').open = isToday;
+  document.getElementById('physique-workout-details').open = isToday;
 
   // A saved breakdown is shown as its table straight away on Edit, so an
   // existing day can be checked without re-running Calculate. The activity

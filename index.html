@@ -2219,8 +2219,6 @@
                     <input type="text" id="physique-body-mass" inputmode="decimal" placeholder="e.g. 94 (kg)">
                 </label>
             </div>
-            <p title="This day's body-mass figures as Save stores them in the Derived column, beside the BMR figures: the L_p-day rolling average, the trend's change per day, and BMI at the rolling average (the body-mass reading itself is the Body Mass field above)">m̄/Δm/BMI: <span id="physique-mass-figures">—</span></p>
-            <p title="This day's four BMR figures as Save stores them in the Derived column — at its own body-mass reading (else the latest earlier one), off the fields typed so far">BMR_mif/kat/cal/adp: <span id="physique-bmr-mif">—</span>/<span id="physique-bmr-kat">—</span>/<span id="physique-bmr-cal">—</span>/<span id="physique-bmr-adp">—</span></p>
             <div class="form-row">
                 <label>Bed
                     <input type="time" id="physique-bedtime">
@@ -2229,13 +2227,16 @@
                     <input type="time" id="physique-wake-time">
                 </label>
             </div>
-            <p title="Sleep Duration from Bed and Wake, and the Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's calorie balance, off the fields typed so far">S/SD: <span id="physique-sleep-duration">—</span>/<span id="physique-sleep-deprivation">—</span></p>
-            <label>Consumption
+            <!-- Collapsed by default on any day but today (openPhysiqueForm), same
+                 disclosure style as Tune's Equations — today's is left open since
+                 that's the day actually being logged. -->
+            <details id="physique-consumption-details">
+                <summary>Consumption</summary>
                 <div class="autocomplete-anchor">
-                    <textarea id="physique-consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
+                    <textarea id="physique-consumption" aria-label="Consumption" rows="4" placeholder="e.g. 100g ground beef&#10;60g frozen okra&#10;38g onion&#10;12.5g tomato paste&#10;4.5g garlic"></textarea>
                     <ul id="physique-consumption-suggestions" class="autocomplete-suggestions" hidden></ul>
                 </div>
-            </label>
+            </details>
             <label hidden>Breakdown
                 <textarea id="physique-breakdown" rows="4"></textarea>
             </label>
@@ -2280,12 +2281,16 @@
                 <input type="text" id="physique-tef" placeholder="e.g. 96 (kcal)">
             </label>
 
-            <label>Workout
+            <!-- Collapsed by default on any day but today (openPhysiqueForm), same
+                 disclosure style as Tune's Equations — today's is left open since
+                 that's the day actually being logged. -->
+            <details id="physique-workout-details">
+                <summary>Workout</summary>
                 <div class="autocomplete-anchor">
-                    <textarea id="physique-workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
+                    <textarea id="physique-workout" aria-label="Workout" rows="4" placeholder="e.g. 36x Rear Delt Fly machine (or cable)&#10;30x Seated Row machine&#10;36x Cable Bicep Curl&#10;30x Lat Pulldown"></textarea>
                     <ul id="physique-workout-suggestions" class="autocomplete-suggestions" hidden></ul>
                 </div>
-            </label>
+            </details>
             <div id="physique-activity-breakdown" class="table-responsive table-compact" hidden>
                 <table>
                     <thead>
@@ -2309,6 +2314,40 @@
             <label hidden>Calories Out
                 <input type="text" id="physique-calories-out" placeholder="e.g. 520 (kcal)">
             </label>
+
+            <!-- Derived figures, moved off the form into one dropdown rather than
+                 interleaved between the fields that price them. Collapsed on any
+                 day but today, same as Consumption and Workout above. Same label
+                 set (TEI/TEF/AEE/SD/D/Δm′) as the Status card (wellness-charts.js
+                 setStatusEnergyTile), just off this form's own typed fields rather
+                 than a saved/typed entry. Plain (non-compact) table, so every row's
+                 own border-bottom is a real table horizontal line, same as the
+                 breakdown table above. -->
+            <details id="physique-derived-details">
+                <summary>Derived</summary>
+                <div class="table-responsive table-compact">
+                    <table id="physique-derived-table">
+                        <thead>
+                        <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Unit</th></tr>
+                        </thead>
+                        <tbody>
+                        <tr title="The L_p-day rolling average body-mass (the reading itself is the Body Mass field above); Desire is the Body Mass target under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td>kg</td></tr>
+                        <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta">—</td><td id="physique-mass-delta-desire">—</td><td>kg</td></tr>
+                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the Body Mass target"><td>BMI</td><td id="physique-mass-bmi">—</td><td id="physique-mass-bmi-desire">—</td><td>kg/m²</td></tr>
+                        <tr><td>BMR_mif</td><td id="physique-bmr-mif">—</td><td>—</td><td>kcal</td></tr>
+                        <tr><td>BMR_kat</td><td id="physique-bmr-kat">—</td><td>—</td><td>kcal</td></tr>
+                        <tr><td>BMR_cal</td><td id="physique-bmr-cal">—</td><td>—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR_adp</td><td id="physique-bmr-adp">—</td><td>—</td><td>kcal</td></tr>
+                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the calorie target (Settings/Tune)"><td>TEI</td><td id="physique-tei">—</td><td id="physique-tei-desire">—</td><td>kcal</td></tr>
+                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the calorie target"><td>TEF</td><td id="physique-tef-derived">—</td><td id="physique-tef-desire">—</td><td>kcal</td></tr>
+                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the Activity target (Settings)"><td>AEE</td><td id="physique-aee">—</td><td id="physique-aee-desire">—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation">—</td><td id="physique-sleep-deprivation-desire">—</td><td>kcal</td></tr>
+                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own target deficit"><td>D</td><td id="physique-balance">—</td><td id="physique-balance-desire">—</td><td>kcal</td></tr>
+                        <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime">—</td><td id="physique-mass-delta-prime-desire">—</td><td>g</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
 
             <p id="physique-form-error" class="status" hidden></p>
 
@@ -2362,6 +2401,28 @@
              lists its activities below them. -->
         <div class="page-tiles instruction-groups" id="instruction-groups"></div>
         <div class="instruction-body" id="instruction-body"></div>
+
+        <!-- A copy of the Indicator panel's own Activity Rotation card (activity-rotation.js),
+             same chart and donut off the same data, just also visible here so the gym's own
+             tiles page shows the rotation without leaving for Health → Indicator. Hidden
+             alongside the tiles themselves (renderInstructionList) once a Group's own page
+             is open. Builds lazily the same way the original does (upsertChart's
+             IntersectionObserver, charts-base.js) — behind this modal's own `hidden` until
+             it's first opened. -->
+        <div class="body-mass-projection-wrap card" id="instruction-rotation-card">
+            <h3>Activity Rotation</h3>
+
+            <div class="protein-rotation-charts">
+                <div class="chart-box">
+                    <canvas id="activity-rotation-chart-gym"></canvas>
+                </div>
+                <div class="chart-box">
+                    <canvas id="activity-rotation-donut-gym"></canvas>
+                </div>
+            </div>
+
+            <div class="donut-legend" id="activity-rotation-legend-gym"></div>
+        </div>
 
         <div class="modal-actions">
             <button type="button" id="guide-log-btn" class="btn btn-icon" title="Tick activities to log them" aria-label="Log ticked" hidden disabled>📝</button>

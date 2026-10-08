@@ -1032,6 +1032,7 @@ td:has(.btn) {
 #insight-pattern-table thead th,
 #physique-calc-breakdown thead th,
 #physique-activity-breakdown thead th,
+#physique-derived-table thead th,
 .workout-table-strength thead th,
 .workout-table-neat thead th {
     border-bottom: 2px solid var(--color-nav);
@@ -1054,6 +1055,13 @@ td:has(.btn) {
 }
 
 #breakdown-table tbody tr:last-child td {
+    border-bottom: 2px solid var(--color-nav);
+}
+
+/* Physique's Derived table: one line closing each group (mass, BMR, the
+   energy-balance inputs) before the next one starts, same idiom as
+   physique-week-start/breakdown-category-start above. */
+#physique-derived-table tr.physique-derived-group-end td {
     border-bottom: 2px solid var(--color-nav);
 }
 
@@ -2491,9 +2499,25 @@ html.home-hub .page-tiles,
 
 #formula-expression-details summary,
 #formula-substituted-details summary,
-#insight-prompt-details summary {
+#insight-prompt-details summary,
+#physique-derived-details summary,
+#physique-consumption-details summary,
+#physique-workout-details summary {
     cursor: pointer;
     color: var(--color-text-muted);
+}
+
+/* Matches .app-form label's own size/spacing, since these replace a label. */
+#physique-derived-details,
+#physique-consumption-details,
+#physique-workout-details {
+    margin-bottom: var(--space-xs);
+}
+
+#physique-derived-details summary,
+#physique-consumption-details summary,
+#physique-workout-details summary {
+    font-size: .8rem;
 }
 
 /* Prompts are paragraphs, so they wrap. */

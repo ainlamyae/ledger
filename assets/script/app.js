@@ -690,6 +690,11 @@ async function loadDashboard(forceRefresh = false) {
         // (each exercise's Group and Weekly Target) both loaded.
         Promise.all([physiquePromise, activitiesPromise]).then(() => {
           renderActivityRotationChart(wellnessDateRange());
+          // The GYM modal's own copy (instruction-rotation-card, index.html) — its
+          // eager boot-time render (initActivityRotationPanel) ran before this data
+          // was in, so it needs the same post-load refresh the line above gives
+          // the Indicator panel's copy.
+          renderActivityRotationChart(wellnessDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);
           renderActivityPlanTables();
           renderInstructionList();
         }),

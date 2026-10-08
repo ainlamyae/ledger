@@ -275,7 +275,7 @@ function renderGlycogenSwingField() {
 //
 // Boer takes the CURRENT body mass, not m_g, and what Save writes is the resulting
 // grams rather than a per-kg rule. That's what keeps the target from sliding down as
-// you diet — the g/kg band in charts.js needs BODY_MASS_TARGET_KG as its basis for
+// you diet — the g/kg band in wellness-math.js needs BODY_MASS_TARGET_KG as its basis for
 // exactly that reason, whereas a gram figure is already frozen at the mass it was
 // computed from, and only moves when you re-save here.
 function readProteinFormula() {
@@ -943,7 +943,7 @@ function renderFormulaPreview() {
     const tau = preview.ACTIVITY_TARGET_MIN;
     const targetKg = preview.BODY_MASS_TARGET_KG;
     // "Arrived" is judged past the target by the glycogen/water swing (see
-    // arrivalTargetKg in charts.js) — the same rule the live State Trend & Forecast
+    // arrivalTargetKg in wellness-charts.js) — the same rule the live State Trend & Forecast
     // chart's own arrival date uses, so this t can't disagree with it.
     const forecastTargetKg = arrivalTargetKg(targetKg, bodyMassKg, heightCm, sex, targetKg < bodyMassKg);
     const detail = withFormulaOverrides(preview, () => calorieTargetDetail(bodyMassKg));
@@ -1238,7 +1238,7 @@ function renderFormulaPreview() {
     // of today's mass is exactly what the pin would hold, so the journey is its own.
     const weeklyPct = weeklyFatLossPct(deltaMSolved, bodyMassKg);
     // "Arrived" is judged past the target by the glycogen/water swing (see
-    // arrivalTargetKg in charts.js) — the same rule the live State Trend & Forecast
+    // arrivalTargetKg in wellness-charts.js) — the same rule the live State Trend & Forecast
     // chart's own arrival date uses, so this t can't disagree with it.
     const forecastTargetKg = arrivalTargetKg(targetKg, bodyMassKg, heightCm, sex, targetKg < bodyMassKg);
     const proj = withFormulaOverrides(preview, () => formulaProjection({

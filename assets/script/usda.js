@@ -7,7 +7,7 @@ const USDA_FDC_SEARCH_API = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 //
 // `nutrients` carries every OTHER figure the search response returned for
 // this food (vitamins, minerals, amino acids...), unused by Calculate's own
-// kcal/protein-only path but read by nutrition.js's Pull Micronutrients. A
+// kcal/protein-only path but read by nutrition.js's Complete. A
 // Foundation/SR Legacy result already comes back with dozens of these in
 // this same response — a separate per-food /food/{fdcId} request was tried
 // first and dropped: it 404s unreliably even against USDA's own documented
@@ -52,7 +52,7 @@ async function usdaLookupKcalCandidates(query) {
 // probably surfaced the wrong food entirely (see usdaLookupKcalCandidates),
 // and returning it would be worse than returning nothing. Shared by
 // calorie-estimator.js's Calculate fallback (compares against the AI's own
-// estimate) and nutrition.js's Pull Micronutrients (compares against the
+// estimate) and nutrition.js's Complete (compares against the
 // row's own logged Calories) — same trust question, two different reference
 // numbers.
 function pickPlausibleUsdaCandidate(candidates, kcalPer100gReference) {

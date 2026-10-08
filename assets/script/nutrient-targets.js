@@ -95,7 +95,7 @@ function nutrientDailyTargets() {
 
 // Patches one or more nutrients' `amount` inside the MICRONUTRIENT_DAILY_TARGETS_JSON
 // override, preserving each one's unit/kind (and every other nutrient) untouched — the
-// Formula Playground's Save calls this so this table's own Protein/Fiber rows track the
+// Tune's Save calls this so this table's own Protein/Fiber rows track the
 // band it just computed instead of sitting on the shipped FDA Daily Value forever. An
 // entry gains an override even if the setting was never customized before, since the
 // starting point is the shipped default for whichever name isn't already overridden.

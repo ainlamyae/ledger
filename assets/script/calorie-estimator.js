@@ -345,7 +345,7 @@ const UNIT_CANONICAL = {
 
 // Pure calorie/protein estimation core — no DOM reads or writes — shared by
 // the single-day Calculate button and the Physique table's bulk
-// Recalculate action (wellness.js). Returns {calories, protein, breakdown,
+// Calculate (recalculatePhysiqueDay, physique.js). Returns {calories, protein, breakdown,
 // usdaUnreachable} or throws (bad/empty input, Groq failure, etc.). Never
 // touches the Notes text itself — the caller's notes are the ones saved,
 // verbatim, no matter what the AI extraction below returns.

@@ -55,7 +55,7 @@ const CARB_TARGET_G_DEFAULT = 275;
 
 // Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 5.0 compound lifting, 7.0
 // jogging). Duplicates activity-estimator.js's EXERCISE_MET_DEFAULT rather than
-// referencing it: charts.js loads first, so that const is still in its dead zone.
+// referencing it: this file loads first, so that const is still in its dead zone.
 const ACTIVITY_MET_FALLBACK = 3.5;
 
 // Tune's MET box while its preview runs (withFormulaOverrides) — a what-if, never
@@ -498,16 +498,6 @@ function calibratedBmrKcal() {
 function currentCalibratedOffsetKcal() {
   if (bmrBasis() !== 'bmr_cal') return 0;
   return latestStoredCalibration()?.offsetKcal ?? 0;
-}
-
-// The saved offset regardless of which basis is currently active — unlike
-// currentCalibratedOffsetKcal above, which is 0 whenever 'bmr_cal' isn't the chosen basis (so
-// the planning math above is a no-op then). For display only: the Status card and Caloric
-// Intake chart show BMR_cal as a reference line "always shown regardless of which basis
-// Balance/Δm actually run on", the same convention λt/BMR_adp already follow, so the three
-// bases can be compared side by side. Null before any calibration has ever been saved.
-function calibratedOffsetKcalRaw() {
-  return latestStoredCalibration()?.offsetKcal ?? null;
 }
 
 // The single choke point every consumer of a raw bmrKcal() figure routes through before

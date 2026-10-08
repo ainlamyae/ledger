@@ -57,7 +57,7 @@
     for (const { name, value } of node.attributes) script.setAttribute(name, value);
     script.textContent = node.textContent;
     // A script element created here defaults to async, i.e. whenever-it-arrives.
-    // index.html's order is load-bearing (Chart.js before charts.js, config
+    // index.html's order is load-bearing (Chart.js before the chart scripts, config
     // before everything), so opt every one that wasn't explicitly marked async
     // back into ordered execution.
     if (!node.hasAttribute('async')) script.async = false;

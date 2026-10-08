@@ -4,7 +4,7 @@
 // target — so a low/empty bar flags "you haven't had this one, eat it."
 // Protein % is the share of your protein target this ingredient should
 // cover (e.g. 10 for "turkey = 10% of my protein"); since that target
-// (charts.js's getProteinTargetG) already updates live with body mass/height/
+// (wellness-math.js's getProteinTargetG) already updates live with body mass/height/
 // activity, each ingredient's gram target moves with it automatically —
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from Physique's own Calculate breakdown,
@@ -325,7 +325,7 @@ function renderProteinRotationChart({ from, to }) {
 }
 
 // No From/To pair of its own any more: this chart is the last block of the Health
-// Indicators panel, and wellnessDateRange() (charts.js) is that panel's one window.
+// Indicator panel, and wellnessDateRange() (wellness-charts.js) is that panel's one window.
 // initWellnessRangeControl() owns the wiring and redraws this chart on a change, so all
 // that's left here is the first, usually data-less render.
 function initProteinRotationPanel() {

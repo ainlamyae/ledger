@@ -115,7 +115,7 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     const p = byDate.get(date) || null;
     const m = massAsOf(date);
     // TEI/AEE are just this day's own logged figures — the standard symbols the Status card
-    // and Formula Playground use for the same two numbers, not a fresh calculation. TEF falls
+    // and Tune use for the same two numbers, not a fresh calculation. TEF falls
     // back to the flat f-share estimate when the day has no measured figure of its own, same
     // as the Status card's own TEF row does. D (and SD, the sleep-driven piece of it) need a
     // maintenance figure to react against (dailyEnergyBalanceKcal), so both are null wherever

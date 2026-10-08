@@ -1,4 +1,4 @@
-// "Health Plan" mode of the Health Insight panel: sends the Formula Playground's
+// "Plan" mode of the Health Insight panel: sends Tune's
 // whole plan — the published identities, the inputs behind them, and the figures
 // they produce — and asks whether the plan is actually feasible.
 //
@@ -73,7 +73,7 @@ function gatherPlanSnapshot() {
     ? null
     : Math.round(adaptedPlateauKg(detail.kcal, coefficients, adaptFraction) * 10) / 10;
 
-  // The rest of the Formula Playground's figure set, computed the same way its own render
+  // The rest of Tune's figure set, computed the same way its own render
   // functions do (same inputs, same rounding) so the Health Plan and Health Tune can't
   // quote different numbers for the same plan.
   //
@@ -97,7 +97,7 @@ function gatherPlanSnapshot() {
   const carbPctMin = getSetting('CARB_PCT_OF_KCAL_MIN', CARB_PCT_OF_KCAL_MIN_DEFAULT);
   const carbPctMax = getSetting('CARB_PCT_OF_KCAL_MAX', CARB_PCT_OF_KCAL_MAX_DEFAULT);
 
-  // Skeletal-muscle / glycogen knobs: the Formula Playground's own defaults (hard-coded in
+  // Skeletal-muscle / glycogen knobs: Tune's own defaults (hard-coded in
   // its boxes, not Settings-backed), repeated here as the same constants so m_musc/m_gly/
   // ΔM_gly match what Tune shows. Kept together so they read as one block, like its rows.
   const glySkeletalPct = 45;
@@ -181,7 +181,7 @@ function planSubstitutedLines(p) {
   const hM = Math.round((p.heightCm / 100) * 100) / 100;
   const proportional = p.projection.journey === 'pct';
 
-  // Ordered to match the Formula Playground's (Tune) own substituted trace, top to bottom,
+  // Ordered to match Tune's own substituted trace, top to bottom,
   // so the two read the same way. Every figure is computed in gatherPlanSnapshot by the same
   // wellness-math functions the playground uses, off the same rounded intake.
   const lines = [];

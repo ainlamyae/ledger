@@ -3,7 +3,7 @@
 // this one is built on REAL numbers — it takes the same per-ingredient totals
 // food-insight.js's aggregateFoodIntake already computes for the picked range,
 // looks each ingredient up in the Nutrition table (nutrition.js), and scales
-// whatever USDA-sourced panel Pull Micronutrients banked in its Micronutrients
+// whatever USDA-sourced panel Complete banked in its Micronutrients
 // column (JSON, per that row's own reference Amount) to how much was actually
 // eaten — the same scaling math calorie-estimator.js already applies to
 // Calories/Protein. The AI is asked to judge sufficiency against standard
@@ -167,7 +167,7 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
 
 // Estimated Thermic Effect of Food share of each macro's OWN calories —
 // Settings so they can be retuned without a code change, same idiom
-// TEF_PERCENT_KEY (charts.js) already uses for the flat whole-intake figure.
+// TEF_PERCENT_KEY (wellness-math.js) already uses for the flat whole-intake figure.
 // Defaults are the commonly-cited per-macro TEF shares: Protein 25%,
 // Carbohydrate 7.5%, Fat 2%.
 const TEF_PROTEIN_SHARE_KEY = 'TEF_PROTEIN_PERCENT';
@@ -212,7 +212,7 @@ function tefMacroRate() {
 // left untouched, so it reads as "not measured" rather than a confident
 // zero. Returns the day's total TEF in kcal, or null when nothing in the
 // breakdown is measurable at all — callers fall back to the flat
-// TEF_PERCENT_OF_INTAKE estimate (charts.js) in that case.
+// TEF_PERCENT_OF_INTAKE estimate (tefDivisor, wellness-math.js) in that case.
 function estimateTefBreakdown(breakdown) {
   let totalTefRaw = 0;
   let matched = false;

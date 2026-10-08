@@ -138,11 +138,28 @@ function activityRotationWindow(toIso, days) {
   return { from: isoFromDate(from), to: toIso };
 }
 
-let activityRotationChart = null;
-let activityRotationDonut = null;
+// Two independent sets of chart instances: the Indicator panel's own, and the
+// GYM modal's copy of the same card (instruction-rotation-card, index.html) —
+// same data and functions, a different pair of canvases, so each needs its
+// own upsertChart handle rather than sharing one (reusing one would destroy
+// whichever copy wasn't rendered most recently the next time the other redraws).
+const activityRotationCharts = {
+  indicator: { chart: null, donut: null },
+  gym: { chart: null, donut: null },
+};
+const ACTIVITY_ROTATION_DEFAULT_IDS = {
+  chart: 'activity-rotation-chart', donut: 'activity-rotation-donut', legend: 'activity-rotation-legend',
+};
+// The GYM modal's copy (instruction-rotation-card, index.html) — shared by
+// initActivityRotationPanel's boot-time render (app.js) and the post-load
+// refresh once Physique/Activities data is actually in (app.js), so the two
+// can't drift onto different element ids.
+const ACTIVITY_ROTATION_GYM_IDS = {
+  chart: 'activity-rotation-chart-gym', donut: 'activity-rotation-donut-gym', legend: 'activity-rotation-legend-gym',
+};
 
-function renderActivityRotationDonut(rows, barColors, toIso) {
-  const ctx = document.getElementById('activity-rotation-donut');
+function renderActivityRotationDonut(rows, barColors, toIso, target, ids) {
+  const ctx = document.getElementById(ids.donut);
   const labels = rows.map((r) => r.name);
 
   // Not a time window like the two below it — each Group's own Weekly Target,
@@ -164,7 +181,7 @@ function renderActivityRotationDonut(rows, barColors, toIso) {
   const hasData = rings.some((ring) => ring.total > 0);
   const allRings = [referenceRing, ...rings];
 
-  activityRotationDonut = upsertChart(activityRotationDonut, ctx, {
+  activityRotationCharts[target].donut = upsertChart(activityRotationCharts[target].donut, ctx, {
     type: 'doughnut',
     data: {
       labels,
@@ -203,8 +220,8 @@ function renderActivityRotationDonut(rows, barColors, toIso) {
   });
 }
 
-function renderActivityRotationChart({ from, to }) {
-  const ctx = document.getElementById('activity-rotation-chart');
+function renderActivityRotationChart({ from, to }, target = 'indicator', ids = ACTIVITY_ROTATION_DEFAULT_IDS) {
+  const ctx = document.getElementById(ids.chart);
   const rows = computeActivityRotationRows(from, to);
 
   const labels = rows.map((r) => r.name);
@@ -212,12 +229,12 @@ function renderActivityRotationChart({ from, to }) {
   const targetData = rows.map((r) => r.targetSessions);
   const { barColors, legend } = activityRotationPalette(rows);
 
-  renderCategoryLegend('activity-rotation-legend', legend);
+  renderCategoryLegend(ids.legend, legend);
 
   const hasData = labels.length > 0;
   const maxValue = Math.ceil(Math.max(1, ...actualData, ...targetData)) + 1;
 
-  activityRotationChart = upsertChart(activityRotationChart, ctx, {
+  activityRotationCharts[target].chart = upsertChart(activityRotationCharts[target].chart, ctx, {
     data: {
       labels,
       datasets: [
@@ -277,13 +294,22 @@ function renderActivityRotationChart({ from, to }) {
     },
   });
 
-  renderActivityRotationDonut(rows, barColors, to);
+  renderActivityRotationDonut(rows, barColors, to, target, ids);
 }
 
 // No From/To pair of its own, same as Protein Source Rotation: the Health
 // Indicator panel's wellnessDateRange() (wellness-charts.js) is the one
 // window every chart in it reads, and initWellnessRangeControl() redraws this
-// on a change.
+// on a change. This first call runs at boot, before Physique/Activities data
+// has loaded — app.js's own Promise.all([physiquePromise, activitiesPromise])
+// callback re-renders both copies again once it's actually in, which is the
+// render that puts real bars (rather than "No Activity Groups tracked yet")
+// on screen either copy first shows. The GYM modal's own copy
+// (instruction-rotation-card, index.html) otherwise doesn't redraw again after
+// that — same one-time-build idiom upsertChart's own IntersectionObserver
+// already gives a chart sitting behind a collapsed panel or, here, a closed
+// modal, just for the whole render rather than only the Chart.js construction.
 function initActivityRotationPanel() {
   renderActivityRotationChart(wellnessDateRange());
+  renderActivityRotationChart(wellnessDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);
 }

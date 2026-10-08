@@ -158,7 +158,7 @@ rate   = ema(i) − ema(i−7)      Body Mass only — regrading and the kg/week
 - **Today is not held out.** A logged reading for today updates the average the moment it's entered, same as any other day — unlike the day-in-progress exceptions elsewhere in this doc, there's no partial-day discount here.
 - **An unlogged day carries the last smoothed value forward** rather than breaking the line or sitting out of the average.
 - Drawn as one solid curve (`trendLineDataset`) in the panel's own near-black/near-white neutral (`targetMarkColor()`) — not the dashed violet segments earlier versions of this chart family used — with `monotone` cubic interpolation so the curve can't overshoot past a local high or low into a bump the data never had.
-- **Body Mass alone also derives a rate** (`emaSlopePerSpan`): the smoothed curve's own change over the trailing 7 days, read off two points on the one continuous curve rather than re-fit each week. Used both to regrade a red bar and quoted in the tooltip as `kg/week`.
+- **Body Mass alone also derives a rate** (`emaSlopePerSpan`): the smoothed curve's own change over the trailing 7 days, read off two points on the one continuous curve rather than re-fit each week. Used both to regrade a red dot and quoted in the tooltip as `kg/week`.
 - Body Mass folds this smoothed series into its kg bounds before padding, and the fat-energy twin axis is derived from those same bounds.
 - Sleep smooths bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 blend toward midnight rather than midday.
 

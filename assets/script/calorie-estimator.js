@@ -924,8 +924,10 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
   // (getCalorieTarget, getProteinTargetBandG/getFiberTargetBandG) rather than a second
   // copy of the arithmetic. Fat/Carbohydrate fall back to the FDA Daily Value reference
   // (no personalized formula for either yet); TEF and Source get no target at all.
-  // Physique-only: the Workout table's own Total has no equivalent day target to show.
-  if (target === 'physique') {
+  // Physique-only, and only today's own form: every other day is read after the
+  // fact, so "still left to reach today's goal" doesn't apply to it the way it
+  // does to the one day actually being logged.
+  if (target === 'physique' && physiqueField('date').value === isoFromDate(new Date())) {
     const wellnessEntries = physiqueAsWellnessEntries();
     const calorieTarget = getCalorieTarget(wellnessEntries);
     const proteinBand = getProteinTargetBandG(wellnessEntries);

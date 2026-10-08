@@ -804,6 +804,9 @@ function renderInstructionList() {
   // As Insight's modes: the tiles alone on GYM's page, a group's list alone on
   // its own (the breadcrumb's GYM goes back to the tiles).
   tiles.hidden = guideGroupSlug !== null;
+  // The Activity Rotation copy (activity-rotation.js) rides along with the
+  // tiles — a group's own page has no room for it beside the activity list.
+  document.getElementById('instruction-rotation-card').hidden = guideGroupSlug !== null;
 
   groups.forEach((rows, group) => {
     const slug = routeSlug(group);

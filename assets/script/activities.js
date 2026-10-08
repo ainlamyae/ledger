@@ -493,7 +493,7 @@ function renderActivityImagePreview() {
 
 // Values already in use for a free-text column, most-used first — the same
 // guard against fragmenting into "Push"/"push"/"Pusg" that Nutrition's
-// Classification datalist provides.
+// Group datalist provides.
 function renderActivityDatalist(datalistId, key) {
   const counts = new Map();
   allActivities.forEach((a) => {

@@ -1,7 +1,10 @@
-// "Protein Source Rotation" panel: for every Nutrition ingredient that
-// has a Protein % value set (nutrition.js), shows a horizontal bar — actual
-// protein eaten from that ingredient in the lookback window vs. a live
-// target — so a low/empty bar flags "you haven't had this one, eat it."
+// "Protein Source Rotation" panel: for every Nutrition Group with at least
+// one ingredient that has a Protein % value set (nutrition.js), shows a
+// horizontal bar — actual protein eaten from that group's tracked ingredients
+// in the lookback window vs. a live target — so a low/empty bar flags "you
+// haven't had this group, eat it." Worked out per ingredient
+// (computeProteinRotationRows), then summed per Group for the chart
+// (groupProteinRotationRows).
 // Protein % is the share of your protein target this ingredient should
 // cover (e.g. 10 for "turkey = 10% of my protein"); since that target
 // (wellness-math.js's getProteinTargetG) already updates live with body mass/height/
@@ -9,7 +12,7 @@
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from Physique's own Calculate breakdown,
 // independent of whatever Nutrition's Amount/Calories happen to say
-// today. Beside the bars, a three-ring donut splits the same sources by
+// today. Beside the bars, a three-ring donut splits the same groups by
 // share of protein — outermost ring the reference Protein % each source is
 // meant to cover, middle ring the 4 weeks ending on the To date, inner ring
 // the last week of it — so a source's short-term and medium-term share can
@@ -25,7 +28,7 @@ function trackedProteinSources() {
     .filter((n) => n.proteinPercent !== null && n.proteinPercent > 0)
     .map((n) => ({
       name: n.name,
-      classification: n.classification || PROTEIN_UNCLASSIFIED_LABEL,
+      group: n.group || PROTEIN_UNCLASSIFIED_LABEL,
       proteinPercent: n.proteinPercent,
     }));
 }
@@ -77,7 +80,7 @@ function computeProteinRotationRows(from, to) {
     const targetProteinG = (s.proteinPercent / 100) * weeklyProteinTarget * (lookbackDays / 7);
     return {
       name: s.name,
-      classification: s.classification,
+      group: s.group,
       actualProteinG: Math.round(actualProteinG * 10) / 10,
       targetProteinG: Math.round(targetProteinG * 10) / 10,
       proteinPercent: s.proteinPercent,
@@ -85,49 +88,91 @@ function computeProteinRotationRows(from, to) {
     };
   });
 
-  return sortByClassificationThenGap(rows);
+  return sortByGroupThenGap(rows);
 }
 
-// Sources cluster under their classification, so a whole group reads as one
+// Sources cluster under their group, so a whole group reads as one
 // block in the bars and one arc in the donut. The old flat "most left to eat
 // first" ordering is kept inside each group, and the groups themselves lead
 // with whichever has the largest combined gap — so the to-do-list read survives
 // grouping instead of being traded away for it. Unclassified sinks to the
 // bottom: it's a gap in the catalog, not a food group.
-function sortByClassificationThenGap(rows) {
+function sortByGroupThenGap(rows) {
   const gap = (r) => r.targetProteinG - r.actualProteinG;
 
   const groupGap = new Map();
-  rows.forEach((r) => groupGap.set(r.classification, (groupGap.get(r.classification) || 0) + gap(r)));
+  rows.forEach((r) => groupGap.set(r.group, (groupGap.get(r.group) || 0) + gap(r)));
 
   return [...rows].sort((a, b) => {
-    if (a.classification === b.classification) return gap(b) - gap(a);
-    const aUnknown = a.classification === PROTEIN_UNCLASSIFIED_LABEL;
-    const bUnknown = b.classification === PROTEIN_UNCLASSIFIED_LABEL;
+    if (a.group === b.group) return gap(b) - gap(a);
+    const aUnknown = a.group === PROTEIN_UNCLASSIFIED_LABEL;
+    const bUnknown = b.group === PROTEIN_UNCLASSIFIED_LABEL;
     if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
-    return groupGap.get(b.classification) - groupGap.get(a.classification);
+    return groupGap.get(b.group) - groupGap.get(a.group);
   });
 }
 
-// One hue per classification, lightness stepped within it — the group reads as
+// The chart's rows: the per-ingredient rows above summed into one per Group,
+// so the rotation reads as "eat more fish" rather than "eat more salmon". The
+// per-ingredient rows stay as they are — Insight's Protein mode reads those —
+// and each group row carries its `sources` so the donut and tooltips can name
+// them. A group's target is the sum of its members' Protein %, so the bars
+// still add up to the same totals as the ingredients they came from. Most
+// left to eat first; Unclassified last, as in sortByGroupThenGap.
+function groupProteinRotationRows(rows) {
+  const byGroup = new Map();
+  rows.forEach((r) => {
+    if (!byGroup.has(r.group)) {
+      byGroup.set(r.group, {
+        name: r.group, group: r.group, sources: [],
+        actualProteinG: 0, targetProteinG: 0, proteinPercent: 0, actualPercentOfTotalTarget: 0,
+      });
+    }
+    const g = byGroup.get(r.group);
+    g.sources.push(r.name);
+    g.actualProteinG += r.actualProteinG;
+    g.targetProteinG += r.targetProteinG;
+    g.proteinPercent += r.proteinPercent;
+    g.actualPercentOfTotalTarget += r.actualPercentOfTotalTarget;
+  });
+
+  const round1 = (v) => Math.round(v * 10) / 10;
+  const gap = (r) => r.targetProteinG - r.actualProteinG;
+  return [...byGroup.values()]
+    .map((g) => ({
+      ...g,
+      actualProteinG: round1(g.actualProteinG),
+      targetProteinG: round1(g.targetProteinG),
+      proteinPercent: round1(g.proteinPercent),
+      actualPercentOfTotalTarget: round1(g.actualPercentOfTotalTarget),
+    }))
+    .sort((a, b) => {
+      const aUnknown = a.group === PROTEIN_UNCLASSIFIED_LABEL;
+      const bUnknown = b.group === PROTEIN_UNCLASSIFIED_LABEL;
+      if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
+      return gap(b) - gap(a);
+    });
+}
+
+// One hue per group, lightness stepped within it — the group reads as
 // a block while two sources inside it stay distinguishable. Shared by the bars
 // and the donut, so a source keeps one colour everywhere in the panel.
 function proteinRotationPalette(rows) {
-  const classifications = [...new Set(rows.map((r) => r.classification))];
-  const hueFor = (c) => Math.round((classifications.indexOf(c) * 360) / classifications.length);
+  const groups = [...new Set(rows.map((r) => r.group))];
+  const hueFor = (c) => Math.round((groups.indexOf(c) * 360) / groups.length);
   const seen = new Map();
 
   const barColors = rows.map((r) => {
-    const n = seen.get(r.classification) || 0;
-    seen.set(r.classification, n + 1);
+    const n = seen.get(r.group) || 0;
+    seen.set(r.group, n + 1);
     // Wraps every 4 so a large group never fades out or drifts into the next
-    // classification's shade.
-    return seriesColor(hueFor(r.classification), { lightness: '--chart-series-light', shade: n % 4 });
+    // group's shade.
+    return seriesColor(hueFor(r.group), { lightness: '--chart-series-light', shade: n % 4 });
   });
 
   return {
     barColors,
-    legend: classifications.map((name) => ({ name, color: seriesColor(hueFor(name), { lightness: '--chart-series-light' }) })),
+    legend: groups.map((name) => ({ name, color: seriesColor(hueFor(name), { lightness: '--chart-series-light' }) })),
   };
 }
 
@@ -155,7 +200,7 @@ function proteinRotationWindow(toIso, days) {
 let proteinRotationChart = null;
 let proteinRotationDonut = null;
 
-// Same source order and colors as the bar chart — one source is one color
+// Same group order and colors as the bar chart — one group is one color
 // everywhere in the panel, in every ring and in its bar, which is what makes
 // the donut readable without a legend of its own. The rings are told apart by
 // position (outermost = reference target, then 4 weeks, then last week),
@@ -177,7 +222,8 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
   const rings = PROTEIN_ROTATION_DONUT_RINGS.map((ring) => {
     const { from, to } = proteinRotationWindow(toIso, ring.days);
     const eaten = from ? actualProteinEatenBySource(from, to) : new Map();
-    const data = rows.map((r) => Math.round((eaten.get(r.name.trim().toLowerCase()) || 0) * 10) / 10);
+    const eatenBy = (name) => eaten.get(name.trim().toLowerCase()) || 0;
+    const data = rows.map((r) => Math.round(r.sources.reduce((sum, name) => sum + eatenBy(name), 0) * 10) / 10);
     return { ...ring, data, total: data.reduce((sum, v) => sum + v, 0) };
   });
 
@@ -212,10 +258,9 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
         },
         tooltip: {
           callbacks: {
-            // The default title looks up data.labels by dataIndex, which is
-            // right for every ring — but the label line below already names the
-            // source, so the slice's classification goes here instead.
-            title: (items) => rows[items[0].dataIndex].classification,
+            // The label line below already names the group, so the title
+            // lists the ingredients it's made of instead.
+            title: (items) => rows[items[0].dataIndex].sources.join(', '),
             label: (item) => {
               const ring = allRings[item.datasetIndex];
               // The reference ring's own numbers ARE percentages already —
@@ -237,15 +282,15 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
 
 function renderProteinRotationChart({ from, to }) {
   const ctx = document.getElementById('protein-rotation-chart');
-  const rows = computeProteinRotationRows(from, to);
+  const rows = groupProteinRotationRows(computeProteinRotationRows(from, to));
 
   const labels = rows.map((r) => r.name);
   const actualData = rows.map((r) => r.actualProteinG);
   const targetData = rows.map((r) => r.targetProteinG);
   const { barColors, legend } = proteinRotationPalette(rows);
 
-  // One swatch per classification rather than per source — the shades within a
-  // group would only add noise, and the group is what the legend explains.
+  // One swatch per group — the bars are labelled by group too, but the donut
+  // isn't, and this is what names its slices.
   renderCategoryLegend('protein-rotation-legend', legend);
 
   const hasData = labels.length > 0;
@@ -290,11 +335,11 @@ function renderProteinRotationChart({ from, to }) {
         },
         tooltip: {
           callbacks: {
-            // The default title is the bare source name; naming its group there
-            // is what makes a block of same-hue bars self-explanatory.
+            // The default title is the bare group name; listing its tracked
+            // ingredients there says what the bar is summed from.
             title: (items) => {
               const row = rows[items[0].dataIndex];
-              return `${row.name} — ${row.classification}`;
+              return `${row.group} — ${row.sources.join(', ')}`;
             },
             label: (item) => {
               const row = rows[item.dataIndex];

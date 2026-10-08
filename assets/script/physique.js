@@ -1,4 +1,4 @@
-﻿// One row per day: sleep window, body mass, what was eaten and what was
+﻿﻿// One row per day: sleep window, body mass, what was eaten and what was
 // burned. The tab every chart, today-tile, Insight mode and Activity Plan tick
 // reads, via the physiqueAsWellnessEntries() adapter below.
 
@@ -1299,12 +1299,14 @@ function physiqueField(id) {
   return document.getElementById(`physique-${id}`);
 }
 
-// Pattern rows carry no date, so the input is disabled (and its required
-// attribute dropped) whenever "Pattern" is checked — disabled inputs don't
-// submit their value, but submitPhysiqueForm blanks it explicitly too in case
-// the browser still reports one.
+// Pattern rows carry no date, body mass or sleep, so Date/Body Mass and
+// Bed/Wake are hidden whenever "Pattern" is checked, and the date input is
+// disabled (its required attribute dropped). submitPhysiqueForm blanks all four
+// on a pattern; unticking Pattern brings back whatever was typed.
 function syncPhysiquePatternMode() {
   const isPattern = document.getElementById('physique-is-pattern').checked;
+  document.getElementById('physique-date-row').hidden = isPattern;
+  document.getElementById('physique-sleep-row').hidden = isPattern;
   const dateInput = physiqueField('date');
   dateInput.disabled = isPattern;
   dateInput.required = !isPattern;
@@ -1347,10 +1349,11 @@ function openPhysiqueForm(entry, duplicate = false) {
 
   // Derived, Consumption and Workout start collapsed on any day but today —
   // today's is the one actually being logged, so its boxes are left open by
-  // default.
+  // default. A Pattern opens Consumption too: the food is what a pattern is for.
   const isToday = physiqueField('date').value === isoFromDate(new Date());
+  const isPattern = document.getElementById('physique-is-pattern').checked;
   document.getElementById('physique-derived-details').open = isToday;
-  document.getElementById('physique-consumption-details').open = isToday;
+  document.getElementById('physique-consumption-details').open = isToday || isPattern;
   document.getElementById('physique-workout-details').open = isToday;
 
   // A saved breakdown is shown as its table straight away on Edit, so an
@@ -1505,14 +1508,16 @@ async function submitPhysiqueForm(event) {
 
   // Read explicitly rather than trusting that a disabled input reports no
   // value, so a pattern's date stays blank even if field and checkbox ever
-  // fall out of sync.
+  // fall out of sync. Body Mass and Bed/Wake are hidden on a pattern, so
+  // they're saved blank too.
   const isPattern = document.getElementById('physique-is-pattern').checked;
+  const patternBlankFields = new Set(['date', 'body-mass', 'bedtime', 'wake-time']);
 
   // An edit keeps the row's other cells (columns this app doesn't know about).
   const editing = allPhysiqueEntries.find((p) => p.row === editingPhysiqueRow);
   const day = { cells: editing ? editing.cells : [] };
   for (const { id, key, numeric } of PHYSIQUE_FIELDS) {
-    const raw = (isPattern && id === 'date') ? '' : physiqueField(id).value.trim();
+    const raw = (isPattern && patternBlankFields.has(id)) ? '' : physiqueField(id).value.trim();
     if (!numeric) {
       day[key] = raw;
       continue;

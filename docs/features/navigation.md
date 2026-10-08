@@ -6,6 +6,7 @@
 
 - `/health/`, `/finance/`, `/other/` are **hubs**: glance cards, then a name-only tile per block.
 - Health tiles: Indicator, Physique, Nutrition, Activity, Insight, Tune, Settings, then **Today** and **GYM** (gray).
+- Finance tiles: Indicator, Transaction, Account, Breakdown, then **Insight** last — the same order as the panels in `index.html`, which the tiles, sidebar and bottom bar all follow.
 - Each block and form is its own page under a breadcrumb starting at **Ledger**: `Ledger / Health / Physique / Log`. Pages switch in place, without a reload.
 - The breadcrumb is the only heading; the home page's reads **Ledger** alone.
 - Forms take the page's place instead of covering it.
@@ -28,7 +29,7 @@
 | 🧬 view | `/health/physique/2026-10-03/micronutrients/` |
 
 - Labelled rows (Contact, Account, Breakdown, Transaction, Travel, Application) use their label; repeats get `-2`, `-3`… in sheet order.
-- Physique's **Today** uses today's date address, logged or not; a Pattern is `/health/physique/pattern-1/`.
+- Physique's **Today** uses today's date address, logged or not; a Pattern is `/health/physique/pattern-1/`. Addresses like these have no file of their own, so locally they need `scripts/serve.py` (see [Getting Started](../getting-started.md#4-run-locally)); plain `python -m http.server` answers them with File not found.
 - Row addresses are served by `404.html`. `sitemap.xml` (`python scripts/build_sitemap.py`) lists block, button and view addresses but never rows, which would publish sheet data.
 
 ## Hub and pages

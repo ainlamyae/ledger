@@ -277,11 +277,11 @@ protein/100kcal = protein / calories × 100
 targetG   = (Protein% / 100) × dailyMidpoint × lookbackDays
 actualG   = Σ protein of every Calculate breakdown item with that name in range
 % of total target = actualG / (dailyMidpoint × lookbackDays) × 100
-sort key  = classification group gap, then targetG − actualG within it, both descending
+chart bar = Σ targetG and Σ actualG over each Group's tracked ingredients, sorted by Σ targetG − Σ actualG descending
 ```
 
-- Group colour: one hue per classification, lightness stepped `62 − (n mod 4)×9` within it.
-- Donut rings: each source's share of `Σ actualG` over the 28 and 7 days ending on the To date.
+- Group colour: one hue per Group.
+- Donut rings: each Group's share of `Σ actualG` over the 28 and 7 days ending on the To date.
 
 ## Today at a Glance
 

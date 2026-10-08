@@ -1,0 +1,5 @@
+#!/bin/sh
+# Stamps assets/script/version.js from the commit messages (scripts/version.cjs)
+# and folds it into the commit just made.
+command -v node >/dev/null 2>&1 || exit 0
+node "$(git rev-parse --show-toplevel)/scripts/version.cjs" --hook || true

@@ -1,0 +1,20 @@
+#!/bin/sh
+# No co-authors, no names or emails in any commit message. Plain sh (no node),
+# so it runs wherever git does.
+#
+# Drops every attribution line: any "Something-by:" trailer (Co-authored-by,
+# Signed-off-by, …), any trailer carrying a <name@email>, "Generated with/by"
+# lines, 🤖 lines and noreply@ addresses.
+msg="$1"
+tmp="$msg.ledger-tmp"
+
+grep -v -i -E \
+  -e '^[[:space:]]*[a-z-]+-by:' \
+  -e '^[[:space:]]*[a-z-]+:.*<[^>]*@[^>]*>' \
+  -e 'generated (with|by)' \
+  -e '🤖' \
+  -e 'noreply@' \
+  "$msg" > "$tmp"
+# Without the trailing blank lines the removed trailers leave behind.
+awk '{ lines[NR] = $0 } /[^[:space:]]/ { last = NR } END { for (i = 1; i <= last; i++) print lines[i] }' "$tmp" > "$msg"
+rm -f "$tmp"

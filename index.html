@@ -96,8 +96,8 @@
 <header>
     <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a></h1>
 
-    <!-- Each entry is a real address, not an in-page anchor: /health/, /finance/
-         and /other/ are pages of their own that show that one wrapper (see
+    <!-- Each entry is a real address, not an in-page anchor: /health/, /finance/,
+         /track/ and /other/ are pages of their own that show that one wrapper (see
          assets/script/section-page.js). data-section names the wrapper the
          address stands for, and is the only list of them anywhere — the section
          pages and the scroll-spy both read this nav rather than repeating it. -->
@@ -112,6 +112,9 @@
         </a>
         <a href="finance/" data-section="finance">
             <span class="nav-label">Finance</span>
+        </a>
+        <a href="track/" data-section="track">
+            <span class="nav-label">Track</span>
         </a>
         <a href="other/" data-section="other">
             <span class="nav-label">Other</span>
@@ -560,14 +563,18 @@
                 </label>
             </div>
 
-            <div class="insight-mode-actions" id="insight-mode-actions">
-                <button type="button" class="page-tile" data-insight-mode="plan" data-route="plan" data-route-view aria-pressed="false"><span class="page-tile-title">Plan</span></button>
-                <button type="button" class="page-tile" data-insight-mode="wellness" data-route="wellness" data-route-view aria-pressed="false"><span class="page-tile-title">Wellness</span></button>
-                <button type="button" class="page-tile" data-insight-mode="food" data-route="food" data-route-view aria-pressed="false"><span class="page-tile-title">Food</span></button>
-                <button type="button" class="page-tile" data-insight-mode="micronutrient" data-route="micronutrient" data-route-view aria-pressed="false"><span class="page-tile-title">Micronutrient</span></button>
-                <button type="button" class="page-tile" data-insight-mode="activity" data-route="activity" data-route-view aria-pressed="false"><span class="page-tile-title">Activity</span></button>
-                <button type="button" class="page-tile" data-insight-mode="protein" data-route="protein" data-route-view aria-pressed="false"><span class="page-tile-title">Protein</span></button>
-                <button type="button" class="page-tile" data-insight-mode="pattern" data-route="pattern" data-route-view aria-pressed="false" title="Send the BMR_cal periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR"><span class="page-tile-title">Pattern</span></button>
+            <!-- The modes, in one card titled Insight, as a hub's tiles are. -->
+            <div class="card insight-mode-actions">
+                <h3>Insight</h3>
+                <div id="insight-mode-actions">
+                    <button type="button" class="page-tile" data-insight-mode="plan" data-route="plan" data-route-view aria-pressed="false"><span class="page-tile-title">Plan</span></button>
+                    <button type="button" class="page-tile" data-insight-mode="wellness" data-route="wellness" data-route-view aria-pressed="false"><span class="page-tile-title">Wellness</span></button>
+                    <button type="button" class="page-tile" data-insight-mode="food" data-route="food" data-route-view aria-pressed="false"><span class="page-tile-title">Food</span></button>
+                    <button type="button" class="page-tile" data-insight-mode="micronutrient" data-route="micronutrient" data-route-view aria-pressed="false"><span class="page-tile-title">Micronutrient</span></button>
+                    <button type="button" class="page-tile" data-insight-mode="activity" data-route="activity" data-route-view aria-pressed="false"><span class="page-tile-title">Activity</span></button>
+                    <button type="button" class="page-tile" data-insight-mode="protein" data-route="protein" data-route-view aria-pressed="false"><span class="page-tile-title">Protein</span></button>
+                    <button type="button" class="page-tile" data-insight-mode="pattern" data-route="pattern" data-route-view aria-pressed="false" title="Send the BMR_cal periods, with macro and activity averages, to AI to find what drives more fat loss and a higher BMR"><span class="page-tile-title">Pattern</span></button>
+                </div>
             </div>
 
             <label class="insight-question-label" for="insight-question">Ask a question (optional)
@@ -1426,15 +1433,9 @@
 
         <!-- Spending Breakdown by Type — the per-category donut wall (Housing,
              Transportation, Grocery, Personal, Household …), four periods each plus an
-             Untyped remainder. Commented out, not deleted: it's wanted again later.
-             Uncomment this section AND the renderTypeBreakdownCharts call in app.js's
-             reportPromise — the renderer (finance-charts.js) and its parsed data are untouched,
-             and the call is what fills this container.
-        <div class="panel-section card">
-            <h3>Spending Breakdown by Type</h3>
-            <div id="type-breakdown-container"></div>
-        </div>
-        -->
+             Untyped remainder; renderTypeBreakdownCharts (finance-charts.js) fills this
+             with one card per category, like every other Indicator chart. -->
+        <div class="panel-section" id="type-breakdown-container"></div>
 
         <div class="panel-section card">
             <h3>Portfolio Allocation</h3>
@@ -1579,8 +1580,12 @@
         <div class="panel" id="financial-insight-panel" data-route="insight">
             <h2>Insight</h2>
 
-            <div class="insight-mode-actions" id="financial-insight-mode-actions">
-                <button type="button" id="financial-insight-load-btn" class="page-tile" data-route="snapshot" data-route-view aria-pressed="false" title="Net worth, cash flow, spending by category and accounts"><span class="page-tile-title">Snapshot</span></button>
+            <!-- The modes, in one card titled Insight, as a hub's tiles are. -->
+            <div class="card insight-mode-actions">
+                <h3>Insight</h3>
+                <div id="financial-insight-mode-actions">
+                    <button type="button" id="financial-insight-load-btn" class="page-tile" data-route="snapshot" data-route-view aria-pressed="false" title="Net worth, cash flow, spending by category and accounts"><span class="page-tile-title">Snapshot</span></button>
+                </div>
             </div>
 
             <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
@@ -1635,8 +1640,8 @@
         </div>
     </section>
 
-    <section id="other" class="panel-group">
-        <h2 class="panel-group-title"><a href="other/">Other</a></h2>
+    <section id="track" class="panel-group">
+        <h2 class="panel-group-title"><a href="track/">Track</a></h2>
 
         <div class="panel" data-route="work-time">
             <div class="panel-header">
@@ -1819,6 +1824,10 @@
 
             <div id="applications-list"></div>
         </div>
+    </section>
+
+    <section id="other" class="panel-group">
+        <h2 class="panel-group-title"><a href="other/">Other</a></h2>
 
         <div class="panel" data-route="contact">
             <div class="panel-header">
@@ -2398,9 +2407,12 @@
     <div class="modal-card">
         <h2 id="activity-instruction-title">Instructions on the Activities</h2>
 
-        <!-- One tile per Group (activities.js's renderInstructionList); a group's page
-             lists its activities below them. -->
-        <div class="page-tiles instruction-groups" id="instruction-groups"></div>
+        <!-- One tile per Group (activities.js's renderInstructionList), in one card
+             titled GYM, as a hub's tiles are; a group's page lists its activities below. -->
+        <div class="card" id="instruction-groups-card">
+            <h3>GYM</h3>
+            <div class="page-tiles instruction-groups" id="instruction-groups"></div>
+        </div>
         <div class="instruction-body" id="instruction-body"></div>
 
         <!-- A copy of the Indicator panel's own Activity Rotation card (activity-rotation.js),

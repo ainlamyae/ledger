@@ -13,7 +13,7 @@ All styling lives in `assets/style/styles.css`. Pages and scripts carry no inlin
 | Charts | Their own palette, `--chart-*` tokens read by `chartColor` / `seriesColor` (`charts-base.js`) |
 | Row tints | **Green** — today's row, or anything logged today · **Indigo** — a Work Time day off. No row is faded |
 | Table lines | One colour, the line **gray** (`--color-border`), as iOS separators: a .5px hairline between rows; 1px under the header, above a Total and at group breaks; 1px dashed above a Desire or Ideal/day |
-| Backgrounds | Page **off-white** (`--color-bg`) under two soft blue/violet washes (`--bg-wash-1`/`-2`, fixed to the screen); cards, inputs, buttons and GYM figures **white** (`--color-surface`); page tiles Apple-style **tinted** capsules (12% of `--color-primary` under blue text, `border-radius: 999px`; dimmed and shrunk while pressed), so they stand out on a card and on the page alike — content is always solid |
+| Backgrounds | Page **off-white** (`--color-bg`) under two soft blue/violet washes (`--bg-wash-1`/`-2`, fixed to the screen); cards, inputs, buttons and GYM figures **white** (`--color-surface`); page tiles Apple-style **gray** capsules (a see-through 15% of the system gray `--color-text-muted` under ordinary text, `border-radius: 999px`; dimmed and shrunk while pressed), so they stand out on a card and on the page alike — content is always solid |
 | Glass | The floating layer only, like Apple's Liquid Glass: header, phone tab bar and action bar, sticky form actions, sidebar, account menu and (wide screens) dialogs. Translucent `--glass-bg` / `--glass-bg-strong`, blurred by `--glass-blur`, a `--glass-border` rim and `--glass-highlight` top edge; text on it is `--glass-text`. Solid again when blur is unsupported or the device asks for reduced transparency |
 
 ## Typography
@@ -24,8 +24,8 @@ Four sizes, as tokens — every `font-size` is one of them — on one 15px base 
 
 | Token | Size | Used for |
 |---|---|---|
-| `--text-small` | .8rem | Card content (`--card-text-size`, set on `.card`), table cells (every width), word buttons, labels, hints, menus, badges, formulas, footer, card labels, sidebar section names, chart text |
-| `--text-body` | 13px | Text, tiles, breadcrumb, sidebar links, status lines |
+| `--text-small` | .8rem | Card content (`--card-text-size`, set on `.card`), tile labels, table cells (every width), word buttons, labels, hints, menus, badges, formulas, footer, card labels, sidebar section names, chart text |
+| `--text-body` | 13px | Text, breadcrumb, sidebar links, status lines |
 | `--text-title` | 1.1rem | Every heading (header title, panel and form titles, `h1`–`h4`), emoji buttons |
 | `--text-display` | 1.4rem | Phone bottom-bar emoji, landing title, flags |
 | `--input-font-size` | 15px (16px on touch) | Every input, select and textarea — 16px keeps iOS from zooming |

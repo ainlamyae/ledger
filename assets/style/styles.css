@@ -414,7 +414,7 @@ header .btn:hover {
 .account-menu-name,
 .page-tile-title {
     font-weight: 600;
-    font-size: var(--text-body);
+    font-size: var(--text-small);
 }
 
 .account-menu-email {
@@ -3303,13 +3303,14 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     /* Narrow sides, so a long one-word label ("Transaction") fits four a row. */
     padding: var(--space-s) var(--space-xs);
     text-align: center;
-    /* Apple's "tinted" button: a light wash of the blue under blue text, which
-       stands out on a white card and on the page alike, in both themes. */
-    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    /* Apple's neutral "gray" button: a see-through wash of the system gray
+       (#8e8e93) under ordinary text, so it reads on a white card and on the page
+       alike, light and dark. */
+    background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
     /* A capsule, as iOS 26 / macOS Tahoe buttons and the glass bottom bar are. */
     border-radius: 999px;
     box-shadow: var(--shadow-card);
-    color: var(--color-primary);
+    color: var(--color-text);
     text-decoration: none;
     transition: transform .2s var(--ease-spring), box-shadow .2s var(--ease-spring), opacity .2s var(--ease-spring);
 }

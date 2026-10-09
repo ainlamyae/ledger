@@ -82,7 +82,7 @@ textarea {
     /* The type scale: four sizes, every font-size in this file is one of them
        (inputs aside: --input-font-size keeps iOS from zooming). */
     --text-small: .8rem;
-    --text-body: .9rem;
+    --text-body: 13px;
     --text-title: 1.1rem;
     --text-display: 1.4rem;
     /* Every card's own text (glance cards and widgets alike): 12px. */

@@ -2920,6 +2920,8 @@ html.home-hub .page-tiles,
     border-top: 1px solid var(--color-border);
 }
 
+/* A spaced em dash between the footer's two parts: typeset as a real
+   character, so text readers (search engines, AI) see the break too. */
 .site-footer .footer-divider {
     margin: 0 var(--space-xs);
 }

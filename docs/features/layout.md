@@ -11,7 +11,8 @@
 - Notifications for Work Time and Car Service: account menu → **Enable notifications**.
 - iPhone Safari never zooms on a tapped field (`maximum-scale=1.0`, 16px touch fields); pinch-zoom still works.
 - From/To pairs keep 30px fields, a 16px gap on a phone, and `--space-s` after them.
-- The footer reads `Ledger v3.3.6 • © 2026 ALI`: product and version first (Ledger links home; the version is stamped per commit), then the copyright with its owner (ALI links to the author's site); the year is the current one.
+- The footer reads `© 2026 ALI — Ledger v3.3.6`, its two parts joined by a spaced em dash, a real character so search engines and AI read the break: the copyright with its owner first (ALI links to the author's site; the year is the current one), then the product and its version (Ledger links home; the version is stamped per commit).
+  - The same facts are in `index.html`'s head for machines: `<meta name="author" content="ALI">` and a schema.org `WebApplication` JSON-LD block (name, URL, description, author and copyright holder ALI, copyright year). It carries no version — that changes every commit and only `version.js` is stamped.
 - On a phone the copyright line sits in a slim strip under the bottom bar; short pages fit without scrolling.
 - The last-load timestamp (`setLastUpdated`, "Updated 11:00:44") lives in the account menu, under the email and above Refresh data — not in the header, at any width.
 

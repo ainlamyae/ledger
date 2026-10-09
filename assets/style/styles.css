@@ -2506,7 +2506,7 @@ html.home-hub .page-tiles,
 
 @media (max-width: 820px) {
     :is(#insight-mode-actions, #financial-insight-mode-actions) {
-        grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
     }
 }
 
@@ -3221,7 +3221,7 @@ html.home-hub .page-tiles,
     display: none;
 }
 
-/* Name-only tiles, as many a row as fit: 3 on a phone, up to 7 on a laptop. */
+/* Name-only tiles, as many a row as fit: 4 on a phone, up to 7 on a laptop. */
 
 html.section-pages[data-page="hub"] .panel-group > .panel[data-route] {
     display: none;
@@ -3300,7 +3300,8 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     align-items: center;
     /* The large button size, the same as the phone's action-bar buttons. */
     min-height: 42px;
-    padding: var(--space-s) var(--space-s);
+    /* Narrow sides, so a long one-word label ("Transaction") fits four a row. */
+    padding: var(--space-s) var(--space-xs);
     text-align: center;
     /* Apple's "tinted" button: a light wash of the blue under blue text, which
        stands out on a white card and on the page alike, in both themes. */
@@ -3353,10 +3354,12 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     color: #fff;
 }
 
+/* Four a row on a phone, down to a 375px-wide one (5rem each plus the gaps). */
 @media (max-width: 820px) {
     html.section-pages[data-page="hub"] .page-tiles,
-    html.home-hub .page-tiles {
-        grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+    html.home-hub .page-tiles,
+    .page-tiles.instruction-groups {
+        grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
     }
 }
 

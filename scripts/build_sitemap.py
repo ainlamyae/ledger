@@ -8,7 +8,7 @@ import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SITE = 'https://ainlamyae.github.io/ledger/'
-SECTIONS = ('health', 'finance', 'other')
+SECTIONS = ('health', 'finance', 'track', 'other')
 
 
 def addresses():

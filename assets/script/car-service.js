@@ -1,4 +1,4 @@
-// Car Service block (Other section): past services from Transportation transactions
+// Car Service block (Track section): past services from Transportation transactions
 // whose description carries the odometer as "@12345km", and the next service of each
 // kind predicted from a linear fit of those readings.
 //
@@ -345,14 +345,14 @@ function renderCarServiceChart(records, predictions, fit, today) {
 function updateCarServiceReminder(predictions, today) {
   const due = predictions.filter((p) => carDaysBetween(today, p.date) <= CAR_REMINDER_DAYS);
   if (!due.length) {
-    setPageBadge('other', 'car-service', null);
+    setPageBadge('track', 'car-service', null);
     return;
   }
 
   const days = carDaysBetween(today, due[0].date);
   const names = [...new Set(due.map((p) => carTypeInfo(p.type).short))].join('+');
   const detail = due.map((p) => `${p.label} (${p.date})`).join(', ');
-  setPageBadge('other', 'car-service', { text: `${days}d`, title: `Car service due: ${detail}` });
+  setPageBadge('track', 'car-service', { text: `${days}d`, title: `Car service due: ${detail}` });
 
   if ('Notification' in window && Notification.permission === 'granted'
     && localStorage.getItem('ledger_last_car_service_notified') !== today) {

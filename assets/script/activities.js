@@ -803,7 +803,9 @@ function renderInstructionList() {
   const groups = guideGroups();
   // As Insight's modes: the tiles alone on GYM's page, a group's list alone on
   // its own (the breadcrumb's GYM goes back to the tiles).
-  tiles.hidden = guideGroupSlug !== null;
+  document.getElementById('instruction-groups-card').hidden = guideGroupSlug !== null;
+  // Empty on the tiles view; hidden so its top margin adds no gap between the cards.
+  body.hidden = guideGroupSlug === null;
   // The Activity Rotation copy (activity-rotation.js) rides along with the
   // tiles — a group's own page has no room for it beside the activity list.
   document.getElementById('instruction-rotation-card').hidden = guideGroupSlug !== null;
@@ -877,27 +879,24 @@ function renderInstructionList() {
         figure.addEventListener('error', () => figure.replaceWith(blank()), { once: true });
       }
 
-      const label = document.createElement('span');
-      label.className = 'instruction-activity-name';
+      // The name is the card's label (.card h3), as on every other card.
+      const label = document.createElement('h3');
       label.textContent = activity.name;
 
-      li.append(figure, label);
+      li.append(label);
 
-      // The name is what you scan for, so the rest of the row sits under it at
-      // plain (non-bold) font weight: what the movement trains, then how much
-      // of it to do (load, sets/reps, rest — see instructionPrescription). A
-      // line whose cell is blank on the sheet is skipped rather than printed
-      // empty.
-      // The prescription is what's read mid-set, so it's in the text colour, not muted.
-      [[activity.muscleGroup, ''], [instructionPrescription(activity), ' instruction-activity-prescription']]
-        .filter(([text]) => text)
-        .forEach(([text, extra]) => {
-          const meta = document.createElement('span');
-          meta.className = `instruction-activity-meta${extra}`;
-          meta.textContent = text;
-          li.appendChild(meta);
-        });
+      // Under the name, above the figure: how much of it to do (load, sets/reps,
+      // rest — see instructionPrescription), skipped when the sheet gives none. It's
+      // what's read mid-set, so it's in the text colour, not muted.
+      const prescription = instructionPrescription(activity);
+      if (prescription) {
+        const meta = document.createElement('span');
+        meta.className = 'instruction-activity-meta instruction-activity-prescription';
+        meta.textContent = prescription;
+        li.appendChild(meta);
+      }
 
+      li.appendChild(figure);
       list.appendChild(li);
     });
 

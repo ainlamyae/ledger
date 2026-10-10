@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.4.0** | feat(versioning): generate a changelog and count versions from 0.0.0 |
+| (this commit) | **3.5.0** | feat(leetcode): add track leetcode page with neetcode roadmap |
+| `20a9c80` | **3.4.0** | feat(versioning): generate a changelog and count versions from 0.0.0 |
 | `7462f3a` | **3.3.0** | feat(versioning): derive app version from conventional commits |
 | `e94e0aa` | **3.2.0** | feat(widgets): show sunrise and sunset in the weather widget |
 | `c414203` | **3.1.0** | feat(charts): replace date pickers with range buttons |

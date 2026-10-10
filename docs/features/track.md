@@ -10,6 +10,8 @@
   - Two tables: **Predicted** (Date, Odometer, Service, Basis) above **Done**. Every Basis credits one source: — Toyota, — TD or — your own history.
   - Due within 30 days → `28d` / `-3d` badge and an optional daily Chrome reminder.
 - **Travel** (`/track/travel/`) and **Application** (`/track/application/`).
+- **LeetCode** (`/track/leetcode/`): the NeetCode 250 by category, ticked off from your logged solves, with a past-year heatmap and NeetCode's roadmap graph; 📝 logs one.
+  - Counts only NeetCode 250 problems you've logged, so it can differ from LeetCode's own solved total (which counts every problem, roadmap or not).
 
 ## Track
 
@@ -21,3 +23,10 @@
   - Service type comes from description keywords (oil, changeover, corrosion/undercarriage, rotation, cabin, air filter, brake fluid, brake/valve/battery, coolant, spark); anything else is **Other**. Predictions more than 2 years out stay in the table but off the chart.
 - **Travel** — one Travel panel: Time Spent by Country flag tiles and a Countries Visited choropleth above the sortable table they're derived from.
 - **Applications** — immigration/visa applications as expandable cards, grouped Ongoing/Closed.
+- **LeetCode** (`leetcode.js`, data in `leetcode-roadmap.js`) — the NeetCode 250 ([neetcode.io/practice](https://neetcode.io/practice/practice/neetcode250); list from [ascherj/neetcode-250-guide](https://github.com/ascherj/neetcode-250-guide)), top to bottom:
+  - **Summary line:** `Solved 45/250 · Easy 27/60 · Medium 17/155 · Hard 1/35`.
+  - **Past Year** card: a heatmap like LeetCode's profile — 7 day rows by week columns, month names on top, scrolled to today on a phone. 1 solve is dark green, the busiest day near light green, none an empty square; hover `2026-08-23: 11 solves`.
+  - **Roadmap** card: NeetCode's roadmap as a graph (`NEETCODE_ROADMAP`, its positions and parent links taken from neetcode.io/roadmap). A node per category with `9/13` and a green progress bar, lines from each topic to the ones it unlocks; a finished node has a green rim, the open one a blue rim; clicking a node opens its card. Scrolls sideways on a phone.
+  - **Category cards** (`5/22 solved`), one open at a time, the first unfinished by default. Each is a table: ✅, Solved (first date, `×2` when solved again), Problem, Difficulty, then the row's buttons — 🎥 (NeetCode video) and 🔗 (LeetCode problem), then ✏️/🗑️ on a solved row or 📝 on an unsolved one.
+  - **📝 Log** (header, or a row's 📝 to prefill it; both open the form page `/track/leetcode/log/`): Date (today), Problem (a roadmap name), Category, Difficulty, LeetCode and NeetCode Video (filled from the problem, editable), Notes. Saves to the **LeetCode** tab, created on the first save; a solved row's ✏️/🗑️ edits or deletes its latest solve.
+  - Progress is your own log: LeetCode and NeetCode don't let the browser read your solved list (the first 44 rows were imported once from your LeetCode account).

@@ -25,7 +25,8 @@ Colour marks **word buttons** only; emoji buttons (`.btn-icon`, `.row-action-btn
 | Colour | Role | Examples |
 |---|---|---|
 | Blue | Add or save | Save & Add Another, Transfer's commit |
-| Gray | Opens an editor without committing | Today, Workouts tiles |
+| Gray | Opens an editor without committing | Physique's Today button |
+| Tinted tile | What a hub tile opens: gray rows, green form, orange chart, purple AI | Every hub tile (see [Hubs, Pages & Addresses](navigation.md)) |
 | Red | Destructive, text labels only | The export filter's remove |
 | Default | Everything else | |
 

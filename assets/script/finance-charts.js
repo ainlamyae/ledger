@@ -541,6 +541,7 @@ const FINANCE_TREND_RANGES = [
   { slug: '3m', label: '3m', months: 3 },
   { slug: '6m', label: '6m', months: 6 },
   { slug: '1y', label: '1y', months: 12 },
+  { slug: '5y', label: '5y', months: 60 },
   { slug: 'all', label: 'All' },
 ];
 let financeTrendRangeSlug = '1y';

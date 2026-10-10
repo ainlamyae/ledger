@@ -19,6 +19,11 @@
     if (localStorage.getItem('ledger_theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
+    try {
+        if (localStorage.getItem('ledger_side_nav') === 'closed') {
+            document.documentElement.dataset.sideNav = 'closed';
+        }
+    } catch (e) {}
 </script>
 
 <!-- Named here, rather than left to arrive with the rest of index.html's head,

@@ -19,7 +19,7 @@ flowchart TD
     Sheets["Google Sheets API v4<br/>sheets.googleapis.com<br/>get / batchGet / append / update / clear / batchUpdate"]
     Drive["Google Drive API v3<br/>googleapis.com/drive/v3/files<br/>active spreadsheet's filename — get / rename"]
     Picker["Google Picker API<br/>gapi 'picker' module + PICKER_API_KEY<br/>spreadsheet selection UI"]
-    Sheet[("The signed-in user's own Ledger spreadsheet<br/>(cloned from TEMPLATE_SPREADSHEET_ID via<br/>Sheets' 'make a copy', selected via Picker)<br/><br/>Transaction · Account · Statement*<br/>Breakdown* · eTimeSheet<br/>Physique · Activity · Nutrition<br/>Contact<br/>Setting · Travel · Application<br/><br/>* formula-driven, app only reads these")]
+    Sheet[("The signed-in user's own Ledger spreadsheet<br/>(cloned from TEMPLATE_SPREADSHEET_ID via<br/>Sheets' 'make a copy', selected via Picker)<br/><br/>Transaction · Account · Statement*<br/>Breakdown* · eTimeSheet<br/>Physique · Activity · Nutrition<br/>Contact<br/>Setting · Travel · Application · LeetCode<br/><br/>* formula-driven, app only reads these")]
 
     App -- "1 . request OAuth token" --> GIS
     GIS -- "2 . access token" --> App
@@ -91,7 +91,7 @@ flowchart TD
     subgraph LoadDashboard["Dashboard load — loadDashboard()"]
         direction TB
         Report["loadReport()<br/>batchGetValues:<br/>Statement, Account,<br/>Breakdown — missingAmount computed<br/>client-side from the first two"]
-        Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initActivities · initPhysique<br/>initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications<br/>(each checks its own cache first)"]
+        Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initActivities · initPhysique<br/>initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications · initLeetcode<br/>(each checks its own cache first)"]
         ProteinRot["Once Physique + Nutrition settle:<br/>renderProteinRotationChart()<br/>(protein-rotation.js)"]
         Render["The wellness/finance/timesheet/travel chart files render every canvas, lazily<br/>app.js renders summary cards<br/>each module renders its own table"]
         Report --> Render
@@ -100,7 +100,7 @@ flowchart TD
 
     LoadDashboard --> Idle(["Dashboard interactive"])
 
-    Idle --> Writes["Add / edit / delete / duplicate<br/>— any single row, any module:<br/>Transaction · Account · Timesheet · Wellness · Physique<br/>Nutrition · Contact · Setting · Travel · Application"]
+    Idle --> Writes["Add / edit / delete / duplicate<br/>— any single row, any module:<br/>Transaction · Account · Timesheet · Wellness · Physique<br/>Nutrition · Contact · Setting · Travel · Application · LeetCode"]
     Writes --> WriteCall["appendValues / updateValues / batchUpdate"]
     WriteCall --> Refresh["Re-read that module's data<br/>+ re-render — no page reload"]
     Refresh --> Idle
@@ -214,6 +214,8 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 54 | `market.js` | Watch List page: Watchlist tab CRUD, symbol search, Close and 1d/1m/1y per row, 🔬 opens Market; alerts (`checkWatchlistAlerts`, badges, ✅ dismiss) |
 | 55 | `portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
 | 56 | `stock-analysis.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
+| 57 | `leetcode-roadmap.js` | The NeetCode 250 problem list and NeetCode's roadmap graph (category positions and parents); data only |
+| 58 | `leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), category cards, past-year heatmap, roadmap graph |
 
 `section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 56 above into a page that has none of them (see [Section pages](#section-pages)).
 
@@ -249,7 +251,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 2. Entity modules init concurrently via `Promise.allSettled`, each reading its own range — but only the modules the page shows (`loadDashboard`, `app.js`):
    - `/health/`: Settings, Activity, Physique, Nutrition, the Settings block.
    - `/finance/`: Settings, the report (Statement/Account/Breakdown), Transaction, Account, Breakdown.
-   - `/track/`: Settings, Work Time, Travel, Application, and Transaction (Car Service is drawn from it).
+   - `/track/`: Settings, Work Time, Travel, Application, LeetCode, and Transaction (Car Service is drawn from it).
    - `/other/`: Settings, Contact, the Settings block.
    - Home: Settings, Activity, Physique and the report — only what the glance cards need; the blocks are reached through tiles.
    Saving a BMR-affecting setting on a page without Physique loads it first, so every stored BMR is still rewritten.

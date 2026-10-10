@@ -723,6 +723,7 @@ async function loadDashboard(forceRefresh = false) {
         initTimeSheet(forceRefresh),
         settingsPromise.then(() => initTravel(forceRefresh)),
         initApplications(forceRefresh),
+        initLeetcode(),
       ] : []),
       ...(shows('other') ? [initContacts(forceRefresh)] : []),
       // Other's Settings block (saving a setting from anywhere loads it on its own).

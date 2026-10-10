@@ -29,7 +29,7 @@
 | Bulk Edit | `/finance/transaction/bulk-edit/` |
 | 🧬 view | `/health/physique/2026-10-03/micronutrients/` |
 
-- Labelled rows (Contact, Account, Breakdown, Transaction, Travel, Application) use their label; repeats get `-2`, `-3`… in sheet order.
+- Labelled rows (Contact, Account, Breakdown, Transaction, Travel, Application, LeetCode — `/track/leetcode/2026-08-20-valid-palindrome/`) use their label; repeats get `-2`, `-3`… in sheet order.
 - Physique's **Today** uses today's date address, logged or not; a Pattern is `/health/physique/pattern-1/`. Addresses like these have no file of their own, so locally they need `scripts/serve.py` (see [Getting Started](../getting-started.md#4-run-locally)); plain `python -m http.server` answers them with File not found.
 - Row addresses are served by `404.html`. `sitemap.xml` (`python scripts/build_sitemap.py`) lists block, button and view addresses but never rows, which would publish sheet data.
 

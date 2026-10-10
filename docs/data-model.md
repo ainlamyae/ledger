@@ -163,6 +163,10 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 - A row with both Type and App Number starts an application; following rows are its status updates.
 - New applications are inserted at row 2 so the sheet's footer formulas shift down intact.
 
+## `LeetCode` (created by the app)
+
+- Columns (found by header name, so they can be moved; a missing one is added at the end on save): Date, Problem, Category (the roadmap's, e.g. Arrays & Hashing), Difficulty (Easy/Medium/Hard), LeetCode (link), NeetCode Video (link), Notes. One row per solve; the LeetCode link (or the Problem name) ticks that problem off the NeetCode 250 roadmap. Written `RAW`.
+
 ## `Watchlist` (created by the app)
 
 - Columns A–F: Symbol, Name, Exchange, Currency, Notes, Alerts. Alerts is JSON (`RAW`) of the stock's alert rules and dismissals, blank when none. Symbol is `AAPL`, `SHOP.TO` (TSX) or `XYZ.V` (TSXV).

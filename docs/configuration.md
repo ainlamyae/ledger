@@ -19,6 +19,7 @@
 | `'Contact'!A2:U` | `contacts.js` | Contact rows |
 | `'Travel'!A2:H` | `travel.js` | Travel rows |
 | `'Application'!A2:E` | `applications.js` | Application header + status-update rows |
+| `'LeetCode'!A1:Z` (header row included; columns found by name) | `leetcode.js` | Solved problems (tab created on the first save) |
 | `Settings!A2:C` | `app.js`, `settings-panel.js` | Personal overrides; `app.js` reads A/B, the panel reads and writes all three |
 | `'Watchlist'!A2:F` | `market.js` | Watchlist stocks and their alerts (tab created on the first save) |
 | `'Trade'!A2:J` | `portfolio.js` | Buys, sells and splits (tab created on the first save) |

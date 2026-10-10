@@ -1408,6 +1408,111 @@ th.sortable:hover {
     transition: max-height .3s var(--ease-spring), opacity .2s var(--ease-spring), padding .3s var(--ease-spring);
 }
 
+/* A LeetCode category's table starts at the card's edge, not under its title. */
+.leetcode-category .app-card-body {
+    padding-left: var(--space-m);
+}
+
+/* LeetCode's roadmap graph (leetcode.js): category nodes joined parent to child;
+   a finished one has a green rim, the open one a blue rim. */
+.leetcode-roadmap {
+    display: block;
+    width: 100%;
+    max-width: 900px;
+    min-width: 720px;
+    height: auto;
+    margin: 0 auto;
+}
+
+.leetcode-roadmap path {
+    fill: none;
+    stroke: var(--color-text-muted);
+    stroke-width: 2;
+}
+
+.leetcode-roadmap g {
+    cursor: pointer;
+    outline: none;
+}
+
+.leetcode-roadmap .roadmap-box {
+    fill: var(--color-surface);
+    stroke: var(--color-border);
+    stroke-width: 2;
+}
+
+.leetcode-roadmap .done .roadmap-box {
+    stroke: var(--color-income);
+}
+
+.leetcode-roadmap .open .roadmap-box,
+.leetcode-roadmap g:focus-visible .roadmap-box {
+    stroke: var(--color-primary);
+    stroke-width: 4;
+}
+
+.leetcode-roadmap text {
+    fill: var(--color-text);
+    font-size: 19px;
+    font-weight: 600;
+    text-anchor: middle;
+}
+
+.leetcode-roadmap .roadmap-count {
+    fill: var(--color-text-muted);
+    font-size: 15px;
+    font-weight: 400;
+}
+
+.leetcode-roadmap .roadmap-track {
+    fill: var(--color-border);
+}
+
+.leetcode-roadmap .roadmap-fill {
+    fill: var(--color-income);
+}
+
+/* LeetCode's past-year heatmap: 7 day rows, one column per week. 1 solve is
+   dark green, the busiest day near light green, none an empty square. */
+.leetcode-heatmap,
+.leetcode-heatmap-months {
+    display: grid;
+    grid-auto-columns: 11px;
+    column-gap: 3px;
+    width: max-content;
+}
+
+.leetcode-heatmap {
+    grid-template-rows: repeat(7, 11px);
+    grid-auto-flow: column;
+    row-gap: 3px;
+}
+
+.leetcode-heatmap-months {
+    font-size: var(--text-small);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+}
+
+.leetcode-heatmap-months span {
+    grid-row: 1;
+    white-space: nowrap;
+}
+
+.leetcode-heatmap > span {
+    border-radius: 2px;
+    border: 1px solid var(--color-border);
+}
+
+.leetcode-heatmap > .heat-1 { background: color-mix(in srgb, var(--color-income) 45%, black); }
+.leetcode-heatmap > .heat-2 { background: color-mix(in srgb, var(--color-income) 70%, black); }
+.leetcode-heatmap > .heat-3 { background: var(--color-income); }
+.leetcode-heatmap > .heat-4 { background: color-mix(in srgb, var(--color-income) 55%, white); }
+
+.leetcode-heatmap > [class^="heat-"] {
+    border-color: transparent;
+}
+
 .app-card.collapsed .app-card-body {
     max-height: 0;
     opacity: 0;

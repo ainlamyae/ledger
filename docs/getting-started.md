@@ -37,6 +37,7 @@ const CONFIG = {
     SETTINGS: 'Settings',
     TRAVEL: 'Travel',
     APPLICATIONS: 'Applications',
+    LEETCODE: 'LeetCode', // created by the app on the first save
   },
 };
 ```

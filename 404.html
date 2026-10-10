@@ -23,6 +23,11 @@
     if (localStorage.getItem('ledger_theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
+    try {
+        if (localStorage.getItem('ledger_side_nav') === 'closed') {
+            document.documentElement.dataset.sideNav = 'closed';
+        }
+    } catch (e) {}
 </script>
 
 <title>Ledger</title>

@@ -416,7 +416,9 @@ const WELLNESS_RANGES = [
   { slug: '1w', label: '1w', days: 7 },
   { slug: '1m', label: '1m', months: 1 },
   { slug: '3m', label: '3m', months: 3 },
+  { slug: '6m', label: '6m', months: 6 },
   { slug: '1y', label: '1y', months: 12 },
+  { slug: '5y', label: '5y', months: 60 },
   { slug: 'all', label: 'All' },
 ];
 let wellnessRangeSlug = '1m';
@@ -1034,22 +1036,21 @@ function renderWellnessBodyMassChart(entries) {
   });
 }
 
-// Headroom around the plotted range, with a floor — a window of near-identical days
-// would otherwise be padded by almost nothing and sit flush against both edges.
+// Headroom above the plotted range, with a floor — a window of near-identical days
+// would otherwise be padded by almost nothing and sit flush against the top.
 const CALORIE_AXIS_PAD_FRACTION = 0.15;
 const CALORIE_AXIS_MIN_PAD_KCAL = 120;
 
-// Rounding for those bounds, so a zoomed axis still lands on readable tick
-// figures (1,650 rather than 1,663).
+// Rounding for the top, so the axis still lands on readable tick figures (1,650
+// rather than 1,663).
 const CALORIE_AXIS_STEP_KCAL = 50;
 
 // Coarser, for the one case where the target still has to widen the axis. A coarse step
 // holds the frame still across several hundred kcal of target movement.
 const CALORIE_AXIS_TARGET_STEP_KCAL = 250;
 
-// Framed on what was LOGGED, padded out. The zeros standing in for unlogged days would
-// drag the floor back down and undo the zoom; clamped at zero so small intakes give the
-// zero-based axis rather than negative calories.
+// From 0 kcal, so a bar's height is the day's intake. The top is framed on what was
+// LOGGED, padded out.
 //
 // The target is deliberately NOT part of the frame. Padding around it made the ruler move
 // with the thing it measures: a 278 kcal change landed the caps 2 px from where they
@@ -1064,11 +1065,10 @@ function calorieAxisBounds(loggedValues, targetValues) {
   const hi = Math.max(...framing);
   const pad = Math.max(CALORIE_AXIS_MIN_PAD_KCAL, (hi - lo) * CALORIE_AXIS_PAD_FRACTION);
 
-  const roundDown = (v, step) => Math.max(0, Math.floor(v / step) * step);
   const roundUp = (v, step) => Math.ceil(v / step) * step;
 
   return {
-    min: Math.min(roundDown(lo - pad, CALORIE_AXIS_STEP_KCAL), roundDown(Math.min(...targetValues), CALORIE_AXIS_TARGET_STEP_KCAL)),
+    min: 0,
     max: Math.max(roundUp(hi + pad, CALORIE_AXIS_STEP_KCAL), roundUp(Math.max(...targetValues), CALORIE_AXIS_TARGET_STEP_KCAL)),
   };
 }
@@ -1242,11 +1242,7 @@ function renderWellnessCaloriesChart(entries) {
       scales: {
         x: wellnessCategoryXScale(dates),
         y: {
-          // NOT zero-based, unlike the other intake charts. The target drifts only a few
-          // tens of kcal across a 12-week window — on a 0-2,500 axis that's a handful of
-          // pixels, which is why the per-day figures still read as one fixed line. Bars
-          // here are a position against their own cap, not a quantity of food, so the
-          // axis covers the region the comparison actually happens in.
+          // From 0 kcal, like the other intake charts.
           min: axis.min,
           max: axis.max,
           afterFit: fixTrendYAxisWidth,

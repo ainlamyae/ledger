@@ -7,7 +7,7 @@
 - `/health/insight/` shows seven mode tiles in one card titled **Insight**; each mode is a page (`/health/insight/plan/`).
 - A mode last generated over 30 days ago gets a red `<days>d` badge on its tile, counting up (`renderInsightAgeBadges`, from its `INSIGHT_*_LAST_GENERATED_AT`; same `.page-badge` as Car Service). Finance Insight's **Snapshot** tile gets the same badge from `FINANCIAL_INSIGHT_LAST_GENERATED_AT`.
 - Page order: range buttons, question box, prompt template, data, Send to AI, answer.
-- **Range buttons — 1w (default), 1m, 3m, 1y, All** — the Health Indicator's row (`WELLNESS_RANGES`, `healthRangeDates`), each a fixed length ending today; All starts at the first logged Physique day. Every mode (Plan, Wellness, Food, Micronutrient, Activity, Protein, Pattern) reads it, and a pick reloads the open mode. The old From/To inputs are commented out in `index.html` and `insight-panel.js`.
+- **Range buttons — 1w (default), 1m, 3m, 6m, 1y, 5y, All** — the Health Indicator's row (`WELLNESS_RANGES`, `healthRangeDates`), each a fixed length ending today; All starts at the first logged Physique day. Every mode (Plan, Wellness, Food, Micronutrient, Activity, Protein, Pattern) reads it, and a pick reloads the open mode. The old From/To inputs are commented out in `index.html` and `insight-panel.js`.
 - Modes: **Plan**, Wellness, Food, Micronutrient, Activity, **Protein** (formerly Protein Sources), **Pattern**.
   - **Micronutrient:** skips zero nutrients with no target; targets come from `MICRONUTRIENT_DAILY_TARGETS_JSON`.
   - **Pattern:** period averages over a length starting at Tune's `L_p`; asks what drives fat loss and a higher BMR.

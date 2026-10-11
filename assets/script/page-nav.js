@@ -27,7 +27,9 @@ function onPageLinkClick(event, sectionId, panel) {
   if (!window.ledgerSectionPage || window.ledgerSectionPage.section !== sectionId) return;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
   event.preventDefault();
-  navigateSectionPage(panel);
+  // On a form page (Log, Edit, Workouts…), close it first or the page stays hidden under it.
+  if (routedForms.length) closeFormPages(panel, panel ? () => navigateSectionPage(panel) : null);
+  else navigateSectionPage(panel);
 }
 
 // The actions used most, one tap from the section's hub (and from its part of the
@@ -37,7 +39,7 @@ function onPageLinkClick(event, sectionId, panel) {
 const QUICK_ACTIONS = {
   health: [
     { label: 'Today', buttonId: 'today-physique-btn', href: () => `physique/${isoFromDate(new Date())}/` },
-    { label: 'GYM', buttonId: 'activity-instruction-btn', href: () => 'activity/gym/' },
+    { label: 'Workouts', buttonId: 'activity-instruction-btn', href: () => 'activity/workouts/' },
   ],
 };
 
@@ -322,7 +324,7 @@ function updateFormCrumb(panel, steps) {
   steps.forEach((step, i) => {
     if (i < steps.length - 1 && panel) {
       const href = `${pageHref(section, panel)}${steps.slice(0, i + 1).map((s) => `${s.slug}/`).join('')}`;
-      // A form's own top level (GYM above one of its groups) goes back to it in place.
+      // A form's own top level (Workouts above one of its groups) goes back to it in place.
       const onClick = step.view
         ? () => formSubViews.get(step.slug)?.show(null)
         : () => openFormStep(panel, step);
@@ -346,7 +348,7 @@ function updateFormCrumb(panel, steps) {
 // right.
 const SELECTION_BAR_IDS = ['physique-bulk-actions', 'nutrition-bulk-actions', 'tx-bulk-actions', 'contacts-bulk-actions'];
 
-// A block's header buttons (Physique's Export CSV / Today / Log, Activity's GYM /
+// A block's header buttons (Physique's Export CSV / Today / Log, Activity's Workouts /
 // Log / Add, …) gathered into one group that ends in ❌, so every page has the same
 // way out in the same place: top right of the header on a wide screen, the right
 // end of the bottom bar on a phone. A block with no buttons (Indicator) gets the

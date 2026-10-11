@@ -21,9 +21,9 @@
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
   - Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
   - Pattern Insight sends the profile block plus period averages over Tune's L_p days (body mass and its change, intake, macros, activity by type, energy balance and BMR offset).
-  - Finance Analysis sends one stock's signal rows, levels, last 5 closes and Finnhub headlines, plus your shares and average cost only when **Include my position** is ticked.
+  - Finance Market's AI read sends one stock's signal rows, levels, last 5 closes, a year of month-end chart values (public prices) and Finnhub headlines, plus your shares and average cost only when **Include my position** is ticked.
   - Nothing is sent until that panel's Send to AI is clicked.
-- **Stock data is opt-in** too: with `TWELVE_DATA_API_KEY`, `ALPHA_VANTAGE_API_KEY` or `FINNHUB_API_KEY` set, the Market, Portfolio and Analysis pages send ticker symbols and dates (and the key, as a query parameter, as those services require) to Twelve Data, Alpha Vantage and Finnhub. No amounts, shares or account names leave the browser this way.
+- **Stock data is opt-in** too: with `TWELVE_DATA_API_KEY`, `ALPHA_VANTAGE_API_KEY` or `FINNHUB_API_KEY` set, the Watch List, Market and Portfolio pages send ticker symbols and dates (and the key, as a query parameter, as those services require) to Twelve Data, Alpha Vantage and Finnhub. No amounts, shares or account names leave the browser this way.
 - `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `USDA_FDC_API_KEY`, `TWELVE_DATA_API_KEY`, `ALPHA_VANTAGE_API_KEY` and `FINNHUB_API_KEY` **are** real bearer secrets, unlike the config values above. They live in your own `Setting` tab and are never committed. The Settings panel masks any key ending `_API_KEY`/`_TOKEN`/`_SECRET` by default — independent of Privacy mode below, which is for amounts, not credentials — with a per-row reveal button that resets on reload.
 - **Privacy mode** is display-only and doesn't change what's stored.
 

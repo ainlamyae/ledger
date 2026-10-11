@@ -121,11 +121,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/finance/analysis/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
     <loc>https://ainlamyae.github.io/ledger/finance/breakdown/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -156,11 +151,6 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/finance/market/add/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://ainlamyae.github.io/ledger/finance/portfolio/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -177,6 +167,16 @@
   </url>
   <url>
     <loc>https://ainlamyae.github.io/ledger/finance/transaction/log/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/finance/watchlist/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/finance/watchlist/add/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

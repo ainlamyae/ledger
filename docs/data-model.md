@@ -163,6 +163,19 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 - A row with both Type and App Number starts an application; following rows are its status updates.
 - New applications are inserted at row 2 so the sheet's footer formulas shift down intact.
 
+## `Watchlist` (created by the app)
+
+- Columns A–E: Symbol, Name, Exchange, Currency, Notes. Symbol is `AAPL`, `SHOP.TO` (TSX) or `XYZ.V` (TSXV).
+
+## `Trade` (created by the app)
+
+- Columns A–J: Date, Account, Symbol, Action (Buy/Sell/Split), Quantity, Price, Fees, Currency, Notes, FX to CAD.
+- Written `RAW`. A Split's Quantity is the ratio (new ÷ old) and its Price is blank. FX to CAD is 1 for CAD.
+
+## `Analysis` (created by the app)
+
+- Columns A–G: Date, Symbol, Verdict, Score, Close, Stop, Report. Append-only; the newest row per Symbol is the one shown.
+
 ## `Setting` (optional, user-managed)
 
 - Columns A/B/C — Key, Value, Notes. Notes is never read by the app.

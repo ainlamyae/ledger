@@ -123,6 +123,11 @@ textarea {
     --bg-wash-2: rgba(124, 58, 237, .08);
 }
 
+/* The space between fields side by side (From/To, a form's pairs); 16px on a phone. */
+:root {
+    --field-pair-gap: var(--space-s);
+}
+
 /* iOS Safari zooms into any field under 16px on tap. */
 @media (pointer: coarse) {
     :root {
@@ -1024,7 +1029,7 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 .export-date-range,
 .export-filter-row {
     display: flex;
-    gap: var(--space-s);
+    gap: var(--field-pair-gap);
     margin-bottom: var(--space-s);
 }
 
@@ -1874,7 +1879,7 @@ td .btn {
        narrower. A 0 floor lets both tracks stay exactly half at every width;
        each control is width: 100% of its own track, so they end up identical. */
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 var(--space-s);
+    gap: 0 var(--field-pair-gap);
 }
 
 /* Three short fields on one line instead of two — same minmax(0, 1fr) floor,
@@ -2098,8 +2103,12 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     min-width: 0;
 }
 
+/* One row: a long institution · type · balance cuts off with … */
 .field-balance {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .checkbox-inline-label input[type="checkbox"] {
@@ -2510,16 +2519,12 @@ html.home-hub .page-tiles,
     }
 }
 
-/* Tune's collapsed Equations and Calculations dropdowns, and Insight's prompt template. */
-#formula-expression-details,
-#formula-substituted-details,
+/* Insight's prompt template. */
 #insight-prompt-details {
     margin-bottom: var(--space-s);
     font-size: var(--text-small);
 }
 
-#formula-expression-details summary,
-#formula-substituted-details summary,
 #insight-prompt-details summary,
 #physique-derived-details summary,
 #physique-consumption-details summary,
@@ -2729,8 +2734,9 @@ html.home-hub .page-tiles,
         padding: var(--space-l);
     }
 
-    .export-date-range {
-        gap: var(--space-l);
+    /* Fields side by side sit further apart on a phone, as From/To. */
+    :root {
+        --field-pair-gap: var(--space-l);
     }
 
     .location-picker-dropdown {
@@ -2947,12 +2953,6 @@ html.home-hub .page-tiles,
     text-decoration: underline;
 }
 
-.formula-where {
-    margin: 0 0 var(--space-s);
-    font-size: var(--text-small);
-    color: var(--color-text-muted);
-}
-
 /* A plain break between the calorie-solve rows and the journey block below —
    no symbol, box or unit to give it, so a formula-row would sit oddly here. */
 .formula-divider {
@@ -2986,10 +2986,13 @@ html.home-hub .page-tiles,
     font-size: var(--text-small);
 }
 
-/* Same control shape as "Solve for", but it sits at the bottom of the modal
-   right above the actions, where that 1rem bottom margin reads as a gap. */
-.formula-pin-mode {
-    margin-bottom: var(--space-s);
+/* Tune's cards: Plan Choices, Equations, Variables, Calculations. */
+.formula-card {
+    margin-bottom: var(--space-l);
+}
+
+.card.formula-card > :last-child {
+    margin-bottom: 0;
 }
 
 /* Δm% above the 1%/week ceiling, and BMI_g outside the healthy 18.5–24.9 band. The colour is

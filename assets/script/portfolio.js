@@ -31,7 +31,7 @@ async function initTrades(forceRefresh = false) {
   document.getElementById('trade-cancel-btn').addEventListener('click', closeTradeForm);
   document.getElementById('trade-action').addEventListener('change', syncTradeActionFields);
   document.getElementById('trade-symbol').addEventListener('change', () => {
-    const symbol = document.getElementById('trade-symbol').value.trim().toUpperCase();
+    const symbol = normalizeSymbol(document.getElementById('trade-symbol').value);
     if (symbol) document.getElementById('trade-currency').value = isCanadianSymbol(symbol) ? 'CAD' : (allWatchlist.find((w) => w.symbol === symbol)?.currency || 'USD');
   });
   onFormSubmit('trade-form', submitTradeForm);
@@ -67,7 +67,6 @@ async function refreshTrades() {
   }
   renderTrades();
   renderPortfolio();
-  syncAnalysisSymbolOptions();
 }
 
 function heldSymbols() {
@@ -194,7 +193,7 @@ function renderHoldingsTable(rows) {
   });
 }
 
-// Investment accounts' Market Value (or Balance), the equity Analysis sizes against.
+// Investment accounts' Market Value (or Balance), the equity Market's position size uses.
 function investmentEquityCad() {
   return allAccounts
     .filter((a) => /^investment/i.test(a.type))
@@ -371,7 +370,7 @@ async function submitTradeForm() {
   const date = document.getElementById('trade-date').value;
   const action = document.getElementById('trade-action').value;
   const account = document.getElementById('trade-account').value;
-  const symbol = document.getElementById('trade-symbol').value.trim().toUpperCase();
+  const symbol = normalizeSymbol(document.getElementById('trade-symbol').value);
   const quantity = tradeNumber('trade-quantity');
   const price = action === 'Split' ? null : tradeNumber('trade-price');
   const fees = action === 'Split' ? 0 : (tradeNumber('trade-fees') ?? 0);

@@ -47,13 +47,13 @@
 - It reads the tab itself rather than sharing `loadReport()`'s copy: that one keeps what the charts derived, while the panel needs each row's own sheet row number to edit it.
 - **Category groups are marked with a line**, not just blank space: a 2px rule sits above the first row of a new Category (`breakdown-category-start`) and under the table's last row, so the Types under each Category read as one visual block in whatever order they're sorted.
 
-## Market, Portfolio, Analysis
+## Watch List, Market, Portfolio
 
 After Breakdown, before Insight; each has its own page:
 
-- [Market](finance-market.md): watchlist and price chart (1d…All).
+- [Watch List](finance-watchlist.md): the stocks you follow, with their latest moves.
+- [Market](finance-market.md): one stock's chart (1d…All), rule-based verdict, risk, news and an AI read.
 - [Portfolio](finance-portfolio.md): buy/sell log at average cost, gain/loss in CAD.
-- [Analysis](finance-analysis.md): rule-based verdict, risk, news and an AI read.
 - Keys to set first: [Stock Data Setup](../stock-data-setup.md).
 
 ## Insight

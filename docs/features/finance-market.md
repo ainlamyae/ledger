@@ -10,6 +10,7 @@
 - Pick the stock from the watchlist drop-down at the top, or with 🔬 on [Watch List](finance-watchlist.md). To analyze a stock, add it to Watch List first.
 - Built for 1-week to 6-month holds. **Nothing here is close to 95% reliable**: the checks are the price signals with the strongest out-of-sample research, and every report says it isn't financial advice.
 - Needs `TWELVE_DATA_API_KEY` (US), `ALPHA_VANTAGE_API_KEY` (TSX) and, for news, `FINNHUB_API_KEY`: see [Stock Data Setup](../stock-data-setup.md).
+- Its tile is on Finance Insight's page (`/finance/insight/`), beside Snapshot, rather than among Finance's own tiles.
 - Market and Analysis used to be two pages; the AI read is now one feature of Market. The `Analysis` tab is unchanged.
 
 ## Verdict

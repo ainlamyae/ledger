@@ -343,7 +343,7 @@ function katchMcArdleBmr(lbmKg) {
 // protein band show — so the trace's `370 + 21.6 × 61.4` multiplies out to the BMR printed
 // beside it instead of missing it by a kcal.
 function bmrLeanBodyMassKg(bodyMassKg, heightCm, sex) {
-  return Math.round(boerLeanBodyMassKg(bodyMassKg, heightCm, sex) * 10) / 10;
+  return Math.round(leanBodyMassKg(bodyMassKg, heightCm, sex) * 10) / 10;
 }
 
 // Which of the two the whole app runs on. A string setting rather than a flag so the sheet
@@ -1042,7 +1042,7 @@ function maintenanceAffineCoefficients({
   heightCm, age, sex, met, tau, kappa, formula = bmrFormula(), tef = tefPercent(), bodyMassKg = null,
 }) {
   const activityPerKg = (met * tau * kappa) / ML_O2_PER_KCAL;
-  const lbm = boerLeanBodyMassCoefficients(sex);
+  const lbm = leanBodyMassCoefficients(sex, heightCm);
   const aBmr = formula === 'katch'
     ? KATCH_BASE_KCAL + KATCH_KCAL_PER_KG_LBM * (lbm.perCm * heightCm + lbm.constant)
     : 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);

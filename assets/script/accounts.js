@@ -1,9 +1,9 @@
-const ACCOUNTS_RANGE = `'${CONFIG.SHEETS.ACCOUNTS}'!A3:E100`;
+const ACCOUNTS_RANGE = `'${CONFIG.SHEETS.ACCOUNTS}'!A3:F100`;
 
 // Every box on the form, in the sheet's own column order — so the row read back
 // from the sheet lines up with them by index.
 const ACCOUNT_FIELD_IDS = [
-  'account-name', 'account-institution', 'account-type', 'account-balance', 'account-current-value',
+  'account-name', 'account-institution', 'account-type', 'account-balance', 'account-current-value', 'account-payment-day',
 ];
 
 let allAccounts = [];
@@ -103,12 +103,80 @@ async function refreshAccountsList(forceRefresh = false) {
       // actual 0, so it renders as '—' instead of a misleading $0.00.
       currentValue: Number.isFinite(currentValueNum) ? currentValueNum : null,
       currentValueText: hasCurrentValue && !Number.isFinite(currentValueNum) ? row[4] : null,
+      paymentDay: parsePaymentDay(row[5]),
     };
   });
 
   accountsDataLoaded = true;
+  renderAccountPaymentBadge();
   renderAccountsList();
   renderAccountCompositionChart(allAccounts);
+}
+
+// 1–31, or null. 31 means the month's last day in a shorter month.
+function parsePaymentDay(value) {
+  const day = Number(value);
+  return value !== '' && value !== undefined && Number.isInteger(day) && day >= 1 && day <= 31 ? day : null;
+}
+
+// That day in the month `monthOffset` from today's, clamped to the month's length.
+function paymentDueDate(day, monthOffset = 0) {
+  const today = new Date();
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + monthOffset + 1, 0).getDate();
+  return new Date(today.getFullYear(), today.getMonth() + monthOffset, Math.min(day, lastDay));
+}
+
+// Past this month's payment day, still owing, and no money in since last month's: { days, dueIso }.
+// Null until transactions load, so it never flags a payment it can't see.
+function accountPaymentOverdue(account) {
+  if (account.paymentDay === null || account.balance >= 0 || !transactionsDataLoaded) return null;
+  const todayIso = isoFromDate(new Date());
+  const dueIso = isoFromDate(paymentDueDate(account.paymentDay));
+  if (todayIso <= dueIso) return null;
+  const previousDueIso = isoFromDate(paymentDueDate(account.paymentDay, -1));
+  const paid = allTransactions.some((t) => t.account === account.name && t.amount > 0
+    && t.date > previousDueIso && t.date <= todayIso);
+  if (paid) return null;
+  return { days: daysFromTodayIso(dueIso) * -1, dueIso };
+}
+
+function paymentBadgeText(due) {
+  return `Pay ${due.days}d`;
+}
+
+function paymentBadgeElement(due) {
+  const el = document.createElement('span');
+  el.className = 'page-badge';
+  el.textContent = paymentBadgeText(due);
+  el.title = `Payment day was ${due.dueIso}, ${due.days} day${due.days === 1 ? '' : 's'} ago, and no payment into this account since last month's`;
+  return el;
+}
+
+// The Account tile's badge holds the A≠T check and overdue payments together.
+const accountBadgeParts = { reconcile: null, payment: null };
+
+function setAccountBadgePart(part, badge) {
+  accountBadgeParts[part] = badge;
+  const parts = Object.values(accountBadgeParts).filter(Boolean);
+  setPageBadge('finance', 'account', parts.length === 0 ? null : {
+    text: parts.map((p) => p.text).join(' · '),
+    title: parts.map((p) => p.title).join('\n'),
+  });
+}
+
+function renderAccountPaymentBadge() {
+  const overdue = allAccounts
+    .map((account) => ({ account, due: accountPaymentOverdue(account) }))
+    .filter((x) => x.due);
+  if (overdue.length === 0) {
+    setAccountBadgePart('payment', null);
+    return;
+  }
+  const oldest = Math.max(...overdue.map((x) => x.due.days));
+  setAccountBadgePart('payment', {
+    text: paymentBadgeText({ days: oldest }),
+    title: `Payment day passed unpaid: ${overdue.map((x) => `${x.account.name} (${x.due.dueIso})`).join(', ')}`,
+  });
 }
 
 function renderAccountsList() {
@@ -124,6 +192,8 @@ function renderAccountsList() {
     const tr = document.createElement('tr');
 
     const nameCell = makeCell(account.name);
+    const due = accountPaymentOverdue(account);
+    if (due) nameCell.append(' ', paymentBadgeElement(due));
     const institutionCell = makeCell(account.institution);
     const typeCell = makeCell(account.type);
 
@@ -187,7 +257,7 @@ function renderAccountsTotalRow(hasAccounts) {
 async function accountRowCells(row) {
   try {
     const resp = await getValues(
-      `'${CONFIG.SHEETS.ACCOUNTS}'!A${row}:E${row}`,
+      `'${CONFIG.SHEETS.ACCOUNTS}'!A${row}:F${row}`,
       { valueRenderOption: 'FORMULA' }
     );
     return (resp.values && resp.values[0]) || [];
@@ -211,6 +281,7 @@ async function openAccountForm(account) {
   document.getElementById('account-balance').value = account ? account.balance.toFixed(2) : '0.00';
   document.getElementById('account-current-value').value =
     account && account.currentValue !== null ? account.currentValue.toFixed(2) : '';
+  document.getElementById('account-payment-day').value = account && account.paymentDay !== null ? account.paymentDay : '';
 
   // Whichever cells are formulas are shown AS their formula, so the form says
   // what the sheet actually holds — and so leaving the box alone sends that
@@ -276,18 +347,26 @@ async function submitAccountForm(event) {
     }
   }
 
+  const paymentDayText = document.getElementById('account-payment-day').value.trim();
+  const paymentDay = paymentDayText === '' ? '' : parsePaymentDay(paymentDayText);
+  if (paymentDay === null) {
+    showFieldError('account-form-error', 'Payment Day must be a whole day of the month, 1 to 31, or blank.');
+    return;
+  }
+
   const values = [[
     document.getElementById('account-name').value,
     document.getElementById('account-institution').value,
     document.getElementById('account-type').value,
     balance,
     currentValue,
+    paymentDay,
   ]];
 
   try {
     let row = editingAccountRow;
     if (row) {
-      await updateValues(`'${CONFIG.SHEETS.ACCOUNTS}'!A${row}:E${row}`, values);
+      await updateValues(`'${CONFIG.SHEETS.ACCOUNTS}'!A${row}:F${row}`, values);
     } else {
       row = appendedRow(await appendValues(ACCOUNTS_RANGE, values));
     }

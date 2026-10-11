@@ -58,7 +58,8 @@ function gatherPlanSnapshot() {
 
   // Rounded to 0.1 kg before the grams come off it, exactly as the playground does
   // — so the two report the same band rather than differing by a gram.
-  const lbmKg = Math.round(boerLeanBodyMassKg(bodyMassKg, heightCm, sex) * 10) / 10;
+  const lbmKg = Math.round(leanBodyMassKg(bodyMassKg, heightCm, sex) * 10) / 10;
+  const lbmCoefficients = leanBodyMassCoefficients(sex, heightCm);
   const perKg = planProteinPerKgBand();
 
   // λt by the arrival date, and where the plateau really lands once BMR has sagged that far
@@ -153,6 +154,7 @@ function gatherPlanSnapshot() {
     equilibriumKg: Math.round(projection.equilibriumKg * 10) / 10,
     projection,
     lbmKg,
+    lbmNavyBfPct: lbmCoefficients.formula === 'navy' ? lbmCoefficients.bfPct : null,
     leanPercent: Math.round((lbmKg / bodyMassKg) * 1000) / 10,
     proteinPerKgMin: Math.min(perKg.low, perKg.high),
     proteinPerKgMax: Math.max(perKg.low, perKg.high),
@@ -186,7 +188,10 @@ function planSubstitutedLines(p) {
   // wellness-math functions the playground uses, off the same rounded intake.
   const lines = [];
 
-  lines.push(`LBM: ${p.sex === 'male' ? `0.407 × ${p.bodyMassKg} + 0.267 × ${p.heightCm} − 19.2` : `0.252 × ${p.bodyMassKg} + 0.473 × ${p.heightCm} − 48.3`} = ${p.lbmKg} kg (${p.leanPercent}% of body mass)`);
+  const lbmTerms = p.lbmNavyBfPct !== null
+    ? `${p.bodyMassKg} × (1 − ${p.lbmNavyBfPct}/100), U.S. Navy`
+    : `${p.sex === 'male' ? `0.407 × ${p.bodyMassKg} + 0.267 × ${p.heightCm} − 19.2` : `0.252 × ${p.bodyMassKg} + 0.473 × ${p.heightCm} − 48.3`}, Boer`;
+  lines.push(`LBM: ${lbmTerms} = ${p.lbmKg} kg (${p.leanPercent}% of body mass)`);
 
   // Both BMR equations side by side, plus the calibrated figure when one's been saved — the
   // plan runs on whichever PLAN INPUTS names (its value is what D, Ein, A and B below use).

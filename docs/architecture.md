@@ -173,7 +173,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
 | 14 | `wellness-math.js` | Pure health/target formulas with no chart or DOM code: BMR/TEF/calorie-target math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, target-date projection |
 | 15 | `wellness-charts.js` | Indicator chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
-| 16 | `finance-charts.js` | Finance Indicator chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Portfolio Allocation) |
+| 16 | `finance-charts.js` | Finance Indicator chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Account Allocation) |
 | 17 | `timesheet-charts.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
 | 18 | `travel-charts.js` | Travel chart renderers, including the country choropleth |
 | 19 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |

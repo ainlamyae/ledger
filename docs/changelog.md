@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.8.0** | feat(nav): open contact and settings from the account menu |
+| (this commit) | **3.9.0** | feat(tune): add navy body-fat and lean body mass choice |
+| `ae8927e` | **3.8.0** | feat(nav): open contact and settings from the account menu |
 | `b9c57cf` | **3.7.0** | feat(activity): price new workout exercises with ai |
 | `a140397` | **3.6.0** | feat(nav): let the sidebar hide and colour-code hub tiles |
 | `8ea7e84` | **3.5.0** | feat(leetcode): add track leetcode page with neetcode roadmap |

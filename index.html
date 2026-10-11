@@ -58,23 +58,20 @@
     // same page by default — always start at the top instead, since panels
     // are collapsed/re-rendered fresh on every load anyway.
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    // Same reasoning as the theme check above, for the "Hide widgets" toggle
-    // (app.js's applyWidgetsVisibility/SHOW_WIDGETS): the row's real hidden
-    // state isn't known until the Settings tab is fetched, long after this
-    // page has already painted it visible — so it flashed on every refresh
-    // for anyone who'd turned it off. Reading the cached copy of that setting
-    // straight out of localStorage here, before first paint, lets styles.css
-    // start the row hidden immediately instead of hiding it a moment later.
-    // A stale/missing cache just falls back to the row's default (visible),
-    // same as app.js's own getSetting('SHOW_WIDGETS', 1) fallback — the real
-    // fetch still corrects it either way once settings load for real.
+    // Same reasoning as the theme check above, for the Widgets and
+    // Bulbs switches (app.js's SWITCHES_KEY): their real values aren't known
+    // until the Settings tab is fetched, long after this page has painted, so a
+    // row turned off would flash on every refresh. Read from this browser's copy
+    // here instead, so styles.css starts it hidden; the fetch still corrects it.
     try {
-        var cachedSettings = JSON.parse(localStorage.getItem('ledger_cache_settings') || 'null');
-        if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_WIDGETS) === 0) {
+        var ledgerSwitches = JSON.parse(localStorage.getItem('ledger_switches') || 'null');
+        // Both start off (app.js's widgetsVisible/bulbsVisible) unless this browser
+        // last had them on.
+        if (!(ledgerSwitches && ledgerSwitches.SHOW_WIDGETS === 1)) {
             document.documentElement.setAttribute('data-widgets-pref', 'hidden');
         }
-        // Same for "Hide bulbs" (SHOW_BULBS), main page only: section pages run this head too.
-        if (!window.ledgerSectionPage && Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_BULBS) === 0) {
+        // Main page only: section pages run this head too.
+        if (!window.ledgerSectionPage && !(ledgerSwitches && ledgerSwitches.SHOW_BULBS === 1)) {
             document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
         }
     } catch (e) {}
@@ -154,17 +151,19 @@
         </a>
     </nav>
     <div class="header-actions">
-        <!-- Refresh data and Clear cache, then the show/hide settings as iPhone
-             switches. app.js's placeSettingsSwitches keeps them in the sidebar's
+        <!-- Contact, Refresh data, Clear cache and Settings, then the show/hide settings as
+             iPhone switches. app.js's placeSettingsSwitches keeps them in the sidebar's
              bottom panel above the account row on a wide screen with the sidebar
              open, and in the account menu everywhere else. -->
         <div id="settings-switches" class="settings-switches">
+            <a href="other/contact/" class="account-menu-item">Contact</a>
             <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
             <button id="clear-cache-btn" class="account-menu-item" title="Re-download the app's own files and reload — for when the browser is still running an older version">Clear cache</button>
+            <a href="other/settings/" class="account-menu-item">Settings</a>
             <label class="switch-row"><span>Dark mode</span><input type="checkbox" role="switch" id="theme-toggle" class="switch"></label>
-            <label class="switch-row" id="privacy-toggle-row" hidden><span>Show amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
-            <label class="switch-row" id="widgets-toggle-row" hidden title="The Time/Date/Azan/Weather row"><span>Show widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
-            <label class="switch-row" id="bulbs-toggle-row" hidden title="The home page's Health and Finance glance cards"><span>Show bulbs</span><input type="checkbox" role="switch" id="bulbs-toggle" class="switch"></label>
+            <label class="switch-row" id="privacy-toggle-row"><span>Amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
+            <label class="switch-row" id="widgets-toggle-row" title="The Time/Date/Azan/Weather row"><span>Widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
+            <label class="switch-row" id="bulbs-toggle-row" title="The home page's Health and Finance glance cards"><span>Bulbs</span><input type="checkbox" role="switch" id="bulbs-toggle" class="switch"></label>
         </div>
 
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
@@ -187,9 +186,7 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                     <span id="last-updated" class="last-updated"></span>
                 </div>
-                <a href="other/contact/" class="account-menu-item">Contact</a>
-                <a href="other/settings/" class="account-menu-item">Settings</a>
-                <button id="rename-sheet-btn" class="account-menu-item account-menu-item-divider">Rename Ledger file</button>
+                <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
                 <button id="notifications-btn" class="account-menu-item" hidden title="Let Chrome show Work Time's and Car Service's daily reminders">Enable notifications</button>
@@ -765,13 +762,26 @@
                          Mifflin-St Jeor is the default and what every existing sheet already runs on,
                          and switching here re-derives the preview through the other one — including A
                          and B, since maintenance stays affine in body mass under both. -->
+                    <!-- Which LBM Katch-McArdle, protein and glycogen read. -->
+                    <fieldset class="formula-solve-for formula-lbm-formula">
+                        <legend>Lean body mass — feeds Katch-McArdle, the protein band and glycogen</legend>
+                        <label title="Boer (1984): LBM from body mass, height and sex. Needs no tape measurements.">
+                            <input type="radio" name="formula-lbm-formula" value="boer" checked>
+                            Boer (m, h, σ)
+                        </label>
+                        <label title="U.S. Navy (Hodgdon & Beckett): LBM = m̄ × (1 − BF%/100), with BF% from neck, waist, height and, for women, hip. Uses Boer until those are filled in.">
+                            <input type="radio" name="formula-lbm-formula" value="navy">
+                            U.S. Navy (C_neck, C_waist, C_hip, h, σ)
+                        </label>
+                    </fieldset>
+
                     <fieldset class="formula-solve-for formula-bmr-formula">
                         <legend>Basal metabolic rate — drives every deficit and desired calorie figure</legend>
                         <label title="Mifflin-St Jeor (1990): BMR from body mass, height, age and sex. The app's original equation, and the one that needs no lean-mass estimate.">
                             <input type="radio" name="formula-bmr-formula" value="mifflin" checked>
                             Mifflin-St Jeor (m, h, a, σ)
                         </label>
-                        <label title="Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. Fat mass is nearly inert metabolically, so this predicts from lean mass alone — more accurate the better your LBM figure is, and here LBM is the Boer estimate below. Age drops out entirely; sex enters only through LBM.">
+                        <label title="Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. Fat mass is nearly inert metabolically, so this predicts from lean mass alone — more accurate the better your LBM figure is, and here LBM is whichever the Lean body mass question above picks. Age drops out entirely; sex enters only through LBM.">
                             <input type="radio" name="formula-bmr-formula" value="katch">
                             Katch-McArdle (LBM)
                         </label>
@@ -838,6 +848,25 @@
                             <input type="text" id="formula-age" inputmode="decimal">
                             <span class="formula-unit">years</span>
                         </label>
+                        <!-- The U.S. Navy body-fat inputs; hip is read for women only. -->
+                        <label class="formula-row" title="Neck circumference, just below the larynx with the tape sloping slightly down at the front. Feeds BF%.">
+                            <span class="formula-sym">C_neck</span>
+                            <span class="formula-name">neck</span>
+                            <input type="text" id="formula-neck" inputmode="decimal">
+                            <span class="formula-unit">cm</span>
+                        </label>
+                        <label class="formula-row" title="Waist circumference: at the navel for men, at the narrowest point for women. Feeds BF%.">
+                            <span class="formula-sym">C_waist</span>
+                            <span class="formula-name">waist</span>
+                            <input type="text" id="formula-waist" inputmode="decimal">
+                            <span class="formula-unit">cm</span>
+                        </label>
+                        <label class="formula-row" title="Hip circumference at the widest part of the buttocks. Feeds BF% for women only; the men's equation doesn't use it.">
+                            <span class="formula-sym">C_hip</span>
+                            <span class="formula-name">hip</span>
+                            <input type="text" id="formula-hip" inputmode="decimal">
+                            <span class="formula-unit">cm</span>
+                        </label>
                         <!-- The raw reading, and readonly because it's a measurement rather than a
                              knob: it's here to be compared against the smoothed figure below, which is
                              the one every identity on this sheet is evaluated at. Type your what-ifs
@@ -880,12 +909,24 @@
                             <input type="text" id="formula-target-bmi" inputmode="decimal">
                             <span class="formula-unit">kg/m²</span>
                         </label>
+                        <label class="formula-row" title="Body-fat %, U.S. Navy (Hodgdon & Beckett): for men, 495 / (1.0324 − 0.19077×log10(C_waist − C_neck) + 0.15456×log10(h)) − 450; for women, 495 / (1.29579 − 0.35004×log10(C_waist + C_hip − C_neck) + 0.22100×log10(h)) − 450. Not editable: derived from C_neck, C_waist, C_hip, h and σ.">
+                            <span class="formula-sym">BF%</span>
+                            <span class="formula-name">body-fat % by U.S. Navy</span>
+                            <input type="text" id="formula-bf-pct-navy" inputmode="decimal" readonly>
+                            <span class="formula-unit">%</span>
+                        </label>
+                        <label class="formula-row" title="Lean body mass from the U.S. Navy body-fat %: m̄ × (1 − BF%/100). Not editable: derived from m̄ and BF%. Used across the sheet when Lean body mass is set to U.S. Navy.">
+                            <span class="formula-sym">LBM_navy</span>
+                            <span class="formula-name">lean body mass by U.S. Navy</span>
+                            <input type="text" id="formula-lbm-navy" inputmode="decimal" readonly>
+                            <span class="formula-unit">kg</span>
+                        </label>
                         <!-- Sits with the rest of the profile it's derived from (m̄, h, σ) and directly
                              above BMR: under Katch-McArdle, BMR is built from this figure rather than
                              the other way around, so it has to be known before BMR is. -->
-                        <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Feeds Katch-McArdle BMR above and the protein/glycogen bands below.">
-                            <span class="formula-sym">LBM</span>
-                            <span class="formula-name">lean body mass</span>
+                        <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Used across the sheet (Katch-McArdle, protein, glycogen) when Lean body mass is set to Boer.">
+                            <span class="formula-sym">LBM_boer</span>
+                            <span class="formula-name">lean body mass by Boer</span>
                             <input type="text" id="formula-lbm" inputmode="decimal" readonly>
                             <span class="formula-unit">kg</span>
                         </label>
@@ -1476,7 +1517,7 @@
         <div class="panel-section" id="type-breakdown-container"></div>
 
         <div class="panel-section card">
-            <h3>Portfolio Allocation</h3>
+            <h3>Account Allocation</h3>
             <div class="chart-box chart-box-flush">
                 <canvas id="account-composition-chart"></canvas>
             </div>
@@ -1745,7 +1786,7 @@
         </div>
 
         <!-- One stock's chart, rule-based signals, news and AI read (stock-analysis.js, market-math.js). -->
-        <div class="panel" id="stock-analysis-panel" data-route="market">
+        <div class="panel" id="stock-analysis-panel" data-route="market" data-tile-host="financial-insight-mode-actions">
             <div class="panel-header">
                 <h2>Market</h2>
                 <button id="market-alert-btn" class="btn btn-icon panel-header-btn" title="Set alerts for this stock" aria-label="Alerts">🔔</button>
@@ -2365,6 +2406,11 @@
             <label>Market Value
                 <input type="text" id="account-current-value" placeholder="optional — today's cash-out value, if different from Balance">
             </label>
+            <label title="Optional — the day of the month to pay the balance back, 1 to 31; a red badge shows once it passes unpaid">Payment Day
+                <span class="timesheet-break-inputs">
+                    <input type="number" id="account-payment-day" inputmode="numeric" min="1" max="31" step="1" aria-label="Payment day of the month">of the month
+                </span>
+            </label>
 
             <p id="account-form-error" class="status" hidden></p>
 
@@ -2554,6 +2600,10 @@
                     <option>PROTEIN_G_PER_KG_LBM_MIN</option>
                     <option>PROTEIN_G_PER_KG_LBM_MAX</option>
                     <option>HEIGHT_CM</option>
+                    <option>NECK_CM</option>
+                    <option>WAIST_CM</option>
+                    <option>HIP_CM</option>
+                    <option>LBM_FORMULA</option>
                     <option>BIRTH_DATE</option>
                     <option>SEX</option>
                     <option>WEEKLY_FAT_LOSS_KG</option>

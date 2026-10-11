@@ -73,7 +73,7 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - One bar per Activity **Group** (Leg Day, Push Day, NEAT, Cardio, …) carrying a Weekly Target — a new column on the `Activity` sheet tab, shared by every exercise row in that Group.
 - A "session" is any day whose logged Workout notes include at least one exercise from that Group — a mixed day (a lift plus a walk) counts as a session for every Group it touches, not just the dominant one.
 - Bar is sessions actually logged in range; a red tick marks the Weekly Target scaled to the window's length.
-- **Grouped by Category** (the sheet's Strength/Cardio/NEAT column) — one hue per category, lightness stepped within it, same legend/coloring convention as Protein Source Rotation's Group grouping.
-- Groups ordered by combined remaining gap (target minus actual); within a group, most sessions still owed first.
+- **Coloured by Category** (the sheet's Strength/Cardio/NEAT column) — one hue per category, lightness stepped within it, same legend/coloring convention as Protein Source Rotation.
+- Groups ordered by remaining gap (target minus actual), as in Protein Source Rotation: furthest below the desired sessions first, down to those that meet or pass it; `Unclassified` last.
 - Beside the bars, a three-ring donut: outer ring each Group's own Weekly Target (the reference split), middle ring the last 4 weeks, inner ring the last week.
 - **A copy of this card also sits under Workouts's own tiles** (`/health/activity/workouts/`) — see [Health — Activity & Workouts](health-activity.md#health--activity-plan).

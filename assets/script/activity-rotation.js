@@ -63,8 +63,8 @@ function actualSessionsByGroup(from, to) {
 // Weekly Target scaled to the window length (weeklyTarget × lookbackDays/7),
 // so a 10-day window still reads "on track" at 10 rather than demanding a
 // full 7 more sessions on top of the last full week. Sorted by remaining gap
-// (target minus actual) descending, grouped by classification first — same
-// to-do-list read as Protein Source Rotation.
+// (target minus actual) descending — same to-do-list read as Protein Source
+// Rotation.
 function computeActivityRotationRows(from, to) {
   const lookbackDays = datesInRange(from, to).length;
   const sources = trackedActivityGroups();
@@ -83,23 +83,18 @@ function computeActivityRotationRows(from, to) {
     };
   });
 
-  return sortActivityRowsByClassificationThenGap(rows);
+  return sortActivityRowsByGap(rows);
 }
 
-// Identical grouping/ordering rule to protein-rotation.js's
-// sortByClassificationThenGap, just over session counts instead of grams.
-function sortActivityRowsByClassificationThenGap(rows) {
+// Most sessions still owed first, met or passed last; Unclassified at the
+// bottom, as in groupProteinRotationRows.
+function sortActivityRowsByGap(rows) {
   const gap = (r) => r.targetSessions - r.actualSessions;
-
-  const groupGap = new Map();
-  rows.forEach((r) => groupGap.set(r.classification, (groupGap.get(r.classification) || 0) + gap(r)));
-
   return [...rows].sort((a, b) => {
-    if (a.classification === b.classification) return gap(b) - gap(a);
     const aUnknown = a.classification === ACTIVITY_UNCLASSIFIED_LABEL;
     const bUnknown = b.classification === ACTIVITY_UNCLASSIFIED_LABEL;
     if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
-    return groupGap.get(b.classification) - groupGap.get(a.classification);
+    return gap(b) - gap(a);
   });
 }
 

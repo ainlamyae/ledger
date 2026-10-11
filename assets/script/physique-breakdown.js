@@ -772,7 +772,7 @@ async function handlePhysiqueScanInput(e) {
       reader.readAsDataURL(file);
     });
 
-    const ingredientText = await groqAnalyzeFoodImage(base64, file.type);
+    const ingredientText = await aiAnalyzeFoodImage(base64, file.type);
 
     // Lives inside the already-open Log form now, so it appends to whatever
     // Consumption already holds rather than wiping the rest of the day's

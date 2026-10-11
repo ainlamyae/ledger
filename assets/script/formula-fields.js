@@ -177,8 +177,8 @@ function currentPinMode() {
 // whenever the checked radio is 'bmr_cal'.
 let lastExplicitBmrFormula = 'mifflin';
 
-// The equation fieldset's two basis options: each layers on the active equation rather
-// than replacing it, and mirrors the same choice in "Which BMR..." below.
+// The BMR fieldset's two basis options: each layers on the active equation rather
+// than replacing it.
 const BMR_BASIS_RADIO_VALUES = ['bmr_cal', 'bmr_adp'];
 
 // Which BMR equation the preview is running. Both are first-class: this is read into the
@@ -191,16 +191,10 @@ function currentBmrFormula() {
 }
 
 // Which basis (applyBmrBasis, wellness-math.js) every deficit and desired calorie figure
-// in the app runs on. The equation fieldset's own "BMR_cal" radio is a second entry point to
-// the SAME choice "Which BMR..." below offers — checking it here takes priority, so the two
-// fieldsets can't disagree about which basis is actually active (formula-playground.js's
-// change handlers keep both radios' CHECKED state in sync too, so neither looks stale).
+// in the app runs on: BMR_cal / BMR_adp, or plain ('bmr') under Mifflin or Katch.
 function currentBmrBasis() {
-  const equationChecked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
-  if (BMR_BASIS_RADIO_VALUES.includes(equationChecked)) return equationChecked;
-  // The lower fieldset's BMR_mif / BMR_kat mean plain BMR on that equation.
-  const basisChecked = document.querySelector('input[name="formula-bmr-basis"]:checked').value;
-  return BMR_BASIS_RADIO_VALUES.includes(basisChecked) ? basisChecked : 'bmr';
+  const checked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+  return BMR_BASIS_RADIO_VALUES.includes(checked) ? checked : 'bmr';
 }
 
 // The mass every identity on this sheet is evaluated at — the smoothed box, never the raw
@@ -293,13 +287,13 @@ Body mass at which TEI becomes maintenance
 Metabolic adaptation — BMR sags faster than the lost mass alone predicts
     BMR_adp(t) = BMR × (1 − λt),  λt capped at λt_max ≈ 10–15% by week 10–12
     m∞_adp =  (TEI − A_adp) / B_adp,  the BMR half of A and B scaled by (1 − λt)
-Activity energy expenditure at the daily target — ACSM metabolic equation
+Activity energy expenditure at the desired daily activity — ACSM metabolic equation
     AEE   =  MET × m × τ × κ / ε
-Sleep efficiency — from sleep length s and sleep deprivation rate γ, per hour below the sleep target
-    η     =  1 − (γ/100) × max(0, s_target − s)
+Sleep efficiency — from sleep length s and sleep deprivation rate γ, per hour below the desired sleep s_des
+    η     =  1 − (γ/100) × max(0, s_des − s)
 Weekly fat loss as a share of body mass — 0.5–1%/week band
     Δm%   =  100 × Δm / m
-Daily energy deficit implied by the weekly fat-loss target, short sleep needs more of it
+Daily energy deficit implied by the desired weekly fat loss, short sleep needs more of it
     D     =  (Δm × ρ / 7) / η
 Sleep Deprivation Effect — the part of D that only makes up for short sleep
     SD    =  D  −  Δm × ρ / 7

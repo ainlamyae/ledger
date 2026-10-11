@@ -26,6 +26,6 @@ Each file opens with an **At a glance** summary, followed by the details.
 | [Health — Insight (AI)](health-insight.md) | The seven AI modes and their prompts |
 | [Health — Physique](health-physique.md) | Daily log, stored figures, day form, progress confetti |
 | [Health — Nutrition](health-nutrition.md) | Ingredient catalogue, Group, grams-first Amount, Complete, Scan, Norm |
-| [Health — Activity & GYM](health-activity.md) | Activity Plan and GYM groups |
+| [Health — Activity & Workouts](health-activity.md) | Activity Plan and Workouts groups |
 | [Track](track.md) | Work Time, Car Service, Travel, Applications |
 | [Other](other.md) | Contacts, Settings |

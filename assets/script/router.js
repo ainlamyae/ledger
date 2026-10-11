@@ -275,7 +275,7 @@ function pendingFormPage() {
 // Holds the form's place while its data loads, so the block's page never shows first.
 // It shows nothing of its own — no placeholder text — and its breadcrumb only when
 // every level's real name is already known from the address (a date, Log); a name
-// that comes from the sheet (an ingredient, a GYM group) isn't guessed, so the
+// that comes from the sheet (an ingredient, a Workouts group) isn't guessed, so the
 // breadcrumb is drawn once, final, when the form opens.
 function showPendingFormPage(panel, steps) {
   if (!window.ledgerSectionPage) return;
@@ -403,7 +403,7 @@ function routeFromLocation() {
   return { panel, button, record, sub };
 }
 
-// A form's own pages under its address (GYM's groups: …/activity/gym/push-day/).
+// A form's own pages under its address (Workouts' groups: …/activity/workouts/push-day/).
 // `show(slug)` shows that page, or the form's top level for null; switching rewrites
 // the address in place, like a view, with no history step of its own.
 const formSubViews = new Map(); // button slug -> { show(subSlug | null), label(subSlug) }
@@ -449,7 +449,7 @@ function routerDataLoaded() {
       if (!routedForms.length && !pendingFormRoute) abandonPendingFormPage();
     });
   } else {
-    // A form page's own page in the address (…/gym/push-day/): the form opens straight
+    // A form page's own page in the address (…/workouts/push-day/): the form opens straight
     // onto it, and claims the entry the address is already on.
     const view = sub && formSubViews.get(button.dataset.route);
     if (view) initialFormSub = { button: button.dataset.route, sub };
@@ -545,7 +545,7 @@ function initRouter() {
       history.pushState({ ledgerPage: true }, '', routeUrl(panel, [buttonStep(button)]));
       document.title = routeTitle(panel, [buttonStep(button)]);
     } else {
-      // The address stays on a form's own page (…/gym/push-day/) while it loads; its
+      // The address stays on a form's own page (…/workouts/push-day/) while it loads; its
       // name shows as "…" until the data does.
       setRoute(panel, sub ? formSubSteps(button, sub, '…') : [buttonStep(button)], { push: true });
     }

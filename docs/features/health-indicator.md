@@ -76,4 +76,4 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Grouped by Category** (the sheet's Strength/Cardio/NEAT column) — one hue per category, lightness stepped within it, same legend/coloring convention as Protein Source Rotation's Group grouping.
 - Groups ordered by combined remaining gap (target minus actual); within a group, most sessions still owed first.
 - Beside the bars, a three-ring donut: outer ring each Group's own Weekly Target (the reference split), middle ring the last 4 weeks, inner ring the last week.
-- **A copy of this card also sits under GYM's own tiles** (`/health/activity/gym/`) — see [Health — Activity & GYM](health-activity.md#health--activity-plan).
+- **A copy of this card also sits under Workouts's own tiles** (`/health/activity/workouts/`) — see [Health — Activity & Workouts](health-activity.md#health--activity-plan).

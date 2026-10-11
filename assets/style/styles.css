@@ -2607,34 +2607,13 @@ html.home-hub .page-tiles,
         display: none;
     }
 
-    /* The copyright line lives in a slim strip at the very bottom of the screen,
-       under the bottom bar (and above the home indicator), always in view; the
-       bars and the account circle sit just above it. */
+    /* The bars and the account circle sit just above the copyright strip. */
     :root {
-        --phone-footer-height: 1.3rem;
         --bottom-bar-bottom: var(--phone-footer-height);
     }
 
+    /* 10px lower than centred, nearer the home indicator; the bars above don't move. */
     html .site-footer {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 9;
-        box-sizing: border-box;
-        height: calc(var(--phone-footer-height) + env(safe-area-inset-bottom, 0px));
-        padding: 0 var(--space-s) env(safe-area-inset-bottom, 0px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: var(--text-small);
-        line-height: 1.2;
-        white-space: nowrap;
-        border-top: none;
-        /* Fades in from the page above to solid at the screen's edge. */
-        background: linear-gradient(transparent, var(--color-bg));
-        /* 10px lower than centred in its strip, nearer the screen's edge; the bars
-           above don't move. */
         transform: translateY(10px);
     }
 
@@ -2920,13 +2899,37 @@ html.home-hub .page-tiles,
     }
 }
 
+/* The copyright line: a slim strip fixed at the very bottom of the screen, on
+   every screen size. */
+:root {
+    --phone-footer-height: 1.3rem;
+}
+
 .site-footer {
-    flex-shrink: 0;
-    text-align: center;
-    padding: var(--space-l);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9;
+    box-sizing: border-box;
+    height: calc(var(--phone-footer-height) + env(safe-area-inset-bottom, 0px));
+    padding: 0 var(--space-s) env(safe-area-inset-bottom, 0px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--color-text-muted);
     font-size: var(--text-small);
-    border-top: 1px solid var(--color-border);
+    line-height: 1.2;
+    white-space: nowrap;
+    /* Half see-through at the top, solid at the screen's edge. */
+    background: linear-gradient(color-mix(in srgb, var(--color-bg) 50%, transparent), var(--color-bg));
+}
+
+/* The page clears the strip on a wide screen (the phone's .container already does). */
+@media (min-width: 1180px) {
+    body {
+        padding-bottom: var(--phone-footer-height);
+    }
 }
 
 /* A spaced em dash between the footer's two parts: typeset as a real
@@ -3385,7 +3388,8 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         flex-direction: column;
         position: fixed;
         top: 0;
-        bottom: 0;
+        /* Ends at the copyright strip, which runs under it as under the page. */
+        bottom: var(--phone-footer-height);
         left: 0;
         width: 13rem;
         padding: 3.5rem var(--space-s) 4.5rem;
@@ -3428,8 +3432,9 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         color: var(--color-text-muted) !important;
     }
 
+    /* White on the blue bar, as a selected page link. */
     .side-nav-section.active {
-        color: var(--color-primary) !important;
+        color: #fff !important;
     }
 
     /* A dialog floats as glass here only: below 1180px it's a full-screen form
@@ -3471,21 +3476,19 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         width: 13rem;
         box-sizing: border-box;
         padding: var(--space-l) var(--space-l);
-        background: var(--color-surface);
         color: var(--color-text);
     }
 
     .header-actions {
         position: fixed;
         left: 0;
-        bottom: 0;
+        /* Just above the copyright strip. */
+        bottom: var(--phone-footer-height);
         z-index: 6;
         width: 13rem;
         box-sizing: border-box;
         padding: var(--space-m) var(--space-l);
         margin: 0;
-        background: var(--color-surface);
-        border-top: 1px solid var(--color-border);
     }
 
     header .btn {

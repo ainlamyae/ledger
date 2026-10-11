@@ -732,7 +732,7 @@
                          and switching here re-derives the preview through the other one — including A
                          and B, since maintenance stays affine in body mass under both. -->
                     <fieldset class="formula-solve-for formula-bmr-formula">
-                        <legend>Basal metabolic rate — every deficit and desired calorie figure runs on it, everywhere in the app</legend>
+                        <legend>Basal metabolic rate — drives every deficit and desired calorie figure</legend>
                         <label title="Mifflin-St Jeor (1990): BMR from body mass, height, age and sex. The app's original equation, and the one that needs no lean-mass estimate.">
                             <input type="radio" name="formula-bmr-formula" value="mifflin" checked>
                             Mifflin-St Jeor (m, h, a, σ)
@@ -890,7 +890,7 @@
                         <!-- The adaptation pair and what it does to BMR by the arrival date t (below). -->
                         <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
                             <span class="formula-sym">λ</span>
-                            <span class="formula-name">metabolic adaptation, per week on the diet</span>
+                            <span class="formula-name">weekly metabolic adaptation</span>
                             <input type="text" id="formula-adapt-per-week" inputmode="decimal">
                             <span class="formula-unit">% of BMR/week</span>
                         </label>
@@ -908,7 +908,7 @@
                         </label>
                         <label class="formula-row" title="The plateau once BMR has adapted: the same m∞ = (TEI − A)/B with the BMR half of A and B scaled by (1 − λt). It sits ABOVE the m∞ printed in the trace, and that gap is why a constant-BMR forecast tends to overshoot in practice.">
                             <span class="formula-sym">m∞_adp</span>
-                            <span class="formula-name">adapted plateau, and the overshoot it implies</span>
+                            <span class="formula-name">adapted plateau</span>
                             <input type="text" id="formula-plateau-adapt" inputmode="decimal" readonly>
                             <!-- `kg` and nothing else, like every other row: the overshoot against m∞,
                                  and the fact that a proportional journey has no plateau to overshoot,
@@ -1224,13 +1224,13 @@
                              so only the two percentages are editable. -->
                         <label class="formula-row">
                             <span class="formula-sym">k_min</span>
-                            <span class="formula-name">fat floor, share of intake calories</span>
+                            <span class="formula-name">fat floor</span>
                             <input type="text" id="formula-fat-pct-min" inputmode="decimal">
                             <span class="formula-unit">% of TEI</span>
                         </label>
                         <label class="formula-row">
                             <span class="formula-sym">k_max</span>
-                            <span class="formula-name">fat ceiling, share of intake calories</span>
+                            <span class="formula-name">fat ceiling</span>
                             <input type="text" id="formula-fat-pct-max" inputmode="decimal">
                             <span class="formula-unit">% of TEI</span>
                         </label>
@@ -1262,13 +1262,13 @@
                              parameter, so only the two percentages are editable. -->
                         <label class="formula-row">
                             <span class="formula-sym">q_min</span>
-                            <span class="formula-name">carbohydrate floor, share of intake calories</span>
+                            <span class="formula-name">carbohydrate floor</span>
                             <input type="text" id="formula-carb-pct-min" inputmode="decimal">
                             <span class="formula-unit">% of TEI</span>
                         </label>
                         <label class="formula-row">
                             <span class="formula-sym">q_max</span>
-                            <span class="formula-name">carbohydrate ceiling, share of intake calories</span>
+                            <span class="formula-name">carbohydrate ceiling</span>
                             <input type="text" id="formula-carb-pct-max" inputmode="decimal">
                             <span class="formula-unit">% of TEI</span>
                         </label>
@@ -1290,9 +1290,7 @@
                 <!-- The model's equations (FORMULA_EXPRESSION, formula-fields.js). -->
                 <div class="card formula-card">
                     <h3>Equations</h3>
-                    <div class="table-responsive">
-                        <pre id="formula-expression"></pre>
-                    </div>
+                    <div id="formula-expression" class="formula-substituted"></div>
                 </div>
 
                 <!-- LBM, P_min and P_max trace their arithmetic here alongside every other

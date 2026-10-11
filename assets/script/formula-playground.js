@@ -294,8 +294,16 @@ async function saveFormulaSettings() {
 }
 
 function initFormulaPlayground() {
-  // The equation list, shown in the "Equations" dropdown above the variables.
-  document.getElementById('formula-expression').textContent = FORMULA_EXPRESSION;
+  // The equation list, styled like Calculations: headings dark, equations gray.
+  const expression = document.getElementById('formula-expression');
+  for (const line of FORMULA_EXPRESSION.split('\n')) {
+    if (!line.trim()) continue;
+    const p = document.createElement('p');
+    const text = line.trim().replace(/ {2,}/g, ' ');
+    if (/^\s/.test(line)) p.textContent = text;
+    else p.append(Object.assign(document.createElement('strong'), { textContent: text }));
+    expression.appendChild(p);
+  }
   // Reseeds from the sheet each time the Health Tune block is expanded.
   const panel = document.getElementById('health-tune-panel');
   let wasCollapsed = true;

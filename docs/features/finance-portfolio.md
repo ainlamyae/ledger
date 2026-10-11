@@ -6,7 +6,7 @@
 
 - `/finance/portfolio/`: your **trade log** and what it's worth today.
 - **📝** (`/finance/portfolio/log/`) logs a Buy, Sell or Split, tagged with one of your [Accounts](finance.md).
-- Cards: **Market Value**, **Cost Basis**, **Unrealized**, **Realized**, all in CAD.
+- Cards: **Market Value**, **Cost Basis**, **Unrealized**, **Realized**, all in CAD (two by two on a phone).
 - Charts: gain/loss over time, and market value against cost. Then tables for Holdings, By Account and Trades.
 - Cost is **average cost (ACB)**, Canada's method, with fees included.
 

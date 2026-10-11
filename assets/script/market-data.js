@@ -279,12 +279,13 @@ function expectedLatestSession(now = new Date()) {
 }
 
 // { bars, currency, provider, partial, stale, fetchedAt, error }.
-async function getDailyBars(symbol, { onWait } = {}) {
+// maxAgeMs: how long saved bars count as fresh (alerts use 4 h to spare the free limits).
+async function getDailyBars(symbol, { onWait, maxAgeMs = MARKET_RECHECK_MS } = {}) {
   symbol = symbol.trim().toUpperCase();
   const provider = marketProviderFor(symbol);
   const key = `${provider}:${symbol}:1day`;
   const cached = await readSeries(key);
-  const fresh = cached && (cached.lastBarDate >= expectedLatestSession() || Date.now() - cached.checkedAt < MARKET_RECHECK_MS);
+  const fresh = cached && (cached.lastBarDate >= expectedLatestSession() || Date.now() - cached.checkedAt < maxAgeMs);
   if (fresh) return { ...cached, provider, stale: false };
 
   try {

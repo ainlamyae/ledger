@@ -11,7 +11,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 ### Product
 
 - [Features](docs/features/README.md) — every section and page, one file each.
-  - [Finance — Watch List](docs/features/finance-watchlist.md) — the stocks you follow, with their latest moves.
+  - [Finance — Watch List](docs/features/finance-watchlist.md) — the stocks you follow, their latest moves and price alerts.
   - [Finance — Market](docs/features/finance-market.md) — one stock's chart 1d to All, rule-based verdict, risk, news and an AI read.
   - [Finance — Portfolio](docs/features/finance-portfolio.md) — trade log at average cost, gain/loss in CAD.
 - [Design System](docs/design-system.md) — colours, type sizes, spacing, tables, buttons.

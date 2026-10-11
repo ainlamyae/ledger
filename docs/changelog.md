@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.6.0** | feat(nav): let the sidebar hide and colour-code hub tiles |
+| (this commit) | **3.7.0** | feat(activity): price new workout exercises with ai |
+| `a140397` | **3.6.0** | feat(nav): let the sidebar hide and colour-code hub tiles |
 | `8ea7e84` | **3.5.0** | feat(leetcode): add track leetcode page with neetcode roadmap |
 | `20a9c80` | **3.4.0** | feat(versioning): generate a changelog and count versions from 0.0.0 |
 | `7462f3a` | **3.3.0** | feat(versioning): derive app version from conventional commits |

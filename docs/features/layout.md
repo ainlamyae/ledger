@@ -27,7 +27,7 @@
 - **Forms are pages**, not overlays (see [Hubs, Pages & Addresses](navigation.md)). Only dialogs that aren't pages (keyboard shortcuts, confirmations, forms opened on the home page) stay overlays.
 - **Tablet and phone (≤1179px), the same bottom-bar nav at every width in that range:**
   - No top bar: the header box is `display: contents`, its logo hidden; the breadcrumb's **Ledger** goes home.
-  - The account avatar and menu (or a round 🔑 sign-in button) sit bottom-left over the bottom bar.
+  - The account avatar and menu (or a round 🔑 sign-in button) sit bottom-left over the bottom bar; the menu holds the show/hide settings as iPhone switches.
   - Health / Finance / Track / Other become a fixed bottom tab bar; page content gets bottom padding to clear it.
   - The tab bar and the page's action bar are pills floating `--bottom-bar-inset` off the edges, with half-circle ends and ❌ as a round button. Lighter glass than the rest (40% opacity, 12px blur). No tab is marked active or changes colour on hover.
 - **Wide screens (≥1180px):** a sidebar replaces the top bar (see [Hubs, Pages & Addresses](navigation.md)). There is no intermediate top-bar state — the layout is bottom-bar-or-sidebar with nothing in between.

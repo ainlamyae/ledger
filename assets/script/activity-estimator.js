@@ -105,8 +105,75 @@ function workoutNoteMinutes(notes) {
   return Math.max(1, Math.round(seconds / 60));
 }
 
+// The Activity sheet's Unit for a parsed note line's type.
+const NOTE_LINE_TYPE_TO_UNIT = { reps: 'x', hold: 'sec', duration: 'min', steps: 'step' };
+
+// The AI's catalogue row for each exercise name the Activity sheet doesn't list
+// (ai.js's aiEstimateActivities), keyed by lower-cased name. Kept in this
+// browser, so a day priced with one still prices the same when it's reopened —
+// opening a day reprices its Workout, and without the guess a new name would
+// drop back to EXERCISE_MET_FALLBACK. A name saved to the sheet (💾) reads from
+// there instead, so its guess is dropped.
+const ACTIVITY_GUESSES_KEY = 'ledger_activity_guesses';
+
+function readActivityGuesses() {
+  try {
+    return new Map(Object.entries(JSON.parse(localStorage.getItem(ACTIVITY_GUESSES_KEY) || '{}')));
+  } catch {
+    return new Map();
+  }
+}
+
+const activityGuesses = readActivityGuesses();
+
+function writeActivityGuesses() {
+  try {
+    localStorage.setItem(ACTIVITY_GUESSES_KEY, JSON.stringify(Object.fromEntries(activityGuesses)));
+  } catch {}
+}
+
+function activityGuess(name) {
+  return activityGuesses.get(String(name || '').toLowerCase()) ?? null;
+}
+
+function forgetActivityGuess(name) {
+  if (activityGuesses.delete(String(name || '').toLowerCase())) writeActivityGuesses();
+}
+
+// 🧮 Calculate's AI step for the Workout: asks for a catalogue row for each name
+// in `notes` that's neither on the Activity sheet nor already guessed. Returns
+// warnings for the form's message line, never throws — a failed call just leaves
+// those lines at the default MET, as before.
+async function guessUnknownActivities(notes) {
+  const seen = new Set();
+  const unknown = parseWorkoutNoteLines(notes).filter((line) => {
+    const key = line.name.toLowerCase();
+    if (seen.has(key) || activityByName(line.name) || activityGuess(line.name)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!unknown.length) return [];
+
+  const distinct = (key) => [...new Set(allActivities.map((a) => a[key]).filter(Boolean))];
+  try {
+    const guesses = await aiEstimateActivities(
+      unknown.map((line) => ({ name: line.name, unit: NOTE_LINE_TYPE_TO_UNIT[line.type] })),
+      { categories: distinct('category'), groups: distinct('group'), muscleGroups: distinct('muscleGroup') },
+    );
+    unknown.forEach((line) => {
+      const guess = guesses.find((g) => g.name.toLowerCase() === line.name.toLowerCase());
+      if (guess) activityGuesses.set(line.name.toLowerCase(), { ...guess, name: line.name, unit: NOTE_LINE_TYPE_TO_UNIT[line.type] });
+    });
+    writeActivityGuesses();
+    return [];
+  } catch (err) {
+    return [`⚠️ Workout AI: ${err.message}`];
+  }
+}
+
 // Sums duration and calorie burn across every parsed line. Each line's own MET
-// is applied only to its own active seconds.
+// is applied only to its own active seconds: the Activity sheet's, else the AI's
+// guess (guessUnknownActivities), else EXERCISE_MET_FALLBACK.
 function estimateWorkoutActivity(notes, bodyMassKg) {
   const lines = parseWorkoutNoteLines(notes);
   if (lines.length === 0) {
@@ -123,8 +190,10 @@ function estimateWorkoutActivity(notes, bodyMassKg) {
   const perLine = [];
 
   lines.forEach((line) => {
-    if (!activityByName(line.name)) unmatchedNames.push(line.name);
-    const met = exerciseMet(line.name);
+    const inTable = Boolean(activityByName(line.name));
+    const guess = inTable ? null : activityGuess(line.name);
+    if (!inTable && !guess) unmatchedNames.push(line.name);
+    const met = guess ? guess.met : exerciseMet(line.name);
     const activeSeconds = activeSecondsForNoteLine(line);
     const lineKcal = metKcal(met, bodyMassKg, activeSeconds / 60);
 
@@ -132,7 +201,11 @@ function estimateWorkoutActivity(notes, bodyMassKg) {
     calories += lineKcal;
     perLine.push({
       name: line.name,
-      category: activityCategory(line.name),
+      category: guess?.category || activityCategory(line.name),
+      // Where the MET came from, for the table's last column: ✅ for the
+      // Activity sheet, AI (with 💾 and ✏️) for a guess, Default otherwise.
+      source: inTable ? 'table' : (guess ? 'ai' : 'default'),
+      guess,
       // The note's own quantity token ("30x", "135sec"), so a table row can be
       // matched back to the Workout line it was priced from at a glance.
       quantity: workoutNoteQuantityForLine(line),

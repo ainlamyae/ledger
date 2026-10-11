@@ -222,6 +222,11 @@ function buildSideNav(sections) {
   aside.id = 'side-nav';
   aside.className = 'side-nav';
   aside.setAttribute('aria-label', 'Pages');
+  // The links scroll on their own, above the bottom panel (the switches and the
+  // account row, index.html's .header-actions), which stays put.
+  const links = document.createElement('div');
+  links.className = 'side-nav-links';
+  aside.appendChild(links);
   sections.forEach((section) => {
     const heading = document.createElement('a');
     heading.className = 'side-nav-section';
@@ -229,7 +234,7 @@ function buildSideNav(sections) {
     heading.dataset.section = section.id;
     heading.textContent = section.label;
     heading.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
-    aside.appendChild(heading);
+    links.appendChild(heading);
     section.panels.forEach((panel) => {
       const link = document.createElement('a');
       link.className = 'side-nav-page';
@@ -238,11 +243,12 @@ function buildSideNav(sections) {
       link.dataset.route = panel.dataset.route;
       link.textContent = routedHeadingText(panel);
       link.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
-      aside.appendChild(link);
+      links.appendChild(link);
     });
   });
   document.body.appendChild(aside);
   document.body.classList.add('with-side-nav');
+  trackSideNavFooter();
   initSideNavToggle();
 }
 
@@ -258,10 +264,21 @@ function setSideNavOpen(open) {
   toggle.title = label;
   toggle.setAttribute('aria-label', label);
   toggle.setAttribute('aria-expanded', String(open));
+  if (typeof placeSettingsSwitches === 'function') placeSettingsSwitches();
   try {
     if (open) localStorage.removeItem(SIDE_NAV_KEY);
     else localStorage.setItem(SIDE_NAV_KEY, 'closed');
   } catch (e) {}
+}
+
+// The bottom panel's height (more switches signed in than out) as
+// --side-nav-footer, which the links stop above.
+function trackSideNavFooter() {
+  const footer = document.querySelector('.header-actions');
+  if (!footer || !('ResizeObserver' in window)) return;
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--side-nav-footer', `${footer.offsetHeight}px`);
+  }).observe(footer);
 }
 
 function initSideNavToggle() {

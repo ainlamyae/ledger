@@ -183,6 +183,66 @@ async function aiExtractIngredients(notesText) {
   return { items };
 }
 
+// The Workout counterpart to aiExtractIngredients: fills in a catalogue row for
+// each exercise name the Activity sheet doesn't list yet, so the day is priced at
+// a real MET rather than the flat default, and 💾 on its row (physique-breakdown.js)
+// can save it as a new activity. `lines` is [{ name, unit }], unit being the
+// note line's own (x, sec, min, step); `catalogue` is the sheet's existing
+// { categories, groups, muscleGroups }, which the model is asked to reuse so a
+// saved row lands in a table that already exists. Returns
+// [{ name, met, category, group, muscleGroup, amount, rest }], one per name.
+async function aiEstimateActivities(lines, catalogue) {
+  const list = (values) => (values.length ? values.map((v) => `"${v}"`).join(', ') : '(none yet)');
+  const systemPrompt = `You fill in exercise catalogue rows for a personal workout log. For each exercise name given, provide:
+- "name": the name exactly as given
+- "met": its MET value from the Compendium of Physical Activities (a number, e.g. 3.5 for a general machine exercise, 8 for running)
+- "category": one of these existing categories if any fits: ${list(catalogue.categories)}
+- "group": one of these existing groups (the plan's sub-tables, e.g. a training day) if any fits, else a short new one: ${list(catalogue.groups)}
+- "muscleGroup": one of these existing muscle groups if any fits, else a short new one ("" for cardio): ${list(catalogue.muscleGroups)}
+- "amount": a typical prescription in the line's unit — "3 x 10" for x (reps), "3 x 45 sec" for sec (a hold), "30" for min, "6000" for step
+- "rest": a typical rest between sets, e.g. "60 sec" ("" for min and step)
+
+Respond with ONLY a JSON object, no other text, in exactly this shape:
+{"activities": [{"name": "<as given>", "met": <number>, "category": "<text>", "group": "<text>", "muscleGroup": "<text>", "amount": "<text>", "rest": "<text>"}, ...]}`;
+
+  const { content, provider } = await aiChat('text', {
+    temperature: 0,
+    seed: AI_SEED,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: lines.map((l) => `${l.name} (unit: ${l.unit})`).join('\n') },
+    ],
+  });
+
+  const fail = (reason) => {
+    const snippet = content.length > 300 ? `${content.slice(0, 300)}…` : content;
+    throw new Error(`${provider.name} returned an unexpected response (${reason}): ${snippet}`);
+  };
+  // Same forgiving parse as aiExtractIngredients: the outermost {...} only.
+  const jsonStart = content.indexOf('{');
+  const jsonEnd = content.lastIndexOf('}');
+  if (jsonStart === -1 || jsonEnd <= jsonStart) fail('no JSON object found');
+  let parsed;
+  try {
+    parsed = JSON.parse(content.slice(jsonStart, jsonEnd + 1));
+  } catch (e) {
+    fail(`invalid JSON — ${e.message}`);
+  }
+  if (!Array.isArray(parsed.activities)) fail('missing "activities" array');
+
+  return parsed.activities
+    .map((a) => ({
+      name: String(a.name || '').trim(),
+      met: parseFloat(a.met),
+      category: String(a.category || '').trim(),
+      group: String(a.group || '').trim(),
+      muscleGroup: String(a.muscleGroup || '').trim(),
+      amount: String(a.amount || '').trim(),
+      rest: String(a.rest || '').trim(),
+    }))
+    .filter((a) => a.name && Number.isFinite(a.met) && a.met > 0);
+}
+
 // Reads a photographed Nutrition Facts label. `nutrients` is [{ name, unit }], the
 // only names the model may use. Returns { name, serving, servingGrams, calories,
 // nutrients: [{ name, amount, unit, percentDV }] }, per serving as printed.

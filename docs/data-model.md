@@ -165,7 +165,7 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 
 ## `Watchlist` (created by the app)
 
-- Columns A–E: Symbol, Name, Exchange, Currency, Notes. Symbol is `AAPL`, `SHOP.TO` (TSX) or `XYZ.V` (TSXV).
+- Columns A–F: Symbol, Name, Exchange, Currency, Notes, Alerts. Alerts is JSON (`RAW`) of the stock's alert rules and dismissals, blank when none. Symbol is `AAPL`, `SHOP.TO` (TSX) or `XYZ.V` (TSXV).
 - Listed on the Watch List page; its rows are also Market's stock picker.
 
 ## `Trade` (created by the app)

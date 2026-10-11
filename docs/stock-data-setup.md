@@ -36,6 +36,7 @@ The Finance **Watch List**, **Market** and **Portfolio** pages need three free A
 ## Good to know
 
 - Only one key is strictly needed per kind of stock: Twelve Data alone covers US stocks, Alpha Vantage alone covers TSX. Without Finnhub, Market just has no News. Finnhub's free plan has no TSX news.
+- Stocks with [alerts](features/finance-watchlist.md#alerts) are re-checked in the background on each Finance and home load, at most every 4 hours each; with many alerted TSX stocks this spends Alpha Vantage's 25 daily calls.
 - Prices are saved in the browser after the first load, so later visits only fetch the newest days. Alpha Vantage's 25 calls a day go furthest when you keep a short TSX watchlist.
 - TSX daily history starts at ~100 days and grows each day you come back. Until then, long ranges and the trend check use month-end prices.
 - What each call sends: [Security & Privacy](security.md). How prices are cached: [Caching Strategy](caching.md).

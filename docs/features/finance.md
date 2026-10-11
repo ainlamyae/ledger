@@ -51,7 +51,7 @@
 
 After Breakdown, before Insight; each has its own page:
 
-- [Watch List](finance-watchlist.md): the stocks you follow, with their latest moves.
+- [Watch List](finance-watchlist.md): the stocks you follow, their latest moves and price alerts (red badge when met).
 - [Market](finance-market.md): one stock's chart (1d…All), rule-based verdict, risk, news and an AI read.
 - [Portfolio](finance-portfolio.md): buy/sell log at average cost, gain/loss in CAD.
 - Keys to set first: [Stock Data Setup](../stock-data-setup.md).

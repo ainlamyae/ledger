@@ -208,10 +208,10 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 48 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |
 | 49 | `car-service.js` | Car Service block: Transportation `@km` transactions → odometer fit, next service per rule (Toyota km schedule, winter tires, rust protection), chart + table |
 | 50 | `market-data.js` | The only code that calls Twelve Data, Alpha Vantage and Finnhub: daily/monthly/intraday bars, symbol search, news, USD/CAD; IndexedDB price cache, per-service rate-limit queue (Alpha Vantage spaced 1.5 s), `normalizeSymbol` (`TSE: AC` → `AC.TO`) |
-| 51 | `market-math.js` | Pure indicators (SMA, ATR, RSI, MACD, Bollinger), the trailing stop (`trailingStopSeries`, `MARKET_ATR_MULT_DEFAULT` = 4), risk measures and the four-check verdict |
+| 51 | `market-math.js` | Pure indicators (SMA, ATR, RSI, MACD, Bollinger), the trailing stop (`trailingStopSeries`, `MARKET_ATR_MULT_DEFAULT` = 4), risk measures the four-check verdict, `checkAlerts` and `parseAlertLine` |
 | 52 | `portfolio-math.js` | Pure average-cost (ACB) holdings and the daily portfolio series in CAD |
 | 53 | `market-charts.js` | Range buttons, `marketLineChart`, series legend, status and % cells shared by the stock pages |
-| 54 | `market.js` | Watch List page: Watchlist tab CRUD, symbol search, Close and 1d/1m/1y per row, 🔬 opens Market |
+| 54 | `market.js` | Watch List page: Watchlist tab CRUD, symbol search, Close and 1d/1m/1y per row, 🔬 opens Market; alerts (`checkWatchlistAlerts`, badges, ✅ dismiss) |
 | 55 | `portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
 | 56 | `stock-analysis.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
 

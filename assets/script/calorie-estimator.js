@@ -94,7 +94,7 @@ function mergeDuplicateBreakdownRows(rows) {
 // candidate rather than picked independently, since a false-match candidate
 // is wrong for both macros at once.
 // Fiber/Fat/Carb have no AI fallback (Groq is only ever asked for
-// kcal/protein — see groq.js) — a candidate with no such nutrient in its
+// kcal/protein — see ai.js) — a candidate with no such nutrient in its
 // panel, or no plausible candidate at all, leaves that macro null, same
 // "not measured" convention resolvedNutritionMacros/estimateTefBreakdown use
 // elsewhere rather than a confident zero.
@@ -364,7 +364,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   // The macro lookup below always re-checks the Nutrition table fresh, so
   // adding or editing a table row and recalculating the same Notes text picks
   // up the change immediately.
-  const extraction = await groqExtractIngredients(notes);
+  const extraction = await aiExtractIngredients(notes);
   const { items } = extraction;
 
   // The model's own "query" field is intentionally NOT trusted as an item's

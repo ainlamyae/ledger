@@ -23,7 +23,7 @@ ledger/
 │       ├── sheets.js             # Sheets API wrapper
 │       ├── cache.js              # Numeric-expression evaluator; clears old cache keys
 │       ├── ui-helpers.js         # Shared table/modal/busy-button helpers
-│       ├── groq.js               # Groq chat client
+│       ├── ai.js                 # AI chat client (Groq or OpenRouter)
 │       ├── usda.js               # USDA FoodData Central client
 │       ├── nutrient-targets.js   # Ideal/day targets for Micronutrient mode
 │       ├── nutrition.js          # Nutrition table, Group, USDA lookup

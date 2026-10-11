@@ -5,12 +5,13 @@
 ## At a glance
 
 - `/health/insight/` shows seven mode tiles in one card titled **Insight**; each mode is a page (`/health/insight/plan/`).
+- A mode last generated over 30 days ago gets a red `<days>d` badge on its tile, counting up (`renderInsightAgeBadges`, from its `INSIGHT_*_LAST_GENERATED_AT`; same `.page-badge` as Car Service).
 - Page order: From/To, question box, prompt template, data, Send to AI, answer.
 - Modes: **Plan**, Wellness, Food, Micronutrient, Activity, **Protein** (formerly Protein Sources), **Pattern**.
   - **Micronutrient:** skips zero nutrients with no target; targets come from `MICRONUTRIENT_DAILY_TARGETS_JSON`.
   - **Pattern:** period averages over a length starting at Tune's `L_p`; asks what drives fat loss and a higher BMR.
 - **Prompt template** dropdown shows exactly what is sent, with on-screen data as `[data shown above]`.
-- Uses your own Groq key.
+- Uses your own AI key — Groq or OpenRouter, whichever `AI_PROVIDER` names.
 
 ## Health — Insight (AI)
 

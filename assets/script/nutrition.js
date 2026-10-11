@@ -1075,7 +1075,7 @@ async function scanNutritionLabel(e) {
   try {
     const names = nutritionLabelNames();
     const { base64, type } = await labelPhotoBase64(file);
-    const label = await groqReadNutritionLabel(base64, type, names);
+    const label = await aiReadNutritionLabel(base64, type, names);
     const units = new Map(names.map((n) => [n.name, n.unit]));
     // The model sometimes echoes a unit after the name: "Fat (g)".
     const knownName = (name) => (units.has(name) ? name : String(name || '').replace(/\s*\([^)]*\)\s*$/, ''));

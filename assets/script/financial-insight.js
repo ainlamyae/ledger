@@ -1,6 +1,6 @@
 // Finance's Insight — the same preview/question/Send-to-AI flow as Health
 // Insight (insight-panel.js), reusing its renderInsightLines/renderInsightText
-// helpers (insight.js) and groqChatText (groq.js), but for money instead of
+// helpers (insight.js) and aiChatText (ai.js), but for money instead of
 // health: net worth and cash flow, average spending by category over four
 // periods, and every account's Balance (deposited) vs. Market Value (today's
 // worth, where tracked) — so a gap between the two reads as the account's own
@@ -286,7 +286,7 @@ async function runFinancialInsightGeneration() {
   btn.textContent = '🤖…';
 
   try {
-    const text = await groqChatText(FINANCIAL_INSIGHT_SYSTEM_PROMPT, financialInsightUserMessage(data, textarea.value));
+    const text = await aiChatText(FINANCIAL_INSIGHT_SYSTEM_PROMPT, financialInsightUserMessage(data, textarea.value));
     body.innerHTML = '';
     renderInsightText(body, text);
 

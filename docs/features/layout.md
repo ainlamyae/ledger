@@ -7,7 +7,7 @@
 - **Keyboard shortcuts** work from any page: `/` filter payees, `n` log a transaction, `Esc` close, `?` help.
 - **Saving never closes a form:** 💾 shows "Saved"; an Add becomes the new row's Edit. Only ❌ closes.
 - Physique filters by its search box alone (no From/To).
-- **Export Transactions** and **Export Physique** (CSV, every row) live in Other › Settings.
+- **Export Transactions** and **Export Physique** (CSV, every row) live in Settings (account menu).
 - Notifications for Work Time and Car Service: account menu → **Enable notifications**.
 - iPhone Safari never zooms on a tapped field (`maximum-scale=1.0`, 16px touch fields); pinch-zoom still works.
 - Range-button rows (Health Indicator, Health Insight, Finance Indicator) are Market's `.pagination` row of `.btn`, current one `.btn-primary`, with `.panel-range`: nothing above, `--space-s` below — the same spacing the From/To row had. Work Time still uses From/To.
@@ -28,7 +28,7 @@
 - **Tablet and phone (≤1179px), the same bottom-bar nav at every width in that range:**
   - No top bar: the header box is `display: contents`, its logo hidden; the breadcrumb's **Ledger** goes home.
   - The account avatar and menu (or a round 🔑 sign-in button) sit bottom-left over the bottom bar; the menu holds the show/hide settings as iPhone switches.
-  - Health / Finance / Track / Other become a fixed bottom tab bar; page content gets bottom padding to clear it.
+  - Ledger / Health / Finance / Track become a fixed bottom tab bar; page content gets bottom padding to clear it.
   - The tab bar and the page's action bar are pills floating `--bottom-bar-inset` off the edges, with half-circle ends and ❌ as a round button. Lighter glass than the rest (40% opacity, 12px blur). No tab is marked active or changes colour on hover.
 - **Wide screens (≥1180px):** a sidebar replaces the top bar (see [Hubs, Pages & Addresses](navigation.md)). There is no intermediate top-bar state — the layout is bottom-bar-or-sidebar with nothing in between.
 
@@ -66,7 +66,7 @@ A form's ❌ is the last button in its own actions row, so a long form closes fr
 - **Keyboard shortcuts** — `/` filters transactions by payee, `n` logs a transaction, `Esc` closes a form or menu, `?` toggles help. From any page, `/` and `n` go to the Transaction page or its Log form. Ignored while typing.
 - **Saving never closes a form** (`showFormSaved`, `stayOnSavedForm`): 💾 writes the row and shows "Saved"; an Add or Log becomes that row's Edit, its address and breadcrumb moved to the row. Transfer clears its amount; Bulk Edit keeps its rows ticked. Only ❌, Back, Cancel or Esc close a form.
 - **Physique's page has no From/To dates**: its table is narrowed by the search box alone.
-- **Exports live in Other › Settings**: **Export Transactions** and **Export Physique** download every row as CSV (`exportTransactionsCSV`, `exportPhysiqueCSV`, `csv.js`), whatever the filters.
+- **Exports live in Settings** (account menu): **Export Transactions** and **Export Physique** download every row as CSV (`exportTransactionsCSV`, `exportPhysiqueCSV`, `csv.js`), whatever the filters.
 - **Accessibility** — `role="dialog"`/`aria-modal` on dialogs, focus trap and restore, keyboard-operable headers, visible focus rings.
 - **Dark mode** — floating toggle, persisted.
 - **Privacy mode** — floating toggle masks amounts, health figures, contact details and Settings values.

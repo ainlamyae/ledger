@@ -5,7 +5,7 @@
 ## At a glance
 
 - `/health/insight/` shows seven mode tiles in one card titled **Insight**; each mode is a page (`/health/insight/plan/`).
-- A mode last generated over 30 days ago gets a red `<days>d` badge on its tile, counting up (`renderInsightAgeBadges`, from its `INSIGHT_*_LAST_GENERATED_AT`; same `.page-badge` as Car Service).
+- A mode last generated over 30 days ago gets a red `<days>d` badge on its tile, counting up (`renderInsightAgeBadges`, from its `INSIGHT_*_LAST_GENERATED_AT`; same `.page-badge` as Car Service). Finance Insight's **Snapshot** tile gets the same badge from `FINANCIAL_INSIGHT_LAST_GENERATED_AT`.
 - Page order: From/To, question box, prompt template, data, Send to AI, answer.
 - Modes: **Plan**, Wellness, Food, Micronutrient, Activity, **Protein** (formerly Protein Sources), **Pattern**.
   - **Micronutrient:** skips zero nutrients with no target; targets come from `MICRONUTRIENT_DAILY_TARGETS_JSON`.

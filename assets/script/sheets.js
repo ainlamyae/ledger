@@ -169,6 +169,23 @@ function batchUpdateValues(data, valueInputOption = 'USER_ENTERED') {
   });
 }
 
+// A tab the app adds on its first save (Watchlist, Trade, Analysis), with a
+// frozen header row. Returns its sheet id.
+async function ensureSheetTab(title, headers) {
+  const meta = await getSpreadsheetMetadata();
+  const existing = meta.sheets.find((s) => s.properties.title === title);
+  if (existing) return existing.properties.sheetId;
+  const res = await batchUpdate([{ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } }]);
+  await updateValues(`'${title}'!A1`, [headers], 'RAW');
+  return res.replies[0].addSheet.properties.sheetId;
+}
+
+// True when the tab exists, so a load can skip reading a tab not made yet.
+async function sheetTabExists(title) {
+  const meta = await getSpreadsheetMetadata();
+  return meta.sheets.some((s) => s.properties.title === title);
+}
+
 function batchUpdate(requests) {
   // Can add, delete or rename tabs, so the shared tab list may be out of date.
   resetSheetReads();

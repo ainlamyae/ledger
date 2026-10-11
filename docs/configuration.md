@@ -20,6 +20,10 @@
 | `'Travel'!A2:H` | `travel.js` | Travel rows |
 | `'Application'!A2:E` | `applications.js` | Application header + status-update rows |
 | `Settings!A2:C` | `app.js`, `settings-panel.js` | Personal overrides; `app.js` reads A/B, the panel reads and writes all three |
+| `'Watchlist'!A2:E` | `market.js` | Watchlist stocks (tab created on the first save) |
+| `'Trade'!A2:J` | `portfolio.js` | Buys, sells and splits (tab created on the first save) |
+| `'Analysis'!A2:G` | `stock-analysis.js` | Saved AI reads, one row per run (tab created on the first save) |
+| `'Account'!E3:E100` | `portfolio.js` | Market Value, written only by the opt-in Update Market Value (`PORTFOLIO_WRITE_MARKET_VALUE` = 1) |
 
 **Auth, file selection and widget preferences (`localStorage`; no sheet data is stored):**
 
@@ -33,6 +37,10 @@
 | `ledger_last_car_service_notified` | `car-service.js` | Today's date once the car-service notification fired (one per day) |
 | `ledger_widget_manual_location` | `widgets.js` | `{lat, lon, label}` from the location picker; overrides auto-detect and Settings |
 | `ledger_widget_second_clock_location` | `widgets.js` | `{label, timezone}` for the second clock |
+| `ledger_market_symbol`, `ledger_market_range`, `ledger_portfolio_range`, `ledger_analysis_range` | `market.js`, `portfolio.js`, `stock-analysis.js` | The stock and chart ranges last shown |
+| `ledger_market_quota` | `market-data.js` | Today's API call counts per stock-data service; cleared with the price cache |
+
+**Stock settings (`Setting` tab):** `TWELVE_DATA_API_KEY`, `ALPHA_VANTAGE_API_KEY`, `FINNHUB_API_KEY` (masked like every `_API_KEY`); `MARKET_RISK_PCT` (default 1, % of investment accounts risked per trade), `MARKET_ATR_MULT` (default 2.5, stop distance in ATRs), `MARKET_RISK_FREE_PCT` (default 0, for Sharpe/Sortino), `PORTFOLIO_WRITE_MARKET_VALUE` (1 shows Update Market Value).
 
 ---
 

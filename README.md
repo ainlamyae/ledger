@@ -11,6 +11,9 @@ A private, serverless personal life dashboard — health, finances, time trackin
 ### Product
 
 - [Features](docs/features/README.md) — every section and page, one file each.
+  - [Finance — Market](docs/features/finance-market.md) — watchlist and price chart, 1d to All.
+  - [Finance — Portfolio](docs/features/finance-portfolio.md) — trade log at average cost, gain/loss in CAD.
+  - [Finance — Analysis](docs/features/finance-analysis.md) — rule-based verdict, risk, news and an AI read.
 - [Design System](docs/design-system.md) — colours, type sizes, spacing, tables, buttons.
 - [Naming & Display Conventions](docs/conventions.md) — wording, BMR names, units, dates, hover format.
 
@@ -21,7 +24,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - [Health Formula Reference](docs/health-formulas.md) — every Health formula and where it lives.
 - [Tech Stack](docs/tech-stack.md) — every layer and library.
 - [Project Structure](docs/project-structure.md) — the file tree, one line per module.
-- [Caching Strategy](docs/caching.md) — no caching, batched reads, quota handling.
+- [Caching Strategy](docs/caching.md) — no sheet caching (stock prices excepted), batched reads, quota handling.
 
 ### Operations
 
@@ -29,6 +32,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - [Deployment](docs/deployment.md) — GitHub Pages and the OAuth origin.
 - [Versioning](docs/versioning.md) — automatic MAJOR.MINOR.PATCH release numbers.
 - [Configuration Reference](docs/configuration.md) — sheet ranges and localStorage entries.
+- [Stock Data Setup](docs/stock-data-setup.md) — to do: the three free API keys for Market, Portfolio and Analysis.
 - [Security & Privacy](docs/security.md) — scopes, secrets, what each external call sends.
 
 ## License

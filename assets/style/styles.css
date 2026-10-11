@@ -1140,11 +1140,12 @@ table {
 }
 
 /* Table rows: 19px for a line of text, 32px when it wraps onto two (16px lines), at
-   every width; the cells have no vertical padding, so the row is its lines. */
+   every width; the cells have no vertical padding, so the row is its lines. 2.5px
+   at each side, so columns sit 5px apart in every table at every width. */
 th,
 td {
     height: 19px;
-    padding: 0 var(--space-m);
+    padding: 0 2.5px;
     text-align: left;
     font-size: var(--text-small);
     line-height: 16px;
@@ -1166,17 +1167,16 @@ td:has(.btn) {
     white-space: nowrap;
 }
 
-/* The app's one "dense data table" look — tighter padding, no per-row border —
+/* The app's one "dense data table" look — no per-row border —
    shared by every table that's mostly rows of short figures (Nutrition,
    Physique, Transaction, Account, Breakdown, Work Time, Travel, Contact,
    Insight's Pattern periods).
-   One class instead of a padding/border-bottom pair repeated per table id, so
+   One class instead of a border-bottom rule repeated per table id, so
    changing the look changes it everywhere at once. Add `table-compact` to a
    `<table>` to opt it in; table-specific column widths/nowrap rules stay
    scoped to their own id below, since those genuinely differ per table. */
 .table-compact th,
 .table-compact td {
-    padding: 0 var(--space-s);
     border-bottom: none;
 }
 
@@ -1279,7 +1279,7 @@ td:has(.btn) {
 
 /* Both Calculate tables are dense (the breakdown carries 9 columns —
    Name/Amount/Cal/Pro/Fiber/Fat/Carb/TEF/Source — now Fiber/Carbohydrate/Fat/TEF
-   folded into it; the activity table 5) — the `table-compact` class on their
+   folded into it; the activity table 6, its last the same Source) — the `table-compact` class on their
    wrapping div (see index.html) keeps them narrow instead of pushing the
    modal wide or wrapping onto a second line on a phone screen. The Total
    row's own top border (above) still marks it off from the per-item rows
@@ -2610,12 +2610,6 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 }
 
 @media (max-width: 820px) {
-    #workout-plan-panel th,
-    #workout-plan-panel td {
-        padding-left: var(--space-xs);
-        padding-right: var(--space-xs);
-    }
-
     /* Class-based, not nth-child: a table's own column count now depends on
        columnVisibility (activities.js) — Muscle Group, Rest and Weight only
        render at all when some row in that table's shape actually has a
@@ -2993,11 +2987,6 @@ html.home-hub .page-tiles,
     .export-filter-row .export-filter-operator,
     .export-filter-row .export-filter-value {
         flex: 1 1 100%;
-    }
-
-    th,
-    td {
-        padding: 0 var(--space-s);
     }
 
     /* WCAG's 24px minimum tap target (the small button size), so a row of

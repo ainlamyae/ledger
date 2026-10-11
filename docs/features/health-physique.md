@@ -11,6 +11,7 @@
 - Day form order: 📷 Scan, 🧬, 🧮, 💾. **Workout** suggests Activity names line by line, keeping the amount (`36x row` → `36x Seated Row machine`).
 - **Confetti:** saving today's Body Mass closer to the target than the last earlier reading drops confetti (`confetti.js`, also fired by an income transaction save — see [Finance](finance.md); off under reduced motion).
 - The breakdown table's last column has no header; the Workout table stays hidden until there's a workout to price.
+- **A new exercise name is priced by AI, like a new ingredient.** The Workout table's last column (no header, as the breakdown's) shows ✅ for a name on the Activity sheet. A name that isn't there shows **AI** once 🧮 Calculate has asked the AI for it (`guessUnknownActivities`, `activity-estimator.js` → `aiEstimateActivities`, `ai.js`): its MET from the Compendium, Category, Group and Muscle Group (reusing the sheet's own where one fits), and a typical Sets x Reps and Rest. The line is priced at that MET instead of the default 3.5. **💾** beside it appends that row to the Activity sheet as-is; **✏️** opens the Add Activity form filled with it, to fix first. Either way the day reprices from the sheet and the row turns ✅. Until Calculate runs (or if the AI call fails) the name shows **Default**, priced at 3.5. Guesses are kept in this browser (`localStorage` `ledger_activity_guesses`), so a reopened day keeps its AI price.
 - See [Data Model → Physique](../data-model.md#physique).
 
 ## Health — Physique

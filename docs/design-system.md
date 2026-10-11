@@ -15,6 +15,7 @@ All styling lives in `assets/style/styles.css`. Pages and scripts carry no inlin
 | Table lines | One colour, the line **gray** (`--color-border`), as iOS separators: a .5px hairline between rows; 1px under the header, above a Total and at group breaks; 1px dashed above a Desire or Ideal/day |
 | Backgrounds | Page **off-white** (`--color-bg`) under two soft blue/violet washes (`--bg-wash-1`/`-2`, fixed to the screen); cards, inputs, buttons and Workouts figures **white** (`--color-surface`); page tiles Apple-style **gray** capsules (a see-through 15% of the system gray `--color-text-muted` under ordinary text, `border-radius: 999px`; dimmed and shrunk while pressed), so they stand out on a card and on the page alike — content is always solid |
 | Glass | The floating layer only, like Apple's Liquid Glass: header, phone tab bar and action bar, sticky form actions, sidebar, account menu and (wide screens) dialogs. Translucent `--glass-bg` / `--glass-bg-strong`, blurred by `--glass-blur`, a `--glass-border` rim and `--glass-highlight` top edge; text on it is `--glass-text`. Solid again when blur is unsupported or the device asks for reduced transparency |
+| Switches | Every show/hide setting is an iPhone switch (`.switch`, a `role="switch"` checkbox): 40×24 track, `--switch-off` gray off, `--switch-on` iOS green `#34C759` on, a white knob that slides with a slight overshoot; one per `.switch-row`, label left, switch right |
 
 ## Typography
 

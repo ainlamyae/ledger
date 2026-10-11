@@ -297,6 +297,7 @@ async function runFinancialInsightGeneration() {
         FINANCIAL_INSIGHT_LAST_GENERATED_AT: generatedAt,
       });
       renderFinancialInsightGeneratedAt(generatedAt);
+      renderInsightAgeBadges();
     } catch (saveErr) {
       showFieldError('financial-insight-form-error', `Generated, but couldn't save it: ${saveErr.message}`);
     }

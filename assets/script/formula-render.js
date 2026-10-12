@@ -32,6 +32,12 @@ function renderFormulaSubstituted(rows, plan = null) {
   } catch (err) {
     console.error('Lean body mass failed to render', err);
   }
+  let navyRows = [];
+  try {
+    navyRows = renderNavyFields();
+  } catch (err) {
+    console.error('U.S. Navy body fat failed to render', err);
+  }
   let proteinRows = [];
   try {
     proteinRows = renderProteinFields();
@@ -89,7 +95,7 @@ function renderFormulaSubstituted(rows, plan = null) {
     console.error('Deficit vs. BMR failed to render', err);
   }
 
-  const allRows = [...lbmRows, ...(rows ?? []), ...deficitBmrRows, ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows];
+  const allRows = [...navyRows, ...lbmRows, ...(rows ?? []), ...deficitBmrRows, ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows];
   sortRowsByTuneOrder(allRows).forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
@@ -101,7 +107,7 @@ function renderFormulaSubstituted(rows, plan = null) {
 
 // Lines without a row of their own, placed just before the row they lead into
 // (A, B, m∞ come before the adaptation pair, as in the Equations list).
-const CALCULATION_ANCHORS = { A: 'λ', B: 'λ', 'm∞': 'λ' };
+const CALCULATION_ANCHORS = { A: 'λ', B: 'λ', 'm∞': 'λ', m_fat: 'LBM_navy' };
 
 // The Calculations lines in the order of Tune's own rows. A line with neither a row
 // nor an anchor stays right after the line it followed. Stable for equal ranks.
@@ -229,7 +235,7 @@ function readGlycogenSwingFormula() {
   if (bodyMassKg === null || heightCm === null || skeletalFrac === null || gPerKgMuscle === null
     || liverG === null || waterRatio === null) return null;
 
-  const rawLbm = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
+  const rawLbm = tuneLeanBodyMassKg(bodyMassKg, heightCm, sex);
   if (!Number.isFinite(rawLbm) || rawLbm <= 0) return null;
   // Rounded to 0.1 kg before it's used further, same as readProteinFormula — otherwise
   // the trace's `s × LBM = m_musc` line would show a rounded LBM that doesn't actually
@@ -289,7 +295,7 @@ function readProteinFormula() {
   // Rounded to 0.1 kg BEFORE the grams are taken off it, not just for display: the trace
   // below shows `p × LBM = P`, and a hidden extra decimal in LBM is exactly what would
   // make that line fail to multiply out by a gram.
-  const raw = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
+  const raw = tuneLeanBodyMassKg(bodyMassKg, heightCm, sex);
   if (!Number.isFinite(raw) || raw <= 0) return null;
   const lbmKg = Math.round(raw * 10) / 10;
 
@@ -309,20 +315,61 @@ function readProteinFormula() {
 // while still sharing the one Boer read every other lean-mass consumer here (protein,
 // glycogen) uses.
 function renderLbmField() {
-  const protein = readProteinFormula();
-
-  if (protein === null) {
+  const bodyMassKg = formulaBodyMassKg();
+  const heightCm = formulaNumber('formula-height');
+  const sex = document.getElementById('formula-sex').value;
+  const raw = bodyMassKg === null || heightCm === null ? NaN : boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
+  if (!Number.isFinite(raw) || raw <= 0) {
     setComputedField('formula-lbm', '—');
     return [];
   }
 
-  const { lbmKg, bodyMassKg, heightCm, sex } = protein;
+  const lbmKg = Math.round(raw * 10) / 10;
   setComputedField('formula-lbm', String(lbmKg));
 
   const coefficients = sex === 'male'
     ? `0.407 × ${bodyMassKg} + 0.267 × ${heightCm} − 19.2`
     : `0.252 × ${bodyMassKg} + 0.473 × ${heightCm} − 48.3`;
-  return [['LBM', `${coefficients}  =  ${lbmKg} kg`]];
+  return [['LBM_boer', `${coefficients}  =  ${lbmKg} kg`]];
+}
+
+// The BF% and LBM_navy boxes and their rows. BF% is rounded first so the trace multiplies out.
+function renderNavyFields() {
+  const heightCm = formulaNumber('formula-height');
+  const neckCm = formulaNumber('formula-neck');
+  const waistCm = formulaNumber('formula-waist');
+  const hipCm = formulaNumber('formula-hip');
+  const sex = document.getElementById('formula-sex').value;
+  const male = sex === 'male';
+  const raw = (heightCm === null || neckCm === null || waistCm === null || (!male && hipCm === null))
+    ? null
+    : navyBodyFatPct(sex, heightCm, neckCm, waistCm, hipCm);
+  if (raw === null || !Number.isFinite(raw)) {
+    setComputedField('formula-bf-pct-navy', '—');
+    setComputedField('formula-lbm-navy', '—');
+    return [];
+  }
+
+  const bfPct = Math.round(raw * 10) / 10;
+  setComputedField('formula-bf-pct-navy', String(bfPct));
+  const bfRow = male
+    ? ['BF%', `495 / (1.0324 − 0.19077 × log10(${waistCm} − ${neckCm}) + 0.15456 × log10(${heightCm})) − 450  =  ${bfPct}%`]
+    : ['BF%', `495 / (1.29579 − 0.35004 × log10(${waistCm} + ${hipCm} − ${neckCm}) + 0.22100 × log10(${heightCm})) − 450  =  ${bfPct}%`];
+
+  const bodyMassKg = formulaBodyMassKg();
+  if (bodyMassKg === null) {
+    setComputedField('formula-lbm-navy', '—');
+    return [bfRow];
+  }
+  const fatKg = Math.round(bodyMassKg * bfPct) / 100;
+  const fatKgShown = Math.round(fatKg * 10) / 10;
+  const lbmNavyKg = Math.round((bodyMassKg - fatKgShown) * 10) / 10;
+  setComputedField('formula-lbm-navy', String(lbmNavyKg));
+  return [
+    bfRow,
+    ['m_fat', `${bodyMassKg} × ${bfPct} / 100  =  ${fatKgShown} kg`],
+    ['LBM_navy', `${bodyMassKg} − ${fatKgShown}  =  ${lbmNavyKg} kg`],
+  ];
 }
 
 // The two protein boxes, and the [label, substituted] rows the trace below appends for
@@ -650,13 +697,14 @@ function formulaBmrRows(bmr, profile) {
 // entirely rather than printed as a "/ 1" nobody needs to read.
 function formulaAffineRows(coefficients, { heightCm, age, sex, met, tau, kappa }) {
   const { a, b, tefDivisor: divisor, formula } = coefficients;
-  const lbm = boerLeanBodyMassCoefficients(sex);
+  const lbm = tuneLeanBodyMassCoefficients(sex, heightCm);
   const sigma = sex === 'male' ? '+ 5' : '− 161';
+  const navy = lbm.formula === 'navy';
   const aTerms = formula === 'katch'
-    ? `370 + 21.6 × (${lbm.perCm} × ${heightCm} − ${Math.abs(lbm.constant)})`
+    ? (navy ? '370' : `370 + 21.6 × (${lbm.perCm} × ${heightCm} − ${Math.abs(lbm.constant)})`)
     : `6.25 × ${heightCm} − 5 × ${age} ${sigma}`;
   const bTerms = formula === 'katch'
-    ? `21.6 × ${lbm.perKg} + ${met} × ${tau} × ${kappa} / 200`
+    ? `21.6 × ${navy ? `(1 − ${lbm.bfPct}/100)` : lbm.perKg} + ${met} × ${tau} × ${kappa} / 200`
     : `10 + ${met} × ${tau} × ${kappa} / 200`;
   const byDivisor = divisor === 1 ? '' : `, all / ${Math.round(divisor * 1000) / 1000}`;
   return [
@@ -864,7 +912,29 @@ function renderCorrectionFields(plan) {
   return rows;
 }
 
+// Tune's typed lean-mass choice and girths, laid over the settings for one read.
+function tuneLeanOverrides() {
+  const typed = (id) => formulaNumber(id) ?? '';
+  return {
+    [LBM_FORMULA_KEY]: currentLbmFormula(),
+    NECK_CM: typed('formula-neck'), WAIST_CM: typed('formula-waist'), HIP_CM: typed('formula-hip'),
+  };
+}
+
+function tuneLeanBodyMassKg(bodyMassKg, heightCm, sex) {
+  return withFormulaOverrides(tuneLeanOverrides(), () => leanBodyMassKg(bodyMassKg, heightCm, sex));
+}
+
+function tuneLeanBodyMassCoefficients(sex, heightCm) {
+  return withFormulaOverrides(tuneLeanOverrides(), () => leanBodyMassCoefficients(sex, heightCm));
+}
+
+// Every BMR, A and B on the sheet reads LBM, so the whole render runs on Tune's lean-mass choice.
 function renderFormulaPreview() {
+  withFormulaOverrides(tuneLeanOverrides(), renderFormulaPreviewOnLeanChoice);
+}
+
+function renderFormulaPreviewOnLeanChoice() {
   // Both unit-pair syncs first, before anything reads the box each one writes: a typed BMI
   // has to become kilograms before m_g is read, exactly as a typed Δm% has to become
   // kilograms before Δm is.

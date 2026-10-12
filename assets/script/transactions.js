@@ -135,6 +135,11 @@ async function refreshTransactions(forceRefresh = false) {
     amount: Number(row[5]) || 0,
   }));
   transactionsDataLoaded = true;
+  // Overdue payments need the transactions to see whether one was paid.
+  if (accountsDataLoaded) {
+    renderAccountPaymentBadge();
+    renderAccountsList();
+  }
   renderTransactions();
   updateTransactionStaleBadge();
   renderCarService();

@@ -762,13 +762,26 @@
                          Mifflin-St Jeor is the default and what every existing sheet already runs on,
                          and switching here re-derives the preview through the other one — including A
                          and B, since maintenance stays affine in body mass under both. -->
+                    <!-- Which LBM Katch-McArdle, protein and glycogen read. -->
+                    <fieldset class="formula-solve-for formula-lbm-formula">
+                        <legend>Lean body mass — feeds Katch-McArdle, the protein band and glycogen</legend>
+                        <label title="Boer (1984): LBM from body mass, height and sex. Needs no tape measurements.">
+                            <input type="radio" name="formula-lbm-formula" value="boer" checked>
+                            Boer (m, h, σ)
+                        </label>
+                        <label title="U.S. Navy (Hodgdon & Beckett): LBM = m̄ × (1 − BF%/100), with BF% from neck, waist, height and, for women, hip. Uses Boer until those are filled in.">
+                            <input type="radio" name="formula-lbm-formula" value="navy">
+                            U.S. Navy (C_neck, C_waist, C_hip, h, σ)
+                        </label>
+                    </fieldset>
+
                     <fieldset class="formula-solve-for formula-bmr-formula">
                         <legend>Basal metabolic rate — drives every deficit and desired calorie figure</legend>
                         <label title="Mifflin-St Jeor (1990): BMR from body mass, height, age and sex. The app's original equation, and the one that needs no lean-mass estimate.">
                             <input type="radio" name="formula-bmr-formula" value="mifflin" checked>
                             Mifflin-St Jeor (m, h, a, σ)
                         </label>
-                        <label title="Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. Fat mass is nearly inert metabolically, so this predicts from lean mass alone — more accurate the better your LBM figure is, and here LBM is the Boer estimate below. Age drops out entirely; sex enters only through LBM.">
+                        <label title="Katch-McArdle (1996): BMR = 370 + 21.6 × LBM. Fat mass is nearly inert metabolically, so this predicts from lean mass alone — more accurate the better your LBM figure is, and here LBM is whichever the Lean body mass question above picks. Age drops out entirely; sex enters only through LBM.">
                             <input type="radio" name="formula-bmr-formula" value="katch">
                             Katch-McArdle (LBM)
                         </label>
@@ -835,6 +848,25 @@
                             <input type="text" id="formula-age" inputmode="decimal">
                             <span class="formula-unit">years</span>
                         </label>
+                        <!-- The U.S. Navy body-fat inputs; hip is read for women only. -->
+                        <label class="formula-row" title="Neck circumference, just below the larynx with the tape sloping slightly down at the front. Feeds BF%.">
+                            <span class="formula-sym">C_neck</span>
+                            <span class="formula-name">neck</span>
+                            <input type="text" id="formula-neck" inputmode="decimal">
+                            <span class="formula-unit">cm</span>
+                        </label>
+                        <label class="formula-row" title="Waist circumference: at the navel for men, at the narrowest point for women. Feeds BF%.">
+                            <span class="formula-sym">C_waist</span>
+                            <span class="formula-name">waist</span>
+                            <input type="text" id="formula-waist" inputmode="decimal">
+                            <span class="formula-unit">cm</span>
+                        </label>
+                        <label class="formula-row" title="Hip circumference at the widest part of the buttocks. Feeds BF% for women only; the men's equation doesn't use it.">
+                            <span class="formula-sym">C_hip</span>
+                            <span class="formula-name">hip</span>
+                            <input type="text" id="formula-hip" inputmode="decimal">
+                            <span class="formula-unit">cm</span>
+                        </label>
                         <!-- The raw reading, and readonly because it's a measurement rather than a
                              knob: it's here to be compared against the smoothed figure below, which is
                              the one every identity on this sheet is evaluated at. Type your what-ifs
@@ -877,12 +909,24 @@
                             <input type="text" id="formula-target-bmi" inputmode="decimal">
                             <span class="formula-unit">kg/m²</span>
                         </label>
+                        <label class="formula-row" title="Body-fat %, U.S. Navy (Hodgdon & Beckett): for men, 495 / (1.0324 − 0.19077×log10(C_waist − C_neck) + 0.15456×log10(h)) − 450; for women, 495 / (1.29579 − 0.35004×log10(C_waist + C_hip − C_neck) + 0.22100×log10(h)) − 450. Not editable: derived from C_neck, C_waist, C_hip, h and σ.">
+                            <span class="formula-sym">BF%</span>
+                            <span class="formula-name">body-fat % by U.S. Navy</span>
+                            <input type="text" id="formula-bf-pct-navy" inputmode="decimal" readonly>
+                            <span class="formula-unit">%</span>
+                        </label>
+                        <label class="formula-row" title="Lean body mass from the U.S. Navy body-fat %: m̄ × (1 − BF%/100). Not editable: derived from m̄ and BF%. Used across the sheet when Lean body mass is set to U.S. Navy.">
+                            <span class="formula-sym">LBM_navy</span>
+                            <span class="formula-name">lean body mass by U.S. Navy</span>
+                            <input type="text" id="formula-lbm-navy" inputmode="decimal" readonly>
+                            <span class="formula-unit">kg</span>
+                        </label>
                         <!-- Sits with the rest of the profile it's derived from (m̄, h, σ) and directly
                              above BMR: under Katch-McArdle, BMR is built from this figure rather than
                              the other way around, so it has to be known before BMR is. -->
-                        <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Feeds Katch-McArdle BMR above and the protein/glycogen bands below.">
-                            <span class="formula-sym">LBM</span>
-                            <span class="formula-name">lean body mass</span>
+                        <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Used across the sheet (Katch-McArdle, protein, glycogen) when Lean body mass is set to Boer.">
+                            <span class="formula-sym">LBM_boer</span>
+                            <span class="formula-name">lean body mass by Boer</span>
                             <input type="text" id="formula-lbm" inputmode="decimal" readonly>
                             <span class="formula-unit">kg</span>
                         </label>
@@ -2362,6 +2406,11 @@
             <label>Market Value
                 <input type="text" id="account-current-value" placeholder="optional — today's cash-out value, if different from Balance">
             </label>
+            <label title="Optional — the day of the month to pay the balance back, 1 to 31; a red badge shows once it passes unpaid">Payment Day
+                <span class="timesheet-break-inputs">
+                    <input type="number" id="account-payment-day" inputmode="numeric" min="1" max="31" step="1" aria-label="Payment day of the month">of the month
+                </span>
+            </label>
 
             <p id="account-form-error" class="status" hidden></p>
 
@@ -2551,6 +2600,10 @@
                     <option>PROTEIN_G_PER_KG_LBM_MIN</option>
                     <option>PROTEIN_G_PER_KG_LBM_MAX</option>
                     <option>HEIGHT_CM</option>
+                    <option>NECK_CM</option>
+                    <option>WAIST_CM</option>
+                    <option>HIP_CM</option>
+                    <option>LBM_FORMULA</option>
                     <option>BIRTH_DATE</option>
                     <option>SEX</option>
                     <option>WEEKLY_FAT_LOSS_KG</option>

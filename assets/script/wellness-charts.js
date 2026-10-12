@@ -566,6 +566,45 @@ function boerLeanBodyMassKg(bodyMassKg, heightCm, sex) {
   return c.perKg * bodyMassKg + c.perCm * heightCm + c.constant;
 }
 
+// U.S. Navy body-fat %, Hodgdon & Beckett (1984), all in cm. Null when a log would be invalid.
+function navyBodyFatPct(sex, heightCm, neckCm, waistCm, hipCm) {
+  if (heightCm == null || neckCm == null || waistCm == null || (sex !== 'male' && hipCm == null)) return null;
+  const girth = sex === 'male' ? waistCm - neckCm : waistCm + hipCm - neckCm;
+  if (!(girth > 0) || !(heightCm > 0)) return null;
+  const density = sex === 'male'
+    ? 1.0324 - 0.19077 * Math.log10(girth) + 0.15456 * Math.log10(heightCm)
+    : 1.29579 - 0.35004 * Math.log10(girth) + 0.22100 * Math.log10(heightCm);
+  return 495 / density - 450;
+}
+
+// Which LBM the app runs on (Tune's Lean body mass choice): Boer, or U.S. Navy.
+const LBM_FORMULA_KEY = 'LBM_FORMULA';
+
+function lbmFormula() {
+  return getSettingString(LBM_FORMULA_KEY, 'boer') === 'navy' ? 'navy' : 'boer';
+}
+
+// BF% off the saved girths, rounded as Tune's box shows it; null until they're saved.
+function savedNavyBodyFatPct(heightCm, sex) {
+  const pct = navyBodyFatPct(sex, heightCm, getSetting('NECK_CM', null), getSetting('WAIST_CM', null), getSetting('HIP_CM', null));
+  return pct === null || !Number.isFinite(pct) ? null : Math.round(pct * 10) / 10;
+}
+
+// Both are affine in m (Navy's BF% doesn't depend on mass), so Katch stays affine either way.
+// Navy falls back to Boer until its girths are on file.
+function leanBodyMassCoefficients(sex, heightCm) {
+  if (lbmFormula() === 'navy') {
+    const bfPct = savedNavyBodyFatPct(heightCm, sex);
+    if (bfPct !== null) return { perKg: 1 - bfPct / 100, perCm: 0, constant: 0, formula: 'navy', bfPct };
+  }
+  return { ...boerLeanBodyMassCoefficients(sex), formula: 'boer' };
+}
+
+function leanBodyMassKg(bodyMassKg, heightCm, sex) {
+  const c = leanBodyMassCoefficients(sex, heightCm);
+  return c.perKg * bodyMassKg + c.perCm * heightCm + c.constant;
+}
+
 // The same four knobs the Formula Playground's glycogen block opens on (s, g_musc,
 // g_liver, r) — defaults here match its input boxes, so a State Trend reader who never
 // opens that modal still gets the same swing it would report for their own body.
@@ -603,7 +642,7 @@ async function seedGlycogenSwingSetting() {
 
 function computeGlycogenSwingKg(bodyMassKg, heightCm, sex) {
   if (bodyMassKg === null || bodyMassKg === undefined || heightCm === null || heightCm === undefined) return null;
-  const lbmKg = boerLeanBodyMassKg(bodyMassKg, heightCm, sex);
+  const lbmKg = leanBodyMassKg(bodyMassKg, heightCm, sex);
   if (!Number.isFinite(lbmKg) || lbmKg <= 0) return null;
   const muscleKg = lbmKg * (GLYCOGEN_SKELETAL_FRAC_DEFAULT / 100);
   if (muscleKg <= 0) return null;

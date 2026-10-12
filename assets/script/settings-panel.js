@@ -323,6 +323,14 @@ async function clearSettingValueFormats(rowNumbers) {
 // number. getSetting() saw NaN and reported the setting as absent, so a
 // correctly-written value silently vanished — as did any other numeric setting
 // whose cell caught the same format.
+// Notes a save writes into a key's Notes cell when it's blank; a typed note is kept.
+const SETTING_DEFAULT_NOTES = {
+  NECK_CM: 'Neck circumference (cm), just below the larynx — U.S. Navy body fat (Hodgdon & Beckett)',
+  WAIST_CM: 'Waist circumference (cm): at the navel for men, narrowest point for women — U.S. Navy body fat',
+  HIP_CM: 'Hip circumference (cm) at the widest point — U.S. Navy body fat, women only',
+  LBM_FORMULA: 'Lean body mass the app runs on: boer (Boer 1984) or navy (U.S. Navy body fat)',
+};
+
 async function saveSettingValues(values) {
   await initSettingsPanel(true);
   if (settingsSheetMissing) {
@@ -338,10 +346,11 @@ async function saveSettingValues(values) {
 
   Object.entries(values).forEach(([key, value]) => {
     const existing = existingByKey.get(key);
+    const defaultNote = SETTING_DEFAULT_NOTES[key] ?? '';
     if (existing) {
-      updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes ?? '']], 'RAW'));
+      updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes || defaultNote]], 'RAW'));
     } else {
-      newRows.push([key, value, '']);
+      newRows.push([key, value, defaultNote]);
     }
   });
 

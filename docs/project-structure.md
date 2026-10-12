@@ -72,13 +72,14 @@ ledger/
 │       ├── bmr-calibration.js    # BMR calibration — back-solves BMR_cal from logged data (Tune)
 │       ├── financial-insight.js  # Finance Insight panel
 │       ├── gate.js               # Pre-login flow
-│       ├── version.js            # APP_VERSION, written by the pre-commit hook
+│       ├── version.js            # APP_VERSION, written by scripts/version.cjs (post-commit hook)
 │       ├── app.js                # Orchestration
 │       ├── router.js             # Block/button/row addresses (<group>/<block>/<button or row>/)
 │       ├── page-nav.js           # Section hub tiles, page breadcrumb, wide-screen sidebar
 │       └── section-page.js       # Loaded only by the section stubs above
 ├── scripts/
-│   ├── hooks/pre-commit               # Stamps version.js (see docs/versioning.md)
+│   ├── hooks/post-commit              # Stamps version.js from commit messages (see docs/versioning.md)
+│   ├── version.cjs                    # Conventional Commits → version (feat = minor, fix = patch)
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template
 │   ├── serve.py                       # Local server with GitHub Pages' 404.html fallback
 │   ├── build_sitemap.py               # sitemap.xml from the address stub folders

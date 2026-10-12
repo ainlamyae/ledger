@@ -101,7 +101,10 @@ function buildPageTiles(section) {
     title.textContent = routedHeadingText(panel);
     tile.appendChild(title);
     tile.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
-    grid.appendChild(tile);
+    // A block can have its tile elsewhere (data-tile-host): Market's sits beside
+    // Snapshot among Finance Insight's mode tiles, not in Finance's own grid.
+    const host = panel.dataset.tileHost && document.getElementById(panel.dataset.tileHost);
+    (host || grid).appendChild(tile);
   });
   // A section's tiles sit in one card titled with its name, on the home page and
   // on the section's own hub alike.

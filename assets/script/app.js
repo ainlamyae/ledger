@@ -5,17 +5,51 @@ const SETTINGS_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-// Amounts are shown by default each time the dashboard loads; clicking the
-// "Hide amounts" menu item hides them for the rest of the session (for reading
-// the dashboard somewhere it can be seen over your shoulder).
-let privacyMode = false;
+// The Amounts, Widgets and Bulbs switches' last known values
+// (SHOW_AMOUNTS, SHOW_WIDGETS, SHOW_BULBS: 0 or 1), kept in this browser so the
+// switches show and work before sign-in. The Settings tab replaces them once
+// it loads (loadDashboard). index.html's head reads the same key before first
+// paint, so a hidden row or card row doesn't flash on a reload.
+const SWITCHES_KEY = 'ledger_switches';
 
-// The Time/Date/Azan/Weather "bulb" row (widgets.js) is shown by default;
-// clicking "Hide widgets" hides the whole row, same SHOW_WIDGETS-setting
-// pattern as privacyMode/SHOW_AMOUNTS above.
-let widgetsVisible = true;
-// The home page's section glance cards; "Hide bulbs", SHOW_BULBS.
-let bulbsVisible = true;
+function readCachedSwitches() {
+  try {
+    return JSON.parse(localStorage.getItem(SWITCHES_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+
+function cacheSwitches() {
+  try {
+    localStorage.setItem(SWITCHES_KEY, JSON.stringify({
+      SHOW_AMOUNTS: privacyMode ? 0 : 1,
+      SHOW_WIDGETS: widgetsVisible ? 1 : 0,
+      SHOW_BULBS: bulbsVisible ? 1 : 0,
+    }));
+  } catch {}
+}
+
+// A switch's change saved to the Settings tab, when there's a sheet to save it
+// to; signed out it stays in this browser only (cacheSwitches) until Settings
+// loads. Best-effort: a missing Settings tab shouldn't block toggling.
+function saveSwitchSetting(values) {
+  cacheSwitches();
+  if (!isSignedIn() || !getActiveSpreadsheetId()) return;
+  saveSettingValues(values).catch((err) => {
+    console.error(`Failed to save ${Object.keys(values).join(', ')} setting:`, err);
+  });
+}
+
+// Amounts are shown unless SHOW_AMOUNTS is 0; the Amounts switch hides
+// them (for reading the dashboard somewhere it can be seen over your shoulder).
+let privacyMode = readCachedSwitches().SHOW_AMOUNTS === 0;
+
+// The Time/Date/Azan/Weather "bulb" row (widgets.js), SHOW_WIDGETS, and the home
+// page's section glance cards, SHOW_BULBS: both start off until this browser or
+// the Settings tab says otherwise.
+let widgetsVisible = readCachedSwitches().SHOW_WIDGETS === 1;
+let bulbsVisible = readCachedSwitches().SHOW_BULBS === 1;
 
 // Replaces every digit with '*', so masked values keep their currency
 // symbol, sign, and separators (e.g. "$1,234.56" -> "$*,***.**").
@@ -649,6 +683,7 @@ async function loadDashboard(forceRefresh = false) {
       bulbsVisible = getSetting('SHOW_BULBS', 1) !== 0;
       updateBulbsButtonUI();
       applyBulbsVisibility();
+      cacheSwitches();
       applySettingsToWidgets();
       renderInsightAgeBadges();
       // Same 0/1 convention, but DEFAULT 0 (hidden) — the home page deliberately
@@ -888,12 +923,9 @@ function setupPrivacyToggle() {
   document.getElementById('privacy-toggle').addEventListener('change', (e) => {
     privacyMode = !e.target.checked;
     updatePrivacyButtonUI();
-    if (!document.getElementById('dashboard').hidden) loadDashboard(false);
-    // Persisted to the Settings tab (not localStorage) so it survives a
-    // refresh; best-effort since a missing Settings tab shouldn't block toggling.
-    saveSettingValues({ SHOW_AMOUNTS: privacyMode ? 0 : 1 }).catch((err) => {
-      console.error('Failed to save SHOW_AMOUNTS setting:', err);
-    });
+    // Signed out there are no amounts on the page to mask yet.
+    if (isSignedIn() && !document.getElementById('dashboard').hidden) loadDashboard(false);
+    saveSwitchSetting({ SHOW_AMOUNTS: privacyMode ? 0 : 1 });
   });
 }
 
@@ -931,10 +963,7 @@ function setupWidgetsToggle() {
     widgetsVisible = e.target.checked;
     updateWidgetsButtonUI();
     applyWidgetsVisibility();
-    // Same best-effort persistence as SHOW_AMOUNTS above.
-    saveSettingValues({ SHOW_WIDGETS: widgetsVisible ? 1 : 0 }).catch((err) => {
-      console.error('Failed to save SHOW_WIDGETS setting:', err);
-    });
+    saveSwitchSetting({ SHOW_WIDGETS: widgetsVisible ? 1 : 0 });
   });
 }
 
@@ -959,9 +988,7 @@ function setupBulbsToggle() {
     bulbsVisible = e.target.checked;
     updateBulbsButtonUI();
     applyBulbsVisibility();
-    saveSettingValues({ SHOW_BULBS: bulbsVisible ? 1 : 0 }).catch((err) => {
-      console.error('Failed to save SHOW_BULBS setting:', err);
-    });
+    saveSwitchSetting({ SHOW_BULBS: bulbsVisible ? 1 : 0 });
   });
 }
 

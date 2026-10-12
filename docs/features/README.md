@@ -9,7 +9,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 | Page | Covers |
 |---|---|
 | [Home Page & Widgets](home.md) | Glance cards, Time/Date/Azan/Weather widgets (Weather with sunrise/sunset), hide toggles |
-| [Hubs, Pages & Addresses](navigation.md) | Hubs, breadcrumb, sidebar (hide with the logo-row button or Ctrl+.) with a bottom panel of Refresh data, Clear cache, iPhone-style show/hide switches and the account row (Google picture, name, email) opening the menu, tiles colour-coded by function, phone bars, badges, every address |
+| [Hubs, Pages & Addresses](navigation.md) | Hubs, breadcrumb, sidebar (hide with the logo-row button or Ctrl+.) with a bottom panel of Contact, Refresh data, Clear cache, Settings, iPhone-style switches (Dark mode, Amounts, Widgets, Bulbs; shown before sign-in, Widgets and Bulbs off by default) and the account row (Google picture, name, email) opening the menu, plain sidebar links, liquid-glass tiles colour-coded by function, Market's tile beside Snapshot on Finance Insight, phone bars, badges, every address |
 | [Layout & Interaction](layout.md) | Responsive layout, content-width tables (columns 5px apart), forms, shortcuts, exports, accessibility, dark/privacy mode |
 | [Buttons](buttons.md) | Emoji actions and button roles |
 | [Chart Conventions](charts.md) | Colours, axes, scoring, legends |
@@ -18,7 +18,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 
 | Page | Covers |
 |---|---|
-| [Finance](finance.md) | Summary cards, Indicator (3m/6m/1y/5y/All range, incl. Spending Breakdown by Type), Transactions (income confetti, a line per receipt), Account, Transfer, Breakdown, Insight |
+| [Finance](finance.md) | Summary cards, Indicator (3m/6m/1y/5y/All range, incl. Spending Breakdown by Type and Account Allocation), Transactions (income confetti, a line per receipt), Account, Transfer, Breakdown, Insight |
 | [Finance — Watch List](finance-watchlist.md) | Watchlist stocks, latest moves, symbol search, price alerts |
 | [Finance — Market](finance-market.md) | One stock's chart 1d…All, verdict and signals, news, AI read |
 | [Finance — Portfolio](finance-portfolio.md) | Trade log, average cost (ACB), gain/loss in CAD, By Account |

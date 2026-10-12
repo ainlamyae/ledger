@@ -20,9 +20,6 @@ function setUIState(state) {
   document.getElementById('signin-btn').hidden = state !== 'signedOut';
   document.getElementById('account-menu').hidden = state === 'signedOut';
   document.getElementById('refresh-btn').hidden = state !== 'dashboard';
-  document.getElementById('privacy-toggle-row').hidden = state !== 'dashboard';
-  document.getElementById('widgets-toggle-row').hidden = state !== 'dashboard';
-  document.getElementById('bulbs-toggle-row').hidden = state !== 'dashboard';
   if (state !== 'signedOut') removeSignInBanner();
   // A form address loaded while signed out (or without a file) can't open its form.
   if (state !== 'dashboard' && typeof abandonPendingFormPage === 'function') abandonPendingFormPage();

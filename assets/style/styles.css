@@ -3506,16 +3506,85 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     /* Narrow sides, so a long one-word label ("Transaction") fits four a row. */
     padding: var(--space-s) var(--space-xs);
     text-align: center;
-    /* Apple's neutral "gray" button: a see-through wash of the system gray
-       (#8e8e93) under ordinary text, so it reads on a white card and on the page
-       alike, light and dark. */
-    background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
+    /* Liquid glass, as iOS 26's buttons, over the tile's own colour: the same
+       see-through 15% wash of --tile-tint as before (Apple's system gray, or its
+       kind's colour below), frosted, with a curved shine across the top, a lit
+       rim (::before) and a soft shadow under it. */
+    --tile-tint: var(--color-text-muted);
+    isolation: isolate;
+    background:
+        radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, .45), rgba(255, 255, 255, 0) 60%),
+        color-mix(in srgb, var(--tile-tint) 15%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(200%) brightness(1.05);
+    backdrop-filter: blur(14px) saturate(200%) brightness(1.05);
+    box-shadow:
+        inset 1px 1px 0 rgba(255, 255, 255, .9),
+        inset -1px -1px 0 rgba(255, 255, 255, .25),
+        inset 0 -6px 12px -8px rgba(15, 23, 42, .18),
+        0 1px 2px rgba(15, 23, 42, .08),
+        0 4px 12px rgba(15, 23, 42, .06);
     /* A capsule, as iOS 26 / macOS Tahoe buttons and the glass bottom bar are. */
     border-radius: 999px;
-    box-shadow: var(--shadow-card);
     color: var(--color-text);
     text-decoration: none;
     transition: transform .2s var(--ease-spring), box-shadow .2s var(--ease-spring), opacity .2s var(--ease-spring);
+}
+
+/* The rim: a 1px gradient ring, bright top-left, fading bottom-right. */
+.page-tile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .15) 45%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .6));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.page-tile:hover,
+.page-tile:focus-visible {
+    box-shadow:
+        inset 1px 1px 0 rgba(255, 255, 255, 1),
+        inset -1px -1px 0 rgba(255, 255, 255, .35),
+        inset 0 -6px 12px -8px rgba(15, 23, 42, .22),
+        0 2px 4px rgba(15, 23, 42, .1),
+        0 8px 20px rgba(15, 23, 42, .1);
+}
+
+/* Dark: a dimmer shine and rim, a deeper shadow. */
+:root[data-theme="dark"] .page-tile {
+    background:
+        radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 60%),
+        color-mix(in srgb, var(--tile-tint) 15%, transparent);
+    box-shadow:
+        inset 1px 1px 0 rgba(255, 255, 255, .22),
+        inset -1px -1px 0 rgba(255, 255, 255, .06),
+        inset 0 -6px 12px -8px rgba(0, 0, 0, .5),
+        0 4px 12px rgba(0, 0, 0, .35);
+}
+
+:root[data-theme="dark"] .page-tile::before {
+    opacity: .45;
+}
+
+:root[data-theme="dark"] .page-tile:hover,
+:root[data-theme="dark"] .page-tile:focus-visible {
+    box-shadow:
+        inset 1px 1px 0 rgba(255, 255, 255, .3),
+        inset -1px -1px 0 rgba(255, 255, 255, .08),
+        inset 0 -6px 12px -8px rgba(0, 0, 0, .5),
+        0 8px 20px rgba(0, 0, 0, .45);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .page-tile {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
 }
 
 /* Pressed, as on iOS: dimmed and a touch smaller while the finger is down. */
@@ -3551,21 +3620,21 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     cursor: pointer;
 }
 
-/* A tile's colour says what it opens (page-nav.js's TILE_KINDS): the same 15% wash
-   as the gray, in green for a form (Tune, Today, Workouts), orange for charts
+/* A tile's colour says what it opens (page-nav.js's TILE_KINDS): the glass's tint
+   (--tile-tint), gray by default, green for a form (Tune, Today, Workouts), orange for charts
    (Indicator) and purple for AI (Insight, Market, and Insight's own mode tiles).
    A block of sheet rows keeps the gray. */
 .page-tile[data-kind="form"] {
-    background: color-mix(in srgb, #34c759 15%, transparent);
+    --tile-tint: #34c759;
 }
 
 .page-tile[data-kind="chart"] {
-    background: color-mix(in srgb, #ff9500 15%, transparent);
+    --tile-tint: #ff9500;
 }
 
 .page-tile[data-kind="ai"],
 :is(#insight-mode-actions, #financial-insight-mode-actions) .page-tile {
-    background: color-mix(in srgb, var(--color-other) 15%, transparent);
+    --tile-tint: var(--color-other);
 }
 
 /* Four a row on a phone, down to a 375px-wide one (5rem each plus the gaps). */
@@ -3623,83 +3692,15 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         color: var(--color-text);
         text-decoration: none;
         font-size: var(--text-body);
-        position: relative;
-        margin-bottom: 2px;
-        isolation: isolate;
-        /* Liquid glass: frosted body, lit rim, curved shine on top. */
-        background:
-            radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 60%),
-            var(--glass-bg);
-        -webkit-backdrop-filter: blur(14px) saturate(200%) brightness(1.05);
-        backdrop-filter: blur(14px) saturate(200%) brightness(1.05);
-        box-shadow:
-            inset 1px 1px 0 rgba(255, 255, 255, .9),
-            inset -1px -1px 0 rgba(255, 255, 255, .25),
-            inset 0 -6px 12px -8px rgba(15, 23, 42, .18),
-            0 1px 2px rgba(15, 23, 42, .08),
-            0 4px 12px rgba(15, 23, 42, .06);
-        transition: transform .2s, box-shadow .2s, background .2s;
-    }
-
-    /* The rim: a 1px gradient ring, bright top-left, fading bottom-right. */
-    .side-nav a::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        padding: 1px;
-        background: linear-gradient(135deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .15) 45%, rgba(255, 255, 255, .05) 60%, rgba(255, 255, 255, .6));
-        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
-        z-index: -1;
     }
 
     .side-nav a:hover {
-        transform: translateY(-1px);
-        box-shadow:
-            inset 1px 1px 0 rgba(255, 255, 255, 1),
-            inset -1px -1px 0 rgba(255, 255, 255, .35),
-            inset 0 -6px 12px -8px rgba(15, 23, 42, .22),
-            0 2px 4px rgba(15, 23, 42, .1),
-            0 8px 20px rgba(15, 23, 42, .1);
-    }
-
-    .side-nav a:active {
-        transform: scale(.98);
+        background: var(--color-border);
     }
 
     .side-nav a.active {
-        background:
-            radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, .5), rgba(255, 255, 255, 0) 55%),
-            linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(0, 0, 0, .12)),
-            var(--color-primary);
+        background: var(--color-primary);
         color: #fff;
-    }
-
-    [data-theme="dark"] .side-nav a:not(.active) {
-        background:
-            radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 60%),
-            var(--glass-bg);
-        box-shadow:
-            inset 1px 1px 0 rgba(255, 255, 255, .22),
-            inset -1px -1px 0 rgba(255, 255, 255, .06),
-            inset 0 -6px 12px -8px rgba(0, 0, 0, .5),
-            0 4px 12px rgba(0, 0, 0, .35);
-    }
-
-    [data-theme="dark"] .side-nav a::before {
-        opacity: .45;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .side-nav a,
-        .side-nav a:hover,
-        .side-nav a:active {
-            transition: none;
-            transform: none;
-        }
     }
 
     .side-nav-section {

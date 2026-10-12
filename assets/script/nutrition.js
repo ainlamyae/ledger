@@ -112,10 +112,9 @@ let allNutritionEntries = [];
 // real answer (an untracked ingredient and an unloaded table look identical).
 let nutritionDataLoaded = false;
 let nutritionListenersAttached = false;
-// Default to Uses, highest first (dir -1), so the ingredients you actually log
-// sit on the first page — the Uses column is always counted now (see
-// renderNutritionList) rather than filled in on demand by a button.
-let nSort = { key: 'uses', dir: -1 };
+// Default: used today first, then protein high to low, then name A–Z
+// (no header of its own; clicking a header switches to that column).
+let nSort = { key: 'today', dir: 1 };
 let nCurrentPage = 1;
 let nutritionSheetId = null;
 let editingNutritionRow = null;
@@ -383,9 +382,10 @@ function resolvedNutritionMacros(n) {
 // this row — 0 is a real, meaningful answer here ("never logged, safe to
 // remove"), so it's kept distinct from "not computed yet" rather than
 // defaulting to it.
-function nutritionUsageCount(n) {
-  return nutritionUsageCounts ? (nutritionUsageCounts.get(n.row) ?? 0) : null;
-}
+// Uses column retired — kept commented in case it comes back.
+// function nutritionUsageCount(n) {
+//   return nutritionUsageCounts ? (nutritionUsageCounts.get(n.row) ?? 0) : null;
+// }
 
 // One Fiber/Fat/Carb/TEF table cell: "—" when there's neither a typed figure
 // nor anything to estimate from, otherwise the resolved number with a
@@ -406,8 +406,14 @@ function getFilteredNutritionEntries() {
     || n.group.toLowerCase().includes(search));
 
   const { key, dir } = nSort;
+  const usedToday = key === 'today' ? todaysUsedNutritionRows() : null;
   return [...filtered].sort((a, b) => {
-    if (key === 'uses') return ((nutritionUsageCount(a) ?? -1) - (nutritionUsageCount(b) ?? -1)) * dir;
+    // if (key === 'uses') return ((nutritionUsageCount(a) ?? -1) - (nutritionUsageCount(b) ?? -1)) * dir;
+    if (key === 'today') {
+      return (usedToday.has(b.row) - usedToday.has(a.row))
+        || ((b.protein ?? 0) - (a.protein ?? 0))
+        || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    }
     if (key === 'calories' || key === 'protein' || key === 'proteinPercent') return ((a[key] ?? 0) - (b[key] ?? 0)) * dir;
     if (key === 'fiber' || key === 'fat' || key === 'carb' || key === 'tef') {
       return ((resolvedNutritionMacros(a)[key] ?? 0) - (resolvedNutritionMacros(b)[key] ?? 0)) * dir;
@@ -496,11 +502,11 @@ function nutritionColumnL(top, panel, locked) {
 // "—" (with a hint to run it) before 📊 Count Uses has computed anything this
 // session, otherwise the count itself — 0 included, since that's exactly the
 // "never logged, safe to remove" case the button exists to surface.
-function usesCell(n) {
-  const count = nutritionUsageCount(n);
-  if (count === null) return makeCell('—', 'Counted once your Physique days have loaded');
-  return makeCell(String(count), `Appears in ${count} logged Consumption line${count === 1 ? '' : 's'} across your Physique days`);
-}
+// function usesCell(n) {
+//   const count = nutritionUsageCount(n);
+//   if (count === null) return makeCell('—', 'Counted once your Physique days have loaded');
+//   return makeCell(String(count), `Appears in ${count} logged Consumption line${count === 1 ? '' : 's'} across your Physique days`);
+// }
 
 function renderNutritionList() {
   const tbody = document.getElementById('nutrition-body');
@@ -512,9 +518,9 @@ function renderNutritionList() {
   // recounting on every search keystroke. Stays null (reads "—") until the
   // first load, since an empty allPhysiqueEntries would otherwise count
   // everything as a real 0.
-  if (physiqueDataLoaded && nutritionUsageCounts === null) {
-    nutritionUsageCounts = computeNutritionUsageCounts();
-  }
+  // if (physiqueDataLoaded && nutritionUsageCounts === null) {
+  //   nutritionUsageCounts = computeNutritionUsageCounts();
+  // }
 
   const filtered = getFilteredNutritionEntries();
   const totalPages = Math.max(1, Math.ceil(filtered.length / N_PAGE_SIZE));
@@ -527,7 +533,7 @@ function renderNutritionList() {
     const message = allNutritionEntries.length === 0
       ? 'No ingredients yet — they\'re added automatically the first time Calculate looks one up, or click "Add" in the panel heading to add one yourself.'
       : 'No ingredients match your search.';
-    tbody.appendChild(renderEmptyRow(14, message));
+    tbody.appendChild(renderEmptyRow(13, message));
   }
 
   // Computed once per render, not per row — todaysUsedNutritionRows walks
@@ -571,7 +577,7 @@ function renderNutritionList() {
       nutritionMacroCell(macros.carb, macros.typed.carb),
       nutritionMacroCell(macros.tef, macros.typed.tef, 'Typed by you.', 'Estimated: Protein (typed) plus Carb/Fat (typed or from 🧬 Micronutrients) at the Atwater/TEF-share rates set in Settings.'),
       makeCell(n.proteinPercent !== null ? `${n.proteinPercent}%` : '—', 'Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover'),
-      usesCell(n),
+      // usesCell(n),
     );
 
     const actionsCell = document.createElement('td');
@@ -1737,17 +1743,17 @@ function todaysUsedNutritionRows() {
 // has loaded; reads allPhysiqueEntries directly, so an empty/unloaded Physique
 // would count everything as 0 — which is why the caller guards on
 // physiqueDataLoaded before trusting the result.
-function computeNutritionUsageCounts() {
-  const counts = new Map();
-  allPhysiqueEntries.forEach((p) => {
-    parsePhysiqueBreakdown(p.breakdown).forEach((item) => {
-      const entry = findNutritionEntry(item.name);
-      if (!entry) return;
-      counts.set(entry.row, (counts.get(entry.row) || 0) + 1);
-    });
-  });
-  return counts;
-}
+// function computeNutritionUsageCounts() {
+//   const counts = new Map();
+//   allPhysiqueEntries.forEach((p) => {
+//     parsePhysiqueBreakdown(p.breakdown).forEach((item) => {
+//       const entry = findNutritionEntry(item.name);
+//       if (!entry) return;
+//       counts.set(entry.row, (counts.get(entry.row) || 0) + 1);
+//     });
+//   });
+//   return counts;
+// }
 
 // Naive singular fold — just enough to catch "egg"/"eggs"-style plural typos
 // (a stray/missing trailing "s") without a full stemming library. Only used

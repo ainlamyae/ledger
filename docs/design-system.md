@@ -46,7 +46,7 @@ Each look is written once: every field starts from one base rule, and cards, Tot
 
 ## Tables
 
-- Full width or as wide as their content; no column has a width of its own.
+- As wide as their content (`width: fit-content`, at most the panel's width, scrolling sideways past it); no column has a width of its own. Physique's Calculate breakdowns still fill the width via their Name column.
 - Content-width tables: Physique, Contacts, Car Service, Activity Plan.
 - `table-compact` tables have no row lines, only a solid line under the header row.
 - Fixed row heights at every width:

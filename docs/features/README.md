@@ -31,4 +31,4 @@ Each file opens with an **At a glance** summary, followed by the details.
 | [Health — Nutrition](health-nutrition.md) | Ingredient catalogue (used-today first, then protein), Group, grams-first Amount, Complete, Scan, Norm |
 | [Health — Activity & Workouts](health-activity.md) | Activity Plan and Workouts groups |
 | [Track](track.md) | Work Time, Car Service, Travel, Applications, LeetCode |
-| [Other](other.md) | Contacts, Settings (tabs with their own addresses, Note / Key / Value) |
+| [Other](other.md) | Contacts, Settings (tabs with their own addresses, Note / Key / Value), both opened from the account menu |

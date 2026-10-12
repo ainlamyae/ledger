@@ -15,6 +15,8 @@ function pageNavSections() {
     label: link.textContent.trim(),
     href: link.getAttribute('href'),
     panels: [...document.querySelectorAll(`#${link.dataset.section} > .panel[data-route]`)],
+    // A hidden nav entry (Other) opens from the account menu, not the sidebar or tiles.
+    inMenu: link.hidden,
   }));
 }
 
@@ -227,7 +229,7 @@ function buildSideNav(sections) {
   const links = document.createElement('div');
   links.className = 'side-nav-links';
   aside.appendChild(links);
-  sections.forEach((section) => {
+  sections.filter((s) => !s.inMenu).forEach((section) => {
     const heading = document.createElement('a');
     heading.className = 'side-nav-section';
     heading.href = section.href;
@@ -337,6 +339,10 @@ function initPageNav() {
     document.documentElement.classList.add('home-hub');
     buildHomeCrumb();
     sections.forEach((s) => {
+      if (s.inMenu) {
+        document.getElementById(s.id).hidden = true;
+        return;
+      }
       buildPageTiles(s);
       buildQuickActions(s);
     });

@@ -147,7 +147,9 @@
         <a href="track/" data-section="track">
             <span class="nav-label">Track</span>
         </a>
-        <a href="other/" data-section="other">
+        <!-- Hidden: Contact and Settings open from the account menu instead; the
+             entry stays so /other/ still resolves (section-page.js). -->
+        <a href="other/" data-section="other" hidden>
             <span class="nav-label">Other</span>
         </a>
     </nav>
@@ -185,7 +187,9 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                     <span id="last-updated" class="last-updated"></span>
                 </div>
-                <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
+                <a href="other/contact/" class="account-menu-item">Contact</a>
+                <a href="other/settings/" class="account-menu-item">Settings</a>
+                <button id="rename-sheet-btn" class="account-menu-item account-menu-item-divider">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
                 <button id="notifications-btn" class="account-menu-item" hidden title="Let Chrome show Work Time's and Car Service's daily reminders">Enable notifications</button>

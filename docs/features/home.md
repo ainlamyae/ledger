@@ -19,6 +19,6 @@
 - **Time** — local `HH:mm:ss` plus a second, independently configurable reference clock.
 - **Date** — Gregorian, Shamsi and Ghamari in one aligned year/month/day grid (the app's YYYY-MM-DD order), via `Intl`.
 - **Azan** — Sobh/Zohr/Maghreb/Midnight, computed client-side (Shia "Tehran" method).
-- **Weather** — current conditions plus a 3-day forecast.
+- **Weather** — one line of current icon and temperature (`🌤️ 21°C`, the condition in words on hover) with today's sunrise and sunset right-aligned, `🌅 07:32 🌇 18:43` (24-hour, the city's own time, from the same Open-Meteo call), plus a 3-day forecast.
 - Location resolution order: manual override → browser geolocation → `WIDGET_DEFAULT_CITY` → Waterloo/Isfahan fallback.
 - Powered by free key-less APIs (Open-Meteo, BigDataCloud), fetched fresh on each load (only the last detected location is remembered).

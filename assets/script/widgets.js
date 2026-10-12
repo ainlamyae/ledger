@@ -568,7 +568,7 @@ function initPrayerWidget(location) {
 }
 
 async function fetchWeather(lat, lon) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=3`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=3`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('Weather request failed');
 
@@ -580,8 +580,15 @@ function renderWeather(data) {
   const unit = (data.current_units && data.current_units.temperature_2m) || '°C';
   const currentInfo = mapWeatherCode(current.weather_code);
 
-  document.getElementById('widget-weather-current').textContent =
-    `${currentInfo.icon} ${Math.round(current.temperature_2m)}${unit} — ${currentInfo.label}`;
+  // Icon and temperature only, so sunrise/sunset fit on the same line; the label is the hover.
+  const currentEl = document.getElementById('widget-weather-current');
+  currentEl.textContent = `${currentInfo.icon} ${Math.round(current.temperature_2m)}${unit}`;
+  currentEl.title = currentInfo.label;
+
+  // Today's, in the location's own time (timezone=auto): "2026-10-12T07:28" -> "07:28".
+  const hhmm = (iso) => (iso ? iso.slice(11, 16) : '—');
+  document.getElementById('widget-weather-sunrise').textContent = `🌅 ${hhmm(data.daily.sunrise?.[0])}`;
+  document.getElementById('widget-weather-sunset').textContent = `🌇 ${hhmm(data.daily.sunset?.[0])}`;
 
   const forecastEl = document.getElementById('widget-weather-forecast');
   forecastEl.innerHTML = '';

@@ -1,0 +1,5 @@
+#!/bin/sh
+# No co-authors and no Claude/Anthropic attribution in any commit message:
+# drops every Co-authored-by trailer, any "Generated with … Claude" line and any
+# line naming an anthropic.com address.
+sed -i -E '/^[[:space:]]*co-authored-by:/Id; /generated with .*claude/Id; /anthropic\.com/Id' "$1"

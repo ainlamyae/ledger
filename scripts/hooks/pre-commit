@@ -1,9 +1,9 @@
 #!/bin/sh
-# Stamps assets/script/version.js with MAJOR.MINOR.PATCH before each commit.
-# Always one step above the last stamp, so rewritten history never lowers it.
-file=assets/script/version.js
-n=$(( $(git rev-list --count HEAD 2>/dev/null || echo 0) + 1 ))
-last=$(sed -n "s/.*APP_VERSION = '\([0-9]*\)\.\([0-9]\)\.\([0-9]\)'.*/\1\2\3/p" "$file" 2>/dev/null)
-[ -n "$last" ] && [ $((last + 1)) -gt "$n" ] && n=$((last + 1))
-printf '// Written by scripts/hooks/pre-commit; do not edit.\nconst APP_VERSION = '\''%s.%s.%s'\'';\n' $((n / 100)) $((n / 10 % 10)) $((n % 10)) > "$file"
-git add "$file"
+# Refuses a commit whose author or committer is Claude or Anthropic. (The
+# version is stamped after the commit now: post-commit, scripts/version.cjs.)
+idents="$(git var GIT_AUTHOR_IDENT) $(git var GIT_COMMITTER_IDENT)"
+if printf '%s' "$idents" | grep -qi 'claude\|anthropic'; then
+  echo "pre-commit: author/committer must not be Claude or Anthropic:" >&2
+  echo "  $idents" >&2
+  exit 1
+fi

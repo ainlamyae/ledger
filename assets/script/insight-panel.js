@@ -141,6 +141,8 @@ const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food', 'in
 let insightLoaded = null;
 
 let getInsightDateRange = () => ({ from: null, to: null });
+// 1w matches the old 7-day default.
+let insightRangeSlug = '1w';
 
 function initInsightPanel() {
   clearFieldError('insight-status');
@@ -148,11 +150,18 @@ function initInsightPanel() {
   // ("Still loading your Physique data…"), it just no longer opens with a prompt.
   document.getElementById('insight-mode-status').textContent = '';
 
-  // Wires the From/To pair and defaults it to the last 7 days, but renders
-  // nothing — a date edit only recomputes once a mode has been loaded.
-  getInsightDateRange = initDateRangeControl('insight-date-from', 'insight-date-to', INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
+  // From/To retired for the range buttons.
+  // getInsightDateRange = initDateRangeControl('insight-date-from', 'insight-date-to', INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
+  //   if (insightLoaded) loadInsightMode(insightLoaded.mode);
+  // });
+  // A pick only recomputes once a mode has been loaded.
+  getInsightDateRange = () => healthRangeDates(insightRangeSlug);
+  const pick = (slug) => {
+    insightRangeSlug = slug;
+    renderRangeButtons('insight-range', WELLNESS_RANGES, insightRangeSlug, pick);
     if (insightLoaded) loadInsightMode(insightLoaded.mode);
-  });
+  };
+  renderRangeButtons('insight-range', WELLNESS_RANGES, insightRangeSlug, pick);
 
   document.getElementById('insight-mode-actions').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-insight-mode]');
@@ -312,8 +321,9 @@ async function runInsightGeneration() {
   const { from, to } = insightLoaded;
   const body = document.getElementById('insight-body');
   const btn = document.getElementById('insight-generate-btn');
-  const fromEl = document.getElementById('insight-date-from');
-  const toEl = document.getElementById('insight-date-to');
+  // const fromEl = document.getElementById('insight-date-from');
+  // const toEl = document.getElementById('insight-date-to');
+  const rangeButtons = [...document.querySelectorAll('#insight-range button')];
   const textarea = document.getElementById('insight-question');
   const modeButtons = [...document.querySelectorAll('#insight-mode-actions [data-insight-mode]')];
 
@@ -326,8 +336,9 @@ async function runInsightGeneration() {
   body.appendChild(loading);
 
   btn.disabled = true;
-  fromEl.disabled = true;
-  toEl.disabled = true;
+  // fromEl.disabled = true;
+  // toEl.disabled = true;
+  rangeButtons.forEach((b) => { b.disabled = true; });
   textarea.disabled = true;
   modeButtons.forEach((b) => { b.disabled = true; });
   const originalLabel = btn.textContent;
@@ -360,8 +371,9 @@ async function runInsightGeneration() {
     showFieldError('insight-status', err.message);
   } finally {
     btn.disabled = false;
-    fromEl.disabled = false;
-    toEl.disabled = false;
+    // fromEl.disabled = false;
+    // toEl.disabled = false;
+    rangeButtons.forEach((b) => { b.disabled = false; });
     textarea.disabled = false;
     modeButtons.forEach((b) => { b.disabled = false; });
     btn.textContent = originalLabel;

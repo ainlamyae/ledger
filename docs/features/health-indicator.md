@@ -9,8 +9,8 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 - **Tune**, opening the Tune, sits in this panel's own heading — the panel whose charts and tiles read every one of its settings.
 
 - All charts share one height and one plot-area width, so their date labels line up down the page.
-- **One From/To pair, above the State Trend & Forecast heading, is the panel's window** — State Trend & Forecast, Body Mass, Calorie Balance, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Physical Activity, Sleep, Protein Source Rotation and Activity Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
-  - **State Trend & Forecast follows it on both ends, forecast included** — nothing plots outside From/To, the same as every other chart here never draws a "tomorrow" bar. With the default To (today), that means the projected segment is invisible until To is pushed into the future; there's nothing chart-specific about that, it's the same rule the rest of the panel already lives by.
+- **One row of range buttons — 1w, 1m (default), 3m, 1y, All — above the State Trend & Forecast heading, is the panel's window**: Market's button row (`renderRangeButtons`), each a fixed length ending today; All starts at the first logged Physique day. The old From/To inputs are commented out in `index.html` and `wellness-charts.js`. It covers State Trend & Forecast, Body Mass, Calorie Balance, Caloric Intake, Protein Intake, Dietary Fiber Intake, Fat Intake, Carbohydrate Intake, Physical Activity, Sleep, Protein Source Rotation and Activity Rotation all plot it, and all redraw together on a change. Default is the last 4 weeks (`WELLNESS_METRICS_DAYS`). Protein Source Rotation used to carry a second pair of its own, so the panel showed two windows at once.
+  - **State Trend & Forecast follows it on both ends, forecast included** — nothing plots outside the window, the same as every other chart here never draws a "tomorrow" bar. With the default To (today), that means the projected segment is invisible until To is pushed into the future; there's nothing chart-specific about that, it's the same rule the rest of the panel already lives by.
   - `wellnessDateRange()` reads the two inputs straight from the DOM, falling back to the default when either is blank — so it can't matter whether a chart renders before or after the control is wired.
   - **Every chart reads the exact same date list** (`wellnessCalorieChartDates`, clipped forward to the earliest **calorie** entry ever logged) rather than each clipping to its own metric's own earliest log — a Sleep chart clipped to its own first entry could pick a different-length list than Body Mass, and two charts running the identical tick-selection algorithm over two different-length lists land on different calendar dates even though both look "evenly spaced". One shared list is what lets every chart's gridlines agree.
   - **Ticks land on Mondays** (`wellnessTickIndices`, `charts-base.js`), not picked evenly by array index — an index-evenly-spaced pick lands on a different weekday every time the window's own length changes by a single day, which read as "random" even once every chart shared one date list. Falls back to evenly-spaced indices on a window too short to contain a Monday, and thins a long window's Mondays back down to ~7 rather than showing all of them. State Trend & Forecast's linear day-offset axis is pinned to the same window's edges (padded half a day either side, matching the half-category-width margin Chart.js's own bar-chart `offset` gives every category axis) and forced onto these same tick values via `afterBuildTicks` — its own axis type has a different default tick-picking heuristic than a category axis, so without this it could (and did) both mislabel and mis-scale relative to the bar charts above it.
@@ -57,19 +57,19 @@ Every chart and tile below reads the **`Physique`** tab — one row per day — 
 
 ## Health — Protein Source Rotation
 
-- Last block of the **Indicator** panel — every Health chart sits in that one panel, so they collapse together and share its one From/To window.
+- Last block of the **Indicator** panel — every Health chart sits in that one panel, so they collapse together and share its one range window.
 - The donut's two rings are fixed spans anchored to the window's **To** date (4 weeks and 1 week), not fractions of the window — so they keep meaning the same thing whatever range is picked.
 - One horizontal bar per Nutrition **Group** that has at least one ingredient carrying a Protein % (`groupProteinRotationRows`).
-- Bar is actual protein eaten in range from that group's tracked ingredients; a red tick marks its live target — the sum of its members' Protein % shares.
-- Hovering a bar or slice lists the ingredients the group is summed from.
+- Bar is actual protein eaten in range from that group's tracked ingredients, stacked by ingredient (one shade of the group's hue each); a red tick marks its live target — the sum of its members' Protein % shares.
+- Hovering a bar segment names that ingredient and its grams; hovering a slice lists the ingredients the group is summed from.
 - One hue per group. Groups ordered by remaining gap, most-left-to-eat first; `Unclassified` last.
-- A legend below shows one swatch per group.
+- A legend below shows one swatch per group, and a second line one swatch per ingredient in its stack shade.
 - Beside the bars, a donut splits the same groups by share: reference Protein %, then 4 weeks, then last week.
 - The per-ingredient figures (`computeProteinRotationRows`) are unchanged — Insight's Protein mode still reads them.
 
 ## Health — Activity Rotation
 
-- Same shape as Protein Source Rotation directly above it — one horizontal bar chart and one rotational donut — and shares its panel and From/To window.
+- Same shape as Protein Source Rotation directly above it — one horizontal bar chart and one rotational donut — and shares its panel and range window.
 - One bar per Activity **Group** (Leg Day, Push Day, NEAT, Cardio, …) carrying a Weekly Target — a new column on the `Activity` sheet tab, shared by every exercise row in that Group.
 - A "session" is any day whose logged Workout notes include at least one exercise from that Group — a mixed day (a lift plus a walk) counts as a session for every Group it touches, not just the dominant one.
 - Bar is sessions actually logged in range; a red tick marks the Weekly Target scaled to the window's length.

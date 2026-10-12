@@ -4,7 +4,7 @@
 // in the lookback window vs. a live target — so a low/empty bar flags "you
 // haven't had this group, eat it." Worked out per ingredient
 // (computeProteinRotationRows), then summed per Group for the chart
-// (groupProteinRotationRows).
+// (groupProteinRotationRows), each bar stacked by ingredient.
 // Protein % is the share of your protein target this ingredient should
 // cover (e.g. 10 for "turkey = 10% of my protein"); since that target
 // (wellness-math.js's getProteinTargetG) already updates live with body mass/height/
@@ -282,12 +282,29 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
 
 function renderProteinRotationChart({ from, to }) {
   const ctx = document.getElementById('protein-rotation-chart');
-  const rows = groupProteinRotationRows(computeProteinRotationRows(from, to));
+  const sourceRows = computeProteinRotationRows(from, to);
+  const rows = groupProteinRotationRows(sourceRows);
 
   const labels = rows.map((r) => r.name);
   const actualData = rows.map((r) => r.actualProteinG);
   const targetData = rows.map((r) => r.targetProteinG);
   const { barColors, legend } = proteinRotationPalette(rows);
+
+  // Ingredients in group-row order, so the palette's hues match the donut's.
+  const stackRows = rows.flatMap((g) => sourceRows.filter((r) => r.group === g.group));
+  const stackColors = proteinRotationPalette(stackRows).barColors;
+  // Second legend line: one swatch per ingredient, in stack order.
+  renderCategoryLegend('protein-rotation-ingredient-legend', stackRows.map((r, i) => ({ name: r.name, color: stackColors[i] })));
+  // One stacked dataset per ingredient, filled only on its own group's row.
+  const stackDatasets = stackRows.map((r, i) => ({
+    type: 'bar',
+    label: r.name,
+    source: r,
+    data: rows.map((g) => (g.group === r.group ? r.actualProteinG : null)),
+    backgroundColor: stackColors[i],
+    stack: 'eaten',
+    order: 2,
+  }));
 
   // One swatch per group — the bars are labelled by group too, but the donut
   // isn't, and this is what names its slices.
@@ -304,10 +321,11 @@ function renderProteinRotationChart({ from, to }) {
     data: {
       labels,
       datasets: [
-        { type: 'bar', label: 'Eaten', data: actualData, backgroundColor: barColors, order: 2 },
+        ...stackDatasets,
         {
           type: 'line',
           label: 'Desired',
+          stack: 'desired',
           data: targetData,
           showLine: false,
           pointStyle: 'line',
@@ -342,11 +360,12 @@ function renderProteinRotationChart({ from, to }) {
               return `${row.group} — ${row.sources.join(', ')}`;
             },
             label: (item) => {
-              const row = rows[item.dataIndex];
-              const pct = item.dataset.label === 'Eaten' ? row.actualPercentOfTotalTarget : row.proteinPercent;
-              const pctLabel = item.dataset.label === 'Eaten' ? 'of total desired' : 'desired';
+              const source = item.dataset.source;
+              const pct = source ? source.actualPercentOfTotalTarget : rows[item.dataIndex].proteinPercent;
+              const pctLabel = source ? 'of total desired' : 'desired';
               const value = `${item.formattedValue}g protein (${pct}% ${pctLabel})`;
-              return `${item.dataset.label}: ${privacyMode ? maskDigits(value) : value}`;
+              const label = source ? `${source.name} eaten` : item.dataset.label;
+              return `${label}: ${privacyMode ? maskDigits(value) : value}`;
             },
           },
         },
@@ -357,6 +376,7 @@ function renderProteinRotationChart({ from, to }) {
         // rather than left to Chart.js, which only rotates once labels
         // actually collide — so the axis doesn't change angle as the range does.
         x: {
+          stacked: true,
           beginAtZero: true,
           max: maxValue,
           ticks: { callback: maskedUnitTick('g', 1), maxRotation: 45, minRotation: 45 },

@@ -23,6 +23,7 @@
 |---|---|
 | Block / form | `/health/tune/`, `/health/physique/log/`, `/finance/account/transfer/`, `/track/work-time/log/` |
 | Insight mode | `/health/insight/plan/` |
+| Settings tab | `/other/settings/ai/`, `/responses/`, `/health/`, `/display/`, `/all/` (bare `/other/settings/` is AI & Keys) |
 | Row Edit | `/health/nutrition/chicken-breast/`, `/health/physique/2026-10-03/`, `/other/settings/body_mass_target_kg/` |
 | Row duplicate | `/finance/transaction/2026-10-05-grocer/duplicate/` |
 | Bulk Edit | `/finance/transaction/bulk-edit/` |

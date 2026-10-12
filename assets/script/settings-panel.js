@@ -13,6 +13,8 @@ async function initSettingsPanel(forceRefresh = false) {
 
   settingsSheetId = meta.settingsSheetId;
   settingsSheetMissing = settingsSheetId === null;
+  // Before the first render, so a /settings/<tab>/ load draws that tab at once.
+  initSettingTabs();
 
   SETTING_TABLES.forEach(({ addButtonId }) => {
     document.getElementById(addButtonId).disabled = settingsSheetMissing;
@@ -22,7 +24,7 @@ async function initSettingsPanel(forceRefresh = false) {
     SETTING_TABLES.forEach(({ bodyId }) => {
       const tbody = document.getElementById(bodyId);
       tbody.innerHTML = '';
-      tbody.appendChild(renderEmptyRow(3, `No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to use this panel.`));
+      tbody.appendChild(renderEmptyRow(4, `No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to use this panel.`));
     });
   } else {
     await refreshSettingsList(forceRefresh);
@@ -47,10 +49,58 @@ async function initSettingsPanel(forceRefresh = false) {
   }
 }
 
-// The Setting tab's one table, under Other (a list so a second view could be added).
+// The Setting tab's one table, under Other, filtered by the active tab below.
 const SETTING_TABLES = [
-  { bodyId: 'settings-body', addButtonId: 'add-setting-btn', includes: () => true },
+  { bodyId: 'settings-body', addButtonId: 'add-setting-btn', includes: (key) => settingTabIncludes(activeSettingTab, key) },
 ];
+
+// Slugs match the #settings-tabs buttons. Health takes every key no other tab
+// claims, so a new key always lands somewhere.
+const SETTING_TABS = [
+  { slug: 'ai', pattern: /^AI_|(API_KEY|_TOKEN|_SECRET|_MODELS)$/i },
+  { slug: 'responses', pattern: /_LAST_(RESULT|GENERATED_AT)$/i },
+  { slug: 'health' },
+  { slug: 'display', pattern: /^(SHOW_|WIDGET_)/i },
+  { slug: 'all' },
+];
+
+let activeSettingTab = SETTING_TABS[0].slug;
+let settingTabsAttached = false;
+
+function settingTabIncludes(slug, key) {
+  if (slug === 'all') return true;
+  const tab = SETTING_TABS.find((t) => t.slug === slug);
+  if (tab.pattern) return tab.pattern.test(key);
+  return !SETTING_TABS.some((t) => t.pattern && t.pattern.test(key));
+}
+
+// Current tab is .btn-primary, as in the Market range row.
+function renderSettingTabs() {
+  document.querySelectorAll('#settings-tabs [data-route]').forEach((btn) => {
+    const active = btn.dataset.route === activeSettingTab;
+    btn.classList.toggle('btn-primary', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function showSettingTab(slug) {
+  activeSettingTab = slug;
+  renderSettingsList();
+}
+
+// The router (data-route-view) puts each tab at /other/settings/<tab>/; the
+// bare address is the first tab.
+function initSettingTabs() {
+  if (settingTabsAttached) return;
+  settingTabsAttached = true;
+  const panel = document.getElementById('settings-tabs').closest('.panel');
+  const view = currentRouteView(panel);
+  if (view) activeSettingTab = view.dataset.route;
+  document.querySelectorAll('#settings-tabs [data-route]').forEach((btn) => {
+    btn.addEventListener('click', () => showSettingTab(btn.dataset.route));
+  });
+  registerViewReset(panel, () => showSettingTab(SETTING_TABS[0].slug));
+}
 
 // A setting's address segment: its key in lowercase, underscores kept
 // (BODY_MASS_TARGET_KG -> body_mass_target_kg).
@@ -116,6 +166,7 @@ function makeSecretRevealButton(key, revealed) {
 }
 
 function renderSettingsList() {
+  renderSettingTabs();
   SETTING_TABLES.forEach((table) => renderSettingsTable(table));
 }
 
@@ -128,7 +179,7 @@ function renderSettingsTable({ bodyId, includes }) {
     .filter((setting) => includes(setting.key))
     .sort((a, b) => a.key.localeCompare(b.key));
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(3, 'No settings yet — add your first one above.'));
+    tbody.appendChild(renderEmptyRow(4, allSettingRows.length ? 'No settings in this tab.' : 'No settings yet — add your first one above.'));
   }
 
   rows.forEach((setting) => {
@@ -157,7 +208,8 @@ function renderSettingsTable({ bodyId, includes }) {
     const shown = truncateSettingValue(shouldMask ? maskText(setting.value) : setting.value);
     const fullTitle = (!shouldMask && shown !== setting.value) ? setting.value : undefined;
 
-    tr.append(makeCell(setting.key), makeCell(shown, fullTitle), actionsCell);
+    const note = truncateSettingValue(setting.notes);
+    tr.append(makeCell(note, note !== setting.notes ? setting.notes : undefined), makeCell(setting.key), makeCell(shown, fullTitle), actionsCell);
     tbody.appendChild(tr);
   });
 }

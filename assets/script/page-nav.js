@@ -57,6 +57,16 @@ const TILE_KINDS = {
   'finance/insight': 'ai',
 };
 
+// Pages with no tile or sidebar link; their addresses still open.
+// Comment an entry out to bring its tile and link back.
+const PAGES_WITHOUT_TILES = [
+  'finance/breakdown',
+];
+
+function pageHasTile(section, panel) {
+  return !PAGES_WITHOUT_TILES.includes(`${section.id}/${panel.dataset.route}`);
+}
+
 function buildQuickActions(section) {
   const actions = QUICK_ACTIONS[section.id];
   const grid = document.querySelector(`#${section.id} > .card > .page-tiles`);
@@ -88,7 +98,7 @@ function buildPageTiles(section) {
   const grid = document.createElement('nav');
   grid.className = 'page-tiles';
   grid.setAttribute('aria-label', `${section.label} pages`);
-  section.panels.forEach((panel) => {
+  section.panels.filter((panel) => pageHasTile(section, panel)).forEach((panel) => {
     const tile = document.createElement('a');
     tile.className = 'page-tile';
     tile.href = pageHref(section, panel);
@@ -240,7 +250,7 @@ function buildSideNav(sections) {
     heading.textContent = section.label;
     heading.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
     links.appendChild(heading);
-    section.panels.forEach((panel) => {
+    section.panels.filter((panel) => pageHasTile(section, panel)).forEach((panel) => {
       const link = document.createElement('a');
       link.className = 'side-nav-page';
       link.href = pageHref(section, panel);

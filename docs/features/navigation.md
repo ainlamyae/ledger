@@ -14,7 +14,7 @@
   | Form | Green | Tune, Today, Workouts |
   | Chart | Orange | Indicator (Health, Finance) |
   | AI | Purple | Insight (Health, Finance), Market, and Insight's own mode tiles (Plan, Wellness… Snapshot) |
-- Finance tiles: Indicator, Transaction, Account, Breakdown, Portfolio, Watch List, then **Insight** last. **Market**'s tile sits on Insight's page instead, beside **Snapshot** among its mode tiles (`data-tile-host` on the block, read by `page-nav.js`'s `buildPageTiles`); it still opens `/finance/market/`, and the sidebar still lists Market — the same order as the panels in `index.html`, which the tiles, sidebar and bottom bar all follow.
+- Finance tiles: Indicator, Transaction, Account, Portfolio, Watch List, then **Insight** last. **Breakdown** has no tile or sidebar link for now, though `/finance/breakdown/` still opens; it's listed in `page-nav.js`'s `PAGES_WITHOUT_TILES`, and commenting its entry out brings both back. **Market**'s tile sits on Insight's page instead, beside **Snapshot** among its mode tiles (`data-tile-host` on the block, read by `page-nav.js`'s `buildPageTiles`); it still opens `/finance/market/`, and the sidebar still lists Market — the same order as the panels in `index.html`, which the tiles, sidebar and bottom bar all follow.
 - Each block and form is its own page under a breadcrumb starting at **Ledger**: `Ledger / Health / Physique / Log`. Pages switch in place, without a reload.
 - The breadcrumb is the only heading; the home page's reads **Ledger** alone.
 - Forms take the page's place instead of covering it.

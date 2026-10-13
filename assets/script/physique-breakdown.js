@@ -63,7 +63,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
   perLine.forEach((line) => {
     const tr = document.createElement('tr');
     tr.append(
-      makeCell(line.name),
+      makeCell(titleCaseIngredientName(line.name)),
       makeCell(line.quantity),
       makeCell(String(line.met)),
       makeCell(activityLineMinutes(line.seconds)),
@@ -395,7 +395,8 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
       // in the same token shape parsing expects (workoutNoteQuantityForLine),
       // so a later Calculate reads this box back exactly as it would the
       // original.
-      physiqueField('workout').value = sortedPerLine.map((line) => `${line.quantity} ${line.name}`).join('\n');
+      // Names title-cased, as Consumption's are (titleCaseIngredientName, nutrition.js).
+      physiqueField('workout').value = sortedPerLine.map((line) => `${line.quantity} ${titleCaseIngredientName(line.name)}`).join('\n');
       if (combinedCount > 0) messages.push(`🔗 ${combinedCount} workout lines combined.`);
     }
     physiqueField('activity-duration').value = minutes;

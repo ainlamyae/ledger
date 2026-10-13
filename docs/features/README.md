@@ -18,7 +18,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 
 | Page | Covers |
 |---|---|
-| [Finance](finance.md) | Summary cards, Indicator (3m/6m/1y/5y/All range, incl. Spending Breakdown by Type and Account Allocation), Transactions (income confetti, a line per receipt), Account (Payment Day with an overdue badge), Transfer, Breakdown, Insight |
+| [Finance](finance.md) | Summary cards, Indicator (3m/6m/1y/5y/All range, incl. Spending Breakdown by Type and Account Allocation), Transactions (income confetti, a line per receipt), Account (Payment Day with an overdue badge), Transfer, Breakdown (no tile for now), Insight |
 | [Finance — Watch List](finance-watchlist.md) | Watchlist stocks, latest moves, symbol search, price alerts |
 | [Finance — Market](finance-market.md) | One stock's chart 1d…All, verdict and signals, news, AI read |
 | [Finance — Portfolio](finance-portfolio.md) | Trade log, average cost (ACB), gain/loss in CAD, By Account |

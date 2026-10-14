@@ -31,6 +31,9 @@ textarea {
 
 :root {
     color-scheme: light;
+    /* An iPhone switch's track when off (iOS's system fill); on, it's iOS green. */
+    --switch-off: rgba(120, 120, 128, .16);
+    --switch-on: #34c759;
     --color-nav-hover: #4279ad;
     /* Apple's system colours (iOS / macOS): blue, red, green, grays. */
     --color-primary: #007aff;
@@ -137,6 +140,7 @@ textarea {
 
 :root[data-theme="dark"] {
     color-scheme: dark;
+    --switch-off: rgba(120, 120, 128, .32);
     --color-nav-hover: #1e293b;
     --color-primary: #0a84ff;
     --color-primary-hover: #409cff;
@@ -460,6 +464,83 @@ header .btn:hover {
 
 .account-menu-item:disabled:hover {
     background: none;
+}
+
+/* The show/hide settings: a label with an iPhone switch at its right end. */
+.settings-switches {
+    display: flex;
+    flex-direction: column;
+}
+
+.switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-m);
+    min-height: 34px;
+    padding: 0 var(--space-m);
+    border-radius: var(--radius-md);
+    font-size: var(--text-small);
+    color: var(--color-text);
+    cursor: pointer;
+}
+
+.switch {
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    flex-shrink: 0;
+    width: 40px;
+    height: 24px;
+    margin: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--switch-off);
+    cursor: pointer;
+    transition: background-color .25s ease;
+}
+
+.switch::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, .2), 0 0 0 .5px rgba(0, 0, 0, .04);
+    transition: transform .25s cubic-bezier(.3, 1.3, .5, 1);
+}
+
+.switch:checked {
+    background: var(--switch-on);
+}
+
+.switch:checked::before {
+    transform: translateX(16px);
+}
+
+.switch:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Refresh data and Clear cache, above the switches: rows of the same height. */
+.settings-switches .account-menu-item {
+    min-height: 34px;
+}
+
+/* In the account menu: between the name and email and the menu's buttons. */
+.account-menu-dropdown .settings-switches {
+    margin-bottom: var(--space-xs);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* The name and email beside the picture: wide screens only (below). */
+.account-btn-text {
+    display: none;
 }
 
 .account-menu-item-divider {
@@ -3522,14 +3603,22 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         bottom: var(--phone-footer-height);
         left: 0;
         width: 13rem;
-        padding: 3.5rem var(--space-s) 4.5rem;
-        overflow-y: auto;
+        /* The bottom panel (.header-actions) sits over its foot, on the same glass. */
+        padding: 3.5rem 0 var(--side-nav-footer, 4.5rem);
+        overflow: hidden;
         background: var(--glass-bg);
         -webkit-backdrop-filter: var(--glass-blur);
         backdrop-filter: var(--glass-blur);
         border-right: 1px solid var(--glass-border);
         box-shadow: var(--glass-highlight);
         z-index: 5;
+    }
+
+    .side-nav-links {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 var(--space-s) var(--space-s);
     }
 
     body.with-side-nav .container {
@@ -3686,6 +3775,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         display: block;
     }
 
+    /* The sidebar's bottom panel: the show/hide switches, then the account row. */
     .header-actions {
         position: fixed;
         left: 0;
@@ -3694,8 +3784,94 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         z-index: 6;
         width: 13rem;
         box-sizing: border-box;
-        padding: var(--space-m) var(--space-l);
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-xs);
+        padding: var(--space-s);
         margin: 0;
+        border-top: 1px solid var(--color-border);
+    }
+
+    .header-actions .settings-switches {
+        padding-bottom: var(--space-xs);
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .header-actions .switch-row:hover,
+    .header-actions .settings-switches .account-menu-item:hover {
+        background: var(--color-border);
+    }
+
+    #signin-btn {
+        margin: var(--space-xs) var(--space-s);
+    }
+
+    /* The Google picture, name and email as one row that opens the menu above it. */
+    .account-avatar-btn {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        width: 100%;
+        padding: var(--space-xs) var(--space-s);
+        border-radius: var(--radius-md);
+        color: var(--color-text);
+        font: inherit;
+        text-align: left;
+        transition: var(--transition-colors);
+    }
+
+    .account-avatar-btn:hover,
+    .account-avatar-btn[aria-expanded="true"] {
+        background: var(--color-border);
+    }
+
+    .account-avatar {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+    }
+
+    .account-btn-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .account-btn-text > span {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        word-break: normal;
+    }
+
+    .account-btn-text > span:empty {
+        display: none;
+    }
+
+    .account-menu-dropdown {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Sidebar hidden: only the picture stays, bottom-left; the switches move
+       into its menu (placeSettingsSwitches). */
+    html[data-side-nav="closed"] .header-actions {
+        width: auto;
+        border-top: 0;
+    }
+
+    html[data-side-nav="closed"] .account-avatar-btn {
+        width: auto;
+        padding: var(--space-xs);
+    }
+
+    html[data-side-nav="closed"] .account-btn-text {
+        display: none;
+    }
+
+    html[data-side-nav="closed"] .account-menu-dropdown {
+        width: auto;
+        min-width: 240px;
     }
 
     header .btn {

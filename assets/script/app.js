@@ -242,7 +242,26 @@ function setupNotificationsButton() {
   });
 }
 
+// Refresh data, Clear cache and the show/hide switches sit in the sidebar's bottom panel, above the account
+// row, on a wide screen with the sidebar open; in the account menu, under its
+// name and email, everywhere else (no sidebar, or the sidebar hidden).
+// page-nav.js's setSideNavOpen calls this too.
+function placeSettingsSwitches() {
+  const switches = document.getElementById('settings-switches');
+  if (!switches) return;
+  const inSidebar = window.matchMedia('(min-width: 1180px)').matches
+    && document.documentElement.dataset.sideNav !== 'closed';
+  if (inSidebar) {
+    document.querySelector('.header-actions').prepend(switches);
+  } else {
+    document.querySelector('#account-menu-dropdown .account-menu-info').after(switches);
+  }
+}
+
 function setupAccountMenu() {
+  placeSettingsSwitches();
+  window.matchMedia('(min-width: 1180px)').addEventListener('change', placeSettingsSwitches);
+
   const menu = document.getElementById('account-menu');
   const btn = document.getElementById('account-menu-btn');
   const dropdown = document.getElementById('account-menu-dropdown');
@@ -833,16 +852,11 @@ function setupPanelToggles() {
 }
 
 function setupThemeToggle() {
-  const btn = document.getElementById('theme-toggle-btn');
+  const toggle = document.getElementById('theme-toggle');
+  toggle.checked = document.documentElement.dataset.theme === 'dark';
 
-  const updateButton = (dark) => {
-    btn.textContent = dark ? 'Switch to light mode' : 'Switch to dark mode';
-  };
-
-  updateButton(document.documentElement.dataset.theme === 'dark');
-
-  btn.addEventListener('click', () => {
-    const dark = document.documentElement.dataset.theme !== 'dark';
+  toggle.addEventListener('change', () => {
+    const dark = toggle.checked;
 
     if (dark) {
       document.documentElement.setAttribute('data-theme', 'dark');
@@ -852,19 +866,17 @@ function setupThemeToggle() {
       localStorage.removeItem('ledger_theme');
     }
 
-    updateButton(dark);
     applyChartTheme();
 
     if (!document.getElementById('dashboard').hidden) loadDashboard(false);
   });
 }
 
-// Reflects the current privacyMode on the menu item's label. Standalone (not
+// Reflects the current privacyMode on its switch. Standalone (not
 // nested in setupPrivacyToggle) so loadDashboard can call it too, once the
 // Settings tab's SHOW_AMOUNTS tells it what privacyMode actually is.
 function updatePrivacyButtonUI() {
-  const btn = document.getElementById('privacy-toggle-btn');
-  btn.textContent = privacyMode ? 'Show amounts' : 'Hide amounts';
+  document.getElementById('privacy-toggle').checked = !privacyMode;
 }
 
 // Masks every formatted amount on the page (cards, tables, chart ticks,
@@ -873,8 +885,8 @@ function updatePrivacyButtonUI() {
 function setupPrivacyToggle() {
   updatePrivacyButtonUI();
 
-  document.getElementById('privacy-toggle-btn').addEventListener('click', () => {
-    privacyMode = !privacyMode;
+  document.getElementById('privacy-toggle').addEventListener('change', (e) => {
+    privacyMode = !e.target.checked;
     updatePrivacyButtonUI();
     if (!document.getElementById('dashboard').hidden) loadDashboard(false);
     // Persisted to the Settings tab (not localStorage) so it survives a
@@ -885,12 +897,11 @@ function setupPrivacyToggle() {
   });
 }
 
-// Reflects the current widgetsVisible on the menu item's label — same
+// Reflects the current widgetsVisible on its switch — same
 // standalone-from-setup shape as updatePrivacyButtonUI, so loadDashboard's
 // SHOW_WIDGETS read can call it too.
 function updateWidgetsButtonUI() {
-  const btn = document.getElementById('widgets-toggle-btn');
-  btn.textContent = widgetsVisible ? 'Hide widgets' : 'Show widgets';
+  document.getElementById('widgets-toggle').checked = widgetsVisible;
 }
 
 // Shows/hides the Time/Date/Azan/Weather row per widgetsVisible. Section pages
@@ -916,8 +927,8 @@ function applyWidgetsVisibility() {
 function setupWidgetsToggle() {
   updateWidgetsButtonUI();
 
-  document.getElementById('widgets-toggle-btn').addEventListener('click', () => {
-    widgetsVisible = !widgetsVisible;
+  document.getElementById('widgets-toggle').addEventListener('change', (e) => {
+    widgetsVisible = e.target.checked;
     updateWidgetsButtonUI();
     applyWidgetsVisibility();
     // Same best-effort persistence as SHOW_AMOUNTS above.
@@ -928,8 +939,7 @@ function setupWidgetsToggle() {
 }
 
 function updateBulbsButtonUI() {
-  const btn = document.getElementById('bulbs-toggle-btn');
-  btn.textContent = bulbsVisible ? 'Hide bulbs' : 'Show bulbs';
+  document.getElementById('bulbs-toggle').checked = bulbsVisible;
 }
 
 // Home page only; section pages keep their cards.
@@ -945,8 +955,8 @@ function applyBulbsVisibility() {
 function setupBulbsToggle() {
   updateBulbsButtonUI();
 
-  document.getElementById('bulbs-toggle-btn').addEventListener('click', () => {
-    bulbsVisible = !bulbsVisible;
+  document.getElementById('bulbs-toggle').addEventListener('change', (e) => {
+    bulbsVisible = e.target.checked;
     updateBulbsButtonUI();
     applyBulbsVisibility();
     saveSettingValues({ SHOW_BULBS: bulbsVisible ? 1 : 0 }).catch((err) => {

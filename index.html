@@ -152,12 +152,31 @@
         </a>
     </nav>
     <div class="header-actions">
+        <!-- Refresh data and Clear cache, then the show/hide settings as iPhone
+             switches. app.js's placeSettingsSwitches keeps them in the sidebar's
+             bottom panel above the account row on a wide screen with the sidebar
+             open, and in the account menu everywhere else. -->
+        <div id="settings-switches" class="settings-switches">
+            <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
+            <button id="clear-cache-btn" class="account-menu-item" title="Re-download the app's own files and reload — for when the browser is still running an older version">Clear cache</button>
+            <label class="switch-row"><span>Dark mode</span><input type="checkbox" role="switch" id="theme-toggle" class="switch"></label>
+            <label class="switch-row" id="privacy-toggle-row" hidden><span>Show amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
+            <label class="switch-row" id="widgets-toggle-row" hidden title="The Time/Date/Azan/Weather row"><span>Show widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
+            <label class="switch-row" id="bulbs-toggle-row" hidden title="The home page's Health and Finance glance cards"><span>Show bulbs</span><input type="checkbox" role="switch" id="bulbs-toggle" class="switch"></label>
+        </div>
+
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
 
         <div id="account-menu" class="account-menu" hidden>
+            <!-- The Google profile picture; on a wide screen a full row with the name
+                 and email beside it. -->
             <button id="account-menu-btn" class="account-avatar-btn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
                 <img id="account-avatar-img" class="account-avatar" alt="" hidden>
                 <span id="account-avatar-fallback" class="account-avatar account-avatar-fallback"></span>
+                <span class="account-btn-text">
+                    <span id="account-btn-name" class="account-menu-name"></span>
+                    <span id="account-btn-email" class="account-menu-email"></span>
+                </span>
             </button>
 
             <div id="account-menu-dropdown" class="account-menu-dropdown" hidden>
@@ -166,16 +185,10 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                     <span id="last-updated" class="last-updated"></span>
                 </div>
-                <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
-                <button id="clear-cache-btn" class="account-menu-item" title="Re-download the app's own files and reload — for when the browser is still running an older version">Clear cache</button>
                 <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
-                <button id="theme-toggle-btn" class="account-menu-item">Switch to dark mode</button>
-                <button id="privacy-toggle-btn" class="account-menu-item" hidden>Hide amounts</button>
                 <button id="notifications-btn" class="account-menu-item" hidden title="Let Chrome show Work Time's and Car Service's daily reminders">Enable notifications</button>
-                <button id="widgets-toggle-btn" class="account-menu-item" hidden title="Show or hide the Time/Date/Azan/Weather row">Hide widgets</button>
-                <button id="bulbs-toggle-btn" class="account-menu-item" hidden title="Show or hide the home page's Health and Finance glance cards">Hide bulbs</button>
                 <button id="signout-btn" class="account-menu-item account-menu-item-divider">Sign out</button>
             </div>
         </div>

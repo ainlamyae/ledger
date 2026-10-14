@@ -215,12 +215,6 @@ function getProteinTargetBandG(entries) {
   return { min: flat, max: flat };
 }
 
-// Midpoint, for callers that structurally need one number — Protein Source Rotation.
-function getProteinTargetG(entries) {
-  const { min, max } = getProteinTargetBandG(entries);
-  return Math.round((min + max) / 2);
-}
-
 // "131" or "131~164" — one place, so the glance tile and the Insight prompt can't
 // drift. The separator is a parameter: the prompt passes '-' rather than send the AI
 // an unusual character.

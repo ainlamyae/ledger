@@ -286,6 +286,12 @@ header h1 {
     flex-shrink: 0;
 }
 
+/* Hides and shows the wide-screen sidebar (page-nav.js's initSideNavToggle);
+   below 1180px there's no sidebar to hide. */
+.side-nav-toggle {
+    display: none;
+}
+
 .nav {
     display: flex;
     gap: var(--space-xl);
@@ -3474,11 +3480,21 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     cursor: pointer;
 }
 
-/* Today on the Health hub (page-nav.js's QUICK_ACTIONS): the last tile, gray
-   like Physique's own Today button (.btn-secondary). */
-.page-tile.quick-tile {
-    background: var(--color-muted);
-    color: #fff;
+/* A tile's colour says what it opens (page-nav.js's TILE_KINDS): the same 15% wash
+   as the gray, in green for a form (Tune, Today, Workouts), orange for charts
+   (Indicator) and purple for AI (Insight, Market, and Insight's own mode tiles).
+   A block of sheet rows keeps the gray. */
+.page-tile[data-kind="form"] {
+    background: color-mix(in srgb, #34c759 15%, transparent);
+}
+
+.page-tile[data-kind="chart"] {
+    background: color-mix(in srgb, #ff9500 15%, transparent);
+}
+
+.page-tile[data-kind="ai"],
+:is(#insight-mode-actions, #financial-insight-mode-actions) .page-tile {
+    background: color-mix(in srgb, var(--color-other) 15%, transparent);
 }
 
 /* Four a row on a phone, down to a 375px-wide one (5rem each plus the gaps). */
@@ -3593,6 +3609,83 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         color: var(--color-text);
     }
 
+    /* The sidebar's button, at the right end of the logo row: a panel drawn
+       with its left column, as in Claude's chat. */
+    .side-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        margin-left: auto;
+        padding: 0;
+        border: 0;
+        border-radius: var(--radius-md);
+        background: none;
+        color: var(--color-text-muted);
+        cursor: pointer;
+        transition: var(--transition-colors);
+    }
+
+    .side-nav-toggle:hover,
+    .side-nav-toggle:focus-visible {
+        background: var(--color-border);
+        color: var(--color-text);
+    }
+
+    .side-nav-toggle-logo {
+        display: none;
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .side-nav {
+        transition: transform .2s ease, visibility .2s;
+    }
+
+    /* Hidden: the sidebar slides away and the page centres in the full width.
+       Top-left keeps only the button, drawn as Ledger's logo until it's hovered
+       (then the panel icon), as Claude's chat does with its own. */
+    html[data-side-nav="closed"] .side-nav {
+        transform: translateX(-100%);
+        visibility: hidden;
+    }
+
+    html[data-side-nav="closed"] body.with-side-nav .container {
+        margin-left: auto;
+    }
+
+    html[data-side-nav="closed"] header h1 {
+        width: auto;
+        padding: var(--space-m);
+    }
+
+    html[data-side-nav="closed"] .logo-link {
+        display: none;
+    }
+
+    html[data-side-nav="closed"] .side-nav-toggle {
+        margin-left: 0;
+    }
+
+    html[data-side-nav="closed"] .side-nav-toggle-logo {
+        display: block;
+    }
+
+    html[data-side-nav="closed"] .side-nav-toggle-icon {
+        display: none;
+    }
+
+    html[data-side-nav="closed"] .side-nav-toggle:hover .side-nav-toggle-logo,
+    html[data-side-nav="closed"] .side-nav-toggle:focus-visible .side-nav-toggle-logo {
+        display: none;
+    }
+
+    html[data-side-nav="closed"] .side-nav-toggle:hover .side-nav-toggle-icon,
+    html[data-side-nav="closed"] .side-nav-toggle:focus-visible .side-nav-toggle-icon {
+        display: block;
+    }
+
     .header-actions {
         position: fixed;
         left: 0;
@@ -3692,6 +3785,11 @@ html.section-pages[data-form-page] body.modal-open {
         width: min(calc(1000px - 2 * var(--form-page-gutter)), calc(100% - 14rem - 2 * var(--form-page-gutter)));
         margin-left: calc(14rem + var(--form-page-gutter));
         margin-right: auto;
+    }
+
+    html.section-pages[data-form-page][data-side-nav="closed"] body.with-side-nav .modal.form-page {
+        width: min(calc(1000px - 2 * var(--form-page-gutter)), calc(100% - 2 * var(--form-page-gutter)));
+        margin-left: auto;
     }
 }
 

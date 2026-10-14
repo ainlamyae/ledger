@@ -78,6 +78,13 @@
             document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
         }
     } catch (e) {}
+    // The wide-screen sidebar hidden with its toggle (page-nav.js), before first
+    // paint so a reload doesn't show it open for a moment.
+    try {
+        if (localStorage.getItem('ledger_side_nav') === 'closed') {
+            document.documentElement.dataset.sideNav = 'closed';
+        }
+    } catch (e) {}
     // The hub/page layout before first paint, so a reload never shows the blocks as
     // they sit in the raw page (every one open, Indicator's charts first) while the
     // scripts load. page-nav.js and router.js add the same classes later and fill
@@ -114,7 +121,11 @@
 <body>
 
 <header>
-    <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a></h1>
+    <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a><!--
+     Wide screens only: hides and shows the sidebar, as in Claude's chat. With the
+     sidebar hidden it's the one thing left top-left, drawn as the logo until
+     hovered (page-nav.js's initSideNavToggle).
+     --><button type="button" id="side-nav-toggle" class="side-nav-toggle" title="Hide sidebar" aria-label="Hide sidebar" aria-controls="side-nav" aria-expanded="true"><img src="favicon.svg" class="side-nav-toggle-logo" alt="" width="20" height="20"><svg class="side-nav-toggle-icon" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7.5 3.5v13"/></svg></button></h1>
 
     <!-- Each entry is a real address, not an in-page anchor: /health/, /finance/,
          /track/ and /other/ are pages of their own that show that one wrapper (see
@@ -1587,6 +1598,107 @@
             <div class="pagination" id="breakdown-pagination"></div>
         </div>
 
+        <!-- Buy/sell log at average cost (portfolio.js, portfolio-math.js). -->
+        <div class="panel" id="portfolio-panel" data-route="portfolio">
+            <div class="panel-header">
+                <h2>Portfolio</h2>
+                <button id="add-trade-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a buy, sell or split" aria-label="Log">📝</button>
+            </div>
+
+            <p class="hint" id="portfolio-status"></p>
+
+            <div class="cards">
+                <div class="card"><h3>Market Value (CAD)</h3><div class="value" id="portfolio-value">—</div></div>
+                <div class="card"><h3>Cost Basis (CAD)</h3><div class="value" id="portfolio-cost">—</div></div>
+                <div class="card"><h3>Unrealized (CAD)</h3><div class="value" id="portfolio-unrealized">—</div></div>
+                <div class="card"><h3>Realized (CAD)</h3><div class="value" id="portfolio-realized">—</div></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Gain / Loss (CAD)</h3>
+                <div class="pagination" id="portfolio-range"></div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="portfolio-gain-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="portfolio-gain-legend"></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Market Value vs Cost (CAD)</h3>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="portfolio-value-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="portfolio-value-legend"></div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Holdings</h3>
+                <div class="table-responsive">
+                    <table id="holdings-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th>Symbol</th>
+                            <th class="num">Shares</th>
+                            <th class="num" title="Average cost per share, fees included (ACB)">Avg Cost</th>
+                            <th class="num">Close</th>
+                            <th class="num">Market Value</th>
+                            <th class="num" title="Market value minus cost, in the stock's own currency">Unrealized</th>
+                            <th class="num">%</th>
+                            <th class="num" title="Gain or loss locked in by sells, in the stock's own currency">Realized</th>
+                        </tr>
+                        </thead>
+                        <tbody id="holdings-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>By Account</h3>
+                <div class="table-responsive">
+                    <table id="portfolio-accounts-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th class="num" title="Today's value of the stocks logged under this account, in CAD">Holdings</th>
+                            <th class="num" title="The Account page's Market Value">Market Value</th>
+                            <th class="num" title="Market Value minus Holdings — usually cash">Difference</th>
+                        </tr>
+                        </thead>
+                        <tbody id="portfolio-accounts-body"></tbody>
+                    </table>
+                </div>
+                <div class="panel-actions">
+                    <button type="button" id="portfolio-write-mv-btn" class="btn btn-secondary" hidden title="Write each account's Holdings into its Market Value (blank or number cells only; formulas are left alone)">Update Market Value</button>
+                </div>
+            </div>
+
+            <div class="panel-section card">
+                <h3>Trades</h3>
+                <div class="table-responsive">
+                    <table id="trades-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th class="sortable" data-sort="date">Date</th>
+                            <th class="sortable" data-sort="account">Account</th>
+                            <th class="sortable" data-sort="symbol">Symbol</th>
+                            <th class="sortable" data-sort="action">Action</th>
+                            <th class="num">Qty</th>
+                            <th class="num">Price</th>
+                            <th class="num">Fees</th>
+                            <th class="num" title="CAD per one unit of the trade's currency on that day">FX</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="trades-body"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="trades-pagination"></div>
+            </div>
+
+            <p class="hint">Average cost (ACB) per account and symbol, fees included; CAD figures use each trade's own FX rate. The superficial-loss rule isn't applied.</p>
+        </div>
+
         <!-- Watchlist stocks and their latest moves (market.js); prices load when this page opens. -->
         <div class="panel" id="watchlist-panel" data-route="watchlist">
             <div class="panel-header">
@@ -1699,107 +1811,6 @@
             <div id="analysis-body" class="insight-body"></div>
             <p id="analysis-alerts-hint" class="hint" hidden></p>
             <p id="analysis-form-error" class="status" hidden></p>
-        </div>
-
-        <!-- Buy/sell log at average cost (portfolio.js, portfolio-math.js). -->
-        <div class="panel" id="portfolio-panel" data-route="portfolio">
-            <div class="panel-header">
-                <h2>Portfolio</h2>
-                <button id="add-trade-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a buy, sell or split" aria-label="Log">📝</button>
-            </div>
-
-            <p class="hint" id="portfolio-status"></p>
-
-            <div class="cards">
-                <div class="card"><h3>Market Value (CAD)</h3><div class="value" id="portfolio-value">—</div></div>
-                <div class="card"><h3>Cost Basis (CAD)</h3><div class="value" id="portfolio-cost">—</div></div>
-                <div class="card"><h3>Unrealized (CAD)</h3><div class="value" id="portfolio-unrealized">—</div></div>
-                <div class="card"><h3>Realized (CAD)</h3><div class="value" id="portfolio-realized">—</div></div>
-            </div>
-
-            <div class="panel-section card">
-                <h3>Gain / Loss (CAD)</h3>
-                <div class="pagination" id="portfolio-range"></div>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="portfolio-gain-chart"></canvas>
-                </div>
-                <div class="donut-legend" id="portfolio-gain-legend"></div>
-            </div>
-
-            <div class="panel-section card">
-                <h3>Market Value vs Cost (CAD)</h3>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="portfolio-value-chart"></canvas>
-                </div>
-                <div class="donut-legend" id="portfolio-value-legend"></div>
-            </div>
-
-            <div class="panel-section card">
-                <h3>Holdings</h3>
-                <div class="table-responsive">
-                    <table id="holdings-table" class="table-compact">
-                        <thead>
-                        <tr>
-                            <th>Account</th>
-                            <th>Symbol</th>
-                            <th class="num">Shares</th>
-                            <th class="num" title="Average cost per share, fees included (ACB)">Avg Cost</th>
-                            <th class="num">Close</th>
-                            <th class="num">Market Value</th>
-                            <th class="num" title="Market value minus cost, in the stock's own currency">Unrealized</th>
-                            <th class="num">%</th>
-                            <th class="num" title="Gain or loss locked in by sells, in the stock's own currency">Realized</th>
-                        </tr>
-                        </thead>
-                        <tbody id="holdings-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="panel-section card">
-                <h3>By Account</h3>
-                <div class="table-responsive">
-                    <table id="portfolio-accounts-table" class="table-compact">
-                        <thead>
-                        <tr>
-                            <th>Account</th>
-                            <th class="num" title="Today's value of the stocks logged under this account, in CAD">Holdings</th>
-                            <th class="num" title="The Account page's Market Value">Market Value</th>
-                            <th class="num" title="Market Value minus Holdings — usually cash">Difference</th>
-                        </tr>
-                        </thead>
-                        <tbody id="portfolio-accounts-body"></tbody>
-                    </table>
-                </div>
-                <div class="panel-actions">
-                    <button type="button" id="portfolio-write-mv-btn" class="btn btn-secondary" hidden title="Write each account's Holdings into its Market Value (blank or number cells only; formulas are left alone)">Update Market Value</button>
-                </div>
-            </div>
-
-            <div class="panel-section card">
-                <h3>Trades</h3>
-                <div class="table-responsive">
-                    <table id="trades-table" class="table-compact">
-                        <thead>
-                        <tr>
-                            <th class="sortable" data-sort="date">Date</th>
-                            <th class="sortable" data-sort="account">Account</th>
-                            <th class="sortable" data-sort="symbol">Symbol</th>
-                            <th class="sortable" data-sort="action">Action</th>
-                            <th class="num">Qty</th>
-                            <th class="num">Price</th>
-                            <th class="num">Fees</th>
-                            <th class="num" title="CAD per one unit of the trade's currency on that day">FX</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody id="trades-body"></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="trades-pagination"></div>
-            </div>
-
-            <p class="hint">Average cost (ACB) per account and symbol, fees included; CAD figures use each trade's own FX rate. The superficial-loss rule isn't applied.</p>
         </div>
 
         <div class="panel" id="financial-insight-panel" data-route="insight">

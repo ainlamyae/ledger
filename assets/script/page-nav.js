@@ -43,6 +43,18 @@ const QUICK_ACTIONS = {
   ],
 };
 
+// What a tile opens, as its colour (styles.css's .page-tile[data-kind]): a form to
+// fill in, charts, or AI. Every other block is rows of a sheet tab and keeps the
+// plain gray. Quick actions (above) are all forms.
+const TILE_KINDS = {
+  'health/indicator': 'chart',
+  'health/insight': 'ai',
+  'health/tune': 'form',
+  'finance/indicator': 'chart',
+  'finance/market': 'ai',
+  'finance/insight': 'ai',
+};
+
 function buildQuickActions(section) {
   const actions = QUICK_ACTIONS[section.id];
   const grid = document.querySelector(`#${section.id} > .card > .page-tiles`);
@@ -52,6 +64,7 @@ function buildQuickActions(section) {
     const source = document.getElementById(action.buttonId);
     const tile = document.createElement('a');
     tile.className = 'page-tile quick-tile';
+    tile.dataset.kind = 'form';
     if (source?.title) tile.title = source.title;
     tile.href = `${section.href}${action.href()}`;
     const title = document.createElement('span');
@@ -79,6 +92,8 @@ function buildPageTiles(section) {
     tile.href = pageHref(section, panel);
     tile.dataset.section = section.id;
     tile.dataset.route = panel.dataset.route;
+    const kind = TILE_KINDS[`${section.id}/${panel.dataset.route}`];
+    if (kind) tile.dataset.kind = kind;
     const title = document.createElement('span');
     title.className = 'page-tile-title';
     title.textContent = routedHeadingText(panel);
@@ -228,6 +243,41 @@ function buildSideNav(sections) {
   });
   document.body.appendChild(aside);
   document.body.classList.add('with-side-nav');
+  initSideNavToggle();
+}
+
+// The logo row's button hides and shows the sidebar, remembered in this browser.
+// index.html's head reads the same key before first paint.
+const SIDE_NAV_KEY = 'ledger_side_nav';
+
+function setSideNavOpen(open) {
+  const toggle = document.getElementById('side-nav-toggle');
+  if (open) delete document.documentElement.dataset.sideNav;
+  else document.documentElement.dataset.sideNav = 'closed';
+  const label = open ? 'Hide sidebar' : 'Show sidebar';
+  toggle.title = label;
+  toggle.setAttribute('aria-label', label);
+  toggle.setAttribute('aria-expanded', String(open));
+  try {
+    if (open) localStorage.removeItem(SIDE_NAV_KEY);
+    else localStorage.setItem(SIDE_NAV_KEY, 'closed');
+  } catch (e) {}
+}
+
+function initSideNavToggle() {
+  const toggle = document.getElementById('side-nav-toggle');
+  if (!toggle) return;
+  setSideNavOpen(document.documentElement.dataset.sideNav !== 'closed');
+  toggle.addEventListener('click', () => {
+    setSideNavOpen(document.documentElement.dataset.sideNav === 'closed');
+  });
+  // Ctrl+. (⌘. on a Mac), as in Claude's chat.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== '.' || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+    if (!window.matchMedia('(min-width: 1180px)').matches) return;
+    event.preventDefault();
+    toggle.click();
+  });
 }
 
 // Marks the current section and page in the sidebar and fills the breadcrumb.

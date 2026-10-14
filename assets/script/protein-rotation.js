@@ -6,9 +6,10 @@
 // (computeProteinRotationRows), then summed per Group for the chart
 // (groupProteinRotationRows), each bar stacked by ingredient.
 // Protein % is the share of your protein target this ingredient should
-// cover (e.g. 10 for "turkey = 10% of my protein"); since that target
-// (wellness-math.js's getProteinTargetG) already updates live with body mass/height/
-// activity, each ingredient's gram target moves with it automatically —
+// cover (e.g. 10 for "turkey = 10% of my protein"), scaled so the tracked
+// ingredients' shares add up to 100% whatever they were typed as; since that
+// target (the top of wellness-math.js's getProteinTargetBandG) already updates
+// live with body mass/height/activity, each ingredient's gram target moves with it automatically —
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from Physique's own Calculate breakdown,
 // independent of whatever Nutrition's Amount/Calories happen to say
@@ -54,6 +55,7 @@ function actualProteinEatenBySource(from, to) {
 
 // One row per tracked ingredient: actual protein (g) eaten this window vs.
 // a target scaled live off the current protein target —
+//   proteinPercent = Protein % / (sum of every tracked Protein %) × 100
 //   targetProteinG = (proteinPercent / 100) × weeklyProteinTarget × (lookbackDays / 7)
 // — so every ingredient's target rises or falls automatically as the real
 // target does, with no separate ratio/scale-factor bookkeeping. Sorted by
@@ -64,11 +66,13 @@ function computeProteinRotationRows(from, to) {
   const lookbackDays = datesInRange(from, to).length;
   const sources = trackedProteinSources();
   const proteinByName = actualProteinEatenBySource(from, to);
-  // Midpoint of the target band: a share-of-target split needs one
-  // denominator, and the middle of the band is the fairest one to divide up
-  // (a floor-based split would under-target every source, a top-end one would
-  // over-target every source).
-  const dailyProteinTarget = getProteinTargetG(physiqueAsWellnessEntries());
+  // The Protein % column is typed freely, so its sum is rarely 100: each
+  // share is taken of that sum instead, and together they always cover the
+  // whole target.
+  const totalPercent = sources.reduce((sum, s) => sum + s.proteinPercent, 0);
+  // The top of the target band: a share-of-target split needs one
+  // denominator, and the full split is what the band's top asks for.
+  const dailyProteinTarget = getProteinTargetBandG(physiqueAsWellnessEntries()).max;
   const weeklyProteinTarget = dailyProteinTarget * 7;
   // Total protein target across the whole lookback window (not per
   // ingredient) — the denominator for "what % of my total target did this
@@ -77,13 +81,14 @@ function computeProteinRotationRows(from, to) {
 
   const rows = sources.map((s) => {
     const actualProteinG = proteinByName.get(s.name.trim().toLowerCase()) || 0;
-    const targetProteinG = (s.proteinPercent / 100) * weeklyProteinTarget * (lookbackDays / 7);
+    const proteinPercent = (s.proteinPercent / totalPercent) * 100;
+    const targetProteinG = (proteinPercent / 100) * weeklyProteinTarget * (lookbackDays / 7);
     return {
       name: s.name,
       group: s.group,
       actualProteinG: Math.round(actualProteinG * 10) / 10,
       targetProteinG: Math.round(targetProteinG * 10) / 10,
-      proteinPercent: s.proteinPercent,
+      proteinPercent: Math.round(proteinPercent * 10) / 10,
       actualPercentOfTotalTarget: totalTargetForWindow > 0 ? Math.round((actualProteinG / totalTargetForWindow) * 1000) / 10 : 0,
     };
   });

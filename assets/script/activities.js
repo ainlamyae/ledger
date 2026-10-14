@@ -568,7 +568,11 @@ async function submitActivityForm(event) {
     const editingRow = editingActivityRow;
     await saveActivityFormFields(fields.values);
     await initActivities(true);
-    const name = fields.values[0];
+    // A new exercise saved from a day's Workout table (✏️, physique-breakdown.js)
+    // reprices that day from the sheet now, and drops the AI guess it was filled from.
+    forgetActivityGuess(fields.name);
+    if (!document.getElementById('physique-modal').hidden) runPhysiqueWorkoutCalc(false);
+    const name = fields.name;
     const saved = allActivities.find((a) => a.row === editingRow)
       || allActivities.filter((a) => a.name === name).at(-1);
     if (saved) {

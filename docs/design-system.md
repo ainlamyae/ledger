@@ -35,7 +35,7 @@ Four sizes, as tokens — every `font-size` is one of them — on one 15px base 
 
 | Token | Values |
 |---|---|
-| Spacing | `--space-xs` … `--space-xxl`: .2rem, .5rem, .75rem, 1rem, 1.5rem, 2rem (only the sidebar's own layout sizes sit outside them) |
+| Spacing | `--space-xs` … `--space-xxl`: .2rem, .5rem, .75rem, 1rem, 1.5rem, 2rem (only the sidebar's own layout sizes and table cells' 2.5px sit outside them) |
 | Shadows | `--shadow-card` (cards, tiles) · `--shadow-dropdown` (menus, toast, phone bars) · `--shadow-hover` (the lift on a hovered tile or panel, darker) |
 | Line height | 1.2 text and controls · 1.5 paragraphs |
 | Weight | One bold: 600 |
@@ -57,6 +57,8 @@ Each look is written once: every field starts from one base rule, and cards, Tot
 | Header or text row (no vertical cell padding, 16px lines) | 19px |
 | Text wrapping onto two lines | 32px |
 | Row with buttons | 29px |
+
+Table cells have 2.5px of padding at each side, so columns sit 5px apart in every table at every width (`th, td`; `table-compact` only drops the row lines).
 
 Row buttons (✏️ 📋 🧬 🗑️) always stay side by side on one line.
 

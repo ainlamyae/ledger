@@ -68,6 +68,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
       makeCell(String(line.met)),
       makeCell(activityLineMinutes(line.seconds)),
       makeCell(String(Math.round(line.calories))),
+      activitySourceCell(line),
     );
     tbody.appendChild(tr);
   });
@@ -80,6 +81,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
     makeCell(''),
     makeCell(String(minutes)),
     makeCell(String(calories)),
+    makeCell(''),
   );
   tbody.appendChild(totalRow);
 
@@ -100,6 +102,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
       makeCell(''),
       makeCell(String(desireMin)),
       makeCell(String(desireKcal)),
+      makeCell(''),
     );
     tbody.appendChild(targetRow);
 
@@ -114,11 +117,99 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
       makeCell(''),
       makeCell(String(Math.round(desireMin - minutes))),
       makeCell(String(Math.round(desireKcal - calories))),
+      makeCell(''),
     );
     tbody.appendChild(remainingRow);
   }
 
   document.getElementById('physique-activity-breakdown').hidden = false;
+}
+
+// The Workout table's last column, as Consumption's (calorie-estimator.js's
+// sourceCell): ✅ for an exercise on the Activity sheet; AI for one the AI
+// priced (guessUnknownActivities), then 💾 to save it to the sheet as-is and ✏️
+// to fix it first; Default for one priced at EXERCISE_MET_FALLBACK, which
+// 🧮 Calculate sends to the AI.
+function activitySourceCell(line) {
+  const cell = document.createElement('td');
+  const label = document.createElement('span');
+  if (line.source === 'table') {
+    label.textContent = '✅';
+    label.title = 'In your Activity sheet';
+  } else if (line.source === 'ai') {
+    label.textContent = 'AI';
+    label.title = 'Not in your Activity sheet yet — MET estimated by AI';
+  } else {
+    label.textContent = 'Default';
+    label.title = `Not in your Activity sheet — priced at the default MET (${EXERCISE_MET_FALLBACK}); 🧮 Calculate asks AI for it`;
+  }
+  cell.appendChild(label);
+  if (line.source === 'ai') {
+    cell.append(' ', makeSaveActivityGuessButton(line.guess), ' ', makeEditActivityGuessButton(line.guess));
+  }
+  return cell;
+}
+
+// The guess as an Activity sheet row, in readActivityFormFields' column order.
+function activityGuessRowValues(guess) {
+  return [
+    guess.category || 'Other',
+    guess.group || 'Other',
+    guess.name,
+    guess.unit,
+    [guess.amount, guess.rest].filter(Boolean).join(', '),
+    '',
+    guess.met,
+    guess.muscleGroup,
+    '',
+    '',
+  ];
+}
+
+// After the Activity sheet gains a row, the open day reprices from it, so the
+// row's AI turns to ✅.
+async function reloadActivitiesIntoPhysique(name) {
+  forgetActivityGuess(name);
+  await initActivities(true);
+  if (!document.getElementById('physique-modal').hidden) runPhysiqueWorkoutCalc(false);
+}
+
+function makeSaveActivityGuessButton(guess) {
+  return makeRowActionButton({
+    emoji: '💾',
+    title: `Not in your Activity sheet yet — save "${guess.name}" (MET ${guess.met}, ${guess.category || 'Other'} · ${guess.group || 'Other'}) so it's a trusted lookup next time instead of a fresh guess`,
+    onClick: async () => {
+      try {
+        if (!activityByName(guess.name)) await appendValues(ACTIVITIES_RANGE, [activityGuessRowValues(guess)]);
+        await reloadActivitiesIntoPhysique(guess.name);
+      } catch (err) {
+        showFieldError('physique-form-error', err.message);
+      }
+    },
+  });
+}
+
+// Opens the Add Activity form the Activity Plan's own Add uses, filled with the
+// guess, under the activity's own address; its Save reprices the day
+// (submitActivityForm, activities.js).
+function makeEditActivityGuessButton(guess) {
+  return makeRowActionButton({
+    emoji: '✏️',
+    title: `Not quite right? Fix "${guess.name}" before saving — Save adds it to your Activity sheet and reprices this line`,
+    onClick: () => {
+      routeRecordEdit('activity', { slug: routeSlug(guess.name), label: guess.name });
+      openActivityForm(null);
+      const [category, group, name, unit] = activityGuessRowValues(guess);
+      setActivityField('category', category);
+      setActivityField('group', group);
+      setActivityField('name', name);
+      setActivityField('unit', unit);
+      setActivityField('amount', guess.amount);
+      setActivityField('rest', guess.rest);
+      setActivityField('met', guess.met);
+      setActivityField('muscle-group', guess.muscleGroup);
+    },
+  });
 }
 
 // One decimal rather than whole minutes: a strength line is often well under a
@@ -849,7 +940,9 @@ async function calculatePhysiqueDay() {
   btn.textContent = '🧮…';
   clearFieldError('physique-form-error');
 
-  const messages = runPhysiqueWorkoutCalc(true);
+  // New exercise names go to the AI first, so the pass below prices them.
+  const workoutAiMessages = (workout && activitiesDataLoaded) ? await guessUnknownActivities(workout) : [];
+  const messages = [...workoutAiMessages, ...runPhysiqueWorkoutCalc(true)];
 
   if (consumption) {
     try {

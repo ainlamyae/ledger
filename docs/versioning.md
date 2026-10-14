@@ -23,8 +23,11 @@ The footer shows the app version as `vMAJOR.MINOR.PATCH` (e.g. `v3.5.0`).
 
 ## Commit authorship
 
-- `scripts/hooks/commit-msg` strips every `Co-authored-by:` trailer, any "Generated with … Claude" line and any `anthropic.com` address from the message — no co-authors, no Claude/Anthropic attribution.
+No co-authors, no names or emails, and never Claude or Anthropic, in any commit — enforced at three points, all plain `sh` (no `node` needed):
+
 - `scripts/hooks/pre-commit` refuses the commit if the author or committer name/email contains Claude or Anthropic.
+- `scripts/hooks/commit-msg` strips every attribution line — any `Something-by:` trailer (`Co-authored-by:`, `Signed-off-by:`, …), any trailer carrying a `<name@email>`, "Generated with/by" lines, 🤖 lines and `noreply@` addresses — then refuses the commit if "Claude" or "Anthropic" is still anywhere in the message, rather than cutting words out of it.
+- `scripts/hooks/pre-push` checks every commit the push adds (message, author and committer) and refuses the push if either name appears, which catches a commit made with `--no-verify`. Commits already on the remote aren't re-checked.
 
 ## Setup (once per clone)
 

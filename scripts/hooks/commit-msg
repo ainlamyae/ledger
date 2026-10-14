@@ -1,5 +1,28 @@
 #!/bin/sh
-# No co-authors and no Claude/Anthropic attribution in any commit message:
-# drops every Co-authored-by trailer, any "Generated with … Claude" line and any
-# line naming an anthropic.com address.
-sed -i -E '/^[[:space:]]*co-authored-by:/Id; /generated with .*claude/Id; /anthropic\.com/Id' "$1"
+# No co-authors, no names or emails and no Claude/Anthropic attribution in any
+# commit message. Plain sh (no node), so it runs wherever git does.
+#
+# 1. Drops every attribution line: any "Something-by:" trailer (Co-authored-by,
+#    Signed-off-by, …), any trailer carrying a <name@email>, "Generated with/by"
+#    lines, 🤖 lines and noreply@ addresses.
+# 2. Refuses the commit if "Claude" or "Anthropic" is still anywhere in the
+#    message, rather than cutting words out of it; pre-push checks again.
+msg="$1"
+tmp="$msg.ledger-tmp"
+
+grep -v -i -E \
+  -e '^[[:space:]]*[a-z-]+-by:' \
+  -e '^[[:space:]]*[a-z-]+:.*<[^>]*@[^>]*>' \
+  -e 'generated (with|by)' \
+  -e '🤖' \
+  -e 'noreply@' \
+  "$msg" > "$tmp"
+# Without the trailing blank lines the removed trailers leave behind.
+awk '{ lines[NR] = $0 } /[^[:space:]]/ { last = NR } END { for (i = 1; i <= last; i++) print lines[i] }' "$tmp" > "$msg"
+rm -f "$tmp"
+
+if grep -v '^#' "$msg" | grep -q -i -E 'claude|anthropic'; then
+  echo "commit-msg: the message must not name Claude or Anthropic:" >&2
+  grep -v '^#' "$msg" | grep -n -i -E 'claude|anthropic' | sed 's/^/  /' >&2
+  exit 1
+fi

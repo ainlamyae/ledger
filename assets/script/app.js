@@ -45,7 +45,7 @@ function saveSwitchSetting(values) {
 // them (for reading the dashboard somewhere it can be seen over your shoulder).
 let privacyMode = readCachedSwitches().SHOW_AMOUNTS === 0;
 
-// The Time/Date/Azan/Weather "bulb" row (widgets.js), SHOW_WIDGETS, and the home
+// The Time/Date/Azan/Weather "bulb" row (ledger-widgets.js), SHOW_WIDGETS, and the home
 // page's section glance cards, SHOW_BULBS: both start off until this browser or
 // the Settings tab says otherwise.
 let widgetsVisible = readCachedSwitches().SHOW_WIDGETS === 1;
@@ -157,7 +157,7 @@ function parseTypeBreakdown(insightRows) {
   return breakdown;
 }
 
-const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'breakdown-modal', 'timesheet-modal', 'nutrition-modal', 'shortcuts-modal'];
+const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'breakdown-modal', 'work-time-modal', 'nutrition-modal', 'shortcuts-modal'];
 
 function toggleShortcutsHelp() {
   const modal = document.getElementById('shortcuts-modal');
@@ -175,7 +175,7 @@ function focusableElements(container) {
 }
 
 // Each modal manages its own hidden flag from wherever it's opened/closed
-// (transactions.js, accounts.js, timesheet.js, etc.) — rather than touching
+// (finance-transaction.js, finance-account.js, track-work-time.js, etc.) — rather than touching
 // every call site, watch the `hidden` attribute here to send focus back to
 // whatever triggered the modal once it closes. Focus is deliberately left
 // alone on open: auto-focusing any field (even a plain text one) pops the
@@ -234,8 +234,8 @@ function setupKeyboardShortcuts() {
       return;
     }
 
-    const target = document.activeElement;
-    const isTyping = target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
+    const focused = document.activeElement;
+    const isTyping = focused && (['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName) || focused.isContentEditable);
     if (isTyping) return;
 
     // Both work from any page: on Finance's own pages in place, elsewhere by going to
@@ -502,7 +502,7 @@ let lastLoadedSettings = null;
 //
 // A read failure is NOT the same as "there are no settings", though, and
 // conflating the two was a real bug: returning {} here silently wiped every
-// setting in memory on one transient read error. Targets reverted to their defaults and Health Insight
+// setting in memory on one transient read error. Desired values reverted to their defaults and Health Insight
 // reported age and height as "not set" — all while the spreadsheet itself was
 // perfectly intact, which is exactly why it looked like a dozen unrelated bugs.
 // So: keep the
@@ -668,7 +668,7 @@ async function loadDashboard(forceRefresh = false) {
   try {
     // Never throws (see loadSettings). Settings fetches concurrently with
     // every other module below instead of blocking them first — only
-    // initPhysique (target-line charts) and initTravel (BIRTH_DATE credit)
+    // initPhysique (desired-line charts) and initTravel (BIRTH_DATE credit)
     // actually read currentSettings, so just those two wait on it.
     const settingsPromise = loadSettings(forceRefresh).then((settings) => {
       currentSettings = settings;
@@ -697,7 +697,7 @@ async function loadDashboard(forceRefresh = false) {
 
     // The core, always loaded whether the blocks are shown or not — it's what
     // populates the always-visible summary tiles. Physique feeds Health's
-    // today-glance (and the Health Indicators charts/plan); the report feeds
+    // today-glance (and the Chart page's charts/plan); the report feeds
     // Finance's Net Worth / Income / Expenditure / Cash-Flow cards.
     //
     // Activities has to land BEFORE Physique: the adapter splits each day's
@@ -710,8 +710,8 @@ async function loadDashboard(forceRefresh = false) {
     // (/health/, /finance/, /track/, /other/) loads its own blocks alone; the home page
     // loads the glance cards (Health status, Finance summary), plus every block
     // when Show blocks is on. Car Service (Track) is drawn from Transactions, so
-    // Track loads those too. The home page also reads Transactions and Work Time for
-    // its tiles' badges (Car Service's days left, Work Time's Log).
+    // Track loads those too. The home page also reads Transactions, Work Time and Accounts for
+    // its tiles' badges (Car Service's days left, Work Time's Log, Account's Pay).
     const section = window.ledgerSectionPage?.section ?? null;
     const home = section === null;
     const shows = (id) => loadBlocks && (home || section === id);
@@ -741,27 +741,29 @@ async function loadDashboard(forceRefresh = false) {
         physiquePromise.then(() => seedGlycogenSwingSetting()).catch((err) => console.error('Saving GLYCOGEN_SWING_KG failed:', err)),
         // Protein Source Rotation needs Physique (actual servings eaten),
         // Nutrition (live per-serving calories/protein), and settings
-        // (protein target) all loaded — refresh only once all three are in.
+        // (desired protein) all loaded — refresh only once all three are in.
         Promise.all([physiquePromise, nutritionPromise]).then(() => {
-          renderProteinRotationChart(wellnessDateRange());
+          renderProteinRotationChart(healthDateRange());
           // Needs both tabs: the grams come from each food's Nutrition row.
           convertPhysiqueBreakdownAmountsToGrams();
         }),
         // Activity Rotation needs Physique (logged Workout notes) and Activities
-        // (each exercise's Group and Weekly Target) both loaded.
+        // (each exercise's Group and Weekly Desired) both loaded.
         Promise.all([physiquePromise, activitiesPromise]).then(() => {
-          renderActivityRotationChart(wellnessDateRange());
+          renderActivityRotationChart(healthDateRange());
           // The GYM modal's own copy (instruction-rotation-card, index.html) — its
           // eager boot-time render (initActivityRotationPanel) ran before this data
           // was in, so it needs the same post-load refresh the line above gives
-          // the Indicator panel's copy.
-          renderActivityRotationChart(wellnessDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);
+          // the Chart panel's copy.
+          renderActivityRotationChart(healthDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);
           renderActivityPlanTables();
           renderInstructionList();
         }),
       ] : []),
       ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
-      ...(home && !shows('track') ? [initTimeSheet(forceRefresh)] : []),
+      ...(home && !shows('track') ? [initWorkTime(forceRefresh)] : []),
+      // Accounts for the Account tile's Pay badge.
+      ...(home && !shows('finance') ? [initAccountManager(forceRefresh)] : []),
       // Watchlist alerts badge the Watch List and Market tiles, here and on home;
       // the price check runs in the background once the keys (settings) are in.
       ...((shows('finance') || home) ? [initWatchlist(forceRefresh).then(() => {
@@ -774,7 +776,7 @@ async function loadDashboard(forceRefresh = false) {
         initTrades(forceRefresh),
       ] : []),
       ...(shows('track') ? [
-        initTimeSheet(forceRefresh),
+        initWorkTime(forceRefresh),
         settingsPromise.then(() => initTravel(forceRefresh)),
         initApplications(forceRefresh),
         initLeetcode(),
@@ -1123,9 +1125,9 @@ function bootDashboard() {
   initInsightPanel();
   initFormulaPlayground();
   initBmrCalibration();
-  // Before the panel below it: this fills the From/To pair every Health Indicators
+  // Before the panel below it: this fills the From/To pair every Health Chart
   // chart reads, and its first render is one of the readers.
-  initWellnessRangeControl();
+  initHealthRangeControl();
   initProteinRotationPanel();
   initActivityRotationPanel();
   initFinancialInsight();

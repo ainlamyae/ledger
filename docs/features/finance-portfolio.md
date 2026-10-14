@@ -12,11 +12,11 @@
 
 ## Details
 
-- **Trade tab** (`portfolio.js`): Date | Account | Symbol | Action | Quantity | Price | Fees | Currency | Notes | FX to CAD, created on the first save and written `RAW`.
+- **Trade tab** (`finance-portfolio.js`): Date | Account | Symbol | Action | Quantity | Price | Fees | Currency | Notes | FX to CAD, created on the first save and written `RAW`.
   - **Split**: Quantity is the ratio (new ÷ old, e.g. 4 for 4-for-1); Price, Fees and FX are blank.
   - **Account** lists Investment-type accounts first.
   - **FX to CAD** is filled on save from that day's USD/CAD (Twelve Data) if left blank, and can be typed over. It's stored with the trade, so a USD position's CAD cost never moves.
-- **Average cost** (`computeHoldings`, `portfolio-math.js`), per account and symbol:
+- **Average cost** (`computeHoldings`, `finance-portfolio-math.js`), per account and symbol:
   - Buy: cost = quantity × price + fees.
   - Sell: proceeds = quantity × price − fees; realized = proceeds − average cost × quantity; the remaining cost drops by the same average.
   - Split: shares multiply, total cost stays.

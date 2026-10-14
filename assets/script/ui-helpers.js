@@ -1,5 +1,5 @@
 // Shared DOM/CRUD helpers used by the entity modules (transactions, accounts,
-// timesheet, wellness, contacts, travel, applications, settings-panel) — the
+// work-time, wellness, contacts, travel, applications, settings-panel) — the
 // mechanical bits of the "table + modal form" pattern that are genuinely
 // identical across those files. Per-entity logic (validation, chart
 // rendering, bulk actions, etc.) stays in each module.
@@ -130,7 +130,7 @@ function makeRowActionButton({ emoji, title, onClick }) {
 }
 
 // Appends " — {date}" to a modal title for a form that's scoped to exactly one
-// calendar day (Physique, Timesheet, a day's own Micronutrients view) — one
+// calendar day (Physique, Work Time, a day's own Micronutrients view) — one
 // shared suffix style so any such modal's heading confirms which day is open
 // at a glance. No date (e.g. a dateless Physique pattern) leaves the title
 // bare rather than showing a dash with nothing after it.

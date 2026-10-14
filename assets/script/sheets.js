@@ -137,10 +137,10 @@ function batchGetValues(ranges, params = {}) {
 }
 
 // valueInputOption defaults to USER_ENTERED — what the entity forms
-// (transactions, timesheet, ...) want, since a typed date or formula should be
+// (transactions, work-time, ...) want, since a typed date or formula should be
 // parsed the way typing it into the cell would be. Pass 'RAW' for values that
 // must round-trip byte-for-byte instead of being reinterpreted; see
-// settings-panel.js's saveSettingValues for why that matters.
+// other-settings.js's saveSettingValues for why that matters.
 function appendValues(range, values, valueInputOption = 'USER_ENTERED') {
   return sheetsRequest(
     `/values/${encodeURIComponent(range)}:append?valueInputOption=${valueInputOption}&insertDataOption=INSERT_ROWS`,

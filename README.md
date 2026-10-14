@@ -6,6 +6,8 @@ A private, serverless personal life dashboard — health, finances, time trackin
 - Single-page vanilla-JS app on GitHub Pages; no build step.
 - Each user copies the template sheet; the app only touches that copy, via Drive's per-file `drive.file` scope.
 
+![Ledger system architecture](assets/images/system-architecture.png)
+
 ## Documentation
 
 ### Product

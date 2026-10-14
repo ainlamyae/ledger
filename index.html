@@ -2049,6 +2049,37 @@
 
             <div id="applications-list"></div>
         </div>
+
+        <div class="panel" data-route="leetcode">
+            <div class="panel-header">
+                <h2>LeetCode</h2>
+                <button id="add-leetcode-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a solved problem" aria-label="Log">📝</button>
+            </div>
+
+            <!-- NeetCode 250 by category, ticked from the LeetCode tab (leetcode.js). -->
+            <p id="leetcode-summary" class="app-card-meta"></p>
+
+            <!-- Spaced as Car Service's cards: Past Year (solves per day, like LeetCode's
+                 profile), Roadmap (a node per category, opening its card below), then the cards. -->
+            <div class="donut-grid wellness-metrics-grid">
+                <div class="card">
+                    <h3>Past Year</h3>
+                    <div class="table-responsive" id="leetcode-heatmap-scroll">
+                        <div class="leetcode-heatmap-months" id="leetcode-heatmap-months"></div>
+                        <div class="leetcode-heatmap" id="leetcode-heatmap"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Roadmap</h3>
+                    <div class="table-responsive">
+                        <svg class="leetcode-roadmap" id="leetcode-roadmap" role="group" aria-label="NeetCode roadmap"></svg>
+                    </div>
+                </div>
+
+                <div id="leetcode-list"></div>
+            </div>
+        </div>
     </section>
 
     <section id="other" class="panel-group">
@@ -3082,6 +3113,48 @@
     </div>
 </div>
 
+<div id="leetcode-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="leetcode-modal-title" hidden>
+    <div class="modal-card">
+        <h2 id="leetcode-modal-title">Log LeetCode</h2>
+
+        <form id="leetcode-form" class="app-form">
+            <label>Date
+                <input type="date" id="leetcode-date">
+            </label>
+            <label>Problem
+                <input type="text" id="leetcode-problem" list="leetcode-problem-options" placeholder="e.g. Two Sum" autocomplete="off">
+                <datalist id="leetcode-problem-options"></datalist>
+            </label>
+            <label>Category
+                <select id="leetcode-category"></select>
+            </label>
+            <label>Difficulty
+                <select id="leetcode-difficulty">
+                    <option>Easy</option>
+                    <option>Medium</option>
+                    <option>Hard</option>
+                </select>
+            </label>
+            <label>LeetCode
+                <input type="url" id="leetcode-link" placeholder="Filled from the problem">
+            </label>
+            <label>NeetCode Video
+                <input type="url" id="leetcode-video" placeholder="Filled from the problem">
+            </label>
+            <label>Notes
+                <input type="text" id="leetcode-notes" placeholder="Optional">
+            </label>
+
+            <p id="leetcode-form-error" class="status" hidden></p>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
+                <button type="button" id="leetcode-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="application-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="application-modal-title" hidden>
     <div class="modal-card">
         <h2 id="application-modal-title">Log an Application</h2>
@@ -3169,6 +3242,8 @@
 <script src="assets/script/settings-panel.js"></script>
 <script src="assets/script/travel.js"></script>
 <script src="assets/script/applications.js"></script>
+<script src="assets/script/leetcode-roadmap.js"></script>
+<script src="assets/script/leetcode.js"></script>
 <script src="assets/script/insight.js"></script>
 <script src="assets/script/food-insight.js"></script>
 <script src="assets/script/micronutrient-insight.js"></script>

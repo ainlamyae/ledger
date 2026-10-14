@@ -19,17 +19,26 @@ function chartFontSize() {
   return 0.8 * parseFloat(getComputedStyle(document.documentElement).fontSize);
 }
 
-// Every reference mark in Health Chart — the per-column caps, State Trend's target
+// Every reference mark in Health Chart — the per-column caps, State Trend's healthy
 // line. Deliberately not red: red is this app's "missed" score, so a limit drawn in it
 // read as a failure rather than as the thing being measured against.
-function targetMarkColor() {
+function desiredMarkColor() {
   return chartColor('--color-text');
 }
 
 // Fixed y-axis label width, so plot areas line up down the section however many
-// digits each chart's values run to. Wide enough for the longest unit-suffixed
-// label in the section (e.g. "-2000 kcal", "24.9 kg/m²").
-const TREND_Y_AXIS_WIDTH = 84;
+// digits each chart's values run to. Wide enough for an 18-character Rotation name
+// ("Protein Supplement") at the chart font, so none is cut by the card's left edge.
+const TREND_Y_AXIS_LABEL_CHARS = 18;
+const TREND_Y_AXIS_WIDTH = 120;
+const TREND_Y_AXIS_RIGHT_WIDTH = 84;
+
+// A Rotation name cut to TREND_Y_AXIS_LABEL_CHARS, so a longer one can't spill off the
+// edge either; the hover still names it in full.
+function trendYAxisCategoryTick(value) {
+  const name = String(this.getLabelForValue(value) ?? '');
+  return name.length > TREND_Y_AXIS_LABEL_CHARS ? `${name.slice(0, TREND_Y_AXIS_LABEL_CHARS - 1)}…` : name;
+}
 
 // Force EVERY axis to the exact same width (not just a minimum): a plain minimum
 // let any chart whose labels ran wider than it — the kcal/g/kg·m² unit ticks do —
@@ -38,7 +47,8 @@ const TREND_Y_AXIS_WIDTH = 84;
 // plot area starts and ends at the same x, so the date gridlines line up straight
 // down the column at every range.
 function fixTrendYAxisWidth(scale) {
-  scale.width = TREND_Y_AXIS_WIDTH;
+  // Right axes only carry short unit ticks, so they keep the old 84px.
+  scale.width = scale.position === 'right' ? TREND_Y_AXIS_RIGHT_WIDTH : TREND_Y_AXIS_WIDTH;
 }
 
 // Invisible spacer reserving the same width as a real right axis, so a chart without
@@ -57,12 +67,12 @@ function ghostRightAxis() {
 // The section's one mark for "the figure that applies here": a hairline floating bar
 // (`[from, to]`, `grouped: false`) overlaying its own column. Shared so the mark means
 // the same thing everywhere. One `values` entry per column; null leaves it unmarked.
-function targetCapDataset(label, values, capHalf, extra = {}) {
+function desiredCapDataset(label, values, capHalf, extra = {}) {
   return {
     type: 'bar',
     label,
     data: values.map((v) => (v === null || v === undefined ? null : [v - capHalf, v + capHalf])),
-    backgroundColor: targetMarkColor(),
+    backgroundColor: desiredMarkColor(),
     grouped: false,
     // Lowest order paints last, so the cap stays visible on a column that overshot it.
     order: 0,
@@ -72,7 +82,7 @@ function targetCapDataset(label, values, capHalf, extra = {}) {
 
 // A fraction of the axis span, not a fixed amount in the data's units, so the cap
 // stays a hairline at any range.
-function targetCapHalf(axisSpan) {
+function desiredCapHalf(axisSpan) {
   return Math.abs(axisSpan) * 0.006;
 }
 
@@ -119,7 +129,7 @@ function trendLineDataset(label, series, extra = {}) {
     type: 'line',
     label,
     data: series,
-    borderColor: targetMarkColor(),
+    borderColor: desiredMarkColor(),
     borderWidth: 2,
     fill: false,
     tension: 0.3,
@@ -302,6 +312,33 @@ function renderCategoryLegend(containerId, categories, toggle) {
   });
 }
 
+// Health Chart legends whose entries switch their series off and on. Hidden names are
+// kept per legend for the page's life, so a range change or reload of data keeps them.
+const chartLegendHidden = new Map(); // legend id -> Set of hidden entry names
+
+function legendHiddenNames(containerId) {
+  if (!chartLegendHidden.has(containerId)) chartLegendHidden.set(containerId, new Set());
+  return chartLegendHidden.get(containerId);
+}
+
+// `rerender` redraws the chart, which reads legendHiddenNames itself.
+function renderToggleLegend(containerId, categories, rerender) {
+  const hidden = legendHiddenNames(containerId);
+  renderCategoryLegend(containerId, categories, {
+    isHidden: (c) => hidden.has(c.name),
+    onToggle: (c) => {
+      if (hidden.has(c.name)) hidden.delete(c.name);
+      else hidden.add(c.name);
+      rerender();
+    },
+  });
+}
+
+// `values` with every point whose class (a legend name) is hidden blanked out.
+function maskHiddenClasses(values, classes, hidden) {
+  return values.map((v, i) => (hidden.has(classes[i]) ? null : v));
+}
+
 // The shared From/To picker: one implementation instead of each panel re-deriving its
 // own defaulting and wiring. Seeds both inputs to the last defaultDays when empty,
 // fires onChange on every edit, and returns a getter for the current {from, to}.
@@ -346,10 +383,7 @@ function shortDateTickCallback(value) {
   return formatIsoDateShort(this.getLabelForValue(value));
 }
 
-// Up to `maxTicks` indices spread evenly across 0..length-1 inclusive (both ends
-// included whenever there's more than one). Only a fallback now — see
-// wellnessTickIndices below, which anchors to calendar weeks instead — for a window too
-// short to contain a Monday, and for thinning a long list of Mondays down to maxTicks.
+// Up to `maxTicks` indices spread evenly across 0..length-1, both ends included.
 function evenlySpacedIndices(length, maxTicks = 7) {
   if (length <= 0) return [];
   if (length <= maxTicks) return Array.from({ length }, (_, i) => i);
@@ -360,37 +394,25 @@ function evenlySpacedIndices(length, maxTicks = 7) {
   return [...new Set(out)];
 }
 
-// Every Monday in `dates` — the grid anchored to calendar weeks rather than picked
-// evenly by array index. Index-evenly-spaced ticks land on a different weekday every
-// time the window's own length changes by even a single day (a 28-day window and a
-// 29-day window spread their 7 picks differently), which is what made the grid feel
-// "random" even once every chart was reading it off one shared date list. Thinned
-// toward maxTicks — still only Mondays — when a long window has more of them than that;
-// falls back to evenlySpacedIndices on a window too short to contain even one.
-function wellnessTickIndices(dates, maxTicks = 7) {
-  const mondays = [];
-  dates.forEach((d, i) => {
-    if (new Date(parseIsoDateUTC(d)).getUTCDay() === 1) mondays.push(i);
-  });
-  if (mondays.length === 0) return evenlySpacedIndices(dates.length, maxTicks);
-  if (mondays.length <= maxTicks) return mondays;
-  return evenlySpacedIndices(mondays.length, maxTicks).map((i) => mondays[i]);
+// Dated Health charts: this many gridlines, the first and last on the window's ends.
+const HEALTH_X_GRIDLINES = 8;
+
+function wellnessTickIndices(dates) {
+  return evenlySpacedIndices(dates.length, HEALTH_X_GRIDLINES);
 }
 
-// The x scale for every category-axis wellness chart (labels: dates) — forces its ticks
-// onto wellnessTickIndices instead of Chart.js's own autoSkip, so it can't drift from
-// State Trend & Forecast's linear axis, which is built to pick the same indices over the
-// same window (see the scales.x block in renderHealthProjectionChart).
+// The x scale for every category-axis wellness chart (labels: dates), on the same ticks
+// as State Trend & Forecast's linear axis (renderHealthProjectionChart).
 function wellnessCategoryXScale(dates) {
   return {
     afterBuildTicks: (axis) => {
       axis.ticks = wellnessTickIndices(dates).map((i) => ({ value: i }));
     },
-    // autoSkip false: it defaults to true and runs AFTER afterBuildTicks, so left on it
-    // was free to thin the ticks just set above however IT saw fit at the current
-    // canvas width — independently of whatever the linear axis's own autoSkip pass
-    // decided — which is exactly the kind of divergence afterBuildTicks was meant to
-    // rule out. Off here, the ticks this function chose are the ticks that get drawn.
+    // No margin: the first and last dates sit on the plot's edges at every range.
+    // Gridlines through each tick's date, not between bars.
+    offset: false,
+    grid: { offset: false },
+    // autoSkip off, or it would thin the ticks set above.
     ticks: { maxRotation: 45, minRotation: 45, autoSkip: false, callback: shortDateTickCallback },
   };
 }

@@ -10,7 +10,7 @@ function renderHealthProjectionChart(entries) {
   const meterCallout = document.getElementById('body-mass-progress-meter-callout');
   const meterDone = document.getElementById('body-mass-progress-meter-done');
   const meterRemaining = document.getElementById('body-mass-progress-meter-remaining');
-  const meterTarget = document.getElementById('body-mass-progress-meter-target');
+  const meterHealthy = document.getElementById('body-mass-progress-meter-healthy');
   const timeWrap = document.getElementById('time-progress-meter');
   const timeElapsed = document.getElementById('time-progress-meter-elapsed');
   const timeRemaining = document.getElementById('time-progress-meter-remaining');
@@ -28,7 +28,7 @@ function renderHealthProjectionChart(entries) {
   meterCallout.classList.remove('danger');
   meterDone.textContent = '—';
   meterRemaining.textContent = '—';
-  meterTarget.textContent = '';
+  meterHealthy.textContent = '';
   meterRemaining.classList.remove('danger');
   timeWrap.style.removeProperty('--fill-pct');
   timeWrap.style.setProperty('--meter-pct', '0');
@@ -51,15 +51,15 @@ function renderHealthProjectionChart(entries) {
   const proj = calcProjection(entries);
   if (!proj) return;
 
-  // First logged body mass to target, shown whatever the trajectory status — "wrong
+  // First logged body mass to healthy, shown whatever the trajectory status — "wrong
   // direction" is worth seeing, just in the danger colour. Both readouts are kg so the
   // pair compares directly; the percentage still drives the bar's width.
-  const bodyMassTarget = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
-  const totalDelta = startBodyMass - bodyMassTarget;
+  const bodyMassHealthy = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
+  const totalDelta = startBodyMass - bodyMassHealthy;
   if (Math.abs(totalDelta) >= 0.1) {
     const pct = Math.max(0, Math.min(100, ((startBodyMass - lastBodyMass) / totalDelta) * 100));
     const doneKg = Math.round(Math.abs(startBodyMass - lastBodyMass) * 10) / 10;
-    const remainingKg = Math.round(Math.abs(lastBodyMass - bodyMassTarget) * 10) / 10;
+    const remainingKg = Math.round(Math.abs(lastBodyMass - bodyMassHealthy) * 10) / 10;
     const isWrongDirection = proj.status === 'wrong-direction';
 
     meterWrap.style.setProperty('--meter-pct', `${pct}`);
@@ -76,26 +76,26 @@ function renderHealthProjectionChart(entries) {
 
     const doneText = `${doneKg} kg`;
     meterDone.textContent = privacyMode ? maskDigits(doneText) : doneText;
-    // "lost" on a cut, "gained" on a bulk: the target's side of the first body-mass reading.
+    // "lost" on a cut, "gained" on a bulk: the healthy mass's side of the first body-mass reading.
     document.getElementById('body-mass-progress-meter-done-label').textContent = totalDelta > 0 ? 'lost' : 'gained';
 
     const remainingText = `${remainingKg} kg`;
     meterRemaining.textContent = privacyMode ? maskDigits(remainingText) : remainingText;
     meterRemaining.classList.toggle('danger', isWrongDirection);
 
-    // The swing (see glycogenSwingKg) alongside the target itself — the target line is a
+    // The swing (see glycogenSwingKg) alongside the healthy mass itself — its line is a
     // single number, but any reading within this band of it is glycogen and water, not a
     // real miss, the same margin State Trend & Forecast's own zone and arrival math use.
-    const targetSwingKg = glycogenSwingKg(lastBodyMass, getSetting('HEIGHT_CM', null), getSettingString('SEX', null));
-    const targetText = targetSwingKg === null
-      ? `→ ${bodyMassTarget} kg`
-      : `→ ${bodyMassTarget} ± ${Math.round(targetSwingKg * 10) / 10} kg`;
-    meterTarget.textContent = privacyMode ? maskDigits(targetText) : targetText;
+    const healthySwingKg = glycogenSwingKg(lastBodyMass, getSetting('HEIGHT_CM', null), getSettingString('SEX', null));
+    const healthyText = healthySwingKg === null
+      ? `→ ${bodyMassHealthy} kg`
+      : `→ ${bodyMassHealthy} ± ${Math.round(healthySwingKg * 10) / 10} kg`;
+    meterHealthy.textContent = privacyMode ? maskDigits(healthyText) : healthyText;
   }
 
   // An undrawable projection drops only the projected SEGMENT. It used to `return`
   // here, but the chart is destroyed at the top of this function, so the panel went
-  // blank and took the history, trend and target lines with it — none of which depend on
+  // blank and took the history, trend and healthy lines with it — none of which depend on
   // a projection. The status line says why, and the rate keeps it concrete.
   const rateNote = () => {
     const kgPerWeek = Math.abs(proj.slope * 7).toFixed(2);
@@ -125,7 +125,7 @@ function renderHealthProjectionChart(entries) {
     // Re-parsed as UTC, so today sits on the same footing as every other date here.
     const todayMs = parseIsoDateUTC(isoFromDate(new Date()));
     const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(bodyMassEntries[0].date)) / 86400000));
-    const daysToGo = Math.max(0, proj.daysToTarget);
+    const daysToGo = Math.max(0, proj.daysToHealthy);
     const totalDays = daysElapsed + daysToGo;
 
     if (totalDays > 0) {
@@ -227,7 +227,7 @@ function renderHealthProjectionChart(entries) {
         sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount);
       }
     });
-    const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+    const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
     let running = startBodyMass;
     calorieTrendDates.forEach((d) => {
@@ -240,7 +240,7 @@ function renderHealthProjectionChart(entries) {
       const tef = tefByDate.has(d) ? tefByDate.get(d) : intake * (1 - tefDivisor());
       // Same sleep-adjusted balance Calorie Balance itself scores (dailyEnergyBalanceKcal)
       // — this walk can't disagree with that chart's own reading of a day's shortfall.
-      const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, sleepHoursByDate.get(d), sleepTarget);
+      const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, sleepHoursByDate.get(d), sleepDesired);
       running += balance / GENERIC_KCAL_PER_KG_FAT;
     });
   }
@@ -298,7 +298,7 @@ function renderHealthProjectionChart(entries) {
           const a = zoneAnchorMap.get(d);
           return { x: dayOffset(d), y: a === undefined ? null : a - swingKg };
         }),
-        // The zone reads as "normal noise", not a target or a warning, so it takes the
+        // The zone reads as "normal noise", not a goal or a warning, so it takes the
         // app's neutral highlight rather than either of those colours.
         backgroundColor: chartColor('--chart-warn', 0.15),
         borderWidth: 0,
@@ -389,14 +389,14 @@ function renderHealthProjectionChart(entries) {
       order: 2,
     }] : []),
     {
-      // bodyMassTarget, not proj.bodyMassTarget — that's only set on an 'ok' projection, but
+      // bodyMassHealthy, not proj.bodyMassHealthy — that's only set on an 'ok' projection, but
       // the desired-mass line is drawn either way.
-      label: `${bodyMassTarget} kg Desired`,
-      data: allLabels.map((d) => ({ x: dayOffset(d), y: bodyMassTarget })),
+      label: `${bodyMassHealthy} kg Desired`,
+      data: allLabels.map((d) => ({ x: dayOffset(d), y: bodyMassHealthy })),
       // Solid, like the section's hairline caps. It stays a continuous LINE rather than
       // caps because this chart has no columns: its x-axis is a linear time scale, so
       // there's nothing per-column for a mark to belong to.
-      borderColor: targetMarkColor(),
+      borderColor: desiredMarkColor(),
       borderWidth: 1.5,
       pointRadius: 0,
       tension: 0,
@@ -421,22 +421,22 @@ function renderHealthProjectionChart(entries) {
   // projection starts from it. The swing band's own edges are included so the padded
   // axis can't clip the zone it's meant to fully show.
   const trendExtremes = zoneAnchorMap === null ? [] : [...zoneAnchorMap.values()].flatMap((v) => [v + swingKg, v - swingKg]);
-  const bodyMassValues = [...trendMap.values(), ...projMap.values(), ...trendExtremes, ...calorieTrendMap.values(), lastBodyMass, bodyMassTarget]
+  const bodyMassValues = [...trendMap.values(), ...projMap.values(), ...trendExtremes, ...calorieTrendMap.values(), lastBodyMass, bodyMassHealthy]
     .filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
   const bodyMassMin = Math.min(...bodyMassValues);
   const bodyMassMax = Math.max(...bodyMassValues);
   const bodyMassPad = Math.max(0.5, (bodyMassMax - bodyMassMin) * 0.08);
 
-  // The target end gets no padding: nothing is ever plotted past it, so padding reserved
-  // an empty band — a 70 kg target floored to 68. Still floor/ceil'd to whole kg, since
-  // the ticks step by 1 from these bounds. Only when the target really is the extreme; a
+  // The healthy end gets no padding: nothing is ever plotted past it, so padding reserved
+  // an empty band — a 70 kg healthy mass floored to 68. Still floor/ceil'd to whole kg, since
+  // the ticks step by 1 from these bounds. Only when the healthy mass really is the extreme; a
   // reading that overshoots it pads normally, because then something IS drawn beyond.
-  const yMin = bodyMassMin < bodyMassTarget
+  const yMin = bodyMassMin < bodyMassHealthy
     ? Math.floor(bodyMassMin - bodyMassPad)
-    : Math.floor(bodyMassTarget);
-  const yMax = bodyMassMax > bodyMassTarget
+    : Math.floor(bodyMassHealthy);
+  const yMax = bodyMassMax > bodyMassHealthy
     ? Math.ceil(bodyMassMax + bodyMassPad)
-    : Math.ceil(bodyMassTarget);
+    : Math.ceil(bodyMassHealthy);
 
   // The EXACT date list Body Mass and Caloric Intake already share (see
   // healthCalorieChartDates) — clipped forward to the earliest CALORIE entry, not
@@ -460,24 +460,17 @@ function renderHealthProjectionChart(entries) {
       // fraction across this chart's width than everywhere else — "today" mid-plot
       // here, far right there.
       //
-      // The ±0.5 day pad on top of those edges matters just as much as the edges
-      // themselves: every bar chart above this one is a CATEGORY axis with Chart.js's
-      // default `offset: true` for bar charts, which reserves half a category's width
-      // as margin on EACH side and centers every gridline inside its own 1-day-wide
-      // band — so day N sits at pixel fraction (N+0.5)/numDays, not N/numDays. A plain
-      // linear axis has no such margin: value=min lands flush at the left edge.
-      // Padding this axis's min/max out by half a day reproduces that same
-      // band-centering, so a gridline for the same calendar day lands at the same
-      // fraction of the plot width on both kinds of axis.
-      min: dayOffset(axisFromDate) - 0.5,
-      max: dayOffset(windowToDate) + 0.5,
+      // Flush with the window's first and last date, like the category axes (offset: false
+      // in wellnessCategoryXScale), so the edge gridlines sit on the plot's edges at every range.
+      min: dayOffset(axisFromDate),
+      max: dayOffset(axisDates.length ? axisDates[axisDates.length - 1] : windowToDate),
       // min = max, so the labels hold a fixed 45° like the rest of the section instead
       // of Chart.js straightening them whenever they happen to fit — which made this
       // axis flip angle on resize.
       //
       // Ticks forced onto the SAME calendar dates the section's category-axis charts
-      // pick (wellnessTickIndices, charts-base.js — Mondays, not an evenly-spaced-by-
-      // index pick) — Chart.js's own autoSkip runs a
+      // pick (wellnessTickIndices, charts-base.js — 8 evenly spaced, ends included) —
+      // Chart.js's own autoSkip runs a
       // pixel-width heuristic that differs between a category axis and this linear
       // day-offset one, so left to itself this axis could (and did) label different
       // calendar dates than every bar chart above it for the exact same window.

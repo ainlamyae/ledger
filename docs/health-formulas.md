@@ -11,11 +11,11 @@
 | Constant | Value | Where |
 |---|---|---|
 | `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `health-math.js` |
-| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `health-math.js` |
+| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3` / `200` (ACSM's 3.5 rounded down). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `health-math.js` |
 | `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort with no body mass on file | `health-math.js` |
 | `WORKOUT_REP_SEC_DEFAULT` | `3` s per rep — a brisk tempo. Overridable via `WORKOUT_REP_SEC` | `health-activity-estimator.js` |
 | `WORKOUT_STEPS_PER_MIN_DEFAULT` | `100` steps/min. Overridable via `WORKOUT_STEPS_PER_MIN` | `health-chart.js` |
-| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `health-math.js`, `health-activity-estimator.js` |
+| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3` (walking, no Walk row) / `3.5` | `health-math.js`, `health-activity-estimator.js` |
 | `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `health-math.js` |
 | `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `health-math.js` |
 | `GLYCOGEN_SKELETAL_FRAC_DEFAULT` | `45 %` of LBM is skeletal muscle | `health-chart.js` |
@@ -28,13 +28,13 @@
 
 | Threshold | Value | Effect |
 |---|---|---|
-| `CALORIE_TARGET_NEAR_FRACTION` | `5 %` | Past the target by ≤5 % is grey, beyond is red |
-| `ACTIVITY_NEAR_TARGET_FRACTION` | `5 %` | Short of the implied burn by ≤5 % is grey |
-| `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* target stays green |
+| `CALORIE_DESIRED_NEAR_FRACTION` | `5 %` | Past the desired intake by ≤5 % is grey, beyond is red |
+| `ACTIVITY_NEAR_DESIRED_FRACTION` | `5 %` | Short of the implied burn by ≤5 % is grey |
+| `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* the healthy mass stays green |
 | Protein over-band | — | Above the top end is a darker green (`#166534`), not red or grey. Below the floor stays red |
-| Calorie Balance vs. target | — | At/beyond target green, short but right side of zero grey, wrong side red |
-| Body Mass vs. its own 7-Day Trend | sign of the rate | A day scored red (moved the wrong way since the last reading) regrades to grey if the smoothed curve's own trailing-7-day rate (`emaSlopePerSpan`) still points toward the target. Stall-reds (a flat reading held too long) are untouched — a different signal |
-| Caloric Intake vs. its own 7-Day Average | `withinCalorieTarget` | A red bar (past the target beyond `CALORIE_TARGET_NEAR_FRACTION`) regrades to grey if the EMA-smoothed average (`emaSeries`) is still on the target's right side |
+| Calorie Balance vs. desired | — | At/beyond desired green, short but right side of zero grey, wrong side red |
+| Body Mass vs. its own 7-Day Trend | sign of the rate | A day scored red (moved the wrong way since the last reading) regrades to grey if the smoothed curve's own trailing-7-day rate (`emaSlopePerSpan`) still points toward the healthy mass. Stall-reds (a flat reading held too long) are untouched — a different signal |
+| Caloric Intake vs. its own 7-Day Average | `withinCalorieDesired` | A red bar (past the desired intake beyond `CALORIE_DESIRED_NEAR_FRACTION`) regrades to grey if the EMA-smoothed average (`emaSeries`) is still on the desired intake's right side |
 
 ## Body
 
@@ -76,41 +76,41 @@ applyBmrBasis(BMR,atDate) = BMR_adp(atDate)          if BMR_BASIS=bmr_adp
                           = BMR + BMR_CAL_OFFSET     if BMR_BASIS=bmr_cal (0 if never calibrated)
                           = BMR                       otherwise
 
-activityTargetKcal(kg)    = metKcal(WALK_MET, kg, ACTIVITY_TARGET_MIN)
-getActivityTargetKcal(kg) = ACTIVITY_TARGET_FIXED_KCAL, if set, else activityTargetKcal(kg)
-getActivityTargetMin(kg)  = ACTIVITY_TARGET_FIXED_KCAL / metKcal(WALK_MET, kg, 1), if set and kg known
+activityDesiredKcal(kg)    = metKcal(WALK_MET, kg, ACTIVITY_DESIRED_MIN)
+getActivityDesiredKcal(kg) = ACTIVITY_DESIRED_FIXED_KCAL, if set, else activityDesiredKcal(kg)
+getActivityDesiredMin(kg)  = ACTIVITY_DESIRED_FIXED_KCAL / metKcal(WALK_MET, kg, 1), if set and kg known
 WALK_MET                  = the Activity sheet's Walk row MET (activityMet → exerciseMet('Walk')); no Setting
-                          = ACTIVITY_TARGET_MIN                                        otherwise
+                          = ACTIVITY_DESIRED_MIN                                        otherwise
 ```
 
-**Calorie target** — one number per day, directional rather than a point to land on (a ceiling heading down, a floor heading up):
+**Desired intake** — one number per day, directional rather than a point to land on (a ceiling heading down, a floor heading up):
 
 ```
-rawD   = (WEEKLY_FAT_LOSS_KG × 7700) / 7
-η      = 1 − (SLEEP_DEPRIVATION_PCT_PER_HOUR/100) × max(0, SLEEP_TARGET_HOURS − PLAN_SLEEP_HOURS)
-D      = rawD > 0 ? rawD / max(η, 0.2) : rawD        bigger deficit needed if sleep is short
-target = round( (BMR + activityTargetKcal − D) / (1 − f) )
+rawD    = (WEEKLY_FAT_LOSS_KG × 7700) / 7
+η       = 1 − (SLEEP_DEPRIVATION_PCT_PER_HOUR/100) × max(0, SLEEP_DESIRED_HOURS − PLAN_SLEEP_HOURS)
+D       = rawD > 0 ? rawD / max(η, 0.2) : rawD        bigger deficit needed if sleep is short
+desired = round( (BMR + activityDesiredKcal − D) / (1 − f) )
 ```
 
-- `PLAN_SLEEP_HOURS` defaults to `SLEEP_TARGET_HOURS` itself — `η = 1`, `D = rawD`, byte-identical to the target this app always produced. See the [Tune](features/health-tune.md#health--tune)'s `s`/`γ`/`δ` fields for where it's tuned.
-- Falls back to flat `CALORIE_TARGET_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing. Age only when the BMR equation in force reads it (`bmrNeedsAge`) — Katch-McArdle doesn't.
-- `f` is `TEF_PERCENT_OF_INTAKE / 100`, default **0**, in which case this is exactly the sum it has always been. See the [Tune](features/health-tune.md#health--tune) for why digestion divides rather than adds.
+- `PLAN_SLEEP_HOURS` defaults to `SLEEP_DESIRED_HOURS` itself — `η = 1`, `D = rawD`, byte-identical to the desired intake this app always produced. See the [Tune](features/health-tune.md#health--tune)'s `s`/`γ`/`δ` fields for where it's tuned.
+- Falls back to flat `CALORIE_DESIRED_KCAL` if height / age / sex / `WEEKLY_FAT_LOSS_KG` is missing. Age only when the BMR equation in force reads it (`bmrNeedsAge`) — Katch-McArdle doesn't.
+- `f` is `TEF_PERCENT_OF_INTAKE / 100`, default **13.5**%. See the [Tune](features/health-tune.md#health--tune) for why digestion divides rather than adds.
 - **Today's** figure is evaluated at the L_p-day rolling average body mass (`planBodyMassKg`, L_p = Tune's saved period length), not the last single reading — so a water-heavy morning doesn't move the day's ceiling. The per-day chart line still re-evaluates from that day's carried-forward body mass.
 - Moves ≈ 15.8 kcal per kg, so a 6 kg loss shifts it by roughly 95 kcal.
-- **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Tune's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's E_in — instead of being recalculated from each body-mass reading. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
-- The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant E_in — so pinning is also what makes the target you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
-- Max when target < current, min when target > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
+- **`CALORIE_DESIRED_FIXED_KCAL` pins it.** Set (via the Tune's **Pin desired daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's E_in — instead of being recalculated from each body-mass reading. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_DESIRED_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
+- The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant E_in — so pinning is also what makes the intake you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
+- Max when the healthy mass < current, min when it > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
 - **Nothing clamps `WEEKLY_FAT_LOSS_KG`**, but it is judged: `weeklyFatLossPct` expresses it as `100 × Δm / m`, and both the Tune's `Δm%` box and the Plan prompt hold it against the `WEEKLY_FAT_LOSS_PCT_FLOOR`/`_CEILING` pair (0.5 and 1% of body mass per week). Above the ceiling the Tune colours the verdict; it still computes and still saves.
-- **`WEEKLY_FAT_LOSS_PCT` replaces the rate rather than scaling it.** Set (via the Tune's **Pin target fat-loss %**, or by hand) and `weeklyFatLossKgAt` recomputes the kilograms from whichever body mass the target is being evaluated at — so the figure above becomes `(p·m/100 × 7700) / 7` and moves with every body-mass reading, per day on the chart. Blank means the flat `WEEKLY_FAT_LOSS_KG` behaviour, unchanged. It's mutually exclusive with `CALORIE_TARGET_FIXED_KCAL`: pinning either blanks the other.
-- Uses the raw, pin-blind `activityTargetKcal` — same as the Tune's own live preview — so a pinned activity calorie-burn target (below) doesn't move today's calorie-intake figure; that's a deliberately separate dial.
-- **`ACTIVITY_TARGET_FIXED_KCAL` pins the activity target itself** the same way `CALORIE_TARGET_FIXED_KCAL` pins intake (via the Tune's **Pin target calorie burn**, or by hand): the Activity tile, the Physical Activity chart's target line/dot colour, and Activity Insight's stated target all switch from `activityTargetKcal`/flat `ACTIVITY_TARGET_MIN` to `getActivityTargetKcal`/`getActivityTargetMin`, so the calorie burn stays put and the minutes needed rise as body mass falls, instead of the reverse.
+- **`WEEKLY_FAT_LOSS_PCT` replaces the rate rather than scaling it.** Set (via the Tune's **Pin desired fat-loss %**, or by hand) and `weeklyFatLossKgAt` recomputes the kilograms from whichever body mass the desired intake is being evaluated at — so the figure above becomes `(p·m/100 × 7700) / 7` and moves with every body-mass reading, per day on the chart. Blank means the flat `WEEKLY_FAT_LOSS_KG` behaviour, unchanged. It's mutually exclusive with `CALORIE_DESIRED_FIXED_KCAL`: pinning either blanks the other.
+- Uses the raw, pin-blind `activityDesiredKcal` — same as the Tune's own live preview — so a pinned desired activity calorie burn (below) doesn't move today's calorie-intake figure; that's a deliberately separate dial.
+- **`ACTIVITY_DESIRED_FIXED_KCAL` pins the desired activity itself** the same way `CALORIE_DESIRED_FIXED_KCAL` pins intake (via the Tune's **Pin desired calorie burn**, or by hand): the Activity tile, the Physical Activity chart's desired line/dot colour, and Activity Insight's stated desired activity all switch from `activityDesiredKcal`/flat `ACTIVITY_DESIRED_MIN` to `getActivityDesiredKcal`/`getActivityDesiredMin`, so the calorie burn stays put and the minutes needed rise as body mass falls, instead of the reverse.
 
 ## Calibrate BMR (`health-tune-calibration.js`)
 
 Measures how wrong the equation's BMR actually is, from actual logged data — Tune's `BMR_cal`, over `n_p` × `L_p`. Two INDEPENDENT estimates of the same deficit, compared; the gap between them is the correction.
 
 ```
-chunkDays  = typed period length, default 10                       the window is split into whole chunks of this many days
+chunkDays  = typed period length, default 7                        the window is split into whole chunks of this many days
 D_chunk    = avg(day.D over the chunk)                            day.D from dailyEnergyBalanceKcal — assumes the equation's BMR is right
 ΔM_chunk   = (massStart_chunk − massEnd_chunk) × 7700 / chunkDays measured, from real mass change — the equation never enters into it
 chunkOffset = D_chunk − ΔM_chunk        0 if the equation already agrees with what was measured; the gap IS the error
@@ -122,10 +122,10 @@ BMR_cal        = BMR(bodyMassNow, h, a, sex, formula) + BMR_CAL_OFFSET
 
 - **Why the direct difference, not a back-solved BMR.** An earlier version blended `avgTEI`, `avgAEE` and `D_chunk` into one "back-solved BMR" and subtracted the equation's own prediction from that — but since `D_chunk` already contains the equation's BMR term, that approach let it algebraically cancel back out, leaving `BMR_CAL_OFFSET` dominated by TEF-estimate/SD noise instead of the real signal. Comparing `D_chunk` to `ΔM_chunk` directly avoids that: `D_chunk − ΔM_chunk ≈ trueBMR − equationBMR` (the equation's own error), because `ΔM_chunk` never routes through the equation at all.
 - Priced one **chunk** at a time — `D_chunk` from that chunk's own days, `ΔM_chunk` from that chunk's own mass reading, `chunkOffset` from those two BEFORE any cross-chunk averaging — since BMR depends on body mass and a multi-chunk window can span real body-mass change.
-- **Period length (days) is typeable, default 10** — the Daily table's `m`/SD/D figures are still evaluated per DAY regardless (and each period's body mass is smoothed over that same period length, so a period's `m̄` spans exactly one period); only how days are grouped into a chunk for `D_chunk`/`ΔM_chunk`/`chunkOffset` changes. A chunk shorter than 7 reacts faster but each one is noisier; longer smooths more but reacts slower to a real metabolic change.
+- **Period length (days) is typeable, default 7** — the Daily table's `m`/SD/D figures are still evaluated per DAY regardless (and each period's body mass is smoothed over that same period length, so a period's `m̄` spans exactly one period); only how days are grouped into a chunk for `D_chunk`/`ΔM_chunk`/`chunkOffset` changes. A chunk shorter than 7 reacts faster but each one is noisier; longer smooths more but reacts slower to a real metabolic change.
 - Read from Physique, not a Setting: the latest day whose stored Derived cell has a `BMR_cal` gives the figure, and `BMR_cal` minus that day's equation BMR gives the shift (`latestStoredCalibration`) — never a replacement formula. `applyBmrBasis` and `maintenanceAffineCoefficients` (§ above) both add the SAME offset to whatever the chosen equation says at any mass, so the app keeps the equation's own slope and just shifts the whole line: "keep the slope, shift the level."
 - `D_chunk` needs at least one day in the chunk with a computable `D` (profile + that day's own mass); `ΔM_chunk` needs a mass reading on or before the chunk's start and end. A chunk missing either drops `chunkOffset` to null rather than forcing a guess.
-- The window is typed as a Number of periods (default 3), ending yesterday — one chunk averages `chunkDays` of noise, months of history averages many chunks, recency-weighted so old ones can't outvote new ones.
+- The window is typed as a Number of periods (default 4), ending yesterday — one chunk averages `chunkDays` of noise, months of history averages many chunks, recency-weighted so old ones can't outvote new ones.
 - Needs the same profile (height, sex, and age unless `BMR_FORMULA=katch`) the plain equation does — `D` (and so `D_chunk`) can't be computed without it.
 
 ## Calorie Balance (per day)
@@ -134,16 +134,16 @@ BMR_cal        = BMR(bodyMassNow, h, a, sex, formula) + BMR_CAL_OFFSET
 maintenance = BMR(that day's carried-forward body mass, height, age, sex)
 TEF         = f × intake                                    that day's logged intake
 rawBalance  = intake − maintenance − activityKcal(that day) − TEF
-deprivation = |rawBalance| × (1 − η(that day's logged sleep, SLEEP_TARGET_HOURS))
+deprivation = |rawBalance| × (1 − η(that day's logged sleep, SLEEP_DESIRED_HOURS))
 balance     = rawBalance + deprivation      always toward positive — shrinks a deficit,
                                              grows a surplus
 expected g  = (balance / 7700) × 1000
 ```
 
 - A day with no food logged is a gap, not a day of eating nothing.
-- The `TEF` term is a share of what was **actually eaten**, not of the target — this row scores the day that happened. At the default `f = 0` it's absent from the arithmetic and from the tooltip; it exists so that switching digestion on can't raise the target intake in one chart without also raising the cost of eating it here. The target dash is drawn at the smoothed body mass, like every other plan-level figure.
+- The `TEF` term is a share of what was **actually eaten**, not of the desired intake — this row scores the day that happened. With `f = 0` it's absent from the arithmetic and from the tooltip; it exists so that switching digestion on can't raise the desired intake in one chart without also raising the cost of eating it here. The desired dash is drawn at the smoothed body mass, like every other plan-level figure.
 - **Measured wins over estimated.** `TEF = f × intake` is the fallback — whenever a day's Physique row has its own TEF column calculated (see [`Physique`](data-model.md#physique)), that figure is used instead, and the tooltip's Digestion row says which one produced the bar (`measured` vs. `est.`). State Trend & Forecast's gray Calorie-Implied Trajectory line gives the same day the same precedence, so the two charts can't disagree about which TEF a given day used.
-- **`deprivation` is zero without that day's own sleep logged** — no basis to apply `η` to, not assumed perfect. Calorie Balance's hover shows the `SD (Sleep Deprivation Effect)` line on every day, 0 included. This is the *reverse* question from the calorie-target `D` above (`sleepDeprivationKcal` vs. `sleepAdjustedDeficitKcal`, both `health-math.js`) — "how much did last night cost the balance that actually happened" rather than "how much bigger does the planned deficit need to be" — so it multiplies by `(1 − η)` instead of dividing by `η`.
+- **`deprivation` is zero without that day's own sleep logged** — no basis to apply `η` to, not assumed perfect. Calorie Balance's hover shows the `SD (Sleep Deprivation Effect)` line on every day, 0 included. This is the *reverse* question from the calorie-desired `D` above (`sleepDeprivationKcal` vs. `sleepAdjustedDeficitKcal`, both `health-math.js`) — "how much did last night cost the balance that actually happened" rather than "how much bigger does the planned deficit need to be" — so it multiplies by `(1 − η)` instead of dividing by `η`.
 
 ## 7-day trend line (all nine scored charts)
 
@@ -157,14 +157,14 @@ rate   = ema(i) − ema(i−7)      Body Mass only — regrading and the kg/week
 - **A continuous exponential moving average, not a fixed weekly bucket** (`emaSeries`, `charts-base.js`). Each day blends its own reading straight into yesterday's already-smoothed value, so there's no calendar-week boundary where the fit resets and the line jumps — the whole curve moves at one steady pace.
 - **Today is not held out.** A logged reading for today updates the average the moment it's entered, same as any other day — unlike the day-in-progress exceptions elsewhere in this doc, there's no partial-day discount here.
 - **An unlogged day carries the last smoothed value forward** rather than breaking the line or sitting out of the average.
-- Drawn as one solid curve (`trendLineDataset`) in the panel's own near-black/near-white neutral (`targetMarkColor()`) — not the dashed violet segments earlier versions of this chart family used — with `monotone` cubic interpolation so the curve can't overshoot past a local high or low into a bump the data never had.
+- Drawn as one solid curve (`trendLineDataset`) in the panel's own near-black/near-white neutral (`desiredMarkColor()`) — not the dashed violet segments earlier versions of this chart family used — with `monotone` cubic interpolation so the curve can't overshoot past a local high or low into a bump the data never had.
 - **Body Mass alone also derives a rate** (`emaSlopePerSpan`): the smoothed curve's own change over the trailing 7 days, read off two points on the one continuous curve rather than re-fit each week. Used both to regrade a red dot and quoted in the tooltip as `kg/week`.
 - Body Mass folds this smoothed series into its kg bounds before padding, and the fat-energy twin axis is derived from those same bounds.
 - Sleep smooths bed/wake in *noon-anchored axis units*, not clock minutes — the shift has already unwrapped midnight, so 23:30 and 00:30 blend toward midnight rather than midday.
 
 ## State Trend & Forecast
 
-**Glycogen + water swing** (`ΔM_gly`) — computed first, since both the trend zone and the target-based forecast below read it:
+**Glycogen + water swing** (`ΔM_gly`) — computed first, since both the trend zone and the healthy-mass forecast below read it:
 
 ```
 m_musc = s × LBM(m̄, h, sex)                        s = GLYCOGEN_SKELETAL_FRAC_DEFAULT
@@ -175,71 +175,71 @@ m_gly  = g_musc × m_musc + g_liver                  per-kg-muscle and liver con
 - `glycogenSwingKg` (`health-chart.js`) — the day-to-day swing glycogen and its bound water alone can account for, at this body. Same identity the Tune's glycogen block walks through (`readGlycogenSwingFormula`), evaluated at its default knobs rather than whatever's currently typed there, so a reader who never opens that modal still gets the figure it would report for their own body. `null` without `HEIGHT_CM`/`SEX` on file, which the zone and the swing-adjusted arrival below both fall back around.
 - **Trend zone** — a transparent band drawn at `trend(t) ± ΔM_gly`, centred not on the trend line itself but on an EMA of it (`computeGlycogenZoneAnchor`, `α = GLYCOGEN_ZONE_SMOOTHING_ALPHA`) — deliberately smoother/slower-moving than the trend, so the zone reads as the stable reference and the trend as what moves inside it.
   - **State Trend & Forecast's own chart** (`healthProjectionChart`) draws this yellow band anchored to that day's gray Calorie-Implied Trajectory instead — `[anchor − ΔM_gly, anchor]`, unshifted at the top so the band's own upper edge draws exactly on the gray line — then shades the gap **red** wherever the green trend line drops below the band's floor: glycogen and water alone don't explain a drop that size, so past the floor reads as a real loss, not the zone's own normal noise. A second, near-invisible dataset (`Muscle Loss (below swing zone)`, `renderHealthProjectionChart`) sits flush on the floor whenever the trend is inside or above it, and only opens up — filling red down to the trend's own value — for the stretch it's genuinely below.
-- **Arrival target** — `arrivalTargetKg(target, m̄, h, sex, isDownward) = target ∓ ΔM_gly`, past the raw target by the swing **in the direction travel is already headed** (cutting subtracts, bulking adds) — so a reading on a high-water day still can't land on the wrong side of the real target. This is what `target` means everywhere below; the progress meter's raw kg-to-go bar and the drawn target line still use the unadjusted figure, shown alongside its `± ΔM_gly`.
+- **Arrival mass** — `arrivalHealthyKg(healthyKg, m̄, h, sex, isDownward) = healthyKg ∓ ΔM_gly`, past the raw healthy mass by the swing **in the direction travel is already headed** (cutting subtracts, bulking adds) — so a reading on a high-water day still can't land on the wrong side of the real healthy mass. This is what `healthyKg` means everywhere below; the progress meter's raw kg-to-go bar and the drawn healthy-mass line still use the unadjusted figure, shown alongside its `± ΔM_gly`.
 
-**Target-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the target being *followed*.
+**Healthy-mass-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the plan being *followed*.
 
 ```
-E_in    = BMR + E_act(target) − D                    calculated target at m̄
+E_in    = BMR + E_act(healthyKg) − D                 calculated desired intake at m̄
 A      = 6.25·cm − 5·age + (male ? +5 : −161)    mass-independent part of maintenance
 B      = 10 + MET·τ·κ/ε                          per-kg part, kcal/day/kg
 m∞     = (E_in − A) / B                           where that intake IS maintenance
 m(t)   = m∞ + (m̄ − m∞)·e^(−B·t/ρ)                every 7 days, capped at 365
-t      = (ρ / B) · ln[ (m̄ − m∞) / (target∓ΔM_gly − m∞) ]
+t      = (ρ / B) · ln[ (m̄ − m∞) / (healthyKg∓ΔM_gly − m∞) ]
 ```
 
-- `D` here is `calorieTargetDetail`'s own sleep-adjusted deficit (see the Calorie target formula above) — `E_in` already reflects `PLAN_SLEEP_HOURS`, so a plan that assumes chronic short sleep forecasts a slower arrival than the same `WEEKLY_FAT_LOSS_KG` would without it, at the default `PLAN_SLEEP_HOURS = SLEEP_TARGET_HOURS` this is exactly the pre-existing figure.
+- `D` here is `calorieDesiredDetail`'s own sleep-adjusted deficit (see the Desired intake formula above) — `E_in` already reflects `PLAN_SLEEP_HOURS`, so a plan that assumes chronic short sleep forecasts a slower arrival than the same `WEEKLY_FAT_LOSS_KG` would without it, at the default `PLAN_SLEEP_HOURS = SLEEP_DESIRED_HOURS` this is exactly the pre-existing figure.
 - `t` is the exact closed-form solution of `dm/dt = (E_in − A − B·m) / ρ`, verified against numeric integration.
 - Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
 - **`m̄` (`planBodyMassKg`), not the last raw body-mass reading** — the same smoothed mass the Tune's own boxes run on, so the two start the curve from the same point.
-- `calcProjection` (`health-math.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Tune makes — rather than a second copy of this formula. The chart and the Tune read one function, so they cannot print two different day counts for the same profile.
-- **With `WEEKLY_FAT_LOSS_PCT` pinned it's a different journey**, and `projectTargetDaysAtFixedPct` is the one that runs. A constant share of a falling mass is `dm/dt = −k·m`, `k = −ln(1 − p/100)/7` per day:
+- `calcProjection` (`health-math.js`) reads `t`, its `status` and `equilibriumKg` **directly off `healthyProjectionFromSettings`'s own return** — the exact `projectHealthyDays` / `projectHealthyDaysAtFixedPct` call the Tune makes — rather than a second copy of this formula. The chart and the Tune read one function, so they cannot print two different day counts for the same profile.
+- **With `WEEKLY_FAT_LOSS_PCT` pinned it's a different journey**, and `projectHealthyDaysAtFixedPct` is the one that runs. A constant share of a falling mass is `dm/dt = −k·m`, `k = −ln(1 − p/100)/7` per day:
 
 ```
 m(t) = m · (1 − p/100)^(t/7)      no plateau — m∞ = 0
 t    = 7 · ln(m / m_des) / −ln(1 − p/100)
 ```
 
-  - Returned in `projectTargetDays`' own shape with `equilibriumKg: 0`, because both journeys are the same exponential with different coefficients — one curve-drawing routine serves both. The coefficient it hands back is `decayPerKg` (`k·ρ` here, `B` there): the chart reads that rather than `B`, since `B` is only the right rate for the constant-intake journey.
-  - **The only plan with no plateau to fall short of** — a constant fraction of a falling mass crosses any positive target eventually, so this journey has no `asymptote` case. Its `unreachable` means the target isn't below the current mass, and it carries a `reason` string rather than an equilibrium figure to describe.
-  - `targetJourneyProjection` picks between the two from the pins, and the chart, the Plan prompt and the Tune's forward `t` all go through it (`pct > 0` only — a pinned zero or negative rate falls back to the constant-E_in form, which reports a hold or a gain properly).
+  - Returned in `projectHealthyDays`' own shape with `equilibriumKg: 0`, because both journeys are the same exponential with different coefficients — one curve-drawing routine serves both. The coefficient it hands back is `decayPerKg` (`k·ρ` here, `B` there): the chart reads that rather than `B`, since `B` is only the right rate for the constant-intake journey.
+  - **The only plan with no plateau to fall short of** — a constant fraction of a falling mass crosses any positive healthy mass eventually, so this journey has no `asymptote` case. Its `unreachable` means the healthy mass isn't below the current mass, and it carries a `reason` string rather than an equilibrium figure to describe.
+  - `healthyJourneyProjection` picks between the two from the pins, and the chart, the Plan prompt and the Tune's forward `t` all go through it (`pct > 0` only — a pinned zero or negative rate falls back to the constant-E_in form, which reports a hold or a gain properly).
   - Verified: 86.9 → 82 kg at 1%/week is 40 days, the chart's own day count agrees to the day, and its weekly curve points step down by exactly 1% of the running mass.
 - Worked example (87.5 → 72 kg, 170 cm, 35 y, male, κ=3, τ=100, 0.84 kg/wk): `BMR 1768`, `E_act 459`, `D 924`, `E_in 1303`, `A 893`, `B 15.25`, `m∞ 26.9 kg`, `t 149 days`.
 
 > **What this forecast is not:**
-> - It states the target, not recent behaviour.
-> - Eating over the target does **not** slip the date — only body mass, the target, or the target's own settings move it.
+> - It states the plan, not recent behaviour.
+> - Eating over the desired intake does **not** slip the date — only body mass, the healthy mass, or the plan's own settings move it.
 > - **Sleep enters it only as a plan-level assumption** (`PLAN_SLEEP_HOURS`, folded into `D` above), never as a night-by-night reading — a run of short nights doesn't move this curve the way it moves Calorie Balance or the Sleep chart's own dot.
-> - Actual-vs-target lives on the Calorie Balance chart instead.
+> - Actual-vs-desired lives on the Calorie Balance chart instead.
 
 **Habit-based fallback** — only when the profile is incomplete and something is logged in the last 14 days:
 
 ```
-maintenance = flat calorie target + avgActivityKcal
+maintenance = flat desired intake + avgActivityKcal
 balance     = avgCalories − maintenance
 baseSlope   = balance / 7700
-sleepRatio  = clamp(avgSleep / SLEEP_TARGET_HOURS, 0.7, 1.0)
+sleepRatio  = clamp(avgSleep / SLEEP_DESIRED_HOURS, 0.7, 1.0)
 slope       = baseSlope × sleepRatio
 ```
 
 **Body-mass-only fallback** — nothing logged at all; ordinary least-squares slope.
 
-- Statuses: `reached`, `no-change`, `wrong-direction`, and `asymptote` (target lies past `m∞`).
+- Statuses: `reached`, `no-change`, `wrong-direction`, and `asymptote` (the healthy mass lies past `m∞`).
 - The slope is reported for all four, so the status line quotes a rate rather than "unavailable".
 
 > **Known inconsistency**, confined to this fallback:
 > - The regression is fitted against the *index* of each reading, so its units are kg per logged entry.
 > - Its consumers treat it as kg per day. They agree only if you log daily.
-> - Unreachable on the target-based path, which never uses it.
+> - Unreachable on the healthy-mass-based path, which never uses it.
 
 **Progress meters** (a full-width card under the Status glance cards):
 
 ```
-bar %       = clamp( (startBodyMass − lastBodyMass) / (startBodyMass − target) × 100, 0, 100 )
+bar %       = clamp( (startBodyMass − lastBodyMass) / (startBodyMass − healthyKg) × 100, 0, 100 )
 done kg     = |startBodyMass − lastBodyMass|
-to-go kg    = |lastBodyMass − target|                unadjusted target — the raw distance
-target text = target [± ΔM_gly]                      swing shown alongside, not folded into the kg above
-time bar %  = daysElapsed / (daysElapsed + daysToTarget) × 100     daysToTarget is t, so already swing-adjusted
+to-go kg    = |lastBodyMass − healthyKg|             unadjusted healthy mass — the raw distance
+healthy text = healthyKg [± ΔM_gly]                 swing shown alongside, not folded into the kg above
+time bar %  = daysElapsed / (daysElapsed + daysToHealthy) × 100     daysToHealthy is t, so already swing-adjusted
 ```
 
 ## Fat energy — the Body Mass chart's second axis
@@ -258,26 +258,26 @@ fatEnergy  = fatMass × 7700
 ## Protein
 
 ```
-band (g/day) = { PROTEIN_TARGET_G_MIN, PROTEIN_TARGET_G_MAX }          ← if either is set
+band (g/day) = { PROTEIN_DESIRED_G_MIN, PROTEIN_DESIRED_G_MAX }          ← if either is set
    else       = { round(basisKg × gPerKg.low), round(basisKg × gPerKg.high) }
-   basisKg    = BODY_MASS_TARGET_KG, else the latest logged body mass
-   fallback   = flat PROTEIN_TARGET_G as a zero-width band
+   basisKg    = BODY_MASS_HEALTHY_KG, else the latest logged body mass
+   fallback   = flat PROTEIN_DESIRED_G as a zero-width band
 midpoint     = round((min + max) / 2)
 in band?     = g ≥ min AND (max == min OR g ≤ max)
 protein/100kcal = protein / calories × 100
 ```
 
-- Three sources, most specific first. The **absolute gram band wins**: it is already a mass × a per-kg figure (the Tune's `p × LBM`), so re-scaling it by a basis mass would double-count. The g/kg band is next, and the flat `PROTEIN_TARGET_G` last.
-- Absolute grams don't drift as you diet — which is what the g/kg band needs `BODY_MASS_TARGET_KG` for. A gram figure is frozen at the lean mass it was computed from and only moves when you re-save the Tune.
+- Three sources, most specific first. The **absolute gram band wins**: it is already a mass × a per-kg figure (the Tune's `p × LBM`), so re-scaling it by a basis mass would double-count. The g/kg band is next, and the flat `PROTEIN_DESIRED_G` last.
+- Absolute grams don't drift as you diet — which is what the g/kg band needs `BODY_MASS_HEALTHY_KG` for. A gram figure is frozen at the lean mass it was computed from and only moves when you re-save the Tune.
 - Written by the [Tune](features/health-tune.md#health--tune) as `p_min/p_max × LBM`, which is the only place in the app that scales anything to **lean** mass rather than total mass. Set the pair by hand on the `Setting` tab and it behaves the same; either end alone is enough, and a backwards pair is sorted.
 
 **Protein Source Rotation**, per tracked ingredient:
 
 ```
-targetG   = (Protein% / 100) × dailyMidpoint × lookbackDays
+desiredG   = (Protein% / 100) × dailyMidpoint × lookbackDays
 actualG   = Σ protein of every Calculate breakdown item with that name in range
-% of total target = actualG / (dailyMidpoint × lookbackDays) × 100
-chart bar = Σ targetG and Σ actualG over each Group's tracked ingredients, sorted by Σ targetG − Σ actualG descending
+% of total desired = actualG / (dailyMidpoint × lookbackDays) × 100
+chart bar = Σ desiredG and Σ actualG over each Group's tracked ingredients, sorted by Σ desiredG − Σ actualG descending
 ```
 
 - Group colour: one hue per Group.
@@ -287,17 +287,17 @@ chart bar = Σ targetG and Σ actualG over each Group's tracked ingredients, sor
 
 - Card order: Status (m/BMI/BMR/TEI/TEF/AEE/SD/D/Δm — today's whole energy budget, read top to bottom), Intake Macros (Protein/Fiber/Fat/Carb), Physical Activity (Cardio/NEAT/Strength), Sleep (Window/Duration).
 - Sums today's entries per category; Fiber/Fat/Carb each read the day's own persisted Physique figure (`fiberG`/`fatG`/`carbG`).
-- Green/red by `withinCalorieTarget` (TEI), `withinProteinBand`/`withinFiberBand`/`withinFatBand`/`withinCarbBand` (macros), `kcal ≥ getActivityTargetKcal(latest body mass)` (AEE), and (Status) which side of `BODY_MASS_TARGET_KG`/the balance target `bodyMassTargetIsDownward`/`targetBalanceKcal` call for (m, BMI and D).
+- Green/red by `withinCalorieDesired` (TEI), `withinProteinBand`/`withinFiberBand`/`withinFatBand`/`withinCarbBand` (macros), `kcal ≥ getActivityDesiredKcal(latest body mass)` (AEE), and (Status) which side of `BODY_MASS_HEALTHY_KG`/the desired balance `bodyMassHealthyIsDownward`/`desiredBalanceKcal` call for (m, BMI and D).
 - Carb's under-band case reads grey, not red — same as its chart's bar coloring.
 - Status's **AEE** sums `activityEntryKcal` per entry rather than just the logged minutes, so it agrees with the Activity/Calorie Balance charts. Physical Activity's Cardio/NEAT/Strength split that same set of entries by the `Activity` sheet's Category column (prefix-matched), each unscored (`N min (-N kcal)`, `0 min (0 kcal)` rather than `—` for a bucket with nothing logged — that's a real zero, not a missing reading).
-- Status is the per-day form of `dailyEnergyBalanceKcal` (`setStatusEnergyTile`): **BMR** is Mifflin at the smoothed mass; **TEI** is intake vs. the calorie target with a `<`/`>` per the target kind; **TEF** is `calTarget.kcal × (1 − tefDivisor())`; **SD** is the sleep-deprivation effect vs. `0`; **D** is intake − BMR − AEE − TEF (+SD) against `targetBalanceKcal(planBodyMassKg(entries))`, the same arithmetic the Calorie Balance chart plots for one day; **BMI** is `planBodyMassKg` vs. `BODY_MASS_TARGET_KG`, rescaled by height; **Δm** is `D ÷ GENERIC_KCAL_PER_KG_FAT` against `-weeklyFatLossKgAt ÷ 7` — negated the same way `targetBalanceKcal` negates it for D, so a positive (cut) `WEEKLY_FAT_LOSS_KG` reads as a negative target mass change, matching Δm's own actual-value sign convention (negative = losing).
+- Status is the per-day form of `dailyEnergyBalanceKcal` (`setStatusEnergyTile`): **BMR** is Mifflin at the smoothed mass; **TEI** is intake vs. the desired intake with a `<`/`>` per the desired kind; **TEF** is `calDesired.kcal × (1 − tefDivisor())`; **SD** is the sleep-deprivation effect vs. `0`; **D** is intake − BMR − AEE − TEF (+SD) against `desiredBalanceKcal(planBodyMassKg(entries))`, the same arithmetic the Calorie Balance chart plots for one day; **BMI** is `planBodyMassKg` vs. `BODY_MASS_HEALTHY_KG`, rescaled by height; **Δm** is `D ÷ GENERIC_KCAL_PER_KG_FAT` against `-weeklyFatLossKgAt ÷ 7` — negated the same way `desiredBalanceKcal` negates it for D, so a positive (cut) `WEEKLY_FAT_LOSS_KG` reads as a negative desired mass change, matching Δm's own actual-value sign convention (negative = losing).
 - Sleep's Duration is colored by `sleepStatusColor` (the chart's own red→amber→green gradient), not a flat two-colour split; Window is `sleepBedMin`-`sleepWakeMin` as one `HH:MM-HH:MM` range.
 
 ## Sleep
 
 ```
 axis position (hours) = ((clockMin − 12·60) + 1440) mod 1440 / 60
-colour ratio          = clamp( (durationHr − target/2) / (target − target/2), 0, 1 )
+colour ratio          = clamp( (durationHr − desiredHr/2) / (desiredHr − desiredHr/2), 0, 1 )
                         red → amber below 0.5, amber → green above
 
 axis min = floor(earliest / 3) × 3      the 3h tick at or below the earliest bedtime
@@ -323,7 +323,7 @@ calories = Σ metKcal( MET(exercise) ?? 3.5, bodyMassKg, activeSecᵢ / 60 )
 ```
 
 - `activeSecondsForNoteLine` (`health-activity-estimator.js`) is the single place this is decided — Log's prefill and Calculate both read it.
-- **Only the two converted units are tunable**, both from `Setting`: `WORKOUT_REP_SEC` (default `3`, a brisk tempo — a controlled machine rep is nearer 4-5 s) and `WORKOUT_STEPS_PER_MIN` (default `100`). A hold carries its own seconds and a cardio row its own minutes, so neither has anything to set. The tempo is global, not per exercise — the whole session moves together when you change it. `WORKOUT_STEPS_PER_MIN` also rescales the Activity chart and target, since both convert steps the same way.
+- **Only the two converted units are tunable**, both from `Setting`: `WORKOUT_REP_SEC` (default `3`, a brisk tempo — a controlled machine rep is nearer 4-5 s) and `WORKOUT_STEPS_PER_MIN` (default `100`). A hold carries its own seconds and a cardio row its own minutes, so neither has anything to set. The tempo is global, not per exercise — the whole session moves together when you change it. `WORKOUT_STEPS_PER_MIN` also rescales the Activity chart and desired activity, since both convert steps the same way.
 - Note parsing: `30x Name` → 30 total reps; legacy `3x10 Name` → 30; `135sec`, `30min`, `6000step`.
 - A second Log the same day appends its new lines to today's entry rather than opening a new row.
 

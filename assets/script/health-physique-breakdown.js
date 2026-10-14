@@ -85,18 +85,18 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
   );
   tbody.appendChild(totalRow);
 
-  // ACTIVITY_TARGET_MIN's minutes/kcal at today's body mass — same pinned-vs-flat
-  // rule the Physical Activity tile/chart use (getActivityTargetMin/Kcal, health-math.js),
+  // ACTIVITY_DESIRED_MIN's minutes/kcal at today's body mass — same pinned-vs-flat
+  // rule the Physical Activity tile/chart use (getActivityDesiredMin/Kcal, health-math.js),
   // so this row can't drift from what "hitting the workout goal" means elsewhere.
   // Only today's own form: every other day is read after the fact, so "still left
   // to reach today's goal" doesn't apply to it the way it does to the one day
   // actually being logged.
   if (physiqueField('date').value === isoFromDate(new Date())) {
-    const desireMin = Math.round(getActivityTargetMin(bodyMassKg));
-    const desireKcal = Math.round(getActivityTargetKcal(bodyMassKg));
-    const targetRow = document.createElement('tr');
-    targetRow.className = 'calc-breakdown-target';
-    targetRow.append(
+    const desireMin = Math.round(getActivityDesiredMin(bodyMassKg));
+    const desireKcal = Math.round(getActivityDesiredKcal(bodyMassKg));
+    const desiredRow = document.createElement('tr');
+    desiredRow.className = 'calc-breakdown-desired';
+    desiredRow.append(
       makeCell('Desire', 'Workout duration/burn goal — from Tune and Settings, not today\'s Workout'),
       makeCell(''),
       makeCell(''),
@@ -104,7 +104,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
       makeCell(String(desireKcal)),
       makeCell(''),
     );
-    tbody.appendChild(targetRow);
+    tbody.appendChild(desiredRow);
 
     // Remaining — Desire minus Total, the duration/burn still left to hit the goal. Left
     // unclamped, so once the Total overshoots the Desire it reads as a negative surplus

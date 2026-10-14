@@ -126,13 +126,17 @@ function paymentDueDate(day, monthOffset = 0) {
   return new Date(today.getFullYear(), today.getMonth() + monthOffset, Math.min(day, lastDay));
 }
 
-// Past this month's payment day, still owing, and no money in since last month's: { days, dueIso }.
+// The badge shows only this many days after the payment day.
+const PAYMENT_BADGE_DAYS = 3;
+
+// 1–3 days past this month's payment day, still owing, nothing in since last month's: { days, dueIso }.
 // Null until transactions load, so it never flags a payment it can't see.
 function accountPaymentOverdue(account) {
   if (account.paymentDay === null || account.balance >= 0 || !transactionsDataLoaded) return null;
   const todayIso = isoFromDate(new Date());
   const dueIso = isoFromDate(paymentDueDate(account.paymentDay));
   if (todayIso <= dueIso) return null;
+  if (daysFromTodayIso(dueIso) * -1 > PAYMENT_BADGE_DAYS) return null;
   const previousDueIso = isoFromDate(paymentDueDate(account.paymentDay, -1));
   const paid = allTransactions.some((t) => t.account === account.name && t.amount > 0
     && t.date > previousDueIso && t.date <= todayIso);
@@ -405,7 +409,7 @@ async function loadAccountBalanceCells() {
 // `=SUMIF(Transaction!…)` already counts the row that was just appended, so
 // adding the amount on top would count it twice, and writing a number over it
 // would cost the sheet its own arithmetic for good.
-async function accountBalanceTarget(name) {
+async function accountBalanceCell(name) {
   // accountsDataLoaded, not a length check: an empty list before the first fetch
   // resolves would otherwise be reported as "no such account" (same distinction
   // Finance's Insight draws).
@@ -450,15 +454,15 @@ async function accountBalanceTarget(name) {
 // balance it won't touch — by the time this runs the transaction itself is
 // saved, and the caller has to be able to say so.
 async function addToAccountBalance(name, amount) {
-  const target = await accountBalanceTarget(name);
-  if (!target.writable) return target;
+  const cell = await accountBalanceCell(name);
+  if (!cell.writable) return cell;
 
-  const next = Math.round((target.current + amount) * 100) / 100;
-  await updateValues(`'${CONFIG.SHEETS.ACCOUNTS}'!D${target.row}`, [[next]]);
+  const next = Math.round((cell.current + amount) * 100) / 100;
+  await updateValues(`'${CONFIG.SHEETS.ACCOUNTS}'!D${cell.row}`, [[next]]);
 
   await refreshAccountsList(true);
   await refreshNetWorth();
-  return { writable: true, from: target.current, to: next };
+  return { writable: true, from: cell.current, to: next };
 }
 
 // Moves money between two of your own accounts by writing straight to each
@@ -553,16 +557,16 @@ async function submitTransferForm(event) {
   }
 
   // Both legs checked before either is written, so a formula-protected
-  // account (accountBalanceTarget — same guard the transaction form's
+  // account (accountBalanceCell — same guard the transaction form's
   // "update the account balance" box uses) can't end up with one side of the
   // transfer applied and the other silently skipped.
-  const [fromTarget, toTarget] = await Promise.all([accountBalanceTarget(from), accountBalanceTarget(to)]);
-  if (!fromTarget.writable) {
-    showFieldError('transfer-form-error', fromTarget.reason);
+  const [fromCell, toCell] = await Promise.all([accountBalanceCell(from), accountBalanceCell(to)]);
+  if (!fromCell.writable) {
+    showFieldError('transfer-form-error', fromCell.reason);
     return;
   }
-  if (!toTarget.writable) {
-    showFieldError('transfer-form-error', toTarget.reason);
+  if (!toCell.writable) {
+    showFieldError('transfer-form-error', toCell.reason);
     return;
   }
 

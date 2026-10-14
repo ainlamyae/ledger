@@ -26,14 +26,14 @@ ledger/
 │       ├── ui-helpers.js         # Shared table/modal/busy-button helpers
 │       ├── ai.js                 # AI chat client (Groq or OpenRouter)
 │       ├── health-nutrition-usda.js               # USDA FoodData Central client
-│       ├── health-nutrient-targets.js   # Ideal/day targets for Micronutrient mode
+│       ├── health-nutrient-desired.js   # Ideal/day desired figures for Micronutrient mode
 │       ├── health-nutrition.js          # Nutrition table, Group, USDA lookup
 │       ├── health-physique-estimator.js  # Calculate for food
 │       ├── health-activity-estimator.js # Calculate for workouts
 │       ├── ledger-widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
 │       ├── confetti.js           # Confetti burst for body-mass progress and income saves
-│       ├── health-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
+│       ├── health-math.js      # Pure health/desired-figure formulas (BMR, TEF, projection, …)
 │       ├── health-chart.js    # Chart renderers
 │       ├── finance-chart.js     # Finance Chart renderers
 │       ├── finance-market-data.js        # Stock prices/news: Twelve Data, Alpha Vantage, Finnhub; IndexedDB cache, rate limits

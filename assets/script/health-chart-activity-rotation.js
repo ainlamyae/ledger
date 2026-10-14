@@ -1,13 +1,13 @@
 // "Activity Rotation" panel: for every Activity Group (Leg Day, Push Day,
-// Pull Day, Cardio, NEAT, ...) that has a Weekly Target set on any of its
+// Pull Day, Cardio, NEAT, ...) that has a Weekly Desired set on any of its
 // rows (health-activity-catalogue.js), shows a horizontal bar — sessions actually logged for
-// that Group in the lookback window vs. a live target scaled off the weekly
+// that Group in the lookback window vs. a live desired count scaled off the weekly
 // figure — so a low/empty bar flags "you're behind on this one." Weekly
-// Target is typed on the Activity sheet tab, same cell repeated across every
+// Desired is typed on the Activity sheet tab, same cell repeated across every
 // exercise row that shares a Group (e.g. every NEAT row carries "7"); see
 // trackedActivityGroups for how that duplication is reconciled. Beside the
 // bars, a three-ring donut splits the same Groups by share of the weekly
-// target — outermost ring the reference split, middle ring the 4 weeks ending
+// desired — outermost ring the reference split, middle ring the 4 weeks ending
 // on the To date, inner ring the last week of it — so a Group's short-term
 // and medium-term rotation can both be read against what it's actually
 // supposed to be. Wired up by initActivityRotationPanel(), called from app.js.
@@ -18,7 +18,7 @@
 
 const ACTIVITY_UNCLASSIFIED_LABEL = 'Unclassified';
 
-// One row per distinct Group across the Activity sheet, Weekly Target being
+// One row per distinct Group across the Activity sheet, Weekly Desired being
 // the sole "is this tracked" switch — same role activityRotationPalette's
 // protein-rotation counterpart gives proteinPercent. Every row that shares a
 // Group is expected to carry the same figure (it's typed once, then copied
@@ -28,16 +28,16 @@ function trackedActivityGroups() {
   const groups = new Map();
   allActivities.forEach((a) => {
     if (!a.group) return;
-    const existing = groups.get(a.group) || { classification: a.category || ACTIVITY_UNCLASSIFIED_LABEL, weeklyTarget: null };
-    if (a.weeklyTarget !== null && a.weeklyTarget > 0) {
-      existing.weeklyTarget = existing.weeklyTarget === null ? a.weeklyTarget : Math.max(existing.weeklyTarget, a.weeklyTarget);
+    const existing = groups.get(a.group) || { classification: a.category || ACTIVITY_UNCLASSIFIED_LABEL, weeklyDesired: null };
+    if (a.weeklyDesired !== null && a.weeklyDesired > 0) {
+      existing.weeklyDesired = existing.weeklyDesired === null ? a.weeklyDesired : Math.max(existing.weeklyDesired, a.weeklyDesired);
     }
     groups.set(a.group, existing);
   });
 
   return [...groups.entries()]
-    .filter(([, v]) => v.weeklyTarget !== null)
-    .map(([name, v]) => ({ name, classification: v.classification, weeklyTarget: v.weeklyTarget }));
+    .filter(([, v]) => v.weeklyDesired !== null)
+    .map(([name, v]) => ({ name, classification: v.classification, weeklyDesired: v.weeklyDesired }));
 }
 
 // Sessions actually logged per Group over the lookback window — one day's
@@ -60,10 +60,10 @@ function actualSessionsByGroup(from, to) {
 }
 
 // One row per tracked Group: sessions actually logged this window vs. its
-// Weekly Target scaled to the window length (weeklyTarget × lookbackDays/7),
+// Weekly Desired scaled to the window length (weeklyDesired × lookbackDays/7),
 // so a 10-day window still reads "on track" at 10 rather than demanding a
 // full 7 more sessions on top of the last full week. Sorted by remaining gap
-// (target minus actual) descending — same to-do-list read as Protein Source
+// (desired minus actual) descending — same to-do-list read as Protein Source
 // Rotation.
 function computeActivityRotationRows(from, to) {
   const lookbackDays = datesInRange(from, to).length;
@@ -72,14 +72,14 @@ function computeActivityRotationRows(from, to) {
 
   const rows = sources.map((s) => {
     const actualSessions = sessionsByGroup.get(s.name) || 0;
-    const targetSessions = s.weeklyTarget * (lookbackDays / 7);
+    const desiredSessions = s.weeklyDesired * (lookbackDays / 7);
     return {
       name: s.name,
       classification: s.classification,
       actualSessions,
-      targetSessions: Math.round(targetSessions * 10) / 10,
-      weeklyTarget: s.weeklyTarget,
-      actualPercentOfTarget: targetSessions > 0 ? Math.round((actualSessions / targetSessions) * 1000) / 10 : 0,
+      desiredSessions: Math.round(desiredSessions * 10) / 10,
+      weeklyDesired: s.weeklyDesired,
+      actualPercentOfDesired: desiredSessions > 0 ? Math.round((actualSessions / desiredSessions) * 1000) / 10 : 0,
     };
   });
 
@@ -89,7 +89,7 @@ function computeActivityRotationRows(from, to) {
 // Most sessions still owed first, met or passed last; Unclassified at the
 // bottom, as in groupProteinRotationRows.
 function sortActivityRowsByGap(rows) {
-  const gap = (r) => r.targetSessions - r.actualSessions;
+  const gap = (r) => r.desiredSessions - r.actualSessions;
   return [...rows].sort((a, b) => {
     const aUnknown = a.classification === ACTIVITY_UNCLASSIFIED_LABEL;
     const bUnknown = b.classification === ACTIVITY_UNCLASSIFIED_LABEL;
@@ -153,17 +153,17 @@ const ACTIVITY_ROTATION_GYM_IDS = {
   chart: 'activity-rotation-chart-gym', donut: 'activity-rotation-donut-gym', legend: 'activity-rotation-legend-gym',
 };
 
-function renderActivityRotationDonut(rows, barColors, toIso, target, ids) {
+function renderActivityRotationDonut(rows, barColors, toIso, slot, ids) {
   const ctx = document.getElementById(ids.donut);
   const labels = rows.map((r) => r.name);
 
-  // Not a time window like the two below it — each Group's own Weekly Target,
+  // Not a time window like the two below it — each Group's own Weekly Desired,
   // the fixed split the other two rings are read against. No `days`, which
   // the tooltip callback below uses to tell it apart from a sessions-logged ring.
   const referenceRing = {
     label: 'Reference desired',
-    data: rows.map((r) => r.weeklyTarget),
-    total: rows.reduce((sum, r) => sum + r.weeklyTarget, 0),
+    data: rows.map((r) => r.weeklyDesired),
+    total: rows.reduce((sum, r) => sum + r.weeklyDesired, 0),
   };
 
   const rings = ACTIVITY_ROTATION_DONUT_RINGS.map((ring) => {
@@ -176,7 +176,7 @@ function renderActivityRotationDonut(rows, barColors, toIso, target, ids) {
   const hasData = rings.some((ring) => ring.total > 0);
   const allRings = [referenceRing, ...rings];
 
-  activityRotationCharts[target].donut = upsertChart(activityRotationCharts[target].donut, ctx, {
+  activityRotationCharts[slot].donut = upsertChart(activityRotationCharts[slot].donut, ctx, {
     type: 'doughnut',
     data: {
       labels,
@@ -215,21 +215,21 @@ function renderActivityRotationDonut(rows, barColors, toIso, target, ids) {
   });
 }
 
-function renderActivityRotationChart({ from, to }, target = 'chart', ids = ACTIVITY_ROTATION_DEFAULT_IDS) {
+function renderActivityRotationChart({ from, to }, slot = 'chart', ids = ACTIVITY_ROTATION_DEFAULT_IDS) {
   const ctx = document.getElementById(ids.chart);
   const rows = computeActivityRotationRows(from, to);
 
   const labels = rows.map((r) => r.name);
   const actualData = rows.map((r) => r.actualSessions);
-  const targetData = rows.map((r) => r.targetSessions);
+  const desiredData = rows.map((r) => r.desiredSessions);
   const { barColors, legend } = activityRotationPalette(rows);
 
   renderCategoryLegend(ids.legend, legend);
 
   const hasData = labels.length > 0;
-  const maxValue = Math.ceil(Math.max(1, ...actualData, ...targetData)) + 1;
+  const maxValue = Math.ceil(Math.max(1, ...actualData, ...desiredData)) + 1;
 
-  activityRotationCharts[target].chart = upsertChart(activityRotationCharts[target].chart, ctx, {
+  activityRotationCharts[slot].chart = upsertChart(activityRotationCharts[slot].chart, ctx, {
     data: {
       labels,
       datasets: [
@@ -237,7 +237,7 @@ function renderActivityRotationChart({ from, to }, target = 'chart', ids = ACTIV
         {
           type: 'line',
           label: 'Desired',
-          data: targetData,
+          data: desiredData,
           showLine: false,
           pointStyle: 'line',
           rotation: 90,
@@ -257,7 +257,7 @@ function renderActivityRotationChart({ from, to }, target = 'chart', ids = ACTIV
         legend: { display: false },
         title: {
           display: !hasData,
-          text: 'No Activity Groups tracked yet — open Activity, edit a row, and set its Weekly Target',
+          text: 'No Activity Groups tracked yet — open Activity, edit a row, and set its Weekly Desired',
           color: Chart.defaults.color,
           font: { size: chartFontSize() },
           padding: { top: 40 },
@@ -271,8 +271,8 @@ function renderActivityRotationChart({ from, to }, target = 'chart', ids = ACTIV
             label: (item) => {
               const row = rows[item.dataIndex];
               const value = item.dataset.label === 'Done'
-                ? `${item.formattedValue} sessions done (${row.actualPercentOfTarget}% of desired this window)`
-                : `${item.formattedValue} sessions desired this window (${row.weeklyTarget}/week)`;
+                ? `${item.formattedValue} sessions done (${row.actualPercentOfDesired}% of desired this window)`
+                : `${item.formattedValue} sessions desired this window (${row.weeklyDesired}/week)`;
               return `${item.dataset.label}: ${privacyMode ? maskDigits(value) : value}`;
             },
           },
@@ -284,12 +284,12 @@ function renderActivityRotationChart({ from, to }, target = 'chart', ids = ACTIV
           max: maxValue,
           ticks: { callback: maskedUnitTick('sessions', 1), maxRotation: 45, minRotation: 45 },
         },
-        y: { afterFit: fixTrendYAxisWidth, ticks: { autoSkip: false } },
+        y: { afterFit: fixTrendYAxisWidth, ticks: { autoSkip: false, callback: trendYAxisCategoryTick } },
       },
     },
   });
 
-  renderActivityRotationDonut(rows, barColors, to, target, ids);
+  renderActivityRotationDonut(rows, barColors, to, slot, ids);
 }
 
 // No From/To pair of its own, same as Protein Source Rotation: the Health

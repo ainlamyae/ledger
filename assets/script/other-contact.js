@@ -332,12 +332,12 @@ function phoneDigits(s) {
 
 const sameText = (a, b) => a.toLowerCase() === b.toLowerCase();
 
-// Combines `target` with `others`, keeping target's own first/last name and
-// never overwriting a field target already has a value for -- only filling
+// Combines `primary` with `others`, keeping primary's own first/last name and
+// never overwriting a field primary already has a value for -- only filling
 // blanks and merging list fields (phones/emails/etc.), same rule the
 // scripts/merge_contacts.py source-merge uses.
-function mergeContactFields(target, others) {
-  const merged = { ...target };
+function mergeContactFields(primary, others) {
+  const merged = { ...primary };
 
   ['prefix', 'middle', 'birthday', 'street', 'city', 'region', 'postal', 'country'].forEach((field) => {
     if (!merged[field]) {
@@ -347,19 +347,19 @@ function mergeContactFields(target, others) {
   });
 
   const phones = dedupeCap(
-    [target.phone1, target.phone2, target.phone3, ...others.flatMap((c) => [c.phone1, c.phone2, c.phone3])],
+    [primary.phone1, primary.phone2, primary.phone3, ...others.flatMap((c) => [c.phone1, c.phone2, c.phone3])],
     3, (a, b) => phoneDigits(a) === phoneDigits(b),
   );
   [merged.phone1, merged.phone2, merged.phone3] = [phones[0] || '', phones[1] || '', phones[2] || ''];
 
   const emails = dedupeCap(
-    [target.email1, target.email2, ...others.flatMap((c) => [c.email1, c.email2])],
+    [primary.email1, primary.email2, ...others.flatMap((c) => [c.email1, c.email2])],
     2, sameText,
   );
   [merged.email1, merged.email2] = [emails[0] || '', emails[1] || ''];
 
   const telegrams = dedupeCap(
-    [target.telegram, target.telegram2, ...others.flatMap((c) => [c.telegram, c.telegram2])],
+    [primary.telegram, primary.telegram2, ...others.flatMap((c) => [c.telegram, c.telegram2])],
     2, sameText,
   );
   [merged.telegram, merged.telegram2] = [telegrams[0] || '', telegrams[1] || ''];
@@ -368,7 +368,7 @@ function mergeContactFields(target, others) {
   if (!merged.linkedin) merged.linkedin = (others.find((c) => c.linkedin) || {}).linkedin || '';
 
   const tags = [];
-  [target, ...others].forEach((c) => {
+  [primary, ...others].forEach((c) => {
     (c.tags || '').split(',').map((t) => t.trim()).filter(Boolean).forEach((t) => {
       if (!tags.some((existing) => sameText(existing, t))) tags.push(t);
     });
@@ -376,7 +376,7 @@ function mergeContactFields(target, others) {
   merged.tags = tags.join(', ');
 
   const notes = [];
-  [target, ...others].forEach((c) => {
+  [primary, ...others].forEach((c) => {
     (c.note || '').split('\n').map((n) => n.trim()).filter(Boolean).forEach((n) => {
       if (!notes.includes(n)) notes.push(n);
     });
@@ -394,19 +394,19 @@ async function mergeSelectedContacts() {
   const selected = allContacts.filter((c) => selectedContactRows.has(c.row)).sort((a, b) => a.row - b.row);
   if (selected.length < 2) return;
 
-  const target = selected[0];
+  const primary = selected[0];
   const others = selected.slice(1);
-  const merged = mergeContactFields(target, others);
+  const merged = mergeContactFields(primary, others);
 
   await confirmAndDelete(
-    `Merge ${selected.length} contacts into "${contactDisplayName(target)}"?\n\n` +
-    `${others.map(contactDisplayName).join(', ')} will be combined into "${contactDisplayName(target)}" ` +
-    `and their rows deleted. Fields already filled on "${contactDisplayName(target)}" are kept as-is; ` +
+    `Merge ${selected.length} contacts into "${contactDisplayName(primary)}"?\n\n` +
+    `${others.map(contactDisplayName).join(', ')} will be combined into "${contactDisplayName(primary)}" ` +
+    `and their rows deleted. Fields already filled on "${contactDisplayName(primary)}" are kept as-is; ` +
     `blanks are filled in from the others. This cannot be undone.`,
     async () => {
       if (!contactsSheetId) contactsSheetId = await fetchContactsSheetId();
 
-      await updateValues(`'${CONFIG.SHEETS.CONTACTS}'!A${target.row}:U${target.row}`, [contactToRowArray(merged)]);
+      await updateValues(`'${CONFIG.SHEETS.CONTACTS}'!A${primary.row}:U${primary.row}`, [contactToRowArray(merged)]);
 
       const deleteRequests = others
         .map((c) => c.row)

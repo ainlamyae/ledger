@@ -43,7 +43,7 @@ Four sizes, as tokens — every `font-size` is one of them — on one 15px base 
 | Animation | .2s hover and colour · .3s open and close · one Apple-like spring curve on all of them (`--ease-spring`, `cubic-bezier(.2, .8, .2, 1)`) |
 | Borders | 1px borders · .5px table hairlines |
 
-Each look is written once: every field starts from one base rule, and cards, Total/target rows, notes, dropdowns and field rows are single rules shared by several selectors.
+Each look is written once: every field starts from one base rule, and cards, Total/desired rows, notes, dropdowns and field rows are single rules shared by several selectors.
 
 ## Tables
 

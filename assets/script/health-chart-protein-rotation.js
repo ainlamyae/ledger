@@ -1,15 +1,15 @@
 // "Protein Source Rotation" panel: for every Nutrition Group with at least
 // one ingredient that has a Protein % value set (health-nutrition.js), shows a
 // horizontal bar — actual protein eaten from that group's tracked ingredients
-// in the lookback window vs. a live target — so a low/empty bar flags "you
+// in the lookback window vs. a live desired figure — so a low/empty bar flags "you
 // haven't had this group, eat it." Worked out per ingredient
 // (computeProteinRotationRows), then summed per Group for the chart
 // (groupProteinRotationRows), each bar stacked by ingredient.
-// Protein % is the share of your protein target this ingredient should
+// Protein % is the share of your desired protein this ingredient should
 // cover (e.g. 10 for "turkey = 10% of my protein"), scaled so the tracked
 // ingredients' shares add up to 100% whatever they were typed as; since that
-// target (the top of health-math.js's getProteinTargetBandG) already updates
-// live with body mass/height/activity, each ingredient's gram target moves with it automatically —
+// desired figure (the top of health-math.js's getProteinDesiredBandG) already updates
+// live with body mass/height/activity, each ingredient's desired grams move with it automatically —
 // no separate serving-size or ratio-scaling math needed. Actual protein
 // eaten is summed straight from Physique's own Calculate breakdown,
 // independent of whatever Nutrition's Amount/Calories happen to say
@@ -54,42 +54,42 @@ function actualProteinEatenBySource(from, to) {
 }
 
 // One row per tracked ingredient: actual protein (g) eaten this window vs.
-// a target scaled live off the current protein target —
+// a desired figure scaled live off the current desired protein —
 //   proteinPercent = Protein % / (sum of every tracked Protein %) × 100
-//   targetProteinG = (proteinPercent / 100) × weeklyProteinTarget × (lookbackDays / 7)
-// — so every ingredient's target rises or falls automatically as the real
-// target does, with no separate ratio/scale-factor bookkeeping. Sorted by
-// remaining gap (target minus actual) descending — the source with the most
+//   desiredProteinG = (proteinPercent / 100) × weeklyProteinDesired × (lookbackDays / 7)
+// — so every ingredient's desired figure rises or falls automatically as the real
+// desired protein does, with no separate ratio/scale-factor bookkeeping. Sorted by
+// remaining gap (desired minus actual) descending — the source with the most
 // left to eat leads the chart (a to-do-list read: eat this one next), while
-// anything already at or past its target sinks toward the bottom.
+// anything already at or past its desired figure sinks toward the bottom.
 function computeProteinRotationRows(from, to) {
   const lookbackDays = datesInRange(from, to).length;
   const sources = trackedProteinSources();
   const proteinByName = actualProteinEatenBySource(from, to);
   // The Protein % column is typed freely, so its sum is rarely 100: each
   // share is taken of that sum instead, and together they always cover the
-  // whole target.
+  // whole desired figure.
   const totalPercent = sources.reduce((sum, s) => sum + s.proteinPercent, 0);
-  // The top of the target band: a share-of-target split needs one
+  // The top of the desired band: a share-of-desired split needs one
   // denominator, and the full split is what the band's top asks for.
-  const dailyProteinTarget = getProteinTargetBandG(physiqueAsHealthEntries()).max;
-  const weeklyProteinTarget = dailyProteinTarget * 7;
-  // Total protein target across the whole lookback window (not per
-  // ingredient) — the denominator for "what % of my total target did this
+  const dailyProteinDesired = getProteinDesiredBandG(physiqueAsHealthEntries()).max;
+  const weeklyProteinDesired = dailyProteinDesired * 7;
+  // Total desired protein across the whole lookback window (not per
+  // ingredient) — the denominator for "what % of my total desired did this
   // ingredient's actual consumption cover this window."
-  const totalTargetForWindow = dailyProteinTarget * lookbackDays;
+  const totalDesiredForWindow = dailyProteinDesired * lookbackDays;
 
   const rows = sources.map((s) => {
     const actualProteinG = proteinByName.get(s.name.trim().toLowerCase()) || 0;
     const proteinPercent = (s.proteinPercent / totalPercent) * 100;
-    const targetProteinG = (proteinPercent / 100) * weeklyProteinTarget * (lookbackDays / 7);
+    const desiredProteinG = (proteinPercent / 100) * weeklyProteinDesired * (lookbackDays / 7);
     return {
       name: s.name,
       group: s.group,
       actualProteinG: Math.round(actualProteinG * 10) / 10,
-      targetProteinG: Math.round(targetProteinG * 10) / 10,
+      desiredProteinG: Math.round(desiredProteinG * 10) / 10,
       proteinPercent: Math.round(proteinPercent * 10) / 10,
-      actualPercentOfTotalTarget: totalTargetForWindow > 0 ? Math.round((actualProteinG / totalTargetForWindow) * 1000) / 10 : 0,
+      actualPercentOfTotalDesired: totalDesiredForWindow > 0 ? Math.round((actualProteinG / totalDesiredForWindow) * 1000) / 10 : 0,
     };
   });
 
@@ -103,7 +103,7 @@ function computeProteinRotationRows(from, to) {
 // grouping instead of being traded away for it. Unclassified sinks to the
 // bottom: it's a gap in the catalog, not a food group.
 function sortByGroupThenGap(rows) {
-  const gap = (r) => r.targetProteinG - r.actualProteinG;
+  const gap = (r) => r.desiredProteinG - r.actualProteinG;
 
   const groupGap = new Map();
   rows.forEach((r) => groupGap.set(r.group, (groupGap.get(r.group) || 0) + gap(r)));
@@ -121,7 +121,7 @@ function sortByGroupThenGap(rows) {
 // so the rotation reads as "eat more fish" rather than "eat more salmon". The
 // per-ingredient rows stay as they are — Insight's Protein mode reads those —
 // and each group row carries its `sources` so the donut and tooltips can name
-// them. A group's target is the sum of its members' Protein %, so the bars
+// them. A group's desired figure is the sum of its members' Protein %, so the bars
 // still add up to the same totals as the ingredients they came from. Most
 // left to eat first; Unclassified last, as in sortByGroupThenGap.
 function groupProteinRotationRows(rows) {
@@ -130,26 +130,26 @@ function groupProteinRotationRows(rows) {
     if (!byGroup.has(r.group)) {
       byGroup.set(r.group, {
         name: r.group, group: r.group, sources: [],
-        actualProteinG: 0, targetProteinG: 0, proteinPercent: 0, actualPercentOfTotalTarget: 0,
+        actualProteinG: 0, desiredProteinG: 0, proteinPercent: 0, actualPercentOfTotalDesired: 0,
       });
     }
     const g = byGroup.get(r.group);
     g.sources.push(r.name);
     g.actualProteinG += r.actualProteinG;
-    g.targetProteinG += r.targetProteinG;
+    g.desiredProteinG += r.desiredProteinG;
     g.proteinPercent += r.proteinPercent;
-    g.actualPercentOfTotalTarget += r.actualPercentOfTotalTarget;
+    g.actualPercentOfTotalDesired += r.actualPercentOfTotalDesired;
   });
 
   const round1 = (v) => Math.round(v * 10) / 10;
-  const gap = (r) => r.targetProteinG - r.actualProteinG;
+  const gap = (r) => r.desiredProteinG - r.actualProteinG;
   return [...byGroup.values()]
     .map((g) => ({
       ...g,
       actualProteinG: round1(g.actualProteinG),
-      targetProteinG: round1(g.targetProteinG),
+      desiredProteinG: round1(g.desiredProteinG),
       proteinPercent: round1(g.proteinPercent),
-      actualPercentOfTotalTarget: round1(g.actualPercentOfTotalTarget),
+      actualPercentOfTotalDesired: round1(g.actualPercentOfTotalDesired),
     }))
     .sort((a, b) => {
       const aUnknown = a.group === PROTEIN_UNCLASSIFIED_LABEL;
@@ -184,7 +184,7 @@ function proteinRotationPalette(rows) {
 // The time-windowed rings of the rotation donut, outermost first — Chart.js
 // draws datasets[0] as the outer ring. Both end on the To date the bars use,
 // so the first of these is the medium-term rotation and the second is the
-// most recent week inside it. The reference ring (each source's target
+// most recent week inside it. The reference ring (each source's desired
 // Protein %) sits outside both — see renderProteinRotationDonut — since it
 // isn't a time window at all, just the one static split the other two are
 // read against.
@@ -208,7 +208,7 @@ let proteinRotationDonut = null;
 // Same group order and colors as the bar chart — one group is one color
 // everywhere in the panel, in every ring and in its bar, which is what makes
 // the donut readable without a legend of its own. The rings are told apart by
-// position (outermost = reference target, then 4 weeks, then last week),
+// position (outermost = reference desired, then 4 weeks, then last week),
 // never by shade.
 function renderProteinRotationDonut(rows, barColors, toIso) {
   const ctx = document.getElementById('protein-rotation-donut');
@@ -292,7 +292,7 @@ function renderProteinRotationChart({ from, to }) {
 
   const labels = rows.map((r) => r.name);
   const actualData = rows.map((r) => r.actualProteinG);
-  const targetData = rows.map((r) => r.targetProteinG);
+  const desiredData = rows.map((r) => r.desiredProteinG);
   const { barColors, legend } = proteinRotationPalette(rows);
 
   // Ingredients in group-row order, so the palette's hues match the donut's.
@@ -319,8 +319,8 @@ function renderProteinRotationChart({ from, to }) {
 
   // Chart.js's own "nice number" auto-max often rounds well past the actual
   // data (e.g. real max 8 -> axis max 12) — fit the axis to the real max
-  // eaten/target value instead, with a little headroom.
-  const maxValue = Math.ceil(Math.max(1, ...actualData, ...targetData)) + 1;
+  // eaten/desired value instead, with a little headroom.
+  const maxValue = Math.ceil(Math.max(1, ...actualData, ...desiredData)) + 1;
 
   proteinRotationChart = upsertChart(proteinRotationChart, ctx, {
     data: {
@@ -331,7 +331,7 @@ function renderProteinRotationChart({ from, to }) {
           type: 'line',
           label: 'Desired',
           stack: 'desired',
-          data: targetData,
+          data: desiredData,
           showLine: false,
           pointStyle: 'line',
           rotation: 90,
@@ -366,7 +366,7 @@ function renderProteinRotationChart({ from, to }) {
             },
             label: (item) => {
               const source = item.dataset.source;
-              const pct = source ? source.actualPercentOfTotalTarget : rows[item.dataIndex].proteinPercent;
+              const pct = source ? source.actualPercentOfTotalDesired : rows[item.dataIndex].proteinPercent;
               const pctLabel = source ? 'of total desired' : 'desired';
               const value = `${item.formattedValue}g protein (${pct}% ${pctLabel})`;
               const label = source ? `${source.name} eaten` : item.dataset.label;
@@ -386,7 +386,7 @@ function renderProteinRotationChart({ from, to }) {
           max: maxValue,
           ticks: { callback: maskedUnitTick('g', 1), maxRotation: 45, minRotation: 45 },
         },
-        y: { afterFit: fixTrendYAxisWidth, ticks: { autoSkip: false } },
+        y: { afterFit: fixTrendYAxisWidth, ticks: { autoSkip: false, callback: trendYAxisCategoryTick } },
       },
     },
   });

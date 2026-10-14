@@ -447,18 +447,18 @@ function closeWorkTimeForm() {
 // new date leaves a gap since the last entry already in the sheet (e.g. a
 // skipped weekend, or any other unlogged stretch), fill every missing day
 // in between with a blank row before appending the new one.
-async function backfillMissingDates(targetDate) {
+async function backfillMissingDates(untilDate) {
   const existingDates = new Set(allTimeEntries.map((e) => e.date));
-  const priorDates = [...existingDates].filter((d) => d < targetDate).sort();
+  const priorDates = [...existingDates].filter((d) => d < untilDate).sort();
   if (priorDates.length === 0) return;
 
   const lastDate = priorDates[priorDates.length - 1];
   const cursor = dateFromIso(lastDate);
   cursor.setDate(cursor.getDate() + 1);
-  const target = dateFromIso(targetDate);
+  const endDate = dateFromIso(untilDate);
 
   const rows = [];
-  while (cursor < target) {
+  while (cursor < endDate) {
     const iso = isoFromDate(cursor);
     if (!existingDates.has(iso)) rows.push(['', iso, dayNameFromDate(iso), '', '', '', '', '']);
     cursor.setDate(cursor.getDate() + 1);

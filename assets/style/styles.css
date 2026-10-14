@@ -912,7 +912,7 @@ kbd {
 }
 
 /* Per-line ingredient suggestions for the Consumption and Workout textareas (health-physique-breakdown.js) —
-   a plain <datalist> can't target one line of a multi-line value, so this is a
+   a plain <datalist> can't suggest for one line of a multi-line value, so this is a
    hand-rolled dropdown instead, styled to match .account-menu-dropdown. */
 .autocomplete-suggestions {
     position: absolute;
@@ -1236,6 +1236,11 @@ td:has(.btn) {
     border-top: 1px solid var(--color-border);
 }
 
+/* Transactions: a receipt's UI-only total, blue so it never reads as a sheet row. */
+#transactions-table tr.tx-receipt-total td {
+    color: var(--color-primary);
+}
+
 #breakdown-table tbody tr:last-child td,
 .workout-table-strength tbody tr:last-child td {
     border-bottom: 1px solid var(--color-border);
@@ -1249,13 +1254,13 @@ td:has(.btn) {
     border-bottom: 1px solid var(--color-border);
 }
 
-/* Target — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
+/* Desired — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
    Duration/Cal workout goal (activity table), directly under the Total they're measured
-   against. A target, not a measurement, so it's set off with a dashed top border instead
+   against. A desired value, not a measurement, so it's set off with a dashed top border instead
    of the Total row's solid one — same idiom as the Food insight table's own Ideal/day row
    (#insight-food-table tr.insight-food-ideal-row below). */
-#physique-calc-breakdown tr.calc-breakdown-target td,
-#physique-activity-breakdown tr.calc-breakdown-target td,
+#physique-calc-breakdown tr.calc-breakdown-desired td,
+#physique-activity-breakdown tr.calc-breakdown-desired td,
 #insight-food-table tr.insight-food-ideal-row td {
     font-weight: 600;
     color: var(--color-text-muted);
@@ -1348,25 +1353,25 @@ td:has(.btn) {
     font-weight: 600;
 }
 
-/* Ideal/day — a target, not a measurement, so it's set off from Total/Avg with a
+/* Ideal/day — a desired value, not a measurement, so it's set off from Total/Avg with a
    dashed top border instead of their solid one, the same idiom the wellness charts'
-   own dashed target lines use. */
+   own dashed desired lines use. */
 
 /* Micronutrients table gap flags (assets/script/health-insight-micronutrient.js,
    assets/script/health-physique.js) — a row is flagged 'severe'/'mild' once its
    measured average sits well under a get-enough-of nutrient's FDA Daily Value;
    running over never flags, even on a limit-type nutrient like sodium, per
-   health-nutrient-targets.js's nutrientGapSeverity. Left-border rather than a filled
+   health-nutrient-desired.js's nutrientGapSeverity. Left-border rather than a filled
    background so the row's own numbers stay legible at both severities. */
 /* Section breaks: under the last Nutrition Facts line (Iron, when present), and
-   above the first nutrient with no daily target. Heavier than the row borders so
+   above the first nutrient with no daily desired value. Heavier than the row borders so
    each reads as a break. */
 #insight-micro-table tr.nutrient-facts-end td,
 #physique-micro-table tr.nutrient-facts-end td {
     border-bottom: 1px solid var(--color-border);
 }
 
-/* A nutrient short of its daily target, severe or mild alike: red. */
+/* A nutrient short of its daily desired value, severe or mild alike: red. */
 #insight-micro-table tr.nutrient-gap td,
 #physique-micro-table tr.nutrient-gap td {
     border-left: 2px solid var(--color-danger);
@@ -2032,7 +2037,7 @@ td .btn {
 
 /* Tight by design. The gaps between a label, its box and the next field are cut
    hardest — they cost height without buying anything — while the box's own
-   vertical padding is only trimmed, since it sets the tap target. Horizontal
+   vertical padding is only trimmed, since it sets the tap area. Horizontal
    padding is left alone: that's the gap between the border and the text you're
    reading, and it's the one that looks cramped when shaved. */
 .app-form label,
@@ -2483,9 +2488,9 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     color: var(--color-text-muted);
 }
 
-/* The "→ 70 ± 1.9 kg" / "→ 2027-01-27" target trailing "left" / "ahead". Regular weight,
+/* The "→ 70 ± 1.9 kg" / "→ 2027-01-27" trailing "left" / "ahead". Regular weight,
    like every other card's figures. */
-.body-mass-progress-meter-target,
+.body-mass-progress-meter-healthy,
 .body-mass-progress-meter-pct {
     font-size: var(--card-text-size);
     color: var(--color-text);
@@ -2990,7 +2995,7 @@ html.home-hub .page-tiles,
         flex: 1 1 100%;
     }
 
-    /* WCAG's 24px minimum tap target (the small button size), so a row of
+    /* WCAG's 24px minimum tap area (the small button size), so a row of
        ✏️/📋/🧬/🗑️ can't mis-tap onto Delete; no taller, so rows stay thin. */
     td .btn {
         margin-right: var(--space-xs);
@@ -3039,7 +3044,7 @@ html.home-hub .page-tiles,
     }
 
     /* Horizontal only — the vertical padding is already at the floor where the
-       box still reads as a tap target. */
+       box still reads as a tap area. */
     .app-form input,
     .app-form select,
     .app-form textarea {

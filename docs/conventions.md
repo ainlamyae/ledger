@@ -7,6 +7,7 @@ One name, one unit and one format for each thing, app-wide.
 ## Wording
 
 - The body has **body mass**, never "weight".
+- A goal is never a "target", anywhere: not in text, names, setting keys, ids or docs. The body-mass goal is **healthy** (healthy body mass, `BODY_MASS_HEALTHY_KG`); every other goal is **desired** (desired intake, desired sleep, `SLEEP_DESIRED_HOURS`).
 - An exercise's dumbbell or machine load is **Load** (the Activity sheet's Weight column is read by position, so its header can stay).
 - Physique form labels match the sheet headers: **Bed**, **Wake**, **Sleep**, **Deprivation**.
 - **Log** always reads Log, never "Log More".

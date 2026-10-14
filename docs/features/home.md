@@ -9,7 +9,7 @@
 - Time, Date, Azan and Weather widgets are `.card` bulbs in a `.cards` row; only their text size is their own.
 - All card text uses `--card-text-size`, regular weight, one padding; titles have their own single size.
 - One gap (`--space-s`) between everything: widget to widget, widgets to cards, card to card, cards to tiles, section to section.
-- Reads only what its cards need, plus Transactions and Work Time for tile badges (5 requests).
+- Reads only what its cards need, plus Transactions, Work Time and Accounts for tile badges (Car Service's days left, Work Time's Log, Account's Pay).
 - Account menu: **Hide widgets** (`SHOW_WIDGETS`) and **Hide bulbs** (`SHOW_BULBS`), both kept across loads.
 
 ## Dashboard widgets

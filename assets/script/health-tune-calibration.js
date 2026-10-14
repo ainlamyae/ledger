@@ -22,8 +22,8 @@
 // match what was actually measured, per the "keep slope, shift level" design.
 
 const BMR_CALIBRATION_WINDOW_DAYS = 7;
-const BMR_CALIBRATION_PERIOD_DAYS_DEFAULT = 10;
-const BMR_CALIBRATION_PERIOD_COUNT_DEFAULT = 3;
+const BMR_CALIBRATION_PERIOD_DAYS_DEFAULT = 7;
+const BMR_CALIBRATION_PERIOD_COUNT_DEFAULT = 4;
 
 // One ISO date, `days` away from `dateIso` — UTC arithmetic throughout (parseIsoDateUTC),
 // never a local Date object, so this can't drift a day off depending on the machine's
@@ -105,7 +105,7 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
   const formulaEarly = bmrFormula();
   const haveProfile = heightCmEarly !== null && (sexEarly === 'male' || sexEarly === 'female')
     && (ageEarly !== null || !bmrNeedsAge(formulaEarly));
-  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
   const tefPct = tefPercent();
   const divisor = tefDivisor(tefPct);
 
@@ -133,7 +133,7 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
       if (maintenanceForDay !== null) {
         const activity = p.caloriesOut ?? 0;
         const sleepHours = p.sleep ?? physiqueSleepHours(p);
-        const balance = dailyEnergyBalanceKcal(p.caloriesIn, maintenanceForDay, activity, tef, sleepHours, sleepTarget);
+        const balance = dailyEnergyBalanceKcal(p.caloriesIn, maintenanceForDay, activity, tef, sleepHours, sleepDesired);
         deficit = Math.round(balance.balance);
         if (sleepHours !== null) sd = Math.round(balance.deprivationKcal);
       }

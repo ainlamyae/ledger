@@ -2,14 +2,14 @@
 
 let healthFiberChart = null;
 // Now a shaded min/max band like Protein Intake, not a flat single line — the Formula
-// Tune's fiber rows produce a band the same shape protein's do (getFiberTargetBandG),
+// Tune's fiber rows produce a band the same shape protein's do (getFiberDesiredBandG),
 // so the chart reads the same way: a floor that's a genuine miss (red) and a ceiling that's
 // still a hit (dark green), not a flat met-or-missed. Read from the same Physique-day Fiber
 // figure (fiberG) the Health tiles' own Fiber card sums — see physiqueAsHealthEntries.
 function renderHealthFiberChart(entries) {
   const ctx = document.getElementById('health-fiber-chart');
 
-  const band = getFiberTargetBandG(entries);
+  const band = getFiberDesiredBandG(entries);
 
   const fiberEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.fiberG !== null && e.fiberG !== undefined);
   // Shared with every other chart in the panel — see the Sleep chart's own copy of this
@@ -27,7 +27,7 @@ function renderHealthFiberChart(entries) {
     borderWidth: 0,
     pointRadius: 0,
     tension: 0,
-    isTargetLine: true,
+    isDesiredLine: true,
     order: 3,
     ...extra,
   });
@@ -41,23 +41,29 @@ function renderHealthFiberChart(entries) {
     return values[i] > band.max ? FIBER_OVER_BAND_COLOR : chartColor('--chart-bad');
   });
 
-  const capHalf = targetCapHalf(Math.max(band.max, ...values, 1));
-  const capFor = (value, label) => targetCapDataset(label, new Array(dates.length).fill(value), capHalf, { isTargetLine: true });
+  const capHalf = desiredCapHalf(Math.max(band.max, ...values, 1));
+  // Cyan, the desired mark's colour on the other Health charts.
+  const capFor = (value, label) => desiredCapDataset(label, new Array(dates.length).fill(value), capHalf, { isDesiredLine: true, backgroundColor: chartColor('--chart-cyan') });
 
-  const targetDatasets = band.max > band.min
+  const desiredDatasets = band.max > band.min
     ? [
       bandFill(band.max, { fill: '+1', backgroundColor: chartColor('--chart-good', 0.1) }),
       bandFill(band.min),
-      capFor(band.max, `${band.max} g upper target`),
-      capFor(band.min, `${band.min} g target floor`),
+      capFor(band.max, `${band.max} g desired upper end`),
+      capFor(band.min, `${band.min} g desired floor`),
     ]
-    : [capFor(band.min, `${band.min} g target`)];
+    : [capFor(band.min, `${band.min} g desired`)];
 
   const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   const gTopFiber = Math.max(...values, band.max, band.min, 1);
   const gStepFiber = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopFiber / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
   const gMaxFiber = Math.ceil(gTopFiber / gStepFiber) * gStepFiber;
+
+  // Legend entries switched off (renderToggleLegend below); bars by their colour's name.
+  const hidden = legendHiddenNames('health-fiber-legend');
+  const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Within desired'
+    : c === FIBER_OVER_BAND_COLOR ? 'Over desired' : 'Under desired'));
 
   healthFiberChart = upsertChart(healthFiberChart, ctx, {
     data: {
@@ -66,12 +72,13 @@ function renderHealthFiberChart(entries) {
         {
           type: 'bar',
           label: 'Actual Intake',
-          data: values,
+          data: maskHiddenClasses(values, barClasses, hidden),
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg),
-        ...targetDatasets,
+        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        // The band's two fill edges go with the band entry, every other mark with the desired one.
+        ...desiredDatasets.map((ds) => ({ ...ds, hidden: hidden.has(ds.label.endsWith('band edge') ? 'Desired Dietary Fiber band' : 'Desired Dietary Fiber') })),
       ],
     },
     options: {
@@ -81,7 +88,7 @@ function renderHealthFiberChart(entries) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          filter: (item) => !item.dataset.isDesiredLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
@@ -119,5 +126,15 @@ function renderHealthFiberChart(entries) {
       },
     },
   });
+
+  // Swatches under the chart, named as in the hover.
+  renderToggleLegend('health-fiber-legend', dates.length === 0 ? [] : [
+    { name: 'Within desired', color: chartColor('--chart-good') },
+    { name: 'Over desired', color: FIBER_OVER_BAND_COLOR },
+    { name: 'Under desired', color: chartColor('--chart-bad') },
+    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: 'Desired Dietary Fiber', color: chartColor('--chart-cyan') },
+    ...(band.max > band.min ? [{ name: 'Desired Dietary Fiber band', color: chartColor('--chart-good', 0.25) }] : []),
+  ], () => renderHealthFiberChart(entries));
 }
 

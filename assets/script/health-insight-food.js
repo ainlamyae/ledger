@@ -172,7 +172,7 @@ function renderFoodInsightPreview(rows, from, to) {
   // hides from someone glancing over at the charts. Rendered one line per fact
   // by the panel's shared renderer, so the profile block reads the same here as
   // it does inside the Wellness/Activity prompt previews.
-  renderInsightLines(document.getElementById('insight-food-profile'), formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)));
+  renderInsightLines(document.getElementById('insight-food-profile'), formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)));
 
   const tbody = document.getElementById('insight-food-body');
   tbody.innerHTML = '';
@@ -267,28 +267,28 @@ function renderFoodInsightPreview(rows, from, to) {
 
   // What this same body would be aiming for, so the Avg/day row directly above has
   // something to compare itself against without leaving the table. Calories and Protein
-  // reuse the exact targets the tiles/charts already compute (getCalorieTargetKcal,
-  // getProteinTargetBandG/getFiberTargetBandG) — the Formula Tune's own figures,
+  // reuse the exact desired figures the tiles/charts already compute (getCalorieDesiredKcal,
+  // getProteinDesiredBandG/getFiberDesiredBandG) — the Formula Tune's own figures,
   // not a second copy of the arithmetic. Fat/Carbohydrate have no personalized formula
   // in the app yet, so they fall back to the FDA Daily Value reference the Micronutrients
-  // mode already uses for the same two nutrients. TEF has no target at all — it's a
+  // mode already uses for the same two nutrients. TEF has no desired figure at all — it's a
   // measured byproduct of what you ate, not something to aim for.
   const healthEntries = physiqueAsHealthEntries();
-  const calorieTarget = getCalorieTarget(healthEntries);
-  const proteinBand = getProteinTargetBandG(healthEntries);
-  const fiberBand = getFiberTargetBandG(healthEntries);
-  const dailyTargets = nutrientDailyTargets();
+  const calorieDesired = getCalorieDesired(healthEntries);
+  const proteinBand = getProteinDesiredBandG(healthEntries);
+  const fiberBand = getFiberDesiredBandG(healthEntries);
+  const dailyDesired = nutrientDailyDesired();
 
   const idealRow = document.createElement('tr');
   idealRow.className = 'insight-food-ideal-row';
   idealRow.append(
-    makeCell('Ideal/day', `${calorieTarget.full} calorie target, current protein/fiber bands and Fat/Carbohydrate FDA Daily Values — from Tune and Settings, not this range's data`),
+    makeCell('Ideal/day', `${calorieDesired.full} desired calories, current protein/fiber bands and Fat/Carbohydrate FDA Daily Values — from Tune and Settings, not this range's data`),
     makeCell(''),
-    makeCell(String(Math.round(calorieTarget.kcal))),
-    makeCell(formatProteinTargetBand(proteinBand)),
-    makeCell(formatProteinTargetBand(fiberBand)),
-    makeCell(String(dailyTargets['Total lipid (fat)']?.amount ?? '—')),
-    makeCell(String(dailyTargets['Carbohydrate, by difference']?.amount ?? '—')),
+    makeCell(String(Math.round(calorieDesired.kcal))),
+    makeCell(formatProteinDesiredBand(proteinBand)),
+    makeCell(formatProteinDesiredBand(fiberBand)),
+    makeCell(String(dailyDesired['Total lipid (fat)']?.amount ?? '—')),
+    makeCell(String(dailyDesired['Carbohydrate, by difference']?.amount ?? '—')),
     makeCell('—'),
   );
   tbody.appendChild(idealRow);
@@ -305,7 +305,7 @@ const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missin
 // sex and age, and "is this enough food" can't be read off an ingredient list
 // without knowing the body it's feeding.
 function formatFoodInsightPrompt(rows, from, to, question) {
-  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)).join('\n');
+  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)).join('\n');
   const header = `Aggregated ingredients logged from ${from} to ${to}, grouped by the Group each ingredient is filed under in the user's own ingredient catalog. Each group line gives that group's ingredient count and totals, followed by its ingredients (name (total amount): total calories, total protein, estimated TEF where measured):`;
   const groups = groupFoodIntakeByGroup(rows);
   const body = groups.length

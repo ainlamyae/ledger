@@ -33,7 +33,7 @@
 | `ledger_token` | `auth.js` | `{ token, expiresAt }` — enables silent refresh |
 | `ledger_consented` | `auth.js` | `'1'` once consent completes; controls `prompt` on next sign-in; cleared on sign-out |
 | `ledger_widget_detected_location` | `ledger-widgets.js` | `{lat, lon, label}` from the last "Use my location" |
-| `ledger_spreadsheet_id` | `drive.js` | The chosen spreadsheet's Drive file ID — every Sheets call targets it |
+| `ledger_spreadsheet_id` | `drive.js` | The chosen spreadsheet's Drive file ID — every Sheets call goes to it |
 | `ledger_last_reminder_notified` | `track-work-time.js` | Today's date once the OS notification fired |
 | `ledger_last_car_service_notified` | `track-car-service.js` | Today's date once the car-service notification fired (one per day) |
 | `ledger_widget_manual_location` | `ledger-widgets.js` | `{lat, lon, label}` from the location picker; overrides auto-detect and Settings |

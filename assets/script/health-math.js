@@ -1,15 +1,15 @@
 
 // Used until a Setting tab exists, so nothing changes for anyone without one.
-const BODY_MASS_TARGET_KG_DEFAULT = 82;
-const CALORIE_TARGET_KCAL_DEFAULT = 2000;
-const SLEEP_TARGET_HOURS_DEFAULT = 8;
-const FIBER_TARGET_G_DEFAULT = 30;
+const BODY_MASS_HEALTHY_KG_DEFAULT = 70;
+const CALORIE_DESIRED_KCAL_DEFAULT = 2000;
+const SLEEP_DESIRED_HOURS_DEFAULT = 8;
+const FIBER_DESIRED_G_DEFAULT = 30;
 // The general USDA %DV reference for total fat (2,000 kcal diet) — same role as the two
 // defaults above, a flat number to score against before the Tune's own
-// pct-of-Eᵢₙ band (FAT_TARGET_G_MIN/MAX) has ever been saved.
-const FAT_TARGET_G_DEFAULT = 65;
-const ACTIVITY_TARGET_MIN_DEFAULT = 100;
-const PROTEIN_TARGET_G_DEFAULT = 100;
+// pct-of-Eᵢₙ band (FAT_DESIRED_G_MIN/MAX) has ever been saved.
+const FAT_DESIRED_G_DEFAULT = 65;
+const ACTIVITY_DESIRED_MIN_DEFAULT = 100;
+const PROTEIN_DESIRED_G_DEFAULT = 100;
 
 // Protein per kg of LEAN mass, not total mass — the band the Formula Tune opens on.
 // 1.8-2.2 spans what the resistance-training literature supports for holding lean mass in
@@ -20,11 +20,10 @@ const PROTEIN_TARGET_G_DEFAULT = 100;
 const PROTEIN_G_PER_KG_LBM_MIN_DEFAULT = 1.8;
 const PROTEIN_G_PER_KG_LBM_MAX_DEFAULT = 2.2;
 
-// The fiber band's two coefficients — the Formula Tune opens on these. 14 g/1000 kcal
-// is the USDA/Dietary Guidelines for Americans rule of thumb (derived from the ~25g/2000kcal
-// adult reference intake); 0.5 g/kg body mass is a common upper-bound heuristic so the
+// The fiber band's two coefficients — the Formula Tune opens on these. 17 g/1000 kcal
+// sits above the USDA rule of thumb (14 g/1000 kcal); 0.5 g/kg body mass is a common upper-bound heuristic so the
 // ceiling scales with the person rather than staying a flat number regardless of size.
-const FIBER_G_PER_1000_KCAL_MIN_DEFAULT = 14;
+const FIBER_G_PER_1000_KCAL_MIN_DEFAULT = 17;
 const FIBER_G_PER_KG_MAX_DEFAULT = 0.5;
 
 // The fat band's two coefficients — 20-35% of total energy from fat is the Institute of
@@ -39,24 +38,21 @@ const FAT_PCT_OF_KCAL_MAX_DEFAULT = 35;
 // plain constant rather than an overridable setting the way the two percentages above are.
 const KCAL_PER_G_FAT = 9;
 
-// The carb band's two coefficients — 45-65% of total energy from carbohydrate is the same
-// IOM AMDR report's range for carbohydrate (Dietary Reference Intakes for Energy,
-// Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also
-// carried forward by the USDA Dietary Guidelines for Americans. Both ends scale off Eᵢₙ, same
-// shape as the fat band above, since that's how the AMDR itself is defined for every macro.
-const CARB_PCT_OF_KCAL_MIN_DEFAULT = 45;
-const CARB_PCT_OF_KCAL_MAX_DEFAULT = 65;
+// The carb band's two coefficients — 30-50% of total energy, below the IOM AMDR's 45-65%
+// to leave room for protein on a deficit. Both ends scale off Eᵢₙ, like the fat band above.
+const CARB_PCT_OF_KCAL_MIN_DEFAULT = 30;
+const CARB_PCT_OF_KCAL_MAX_DEFAULT = 50;
 // Carbohydrate's fixed energy density (Atwater) — grams per kcal, same role as KCAL_PER_G_FAT.
 const KCAL_PER_G_CARB = 4;
 // The general USDA %DV reference for total carbohydrate (2,000 kcal diet) — same role as
-// FAT_TARGET_G_DEFAULT, a flat number to score against before the Tune's own
-// pct-of-Eᵢₙ band (CARB_TARGET_G_MIN/MAX) has ever been saved.
-const CARB_TARGET_G_DEFAULT = 275;
+// FAT_DESIRED_G_DEFAULT, a flat number to score against before the Tune's own
+// pct-of-Eᵢₙ band (CARB_DESIRED_G_MIN/MAX) has ever been saved.
+const CARB_DESIRED_G_DEFAULT = 275;
 
-// Intensity assumed for ACTIVITY_TARGET_MIN (3.0 walking, 5.0 compound lifting, 7.0
+// Intensity assumed for ACTIVITY_DESIRED_MIN (3.0 walking, 5.0 compound lifting, 7.0
 // jogging). Duplicates health-activity-estimator.js's EXERCISE_MET_DEFAULT rather than
 // referencing it: this file loads first, so that const is still in its dead zone.
-const ACTIVITY_MET_FALLBACK = 3.5;
+const ACTIVITY_MET_FALLBACK = 3;
 
 // Tune's MET box while its preview runs (withFormulaOverrides) — a what-if, never
 // saved to the Setting tab.
@@ -68,20 +64,22 @@ const ACTIVITY_MET_PREVIEW_KEY = 'ACTIVITY_MET_PREVIEW';
 function activityMet() {
   const preview = currentSettings[ACTIVITY_MET_PREVIEW_KEY];
   if (typeof preview === 'number' && Number.isFinite(preview)) return preview;
-  return typeof exerciseMet === 'function' ? exerciseMet('Walk') : ACTIVITY_MET_FALLBACK;
+  // No Walk row (a fresh sheet): the walking fallback, not the generic exercise one.
+  const met = typeof activityByName === 'function' ? activityByName('Walk')?.met : null;
+  return Number.isFinite(met) ? met : ACTIVITY_MET_FALLBACK;
 }
 
-// Energy density of body fat, shared by the projection, the calorie target and Calorie
+// Energy density of body fat, shared by the projection, desired intake and Calorie
 // Balance. A population constant, not a personal parameter.
 const GENERIC_KCAL_PER_KG_FAT = 7700;
 
 // Last resort, for when no body mass is on file and the MET formula can't be evaluated.
 const GENERIC_KCAL_PER_ACTIVE_MIN = 5;
 
-// ACSM form: 1 MET = 3.5 mL O₂/kg/min and a litre of O₂ releases ~5 kcal (200 mL
-// per kcal), so 3.5/200 kcal per MET per kg per minute. Not the `MET × kg × hours`
+// ACSM form: 1 MET ≈ 3.5 mL O₂/kg/min (default 3, Tune's κ) and a litre of O₂ releases
+// ~5 kcal (200 mL per kcal), so κ/200 kcal per MET per kg per minute. Not the `MET × kg × hours`
 // shorthand, which assumes 1 MET = 1 kcal/kg/hour and lands a flat 5% low.
-const MET_ML_O2_PER_KG_MIN_DEFAULT = 3.5;
+const MET_ML_O2_PER_KG_MIN_DEFAULT = 3;
 const ML_O2_PER_KCAL = 200;
 
 // Only the mL-O₂ numerator is overridable (KCAL_PER_MET_KG_MIN). The /200 is oxygen's
@@ -90,7 +88,7 @@ function kcalPerMetKgMin() {
   return getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT) / ML_O2_PER_KCAL;
 }
 
-// The app's only MET→kcal conversion, so the target's assumed activity burn and
+// The app's only MET→kcal conversion, so desired intake's assumed activity burn and
 // Calculate's measured one (health-activity-estimator.js) can't disagree.
 function metKcal(met, bodyMassKg, minutes) {
   return met * bodyMassKg * minutes * kcalPerMetKgMin();
@@ -138,9 +136,9 @@ function smoothedBodyMassKg(entries, windowDays = bodyMassSmoothingDays()) {
   return Math.round((inWindow.reduce((sum, e) => sum + e.amount, 0) / inWindow.length) * 10) / 10;
 }
 
-// The mass every PLAN-level figure is evaluated at — the target intake, its direction, the
+// The mass every PLAN-level figure is evaluated at — the desired intake, its direction, the
 // forecast, the Tune's boxes and the Health Plan prompt. Deliberately NOT used by the
-// per-day series (Caloric Intake's target line, Calorie Balance's maintenance): those
+// per-day series (Caloric Intake's desired line, Calorie Balance's maintenance): those
 // describe what was true on one specific day, and that day's own reading is the honest
 // input there. Here the noise is only noise.
 function planBodyMassKg(entries) {
@@ -152,7 +150,7 @@ const G_PER_KG_BAND_SEPARATOR = /\s*(?:~|-|–|—|to)\s*/i;
 
 // That single cell as {low, high} — null if absent or holding nothing numeric.
 function parseGPerKgRangeCell() {
-  const raw = getSettingString('PROTEIN_TARGET_G_PER_KG', null);
+  const raw = getSettingString('PROTEIN_DESIRED_G_PER_KG', null);
   if (raw === null) return null;
 
   const parts = String(raw).trim().split(G_PER_KG_BAND_SEPARATOR)
@@ -163,14 +161,14 @@ function parseGPerKgRangeCell() {
   return { low: parts[0], high: parts[parts.length - 1] };
 }
 
-// The g/kg band as {low, high}; null sends getProteinTargetBandG to its flat fallback.
+// The g/kg band as {low, high}; null sends getProteinDesiredBandG to its flat fallback.
 // Either entry style works — one cell (`1.6-2`) or one end per row — with the explicit
 // _MIN/_MAX rows winning per end. Sorted, so a band entered backwards still reads.
 function getProteinGPerKgBand() {
   const cell = parseGPerKgRangeCell();
   const ends = [
-    getSetting('PROTEIN_TARGET_G_PER_KG_MIN', null) ?? cell?.low ?? null,
-    getSetting('PROTEIN_TARGET_G_PER_KG_MAX', null) ?? cell?.high ?? null,
+    getSetting('PROTEIN_DESIRED_G_PER_KG_MIN', null) ?? cell?.low ?? null,
+    getSetting('PROTEIN_DESIRED_G_PER_KG_MAX', null) ?? cell?.high ?? null,
   ].filter((n) => n !== null);
 
   if (ends.length === 0) return null;
@@ -183,8 +181,8 @@ function getProteinGPerKgBand() {
 // ends optional and sorted, same as the g/kg pair.
 function getProteinAbsoluteBandG() {
   const ends = [
-    getSetting('PROTEIN_TARGET_G_MIN', null),
-    getSetting('PROTEIN_TARGET_G_MAX', null),
+    getSetting('PROTEIN_DESIRED_G_MIN', null),
+    getSetting('PROTEIN_DESIRED_G_MAX', null),
   ].filter((n) => n !== null && n > 0);
 
   if (ends.length === 0) return null;
@@ -192,10 +190,10 @@ function getProteinAbsoluteBandG() {
 }
 
 // A band, not a point, because the evidence behind it is a range (1.6-2.0 g/kg).
-// Applied to TARGET body mass, not today's: scaling off current body mass would shrink the
-// target with every kg lost, exactly when protein matters most. Falls back to the
-// latest body-mass reading, then to a zero-width band at the flat PROTEIN_TARGET_G.
-function getProteinTargetBandG(entries) {
+// Applied to HEALTHY body mass, not today's: scaling off current body mass would shrink the
+// band with every kg lost, exactly when protein matters most. Falls back to the
+// latest body-mass reading, then to a zero-width band at the flat PROTEIN_DESIRED_G.
+function getProteinDesiredBandG(entries) {
   // The lean-mass band first: it's the most specific thing on the sheet, and the only
   // one whose grams were computed against a body-composition estimate rather than
   // total mass.
@@ -204,21 +202,21 @@ function getProteinTargetBandG(entries) {
 
   const band = getProteinGPerKgBand();
   const basisBodyMassKg = band !== null
-    ? (getSetting('BODY_MASS_TARGET_KG', null) ?? latestBodyMassKg(entries))
+    ? (getSetting('BODY_MASS_HEALTHY_KG', null) ?? latestBodyMassKg(entries))
     : null;
 
   if (basisBodyMassKg !== null) {
     return { min: Math.round(basisBodyMassKg * band.low), max: Math.round(basisBodyMassKg * band.high) };
   }
 
-  const flat = getSetting('PROTEIN_TARGET_G', PROTEIN_TARGET_G_DEFAULT);
+  const flat = getSetting('PROTEIN_DESIRED_G', PROTEIN_DESIRED_G_DEFAULT);
   return { min: flat, max: flat };
 }
 
 // "131" or "131~164" — one place, so the glance tile and the Insight prompt can't
 // drift. The separator is a parameter: the prompt passes '-' rather than send the AI
 // an unusual character.
-function formatProteinTargetBand(band, separator = '~') {
+function formatProteinDesiredBand(band, separator = '~') {
   return band.max > band.min ? `${band.min}${separator}${band.max}` : `${band.min}`;
 }
 
@@ -229,28 +227,28 @@ function withinProteinBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
 
-// The fiber band the Formula Tune writes — FIBER_TARGET_G_MIN/MAX, same shape as
+// The fiber band the Formula Tune writes — FIBER_DESIRED_G_MIN/MAX, same shape as
 // getProteinAbsoluteBandG. Sorted, so a band that came out backwards (a very light body
 // weight paired with a high intake, where the per-kg ceiling can undercut the per-1000kcal
 // floor) still reads as a proper band rather than an inverted one.
 function getFiberAbsoluteBandG() {
   const ends = [
-    getSetting('FIBER_TARGET_G_MIN', null),
-    getSetting('FIBER_TARGET_G_MAX', null),
+    getSetting('FIBER_DESIRED_G_MIN', null),
+    getSetting('FIBER_DESIRED_G_MAX', null),
   ].filter((n) => n !== null && n > 0);
 
   if (ends.length === 0) return null;
   return { min: Math.round(Math.min(...ends)), max: Math.round(Math.max(...ends)) };
 }
 
-// Falls back to the flat FIBER_TARGET_G/_DEFAULT as a zero-width band, same fallback shape
-// getProteinTargetBandG uses, for whoever hasn't opened the Formula Tune's fiber rows
+// Falls back to the flat FIBER_DESIRED_G/_DEFAULT as a zero-width band, same fallback shape
+// getProteinDesiredBandG uses, for whoever hasn't opened the Formula Tune's fiber rows
 // yet.
-function getFiberTargetBandG(entries) {
+function getFiberDesiredBandG(entries) {
   const absolute = getFiberAbsoluteBandG();
   if (absolute !== null) return absolute;
 
-  const flat = getSetting('FIBER_TARGET_G', FIBER_TARGET_G_DEFAULT);
+  const flat = getSetting('FIBER_DESIRED_G', FIBER_DESIRED_G_DEFAULT);
   return { min: flat, max: flat };
 }
 
@@ -261,26 +259,26 @@ function withinFiberBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
 
-// The fat band the Formula Tune writes — FAT_TARGET_G_MIN/MAX, same shape as
+// The fat band the Formula Tune writes — FAT_DESIRED_G_MIN/MAX, same shape as
 // getFiberAbsoluteBandG. Sorted for the same reason: both ends are a share of Eᵢₙ, so
 // there's no structural reason they can't come out backwards either.
 function getFatAbsoluteBandG() {
   const ends = [
-    getSetting('FAT_TARGET_G_MIN', null),
-    getSetting('FAT_TARGET_G_MAX', null),
+    getSetting('FAT_DESIRED_G_MIN', null),
+    getSetting('FAT_DESIRED_G_MAX', null),
   ].filter((n) => n !== null && n > 0);
 
   if (ends.length === 0) return null;
   return { min: Math.round(Math.min(...ends)), max: Math.round(Math.max(...ends)) };
 }
 
-// Falls back to the flat FAT_TARGET_G/_DEFAULT as a zero-width band, same fallback shape
-// getFiberTargetBandG uses, for whoever hasn't opened the Formula Tune's fat rows yet.
-function getFatTargetBandG(entries) {
+// Falls back to the flat FAT_DESIRED_G/_DEFAULT as a zero-width band, same fallback shape
+// getFiberDesiredBandG uses, for whoever hasn't opened the Formula Tune's fat rows yet.
+function getFatDesiredBandG(entries) {
   const absolute = getFatAbsoluteBandG();
   if (absolute !== null) return absolute;
 
-  const flat = getSetting('FAT_TARGET_G', FAT_TARGET_G_DEFAULT);
+  const flat = getSetting('FAT_DESIRED_G', FAT_DESIRED_G_DEFAULT);
   return { min: flat, max: flat };
 }
 
@@ -289,25 +287,25 @@ function withinFatBand(g, band) {
   return g >= band.min && (band.max === band.min || g <= band.max);
 }
 
-// The carb band the Formula Tune writes — CARB_TARGET_G_MIN/MAX, same shape as
+// The carb band the Formula Tune writes — CARB_DESIRED_G_MIN/MAX, same shape as
 // getFatAbsoluteBandG. Sorted for the same reason: both ends are a share of Eᵢₙ.
 function getCarbAbsoluteBandG() {
   const ends = [
-    getSetting('CARB_TARGET_G_MIN', null),
-    getSetting('CARB_TARGET_G_MAX', null),
+    getSetting('CARB_DESIRED_G_MIN', null),
+    getSetting('CARB_DESIRED_G_MAX', null),
   ].filter((n) => n !== null && n > 0);
 
   if (ends.length === 0) return null;
   return { min: Math.round(Math.min(...ends)), max: Math.round(Math.max(...ends)) };
 }
 
-// Falls back to the flat CARB_TARGET_G/_DEFAULT as a zero-width band, same fallback shape
-// getFatTargetBandG uses, for whoever hasn't opened the Formula Tune's carb rows yet.
-function getCarbTargetBandG(entries) {
+// Falls back to the flat CARB_DESIRED_G/_DEFAULT as a zero-width band, same fallback shape
+// getFatDesiredBandG uses, for whoever hasn't opened the Formula Tune's carb rows yet.
+function getCarbDesiredBandG(entries) {
   const absolute = getCarbAbsoluteBandG();
   if (absolute !== null) return absolute;
 
-  const flat = getSetting('CARB_TARGET_G', CARB_TARGET_G_DEFAULT);
+  const flat = getSetting('CARB_DESIRED_G', CARB_DESIRED_G_DEFAULT);
   return { min: flat, max: flat };
 }
 
@@ -385,10 +383,9 @@ function bmrKcal(bodyMassKg, heightCm, age, sex, formula = bmrFormula()) {
 // − BMR − Eₐ = −D rearranges to that same line — so the two conventions can't disagree
 // about a number here.
 //
-// Defaults to 0, which is exactly the app's arithmetic before this existed. Switching it on
-// lifts every target by ~11%, and that's a decision for whoever owns the plan.
+// Defaults to 13.5% of intake, Tune's starting f.
 const TEF_PERCENT_KEY = 'TEF_PERCENT_OF_INTAKE';
-const TEF_PERCENT_DEFAULT = 0;
+const TEF_PERCENT_DEFAULT = 13.5;
 
 function tefPercent() {
   return getSetting(TEF_PERCENT_KEY, TEF_PERCENT_DEFAULT);
@@ -410,7 +407,7 @@ function tefDivisor(percent = tefPercent()) {
 //
 // Reported, never planned with: Eᵢₙ, the deficit and the arrival date are all left as the
 // un-adapted identities give them, because the adaptation is a consequence of the diet
-// rather than an input to it, and t is a moving target while λt is still growing. What it
+// rather than an input to it, and t keeps moving while λt is still growing. What it
 // buys is the honest caveat on m∞ — a plateau at a HEAVIER mass than the constant-BMR model
 // promises, which is the usual reason a forecast overshoots in practice. adaptedPlateauKg
 // below is how much heavier.
@@ -543,45 +540,45 @@ function restingMaintenanceKcal(entries) {
 }
 
 // Inside this margin the Physical Activity dot goes gray rather than red. Same 5% as
-// CALORIE_TARGET_NEAR_FRACTION, kept separate because the two score different things.
-const ACTIVITY_NEAR_TARGET_FRACTION = 0.05;
+// CALORIE_DESIRED_NEAR_FRACTION, kept separate because the two score different things.
+const ACTIVITY_NEAR_DESIRED_FRACTION = 0.05;
 
-// What ACTIVITY_TARGET_MIN implies at `bodyMassKg`. Gross, not net of resting — Calorie
+// What ACTIVITY_DESIRED_MIN implies at `bodyMassKg`. Gross, not net of resting — Calorie
 // Balance also adds gross activity to plain BMR, so both maintenance figures agree.
-function activityTargetKcal(bodyMassKg) {
-  return metKcal(activityMet(), bodyMassKg, getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT));
+function activityDesiredKcal(bodyMassKg) {
+  return metKcal(activityMet(), bodyMassKg, getSetting('ACTIVITY_DESIRED_MIN', ACTIVITY_DESIRED_MIN_DEFAULT));
 }
 
-// A PINNED activity target: the same idea as CALORIE_TARGET_PIN_KEY below, but for the
-// workout goal itself. Unset, the goal is ACTIVITY_TARGET_MIN minutes and whatever that
+// A PINNED desired activity: the same idea as CALORIE_DESIRED_PIN_KEY below, but for the
+// workout goal itself. Unset, the goal is ACTIVITY_DESIRED_MIN minutes and whatever that
 // burns falls as body mass falls, since metKcal scales with mass — pin this instead and
 // the BURN stays put, so the minutes needed rise instead as you get lighter.
 //
-// Deliberately doesn't touch activityTargetKcal above (or calorieTargetDetail, which calls
+// Deliberately doesn't touch activityDesiredKcal above (or calorieDesiredDetail, which calls
 // it): those stay the raw, pin-blind calculation the Tune previews live and
-// the calorie-intake target is built from — the same way CALORIE_TARGET_PIN_KEY leaves
-// calorieTargetDetail alone. Only the activity tile and chart, which show the workout goal
+// the desired intake is built from — the same way CALORIE_DESIRED_PIN_KEY leaves
+// calorieDesiredDetail alone. Only the activity tile and chart, which show the workout goal
 // itself rather than daily intake, read this.
-const ACTIVITY_TARGET_PIN_KEY = 'ACTIVITY_TARGET_FIXED_KCAL';
+const ACTIVITY_DESIRED_PIN_KEY = 'ACTIVITY_DESIRED_FIXED_KCAL';
 
-function pinnedActivityTargetKcal() {
-  return getSetting(ACTIVITY_TARGET_PIN_KEY, null);
+function pinnedActivityDesiredKcal() {
+  return getSetting(ACTIVITY_DESIRED_PIN_KEY, null);
 }
 
-// TODAY's activity kcal target: the pinned figure if one is set, else whatever
-// ACTIVITY_TARGET_MIN implies at bodyMassKg.
-function getActivityTargetKcal(bodyMassKg) {
-  return pinnedActivityTargetKcal() ?? activityTargetKcal(bodyMassKg);
+// TODAY's desired activity kcal: the pinned figure if one is set, else whatever
+// ACTIVITY_DESIRED_MIN implies at bodyMassKg.
+function getActivityDesiredKcal(bodyMassKg) {
+  return pinnedActivityDesiredKcal() ?? activityDesiredKcal(bodyMassKg);
 }
 
-// The mirror for minutes: unset, it's just the flat ACTIVITY_TARGET_MIN; pinned, it's
+// The mirror for minutes: unset, it's just the flat ACTIVITY_DESIRED_MIN; pinned, it's
 // however many minutes at bodyMassKg it now takes to burn the pinned figure — rising as
 // body mass falls, since the same MET moves less mass per minute. No body mass, no figure
 // to divide by, so it falls back to the flat minutes setting either way.
-function getActivityTargetMin(bodyMassKg) {
-  const pinnedKcal = pinnedActivityTargetKcal();
+function getActivityDesiredMin(bodyMassKg) {
+  const pinnedKcal = pinnedActivityDesiredKcal();
   if (pinnedKcal === null || bodyMassKg === null) {
-    return getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
+    return getSetting('ACTIVITY_DESIRED_MIN', ACTIVITY_DESIRED_MIN_DEFAULT);
   }
   return pinnedKcal / (activityMet() * bodyMassKg * kcalPerMetKgMin());
 }
@@ -594,20 +591,20 @@ function activityEntryKcal(entry, bodyMassKg) {
   return bodyMassKg != null ? metKcal(activityMet(), bodyMassKg, mins) : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
 }
 
-// Sleep Efficiency Factor: 1 − rate × hours below target — the per-hour cost a short
-// night has on fat-loss efficiency. 1.0 at or above target, floored at 0 rather than
+// Sleep Efficiency Factor: 1 − rate × hours below desired — the per-hour cost a short
+// night has on fat-loss efficiency. 1.0 at or above desired, floored at 0 rather than
 // going negative on an extreme night. The rate itself is a Tune input (γ,
 // SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY), not a constant — this reads whatever's saved (or
-// overlaid by the Tune's preview), defaulting to 2.5%/hr, the literature's own
-// 2–3%/hr range. Shared by calorieTargetDetail (the plan-level target, below), the
+// overlaid by the Tune's preview), defaulting to 3%/hr, within the literature's
+// 2–3%/hr range. Shared by calorieDesiredDetail (the plan-level intake, below), the
 // Calorie Balance / State Trend & Forecast charts' day-by-day reading, and the Sleep
 // chart's own dot, so none of them can disagree about what a given night is worth.
 const SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY = 'SLEEP_DEPRIVATION_PCT_PER_HOUR';
-const SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT = 2.5;
+const SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT = 3;
 
-function sleepEfficiencyFactor(sleepHours, sleepTargetHours) {
-  if (sleepHours === null || sleepHours === undefined || !sleepTargetHours) return 1;
-  const hoursBelow = Math.max(0, sleepTargetHours - sleepHours);
+function sleepEfficiencyFactor(sleepHours, sleepDesiredHours) {
+  if (sleepHours === null || sleepHours === undefined || !sleepDesiredHours) return 1;
+  const hoursBelow = Math.max(0, sleepDesiredHours - sleepHours);
   const pctPerHour = getSetting(SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY, SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT);
   return Math.max(0, 1 - (pctPerHour / 100) * hoursBelow);
 }
@@ -623,9 +620,9 @@ function sleepEfficiencyFactor(sleepHours, sleepTargetHours) {
 // "how much BIGGER does the planned deficit need to be" — so it always multiplies by
 // (1 - factor) rather than dividing. See dailyEnergyBalanceKcal for where this feeds a
 // day's actual balance.
-function sleepDeprivationKcal(balanceKcal, sleepHours, sleepTargetHours) {
+function sleepDeprivationKcal(balanceKcal, sleepHours, sleepDesiredHours) {
   if (balanceKcal === null || sleepHours === null || sleepHours === undefined) return null;
-  const factor = sleepEfficiencyFactor(sleepHours, sleepTargetHours);
+  const factor = sleepEfficiencyFactor(sleepHours, sleepDesiredHours);
   return Math.round(Math.abs(balanceKcal) * (1 - factor));
 }
 
@@ -636,26 +633,26 @@ function sleepDeprivationKcal(balanceKcal, sleepHours, sleepTargetHours) {
 // balance started on. Shared by Calorie Balance and State Trend & Forecast's
 // Calorie-Implied Trajectory so the two can't disagree about what a day's shortfall (or
 // overshoot) actually cost.
-function dailyEnergyBalanceKcal(intake, maintenance, activity, tef, sleepHours, sleepTargetHours) {
+function dailyEnergyBalanceKcal(intake, maintenance, activity, tef, sleepHours, sleepDesiredHours) {
   const rawBalance = intake - maintenance - activity - tef;
-  const deprivationKcal = sleepDeprivationKcal(rawBalance, sleepHours, sleepTargetHours) ?? 0;
+  const deprivationKcal = sleepDeprivationKcal(rawBalance, sleepHours, sleepDesiredHours) ?? 0;
   return { rawBalance, deprivationKcal, balance: rawBalance + deprivationKcal };
 }
 
-// Never divide the deficit up by more than this — realistic inputs (sleepTargetHours up
+// Never divide the deficit up by more than this — realistic inputs (sleepDesiredHours up
 // to a day, planSleepHours ≥ 0) never come close, but a typed extreme shouldn't be able to
-// send the target intake to ±Infinity.
+// send the desired intake to ±Infinity.
 const SLEEP_EFFICIENCY_FACTOR_MIN = 0.2;
 
-// The FORWARD question calorieTargetDetail asks: given a night that only delivers
+// The FORWARD question calorieDesiredDetail asks: given a night that only delivers
 // `sleepEfficiencyFactor` of full value, how much BIGGER does the raw deficit need to be
 // to still realize `rawDeficitKcal`/day of actual fat loss? Divides rather than
 // multiplies — the mirror of sleepDeprivationKcal's reverse (actual-balance) question
 // above. Only on an actual deficit; a surplus or maintenance passes through unchanged,
 // since poor sleep isn't modelled as making a bulk MORE effective. Shared by
-// calorieTargetDetail and every Tune mode that constructs D from a target
+// calorieDesiredDetail and every Tune mode that constructs D from a desired
 // rate (EIN/FIXED_PCT/TAU), so none of them can quote a different D for the same inputs.
-function sleepAdjustedDeficitKcal(rawDeficitKcal, planSleepHours, sleepTargetHours) {
+function sleepAdjustedDeficitKcal(rawDeficitKcal, planSleepHours, sleepDesiredHours) {
   // Read once and carried in the result, rather than re-read by every caller that wants
   // to trace η back to γ — so a typed (unsaved) γ in the Tune reaches the
   // trace the same way it reached the factor, off this one read.
@@ -663,24 +660,24 @@ function sleepAdjustedDeficitKcal(rawDeficitKcal, planSleepHours, sleepTargetHou
   if (rawDeficitKcal === null || rawDeficitKcal <= 0) {
     return { rawDeficitKcal, deficitKcal: rawDeficitKcal, sleepDeprivationEffectKcal: 0, factor: 1, pctPerHour };
   }
-  const factor = sleepEfficiencyFactor(planSleepHours, sleepTargetHours);
+  const factor = sleepEfficiencyFactor(planSleepHours, sleepDesiredHours);
   const deficitKcal = rawDeficitKcal / Math.max(factor, SLEEP_EFFICIENCY_FACTOR_MIN);
   return {
     rawDeficitKcal, deficitKcal, sleepDeprivationEffectKcal: Math.round(deficitKcal - rawDeficitKcal), factor, pctPerHour,
   };
 }
 
-// The target for ONE body mass: BMR + the burn ACTIVITY_TARGET_MIN implies − the deficit
+// The desired intake for ONE body mass: BMR + the burn ACTIVITY_DESIRED_MIN implies − the deficit
 // that hits WEEKLY_FAT_LOSS_KG. No lifestyle multiplier, so it agrees with the forecast
-// and Calorie Balance. The trade, since no label carries it: BMR + target activity
+// and Calorie Balance. The trade, since no label carries it: BMR + desired activity
 // omits food's thermic effect and incidental NEAT, landing near 1.29 x BMR — so a
 // former 1.55-multiplier user loses ~475 kcal/day of ceiling, and WEEKLY_FAT_LOSS_KG
 // is the dial for it.
 //
 // Body mass is an argument because both terms scale with it and Caloric Intake evaluates
-// per day. Null when an input is missing; the caller falls back to CALORIE_TARGET_KCAL.
+// per day. Null when an input is missing; the caller falls back to CALORIE_DESIRED_KCAL.
 // `storedBmr`: a past day's BMR from its stored cell, used instead of the equation.
-function calorieTargetDetail(bodyMassKg, storedBmr = null) {
+function calorieDesiredDetail(bodyMassKg, storedBmr = null) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
@@ -695,22 +692,22 @@ function calorieTargetDetail(bodyMassKg, storedBmr = null) {
   if (!haveAllInputs) return null;
 
   const bmr = storedBmr ?? applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex));
-  const activityKcal = activityTargetKcal(bodyMassKg);
+  const activityKcal = activityDesiredKcal(bodyMassKg);
 
-  // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the target
+  // A negative WEEKLY_FAT_LOSS_KG (lean bulk) makes this a surplus and lifts the figure
   // above maintenance, flipping it from a ceiling to a floor. No plausibility guard: an
-  // aggressive target means an aggressive setting, which is the user's call.
+  // aggressive figure means an aggressive setting, which is the user's call.
   const rawDeficit = (weeklyFatLossKg * GENERIC_KCAL_PER_KG_FAT) / 7;
 
-  // PLAN_SLEEP_HOURS defaults to the sleep target itself — "assume you hit it" — so an
+  // PLAN_SLEEP_HOURS defaults to the desired sleep itself — "assume you hit it" — so an
   // untouched setting keeps this identical to the arithmetic before the sleep model
   // existed. Type fewer hours in the Tune's `s` box and the deficit below
   // grows to compensate for the lost efficiency (see sleepAdjustedDeficitKcal).
-  const sleepTargetHours = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
-  const planSleepHours = getSetting('PLAN_SLEEP_HOURS', sleepTargetHours);
+  const sleepDesiredHours = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
+  const planSleepHours = getSetting('PLAN_SLEEP_HOURS', sleepDesiredHours);
   const {
     deficitKcal: deficit, sleepDeprivationEffectKcal, factor, pctPerHour,
-  } = sleepAdjustedDeficitKcal(rawDeficit, planSleepHours, sleepTargetHours);
+  } = sleepAdjustedDeficitKcal(rawDeficit, planSleepHours, sleepDesiredHours);
 
   // The TEF divisor is the last step, not a term: digestion's cost is a share of the intake
   // being solved for, so it scales the whole balance rather than being added to one side of
@@ -722,7 +719,7 @@ function calorieTargetDetail(bodyMassKg, storedBmr = null) {
   // Off the ROUNDED intake, so `TEF = f × Eᵢₙ` multiplies out against the Eᵢₙ shown beside it.
   return {
     kcal, bmr, activityKcal, weeklyFatLossKg, rawDeficit, deficit, sleepDeprivationEffectKcal, factor, pctPerHour,
-    planSleepHours, sleepTargetHours, tefKcal: kcal * (1 - divisor), tefDivisor: divisor,
+    planSleepHours, sleepDesiredHours, tefKcal: kcal * (1 - divisor), tefDivisor: divisor,
   };
 }
 
@@ -732,8 +729,8 @@ function calorieTargetDetail(bodyMassKg, storedBmr = null) {
 //
 // 0.5–1% of body mass per week is the usual sustainable range, and 1% the ceiling:
 // above it more of what comes off is lean mass, and the pace rarely holds. It's only
-// ever a verdict shown beside the box, never a limit — an aggressive target is the
-// user's call, exactly as calorieTargetDetail treats one.
+// ever a verdict shown beside the box, never a limit — an aggressive rate is the
+// user's call, exactly as calorieDesiredDetail treats one.
 const WEEKLY_FAT_LOSS_PCT_FLOOR = 0.5;
 const WEEKLY_FAT_LOSS_PCT_CEILING = 1;
 
@@ -751,7 +748,7 @@ function weeklyFatLossKgFromPct(pct, bodyMassKg) {
 }
 
 // PINNING THE PERCENTAGE: the third way to hold a plan steady, alongside
-// CALORIE_TARGET_FIXED_KCAL. Set it and the weekly kilograms are recomputed from every
+// CALORIE_DESIRED_FIXED_KCAL. Set it and the weekly kilograms are recomputed from every
 // new body-mass reading as a share of THAT mass, so the pace stays proportional to the body doing
 // the losing instead of being a fixed number of kilograms.
 //
@@ -776,85 +773,85 @@ function weeklyFatLossKgAt(bodyMassKg) {
   return getSetting('WEEKLY_FAT_LOSS_KG', null);
 }
 
-function calculatedCalorieTargetKcal(bodyMassKg, storedBmr = null) {
-  const detail = calorieTargetDetail(bodyMassKg, storedBmr);
+function calculatedCalorieDesiredKcal(bodyMassKg, storedBmr = null) {
+  const detail = calorieDesiredDetail(bodyMassKg, storedBmr);
   return detail === null ? null : detail.kcal;
 }
 
-function flatCalorieTargetKcal() {
-  return getSetting('CALORIE_TARGET_KCAL', CALORIE_TARGET_KCAL_DEFAULT);
+function flatCalorieDesiredKcal() {
+  return getSetting('CALORIE_DESIRED_KCAL', CALORIE_DESIRED_KCAL_DEFAULT);
 }
 
-// A PINNED target: one number that stays put instead of being recalculated from
+// A PINNED desired intake: one number that stays put instead of being recalculated from
 // each new body-mass reading. Set it and the figure stops tracking body mass — which is
 // also what makes the app self-consistent, because the forecast
-// (projectTargetDays) has always solved dm/dt at a CONSTANT Eᵢₙ. A target that
+// (projectHealthyDays) has always solved dm/dt at a CONSTANT Eᵢₙ. A figure that
 // steps down with you is a different, faster plan than the one being forecast.
 //
-// Deliberately its own key rather than reusing CALORIE_TARGET_KCAL: that one is
+// Deliberately its own key rather than reusing CALORIE_DESIRED_KCAL: that one is
 // the fallback for an incomplete profile and is already sitting on existing
-// sheets, so giving it precedence would silently change the target for anyone
+// sheets, so giving it precedence would silently change desired intake for anyone
 // whose copy holds a stale value. Blank here means today's behaviour, unchanged.
-const CALORIE_TARGET_PIN_KEY = 'CALORIE_TARGET_FIXED_KCAL';
+const CALORIE_DESIRED_PIN_KEY = 'CALORIE_DESIRED_FIXED_KCAL';
 
-function pinnedCalorieTargetKcal() {
-  return getSetting(CALORIE_TARGET_PIN_KEY, null);
+function pinnedCalorieDesiredKcal() {
+  return getSetting(CALORIE_DESIRED_PIN_KEY, null);
 }
 
-// TODAY's target: the calculated figure at the smoothed body mass, else flat
-// CALORIE_TARGET_KCAL. Only the FIGURE — which side to be on is getCalorieTargetKind,
-// and getCalorieTarget pairs them so no label can carry one without the other.
+// TODAY's desired intake: the calculated figure at the smoothed body mass, else flat
+// CALORIE_DESIRED_KCAL. Only the FIGURE — which side to be on is getCalorieDesiredKind,
+// and getCalorieDesired pairs them so no label can carry one without the other.
 //
-// Smoothed rather than the last reading alone (planBodyMassKg): both terms of the target
+// Smoothed rather than the last reading alone (planBodyMassKg): both terms of the figure
 // scale with mass, so a single water-heavy morning would otherwise move the day's calorie
 // ceiling by ~30 kcal for no metabolic reason — and it's the same basis the Formula
 // Tune previews and saves against, so the tile and the modal can't disagree.
-function getCalorieTargetKcal(entries) {
-  return pinnedCalorieTargetKcal()
-    ?? calculatedCalorieTargetKcal(planBodyMassKg(entries))
-    ?? flatCalorieTargetKcal();
+function getCalorieDesiredKcal(entries) {
+  return pinnedCalorieDesiredKcal()
+    ?? calculatedCalorieDesiredKcal(planBodyMassKg(entries))
+    ?? flatCalorieDesiredKcal();
 }
 
-// The target per day, each from the body mass in effect THAT day rather than today's
+// The desired intake per day, each from the body mass in effect THAT day rather than today's
 // applied backwards. It moves ~15.8 kcal/kg across both terms, so a 6 kg loss shifts it
 // ~95 kcal — enough that one flat line marked days red that were comfortably inside the
 // maximum actually applying when they were eaten. Each entry carries its body mass so the
 // tooltip can say why the figure moved; null on the flat fallback, which has no basis.
-function calorieTargetSeries(entries, dates) {
-  // A pinned target is one flat line by definition — the whole point is that it
+function calorieDesiredSeries(entries, dates) {
+  // A pinned figure is one flat line by definition — the whole point is that it
   // didn't move as the body mass under it did. bodyMassKg stays null so the
   // tooltip doesn't claim a body-mass reading explains a figure that ignores them.
-  const pinned = pinnedCalorieTargetKcal();
+  const pinned = pinnedCalorieDesiredKcal();
   if (pinned !== null) return dates.map(() => ({ kcal: pinned, bodyMassKg: null }));
 
   const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
   const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(bodyMassEntries), dates);
-  const flat = flatCalorieTargetKcal();
+  const flat = flatCalorieDesiredKcal();
 
   return dates.map((date) => {
     const bodyMassKg = bodyMassForDate.get(date) ?? null;
-    const kcal = calculatedCalorieTargetKcal(bodyMassKg, storedBmrForDate(date));
+    const kcal = calculatedCalorieDesiredKcal(bodyMassKg, storedBmrForDate(date));
     return kcal === null ? { kcal: flat, bodyMassKg: null } : { kcal, bodyMassKg };
   });
 }
 
-// This target is directional, not a point to land on — a ceiling heading down, a floor
+// Desired intake is directional, not a point to land on — a ceiling heading down, a floor
 // heading up. Eating 400 under a bulk's figure is no better than 400 over a cut's, so
 // scoring both sides the same way would tell half the users the opposite of the truth.
 //
-// Direction is target body mass vs. the smoothed body mass. With neither, or a target already
+// Direction is healthy body mass vs. the smoothed body mass. With neither, or a healthy mass already
 // reached (0.1 kg tolerance), the sign of WEEKLY_FAT_LOSS_KG decides — negative is a bulk, so a
 // floor. Nothing at all keeps the ceiling.
 //
-// Smoothed for a stronger reason than the figure itself: this decides whether the target is a
+// Smoothed for a stronger reason than the figure itself: this decides whether the figure is a
 // ceiling or a floor, so within 0.1 kg of goal a single noisy reading could flip the whole
 // panel's scoring from one day to the next.
-function getCalorieTargetKind(entries) {
-  const targetKg = getSetting('BODY_MASS_TARGET_KG', null);
+function getCalorieDesiredKind(entries) {
+  const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', null);
   const currentKg = planBodyMassKg(entries);
 
-  if (targetKg !== null && currentKg !== null && Math.abs(targetKg - currentKg) >= 0.1) {
-    return targetKg < currentKg ? 'max' : 'min';
+  if (healthyKg !== null && currentKg !== null && Math.abs(healthyKg - currentKg) >= 0.1) {
+    return healthyKg < currentKg ? 'max' : 'min';
   }
 
   // Only the sign is read, and a pinned percentage carries the same one — a negative rate
@@ -865,10 +862,10 @@ function getCalorieTargetKind(entries) {
 
 // Figure, kind and every display form in one object, so the tile, the chart and the
 // Insight prompt can't describe the same number two different ways.
-function getCalorieTarget(entries) {
-  const kind = getCalorieTargetKind(entries);
+function getCalorieDesired(entries) {
+  const kind = getCalorieDesiredKind(entries);
   return {
-    kcal: getCalorieTargetKcal(entries),
+    kcal: getCalorieDesiredKcal(entries),
     kind,
     isMax: kind === 'max',
     word: kind === 'max' ? 'Max' : 'Min',
@@ -876,22 +873,22 @@ function getCalorieTarget(entries) {
   };
 }
 
-// Is a day's intake on the right side of the target? At-or-under a ceiling,
+// Is a day's intake on the right side of desired? At-or-under a ceiling,
 // at-or-over a floor — hitting it exactly counts as met either way.
-function withinCalorieTarget(kcal, target) {
-  return target.isMax ? kcal <= target.kcal : kcal >= target.kcal;
+function withinCalorieDesired(kcal, desired) {
+  return desired.isMax ? kcal <= desired.kcal : kcal >= desired.kcal;
 }
 
 // Inside this margin a day is neither scored nor condemned — a few percent is within
 // the noise of the estimate and of the log itself.
-const CALORIE_TARGET_NEAR_FRACTION = 0.05;
+const CALORIE_DESIRED_NEAR_FRACTION = 0.05;
 
-// 'met' on the right side, 'near' within CALORIE_TARGET_NEAR_FRACTION past it, 'missed'
+// 'met' on the right side, 'near' within CALORIE_DESIRED_NEAR_FRACTION past it, 'missed'
 // beyond. Distance is measured alike for a ceiling and a floor, so a bulk's
 // under-eating grades exactly like a cut's over-eating.
-function calorieTargetScore(kcal, target) {
-  if (withinCalorieTarget(kcal, target)) return 'met';
-  return Math.abs(kcal - target.kcal) <= target.kcal * CALORIE_TARGET_NEAR_FRACTION ? 'near' : 'missed';
+function calorieDesiredScore(kcal, desired) {
+  if (withinCalorieDesired(kcal, desired)) return 'met';
+  return Math.abs(kcal - desired.kcal) <= desired.kcal * CALORIE_DESIRED_NEAR_FRACTION ? 'near' : 'missed';
 }
 
 // Least-squares fit. The intercept is only needed by the Body Mass weekly trend,
@@ -1021,7 +1018,7 @@ function detectPlateau(trendMap) {
 
 // A and B from "Maintenance is affine in body mass — M(m) = A + B×m": the body-mass-
 // independent and body-mass-scaling halves of BMR + activity burn. Shared by
-// projectTargetDays (the forward m_g → t direction) and the Tune's reverse
+// projectHealthyDays (the forward m_g → t direction) and the Tune's reverse
 // t → m_g solve, so both read the same A/B rather than two copies of this algebra.
 //
 // Affine under BOTH BMR equations, which is what lets one decay model serve them. Mifflin is
@@ -1108,7 +1105,7 @@ function adaptedPlateauKg(intakeKcal, coefficients, adaptFraction) {
     / ((remaining * bBmr + activityPerKg) / divisor);
 }
 
-// The TARGET trajectory — eating exactly Eᵢₙ and hitting ACTIVITY_TARGET_MIN every
+// The DESIRED trajectory — eating exactly Eᵢₙ and hitting ACTIVITY_DESIRED_MIN every
 // day. Shared with the Tune, so its printed A / B / m∞ / t and the chart's
 // forecast are one piece of arithmetic rather than two that can disagree.
 //
@@ -1116,22 +1113,22 @@ function adaptedPlateauKg(intakeKcal, coefficients, adaptFraction) {
 // the exact answer is one log. Verified against numeric integration.
 //
 // Works both directions — a surplus puts m∞ above m and the same log gives days to gain
-// — but only reaches targets BETWEEN m and m∞. Past the asymptote is genuinely
+// — but only reaches masses BETWEEN m and m∞. Past the asymptote is genuinely
 // unreachable at that intake, and is reported rather than extrapolated.
 // `formula` and `tef` ride along unread except to reach maintenanceAffineCoefficients, so
 // the Tune's unsaved BMR equation and thermic share reach the forecast the same way
 // they reach A and B. Omitted by the settings-driven callers, which get the saved pair.
-function projectTargetDays({
-  intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg, formula, tef,
+function projectHealthyDays({
+  intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, healthyKg, formula, tef,
 }) {
   const { a, b } = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, formula, tef, bodyMassKg });
   const equilibriumKg = (intakeKcal - a) / b;
 
-  if (Math.abs(bodyMassKg - targetKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG) {
+  if (Math.abs(bodyMassKg - healthyKg) < BODY_MASS_AT_HEALTHY_TOLERANCE_KG) {
     return { a, b, equilibriumKg, status: 'reached' };
   }
 
-  const ratio = (bodyMassKg - equilibriumKg) / (targetKg - equilibriumKg);
+  const ratio = (bodyMassKg - equilibriumKg) / (healthyKg - equilibriumKg);
   if (!Number.isFinite(ratio) || ratio <= 1) {
     return { a, b, equilibriumKg, status: 'unreachable' };
   }
@@ -1145,19 +1142,19 @@ function projectTargetDays({
   return { a, b, decayPerKg: b, equilibriumKg, days, etaIso: isoFromDate(eta), status: 'ok', journey: 'intake' };
 }
 
-// The OTHER target trajectory: the one a pinned percentage describes. Δm = p·m/100 every
+// The OTHER desired trajectory: the one a pinned percentage describes. Δm = p·m/100 every
 // week, so the mass falls by a constant FRACTION rather than a constant number of
 // kilograms — m(t) = m × (1 − p/100)^(t/7), i.e. dm/dt = −k·m with k = −ln(1 − p/100)/7
-// per day. Returned in projectTargetDays' shape, with m∞ = 0, because the two are the same
+// per day. Returned in projectHealthyDays' shape, with m∞ = 0, because the two are the same
 // exponential with different coefficients: one curve-drawing routine serves both.
 //
 // No plateau, and therefore no 'unreachable' for a real rate — a constant fraction off a
-// falling mass always crosses any positive target eventually, which is exactly what makes
+// falling mass always crosses any positive healthy mass eventually, which is exactly what makes
 // this the one plan that can't stall short of the goal. A rate of zero or less is the only
-// thing that never arrives, and the caller keeps it out (see targetProjection).
-function projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct }) {
+// thing that never arrives, and the caller keeps it out (see healthyProjection).
+function projectHealthyDaysAtFixedPct({ bodyMassKg, healthyKg, weeklyPct }) {
   const base = { decayPerKg: 0, equilibriumKg: 0, journey: 'pct' };
-  if (Math.abs(bodyMassKg - targetKg) < BODY_MASS_AT_TARGET_TOLERANCE_KG) {
+  if (Math.abs(bodyMassKg - healthyKg) < BODY_MASS_AT_HEALTHY_TOLERANCE_KG) {
     return { ...base, status: 'reached' };
   }
 
@@ -1165,7 +1162,7 @@ function projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct }) {
   // consumer of this — the curve, the day count — works in days.
   const kPerDay = -Math.log(1 - weeklyPct / 100) / 7;
   const decayPerKg = kPerDay * GENERIC_KCAL_PER_KG_FAT;
-  const days = Math.log(bodyMassKg / targetKg) / kPerDay;
+  const days = Math.log(bodyMassKg / healthyKg) / kPerDay;
   if (!Number.isFinite(days) || days <= 0) {
     // There are only two ways a constant positive share never arrives, and neither is a
     // plateau — so the reason travels with the result: the display has no equilibrium figure
@@ -1174,7 +1171,7 @@ function projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct }) {
       ...base,
       status: 'unreachable',
       reason: weeklyPct > 0
-        ? 'the target is not below your current body mass'
+        ? 'the healthy body mass is not below your current body mass'
         : 'a rate of 0% or less never moves the mass',
     };
   }
@@ -1184,54 +1181,54 @@ function projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct }) {
   return { ...base, decayPerKg, days, etaIso: isoFromDate(eta), status: 'ok' };
 }
 
-// The target trajectory in whichever journey the pins currently describe — the single
+// The desired trajectory in whichever journey the pins currently describe — the single
 // entry point the chart and the Health Plan prompt both go through, so a pinned percentage
 // can't move the arrival date in one of them and not the other. A and B are merged in
 // either way: they describe maintenance, which is true regardless of which journey is
 // being walked, and the chart reads them for the rate note.
 //
 // pct > 0 only. A pinned zero or negative percentage is a hold or a bulk, and the
-// constant-Eᵢₙ form below already handles both — including reporting a target below the
+// constant-Eᵢₙ form below already handles both — including reporting a healthy mass below the
 // plateau as unreachable, which the proportional form has no way to express.
-function targetJourneyProjection({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg }) {
+function healthyJourneyProjection({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, healthyKg }) {
   const pct = pinnedWeeklyFatLossPct();
   if (pct !== null && pct > 0) {
     return {
       ...maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, bodyMassKg }),
-      ...projectTargetDaysAtFixedPct({ bodyMassKg, targetKg, weeklyPct: pct }),
+      ...projectHealthyDaysAtFixedPct({ bodyMassKg, healthyKg, weeklyPct: pct }),
     };
   }
-  return projectTargetDays({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg });
+  return projectHealthyDays({ intakeKcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, healthyKg });
 }
 
-// The same target trajectory from saved Settings rather than the Tune's live inputs,
+// The same desired trajectory from saved Settings rather than the Tune's live inputs,
 // so the two agree whenever its boxes still hold what's on the sheet. Null without a profile.
-function targetProjectionFromSettings(entries, bodyMassKg, targetKg) {
+function healthyProjectionFromSettings(entries, bodyMassKg, healthyKg) {
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
   if (heightCm === null || (age === null && bmrNeedsAge()) || (sex !== 'male' && sex !== 'female')) return null;
 
-  return targetJourneyProjection({
-    // Eᵢₙ itself: the calculated target is exactly what the Tune computes.
-    intakeKcal: getCalorieTargetKcal(entries),
+  return healthyJourneyProjection({
+    // Eᵢₙ itself: the calculated desired intake is exactly what the Tune computes.
+    intakeKcal: getCalorieDesiredKcal(entries),
     bodyMassKg,
     heightCm,
     age,
     sex,
     met: activityMet(),
-    tau: getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT),
+    tau: getSetting('ACTIVITY_DESIRED_MIN', ACTIVITY_DESIRED_MIN_DEFAULT),
     kappa: getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT),
-    targetKg,
+    healthyKg,
   });
 }
 
 function calcProjection(entries) {
-  const bodyMassTarget = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const bodyMassHealthy = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
   // The figure only; which side to be on doesn't enter this arithmetic. Stands in as
   // the intake level when nothing has been logged.
-  const calorieTarget = getCalorieTargetKcal(entries);
-  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const calorieDesired = getCalorieDesiredKcal(entries);
+  const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1249,67 +1246,67 @@ function calcProjection(entries) {
   const lastBodyMass = bodyMassEntries[bodyMassEntries.length - 1].amount;
   // planBodyMassKg (m̄), not the raw last reading — per its own definition, this is the
   // mass every PLAN-level figure is evaluated at, the Tune's own bodyMassKg
-  // included, so the target method's day count and ETA below can't disagree with what
+  // included, so the desired method's day count and ETA below can't disagree with what
   // the Tune prints for the same profile.
   const planMass = planBodyMassKg(entries) ?? lastBodyMass;
 
-  const arrivalTarget = arrivalTargetKg(
-    bodyMassTarget, planMass, getSetting('HEIGHT_CM', null), getSettingString('SEX', null),
-    bodyMassTargetIsDownward(entries),
+  const arrivalHealthy = arrivalHealthyKg(
+    bodyMassHealthy, planMass, getSetting('HEIGHT_CM', null), getSettingString('SEX', null),
+    bodyMassHealthyIsDownward(entries),
   );
 
-  // The TARGET wins whenever the profile allows it — read straight off targetProjection,
-  // the exact projectTargetDays / projectTargetDaysAtFixedPct result the Formula
-  // Tune's own t and ETA come from (via targetProjectionFromSettings), not a second
-  // copy of the day-count formula. That makes the forecast a statement of the target, not
-  // of recent behaviour: eat over the target for a fortnight and it does NOT slip.
-  // Calorie Balance is where actual-vs-target shows day by day.
-  const targetProjection = targetProjectionFromSettings(entries, planMass, arrivalTarget);
-  if (targetProjection !== null) {
-    if (targetProjection.status === 'reached') return { status: 'reached' };
+  // The DESIRED plan wins whenever the profile allows it — read straight off healthyProjection,
+  // the exact projectHealthyDays / projectHealthyDaysAtFixedPct result the Formula
+  // Tune's own t and ETA come from (via healthyProjectionFromSettings), not a second
+  // copy of the day-count formula. That makes the forecast a statement of the plan, not
+  // of recent behaviour: eat over desired intake for a fortnight and it does NOT slip.
+  // Calorie Balance is where actual-vs-desired shows day by day.
+  const healthyProjection = healthyProjectionFromSettings(entries, planMass, arrivalHealthy);
+  if (healthyProjection !== null) {
+    if (healthyProjection.status === 'reached') return { status: 'reached' };
 
     // Rate at m̄, for the ETA line's note — the same mass t was solved from.
-    const slope = (calorieTarget - (targetProjection.a + targetProjection.b * planMass)) / GENERIC_KCAL_PER_KG_FAT;
+    const slope = (calorieDesired - (healthyProjection.a + healthyProjection.b * planMass)) / GENERIC_KCAL_PER_KG_FAT;
 
-    if (targetProjection.status === 'unreachable') {
-      return { status: 'asymptote', method: 'target', slope, equilibriumKg: targetProjection.equilibriumKg };
+    if (healthyProjection.status === 'unreachable') {
+      return { status: 'asymptote', method: 'healthy', slope, equilibriumKg: healthyProjection.equilibriumKg };
     }
 
-    // status === 'ok': today + the exact day count projectTargetDays solved, not a
+    // status === 'ok': today + the exact day count projectHealthyDays solved, not a
     // re-derivation of it — same rounding, so the ETA can't land a day off from the
     // Tune's.
-    const daysToTarget = Math.round(targetProjection.days);
+    const daysToHealthy = Math.round(healthyProjection.days);
     const etaDate = new Date(today);
-    etaDate.setDate(today.getDate() + daysToTarget);
+    etaDate.setDate(today.getDate() + daysToHealthy);
 
     // m(t) = m∞ + (m − m∞)·e^(−decay·t/ρ), the curve those same coefficients trace.
-    const bodyMassAtDay = (d) => targetProjection.equilibriumKg
-      + (planMass - targetProjection.equilibriumKg) * Math.exp(-(targetProjection.decayPerKg * d) / GENERIC_KCAL_PER_KG_FAT);
+    const bodyMassAtDay = (d) => healthyProjection.equilibriumKg
+      + (planMass - healthyProjection.equilibriumKg) * Math.exp(-(healthyProjection.decayPerKg * d) / GENERIC_KCAL_PER_KG_FAT);
 
-    const cappedDays = Math.min(daysToTarget, 365);
+    const cappedDays = Math.min(daysToHealthy, 365);
     const projectedPoints = [];
     for (let d = 0; d <= cappedDays; d += 7) {
       const pd = new Date(today);
       pd.setDate(today.getDate() + d);
       projectedPoints.push({ date: isoFromDate(pd), bodyMass: Math.round(bodyMassAtDay(d) * 10) / 10 });
     }
-    if (daysToTarget <= 365) {
-      projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: Math.round(arrivalTarget * 10) / 10 });
+    if (daysToHealthy <= 365) {
+      projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: Math.round(arrivalHealthy * 10) / 10 });
     }
 
     return {
       status: 'ok',
       slope,
-      daysToTarget,
+      daysToHealthy,
       etaDate,
       projectedPoints,
-      method: 'target',
-      bodyMassTarget,
-      equilibriumKg: targetProjection.equilibriumKg,
+      method: 'healthy',
+      bodyMassHealthy,
+      equilibriumKg: healthyProjection.equilibriumKg,
     };
   }
 
-  // No profile: the target can't be projected at all, so fall back to what the LOGGED
+  // No profile: the plan can't be projected at all, so fall back to what the LOGGED
   // behaviour of the last 14 days implies instead.
   const recentEntries = entries.filter((e) => e.date >= cutoffIso && e.date <= todayIso);
 
@@ -1334,25 +1331,25 @@ function calcProjection(entries) {
   let decay = null;
 
   if (caloriesByDate.size > 0 || activityKcalByDate.size > 0) {
-    const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieTarget;
+    const avgCalories = caloriesByDate.size > 0 ? avg(caloriesByDate) : calorieDesired;
     const avgActivityKcal = activityKcalByDate.size > 0 ? avg(activityKcalByDate) : 0;
-    const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepTarget;
+    const avgSleep = sleepByDate.size > 0 ? avg(sleepByDate) : sleepDesired;
 
-    // Negative balance = deficit = loss. Against MAINTENANCE, not calorieTarget: the
-    // target is already maintenance minus the target deficit, so eating exactly it
+    // Negative balance = deficit = loss. Against MAINTENANCE, not calorieDesired: the
+    // figure is already maintenance minus the desired deficit, so eating exactly it
     // produced a ~zero balance and a "no net change" forecast — precisely when the
-    // target loss should have been delivered. Same shape as the target's own basis,
-    // differing only in the activity figure: logged burn here, target burn there.
+    // desired loss should have been delivered. Same shape as desired intake's own basis,
+    // differing only in the activity figure: logged burn here, desired burn there.
     const resting = restingMaintenanceKcal(entries);
     const maintenance = resting !== null
       ? resting + avgActivityKcal
-      // No profile, so no BMR and no calculated target — the flat CALORIE_TARGET_KCAL
+      // No profile, so no BMR and no calculated figure — the flat CALORIE_DESIRED_KCAL
       // the user chose directly is the best baseline available.
-      : calorieTarget + avgActivityKcal;
+      : calorieDesired + avgActivityKcal;
 
     const balance = avgCalories - maintenance;
     const baseSlope = balance / GENERIC_KCAL_PER_KG_FAT;
-    const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepTarget));
+    const sleepRatio = Math.min(1.0, Math.max(0.7, avgSleep / sleepDesired));
     slope = baseSlope * sleepRatio;
 
     // Maintenance is affine in body mass, not constant, so a fixed intake decays
@@ -1388,54 +1385,54 @@ function calcProjection(entries) {
 
   // lastBodyMass, not planMass: these methods' own slope/equilibrium above were fitted
   // from the actual latest reading (see resting/perKg/bodyMassIndependent), so the curve
-  // has to start from the same point they describe. Only the 'target' method (returned
+  // has to start from the same point they describe. Only the 'healthy' method (returned
   // above already) is measured at m̄.
-  const goingDown = arrivalTarget < lastBodyMass;
+  const goingDown = arrivalHealthy < lastBodyMass;
   if ((goingDown && slope > 0) || (!goingDown && slope < 0)) return { status: 'wrong-direction', method, slope };
 
-  // A fixed intake only ever carries you to its own equilibrium, so a target on the far
+  // A fixed intake only ever carries you to its own equilibrium, so a healthy mass on the far
   // side is never reached. The straight line always produced a date regardless, which
   // is what this status exists to report.
   if (decay !== null) {
     const gapNow = lastBodyMass - decay.equilibriumKg;
-    const gapTarget = arrivalTarget - decay.equilibriumKg;
-    if (gapTarget / gapNow <= 0) {
+    const gapHealthy = arrivalHealthy - decay.equilibriumKg;
+    if (gapHealthy / gapNow <= 0) {
       return { status: 'asymptote', method, slope, equilibriumKg: decay.equilibriumKg };
     }
   }
 
   // The straight line's division, or the closed form t = (ρ/B)·ln[(m − m∞)/(m_g − m∞)].
-  const daysToTarget = decay !== null
+  const daysToHealthy = decay !== null
     ? Math.round((decay.kcalPerKg / decay.perKg)
-      * Math.log((lastBodyMass - decay.equilibriumKg) / (arrivalTarget - decay.equilibriumKg)))
-    : Math.round((arrivalTarget - lastBodyMass) / slope);
+      * Math.log((lastBodyMass - decay.equilibriumKg) / (arrivalHealthy - decay.equilibriumKg)))
+    : Math.round((arrivalHealthy - lastBodyMass) / slope);
   const etaDate = new Date(today);
-  etaDate.setDate(today.getDate() + daysToTarget);
+  etaDate.setDate(today.getDate() + daysToHealthy);
 
   // m(t) = m∞ + (m − m∞)·e^(−B·t/ρ) for the curve, m + slope·t for the line.
   const bodyMassAtDay = (d) => (decay !== null
     ? decay.equilibriumKg + (lastBodyMass - decay.equilibriumKg) * Math.exp(-(decay.perKg * d) / decay.kcalPerKg)
     : lastBodyMass + slope * d);
 
-  const cappedDays = Math.min(daysToTarget, 365);
+  const cappedDays = Math.min(daysToHealthy, 365);
   const projectedPoints = [];
   for (let d = 0; d <= cappedDays; d += 7) {
     const pd = new Date(today);
     pd.setDate(today.getDate() + d);
     projectedPoints.push({ date: isoFromDate(pd), bodyMass: Math.round(bodyMassAtDay(d) * 10) / 10 });
   }
-  if (daysToTarget <= 365) {
-    projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: Math.round(arrivalTarget * 10) / 10 });
+  if (daysToHealthy <= 365) {
+    projectedPoints.push({ date: isoFromDate(etaDate), bodyMass: Math.round(arrivalHealthy * 10) / 10 });
   }
 
   return {
     status: 'ok',
     slope,
-    daysToTarget,
+    daysToHealthy,
     etaDate,
     projectedPoints,
     method,
-    bodyMassTarget,
+    bodyMassHealthy,
     equilibriumKg: decay !== null ? decay.equilibriumKg : null,
   };
 }

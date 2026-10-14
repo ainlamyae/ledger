@@ -63,16 +63,16 @@ function exportFilterMatches(transaction, filter) {
   const rawValue = transaction[filter.field];
 
   if (fieldDef.type === 'number') {
-    const target = Number(filter.value);
-    if (Number.isNaN(target)) return true;
+    const threshold = Number(filter.value);
+    if (Number.isNaN(threshold)) return true;
     const amount = Number(rawValue) || 0;
     switch (filter.operator) {
-      case 'eq': return amount === target;
-      case 'neq': return amount !== target;
-      case 'gt': return amount > target;
-      case 'gte': return amount >= target;
-      case 'lt': return amount < target;
-      case 'lte': return amount <= target;
+      case 'eq': return amount === threshold;
+      case 'neq': return amount !== threshold;
+      case 'gt': return amount > threshold;
+      case 'gte': return amount >= threshold;
+      case 'lt': return amount < threshold;
+      case 'lte': return amount <= threshold;
       default: return true;
     }
   }

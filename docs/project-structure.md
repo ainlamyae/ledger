@@ -9,7 +9,8 @@ ledger/
 ├── finance/index.html            #   their own — section-page.js builds each from
 ├── track/index.html              #   index.html and shows that group alone
 ├── other/index.html              #
-├── <group>/<block>/[<button>/]index.html # Copies of the stub above, one per address (see router.js)
+├── <group>/<block>/[<button>/]index.html # Copies of the stub above, one per address (see router.js),
+│                                 #   e.g. track/leetcode/ and track/leetcode/log/
 ├── favicon.svg · manifest.json · robots.txt · sitemap.xml
 ├── sw.js                         # Retired service worker: clears old caches, unregisters itself
 ├── assets/
@@ -57,6 +58,8 @@ ledger/
 │       ├── settings-panel.js     # Settings table
 │       ├── travel.js             # Travel panel
 │       ├── applications.js       # Applications cards
+│       ├── leetcode.js           # LeetCode roadmap and solve log
+│       ├── leetcode-roadmap.js   # NeetCode 250 problem list
 │       ├── insight.js            # Insight shared helpers + Wellness mode
 │       ├── food-insight.js       # Insight Food mode
 │       ├── micronutrient-insight.js # Insight Micronutrient mode

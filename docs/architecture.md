@@ -53,7 +53,7 @@ Each panel group is reachable at an address of its own — `/health/`, `/finance
 
 - **The markup still lives in `index.html` alone.** Each of those directories holds an identical stub (`<base href="../">`, the theme bootstrap, the stylesheet, and `section-page.js`). The loader fetches `index.html`, replays its head, its body and its scripts into the stub, then hides everything outside the group the address names. A panel added to `index.html`, or moved from one group to another, appears on the right section page with nothing to keep in sync — there is no generated copy of the dashboard anywhere.
 - **The list of sections is the `<nav>` markup.** `section-page.js` matches the first path segment below the app root against each nav link's `href` and reads the group id off its `data-section`. A fourth group needs a nav link, a `<section>`, and a copy of the stub — no change to the loader, which enumerates nothing.
-- **Hidden, not removed.** The other two groups stay in the DOM: `loadDashboard` renders the whole dashboard, and every renderer expects its elements to exist. The Time/Date/Azan/Weather row is hidden too, even though the home page itself shows it by default — it belongs to the dashboard as a whole, not to one wrapper — and `widgets.js` checks that row before starting anything, so a section page runs neither a ticking clock nor the forecast and prayer-time requests behind it.
+- **Hidden, not removed.** The other two groups stay in the DOM: `loadDashboard` renders the whole dashboard, and every renderer expects its elements to exist. The Time/Date/Azan/Weather row is hidden too, even though the home page itself shows it by default — it belongs to the dashboard as a whole, not to one wrapper — and `ledger-widgets.js` checks that row before starting anything, so a section page runs neither a ticking clock nor the forecast and prayer-time requests behind it.
 - **Start-up is registered, not listened for.** `index.html`'s scripts arrive after a section page's own `load` event, so `app.js` hands its start-up step to `window.ledgerSectionPage.onBoot()` when it exists instead of waiting on `load`/`DOMContentLoaded`. The loader runs those steps once every script — including the async Google ones, which `load` would also have waited for — has arrived, so the boot order is the one `index.html` gets.
 - **The page routes before the rest of start-up.** Its view comes first: `routeDashboard` (block toggles, `initPageNav`, `initRouter`) is registered with `onRoute()` and runs as soon as the app's own in-order scripts have, without waiting for Google's async sign-in scripts. Until then `html[data-routing]` keeps the content hidden, so a reload of `/health/nutrition/` never shows the whole section before the page. The home page runs the same `routeDashboard` inside its boot.
 - **Block and button addresses go one or two levels deeper** — `/health/tune/`, `/health/physique/log/`. Each is a real folder holding a copy of its group's stub (only `<base href>` and `<title>` differ), so a reload or shared link lands there; `section-page.js` exposes the rest of the path as `ledgerSectionPage.route`, and `router.js` expands that block, opens that form once the data has loaded, and keeps the address in step as blocks and forms open and close. The slugs are `data-route` attributes on the panels and their header buttons.
@@ -91,16 +91,16 @@ flowchart TD
     subgraph LoadDashboard["Dashboard load — loadDashboard()"]
         direction TB
         Report["loadReport()<br/>batchGetValues:<br/>Statement, Account,<br/>Breakdown — missingAmount computed<br/>client-side from the first two"]
-        Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initTimeSheet<br/>initWellness · initActivities · initPhysique<br/>initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications · initLeetcode<br/>(each checks its own cache first)"]
-        ProteinRot["Once Physique + Nutrition settle:<br/>renderProteinRotationChart()<br/>(protein-rotation.js)"]
-        Render["The wellness/finance/timesheet/travel chart files render every canvas, lazily<br/>app.js renders summary cards<br/>each module renders its own table"]
+        Modules["Promise.allSettled:<br/>initTransactions · initAccountManager · initWorkTime<br/>initHealthRangeControl · initActivities · initPhysique<br/>initNutrition · initContacts<br/>initSettingsPanel · initTravel · initApplications · initLeetcode<br/>(each checks its own cache first)"]
+        ProteinRot["Once Physique + Nutrition settle:<br/>renderProteinRotationChart()<br/>(health-chart-protein-rotation.js)"]
+        Render["The health/finance/work-time/travel chart files render every canvas, lazily<br/>app.js renders summary cards<br/>each module renders its own table"]
         Report --> Render
         Modules --> ProteinRot --> Render
     end
 
     LoadDashboard --> Idle(["Dashboard interactive"])
 
-    Idle --> Writes["Add / edit / delete / duplicate<br/>— any single row, any module:<br/>Transaction · Account · Timesheet · Wellness · Physique<br/>Nutrition · Contact · Setting · Travel · Application · LeetCode"]
+    Idle --> Writes["Add / edit / delete / duplicate<br/>— any single row, any module:<br/>Transaction · Account · Work Time · Wellness · Physique<br/>Nutrition · Contact · Setting · Travel · Application · LeetCode"]
     Writes --> WriteCall["appendValues / updateValues / batchUpdate"]
     WriteCall --> Refresh["Re-read that module's data<br/>+ re-render — no page reload"]
     Refresh --> Idle
@@ -115,7 +115,7 @@ flowchart TD
 
     Idle --> TSFlow["Time Tracker: 'Log a Work Time'"]
     TSFlow --> TSWrite["backfillMissingDates() fills any<br/>gap, then appendValues/updateValues<br/>the logged day"]
-    TSWrite --> TSReminder["checkTimesheetReminder() re-evaluates<br/>the Log badge, scoped to whichever<br/>company was last logged on/before today"]
+    TSWrite --> TSReminder["checkWorkTimeReminder() re-evaluates<br/>the Log badge, scoped to whichever<br/>company was last logged on/before today"]
     TSReminder --> Idle
 
     Idle --> TravelFlow["Travel views<br/>(derived, no extra API call)"]
@@ -144,7 +144,7 @@ flowchart TD
     Idle --> InsightPanel["Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
     InsightMode -- no --> Idle
-    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>ingredient rollup by Group /<br/>real Micronutrients totals vs. Ideal/day<br/>(nutrient-targets.js) + coverage count /<br/>per-muscle-group reps — no API call"]
+    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>ingredient rollup by Group /<br/>real Micronutrients totals vs. Ideal/day<br/>(health-nutrient-targets.js) + coverage count /<br/>per-muscle-group reps — no API call"]
     InsightPreview --> InsightSend{"Send to AI<br/>clicked?"}
     InsightSend -- yes --> InsightReport["Groq chat-completions API<br/>renders free-text report,<br/>saved to that mode's INSIGHT_* keys"] --> Idle
     InsightSend -- no --> Idle
@@ -165,57 +165,57 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 5 | `cache.js` | Numeric-expression evaluator; deletes the `ledger_cache_*` keys earlier versions stored |
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
 | 7 | `ai.js` | AI chat client for Groq or OpenRouter (`AI_PROVIDER`), models from `GROQ_MODELS`/`OPENROUTER_MODELS`; tolerant JSON parsing; never rewrites the user's own Notes; vision calls (`aiAnalyzeFoodImage`, `aiReadNutritionLabel`) for photo scans |
-| 8 | `usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
-| 9 | `nutrient-targets.js` | Ideal/day reference amounts (mostly FDA Daily Values) and gap-severity thresholds for the Micronutrients mode, overridable via a `MICRONUTRIENT_DAILY_TARGETS_JSON` Setting |
-| 10 | `nutrition.js` | Nutrition table, Group column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry`, Log into today's Physique Consumption |
-| 11 | `calorie-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
-| 12 | `widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
+| 8 | `health-nutrition-usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
+| 9 | `health-nutrient-targets.js` | Ideal/day reference amounts (mostly FDA Daily Values) and gap-severity thresholds for the Micronutrients mode, overridable via a `MICRONUTRIENT_DAILY_TARGETS_JSON` Setting |
+| 10 | `health-nutrition.js` | Nutrition table, Group column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry`, Log into today's Physique Consumption |
+| 11 | `health-physique-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
+| 12 | `ledger-widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
-| 14 | `wellness-math.js` | Pure health/target formulas with no chart or DOM code: BMR/TEF/calorie-target math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, target-date projection |
-| 15 | `wellness-charts.js` | Indicator chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
-| 16 | `finance-charts.js` | Finance Indicator chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Account Allocation) |
-| 17 | `timesheet-charts.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
-| 18 | `travel-charts.js` | Travel chart renderers, including the country choropleth |
-| 19 | `transactions.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
-| 20 | `accounts.js` | Account: balances, CRUD, sheet-formula round-trip |
-| 21 | `breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
-| 22 | `timesheet.js` | Work Time panel, holiday/missed detection, analytics data, Log badge |
+| 14 | `health-math.js` | Pure health/target formulas with no chart or DOM code: BMR/TEF/calorie-target math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, target-date projection |
+| 15 | `health-chart.js` | Chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
+| 16 | `finance-chart.js` | Finance Chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Account Allocation) |
+| 17 | `track-work-time-chart.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
+| 18 | `track-travel-chart.js` | Travel chart renderers, including the country choropleth |
+| 19 | `finance-transaction.js` | Transaction Log: filters, sorting, pagination, CRUD, bulk edit/delete |
+| 20 | `finance-account.js` | Account: balances, CRUD, sheet-formula round-trip |
+| 21 | `finance-breakdown.js` | Breakdown panel: Category/Type CRUD scoped to `A:B`, formula-preserving Add/Duplicate |
+| 22 | `track-work-time.js` | Work Time panel, holiday/missed detection, analytics data, Log badge |
 | 23 | `csv.js` | CSV import, advanced filter engine, download helper |
-| 24 | `activities.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
-| 25 | `physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, table rendering, form open/close, and `physiqueAsWellnessEntries()` — the adapter every chart and Insight mode reads |
-| 26 | `physique-breakdown.js` | Physique's food/workout Calculate (incremental + bulk over selected days), Combine & Sort, and the Consumption autocomplete — loads right after `physique.js`, sharing its module state |
-| 27 | `strength-plan.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `activities.js` |
-| 28 | `activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
-| 29 | `contacts.js` | Contact panel, CRUD, bulk export/delete/merge |
-| 30 | `settings-panel.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
-| 31 | `travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
-| 32 | `applications.js` | Parses header+status-update rows into Ongoing/Closed cards |
-| 33 | `insight.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
-| 34 | `food-insight.js` | Food mode: per-ingredient rollup **grouped by Group** |
-| 35 | `micronutrient-insight.js` | Micronutrient mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `nutrient-targets.js`'s Ideal/day figures |
-| 36 | `activity-insight.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 37 | `protein-source-rotation-insight.js` | Protein mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
-| 38 | `plan-insight.js` | Plan mode: the Tune's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
-| 39 | `fat-loss-pattern-insight.js` | Pattern mode: the BMR_cal periods plus macro/activity-type averages, and the pattern-finding prompt |
-| 40 | `insight-panel.js` | The panel itself: mode table, load buttons, AI call, per-mode save/restore |
-| 41 | `protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Group |
-| 42 | `formula-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
-| 43 | `formula-render.js` | Tune's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
-| 44 | `formula-playground.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
-| 45 | `financial-insight.js` | Finance Insight panel: net worth/cash flow/category-spend/account snapshot, AI call |
+| 24 | `health-activity-catalogue.js` | Activities catalogue: parses the sheet, rebuilds the Activity Plan tables and Instruction modal, add/edit/duplicate/delete of catalogue rows, serves category/MET/muscle-group/image lookups |
+| 25 | `health-physique.js` | Physique table and form: one row per day, CRUD, duplicate-date guard, table rendering, form open/close, and `physiqueAsHealthEntries()` — the adapter every chart and Insight mode reads |
+| 26 | `health-physique-breakdown.js` | Physique's food/workout Calculate (incremental + bulk over selected days), Combine & Sort, and the Consumption autocomplete — loads right after `health-physique.js`, sharing its module state |
+| 27 | `health-activity.js` | Logged-today ticks, incremental Log a Workout (writes the Physique day row), Instruction modal wiring — the tables themselves come from `health-activity-catalogue.js` |
+| 28 | `health-activity-estimator.js` | Workout note parsing, active-seconds and per-line MET-based burn |
+| 29 | `other-contact.js` | Contact panel, CRUD, bulk export/delete/merge |
+| 30 | `other-settings.js` | Settings table CRUD, plus `saveSettingValues` for computed results |
+| 31 | `track-travel.js` | Travel panel CRUD; feeds country-days and the choropleth |
+| 32 | `track-application.js` | Parses header+status-update rows into Ongoing/Closed cards |
+| 33 | `health-insight-wellness.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
+| 34 | `health-insight-food.js` | Food mode: per-ingredient rollup **grouped by Group** |
+| 35 | `health-insight-micronutrient.js` | Micronutrient mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `health-nutrient-targets.js`'s Ideal/day figures |
+| 36 | `health-insight-activity.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
+| 37 | `health-insight-protein.js` | Protein mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
+| 38 | `health-insight-plan.js` | Plan mode: the Tune's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
+| 39 | `health-insight-pattern.js` | Pattern mode: the BMR_cal periods plus macro/activity-type averages, and the pattern-finding prompt |
+| 40 | `health-insight.js` | The panel itself: mode table, load buttons, AI call, per-mode save/restore |
+| 41 | `health-chart-protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Group |
+| 42 | `health-tune-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
+| 43 | `health-tune-render.js` | Tune's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
+| 44 | `health-tune.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
+| 45 | `finance-insight.js` | Finance Insight panel: net worth/cash flow/category-spend/account snapshot, AI call |
 | 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
 | 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
 | 48 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |
-| 49 | `car-service.js` | Car Service block: Transportation `@km` transactions → odometer fit, next service per rule (Toyota km schedule, winter tires, rust protection), chart + table |
-| 50 | `market-data.js` | The only code that calls Twelve Data, Alpha Vantage and Finnhub: daily/monthly/intraday bars, symbol search, news, USD/CAD; IndexedDB price cache, per-service rate-limit queue (Alpha Vantage spaced 1.5 s), `normalizeSymbol` (`TSE: AC` → `AC.TO`) |
-| 51 | `market-math.js` | Pure indicators (SMA, ATR, RSI, MACD, Bollinger), the trailing stop (`trailingStopSeries`, `MARKET_ATR_MULT_DEFAULT` = 4), risk measures the four-check verdict, `checkAlerts` and `parseAlertLine` |
-| 52 | `portfolio-math.js` | Pure average-cost (ACB) holdings and the daily portfolio series in CAD |
-| 53 | `market-charts.js` | Range buttons, `marketLineChart`, series legend, status and % cells shared by the stock pages |
-| 54 | `market.js` | Watch List page: Watchlist tab CRUD, symbol search, Close and 1d/1m/1y per row, 🔬 opens Market; alerts (`checkWatchlistAlerts`, badges, ✅ dismiss) |
-| 55 | `portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
-| 56 | `stock-analysis.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
-| 57 | `leetcode-roadmap.js` | The NeetCode 250 problem list and NeetCode's roadmap graph (category positions and parents); data only |
-| 58 | `leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), category cards, past-year heatmap, roadmap graph |
+| 49 | `track-car-service.js` | Car Service block: Transportation `@km` transactions → odometer fit, next service per rule (Toyota km schedule, winter tires, rust protection), chart + table |
+| 50 | `finance-market-data.js` | The only code that calls Twelve Data, Alpha Vantage and Finnhub: daily/monthly/intraday bars, symbol search, news, USD/CAD; IndexedDB price cache, per-service rate-limit queue (Alpha Vantage spaced 1.5 s), `normalizeSymbol` (`TSE: AC` → `AC.TO`) |
+| 51 | `finance-market-math.js` | Pure indicators (SMA, ATR, RSI, MACD, Bollinger), the trailing stop (`trailingStopSeries`, `MARKET_ATR_MULT_DEFAULT` = 4), risk measures the four-check verdict, `checkAlerts` and `parseAlertLine` |
+| 52 | `finance-portfolio-math.js` | Pure average-cost (ACB) holdings and the daily portfolio series in CAD |
+| 53 | `finance-market-chart.js` | Range buttons, `marketLineChart`, series legend, status and % cells shared by the stock pages |
+| 54 | `finance-watchlist.js` | Watch List page: Watchlist tab CRUD, symbol search, Close and 1d/1m/1y per row, 🔬 opens Market; alerts (`checkWatchlistAlerts`, badges, ✅ dismiss) |
+| 55 | `finance-portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
+| 56 | `finance-market.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
+| 57 | `track-leetcode-roadmap.js` | The NeetCode 250 problem list and NeetCode's roadmap graph (category positions and parents); data only |
+| 58 | `track-leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), category cards, past-year heatmap, roadmap graph |
 
 `section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 56 above into a page that has none of them (see [Section pages](#section-pages)).
 
@@ -255,7 +255,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
    - `/other/`: Settings, Contact, the Settings block.
    - Home: Settings, Activity, Physique and the report — only what the glance cards need; the blocks are reached through tiles.
    Saving a BMR-affecting setting on a page without Physique loads it first, so every stored BMR is still rewritten.
-3. The wellness/finance/timesheet/travel chart files render canvases lazily (`upsertChart`, `charts-base.js`, builds a chart only once its `.chart-box` scrolls into view); `app.js` renders summary cards; each module renders its table.
+3. The health/finance/work-time/travel chart files render canvases lazily (`upsertChart`, `charts-base.js`, builds a chart only once its `.chart-box` scrolls into view); `app.js` renders summary cards; each module renders its table.
 
 **Writes**
 

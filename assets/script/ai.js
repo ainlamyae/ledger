@@ -89,7 +89,7 @@ async function aiChatText(systemPrompt, userMessage, temperature = 0.4) {
 // would silently change names (e.g. "egg" -> "egg, whole") which then got
 // written back over what the user actually typed. The Notes field is never
 // touched by this response now; "query" below is used purely as an internal
-// USDA search term (calorie-estimator.js prefers the user's own text for the
+// USDA search term (health-physique-estimator.js prefers the user's own text for the
 // Nutrition table match/lookup whenever the split lines up 1:1).
 const AI_EXTRACT_SYSTEM_PROMPT = `You are a nutrition estimator for a personal health log. The user gives you a freeform
 description of food ingredients and amounts (e.g. "2 eggs, 1 slice toast, 1 tbsp butter").
@@ -185,7 +185,7 @@ async function aiExtractIngredients(notesText) {
 
 // The Workout counterpart to aiExtractIngredients: fills in a catalogue row for
 // each exercise name the Activity sheet doesn't list yet, so the day is priced at
-// a real MET rather than the flat default, and 💾 on its row (physique-breakdown.js)
+// a real MET rather than the flat default, and 💾 on its row (health-physique-breakdown.js)
 // can save it as a new activity. `lines` is [{ name, unit }], unit being the
 // note line's own (x, sec, min, step); `catalogue` is the sheet's existing
 // { categories, groups, muscleGroups }, which the model is asked to reuse so a

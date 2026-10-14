@@ -19,7 +19,7 @@ function chartFontSize() {
   return 0.8 * parseFloat(getComputedStyle(document.documentElement).fontSize);
 }
 
-// Every reference mark in Health Indicators — the per-column caps, State Trend's target
+// Every reference mark in Health Chart — the per-column caps, State Trend's target
 // line. Deliberately not red: red is this app's "missed" score, so a limit drawn in it
 // read as a failure rather than as the thing being measured against.
 function targetMarkColor() {
@@ -27,11 +27,18 @@ function targetMarkColor() {
 }
 
 // Fixed y-axis label width, so plot areas line up down the section however many
-// digits each chart's values run to.
-const TREND_Y_AXIS_WIDTH = 64;
+// digits each chart's values run to. Wide enough for the longest unit-suffixed
+// label in the section (e.g. "-2000 kcal", "24.9 kg/m²").
+const TREND_Y_AXIS_WIDTH = 84;
 
+// Force EVERY axis to the exact same width (not just a minimum): a plain minimum
+// let any chart whose labels ran wider than it — the kcal/g/kg·m² unit ticks do —
+// keep a wider axis, which pushed its plot area in and slid that chart's vertical
+// gridlines out of line with the rest of the section. Pinned equal, every chart's
+// plot area starts and ends at the same x, so the date gridlines line up straight
+// down the column at every range.
 function fixTrendYAxisWidth(scale) {
-  if (scale.width < TREND_Y_AXIS_WIDTH) scale.width = TREND_Y_AXIS_WIDTH;
+  scale.width = TREND_Y_AXIS_WIDTH;
 }
 
 // Invisible spacer reserving the same width as a real right axis, so a chart without
@@ -162,7 +169,7 @@ function niceAxisBound(value) {
 //
 // The returned value stands in for the real Chart instance everywhere a caller
 // stores it back as `existingChart` next time — but one chart (Category Expenditure
-// Trend, finance-charts.js) also keeps calling real Chart.js instance methods
+// Trend, finance-chart.js) also keeps calling real Chart.js instance methods
 // (isDatasetVisible/setDatasetVisibility/update) and touching `.options` on it
 // directly, from its own legend, so a plain {destroy()} stand-in isn't enough. This
 // returns a Proxy instead: once the real chart exists, every property/method
@@ -373,7 +380,7 @@ function wellnessTickIndices(dates, maxTicks = 7) {
 // The x scale for every category-axis wellness chart (labels: dates) — forces its ticks
 // onto wellnessTickIndices instead of Chart.js's own autoSkip, so it can't drift from
 // State Trend & Forecast's linear axis, which is built to pick the same indices over the
-// same window (see the scales.x block in renderWellnessProjectionChart).
+// same window (see the scales.x block in renderHealthProjectionChart).
 function wellnessCategoryXScale(dates) {
   return {
     afterBuildTicks: (axis) => {

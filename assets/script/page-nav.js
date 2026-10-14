@@ -49,10 +49,10 @@ const QUICK_ACTIONS = {
 // fill in, charts, or AI. Every other block is rows of a sheet tab and keeps the
 // plain gray. Quick actions (above) are all forms.
 const TILE_KINDS = {
-  'health/indicator': 'chart',
+  'health/chart': 'chart',
   'health/insight': 'ai',
   'health/tune': 'form',
-  'finance/indicator': 'chart',
+  'finance/chart': 'chart',
   'finance/market': 'ai',
   'finance/insight': 'ai',
 };
@@ -439,7 +439,7 @@ const SELECTION_BAR_IDS = ['physique-bulk-actions', 'nutrition-bulk-actions', 't
 // A block's header buttons (Physique's Export CSV / Today / Log, Activity's Workouts /
 // Log / Add, …) gathered into one group that ends in ❌, so every page has the same
 // way out in the same place: top right of the header on a wide screen, the right
-// end of the bottom bar on a phone. A block with no buttons (Indicator) gets the
+// end of the bottom bar on a phone. A block with no buttons (Chart) gets the
 // group with just ❌, and a heading without a .panel-header gets one around it.
 // Moved, not copied, so every listener stays attached.
 function groupHeaderActions(panel) {

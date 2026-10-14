@@ -5,16 +5,16 @@
 ## At a glance
 
 - `/health/`, `/finance/`, `/track/`, `/other/` are **hubs**: glance cards, then a name-only tile per block.
-- Health tiles: Indicator, Physique, Nutrition, Activity, Insight, Tune, Settings, then **Today** and **Workouts**.
+- Health tiles: Chart, Physique, Nutrition, Activity, Insight, Tune, Settings, then **Today** and **Workouts**.
 - **A tile's colour says what it opens** (`page-nav.js`'s `TILE_KINDS`), each a 15% tint in the same liquid-glass capsule (frosted body, top shine, lit rim):
 
   | Kind | Wash | Tiles |
   |---|---|---|
   | Database | Gray | Physique, Nutrition, Activity, Transaction, Account, Breakdown, Portfolio, Watch List, Work Time, Car Service, Travel, Application, LeetCode, Contact, Settings |
   | Form | Green | Tune, Today, Workouts |
-  | Chart | Orange | Indicator (Health, Finance) |
+  | Chart | Orange | Chart (Health, Finance) |
   | AI | Purple | Insight (Health, Finance), Market, and Insight's own mode tiles (Plan, Wellness… Snapshot) |
-- Finance tiles: Indicator, Transaction, Account, Portfolio, Watch List, then **Insight** last. **Breakdown** has no tile or sidebar link for now, though `/finance/breakdown/` still opens; it's listed in `page-nav.js`'s `PAGES_WITHOUT_TILES`, and commenting its entry out brings both back. **Market**'s tile sits on Insight's page instead, beside **Snapshot** among its mode tiles (`data-tile-host` on the block, read by `page-nav.js`'s `buildPageTiles`); it still opens `/finance/market/`, and the sidebar still lists Market — the same order as the panels in `index.html`, which the tiles, sidebar and bottom bar all follow.
+- Finance tiles: Chart, Transaction, Account, Portfolio, Watch List, then **Insight** last. **Breakdown** has no tile or sidebar link for now, though `/finance/breakdown/` still opens; it's listed in `page-nav.js`'s `PAGES_WITHOUT_TILES`, and commenting its entry out brings both back. **Market**'s tile sits on Insight's page instead, beside **Snapshot** among its mode tiles (`data-tile-host` on the block, read by `page-nav.js`'s `buildPageTiles`); it still opens `/finance/market/`, and the sidebar still lists Market — the same order as the panels in `index.html`, which the tiles, sidebar and bottom bar all follow.
 - Each block and form is its own page under a breadcrumb starting at **Ledger**: `Ledger / Health / Physique / Log`. Pages switch in place, without a reload.
 - The breadcrumb is the only heading; the home page's reads **Ledger** alone.
 - Forms take the page's place instead of covering it.
@@ -23,7 +23,7 @@
 - **Actions bar:** one place and order per page, ❌ last — top of the page on a laptop, bottom bar on tablet and phone. Both bottom bars are glass pills (`--glass-*`, see [Design System](../design-system.md)) of the same height (`--bottom-bar-height`); the action bar starts with a **Ledger** tab.
 - **Loading:** a reload paints the final layout from the first frame and opens straight onto that page or form; Insight mode pages fill in as data arrives.
 - **Badges** on tiles and breadcrumbs: `A<T $13` (Account), `28d` (Car Service), `3d` (Work Time — opens today), `Log` (Physique — opens today), `31d` (Transaction, Insight and Market tiles — over 30 days old), `AC.TO<20.16` (Watch List and Market — a met stock alert).
-- Finance has **Indicator** and **Insight**; Insight has one mode, **Snapshot** (`/finance/insight/snapshot/`), its tile in a card titled **Insight** like Health's.
+- Finance has **Chart** and **Insight**; Insight has one mode, **Snapshot** (`/finance/insight/snapshot/`), its tile in a card titled **Insight** like Health's.
 
 ### Addresses
 
@@ -45,7 +45,7 @@
 
 - **Every section page starts with the same breadcrumb, top-left**: `Ledger / Health` on the hub (in place of the old centred section title; **Ledger** links to the home page), `Ledger / Health / Physique` on a page, `Ledger / Health / Physique / Log` on a form page.
 - **A section page is a hub, and each block is a page** (`page-nav.js`, `router.js`'s `showSectionPage`). `/health/`, `/finance/`, `/track/` and `/other/` show the section's glance cards, then one card titled with the section's name holding one **tile** per block — just its name, as many a row as fit (4 on a phone, up to 7 on a laptop). `/health/physique/` shows that block alone, opened, under a breadcrumb (`Ledger / Health / Physique`); its heading is a title, not a fold toggle.
-- **One bottom bar at a time, and ❌ on every page** (`page-nav.js`'s `updateActionBar`). On a phone the page's own action row replaces the Ledger · Health · Finance · Track tab bar as the one bar pinned to the bottom: a form page's actions, a selection bar while rows are ticked (Physique, Nutrition, Transaction, Contact), Tune's Reset · Update · Save or Insight's Send to AI, otherwise the block's header buttons (Physique's Today · Log). Every bar ends in ❌ at the far right — a page with no buttons (Indicator) gets a bar with just ❌ — in one row that scrolls sideways when it's long, with ❌ kept in view; it starts with a **Ledger** tab, its buttons share one 42px size and differ only in colour, ❌ at the right end, and it is exactly as tall as the tab bar it replaces (both read `--bottom-bar-height`, which the avatar's box and the page's bottom clearance use too). On a wide screen the header buttons stay in the header with ❌ top right on every page. ❌ on a page returns to the section hub, on a selection bar clears the selection, on a form closes it.
+- **One bottom bar at a time, and ❌ on every page** (`page-nav.js`'s `updateActionBar`). On a phone the page's own action row replaces the Ledger · Health · Finance · Track tab bar as the one bar pinned to the bottom: a form page's actions, a selection bar while rows are ticked (Physique, Nutrition, Transaction, Contact), Tune's Reset · Update · Save or Insight's Send to AI, otherwise the block's header buttons (Physique's Today · Log). Every bar ends in ❌ at the far right — a page with no buttons (Chart) gets a bar with just ❌ — in one row that scrolls sideways when it's long, with ❌ kept in view; it starts with a **Ledger** tab, its buttons share one 42px size and differ only in colour, ❌ at the right end, and it is exactly as tall as the tab bar it replaces (both read `--bottom-bar-height`, which the avatar's box and the page's bottom clearance use too). On a wide screen the header buttons stay in the header with ❌ top right on every page. ❌ on a page returns to the section hub, on a selection bar clears the selection, on a form closes it.
 - **Reloading a form address** (`/health/physique/2026-10-05/`, `/health/physique/log/`) opens straight onto that form page — its breadcrumb over a "Loading…" card — and the form fills it once the data loads; the address never switches to the block in between. If the form can't open (signed out, an unknown row) the block's page is shown.
 - **Stacked forms** (a day's 🧬 view opened from its Edit): only the top one is shown, as a page with its own breadcrumb; the one under it returns when it closes.
 - **Quick actions:** the Health hub (and Health's part of the home page) carries **Today** then **Workouts** as its last tiles, green like Tune (a form), after Settings (`QUICK_ACTIONS`, `page-nav.js`); Workouts opens `/health/activity/workouts/`. On the hub it clicks Physique's own Today, so today's entry (or a new one dated today) opens exactly as it does from the Physique page (`/health/physique/2026-10-05/`), and closing it returns to the hub; on the home page it goes to that address.

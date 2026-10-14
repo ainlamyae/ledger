@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 
-const src = fs.readFileSync(new URL('../assets/script/market-math.js', import.meta.url), 'utf8');
+const src = fs.readFileSync(new URL('../assets/script/finance-market-math.js', import.meta.url), 'utf8');
 const ctx = vm.createContext({ Math, console });
 vm.runInContext(src, ctx);
 const M = ctx;

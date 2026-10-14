@@ -1,9 +1,9 @@
-// Tests for assets/script/portfolio-math.js, loaded via node:vm.
+// Tests for assets/script/finance-portfolio-math.js, loaded via node:vm.
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 
-const src = readFileSync(new URL('../assets/script/portfolio-math.js', import.meta.url), 'utf8');
+const src = readFileSync(new URL('../assets/script/finance-portfolio-math.js', import.meta.url), 'utf8');
 const ctx = vm.createContext({ Math, console, Map, Set });
 vm.runInContext(src, ctx);
 const { computeHoldings, holdingValue, priceOn, buildPortfolioSeries } = ctx;

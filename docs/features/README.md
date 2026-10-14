@@ -9,7 +9,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 | Page | Covers |
 |---|---|
 | [Home Page & Widgets](home.md) | Glance cards, Time/Date/Azan/Weather widgets (Weather with sunrise/sunset), hide toggles |
-| [Hubs, Pages & Addresses](navigation.md) | Hubs, breadcrumb, sidebar (hide with the logo-row button or Ctrl+.), tiles colour-coded by function, phone bars, badges, every address |
+| [Hubs, Pages & Addresses](navigation.md) | Hubs, breadcrumb, sidebar (hide with the logo-row button or Ctrl+.) with a bottom panel of Refresh data, Clear cache, iPhone-style show/hide switches and the account row (Google picture, name, email) opening the menu, tiles colour-coded by function, phone bars, badges, every address |
 | [Layout & Interaction](layout.md) | Responsive layout, content-width tables, forms, shortcuts, exports, accessibility, dark/privacy mode |
 | [Buttons](buttons.md) | Emoji actions and button roles |
 | [Chart Conventions](charts.md) | Colours, axes, scoring, legends |

@@ -321,6 +321,11 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     : '—';
   bmrAdaptEl.textContent = privacyMode ? maskDigits(bmrAdaptText) : bmrAdaptText;
 
+  // BMR_avg — the mean of today's known four, also shown whatever the basis.
+  const bmrAvg = todayBmrFigures.BMR_avg ?? bmrAverageOf(todayBmrFigures);
+  const bmrAvgText = maintenanceKcal !== null && bmrAvg !== null ? `${-bmrAvg} kcal` : '—';
+  document.getElementById('today-status-bmr-avg-value').textContent = privacyMode ? maskDigits(bmrAvgText) : bmrAvgText;
+
   // BMR_cal — same "always shown regardless of basis" idea. Hidden entirely (not just
   // dashed) until today's stored figures carry one: the rolling n_p × L_p calibration,
   // absent in the first n_p × L_p days of data.

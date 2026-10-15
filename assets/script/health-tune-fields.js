@@ -186,9 +186,9 @@ function currentPinMode() {
 // whenever the checked radio is 'bmr_cal'.
 let lastExplicitBmrFormula = 'mifflin';
 
-// The BMR fieldset's two basis options: each layers on the active equation rather
+// The BMR fieldset's three basis options: each layers on the active equation rather
 // than replacing it.
-const BMR_BASIS_RADIO_VALUES = ['bmr_cal', 'bmr_adp'];
+const BMR_BASIS_RADIO_VALUES = ['bmr_cal', 'bmr_adp', 'bmr_avg'];
 
 // Which BMR equation the preview is running. Both are first-class: this is read into the
 // settings overlay so calorieDesiredDetail and activityDesiredKcal see it, and passed
@@ -200,7 +200,7 @@ function currentBmrFormula() {
 }
 
 // Which basis (applyBmrBasis, health-math.js) every deficit and desired calorie figure
-// in the app runs on: BMR_cal / BMR_adp, or plain ('bmr') under Mifflin or Katch.
+// in the app runs on: BMR_cal / BMR_adp / BMR_avg, or plain ('bmr') under Mifflin or Katch.
 function currentBmrBasis() {
   const checked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
   return BMR_BASIS_RADIO_VALUES.includes(checked) ? checked : 'bmr';
@@ -307,6 +307,7 @@ Body mass at which TEI becomes maintenance
 Metabolic adaptation — BMR sags faster than the lost mass alone predicts
     BMR_adp(t) = BMR × (1 − λt),  λt capped at λt_max ≈ 10–15% by week 10–12
     m∞_adp =  (TEI − A_adp) / B_adp,  the BMR half of A and B scaled by (1 − λt)
+    BMR_avg =  (BMR_mif + BMR_kat + BMR_cal + BMR_adp) / n,  over the n known, BMR_adp as of today
 Activity energy expenditure at the desired daily activity — ACSM metabolic equation
     AEE   =  MET × m × τ × κ / ε
 Sleep efficiency — from sleep length s and sleep deprivation rate γ, per hour below the desired sleep s_des

@@ -13,7 +13,6 @@ let currentPage = 1;
 let listenersAttached = false;
 let txSort = { key: null, dir: 1 };
 let selectedRows = new Set();
-let transactionsDirtyFromAdd = false;
 // Same purpose as health-physique.js's physiqueDataLoaded — lets a click that races
 // the initial fetch (e.g. Finance's Insight) tell "not loaded yet" apart
 // from "loaded, zero transactions".
@@ -66,15 +65,6 @@ async function initTransactions(forceRefresh = false) {
       updateBalanceWanted = e.target.checked;
     });
 
-    // Deferred full refresh when the modal closes after a keepOpen add sequence.
-    // Covers all close paths: Cancel button, Escape key, and normal Save.
-    new MutationObserver(() => {
-      const modal = document.getElementById('tx-modal');
-      if (modal.hidden && transactionsDirtyFromAdd) {
-        transactionsDirtyFromAdd = false;
-        refreshTransactions(true);
-      }
-    }).observe(document.getElementById('tx-modal'), { attributes: true, attributeFilter: ['hidden'] });
     document.getElementById('tx-account-filter').addEventListener('change', resetTransactionsPageAndRender);
     document.getElementById('tx-payee-filter').addEventListener('input', resetTransactionsPageAndRender);
     document.getElementById('tx-category-filter').addEventListener('change', resetTransactionsPageAndRender);
@@ -495,10 +485,6 @@ function openTransactionForm(transaction, duplicate = false) {
   syncTxAccountBalance();
   document.getElementById('tx-category').value = transaction ? transaction.category : '';
 
-  // A duplicate is a new row (like Add), not an in-place edit, so "Save & Add
-  // Another" should be offered just like it is for a brand-new transaction.
-  document.getElementById('tx-save-add-btn').hidden = !!transaction && !duplicate;
-
   // On an edit, save reverses the old amount and applies the new one.
   updateBalanceWanted = true;
   document.getElementById('tx-update-balance').checked = true;
@@ -531,8 +517,6 @@ function isIncomeTransaction(category, amount) {
 
 async function submitTransactionForm(event) {
   event.preventDefault();
-
-  const keepOpen = event.submitter?.id === 'tx-save-add-btn';
 
   const amount = evaluateNumberExpression(document.getElementById('tx-amount').value);
   if (amount === null) {
@@ -593,27 +577,13 @@ async function submitTransactionForm(event) {
 
     if (isIncomeTransaction(values[0][3], amount)) celebrateWithConfetti();
 
-    if (keepOpen) {
-      // Optimistic local append — no API re-fetch, no datalist rebuild, no .focus() call.
-      // Rebuilding datalists while a form input is focused freezes iOS WebKit.
-      // The deferred MutationObserver on tx-modal triggers a full refresh on close.
-      const [date, account, payee, category, description, amt] = values[0];
-      const nextRow = allTransactions.length > 0 ? allTransactions[allTransactions.length - 1].row + 1 : 2;
-      allTransactions.push({ row: nextRow, date, account, payee, category, description, amount: amt });
-      renderTransactions();
-      document.getElementById('tx-description').value = '';
-      document.getElementById('tx-amount').value = '';
-      clearFieldError('tx-form-error');
-      transactionsDirtyFromAdd = true;
-    } else {
-      await refreshTransactions(true);
-      const saved = allTransactions.find((t) => t.row === savedRow);
-      if (saved) {
-        openTransactionForm(saved);
-        stayOnSavedForm('tx-modal', editTransaction.step(saved));
-      }
-      showFormSaved('tx-form-error');
+    await refreshTransactions(true);
+    const saved = allTransactions.find((t) => t.row === savedRow);
+    if (saved) {
+      openTransactionForm(saved);
+      stayOnSavedForm('tx-modal', editTransaction.step(saved));
     }
+    showFormSaved('tx-form-error');
   } catch (err) {
     showFieldError('tx-form-error', err.message);
   }

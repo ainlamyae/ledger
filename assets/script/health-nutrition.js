@@ -62,7 +62,7 @@ function titleCaseIngredientName(text) {
 //    1 if there isn't one, e.g. Amount is just "rice cake").
 // A row with neither is still visible/editable here, just unusable for
 // auto-scaling until edited.
-const NUTRITION_GRAMS_PATTERN = /(\d+(?:\.\d+)?)\s*g\b/i;
+const NUTRITION_GRAMS_PATTERN = /(\d+(?:\.\d+)?)\s*(?:grams?|gr|g)\b/i;
 function parseGramsFromAmount(amount) {
   const match = String(amount || '').match(NUTRITION_GRAMS_PATTERN);
   return match ? parseFloat(match[1]) : null;
@@ -77,14 +77,14 @@ function parseGramsFromAmount(amount) {
 // it, \d+ backtracks on a plain weight like "100g" (greedy match "100" fails
 // the "not followed by g" check, backtracks to "10", which IS followed by a
 // non-"g" char "0" and wrongly passes) — misreading a 100g weight as count 10.
-const NUTRITION_LEADING_COUNT_PATTERN = /^\s*(?=(\d+(?:\.\d+)?))\1(?!\s*g\b)/i;
+const NUTRITION_LEADING_COUNT_PATTERN = /^\s*(?=(\d+(?:\.\d+)?))\1(?!\s*(?:grams?|gr|g)\b)/i;
 // The gram figure leads Amount, so the count sits after it: "325g (1x)",
 // "30g (2tsp)", "31g (1 scoop)". Tried in order — an "Nx" anywhere, then a
 // number opening a parenthesis, then a leading number ("2 eggs", or an old
 // "1 scoop (31g)") — none of them ever a gram figure itself (same atomic
 // lookahead trick as NUTRITION_LEADING_COUNT_PATTERN).
 const NUTRITION_X_COUNT_PATTERN = /(\d+(?:\.\d+)?)\s*x\b/i;
-const NUTRITION_PAREN_COUNT_PATTERN = /\(\s*(?=(\d+(?:\.\d+)?))\1(?!\s*g\b)/i;
+const NUTRITION_PAREN_COUNT_PATTERN = /\(\s*(?=(\d+(?:\.\d+)?))\1(?!\s*(?:grams?|gr|g)\b)/i;
 const NUTRITION_COUNT_PATTERNS = [NUTRITION_X_COUNT_PATTERN, NUTRITION_PAREN_COUNT_PATTERN, NUTRITION_LEADING_COUNT_PATTERN];
 function nutritionCountPattern(amount) {
   const text = String(amount || '');
@@ -100,7 +100,7 @@ function parseCountFromAmount(amount) {
 // the grams come first. Anything else is returned as typed. Applied when the
 // form saves and, once, to rows saved in the old order
 // (migrateNutritionAmountOrder).
-const NUTRITION_COUNT_FIRST_PATTERN = /^\s*(\d+(?:\.\d+)?(?!\d|\.\d|\s*g\b)[^()]*?)\s*\(\s*(\d+(?:\.\d+)?)\s*g\s*\)\s*$/i;
+const NUTRITION_COUNT_FIRST_PATTERN = /^\s*(\d+(?:\.\d+)?(?!\d|\.\d|\s*(?:grams?|gr|g)\b)[^()]*?)\s*\(\s*(\d+(?:\.\d+)?)\s*(?:grams?|gr|g)\s*\)\s*$/i;
 function gramsFirstAmount(amount) {
   const match = String(amount || '').match(NUTRITION_COUNT_FIRST_PATTERN);
   return match ? `${match[2]}g (${match[1]})` : amount;
@@ -1322,11 +1322,11 @@ function nutritionNamesMatch(a, b) {
 
 // Rebuilds one Consumption line under the ingredient's new name, keeping
 // whatever quantity/unit it already had — the same "<quantity><unit> <name>"
-// shape Tidy and Calculate both write (combineAndSortConsumptionText,
+// shape Calculate writes (combineAndSortConsumptionText,
 // health-physique-breakdown.js), so a line this touches reads exactly like one
-// either of them would have produced. Null when the line's quantity can't be
+// it would have produced. Null when the line's quantity can't be
 // parsed at all — the rare hand-typed line with no leading amount, left
-// exactly as typed rather than mangled, same as Tidy leaves it.
+// exactly as typed rather than mangled, same as Calculate leaves it.
 function renamedConsumptionLine(line, newName) {
   const { quantity, unit } = extractIngredientQuantity(line);
   if (quantity === null) return null;

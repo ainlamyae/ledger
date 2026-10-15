@@ -31,7 +31,7 @@ The Finance **Watch List**, **Market** and **Portfolio** pages need three free A
 | `MARKET_RISK_PCT` | 1 | % of your Investment accounts risked per trade (Market's Position Size) |
 | `MARKET_ATR_MULT` | 4 | Trailing stop distance below the 22-day highest close, in ATR14s. 4 suits holds of weeks to months; 2.5–3 stops out far more often |
 | `MARKET_RISK_FREE_PCT` | 0 | Yearly risk-free rate for Sharpe and Sortino, e.g. 3 |
-| `PORTFOLIO_WRITE_MARKET_VALUE` | 0 | 1 shows Portfolio's **Update Market Value** button |
+| `PORTFOLIO_WRITE_MARKET_VALUE` | 0 | 1 shows Portfolio's 🔄 **Update Market Value** button |
 
 ## Good to know
 

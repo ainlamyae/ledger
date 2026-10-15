@@ -446,7 +446,34 @@ const BMR_BASIS_DEFAULT = 'bmr';
 
 function bmrBasis() {
   const raw = getSettingString(BMR_BASIS_KEY, BMR_BASIS_DEFAULT);
-  return (raw === 'bmr_adp' || raw === 'bmr_cal') ? raw : BMR_BASIS_DEFAULT;
+  return (raw === 'bmr_adp' || raw === 'bmr_cal' || raw === 'bmr_avg') ? raw : BMR_BASIS_DEFAULT;
+}
+
+// BMR_avg: the mean of a day's known BMR_mif, BMR_kat, BMR_cal and BMR_adp. The plan runs it
+// as the active equation scaled by BMR_avg / equation on the latest stored day (Tune's own
+// boxes while it previews), so the affine model keeps the equation's shape.
+const BMR_AVG_RATIO_PREVIEW_KEY = 'BMR_AVG_RATIO_PREVIEW';
+const BMR_AVERAGED_KEYS = ['BMR_mif', 'BMR_kat', 'BMR_cal', 'BMR_adp'];
+
+function bmrAverageOf(figures) {
+  const known = BMR_AVERAGED_KEYS.map((key) => figures?.[key]).filter(Number.isFinite);
+  return known.length ? Math.round(known.reduce((sum, v) => sum + v, 0) / known.length) : null;
+}
+
+// 1 outside 'bmr_avg', or with no stored day to measure it on.
+function currentBmrAverageRatio() {
+  if (bmrBasis() !== 'bmr_avg') return 1;
+  const preview = currentSettings[BMR_AVG_RATIO_PREVIEW_KEY];
+  if (typeof preview === 'number' && Number.isFinite(preview)) return preview;
+  if (typeof physiqueDatedAscending !== 'function') return 1;
+  const equationKey = BMR_EQUATION_KEYS[bmrFormula()];
+  const days = physiqueDatedAscending();
+  for (let i = days.length - 1; i >= 0; i--) {
+    const figures = days[i].bmr;
+    const avg = bmrAverageOf(figures);
+    if (avg !== null && Number.isFinite(figures?.[equationKey]) && figures[equationKey] > 0) return avg / figures[equationKey];
+  }
+  return 1;
 }
 
 // The current BMR calibration: an empirically back-solved BMR from actual logged
@@ -502,6 +529,7 @@ function currentCalibratedOffsetKcal() {
 // one-line wrap instead of a signature change threaded through its whole call chain.
 function applyBmrBasis(bmr, atIsoDate = null) {
   if (bmr === null) return bmr;
+  if (bmrBasis() === 'bmr_avg') return bmr * currentBmrAverageRatio();
   if (bmrBasis() === 'bmr_cal') return bmr + currentCalibratedOffsetKcal();
   if (bmrBasis() !== 'bmr_adp') return bmr;
   const bodyMassEntries = physiqueAsHealthEntries().filter((e) => e.category === 'Body Mass' && e.amount !== null);
@@ -1078,6 +1106,11 @@ function maintenanceAffineCoefficients({
     const calibratedFraction = calibratedOffset / equationBmrNow;
     aBmrEff = aBmr * (1 + calibratedFraction);
     bBmrEff = bBmr * (1 + calibratedFraction);
+  } else if (bmrBasis() === 'bmr_avg') {
+    // The equation scaled to BMR_avg, both halves alike, as bmr_cal's fraction is.
+    const ratio = currentBmrAverageRatio();
+    aBmrEff = aBmr * ratio;
+    bBmrEff = bBmr * ratio;
   } else {
     aBmrEff = aBmr * (1 - basisFraction) + calibratedOffset;
     bBmrEff = bBmr * (1 - basisFraction);

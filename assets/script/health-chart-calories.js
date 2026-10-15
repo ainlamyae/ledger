@@ -58,6 +58,7 @@ function renderHealthCaloriesChart(entries) {
     { key: 'BMR_kat', color: chartColor('--chart-orange') },
     { key: 'BMR_cal', color: chartColor('--chart-indigo') },
     { key: 'BMR_adp', color: chartColor('--chart-purple') },
+    { key: 'BMR_avg', color: chartColor('--chart-warn') },
   ];
   const bmrByKey = Object.fromEntries(BMR_CAPS.map(({ key }) => [key, new Map()]));
   const restingKcalByDate = new Map();
@@ -201,7 +202,7 @@ function renderHealthCaloriesChart(entries) {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
               const lines = [`Desired ${desired.word}: ${desiredByDay[i].kcal} kcal`];
-              // Named as in the Physique form: BMR_mif, BMR_kat, BMR_cal, BMR_adp.
+              // Named as in the Physique form: BMR_mif, BMR_kat, BMR_cal, BMR_adp, BMR_avg.
               BMR_CAPS.forEach(({ key }) => {
                 const kcal = bmrByKey[key].get(items[0].label);
                 if (kcal !== undefined) lines.push(`${bmrHoverLabel(key)}: ${Math.round(kcal)} kcal`);

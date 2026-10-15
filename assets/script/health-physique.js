@@ -168,9 +168,9 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     document.getElementById(`physique-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
-  // The four BMR figures Save will store, each its own row — "kcal" is the Unit
+  // The five BMR figures Save will store, each its own row — "kcal" is the Unit
   // column. Shown negative, same as the Status card's own BMR rows: an expenditure.
-  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp']].forEach(([id, key]) => {
+  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp'], ['avg', 'BMR_avg']].forEach(([id, key]) => {
     const text = bmr[key] !== undefined ? `${-bmr[key]}` : '—';
     document.getElementById(`physique-bmr-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
@@ -280,7 +280,6 @@ async function initPhysique(forceRefresh = false) {
       renderPhysiqueList();
     });
     onAsyncClick('physique-bulk-calc-btn', bulkCalculatePhysique);
-    onAsyncClick('physique-bulk-combine-btn', bulkCombineAndSortPhysique);
   }
 
   await refreshPhysique(forceRefresh);
@@ -467,7 +466,7 @@ async function recomputeStoredMassAfter(fromDate) {
 
 // --- Stored BMR ------------------------------------------------------------
 //
-// Each day's Derived cell holds {"BMR_mif","BMR_kat","BMR_cal","BMR_adp"} (kcal),
+// Each day's Derived cell holds {"BMR_mif","BMR_kat","BMR_cal","BMR_adp","BMR_avg"} (kcal),
 // computed once on save and read by every per-day display. A key is left out
 // when its inputs are missing.
 
@@ -477,6 +476,7 @@ const BMR_DEFINITIONS = {
   BMR_kat: 'Katch-McArdle BMR',
   BMR_cal: 'Calibrated BMR',
   BMR_adp: 'Adapted BMR by t',
+  BMR_avg: 'Average BMR',
 };
 
 // "BMR_kat (Katch-McArdle BMR)" — the label (definition) form every hover uses.
@@ -609,6 +609,8 @@ function computePhysiqueBmrFigures(date, bodyMassKg = physiqueBodyMassAsOf(date)
   const figures = physiqueBaseBmrFigures(date, bodyMassKg);
   const calibrated = physiqueCalibratedBmr(date, figures[BMR_EQUATION_KEYS[bmrFormula()]], figures);
   if (calibrated !== undefined) figures.BMR_cal = clampBmrCal(calibrated, figures);
+  const avg = bmrAverageOf(figures);
+  if (avg !== null) figures.BMR_avg = avg;
   return figures;
 }
 
@@ -617,20 +619,24 @@ function computePhysiqueBmrFigures(date, bodyMassKg = physiqueBodyMassAsOf(date)
 function bmrFiguresForDate(date) {
   if (bmrFiguresCache.has(date)) return bmrFiguresCache.get(date);
   const stored = ignoreStoredBmr ? null : physiqueRowAsOf(date)?.bmr;
-  const figures = stored && Object.keys(stored).length
+  const base = stored && Object.keys(stored).length
     ? stored
     : physiqueBaseBmrFigures(date, physiqueBodyMassAsOf(date));
+  // A day stored before BMR_avg existed gets it from its other four.
+  const avg = base.BMR_avg === undefined ? bmrAverageOf(base) : null;
+  const figures = avg === null ? base : { ...base, BMR_avg: avg };
   bmrFiguresCache.set(date, figures);
   return figures;
 }
 
-// One figure from a day's set for `basis` ('bmr', 'bmr_cal', 'bmr_adp'). Plain
-// BMR stands in for a missing BMR_cal/BMR_adp, as before. Null without a profile.
+// One figure from a day's set for `basis` ('bmr', 'bmr_cal', 'bmr_adp', 'bmr_avg'). Plain
+// BMR stands in for a missing one, as before. Null without a profile.
 function pickBmrForBasis(figures, basis = bmrBasis()) {
   const plain = figures[BMR_EQUATION_KEYS[bmrFormula()]];
   if (plain === undefined) return null;
   if (basis === 'bmr_adp') return figures.BMR_adp ?? plain;
   if (basis === 'bmr_cal') return figures.BMR_cal ?? plain;
+  if (basis === 'bmr_avg') return figures.BMR_avg ?? bmrAverageOf(figures) ?? plain;
   return plain;
 }
 
@@ -667,10 +673,14 @@ function physiqueDeprivationKcal(day, sleepHours, bmrFigures) {
 function physiqueBmrForSave(date, bodyMassKg) {
   if (!date) return {};
   const saved = allPhysiqueEntries.find((p) => p.date && p.date === date);
-  if (saved?.bmr && (saved.bodyMass ?? null) === (bodyMassKg ?? null)) return { ...saved.bmr };
-  const bmr = computePhysiqueBmrFigures(date, bodyMassKg ?? physiqueBodyMassAsOf(isoDatePlusDays(date, -1)));
+  const bmr = saved?.bmr && (saved.bodyMass ?? null) === (bodyMassKg ?? null)
+    ? { ...saved.bmr }
+    : computePhysiqueBmrFigures(date, bodyMassKg ?? physiqueBodyMassAsOf(isoDatePlusDays(date, -1)));
   // A BMR_cal already stored for this date is kept as is (only a settings change rewrites it).
   if (saved?.bmr?.BMR_cal !== undefined) bmr.BMR_cal = saved.bmr.BMR_cal;
+  // BMR_avg from the figures actually kept, BMR_cal included.
+  const avg = bmrAverageOf(bmr);
+  if (avg !== null) bmr.BMR_avg = avg;
   return bmr;
 }
 
@@ -682,7 +692,7 @@ function physiqueDerivedFigures(day) {
   return { sleep, bmr: { ...bmr, ...mass }, deprivation: physiqueDeprivationKcal(day, sleep, bmr) };
 }
 
-const BMR_JSON_ORDER = ['BMR_mif', 'BMR_kat', 'BMR_cal', 'BMR_adp'];
+const BMR_JSON_ORDER = ['BMR_mif', 'BMR_kat', 'BMR_cal', 'BMR_adp', 'BMR_avg'];
 
 function physiqueCellValue(key, value) {
   if (key !== 'bmr') return value ?? '';
@@ -1242,7 +1252,6 @@ function updatePhysiqueBulkActionsUI() {
   document.getElementById('physique-bulk-summary').textContent =
     selected.length ? `${selected.length} selected` : '';
   document.getElementById('physique-bulk-calc-btn').disabled = !selected.some(eligibleForBulkCalc);
-  document.getElementById('physique-bulk-combine-btn').disabled = !selected.some(eligibleForBulkCombine);
 }
 
 // The 🧬 row action: this day's own real, measured nutrient totals — the same
@@ -1610,7 +1619,8 @@ async function recalculatePhysiqueDay(p, bodyMassKg) {
     if (dayMacros.fat !== null) day.fat = dayMacros.fat;
     if (dayMacros.carbohydrate !== null) day.carbohydrate = dayMacros.carbohydrate;
     if (tef) day.tef = tef.tefKcal;
-    day.consumption = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
+    // Tidied as the form's Calculate does: duplicates combined, sorted by calories, names capitalized.
+    day.consumption = combineAndSortConsumptionText(breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n')).text;
     day.breakdown = breakdownToJson(breakdown);
     day.caloriesIn = calories;
     day.proteinIn = protein;

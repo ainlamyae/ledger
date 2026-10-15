@@ -129,8 +129,9 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   };
   // A pattern has no date, so no BMR.
   const bmr = document.getElementById('physique-is-pattern').checked ? {} : physiqueBmrForSave(day.date, day.bodyMass);
-  const energy = physiqueEnergyBalance(day, sleepHours, bmr);
-  el.textContent = energy ? `${energy.deprivationKcal}` : '—';
+  // No Bed/Wake yet: SD = 0, so D and Δm′ still show.
+  const energy = physiqueEnergyBalance(day, sleepHours, bmr, { sleepOptional: true });
+  el.textContent = energy ? `${energy.deprivationKcal}` : sleepHours === null ? '0' : '—';
 
   // TEI, TEF and AEE as typed/estimated for this day, the same three
   // dailyEnergyBalanceKcal weighs against maintenance and SD to land on D —
@@ -139,7 +140,9 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   // Unit column, not repeated in each cell's own text.
   const teiText = day.caloriesIn !== null ? `${day.caloriesIn}` : '—';
   document.getElementById('physique-tei').textContent = privacyMode ? maskDigits(teiText) : teiText;
-  const tefText = energy ? `${-energy.tef}` : '—';
+  // Needs only intake, not the sleep times D does.
+  const tefKcal = energy ? energy.tef : day.tef ?? (day.caloriesIn !== null ? Math.round(day.caloriesIn * (1 - tefDivisor())) : null);
+  const tefText = tefKcal !== null ? `${-tefKcal}` : '—';
   document.getElementById('physique-tef-derived').textContent = privacyMode ? maskDigits(tefText) : tefText;
   const aeeText = `${day.caloriesOut > 0 ? '-' : ''}${day.caloriesOut}`;
   document.getElementById('physique-aee').textContent = privacyMode ? maskDigits(aeeText) : aeeText;
@@ -637,9 +640,10 @@ function storedBmrForDate(date, basis = bmrBasis()) {
 
 // A day's energy balance off its own TEI, AEE, TEF and stored BMR — the same
 // dailyEnergyBalanceKcal the Status card uses. Null without a BMR, TEI or sleep.
-function physiqueEnergyBalance(day, sleepHours, bmrFigures) {
+// sleepOptional: no Bed/Wake counts as SD = 0 (the form's live table) instead of no result.
+function physiqueEnergyBalance(day, sleepHours, bmrFigures, { sleepOptional = false } = {}) {
   const maintenance = pickBmrForBasis(bmrFigures);
-  if (maintenance === null || day.caloriesIn === null || sleepHours === null) return null;
+  if (maintenance === null || day.caloriesIn === null || (sleepHours === null && !sleepOptional)) return null;
   const tef = day.tef !== null ? day.tef : Math.round(day.caloriesIn * (1 - tefDivisor()));
   return {
     tef,
@@ -1304,13 +1308,17 @@ function physiqueField(id) {
 }
 
 // Pattern rows carry no date, body mass or sleep, so Date/Body Mass and
-// Bed/Wake are hidden whenever "Pattern" is checked, and the date input is
+// Bed/Wake (and Workout, Derived) are hidden whenever "Pattern" is checked, and the date input is
 // disabled (its required attribute dropped). submitPhysiqueForm blanks all four
 // on a pattern; unticking Pattern brings back whatever was typed.
 function syncPhysiquePatternMode() {
   const isPattern = document.getElementById('physique-is-pattern').checked;
   document.getElementById('physique-date-row').hidden = isPattern;
   document.getElementById('physique-sleep-row').hidden = isPattern;
+  document.getElementById('physique-derived-details').hidden = isPattern;
+  document.getElementById('physique-workout-details').hidden = isPattern;
+  const workoutTable = document.getElementById('physique-activity-breakdown');
+  workoutTable.hidden = isPattern || !document.getElementById('physique-activity-breakdown-body').children.length;
   const dateInput = physiqueField('date');
   dateInput.disabled = isPattern;
   dateInput.required = !isPattern;
@@ -1512,10 +1520,10 @@ async function submitPhysiqueForm(event) {
 
   // Read explicitly rather than trusting that a disabled input reports no
   // value, so a pattern's date stays blank even if field and checkbox ever
-  // fall out of sync. Body Mass and Bed/Wake are hidden on a pattern, so
+  // fall out of sync. Body Mass, Bed/Wake and Workout are hidden on a pattern, so
   // they're saved blank too.
   const isPattern = document.getElementById('physique-is-pattern').checked;
-  const patternBlankFields = new Set(['date', 'body-mass', 'bedtime', 'wake-time']);
+  const patternBlankFields = new Set(['date', 'body-mass', 'bedtime', 'wake-time', 'workout', 'activity-duration', 'calories-out']);
 
   // An edit keeps the row's other cells (columns this app doesn't know about).
   const editing = allPhysiqueEntries.find((p) => p.row === editingPhysiqueRow);

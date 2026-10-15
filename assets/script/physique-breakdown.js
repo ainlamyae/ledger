@@ -122,7 +122,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
     tbody.appendChild(remainingRow);
   }
 
-  document.getElementById('physique-activity-breakdown').hidden = false;
+  document.getElementById('physique-activity-breakdown').hidden = document.getElementById('physique-is-pattern').checked;
 }
 
 // The Workout table's last column, as Consumption's (calorie-estimator.js's

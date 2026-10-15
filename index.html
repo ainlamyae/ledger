@@ -58,23 +58,20 @@
     // same page by default — always start at the top instead, since panels
     // are collapsed/re-rendered fresh on every load anyway.
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    // Same reasoning as the theme check above, for the "Hide widgets" toggle
-    // (app.js's applyWidgetsVisibility/SHOW_WIDGETS): the row's real hidden
-    // state isn't known until the Settings tab is fetched, long after this
-    // page has already painted it visible — so it flashed on every refresh
-    // for anyone who'd turned it off. Reading the cached copy of that setting
-    // straight out of localStorage here, before first paint, lets styles.css
-    // start the row hidden immediately instead of hiding it a moment later.
-    // A stale/missing cache just falls back to the row's default (visible),
-    // same as app.js's own getSetting('SHOW_WIDGETS', 1) fallback — the real
-    // fetch still corrects it either way once settings load for real.
+    // Same reasoning as the theme check above, for the Widgets and
+    // Bulbs switches (app.js's SWITCHES_KEY): their real values aren't known
+    // until the Settings tab is fetched, long after this page has painted, so a
+    // row turned off would flash on every refresh. Read from this browser's copy
+    // here instead, so styles.css starts it hidden; the fetch still corrects it.
     try {
-        var cachedSettings = JSON.parse(localStorage.getItem('ledger_cache_settings') || 'null');
-        if (Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_WIDGETS) === 0) {
+        var ledgerSwitches = JSON.parse(localStorage.getItem('ledger_switches') || 'null');
+        // Both start off (app.js's widgetsVisible/bulbsVisible) unless this browser
+        // last had them on.
+        if (!(ledgerSwitches && ledgerSwitches.SHOW_WIDGETS === 1)) {
             document.documentElement.setAttribute('data-widgets-pref', 'hidden');
         }
-        // Same for "Hide bulbs" (SHOW_BULBS), main page only: section pages run this head too.
-        if (!window.ledgerSectionPage && Number(cachedSettings && cachedSettings.data && cachedSettings.data.SHOW_BULBS) === 0) {
+        // Main page only: section pages run this head too.
+        if (!window.ledgerSectionPage && !(ledgerSwitches && ledgerSwitches.SHOW_BULBS === 1)) {
             document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
         }
     } catch (e) {}
@@ -154,17 +151,19 @@
         </a>
     </nav>
     <div class="header-actions">
-        <!-- Refresh data and Clear cache, then the show/hide settings as iPhone
-             switches. app.js's placeSettingsSwitches keeps them in the sidebar's
+        <!-- Contact, Refresh data, Clear cache and Settings, then the show/hide settings as
+             iPhone switches. app.js's placeSettingsSwitches keeps them in the sidebar's
              bottom panel above the account row on a wide screen with the sidebar
              open, and in the account menu everywhere else. -->
         <div id="settings-switches" class="settings-switches">
+            <a href="other/contact/" class="account-menu-item">Contact</a>
             <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
             <button id="clear-cache-btn" class="account-menu-item" title="Re-download the app's own files and reload — for when the browser is still running an older version">Clear cache</button>
+            <a href="other/settings/" class="account-menu-item">Settings</a>
             <label class="switch-row"><span>Dark mode</span><input type="checkbox" role="switch" id="theme-toggle" class="switch"></label>
-            <label class="switch-row" id="privacy-toggle-row" hidden><span>Show amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
-            <label class="switch-row" id="widgets-toggle-row" hidden title="The Time/Date/Azan/Weather row"><span>Show widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
-            <label class="switch-row" id="bulbs-toggle-row" hidden title="The home page's Health and Finance glance cards"><span>Show bulbs</span><input type="checkbox" role="switch" id="bulbs-toggle" class="switch"></label>
+            <label class="switch-row" id="privacy-toggle-row"><span>Amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
+            <label class="switch-row" id="widgets-toggle-row" title="The Time/Date/Azan/Weather row"><span>Widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
+            <label class="switch-row" id="bulbs-toggle-row" title="The home page's Health and Finance glance cards"><span>Bulbs</span><input type="checkbox" role="switch" id="bulbs-toggle" class="switch"></label>
         </div>
 
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
@@ -187,9 +186,7 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                     <span id="last-updated" class="last-updated"></span>
                 </div>
-                <a href="other/contact/" class="account-menu-item">Contact</a>
-                <a href="other/settings/" class="account-menu-item">Settings</a>
-                <button id="rename-sheet-btn" class="account-menu-item account-menu-item-divider">Rename Ledger file</button>
+                <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
                 <button id="notifications-btn" class="account-menu-item" hidden title="Let Chrome show Work Time's and Car Service's daily reminders">Enable notifications</button>
@@ -1476,7 +1473,7 @@
         <div class="panel-section" id="type-breakdown-container"></div>
 
         <div class="panel-section card">
-            <h3>Portfolio Allocation</h3>
+            <h3>Account Allocation</h3>
             <div class="chart-box chart-box-flush">
                 <canvas id="account-composition-chart"></canvas>
             </div>
@@ -1745,7 +1742,7 @@
         </div>
 
         <!-- One stock's chart, rule-based signals, news and AI read (stock-analysis.js, market-math.js). -->
-        <div class="panel" id="stock-analysis-panel" data-route="market">
+        <div class="panel" id="stock-analysis-panel" data-route="market" data-tile-host="financial-insight-mode-actions">
             <div class="panel-header">
                 <h2>Market</h2>
                 <button id="market-alert-btn" class="btn btn-icon panel-header-btn" title="Set alerts for this stock" aria-label="Alerts">🔔</button>

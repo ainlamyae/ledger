@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.11.0** | feat(health): adopt section-page naming and add chart legends |
+| (this commit) | **3.12.0** | feat(tune): add BMR_avg basis and tidy settings and action buttons |
+| `6fdb621` | **3.11.0** | feat(health): adopt section-page naming and add chart legends |
 | `5111d62` | **3.10.0** | feat(nav): hide breakdown from tiles and title-case workout names |
 | `fd001fe` | **3.9.0** | feat(tune): add navy body-fat and lean body mass choice |
 | `ae8927e` | **3.8.0** | feat(nav): open contact and settings from the account menu |

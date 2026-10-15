@@ -283,7 +283,8 @@
                 <div class="widget-row"><span>BMR_mif</span><span id="today-status-bmr-mif-value">—</span></div>
                 <div class="widget-row"><span>BMR_kat</span><span id="today-status-bmr-kat-value">—</span></div>
                 <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
-                <div class="widget-row widget-row-divider"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
+                <div class="widget-row"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
+                <div class="widget-row widget-row-divider" title="Average basal metabolic rate: the mean of today's known BMR_mif, BMR_kat, BMR_cal and BMR_adp"><span>BMR_avg</span><span id="today-status-bmr-avg-value">—</span></div>
                 <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
                 <div class="widget-row"><span>TEF</span><span id="today-status-digestion-value">—</span></div>
                 <div class="widget-row"><span>AEE</span><span id="today-status-activity-value">—</span></div>
@@ -536,8 +537,7 @@
 
             <div class="panel-actions" id="physique-bulk-actions" hidden>
                 <span id="physique-bulk-summary"></span>
-                <button id="physique-bulk-combine-btn" class="btn" title="For each selected day: combine duplicate ingredient lines (same name and unit), sort by calories, and capitalize each ingredient's name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI">Tidy</button>
-                <button id="physique-bulk-calc-btn" class="btn btn-icon" title="Calculate the selected days" aria-label="Calculate">🧮</button>
+                <button id="physique-bulk-calc-btn" class="btn btn-icon" title="Calculate the selected days, and tidy their Consumption (combine duplicate lines, sort by calories, capitalize names)" aria-label="Calculate">🧮</button>
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
 
@@ -583,7 +583,7 @@
             <div class="panel-actions" id="nutrition-bulk-actions" hidden>
                 <span id="nutrition-bulk-summary"></span>
                 <button id="nutrition-bulk-merge-btn" class="btn btn-icon" title="Merge Selected" aria-label="Merge Selected">🔗</button>
-                <button id="nutrition-bulk-capitalize-btn" class="btn" title="Capitalize each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field">Capitalize Names</button>
+                <button id="nutrition-bulk-capitalize-btn" class="btn btn-icon" title="Capitalize Names: each word of every selected ingredient's Name (skipping minor joining words like 'and' unless one leads the name) — local only, no AI, never touches any other field" aria-label="Capitalize Names">🔠</button>
                 <button id="nutrition-pull-micros-btn" class="btn btn-icon" title="Look up each selected ingredient's top USDA FoodData Central match and fill Calories, Protein and the full Micronutrients panel from it, scaled to each row's own Amount — never touches Amount or Verified" aria-label="Complete">🧲</button>
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
@@ -802,6 +802,10 @@
                             <input type="radio" name="formula-bmr-formula" value="bmr_adp">
                             BMR_adp (adapted)
                         </label>
+                        <label title="Uses Mifflin-St Jeor or Katch-McArdle, whichever was last picked (BMR_FORMULA is untouched), scaled to BMR_avg: the mean of BMR_mif, BMR_kat, BMR_cal and BMR_adp, whichever are known. Every deficit and desired calorie figure runs on it.">
+                            <input type="radio" name="formula-bmr-formula" value="bmr_avg">
+                            BMR_avg (average)
+                        </label>
                     </fieldset>
 
                     <fieldset class="formula-solve-for formula-pin-mode">
@@ -999,6 +1003,13 @@
                                  are both said in the substituted trace. Same rule the Δm% verdict
                                  follows — the unit column is a unit. -->
                             <span class="formula-unit">kg</span>
+                        </label>
+                        <hr class="formula-divider">
+                        <label class="formula-row" title="The mean of BMR_mif, BMR_kat, BMR_cal and BMR_adp, whichever are known. BMR_adp is taken as of today, not by t, since t itself depends on the BMR picked above.">
+                            <span class="formula-sym">BMR_avg</span>
+                            <span class="formula-name">average basal metabolic rate</span>
+                            <input type="text" id="formula-bmr-avg" inputmode="decimal" readonly>
+                            <span class="formula-unit">kcal/day</span>
                         </label>
                         <!-- Marks the end of the profile block (m, m̄, h, a, σ, m_des, BMI_des, LBM,
                              BMR) before the activity block starts below. -->
@@ -1541,7 +1552,7 @@
                 <button id="add-transaction-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a transaction" aria-label="Log">📝</button>
             </div>
 
-            <button id="import-csv-btn" class="btn" hidden>Import CSV</button>
+            <button id="import-csv-btn" class="btn btn-icon" hidden title="Import CSV" aria-label="Import CSV">📥</button>
             <input type="file" id="import-csv-input" accept=".csv" hidden>
 
             <div class="export-date-range">
@@ -1601,7 +1612,7 @@
         <div class="panel" data-route="account">
             <div class="panel-header">
                 <h2>Account</h2>
-                <button id="transfer-funds-btn" data-route="transfer" class="btn btn-secondary panel-header-btn" title="Move money between two of your own accounts">Transfer</button>
+                <button id="transfer-funds-btn" data-route="transfer" class="btn btn-icon panel-header-btn" title="Transfer: move money between two of your own accounts" aria-label="Transfer">🔀</button>
                 <button id="add-account-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an account" aria-label="Add">➕</button>
             </div>
 
@@ -1736,7 +1747,7 @@
                     </table>
                 </div>
                 <div class="panel-actions">
-                    <button type="button" id="portfolio-write-mv-btn" class="btn btn-secondary" hidden title="Write each account's Holdings into its Market Value (blank or number cells only; formulas are left alone)">Update Market Value</button>
+                    <button type="button" id="portfolio-write-mv-btn" class="btn btn-icon" hidden title="Update Market Value: write each account's Holdings into its Market Value (blank or number cells only; formulas are left alone)" aria-label="Update Market Value">🔄</button>
                 </div>
             </div>
 
@@ -2170,8 +2181,8 @@
             </div>
 
             <div class="panel-actions">
-                <button id="export-contacts-google-btn" class="btn">Export for Google/Phone</button>
-                <button id="export-contacts-outlook-btn" class="btn">Export for Outlook</button>
+                <button id="export-contacts-google-btn" class="btn btn-icon" title="Export for Google/Phone" aria-label="Export for Google/Phone">📱</button>
+                <button id="export-contacts-outlook-btn" class="btn btn-icon" title="Export for Outlook" aria-label="Export for Outlook">📧</button>
             </div>
 
             <div class="filters">
@@ -2308,9 +2319,8 @@
 
             <div class="modal-actions">
                 <!-- Not a submit: it rewrites the Amount box and leaves the form open, so
-                     the taxed figure is on screen to check before either Save takes it. -->
+                     the taxed figure is on screen to check before Save takes it. -->
                 <button type="button" id="tx-tax-btn" class="btn">Tax</button>
-                <button type="submit" id="tx-save-add-btn" class="btn btn-primary">Save &amp; Add Another</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
@@ -2580,7 +2590,7 @@
             <p id="transfer-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <button type="submit" class="btn btn-primary">Transfer</button>
+                <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="transfer-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
@@ -2834,7 +2844,8 @@
                         <tr><td>BMR_mif</td><td id="physique-bmr-mif">—</td><td>—</td><td>kcal</td></tr>
                         <tr><td>BMR_kat</td><td id="physique-bmr-kat">—</td><td>—</td><td>kcal</td></tr>
                         <tr><td>BMR_cal</td><td id="physique-bmr-cal">—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR_adp</td><td id="physique-bmr-adp">—</td><td>—</td><td>kcal</td></tr>
+                        <tr><td>BMR_adp</td><td id="physique-bmr-adp">—</td><td>—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR_avg</td><td id="physique-bmr-avg">—</td><td>—</td><td>kcal</td></tr>
                         <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei">—</td><td id="physique-tei-desire">—</td><td>kcal</td></tr>
                         <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived">—</td><td id="physique-tef-desire">—</td><td>kcal</td></tr>
                         <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee">—</td><td id="physique-aee-desire">—</td><td>kcal</td></tr>

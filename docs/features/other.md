@@ -16,4 +16,5 @@
 
 - **Contacts** — searchable, paginated list; bulk export (Google/Outlook CSV), delete and merge.
 - **Settings** — Note / Key / Value table for the `Setting` tab (Note and Value cut to 32 characters with …, full text on hover and in Edit), applied to live widgets without a reload.
+  - **Every key has a Note**: a save, the Settings form with its Note left blank, and every load fill a blank Notes cell from `SETTING_DEFAULT_NOTES` (`other-settings.js`, one note per key the app writes); an AI mode's `…_LAST_RESULT` / `…_LAST_GENERATED_AT` get one built from the key (`settingDefaultNote`).
 - **No caching** — every load and Refresh reads the sheets directly; see [Caching](../caching.md).

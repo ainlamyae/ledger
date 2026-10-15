@@ -29,6 +29,7 @@ async function initSettingsPanel(forceRefresh = false) {
   } else {
     await refreshSettingsList(forceRefresh);
     await removeRetiredSettings();
+    await fillBlankSettingNotes();
   }
 
   if (!settingPanelListenersAttached) {
@@ -245,7 +246,8 @@ async function submitSettingForm(event) {
     // Trimmed: the box is multi-line, and a stray trailing Enter would otherwise be
     // saved into the value ("male\n" no longer reads as male).
     document.getElementById('setting-value').value.trim(),
-    document.getElementById('setting-notes').value,
+    // A blank note takes the key's default one.
+    document.getElementById('setting-notes').value.trim() || settingDefaultNote(key),
   ]];
 
   try {
@@ -323,13 +325,80 @@ async function clearSettingValueFormats(rowNumbers) {
 // number. getSetting() saw NaN and reported the setting as absent, so a
 // correctly-written value silently vanished — as did any other numeric setting
 // whose cell caught the same format.
-// Notes a save writes into a key's Notes cell when it's blank; a typed note is kept.
+// The Notes a save writes into a key's Notes cell when it's blank (a typed note is kept),
+// so no key the app writes lands without one.
 const SETTING_DEFAULT_NOTES = {
-  NECK_CM: 'Neck circumference (cm), just below the larynx — U.S. Navy body fat (Hodgdon & Beckett)',
-  WAIST_CM: 'Waist circumference (cm): at the navel for men, narrowest point for women — U.S. Navy body fat',
+  ACTIVITY_DESIRED_FIXED_KCAL: 'Pins the desired daily activity burn (kcal); blank = worked out from ACTIVITY_DESIRED_MIN of walking at your body mass',
+  ACTIVITY_DESIRED_MIN: 'Desired daily activity (minutes) line on the Physical Activity chart',
+  AI_PROVIDER: 'groq or openrouter',
+  ALPHA_VANTAGE_API_KEY: 'Alpha Vantage API key for Market prices and news',
+  BIRTH_DATE: 'Your birth date (YYYY-MM-DD); gives your age for the BMR formula and the Insight profile',
+  BMR_ADAPT_PCT_CAP: 'Most metabolic adaptation allowed (%): BMR_adp never falls more than this below BMR',
+  BMR_ADAPT_PCT_PER_WEEK: 'Metabolic adaptation per week of dieting (%), used by BMR_adp until it reaches BMR_ADAPT_PCT_CAP',
+  BMR_BASIS: 'Which BMR the plan runs on: bmr = the BMR_FORMULA equation, bmr_cal = calibrated from your logs, bmr_adp = adapted, bmr_avg = the average of the four',
+  BMR_CALIBRATION_PERIOD_COUNT: 'How many periods BMR_cal is calibrated over (Tune n_p); saved by Tune Update',
+  BMR_CALIBRATION_PERIOD_DAYS: 'Days per BMR_cal period and the rolling-average body-mass window (Tune L_p); saved by Tune Update',
+  BMR_FORMULA: 'BMR equation: mifflin (Mifflin-St Jeor) or katch (Katch-McArdle, from lean body mass)',
+  BODY_MASS_HEALTHY_KG: 'Your healthy body mass, kg',
+  CALORIE_DESIRED_FIXED_KCAL: 'Pins the desired daily calorie intake (kcal) everywhere; blank = recalculated from body mass and WEEKLY_FAT_LOSS_KG',
+  CARB_DESIRED_G_MAX: 'High end of the desired daily carbohydrate band, g; saved by Tune',
+  CARB_DESIRED_G_MIN: 'Low end of the desired daily carbohydrate band, g; saved by Tune',
+  CARB_PCT_OF_KCAL_MAX: 'High end of the carbohydrate rule, % of daily calories; saved by Tune',
+  CARB_PCT_OF_KCAL_MIN: 'Low end of the carbohydrate rule, % of daily calories; saved by Tune',
+  FAT_DESIRED_G_MAX: 'High end of the desired daily fat band, g; saved by Tune',
+  FAT_DESIRED_G_MIN: 'Low end of the desired daily fat band, g; saved by Tune',
+  FAT_PCT_OF_KCAL_MAX: 'High end of the fat rule, % of daily calories; saved by Tune',
+  FAT_PCT_OF_KCAL_MIN: 'Low end of the fat rule, % of daily calories; saved by Tune',
+  FIBER_DESIRED_G_MAX: 'High end of the desired daily fiber band, g; saved by Tune',
+  FIBER_DESIRED_G_MIN: 'Low end of the desired daily fiber band, g; saved by Tune',
+  FIBER_G_PER_1000_KCAL_MIN: 'Low end of the fiber rule, g per 1,000 kcal eaten; saved by Tune',
+  FIBER_G_PER_KG_MAX: 'High end of the fiber rule, g per kg body mass; saved by Tune',
+  FINNHUB_API_KEY: 'Finnhub API key for Market quotes and news',
+  GLYCOGEN_SWING_KG: 'Expected glycogen/water swing in body mass, kg (the ± beside body mass); saved by Tune',
+  GROQ_API_KEY: 'Groq API key for AI (Calculate, Scan, Insight) when AI_PROVIDER is groq',
+  GROQ_MODELS: 'text and vision model ids for Groq',
+  HEIGHT_CM: 'Your height, cm; for BMI, lean body mass and BMR',
   HIP_CM: 'Hip circumference (cm) at the widest point — U.S. Navy body fat, women only',
+  KCAL_PER_MET_KG_MIN: 'Oxygen per MET (ml O2/kg/min), default 3; activity kcal = MET x kg x min x this / 200',
   LBM_FORMULA: 'Lean body mass the app runs on: boer (Boer 1984) or navy (U.S. Navy body fat)',
+  MICRONUTRIENT_DAILY_DESIRED_JSON: 'Desired daily amount per nutrient (JSON) for Micronutrient Insight; Tune updates protein, fiber and fat',
+  NECK_CM: 'Neck circumference (cm), just below the larynx — U.S. Navy body fat (Hodgdon & Beckett)',
+  OPENROUTER_API_KEY: 'OpenRouter API key for AI (Calculate, Scan, Insight) when AI_PROVIDER is openrouter',
+  OPENROUTER_MODELS: 'text and vision model ids for OpenRouter',
+  PLAN_SLEEP_HOURS: 'Sleep the plan assumes you get, hours; less than SLEEP_DESIRED_HOURS raises the deficit needed',
+  PROTEIN_DESIRED_G_MAX: 'High end of the desired daily protein band, g; saved by Tune, read by the tile, chart, Insight and Protein Source Rotation',
+  PROTEIN_DESIRED_G_MIN: 'Low end of the desired daily protein band, g; saved by Tune, read by the tile, chart, Insight and Protein Source Rotation',
+  PROTEIN_G_PER_KG_LBM_MAX: 'High end of the protein rule, g per kg lean body mass; saved by Tune with PROTEIN_DESIRED_G_MAX',
+  PROTEIN_G_PER_KG_LBM_MIN: 'Low end of the protein rule, g per kg lean body mass; saved by Tune with PROTEIN_DESIRED_G_MIN',
+  SEX: 'Needed for the BMR formula\'s constant term',
+  SHOW_AMOUNTS: '1 shows amounts; 0 turns on privacy mode, masking amounts and health figures',
+  SHOW_BULBS: '1 or blank shows the home page bulbs, 0 hides them (account menu: Hide bulbs)',
+  SHOW_WIDGETS: '1 shows the home page widgets, 0 hides them (account menu: Hide widgets)',
+  SLEEP_DEPRIVATION_PCT_PER_HOUR: 'Fat-loss efficiency lost per hour of sleep short of SLEEP_DESIRED_HOURS (%)',
+  SLEEP_DESIRED_HOURS: 'Desired daily sleep line on the Sleep chart, and the sleep factor in the State Trend & Forecast projection',
+  TEF_CARB_PERCENT: 'Share of carbohydrate calories spent digesting (%), for each day\'s TEF',
+  TEF_FAT_PERCENT: 'Share of fat calories spent digesting (%), for each day\'s TEF',
+  TEF_PERCENT_OF_INTAKE: 'Share of eaten calories spent digesting (%) in the calorie balance; 0 leaves TEF out',
+  TEF_PROTEIN_PERCENT: 'Share of protein calories spent digesting (%), for each day\'s TEF',
+  TWELVE_DATA_API_KEY: 'Twelve Data API key for Market and Portfolio prices',
+  USDA_FDC_API_KEY: 'USDA FoodData Central API key, for looking up ingredient nutrition and micronutrients',
+  WAIST_CM: 'Waist circumference (cm): at the navel for men, narrowest point for women — U.S. Navy body fat',
+  WEEKLY_FAT_LOSS_KG: 'Your desired rate of loss (kg/week). Use a negative number instead for a lean bulk',
+  WEEKLY_FAT_LOSS_PCT: 'Pins the weekly loss as % of body mass, replacing WEEKLY_FAT_LOSS_KG; blank = use the kg rate',
+  WIDGET_DEFAULT_CITY: 'City for the home page weather and main clock',
+  WIDGET_SECOND_CLOCK_CITY: 'City for the home page second clock',
+  WORKOUT_REP_SEC: 'Seconds per rep, to turn logged reps into active minutes',
+  WORKOUT_STEPS_PER_MIN: 'Steps per minute, to turn logged steps into active minutes',
 };
+
+// An AI mode's saved response and its time get a note from their own key.
+function settingDefaultNote(key) {
+  if (SETTING_DEFAULT_NOTES[key]) return SETTING_DEFAULT_NOTES[key];
+  const mode = key.replace(/_LAST_(RESULT|GENERATED_AT)$/, '').replace(/_/g, ' ').toLowerCase();
+  if (/_LAST_RESULT$/.test(key)) return `Last ${mode} response, shown until the next Generate`;
+  if (/_LAST_GENERATED_AT$/.test(key)) return `When the ${mode} response was last generated`;
+  return '';
+}
 
 async function saveSettingValues(values) {
   await initSettingsPanel(true);
@@ -346,7 +415,7 @@ async function saveSettingValues(values) {
 
   Object.entries(values).forEach(([key, value]) => {
     const existing = existingByKey.get(key);
-    const defaultNote = SETTING_DEFAULT_NOTES[key] ?? '';
+    const defaultNote = settingDefaultNote(key);
     if (existing) {
       updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes || defaultNote]], 'RAW'));
     } else {
@@ -375,6 +444,17 @@ async function saveSettingValues(values) {
 // page's Show blocks (it shows page tiles instead). A copy left in the Setting tab would only be a stale duplicate, so any row
 // still holding one is deleted on load (once; nothing writes them any more).
 const RETIRED_SETTING_KEYS = ['ACTIVITY_MET', 'ACTIVITY_MET_DEFAULT', 'BMR_CALIBRATED_KCAL', 'BMR_CALIBRATED_OFFSET_KCAL', 'SHOW_BLOCKS'];
+
+// A row with a blank Notes cell gets its key's default note, once, on load.
+async function fillBlankSettingNotes() {
+  const blanks = allSettingRows
+    .map((setting) => ({ setting, note: settingDefaultNote(setting.key.trim()) }))
+    .filter(({ setting, note }) => note && !String(setting.notes || '').trim());
+  if (!blanks.length) return;
+  await Promise.all(blanks.map(({ setting, note }) => updateValues(`${CONFIG.SHEETS.SETTINGS}!C${setting.row}`, [[note]], 'RAW')));
+  console.info(`[settings] filled blank notes: ${blanks.map(({ setting }) => setting.key).join(', ')}`);
+  await refreshSettingsList(true);
+}
 
 async function removeRetiredSettings() {
   const rows = allSettingRows

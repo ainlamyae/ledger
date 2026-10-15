@@ -6,7 +6,7 @@
 
 - **Status** card, four groups:
   1. `m` with `m̄` in brackets vs healthy mass ± swing (`80 (80.6) / 70 ± 1.9 kg`), BMI, measured **Δm** vs desired rate (`-108 / -101 g/day`).
-  2. `BMR_mif`, `BMR_kat`, `BMR_cal`, `BMR_adp`.
+  2. `BMR_mif`, `BMR_kat`, `BMR_cal`, `BMR_adp`, `BMR_avg` (their mean).
   3. TEI, TEF, AEE, SD.
   4. D and **Δm′**, the change calculated from D (primed to tell it from measured Δm).
 - Intake Macros, Physical Activity and Sleep (Window, then Duration) stack beside Status, aligned top and bottom.

@@ -82,7 +82,7 @@ function renderFormulaSubstituted(rows, plan = null) {
   // down with it.
   let correctionRows = [];
   try {
-    correctionRows = renderCorrectionFields(plan);
+    correctionRows = [...renderCorrectionFields(plan), ...bmrAverageRows()];
   } catch (err) {
     console.error('Correction terms failed to render', err);
   }
@@ -849,6 +849,37 @@ function renderDeficitVsBmrField(plan) {
   return [['D_bmr%', `(${Math.round(bmr)} − ${Math.round(intakeKcal)}) / ${Math.round(bmr)} × 100  =  ${pct} %`]];
 }
 
+// BMR_avg over Tune's own figures, with BMR_adp as of today rather than by t: t itself
+// depends on the BMR picked. Kept for the Calculations row under m∞_adp.
+let tuneBmrAverage = null;
+
+function computeTuneBmrAverage({ bodyMassKg, heightCm, age, sex, bmr, calibration }) {
+  const parts = [];
+  if (age !== null) parts.push(['BMR_mif', bmrKcal(bodyMassKg, heightCm, age, sex, 'mifflin')]);
+  parts.push(['BMR_kat', bmrKcal(bodyMassKg, heightCm, age, sex, 'katch')]);
+  if (calibration?.result.ok) parts.push(['BMR_cal', bmr + calibration.result.offsetKcal]);
+  const { pctPerWeek, pctCap } = readAdaptationInputs();
+  const bodyMassEntries = physiqueAsHealthEntries().filter((e) => e.category === 'Body Mass' && e.amount !== null);
+  const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries);
+  if (pctPerWeek !== null && pctCap !== null && daysOnDiet !== null) {
+    parts.push(['BMR_adp', bmr * (1 - adaptationFraction(daysOnDiet, pctPerWeek, pctCap))]);
+  }
+  const rounded = parts.filter(([, v]) => Number.isFinite(v)).map(([key, v]) => [key, Math.round(v)]);
+  if (!rounded.length) return null;
+  const avg = Math.round(rounded.reduce((sum, [, v]) => sum + v, 0) / rounded.length);
+  return { avg, parts: rounded, daysOnDiet };
+}
+
+function bmrAverageRows() {
+  if (!tuneBmrAverage) return [];
+  const { avg, parts, daysOnDiet } = tuneBmrAverage;
+  // Names which BMRs went in only when one is missing; BMR_adp's day always.
+  const notes = [];
+  if (parts.length < BMR_AVERAGED_KEYS.length) notes.push(`over ${parts.map(([key]) => key).join(', ')}`);
+  if (parts.some(([key]) => key === 'BMR_adp')) notes.push(`BMR_adp as of day ${daysOnDiet}`);
+  return [['BMR_avg', `(${parts.map(([, v]) => v).join(' + ')}) / ${parts.length}  =  ${avg} kcal/day${notes.length ? ` — ${notes.join(', ')}` : ''}`]];
+}
+
 function renderCorrectionFields(plan) {
   const bmrEl = 'formula-bmr-adapt';
   const plateauEl = 'formula-plateau-adapt';
@@ -988,6 +1019,10 @@ function renderFormulaPreviewOnLeanChoice() {
   // Live over n_p × L_p, on the plain active equation (whatever basis is picked below).
   const calibration = tuneBmrCalibration();
   setComputedField('formula-bmr-cal', calibration?.result.ok ? String(Math.round(bmr + calibration.result.offsetKcal)) : '—');
+  // BMR_avg, and the ratio the bmr_avg basis previews on (BMR_AVG_RATIO_PREVIEW_KEY, never saved).
+  tuneBmrAverage = computeTuneBmrAverage({ bodyMassKg, heightCm, age, sex, bmr, calibration });
+  setComputedField('formula-bmr-avg', tuneBmrAverage ? String(tuneBmrAverage.avg) : '—');
+  if (tuneBmrAverage && bmr > 0) preview[BMR_AVG_RATIO_PREVIEW_KEY] = tuneBmrAverage.avg / bmr;
   // The same window's working, under Calculations.
   renderBmrCalibrationWeeks(calibration ? calibration.result.weeks : [], 'formula-cal-weeks-body');
   renderBmrCalibrationSubstituted(calibration ? calibration.result : { ok: false }, 'formula-cal-substituted');

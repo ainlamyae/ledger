@@ -5,6 +5,7 @@
 ## At a glance
 
 - **Add/Edit Ingredient:** Group, Name, Protein %, **Amount**, then a lock table: tick, name, box, unit.
+- **A gram figure** reads as `100g`, `100 g`, `100gr`, `100 gram` or `100 grams` (any case); a bare `100` is a count, not grams (`NUTRITION_GRAMS_PATTERN`).
 - **Amount puts the grams first**: `325g (1x)`, `30g (2tsp)`, `110g (1can)` — not `1x (325g)`. Any amount that starts with a number and ends in `(Ng)` is turned around. Saving the form rewrites the old order (`gramsFirstAmount`), and rows already in the sheet the old way are rewritten once on load (`migrateNutritionAmountOrder`). The count is read from an `Nx`, a number opening the parenthesis, or a leading number (`parseCountFromAmount`).
 - Row order: TEF, then Nutrition Facts lines in Canadian label order (`NUTRITION_FACTS_ORDER`), then other micronutrients alphabetically, zeros last.
 - A ticked row is locked:

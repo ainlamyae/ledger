@@ -84,8 +84,8 @@ function onAsyncClick(buttonId, handler) {
 }
 
 // Wires a form's submit to an async handler and marks the button that actually
-// submitted busy for its duration — `submitter` rather than a lookup, so
-// "Save & Add Another" shows its own progress instead of Save's.
+// submitted busy for its duration — `submitter` rather than a lookup, for a form
+// with more than one submit button.
 function onFormSubmit(formId, handler) {
   const form = document.getElementById(formId);
   form.addEventListener('submit', (event) => {

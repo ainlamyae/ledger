@@ -13,6 +13,9 @@
 | Scan | 📷 | | Reset | ♻️ |
 | Calculate | 🧮 | | Today (Physique) | 📍 |
 | Micronutrients | 🧬 | | Close | ❌ |
+| Transfer | 🔀 | | Capitalize Names | 🔠 |
+| Import CSV | 📥 | | Export for Google/Phone | 📱 |
+| Export for Outlook | 📧 | | Update Market Value | 🔄 (an Update) |
 
 - Selection bars: 🔗 ✏️ 🗑️ 📱 📧.
 - Emoji buttons are always white; the word shows on hover, for screen readers and in the breadcrumb (`…/ Add`). Busy: the emoji followed by `…`.
@@ -24,7 +27,7 @@ Colour marks **word buttons** only; emoji buttons (`.btn-icon`, `.row-action-btn
 
 | Colour | Role | Examples |
 |---|---|---|
-| Blue | Add or save | Save & Add Another, Transfer's commit |
+| Blue | Commit a text-labelled action, or the current tab/range | Select my Ledger, Set, Add Filter, the active range button |
 | Gray | Opens an editor without committing | Physique's Today button |
 | Tinted tile | What a hub tile opens: gray rows, green form, orange chart, purple AI | Every hub tile (see [Hubs, Pages & Addresses](navigation.md)) |
 | Red | Destructive, text labels only | The export filter's remove |

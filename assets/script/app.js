@@ -1037,7 +1037,6 @@ function setupScrollSpy() {
 const AUTH_GATED_SELECTOR = [
   '.panel-header-btn',            // every panel's Log / Add
   '.row-action-btn',              // ✏️ / 📋 / 🗑️ on every table row
-  '#physique-bulk-combine-btn',
   '#physique-bulk-calc-btn',
   '#nutrition-bulk-merge-btn',
   '#tx-bulk-edit-btn',

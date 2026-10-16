@@ -1688,7 +1688,7 @@ th.sortable:hover {
    two read as a single row — the bar chart no longer grows per ingredient. */
 .protein-rotation-charts {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-columns: 550px minmax(0, 1fr);
     gap: var(--space-l);
     align-items: start;
 }
@@ -4310,10 +4310,27 @@ html.section-pages .panel.page-active:hover {
         padding: var(--space-l) !important;
     }
 
-    /* Don't slice a chart or card across a page break where it can be helped. */
+    /* Swatches are backgrounds, which print drops unless told to keep them. */
+    .donut-legend-swatch {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* max-width narrows a canvas but not its height; contain keeps donuts round. */
+    .chart-box canvas {
+        object-fit: contain;
+    }
+
+    /* A4 is under the 820px stack point; keep the 550px bar beside the donut. */
+    .protein-rotation-charts {
+        grid-template-columns: 550px minmax(0, 1fr);
+    }
+
+    /* Don't slice a chart or card across a page break where it can be helped.
+       Not .panel: a page-tall panel got pushed whole to sheet 2, leaving sheet 1 blank. */
     canvas,
+    .chart-box,
     .app-card,
-    .panel,
     table {
         break-inside: avoid;
         page-break-inside: avoid;

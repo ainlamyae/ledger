@@ -136,20 +136,10 @@ function renderHealthEnergyBalanceChart(entries) {
   // mass: one dashed line for the whole window, drawn at the rate the plan's mass implies.
   const desired = hasData ? desiredBalanceKcal(planBodyMassKg(entries)) : null;
 
-  const maxDeficit = Math.max(0, ...values.map((v) => -v), desired === null ? 0 : -desired);
-  const maxSurplus = Math.max(0, ...values, desired === null ? 0 : desired);
-  const upToTick = (v) => Math.ceil(Math.max(v * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL) / ENERGY_BALANCE_TICK_KCAL)
-    * ENERGY_BALANCE_TICK_KCAL;
-  const yMin = -upToTick(maxDeficit);
-  const yMax = upToTick(maxSurplus);
-
-  // A fraction of the axis span, so the dash stays a hairline at any range.
-  const desiredHalf = (yMax - yMin) * 0.004;
-
   // balanceData already nulls the unlogged days, so they sit out of the fit.
   const weeklyAvg = emaSeries(balanceData);
 
-  // Legend entries switched off (renderToggleLegend below); bars by their colour's name.
+  // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-energy-balance-legend');
   const word = desired !== null && desired < 0 ? 'Deficit' : 'Surplus';
   const barColors = balanceData.map((v, i) => energyBalanceColor(v, isCut, desired, weeklyAvg[i]));
@@ -159,6 +149,22 @@ function renderHealthEnergyBalanceChart(entries) {
     return c === chartColor('--chart-good') ? 'Week on desired pace' : 'Missed desired';
   });
 
+  const shownBalance = maskHiddenClasses(balanceData, barClasses, hidden);
+  const shown = [
+    ...shownBalance,
+    ...(hidden.has('7-Day Average') ? [] : weeklyAvg),
+    ...(desired === null || hidden.has(`Desired ${word}`) ? [] : [desired]),
+  ].filter((v) => v !== null);
+  const maxDeficit = Math.max(0, ...shown.map((v) => -v));
+  const maxSurplus = Math.max(0, ...shown);
+  const upToTick = (v) => Math.ceil(Math.max(v * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL) / ENERGY_BALANCE_TICK_KCAL)
+    * ENERGY_BALANCE_TICK_KCAL;
+  const yMin = -upToTick(maxDeficit);
+  const yMax = upToTick(maxSurplus);
+
+  // A fraction of the axis span, so the dash stays a hairline at any range.
+  const desiredHalf = (yMax - yMin) * 0.004;
+
   healthEnergyBalanceChart = upsertChart(healthEnergyBalanceChart, ctx, {
     data: {
       labels,
@@ -166,7 +172,7 @@ function renderHealthEnergyBalanceChart(entries) {
         {
           type: 'bar',
           label: 'Calorie balance',
-          data: maskHiddenClasses(balanceData, barClasses, hidden),
+          data: shownBalance,
           backgroundColor: barColors,
           order: 2,
         },

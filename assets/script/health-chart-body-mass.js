@@ -284,7 +284,21 @@ function renderHealthBodyMassChart(entries) {
   // `grace` too late to read here. The trend folds in too — a fit extended to the week's
   // edges can reach past every reading in it, and would otherwise clip.
   const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
-  const logged = [...values, ...trendSeries, ...zoneUpperSeries, ...zoneLowerSeries, ...calorieTrendSeries, healthyKg].filter((v) => v !== null);
+  // Legend entries switched off (renderToggleLegend below) leave the axis too; dots by their colour's name.
+  const hidden = legendHiddenNames('health-body-mass-legend');
+  const dotClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Toward healthy'
+    : c === chartColor('--chart-bad') ? 'Away from healthy' : 'Unscored'));
+  const shownValues = maskHiddenClasses(values, dotClasses, hidden);
+  const shownIf = (name, series) => (hidden.has(name) ? [] : series);
+  const logged = [
+    ...shownValues,
+    ...shownIf('7-Day Trend', trendSeries),
+    ...shownIf('Glycogen + Water Swing', zoneUpperSeries),
+    // Muscle Loss fills down from the swing's lower edge, so either keeps it.
+    ...(hidden.has('Glycogen + Water Swing') && hidden.has('Muscle Loss') ? [] : zoneLowerSeries),
+    ...shownIf('Calorie Trend', calorieTrendSeries),
+    ...shownIf('Healthy Body Mass', [healthyKg]),
+  ].filter((v) => v !== null);
   const kgLo = logged.length ? Math.min(...logged) : 0;
   const kgHi = logged.length ? Math.max(...logged) : 0;
   const kgPad = Math.max((kgHi - kgLo) * BODY_MASS_AXIS_PAD_FRACTION, BODY_MASS_AXIS_MIN_PAD_KG);
@@ -295,11 +309,6 @@ function renderHealthBodyMassChart(entries) {
     ?? BODY_MASS_TICK_STEPS_KG[BODY_MASS_TICK_STEPS_KG.length - 1];
   const yMin = Math.max(0, Math.floor((kgLo - kgPad) / kgStep) * kgStep);
   const yMax = Math.ceil((kgHi + kgPad) / kgStep) * kgStep;
-
-  // Legend entries switched off (renderToggleLegend below); dots by their colour's name.
-  const hidden = legendHiddenNames('health-body-mass-legend');
-  const dotClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Toward healthy'
-    : c === chartColor('--chart-bad') ? 'Away from healthy' : 'Unscored'));
 
   healthBodyMassChart = upsertChart(healthBodyMassChart, ctx, {
     data: {
@@ -314,17 +323,17 @@ function renderHealthBodyMassChart(entries) {
           // joins the next, across days with none.
           type: 'line',
           label: 'Body Mass',
-          data: maskHiddenClasses(values, dotClasses, hidden),
+          data: shownValues,
           showLine: true,
           borderColor: chartColor('--chart-neutral', 0.5),
           borderWidth: 1.5,
           tension: 0,
           spanGaps: true,
-          pointRadius: 5,
-          pointHoverRadius: 7,
+          pointRadius: fitPointRadius(5),
+          pointHoverRadius: fitPointRadius(7),
           pointBackgroundColor: barColors,
           pointBorderColor: chartColor('--chart-point-border'),
-          pointBorderWidth: 1.5,
+          pointBorderWidth: fitPointBorderWidth(5, 1.5),
           order: 2,
         },
         trendLineDataset('7-Day Trend', trendSeries, { hidden: hidden.has('7-Day Trend') }),

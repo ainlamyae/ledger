@@ -67,14 +67,17 @@ function renderHealthCarbChart(entries) {
 
   const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
-  const gTopCarb = Math.max(...values, band.max, band.min, 1);
-  const gStepCarb = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopCarb / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
-  const gMaxCarb = Math.ceil(gTopCarb / gStepCarb) * gStepCarb;
-
-  // Legend entries switched off (renderToggleLegend below); bars by their colour's name.
+  // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-carb-legend');
   const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Within desired'
     : c === chartColor('--chart-bad') ? 'Over desired' : 'Under desired'));
+  const shownValues = maskHiddenClasses(values, barClasses, hidden);
+  const shownDesired = hidden.has('Desired Carbohydrate') && (band.max === band.min || hidden.has('Desired Carbohydrate band')) ? [] : [band.max, band.min];
+  const shownAvg = hidden.has('7-Day Average') ? [] : weeklyAvg;
+  const gTopCarb = Math.max(...shownValues, ...shownAvg, ...shownDesired, 1);
+  const gStepCarb = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopCarb / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
+  const gMaxCarb = Math.ceil(gTopCarb / gStepCarb) * gStepCarb;
+
 
   healthCarbChart = upsertChart(healthCarbChart, ctx, {
     data: {
@@ -83,7 +86,7 @@ function renderHealthCarbChart(entries) {
         {
           type: 'bar',
           label: 'Actual Intake',
-          data: maskHiddenClasses(values, barClasses, hidden),
+          data: shownValues,
           backgroundColor: barColors,
           order: 2,
         },

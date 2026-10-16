@@ -92,7 +92,6 @@ function renderHealthSleepChart(entries) {
   // Shifted once up front, feeding both the axis range and the chart data, so the shift
   // and the validity check (wake must land after bed) live in one place.
   const shiftedByDate = new Map();
-  const validShiftedPairs = [];
   dates.forEach((d) => {
     const e = bestByDate.get(d);
     if (!e) return;
@@ -100,10 +99,7 @@ function renderHealthSleepChart(entries) {
     const end = sleepAxisValue(e.sleepWakeMin);
     if (end <= start) return;
     shiftedByDate.set(d, { start, end, e });
-    validShiftedPairs.push({ start, end });
   });
-
-  const { axisMin, axisMax } = computeSleepAxisRange(validShiftedPairs);
 
   const rangeByDate = new Map(); // date -> { bedMin, wakeMin, durationHr }
   const barColors = [];
@@ -142,8 +138,8 @@ function renderHealthSleepChart(entries) {
     return kcal;
   });
 
-  // Legend entries switched off (renderToggleLegend below); nights by how far short of
-  // the desired sleep they fell, the cut-offs the gradient runs between.
+  // Legend entries switched off (renderToggleLegend below) leave the axis too; nights by
+  // how far short of the desired sleep they fell, the cut-offs the gradient runs between.
   const hidden = legendHiddenNames('health-sleep-legend');
   const nightClasses = dates.map((d) => {
     const r = rangeByDate.get(d);
@@ -151,6 +147,14 @@ function renderHealthSleepChart(entries) {
     if (r.durationHr >= sleepDesired) return 'Desired sleep met';
     return r.durationHr <= sleepDesired / 2 ? 'Half of desired or less' : 'Short of desired';
   });
+  const shownPairs = dates.map((d, i) => (hidden.has(nightClasses[i]) ? null : shiftedByDate.get(d)))
+    .filter(Boolean);
+  if (!hidden.has('7-Day Average Bed & Wake')) {
+    dates.forEach((d, i) => {
+      if (bedAvg[i] !== null && wakeAvg[i] !== null) shownPairs.push({ start: bedAvg[i], end: wakeAvg[i] });
+    });
+  }
+  const { axisMin, axisMax } = computeSleepAxisRange(shownPairs);
 
   wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
     data: {
@@ -172,8 +176,9 @@ function renderHealthSleepChart(entries) {
           data: deprivationEffectData,
           showLine: false,
           spanGaps: false,
-          pointRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? 4 : 0),
-          pointHoverRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? 5 : 0),
+          pointRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? fitPointRadius(4)(c) : 0),
+          pointHoverRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? fitPointRadius(5)(c) : 0),
+          pointBorderWidth: fitPointBorderWidth(4, 1),
           pointBackgroundColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           pointBorderColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           yAxisID: 'y',

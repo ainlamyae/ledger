@@ -606,7 +606,7 @@ function renderReconciliationStatus(missingAmount) {
   const isReconciled = Math.abs(missingAmount) < 0.005;
 
   // A>T: accounts above the transactions' total; A<T: below.
-  setPageBadge('finance', 'account', isReconciled ? null : {
+  setAccountBadgePart('reconcile', isReconciled ? null : {
     // Whole dollars (rounded up, so a few cents still show $1); the exact figure in its hover.
     text: `A${missingAmount > 0 ? '>' : '<'}T ${formatCurrency(Math.ceil(Math.abs(missingAmount))).replace(/\.00$/, '')}`,
     title: `Accounts ${missingAmount > 0 ? 'above' : 'below'} the transactions by ${formatCurrency(Math.abs(missingAmount))}`,

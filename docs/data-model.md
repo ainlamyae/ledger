@@ -20,12 +20,13 @@ One Google Sheet per user, cloned from the template, with these tabs.
 | Cell/Column | Type | Notes |
 |---|---|---|
 | D1 | Number (formula) | Net Worth, e.g. `=ROUND(SUM(D3:D100),2)` |
-| Row 2 | Header | `Account \| Institute \| Type \| Balance \| Market Value` |
+| Row 2 | Header | `Account \| Institute \| Type \| Balance \| Market Value \| Payment Day` |
 | A3:A | Text | Account name — also the dropdown source for `Transaction` |
 | B3:B | Text | Institution |
 | C3:C | Text | `Cash`, `Chequing`, `Saving`, `Credit`, `Investment`, `Person`, `Other`, … |
 | D3:D | Number | Balance — the deposited/book figure that ties out to transaction history |
 | E3:E | Number, optional | Market Value — today's redemption/cash-out value, where it differs from Balance (interest-bearing or investment accounts). Blank means "not tracked" and renders as `—`; not included in any sheet formula |
+| F3:F | Number, optional | Payment Day — the day of the month (1–31; past a short month's end means its last day) the balance is paid back, e.g. a credit card. Once it passes with the balance below 0 and no money into the account since the previous month's payment day, a red `Pay <n>d` badge shows on the row and on the Account tile |
 
 - **Reconciliation** — computed client-side, not a sheet formula: `D1` (recorded balances) minus `Statement`'s last row, Cumulative column (transaction history). Non-zero means a balance is wrong or a transaction is missing. Uses Balance, not Market Value — Market Value is informational only.
 - **Your own formulas in these cells survive an edit.** Any of the five columns may hold a formula (a Market Value written as `=D7*1.02`, a balance summing another tab). The list reads the *computed* numbers, so the edit form takes a second single-row read rendered as **formulas** and shows a formula cell as its formula text; leaving the box alone sends that text back verbatim. Editing an account used to write the computed figure into all five cells, replacing the formula with whatever it produced that day. You can also type a new formula into Balance or Market Value — anything starting with `=` that isn't plain arithmetic goes to the sheet as a formula, while `=5000-1234.56` is still evaluated here and stored as a plain number.

@@ -1,6 +1,6 @@
 
 function loadFormulaInputsFromSettings() {
-  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS, ...CALIBRATION_FORMULA_FIELDS].forEach((field) => {
+  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS, ...CALIBRATION_FORMULA_FIELDS, ...NAVY_FORMULA_FIELDS].forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
   });
   // Seeded from the same places the charts read, so the figure shown on open
@@ -89,6 +89,7 @@ function openFormulaPlayground() {
   lastExplicitBmrFormula = bmrFormula();
   const equationRadioValue = BMR_BASIS_RADIO_VALUES.includes(bmrBasis()) ? bmrBasis() : bmrFormula();
   document.querySelector(`input[name="formula-bmr-formula"][value="${equationRadioValue}"]`).checked = true;
+  document.querySelector(`input[name="formula-lbm-formula"][value="${lbmFormula()}"]`).checked = true;
   loadFormulaInputsFromSettings();
   applySolveForMode('DELTA_M');
   renderFormulaPreview();
@@ -213,7 +214,7 @@ async function saveFormulaSettings() {
   // rule: they change no target, but the Health Plan prompt quotes them, so the sheet has to
   // remember what the plateau caveat was computed with. Each only when it holds a number —
   // a blank one is left alone rather than written as an empty cell.
-  ADAPT_FORMULA_FIELDS.forEach((field) => {
+  [...ADAPT_FORMULA_FIELDS, ...NAVY_FORMULA_FIELDS].forEach((field) => {
     const value = formulaNumber(field.inputId);
     if (value !== null) overrides[field.key] = value;
   });
@@ -337,12 +338,16 @@ function initFormulaPlayground() {
     ...CARB_FORMULA_FIELDS.map((f) => f.inputId),
     ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
     ...CALIBRATION_FORMULA_FIELDS.map((f) => f.inputId),
+    ...NAVY_FORMULA_FIELDS.map((f) => f.inputId),
     'formula-body-mass-smooth', 'formula-height', 'formula-age',
     'formula-glycogen-skeletal-frac', 'formula-glycogen-per-kg-muscle', 'formula-glycogen-liver',
     'formula-glycogen-water-ratio'].forEach((id) => {
     document.getElementById(id).addEventListener('input', renderFormulaPreview);
   });
   document.getElementById('formula-sex').addEventListener('change', renderFormulaPreview);
+  document.querySelectorAll('input[name="formula-lbm-formula"]').forEach((radio) => {
+    radio.addEventListener('change', renderFormulaPreview);
+  });
 
   // Switching BMR equations re-derives everything: the figure, A and B, the plateau and the
   // arrival date, and (under Katch) whether a blank age is even a problem — so it goes

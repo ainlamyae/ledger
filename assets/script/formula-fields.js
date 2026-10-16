@@ -53,6 +53,13 @@ const ADAPT_FORMULA_FIELDS = [
   { key: ADAPT_PCT_CAP_KEY, inputId: 'formula-adapt-cap', fallback: () => ADAPT_PCT_CAP_DEFAULT },
 ];
 
+// U.S. Navy body-fat girths. No default: blank just leaves BF% and LBM_navy blank.
+const NAVY_FORMULA_FIELDS = [
+  { key: 'NECK_CM', inputId: 'formula-neck', fallback: () => '' },
+  { key: 'WAIST_CM', inputId: 'formula-waist', fallback: () => '' },
+  { key: 'HIP_CM', inputId: 'formula-hip', fallback: () => '' },
+];
+
 // The BMR_cal window (n_p × L_p days ending yesterday).
 const CALIBRATION_FORMULA_FIELDS = [
   { key: BMR_CALIBRATION_PERIOD_COUNT_KEY, inputId: 'formula-cal-period-count', fallback: () => BMR_CALIBRATION_PERIOD_COUNT_DEFAULT },
@@ -265,9 +272,19 @@ function applySolveForMode(mode) {
 // heading.
 const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass
     m̄     =  (1/L_p) × Σ m(t−i),  i = 0…L_p−1
+The healthy body mass as a BMI — 18.5–24.9 healthy band
+    BMI_des =  m_des / (h/100)²
+Body-fat % by U.S. Navy — Hodgdon & Beckett (1984), girths and height in cm
+    BF%   =  495 / (1.0324  −  0.19077×log10(C_waist − C_neck)  +  0.15456×log10(h))  −  450           (♂)
+    BF%   =  495 / (1.29579  −  0.35004×log10(C_waist + C_hip − C_neck)  +  0.22100×log10(h))  −  450   (♀)
+Lean body mass by U.S. Navy — body mass less its fat mass
+    m_fat    =  m × BF% / 100
+    LBM_navy =  m  −  m_fat  =  m × (1 − BF%/100)
 Lean body mass — Boer (1984)
-    LBM   =  0.407×m  +  0.267×h  −  19.2      (♂)
-    LBM   =  0.252×m  +  0.473×h  −  48.3      (♀)
+    LBM_boer =  0.407×m  +  0.267×h  −  19.2      (♂)
+    LBM_boer =  0.252×m  +  0.473×h  −  48.3      (♀)
+Lean body mass in force — whichever Plan Choices picks
+    LBM   =  LBM_boer  or  LBM_navy
 Basal metabolic rate by Katch-McArdle (1996), from lean mass instead of age/sex
     BMR_kat =  370  +  21.6×LBM
 Basal metabolic rate by Mifflin-St Jeor (1990)
@@ -282,6 +299,7 @@ Maintenance is affine in body mass — M(m) = A + B×m
     B     =  (10  +  MET × τ × κ / ε) / (1 − f)         under Mifflin
     A     =  (370  +  21.6×(c_h×h + c_0)) / (1 − f)     under Katch
     B     =  (21.6×c_m  +  MET × τ × κ / ε) / (1 − f)   under Katch
+    c_h = c_0 = 0,  c_m = 1 − BF%/100                    on LBM_navy
 Body mass at which TEI becomes maintenance
     m∞    =  (TEI  −  A) / B
 Metabolic adaptation — BMR sags faster than the lost mass alone predicts
@@ -301,8 +319,6 @@ Thermic effect of food — a share of the very intake being solved for
     TEF   =  f × TEI
 Desired daily intake — TEF folded in by solving, not by adding
     TEI   =  BMR  +  AEE  +  TEF  −  D    =    (BMR  +  AEE  −  D) / (1 − f)
-The healthy body mass as a BMI — 18.5–24.9 healthy band
-    BMI_des =  m_des / (h/100)²
 Exponential decay toward m∞, not linear loss
     m(t)  =  m∞  +  (m − m∞) × e^(−B×t/ρ)
     t     =  (ρ / B) × ln[ (m − m∞) / (m_des − m∞) ]
@@ -327,6 +343,10 @@ Fat band — both ends a share of intake, 20-35% AMDR
 Carb band — both ends a share of intake, 45-65% AMDR
     C_min =  (q_min/100 × TEI) / 4
     C_max =  (q_max/100 × TEI) / 4`;
+
+function currentLbmFormula() {
+  return document.querySelector('input[name="formula-lbm-formula"]:checked').value;
+}
 
 function formulaFieldValue(field) {
   // `value` skips Settings entirely — for fields (like Activity Intensity) whose
@@ -441,6 +461,7 @@ function readFormulaInputs() {
   overrides.SEX = sex;
   overrides[BMR_FORMULA_KEY] = formula;
   overrides[BMR_BASIS_KEY] = currentBmrBasis();
+  overrides[LBM_FORMULA_KEY] = currentLbmFormula();
 
   // The Δm box is the preview's only source of truth for the rate, so the pin key is
   // blanked out of the overlay: a WEEKLY_FAT_LOSS_PCT already on the sheet would otherwise

@@ -25,7 +25,8 @@ const CALORIE_AXIS_DESIRED_STEP_KCAL = 250;
 // The caps still can't fall off-plot, so the frame is WIDENED — never re-padded — to
 // reach one. That only arises when the desired figure sits beyond everything logged.
 function calorieAxisBounds(loggedValues, desiredValues) {
-  const framing = loggedValues.length ? loggedValues : desiredValues;
+  // Falls back to 0 when every entry is hidden.
+  const framing = loggedValues.length ? loggedValues : desiredValues.length ? desiredValues : [0];
   const lo = Math.min(...framing);
   const hi = Math.max(...framing);
   const pad = Math.max(CALORIE_AXIS_MIN_PAD_KCAL, (hi - lo) * CALORIE_AXIS_PAD_FRACTION);
@@ -34,7 +35,7 @@ function calorieAxisBounds(loggedValues, desiredValues) {
 
   return {
     min: 0,
-    max: Math.max(roundUp(hi + pad, CALORIE_AXIS_STEP_KCAL), roundUp(Math.max(...desiredValues), CALORIE_AXIS_DESIRED_STEP_KCAL)),
+    max: Math.max(roundUp(hi + pad, CALORIE_AXIS_STEP_KCAL), roundUp(Math.max(0, ...desiredValues), CALORIE_AXIS_DESIRED_STEP_KCAL)),
   };
 }
 
@@ -124,10 +125,18 @@ function renderHealthCaloriesChart(entries) {
     if (withinCalorieDesired(avg, dayDesired(i))) barColors[i] = CALORIE_NEAR_DESIRED_COLOR;
   });
 
-  const restingKcalValues = BMR_CAPS.flatMap(({ key }) => [...bmrByKey[key].values()]);
+  // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by
+  // their colour's name, a gradient one counting as missed.
+  const hidden = legendHiddenNames('health-calories-legend');
+  const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Desired met'
+    : c === CALORIE_NEAR_DESIRED_COLOR ? 'Near desired' : 'Missed desired'));
+  const shownValues = maskHiddenClasses(values, barClasses, hidden);
+
+  const restingKcalValues = BMR_CAPS.filter(({ key }) => !hidden.has(BMR_DEFINITIONS[key]))
+    .flatMap(({ key }) => [...bmrByKey[key].values()]);
   const axis = calorieAxisBounds(
-    values.filter((v, i) => byDate.has(dates[i])),
-    desiredByDay.map((b) => b.kcal).concat(restingKcalValues),
+    shownValues.filter((v, i) => v !== null && byDate.has(dates[i])),
+    (hidden.has(`Desired ${desired.word}`) ? [] : desiredByDay.map((b) => b.kcal)).concat(restingKcalValues),
   );
 
   // A cap across each bar rather than one continuous line: a line spanning the window
@@ -136,12 +145,6 @@ function renderHealthCaloriesChart(entries) {
   const capHalf = (axis.max - axis.min) * 0.004;
   const capData = desiredByDay.map((b) => [b.kcal - capHalf, b.kcal + capHalf]);
 
-  // Legend entries switched off (renderToggleLegend below); bars by their colour's name,
-  // a gradient one counting as missed.
-  const hidden = legendHiddenNames('health-calories-legend');
-  const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Desired met'
-    : c === CALORIE_NEAR_DESIRED_COLOR ? 'Near desired' : 'Missed desired'));
-
   healthCaloriesChart = upsertChart(healthCaloriesChart, ctx, {
     data: {
       labels: dates,
@@ -149,7 +152,7 @@ function renderHealthCaloriesChart(entries) {
         {
           type: 'bar',
           label: 'Calories',
-          data: maskHiddenClasses(values, barClasses, hidden),
+          data: shownValues,
           backgroundColor: barColors,
           order: 2,
         },

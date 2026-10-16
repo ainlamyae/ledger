@@ -62,14 +62,17 @@ function renderHealthProteinChart(entries) {
   // Logged days only, so the zero stand-ins don't pull the week under the band's floor.
   const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
-  const gTopProtein = Math.max(...values, band.max, band.min, 1);
-  const gStepProtein = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopProtein / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
-  const gMaxProtein = Math.ceil(gTopProtein / gStepProtein) * gStepProtein;
-
-  // Legend entries switched off (renderToggleLegend below); bars by their colour's name.
+  // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-protein-legend');
   const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Within desired'
     : c === PROTEIN_OVER_BAND_COLOR ? 'Over desired' : 'Under desired'));
+  const shownValues = maskHiddenClasses(values, barClasses, hidden);
+  const shownDesired = hidden.has('Desired Protein') && (band.max === band.min || hidden.has('Desired Protein band')) ? [] : [band.max, band.min];
+  const shownAvg = hidden.has('7-Day Average') ? [] : weeklyAvg;
+  const gTopProtein = Math.max(...shownValues, ...shownAvg, ...shownDesired, 1);
+  const gStepProtein = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopProtein / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
+  const gMaxProtein = Math.ceil(gTopProtein / gStepProtein) * gStepProtein;
+
 
   healthProteinChart = upsertChart(healthProteinChart, ctx, {
     data: {
@@ -78,7 +81,7 @@ function renderHealthProteinChart(entries) {
         {
           type: 'bar',
           label: 'Actual Intake',
-          data: maskHiddenClasses(values, barClasses, hidden),
+          data: shownValues,
           backgroundColor: barColors,
           order: 2,
         },

@@ -15,6 +15,7 @@ function renderHealthProjectionChart(entries) {
   const timeElapsed = document.getElementById('time-progress-meter-elapsed');
   const timeRemaining = document.getElementById('time-progress-meter-remaining');
   const timeEta = document.getElementById('time-progress-meter-eta');
+  const [meterTrack, timeTrack] = document.querySelectorAll('.body-mass-progress-meter-track');
   const etaEl = document.getElementById('body-mass-projection-eta');
   const plateauNote = document.getElementById('body-mass-plateau-note');
   // Never hidden: the card is in the page from the first paint with "—" in it, like
@@ -22,6 +23,8 @@ function renderHealthProjectionChart(entries) {
   // isn't enough logged to measure progress). Hiding it until the data arrived made it
   // pop in after everything else and shift the page under it.
   meterWrap.style.removeProperty('--fill-pct');
+  meterTrack.style.removeProperty('--mark-step');
+  timeTrack.style.removeProperty('--mark-step');
   meterWrap.style.setProperty('--meter-pct', '0');
   meterFill.classList.remove('danger');
   meterCallout.textContent = '';
@@ -63,6 +66,8 @@ function renderHealthProjectionChart(entries) {
     const isWrongDirection = proj.status === 'wrong-direction';
 
     meterWrap.style.setProperty('--meter-pct', `${pct}`);
+    // A mark every 2 kg from the first reading.
+    meterTrack.style.setProperty('--mark-step', `${(2 / Math.abs(totalDelta)) * 100}`);
     meterFill.classList.toggle('danger', isWrongDirection);
     if (!isWrongDirection) meterWrap.style.setProperty('--fill-pct', `${Math.round(pct)}`);
 
@@ -131,6 +136,8 @@ function renderHealthProjectionChart(entries) {
     if (totalDays > 0) {
       const timePct = Math.max(0, Math.min(100, (daysElapsed / totalDays) * 100));
       timeWrap.style.setProperty('--meter-pct', `${timePct}`);
+      // A mark every 4 weeks from the first reading.
+      timeTrack.style.setProperty('--mark-step', `${(28 / totalDays) * 100}`);
       timeWrap.style.setProperty('--fill-pct', `${Math.round(timePct)}`);
 
       const elapsedText = `${daysElapsed} ${daysElapsed === 1 ? 'day' : 'days'}`;

@@ -36,6 +36,7 @@ function datesInRange(fromIso, toIso) {
 function renderHealthCharts(entries) {
   renderTodayGlanceCards(entries);
   renderHealthBodyMassChart(entries);
+  renderHealthIntakeChart(entries);
   renderHealthCaloriesChart(entries);
   renderHealthProteinChart(entries);
   renderHealthFiberChart(entries);
@@ -438,9 +439,25 @@ function initHealthRangeControl() {
     renderRangeButtons('health-range', HEALTH_RANGES, healthRangeSlug, pick);
     renderHealthCharts(physiqueAsHealthEntries());
     renderProteinRotationChart(healthDateRange());
+    renderProteinRotationChart(healthDateRange(), 'nutrition', PROTEIN_ROTATION_NUTRITION_IDS);
     renderActivityRotationChart(healthDateRange());
+    renderActivityRotationChart(healthDateRange(), 'activity', ACTIVITY_ROTATION_ACTIVITY_IDS);
   };
   renderRangeButtons('health-range', HEALTH_RANGES, healthRangeSlug, pick);
+}
+
+// 🔍 shows or hides the detailed charts; hidden again on every load.
+function initHealthDetailToggle() {
+  const button = document.getElementById('health-detail-btn');
+  if (!button) return;
+  button.addEventListener('click', () => {
+    const show = button.getAttribute('aria-pressed') !== 'true';
+    button.setAttribute('aria-pressed', String(show));
+    button.textContent = show ? '🙈' : '🔍';
+    button.title = show ? 'Hide the detailed charts' : 'Show the detailed charts: Caloric, Protein, Dietary Fiber, Fat and Carbohydrate Intake, Protein Source Rotation and Activity Rotation';
+    button.setAttribute('aria-label', show ? 'Less detail' : 'More detail');
+    document.querySelectorAll('.health-detail-chart').forEach((card) => { card.hidden = !show; });
+  });
 }
 
 // The date list built from that range, clipped to what this particular metric has

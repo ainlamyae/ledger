@@ -141,6 +141,7 @@ function activityRotationWindow(toIso, days) {
 const activityRotationCharts = {
   chart: { chart: null, donut: null },
   gym: { chart: null, donut: null },
+  activity: { chart: null, donut: null },
 };
 const ACTIVITY_ROTATION_DEFAULT_IDS = {
   chart: 'activity-rotation-chart', donut: 'activity-rotation-donut', legend: 'activity-rotation-legend',
@@ -151,6 +152,10 @@ const ACTIVITY_ROTATION_DEFAULT_IDS = {
 // can't drift onto different element ids.
 const ACTIVITY_ROTATION_GYM_IDS = {
   chart: 'activity-rotation-chart-gym', donut: 'activity-rotation-donut-gym', legend: 'activity-rotation-legend-gym',
+};
+// The Activity page's copy, at the top of that page.
+const ACTIVITY_ROTATION_ACTIVITY_IDS = {
+  chart: 'activity-rotation-chart-activity', donut: 'activity-rotation-donut-activity', legend: 'activity-rotation-legend-activity',
 };
 
 function renderActivityRotationDonut(rows, barColors, toIso, slot, ids) {
@@ -307,4 +312,5 @@ function renderActivityRotationChart({ from, to }, slot = 'chart', ids = ACTIVIT
 function initActivityRotationPanel() {
   renderActivityRotationChart(healthDateRange());
   renderActivityRotationChart(healthDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);
+  renderActivityRotationChart(healthDateRange(), 'activity', ACTIVITY_ROTATION_ACTIVITY_IDS);
 }

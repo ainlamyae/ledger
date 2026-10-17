@@ -1,4 +1,5 @@
 // Confetti burst, like iMessage's celebration effect. Colours are the chart tokens.
+// Also warnWithPulse, its opposite: a red pulse round the whole page and a shake.
 
 const CONFETTI_COLOURS = ['--chart-good', '--chart-blue', '--chart-purple', '--chart-warn', '--chart-cyan', '--chart-indigo', '--chart-bad'];
 const CONFETTI_COUNT = 160;
@@ -57,4 +58,22 @@ function celebrateWithConfetti() {
     else canvas.remove();
   }
   requestAnimationFrame(frame);
+}
+
+// Three red pulses round the screen's edge and a wrong-password shake of the open
+// form (else the page), then gone; clicks pass through. Shown under reduced motion too.
+function warnWithPulse() {
+  const target = document.querySelector('.modal:not([hidden]) .modal-card') || document.getElementById('dashboard');
+  if (target) {
+    target.classList.remove('warning-shake');
+    void target.offsetWidth; // restart the shake on a repeat save
+    target.classList.add('warning-shake');
+    target.addEventListener('animationend', () => target.classList.remove('warning-shake'), { once: true });
+  }
+  document.querySelector('.warning-pulse')?.remove();
+  const overlay = document.createElement('div');
+  overlay.className = 'warning-pulse';
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.addEventListener('animationend', () => overlay.remove());
+  document.body.appendChild(overlay);
 }

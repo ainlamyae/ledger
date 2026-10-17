@@ -12,7 +12,7 @@ const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:J`;
 
 // Compendium 02054 general value, for a name the sheet doesn't price.
 // Distinct from health-math.js's ACTIVITY_MET_FALLBACK, which is the assumed
-// intensity for the daily activity TARGET rather than any one exercise.
+// intensity for the daily desired activity rather than any one exercise.
 const EXERCISE_MET_FALLBACK = 3.5;
 
 let allActivities = [];
@@ -114,7 +114,7 @@ async function initActivities(forceRefresh = false) {
         // Group (Leg Day's five exercises all carry the same figure), so a
         // Group counts as tracked once ANY of its rows sets it; see
         // trackedActivityGroups for how the duplicates are reconciled.
-        weeklyTarget: (row[9] !== undefined && row[9] !== '') ? Number(row[9]) : null,
+        weeklyDesired: (row[9] !== undefined && row[9] !== '') ? Number(row[9]) : null,
       };
     })
     .filter((a) => a.name);
@@ -141,7 +141,7 @@ function activityCategory(name) {
 }
 
 // Named for the exercise, not the day: health-math.js's activityMet() is the
-// target-intensity MET and takes no argument.
+// desired-intensity MET and takes no argument.
 function exerciseMet(name) {
   const met = activityByName(name)?.met;
   return (met !== null && met !== undefined && Number.isFinite(met)) ? met : EXERCISE_MET_FALLBACK;
@@ -303,7 +303,7 @@ function makeActivityTable(rows, columnVisibility) {
 }
 
 // Sort activities by rotation completion: least done (biggest gap) first.
-// Groups with no Weekly Target (untracked) fall to the end in sheet order.
+// Groups with no Weekly Desired (untracked) fall to the end in sheet order.
 // Shared by the plan tables and the Instructions modal.
 function sortActivitiesByRotation(activities) {
   const rotationRows = computeActivityRotationRows(healthDateRange());
@@ -322,7 +322,7 @@ function renderActivityPlanTables() {
   if (!allActivities.length) {
     const empty = document.createElement('p');
     empty.className = 'hint';
-    empty.textContent = `No activities yet — click "Add Activity" above, or add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab directly (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group, Weight, Weekly Target).`;
+    empty.textContent = `No activities yet — click "Add Activity" above, or add rows to the "${CONFIG.SHEETS.ACTIVITIES}" tab directly (Category, Group, Name, Unit, "Sets x Reps, Rest", Image, MET, Muscle Group, Weight, Weekly Desired).`;
     container.appendChild(empty);
     return;
   }
@@ -376,7 +376,7 @@ function openActivityForm(activity, duplicate = false) {
   setActivityField('image', activity?.image);
   setActivityField('muscle-group', activity?.muscleGroup);
   setActivityField('weight', activity?.weight);
-  setActivityField('weekly-target', activity?.weeklyTarget);
+  setActivityField('weekly-desired', activity?.weeklyDesired);
   renderActivityImagePreview();
 
   renderActivityDatalist('activity-category-options', 'category');
@@ -518,10 +518,10 @@ function readActivityFormFields() {
     return { ok: false };
   }
 
-  const weeklyTargetRaw = activityFieldValue('weekly-target');
-  const weeklyTarget = weeklyTargetRaw ? evaluateNumberExpression(weeklyTargetRaw) : null;
-  if (weeklyTargetRaw && weeklyTarget === null) {
-    showFieldError('activity-form-error', 'Weekly Target must be a number (e.g. 7), or blank to leave this Group out of Activity Rotation.');
+  const weeklyDesiredRaw = activityFieldValue('weekly-desired');
+  const weeklyDesired = weeklyDesiredRaw ? evaluateNumberExpression(weeklyDesiredRaw) : null;
+  if (weeklyDesiredRaw && weeklyDesired === null) {
+    showFieldError('activity-form-error', 'Weekly Desired must be a number (e.g. 7), or blank to leave this Group out of Activity Rotation.');
     return { ok: false };
   }
 
@@ -542,7 +542,7 @@ function readActivityFormFields() {
     met !== null ? met : '',
     activityFieldValue('muscle-group'),
     activityFieldValue('weight'),
-    weeklyTarget !== null ? weeklyTarget : '',
+    weeklyDesired !== null ? weeklyDesired : '',
   ];
 
   return { ok: true, name, met, values };

@@ -49,16 +49,16 @@ function gatherProfileSnapshot() {
 // so the profile goes to all three rather than only to the panel that happens
 // to compute calorie figures. Missing fields are reported as "not set" instead
 // of being dropped, so the model can see what it doesn't know rather than
-// quietly assuming a default. bodyMassTargetKg is passed only by the Wellness mode,
+// quietly assuming a default. bodyMassHealthyKg is passed only by the Wellness mode,
 // the one panel whose subject is the journey rather than today's body.
-function formatProfileLines(p, bodyMassTargetKg = null) {
-  const targetSuffix = bodyMassTargetKg !== null ? ` (desired: ${bodyMassTargetKg} kg)` : '';
+function formatProfileLines(p, bodyMassHealthyKg = null) {
+  const healthySuffix = bodyMassHealthyKg !== null ? ` (desired: ${bodyMassHealthyKg} kg)` : '';
   // Tune's order: sex, height, age, then body mass.
   return [
     `Sex: ${p.sex !== null ? p.sex : 'not set'}`,
     `Height: ${p.heightCm !== null ? `${p.heightCm} cm` : 'not set'}`,
     `Age: ${p.age !== null ? p.age : 'not set'}`,
-    `Current body mass: ${p.bodyMassKg !== null ? `${p.bodyMassKg} kg${targetSuffix}` : 'not logged'}`,
+    `Current body mass: ${p.bodyMassKg !== null ? `${p.bodyMassKg} kg${healthySuffix}` : 'not logged'}`,
     `BMI: ${p.bmi !== null ? p.bmi : 'not available (needs height and a logged body mass)'}`,
   ];
 }
@@ -172,13 +172,13 @@ function findMicronutrient(data, name) {
   return data.nutrients.find((n) => n.name === name) || null;
 }
 
-// The fixed FDA Daily Value/day for one nutrient, target amount and unit
-// split out so the caller can show a target even on a window with no priced
-// intake at all (the fat/fiber rows below), the same way calorieTarget and
-// proteinTarget are always shown regardless of whether anything was logged.
-function nutrientTargetAmount(name) {
-  const target = nutrientDailyTargets()[name];
-  return target ? { amount: target.amount, unit: target.unit } : { amount: null, unit: 'g' };
+// The fixed FDA Daily Value/day for one nutrient, amount and unit
+// split out so the caller can show a desired figure even on a window with no priced
+// intake at all (the fat/fiber rows below), the same way calorieDesired and
+// proteinDesired are always shown regardless of whether anything was logged.
+function nutrientDesiredAmount(name) {
+  const desired = nutrientDailyDesired()[name];
+  return desired ? { amount: desired.amount, unit: desired.unit } : { amount: null, unit: 'g' };
 }
 
 function gatherInsightMetrics(fromIso, toIso) {
@@ -200,15 +200,15 @@ function gatherInsightMetrics(fromIso, toIso) {
 
   const fat = findMicronutrient(microCurrent, WELLNESS_FAT_NUTRIENT);
   const prevFat = findMicronutrient(microPrevious, WELLNESS_FAT_NUTRIENT);
-  const fatTarget = nutrientTargetAmount(WELLNESS_FAT_NUTRIENT);
+  const fatDesired = nutrientDesiredAmount(WELLNESS_FAT_NUTRIENT);
 
   const fiber = findMicronutrient(microCurrent, WELLNESS_FIBER_NUTRIENT);
   const prevFiber = findMicronutrient(microPrevious, WELLNESS_FIBER_NUTRIENT);
-  const fiberTarget = nutrientTargetAmount(WELLNESS_FIBER_NUTRIENT);
+  const fiberDesired = nutrientDesiredAmount(WELLNESS_FIBER_NUTRIENT);
 
   const carb = findMicronutrient(microCurrent, WELLNESS_CARB_NUTRIENT);
   const prevCarb = findMicronutrient(microPrevious, WELLNESS_CARB_NUTRIENT);
-  const carbTarget = nutrientTargetAmount(WELLNESS_CARB_NUTRIENT);
+  const carbDesired = nutrientDesiredAmount(WELLNESS_CARB_NUTRIENT);
 
   return {
     lookbackDays,
@@ -216,30 +216,30 @@ function gatherInsightMetrics(fromIso, toIso) {
     // sex included because the BMR behind every calorie figure here is built
     // from it, and calorie/protein norms genuinely differ by it.
     profile: gatherProfileSnapshot(),
-    bodyMassTargetKg: getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT),
+    bodyMassHealthyKg: getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT),
     projection,
 
     avgCalories: current.avgCalories,
     prevAvgCalories: previous.avgCalories,
     // The whole figure, not a bare number — {kcal, kind} — so the prompt can
-    // name it "max" or "min" rather than the direction-blind "target: 1388",
+    // name it "max" or "min" rather than the direction-blind "desired: 1388",
     // which let the AI praise a 900-kcal day on a bulk and scold a 1,300-kcal
     // one on a cut — both of which are the opposite of the truth.
-    calorieTarget: getCalorieTarget(physiqueAsHealthEntries()),
+    calorieDesired: getCalorieDesired(physiqueAsHealthEntries()),
     caloriesDaysLogged: current.caloriesDaysLogged,
 
     avgProtein: current.avgProtein,
     prevAvgProtein: previous.avgProtein,
-    // The band's display form ("131-164"), not a single number — the target
+    // The band's display form ("131-164"), not a single number — desired protein
     // genuinely is a range, and collapsing it to a midpoint here would have
-    // the AI calling an in-range day short of target. ASCII hyphen rather than
+    // the AI calling an in-range day short of desired. ASCII hyphen rather than
     // the UI's en dash, since this string is headed for the prompt.
-    proteinTarget: formatProteinTargetBand(getProteinTargetBandG(physiqueAsHealthEntries()), '-'),
+    proteinDesired: formatProteinDesiredBand(getProteinDesiredBandG(physiqueAsHealthEntries()), '-'),
     proteinDaysLogged: current.proteinDaysLogged,
 
     avgActivityMins: current.avgActivityMins,
     prevAvgActivityMins: previous.avgActivityMins,
-    activityTarget: Math.round(getActivityTargetMin(latestBodyMassKg(physiqueAsHealthEntries()))),
+    activityDesired: Math.round(getActivityDesiredMin(latestBodyMassKg(physiqueAsHealthEntries()))),
     activityDaysLogged: current.activityDaysLogged,
     avgActivityKcal: current.avgActivityKcal,
     prevAvgActivityKcal: previous.avgActivityKcal,
@@ -248,7 +248,7 @@ function gatherInsightMetrics(fromIso, toIso) {
 
     avgSleepHours: current.avgSleepHours,
     prevAvgSleepHours: previous.avgSleepHours,
-    sleepTarget: getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT),
+    sleepDesired: getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT),
     sleepDaysLogged: current.sleepDaysLogged,
 
     // 'reference', not 'floor'/'ceiling' — a total-fat Daily Value isn't a
@@ -258,19 +258,19 @@ function gatherInsightMetrics(fromIso, toIso) {
     // caloriesDaysLogged when a logged meal hasn't been priced yet.
     avgFat: fat ? fat.perDay : null,
     prevAvgFat: prevFat ? prevFat.perDay : null,
-    fatTarget: fatTarget.amount,
+    fatDesired: fatDesired.amount,
     fatDaysLogged: microCurrent.daysLogged,
 
     avgFiber: fiber ? fiber.perDay : null,
     prevAvgFiber: prevFiber ? prevFiber.perDay : null,
-    fiberTarget: fiberTarget.amount,
+    fiberDesired: fiberDesired.amount,
     fiberDaysLogged: microCurrent.daysLogged,
 
     // Same 'reference' shape as fat above — carbohydrate's Daily Value is a
     // reference figure too, not a pass/fail line.
     avgCarb: carb ? carb.perDay : null,
     prevAvgCarb: prevCarb ? prevCarb.perDay : null,
-    carbTarget: carbTarget.amount,
+    carbDesired: carbDesired.amount,
     carbDaysLogged: microCurrent.daysLogged,
   };
 }
@@ -295,7 +295,7 @@ function formatTrajectoryLine(projection) {
   // "currently" because the rate isn't constant: the arrival date comes from an
   // exponential model in which the rate decays as BMR falls with body mass, so
   // quoting the present rate as if it held to the desired mass would overstate progress.
-  return `Body mass trajectory: currently ${direction} ~${kgPerWeek} kg/week (slowing as body mass drops), estimated to reach the ${projection.bodyMassTarget} kg desired mass around ${isoFromDate(projection.etaDate)} (~${projection.daysToTarget} days) — generic population-average estimate.`;
+  return `Body mass trajectory: currently ${direction} ~${kgPerWeek} kg/week (slowing as body mass drops), estimated to reach the ${projection.bodyMassHealthy} kg desired mass around ${isoFromDate(projection.etaDate)} (~${projection.daysToHealthy} days) — generic population-average estimate.`;
 }
 
 // One line per activity description (e.g. NEAT / Resistance / Cardio),
@@ -303,8 +303,8 @@ function formatTrajectoryLine(projection) {
 // figure exists, avg kcal/day burned alongside it), previous-period
 // comparison, and logging coverage — so the AI can reason about the mix of
 // activity types, not just their combined total (which the 'Avg activity
-// total' line above this still covers, since that's what the activity
-// target is measured against).
+// total' line above this still covers, since that's what the desired
+// activity is measured against).
 function formatActivityBreakdownLines(m) {
   return Object.keys(m.activityByDescription)
     .sort()
@@ -326,11 +326,11 @@ function formatInsightPrompt(m) {
   // No range on the line: every figure here covers the same one, so repeating it
   // eight times cost more than the data did. The [N/M days logged] marker carries
   // the window length where coverage is partial.
-  const line = (label, value, unit, target, daysLogged, prevValue, word = 'desired') => {
+  const line = (label, value, unit, desired, daysLogged, prevValue, word = 'desired') => {
     if (value === null) return `${label}: not logged this period`;
     const coverage = daysLogged < m.lookbackDays ? ` [only ${daysLogged}/${m.lookbackDays} days logged]` : '';
     const trend = prevValue !== null ? ` — previous period: ${prevValue}${unit}` : '';
-    return `${label}: ${value}${unit} (${word}: ${target}${unit})${trend}${coverage}`;
+    return `${label}: ${value}${unit} (${word}: ${desired}${unit})${trend}${coverage}`;
   };
 
   // Bespoke rather than built from the generic line() helper above, since
@@ -343,7 +343,7 @@ function formatInsightPrompt(m) {
     const kcalNow = m.avgActivityKcal !== null ? `, ${m.avgActivityKcal} kcal/day burned` : '';
     const kcalPrev = m.prevAvgActivityKcal !== null ? `, ${m.prevAvgActivityKcal} kcal/day burned` : '';
     const trend = m.prevAvgActivityMins !== null ? ` — previous period: ${m.prevAvgActivityMins} min/day${kcalPrev}` : '';
-    return `Avg activity total: ${m.avgActivityMins} min/day${kcalNow} (desired: ${m.activityTarget} min/day)${trend}${coverage}`;
+    return `Avg activity total: ${m.avgActivityMins} min/day${kcalNow} (desired: ${m.activityDesired} min/day)${trend}${coverage}`;
   })();
 
   // Ordered to match the Wellness charts below it (State Trend & Forecast,
@@ -354,16 +354,16 @@ function formatInsightPrompt(m) {
   // same intake and activity-burn figures below it, just plotted net rather
   // than reported again as a third number.
   const lines = [
-    ...formatProfileLines(m.profile, m.bodyMassTargetKg),
+    ...formatProfileLines(m.profile, m.bodyMassHealthyKg),
     formatTrajectoryLine(m.projection),
-    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieTarget.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieTarget.kind),
-    line('Avg protein intake', m.avgProtein, ' g/day', m.proteinTarget, m.proteinDaysLogged, m.prevAvgProtein),
-    line('Avg dietary fiber intake', m.avgFiber, ' g/day', m.fiberTarget, m.fiberDaysLogged, m.prevAvgFiber),
-    line('Avg fat intake', m.avgFat, ' g/day', m.fatTarget, m.fatDaysLogged, m.prevAvgFat, 'reference'),
-    line('Avg carbohydrate intake', m.avgCarb, ' g/day', m.carbTarget, m.carbDaysLogged, m.prevAvgCarb, 'reference'),
+    line('Avg calorie intake', m.avgCalories, ' kcal/day', m.calorieDesired.kcal, m.caloriesDaysLogged, m.prevAvgCalories, m.calorieDesired.kind),
+    line('Avg protein intake', m.avgProtein, ' g/day', m.proteinDesired, m.proteinDaysLogged, m.prevAvgProtein),
+    line('Avg dietary fiber intake', m.avgFiber, ' g/day', m.fiberDesired, m.fiberDaysLogged, m.prevAvgFiber),
+    line('Avg fat intake', m.avgFat, ' g/day', m.fatDesired, m.fatDaysLogged, m.prevAvgFat, 'reference'),
+    line('Avg carbohydrate intake', m.avgCarb, ' g/day', m.carbDesired, m.carbDaysLogged, m.prevAvgCarb, 'reference'),
     activityTotalLine,
     ...formatActivityBreakdownLines(m),
-    line('Avg sleep', m.avgSleepHours, ' hr/day', m.sleepTarget, m.sleepDaysLogged, m.prevAvgSleepHours),
+    line('Avg sleep', m.avgSleepHours, ' hr/day', m.sleepDesired, m.sleepDaysLogged, m.prevAvgSleepHours),
   ];
 
   return lines.filter((l) => l !== null).join('\n');

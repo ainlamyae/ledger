@@ -289,7 +289,7 @@ function renderCarServiceChart(records, predictions, fit, today) {
       datasets: [
         {
           label: 'Odometer', status: 'logged', data: readings, spanGaps: true,
-          borderColor: targetMarkColor(), borderWidth: 2, pointRadius: 0, tension: 0, order: 1,
+          borderColor: desiredMarkColor(), borderWidth: 2, pointRadius: 0, tension: 0, order: 1,
         },
         {
           label: 'Odometer', status: 'forecast', data: forecast,

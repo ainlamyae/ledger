@@ -5,14 +5,14 @@
 // The other four modes report what HAPPENED. This one reports what the settings
 // INTEND, and pairs it with the same recent averages Wellness reads so the model
 // can judge the plan against the logging rather than in the abstract: a 1,228 kcal
-// target is a different proposition for someone averaging 1,300 than for someone
+// desired intake is a different proposition for someone averaging 1,300 than for someone
 // averaging 2,100.
 //
 // Computed from `Settings` plus the latest body-mass reading, NOT from the Tune's
 // input boxes — the modal may never have been opened this session, and the saved
 // values are what the app actually runs on. Every figure goes through the same
-// functions the Tune and the charts use (calorieTargetDetail,
-// maintenanceAffineCoefficients, projectTargetDays, boerLeanBodyMassKg), so all
+// functions the Tune and the charts use (calorieDesiredDetail,
+// maintenanceAffineCoefficients, projectHealthyDays, boerLeanBodyMassKg), so all
 // three can't disagree about the same plan.
 
 // Both ends of the protein band, in the LBM-scaled form the Tune writes.
@@ -26,8 +26,8 @@ function planProteinPerKgBand() {
 }
 
 // The plan as the app currently holds it, or null when the profile it's built from
-// is incomplete — the same all-or-nothing rule calorieTargetDetail applies, since
-// a plan missing height or sex has no BMR and therefore no target at all.
+// is incomplete — the same all-or-nothing rule calorieDesiredDetail applies, since
+// a plan missing height or sex has no BMR and therefore no desired intake at all.
 function gatherPlanSnapshot() {
   const entries = physiqueAsHealthEntries();
   // The smoothed mass, exactly as the Tune and the calorie tile use it — a plan
@@ -39,21 +39,21 @@ function gatherPlanSnapshot() {
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
 
-  const detail = bodyMassKg === null ? null : calorieTargetDetail(bodyMassKg);
+  const detail = bodyMassKg === null ? null : calorieDesiredDetail(bodyMassKg);
   if (detail === null) return null;
 
   const met = activityMet();
-  const tau = getSetting('ACTIVITY_TARGET_MIN', ACTIVITY_TARGET_MIN_DEFAULT);
+  const tau = getSetting('ACTIVITY_DESIRED_MIN', ACTIVITY_DESIRED_MIN_DEFAULT);
   const kappa = getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT);
-  const targetKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
 
   const coefficients = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, bodyMassKg });
   const { a, b } = coefficients;
-  // targetJourneyProjection, not projectTargetDays: with the percentage pinned the plan walks
+  // healthyJourneyProjection, not projectHealthyDays: with the percentage pinned the plan walks
   // the proportional journey, and the prompt has to be judging the same arrival date the Body
   // Mass chart is showing.
-  const projection = targetJourneyProjection({
-    intakeKcal: detail.kcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, targetKg,
+  const projection = healthyJourneyProjection({
+    intakeKcal: detail.kcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, healthyKg,
   });
 
   // Rounded to 0.1 kg before the grams come off it, exactly as the Tune does
@@ -85,7 +85,7 @@ function gatherPlanSnapshot() {
   // The stored calibration (health-tune-calibration.js), shown as-is like the Status card — null
   // until one has been saved, in which case the line is simply dropped.
   const calibratedBmr = calibratedBmrKcal();
-  const bmiDes = heightCm ? Math.round((targetKg / ((heightCm / 100) ** 2)) * 10) / 10 : null;
+  const bmiDes = heightCm ? Math.round((healthyKg / ((heightCm / 100) ** 2)) * 10) / 10 : null;
   const maintenanceKcal = Math.round(detail.bmr + detail.activityKcal);
   const deficitVsBmrPct = detail.bmr ? Math.round(((detail.bmr - detail.kcal) / detail.bmr) * 1000) / 10 : null;
 
@@ -110,7 +110,7 @@ function gatherPlanSnapshot() {
   const glycogenSwingKg = Math.round((glycogenG * (1 + glyWaterRatio)) / 100) / 10;
 
   return {
-    bodyMassKg, rawBodyMassKg, heightCm, age, sex, targetKg, met, tau, kappa,
+    bodyMassKg, rawBodyMassKg, heightCm, age, sex, healthyKg, met, tau, kappa,
     formula: coefficients.formula,
     mifflinBmr, katchBmr, calibratedBmr, bmiDes, maintenanceKcal, deficitVsBmrPct,
     fiberPerKcalMin, fiberPerKgMax, fatPctMin, fatPctMax, carbPctMin, carbPctMax,
@@ -130,14 +130,14 @@ function gatherPlanSnapshot() {
     adaptedBmr: Math.round(detail.bmr * (1 - adaptFraction)),
     adaptedPlateau,
     // The REALIZED deficit the intake was actually built from, not the raw dm × 7700 / 7
-    // rate — the two differ whenever PLAN_SLEEP_HOURS is short of the sleep target (see
+    // rate — the two differ whenever PLAN_SLEEP_HOURS is short of the desired sleep (see
     // sleepAdjustedDeficitKcal), and Ein below has to be traceable back to whichever one
     // actually produced it.
     deficitKcal: Math.round(detail.deficit),
     rawDeficitKcal: Math.round(detail.rawDeficit),
     sleepDeprivationEffectKcal: detail.sleepDeprivationEffectKcal,
     planSleepHours: detail.planSleepHours,
-    sleepTargetHours: detail.sleepTargetHours,
+    sleepDesiredHours: detail.sleepDesiredHours,
     weeklyFatLossKg: detail.weeklyFatLossKg,
     bmr: Math.round(detail.bmr),
     activityKcal: Math.round(detail.activityKcal),
@@ -145,10 +145,10 @@ function gatherPlanSnapshot() {
     // Whether that intake is a pinned figure, a pinned percentage of body mass, or
     // recalculated from a fixed kilogram rate is the plan's own design decision, and it
     // changes what "following the plan" means — so the model is told which is in force.
-    intakeIsPinned: pinnedCalorieTargetKcal() !== null,
+    intakeIsPinned: pinnedCalorieDesiredKcal() !== null,
     pinnedPct: pinnedWeeklyFatLossPct(),
     weeklyFatLossPct: weeklyFatLossPct(detail.weeklyFatLossKg, bodyMassKg),
-    activityIsPinned: pinnedActivityTargetKcal() !== null,
+    activityIsPinned: pinnedActivityDesiredKcal() !== null,
     a: Math.round(a),
     b: Math.round(b * 100) / 100,
     equilibriumKg: Math.round(projection.equilibriumKg * 10) / 10,
@@ -202,7 +202,7 @@ function planSubstitutedLines(p) {
   lines.push(`Ea (AEE): ${p.met} × ${p.bodyMassKg} × ${p.tau} × ${p.kappa} / 200 = ${p.activityKcal} kcal/day`);
 
   lines.push(p.sleepDeprivationEffectKcal > 0
-    ? `D: (${p.weeklyFatLossKg} × 7700 / 7) / eta = ${p.rawDeficitKcal} / eta = ${p.deficitKcal} kcal/day — eta is the Sleep Efficiency Factor for ${p.planSleepHours}h assumed sleep against an ${p.sleepTargetHours}h target, so short sleep adds ${p.sleepDeprivationEffectKcal} kcal/day (SD) to the raw rate`
+    ? `D: (${p.weeklyFatLossKg} × 7700 / 7) / eta = ${p.rawDeficitKcal} / eta = ${p.deficitKcal} kcal/day — eta is the Sleep Efficiency Factor for ${p.planSleepHours}h assumed sleep against ${p.sleepDesiredHours}h desired sleep, so short sleep adds ${p.sleepDeprivationEffectKcal} kcal/day (SD) to the raw rate`
     : `D: ${p.weeklyFatLossKg} × 7700 / 7 = ${p.deficitKcal} kcal/day`);
 
   lines.push(p.tefPercent > 0
@@ -224,18 +224,18 @@ function planSubstitutedLines(p) {
   if (!proportional) lines.push(`m_inf: (${p.intakeKcal} − ${p.a}) / ${p.b} = ${p.equilibriumKg} kg`);
 
   if (p.projection.status === 'ok' && proportional) {
-    lines.push(`t: 7 × ln(${p.bodyMassKg} / ${p.targetKg}) / −ln(1 − ${p.pinnedPct}/100) = ${Math.round(p.projection.days)} days, arriving ${p.projection.etaIso} (no plateau: a constant share of a falling mass always reaches the target)`);
+    lines.push(`t: 7 × ln(${p.bodyMassKg} / ${p.healthyKg}) / −ln(1 − ${p.pinnedPct}/100) = ${Math.round(p.projection.days)} days, arriving ${p.projection.etaIso} (no plateau: a constant share of a falling mass always reaches the healthy body mass)`);
   } else if (p.projection.status === 'ok') {
-    lines.push(`t: (7700 / ${p.b}) × ln[(${p.bodyMassKg} − ${p.equilibriumKg}) / (${p.targetKg} − ${p.equilibriumKg})] = ${Math.round(p.projection.days)} days, arriving ${p.projection.etaIso}`);
+    lines.push(`t: (7700 / ${p.b}) × ln[(${p.bodyMassKg} − ${p.equilibriumKg}) / (${p.healthyKg} − ${p.equilibriumKg})] = ${Math.round(p.projection.days)} days, arriving ${p.projection.etaIso}`);
   } else if (p.projection.status === 'unreachable' && proportional) {
     lines.push(`t: never — ${p.projection.reason}`);
   } else if (p.projection.status === 'unreachable') {
-    lines.push(`t: never — at this intake the body mass levels off at ${p.equilibriumKg} kg, short of the ${p.targetKg} kg target`);
+    lines.push(`t: never — at this intake the body mass levels off at ${p.equilibriumKg} kg, short of the ${p.healthyKg} kg healthy body mass`);
   } else if (p.projection.status === 'reached') {
-    lines.push('t: already at the target body mass');
+    lines.push('t: already at the healthy body mass');
   }
 
-  if (p.bmiDes !== null) lines.push(`BMI_des: ${p.targetKg} / (${hM})² = ${p.bmiDes} kg/m²`);
+  if (p.bmiDes !== null) lines.push(`BMI_des: ${p.healthyKg} / (${hM})² = ${p.bmiDes} kg/m²`);
   lines.push(`dm%: 100 × ${p.weeklyFatLossKg} / ${p.bodyMassKg} = ${p.weeklyFatLossPct} %/week`);
   if (p.deficitVsBmrPct !== null) lines.push(`D_bmr%: (${p.bmr} − ${p.intakeKcal}) / ${p.bmr} × 100 = ${p.deficitVsBmrPct} %`);
 
@@ -268,7 +268,7 @@ function planSubstitutedLines(p) {
 
 // Which of the three rate plans is in force, in words — the pins are mutually exclusive, so
 // exactly one of these describes the sheet. It matters to the judgement, not just the
-// arithmetic: the same target intake is a different promise depending on whether it will be
+// arithmetic: the same desired intake is a different promise depending on whether it will be
 // recut at the next body-mass reading, and how.
 function planRatePinDescription(p) {
   if (p.intakeIsPinned) return 'the daily intake is pinned, so the deficit shrinks as body mass drops';
@@ -286,12 +286,12 @@ function planInputLines(p) {
     `a (age): ${p.age} years${p.formula === 'katch' ? ' (unused — the Katch-McArdle BMR equation does not read age)' : ''}`,
     `m (latest single body-mass reading): ${p.rawBodyMassKg} kg`,
     `m_bar (L_p-day rolling average, L_p = ${bodyMassSmoothingDays()} days — the mass every figure below is evaluated at): ${p.bodyMassKg} kg`,
-    `m_g (target body mass): ${p.targetKg} kg`,
+    `m_g (healthy body mass): ${p.healthyKg} kg`,
     `MET (assumed activity intensity): ${p.met}`,
-    `tau (daily activity target): ${p.tau} min/day`,
+    `tau (desired daily activity): ${p.tau} min/day`,
     `kappa (oxygen uptake per MET): ${p.kappa} mL O2/kg/min`,
-    `dm (weekly fat loss target): ${p.weeklyFatLossKg} kg/week, i.e. ${p.weeklyFatLossPct}% of current body mass per week`,
-    `s (sleep length the plan assumes) vs. sleep target: ${p.planSleepHours}h vs. ${p.sleepTargetHours}h${p.sleepDeprivationEffectKcal > 0 ? ` — short of target, so the deficit above is inflated by ${p.sleepDeprivationEffectKcal} kcal/day to compensate` : ' — at or above target, no deficit adjustment'}`,
+    `dm (desired weekly fat loss): ${p.weeklyFatLossKg} kg/week, i.e. ${p.weeklyFatLossPct}% of current body mass per week`,
+    `s (sleep length the plan assumes) vs. desired sleep: ${p.planSleepHours}h vs. ${p.sleepDesiredHours}h${p.sleepDeprivationEffectKcal > 0 ? ` — short of desired sleep, so the deficit above is inflated by ${p.sleepDeprivationEffectKcal} kcal/day to compensate` : ' — at or above desired sleep, no deficit adjustment'}`,
     `p_min - p_max (protein per kg of lean mass): ${p.proteinPerKgMin} - ${p.proteinPerKgMax} g/kg LBM/day`,
     `BMR equation in force: ${p.formula === 'katch' ? 'Katch-McArdle, BMR = 370 + 21.6 x LBM' : 'Mifflin-St Jeor, BMR = 10m + 6.25h - 5a + sigma'}`,
     `f (thermic effect of food): ${p.tefPercent}% of intake${p.tefPercent > 0 ? '' : ' (not counted in this plan)'}`,
@@ -319,7 +319,7 @@ function formatPlanInsightPrompt(data) {
     'PLAN INPUTS:',
     ...planInputLines(plan),
     '',
-    'THE PLAN — the formulas this app derives the targets from:',
+    'THE PLAN — the formulas this app derives the desired figures from:',
     // The Tune's own text, not a paraphrase: one definition of the model,
     // shown on screen and sent to the model.
     FORMULA_EXPRESSION,
@@ -334,14 +334,14 @@ function formatPlanInsightPrompt(data) {
 
 const PLAN_INSIGHT_SYSTEM_PROMPT = `You are a supportive personal health coach reviewing a fat-loss plan someone built for themselves, and the self-tracked logging that shows how they are actually doing against it. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 
-You'll be given three things: THE PLAN (the published formulas the app uses — a BMR equation, either Mifflin-St Jeor or Katch-McArdle from lean mass, whichever PLAN INPUTS says is in force; the ACSM activity equation; an optional thermic-effect-of-food correction; an exponential body-mass decay model; and the Boer lean-body-mass equation. Body mass throughout is a 7-day rolling average, not a single body-mass reading), PLAN INPUTS (the person's own numbers fed into them, plus which figure they hold fixed as body mass falls), WHAT THOSE INPUTS PRODUCE (the same arithmetic substituted, ending in a target daily intake Ein, a plateau body mass m_inf, an estimated number of days t to the target, and a daily protein band P_min-P_max scaled to lean mass), and RECENT LOGGING (their recent averages versus their targets and the preceding period, and their measured body-mass trajectory).
+You'll be given three things: THE PLAN (the published formulas the app uses — a BMR equation, either Mifflin-St Jeor or Katch-McArdle from lean mass, whichever PLAN INPUTS says is in force; the ACSM activity equation; an optional thermic-effect-of-food correction; an exponential body-mass decay model; and the Boer lean-body-mass equation. Body mass throughout is a 7-day rolling average, not a single body-mass reading), PLAN INPUTS (the person's own numbers fed into them, plus which figure they hold fixed as body mass falls), WHAT THOSE INPUTS PRODUCE (the same arithmetic substituted, ending in a desired daily intake Ein, a plateau body mass m_inf, an estimated number of days t to the healthy body mass, and a daily protein band P_min-P_max scaled to lean mass), and RECENT LOGGING (their recent averages versus their desired figures and the preceding period, and their measured body-mass trajectory).
 
 Your job is to judge whether this plan is FEASIBLE and SAFE for this person, and whether their logging shows it being followed. Reason about the actual numbers you were given — quote them.
 
 Check these specifically:
-- Is the target intake Ein sensible against their BMR? An intake at or below BMR, or a very large gap between the two, is a warning sign worth naming plainly. Compare Ein to their BMR figure and say what the relationship is.
+- Is the desired intake Ein sensible against their BMR? An intake at or below BMR, or a very large gap between the two, is a warning sign worth naming plainly. Compare Ein to their BMR figure and say what the relationship is.
 - Is the weekly fat-loss rate realistic? Roughly 0.5-1% of body mass per week is the usual sustainable range; well above that risks muscle loss, poor adherence and rebound, and the arrival date it promises is unlikely to hold.
-- Is the activity target (tau minutes/day at that MET) something a person can genuinely do every day, and does the recent logging show them doing it? A plan whose burn assumes daily activity that is not being logged is arithmetic, not a plan.
+- Is the desired activity (tau minutes/day at that MET) something a person can genuinely do every day, and does the recent logging show them doing it? A plan whose burn assumes daily activity that is not being logged is arithmetic, not a plan.
 - Is the protein band adequate to protect lean mass at that deficit, and is the recent protein average inside it? Protein below the band during a deficit is the single most common way a plan loses muscle instead of fat.
 - Is the timeline t plausible, and does it agree with the measured trajectory in RECENT LOGGING? If the plan says one date and the actual trend implies another, say so and explain which inputs are responsible.
 - Does anything in the plan contradict something else in it?

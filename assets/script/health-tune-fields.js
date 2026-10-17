@@ -1,4 +1,4 @@
-// "Tune" in the Health Chart heading: shows the daily calorie target as a
+// "Tune" in the Health Chart heading: shows the desired daily intake as a
 // formula with its tunable inputs editable, recomputes as you type, and can write
 // the values back to the Settings tab.
 //
@@ -9,12 +9,16 @@
 // computed depends on the mode, and for TAU/DELTA_M on which one you last
 // typed into (see computedIdsForMode below).
 //
-// The point is that the target is the one number in the app derived from settings
+// The point is that the desired intake is the one number in the app derived from settings
 // you can't see the effect of until you save them — this makes the arithmetic and
 // the sensitivity visible first, in whichever direction you actually want it. It
-// computes with the SAME functions the charts use (calorieTargetDetail,
-// projectTargetDays, maintenanceAffineCoefficients, via a temporary settings
+// computes with the SAME functions the charts use (calorieDesiredDetail,
+// projectHealthyDays, maintenanceAffineCoefficients, via a temporary settings
 // overlay), so the preview can't drift from what saving would actually produce.
+
+// What a fresh user (no Settings, no readings) sees in Tune's profile boxes.
+const TUNE_PROFILE_DEFAULTS = { heightCm: 170, age: 35, neckCm: 38, waistCm: 91, hipCm: 99, bodyMassKg: 78.9, smoothBodyMassKg: 79 };
+const WEEKLY_FAT_LOSS_PCT_DEFAULT = 1;
 
 // Editable rows: the Settings key, its input, and the fallback shown when the key
 // isn't set. Order matches the formula's own term order. Every one of these can
@@ -26,20 +30,18 @@ const FORMULA_FIELDS = [
   // Walk's own catalogue MET (Edit Activity) — the Activity sheet row is the one place
   // that number is maintained. A typed value only drives the preview: its key is a
   // preview-only one (activityMet, health-math.js) that Save never writes.
-  { key: ACTIVITY_MET_PREVIEW_KEY, inputId: 'formula-met', value: () => exerciseMet('Walk') },
-  { key: 'ACTIVITY_TARGET_MIN', inputId: 'formula-activity-min', fallback: () => ACTIVITY_TARGET_MIN_DEFAULT },
-  // Defaults to the sleep target itself (Settings' SLEEP_TARGET_HOURS) — "assume you hit
+  { key: ACTIVITY_MET_PREVIEW_KEY, inputId: 'formula-met', value: () => activityMet() },
+  { key: 'ACTIVITY_DESIRED_MIN', inputId: 'formula-activity-min', fallback: () => ACTIVITY_DESIRED_MIN_DEFAULT },
+  // Defaults to the desired sleep itself (Settings' SLEEP_DESIRED_HOURS) — "assume you hit
   // it" — so an untouched box keeps producing the exact deficit this app always has. Type
   // fewer hours and D (below) grows to compensate for the lost fat-loss efficiency.
-  { key: 'PLAN_SLEEP_HOURS', inputId: 'formula-plan-sleep-hours', fallback: () => getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT) },
+  { key: 'PLAN_SLEEP_HOURS', inputId: 'formula-plan-sleep-hours', fallback: () => getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT) },
   // The literature's own 2-3%/hr range, defaulting to its midpoint — a rate, not a fixed
   // constant, so it's tunable here like every other coefficient on this sheet.
   { key: SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY, inputId: 'formula-sleep-deprivation-pct', fallback: () => SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT },
-  // No default: an unset WEEKLY_FAT_LOSS_KG is exactly what makes the target
-  // uncomputable and sends the charts to the flat CALORIE_TARGET_KCAL, so the
-  // Tune opens on 0 (maintenance) rather than inventing a deficit.
-  { key: 'WEEKLY_FAT_LOSS_KG', inputId: 'formula-weekly-loss', fallback: () => 0 },
-  { key: 'BODY_MASS_TARGET_KG', inputId: 'formula-target', fallback: () => BODY_MASS_TARGET_KG_DEFAULT },
+  // Unset: 1%/week of m̄, Tune's starting Δm%.
+  { key: 'WEEKLY_FAT_LOSS_KG', inputId: 'formula-weekly-loss', fallback: () => weeklyFatLossKgFromPct(WEEKLY_FAT_LOSS_PCT_DEFAULT, planBodyMassKg(physiqueAsHealthEntries()) ?? TUNE_PROFILE_DEFAULTS.smoothBodyMassKg) },
+  { key: 'BODY_MASS_HEALTHY_KG', inputId: 'formula-healthy', fallback: () => BODY_MASS_HEALTHY_KG_DEFAULT },
   // In this list, not the two below it: f divides the whole intake identity, so a blank
   // one leaves Eᵢₙ genuinely uncomputable rather than merely undecorated.
   { key: TEF_PERCENT_KEY, inputId: 'formula-tef-pct', fallback: () => TEF_PERCENT_DEFAULT },
@@ -47,17 +49,17 @@ const FORMULA_FIELDS = [
 
 // Metabolic adaptation's pair, kept out of FORMULA_FIELDS for the same reason the protein
 // band is: λ feeds only the two reported rows (BMR_a and the adapted plateau), so a blank
-// one should stop those from being shown, never stop the target from being computed.
+// one should stop those from being shown, never stop the desired intake from being computed.
 const ADAPT_FORMULA_FIELDS = [
   { key: ADAPT_PCT_PER_WEEK_KEY, inputId: 'formula-adapt-per-week', fallback: () => ADAPT_PCT_PER_WEEK_DEFAULT },
   { key: ADAPT_PCT_CAP_KEY, inputId: 'formula-adapt-cap', fallback: () => ADAPT_PCT_CAP_DEFAULT },
 ];
 
-// U.S. Navy body-fat girths. No default: blank just leaves BF% and LBM_navy blank.
+// U.S. Navy body-fat girths.
 const NAVY_FORMULA_FIELDS = [
-  { key: 'NECK_CM', inputId: 'formula-neck', fallback: () => '' },
-  { key: 'WAIST_CM', inputId: 'formula-waist', fallback: () => '' },
-  { key: 'HIP_CM', inputId: 'formula-hip', fallback: () => '' },
+  { key: 'NECK_CM', inputId: 'formula-neck', fallback: () => TUNE_PROFILE_DEFAULTS.neckCm },
+  { key: 'WAIST_CM', inputId: 'formula-waist', fallback: () => TUNE_PROFILE_DEFAULTS.waistCm },
+  { key: 'HIP_CM', inputId: 'formula-hip', fallback: () => TUNE_PROFILE_DEFAULTS.hipCm },
 ];
 
 // The BMR_cal window (n_p × L_p days ending yesterday).
@@ -69,7 +71,7 @@ const CALIBRATION_FORMULA_FIELDS = [
 // The lean-mass protein band: its own pair of fields, kept out of FORMULA_FIELDS on
 // purpose. Those are read unconditionally and a blank one invalidates the whole calorie
 // preview — but protein feeds nothing in the calorie identities, so an empty p_min
-// should only stop protein from being computed and saved, not the target.
+// should only stop protein from being computed and saved, not the desired intake.
 const PROTEIN_FORMULA_FIELDS = [
   { key: 'PROTEIN_G_PER_KG_LBM_MIN', inputId: 'formula-protein-per-kg-min', fallback: () => PROTEIN_G_PER_KG_LBM_MIN_DEFAULT },
   { key: 'PROTEIN_G_PER_KG_LBM_MAX', inputId: 'formula-protein-per-kg-max', fallback: () => PROTEIN_G_PER_KG_LBM_MAX_DEFAULT },
@@ -77,7 +79,7 @@ const PROTEIN_FORMULA_FIELDS = [
 
 // The fiber band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
 // PROTEIN_FORMULA_FIELDS: fiber feeds no calorie identity, so a blank one should only stop
-// fiber from being computed and saved, not the target.
+// fiber from being computed and saved, not the desired intake.
 const FIBER_FORMULA_FIELDS = [
   { key: 'FIBER_G_PER_1000_KCAL_MIN', inputId: 'formula-fiber-per-1000kcal-min', fallback: () => FIBER_G_PER_1000_KCAL_MIN_DEFAULT },
   { key: 'FIBER_G_PER_KG_MAX', inputId: 'formula-fiber-per-kg-max', fallback: () => FIBER_G_PER_KG_MAX_DEFAULT },
@@ -85,7 +87,7 @@ const FIBER_FORMULA_FIELDS = [
 
 // The fat band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
 // FIBER_FORMULA_FIELDS: fat feeds no calorie identity, so a blank one should only stop
-// fat from being computed and saved, not the target.
+// fat from being computed and saved, not the desired intake.
 const FAT_FORMULA_FIELDS = [
   { key: 'FAT_PCT_OF_KCAL_MIN', inputId: 'formula-fat-pct-min', fallback: () => FAT_PCT_OF_KCAL_MIN_DEFAULT },
   { key: 'FAT_PCT_OF_KCAL_MAX', inputId: 'formula-fat-pct-max', fallback: () => FAT_PCT_OF_KCAL_MAX_DEFAULT },
@@ -93,17 +95,17 @@ const FAT_FORMULA_FIELDS = [
 
 // The carb band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
 // FAT_FORMULA_FIELDS: carb feeds no calorie identity, so a blank one should only stop
-// carb from being computed and saved, not the target.
+// carb from being computed and saved, not the desired intake.
 const CARB_FORMULA_FIELDS = [
   { key: 'CARB_PCT_OF_KCAL_MIN', inputId: 'formula-carb-pct-min', fallback: () => CARB_PCT_OF_KCAL_MIN_DEFAULT },
   { key: 'CARB_PCT_OF_KCAL_MAX', inputId: 'formula-carb-pct-max', fallback: () => CARB_PCT_OF_KCAL_MAX_DEFAULT },
 ];
 
 // Which box each "Solve for" radio value fills in. Activity intensity (MET)
-// isn't offered as a solvable target — only τ, on the activity side, is.
+// isn't offered as a solvable unknown — only τ, on the activity side, is.
 const FORMULA_SOLVE_FIELD_ID = {
   EIN: 'formula-ein',
-  TARGET_MASS: 'formula-target',
+  HEALTHY_MASS: 'formula-healthy',
   TAU: 'formula-activity-min',
   DELTA_M: 'formula-weekly-loss',
 };
@@ -116,12 +118,12 @@ const FORMULA_SOLVE_FIELD_ID = {
 // formula-weekly-loss-pct is on the list for the opposite reason to formula-eta: it's
 // never typed in DELTA_M mode, where Δm is the answer, so the percentage is an answer
 // too and the box has to go readonly with it.
-// formula-target-bmi is on the list for the same reason formula-weekly-loss-pct is: in
-// TARGET_MASS the kilograms are the answer, so the BMI they come to is an answer too and the
+// formula-healthy-bmi is on the list for the same reason formula-weekly-loss-pct is: in
+// HEALTHY_MASS the kilograms are the answer, so the BMI they come to is an answer too and the
 // box has to go readonly with them.
-const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-days', 'formula-eta', 'formula-weekly-loss-pct', 'formula-target-bmi'];
+const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-days', 'formula-eta', 'formula-weekly-loss-pct', 'formula-healthy-bmi'];
 
-// Which fields are computed in EIN and TARGET_MASS — fixed, unlike TAU and
+// Which fields are computed in EIN and HEALTHY_MASS — fixed, unlike TAU and
 // DELTA_M below, which let you type either Eᵢₙ or t and compute whichever
 // you didn't touch.
 // FIXED_PCT is the one mode named for what it HOLDS rather than what it solves: Δm% is
@@ -130,7 +132,7 @@ const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-d
 // from a share of body mass and the journey is proportional rather than constant-intake.
 const FORMULA_COMPUTED_IDS = {
   EIN: ['formula-ein', 'formula-days', 'formula-eta'],
-  TARGET_MASS: ['formula-target', 'formula-target-bmi'],
+  HEALTHY_MASS: ['formula-healthy', 'formula-healthy-bmi'],
   FIXED_PCT: ['formula-weekly-loss', 'formula-ein', 'formula-days', 'formula-eta'],
 };
 
@@ -151,18 +153,18 @@ const dualKnownField = { TAU: 'ein', DELTA_M: 'ein' };
 // so it's typed there whatever you last touched.
 let weeklyLossKnownField = 'kg';   // 'kg' | 'pct'
 
-// The same idea again for the target body mass, which also has two boxes: kilograms and the
+// The same idea again for the healthy body mass, which also has two boxes: kilograms and the
 // BMI they come to at this height. One quantity in two units, so whichever you last typed
 // into is the known and the other is rewritten from it on every render.
 //
-// One mode overrules the memory: TARGET_MASS solves for m_g, so both boxes are answers and
+// One mode overrules the memory: HEALTHY_MASS solves for m_g, so both boxes are answers and
 // neither is typed. (There's no FIXED_PCT-style counterpart pinning the BMI — nothing in the
 // app holds a BMI still, so there's nothing to overrule it in the other direction.)
-let targetMassKnownField = 'kg';   // 'kg' | 'bmi'
+let healthyMassKnownField = 'kg';   // 'kg' | 'bmi'
 
-function targetBmiIsTyped() {
-  if (currentSolveFor() === 'TARGET_MASS') return false;
-  return targetMassKnownField === 'bmi';
+function healthyBmiIsTyped() {
+  if (currentSolveFor() === 'HEALTHY_MASS') return false;
+  return healthyMassKnownField === 'bmi';
 }
 
 function weeklyLossPctIsTyped() {
@@ -189,7 +191,7 @@ let lastExplicitBmrFormula = 'mifflin';
 const BMR_BASIS_RADIO_VALUES = ['bmr_cal', 'bmr_adp'];
 
 // Which BMR equation the preview is running. Both are first-class: this is read into the
-// settings overlay so calorieTargetDetail and activityTargetKcal see it, and passed
+// settings overlay so calorieDesiredDetail and activityDesiredKcal see it, and passed
 // explicitly to maintenanceAffineCoefficients, which is called outside the overlay. Never
 // 'bmr_cal' itself — see lastExplicitBmrFormula above.
 function currentBmrFormula() {
@@ -223,7 +225,7 @@ function weeklyLossPctInPlay(weeklyLossKg, bodyMassKg) {
 
 // The selected radio's own field is always computed, plus exactly one of
 // {Eᵢₙ, t} — never both, never neither — for whichever this mode's OTHER
-// field is (dualKnownField picks it for TAU/DELTA_M; EIN and TARGET_MASS have
+// field is (dualKnownField picks it for TAU/DELTA_M; EIN and HEALTHY_MASS have
 // no choice to make, see FORMULA_COMPUTED_IDS above).
 function computedIdsForMode(mode) {
   if (mode === 'TAU') {
@@ -356,7 +358,7 @@ function formulaFieldValue(field) {
 }
 
 // Runs fn with `currentSettings` overlaid by the Tune's edits, so the
-// preview goes through the real calorieTargetDetail/metKcal path instead of a
+// preview goes through the real calorieDesiredDetail/metKcal path instead of a
 // second copy of the arithmetic that could disagree with it.
 function withFormulaOverrides(overrides, fn) {
   const saved = currentSettings;
@@ -465,7 +467,7 @@ function readFormulaInputs() {
 
   // The Δm box is the preview's only source of truth for the rate, so the pin key is
   // blanked out of the overlay: a WEEKLY_FAT_LOSS_PCT already on the sheet would otherwise
-  // make calorieTargetDetail recompute the rate from the saved percentage and ignore what's
+  // make calorieDesiredDetail recompute the rate from the saved percentage and ignore what's
   // typed here. Not blanked in `overrides` — what Save writes to that key is the pin
   // fieldset's decision, not this function's.
   const preview = { ...overrides, [WEEKLY_FAT_LOSS_PCT_PIN_KEY]: '' };

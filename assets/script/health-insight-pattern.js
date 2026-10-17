@@ -81,12 +81,12 @@ function gatherFatLossPattern(fromIso, toIso, chunkDays) {
     periods,
     reason: result.ok ? null : result.reason,
     chunkDays,
-    bodyMassTargetKg: getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT),
+    bodyMassHealthyKg: getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT),
   };
 }
 
 function renderFatLossPatternPreview(data) {
-  renderInsightLines(document.getElementById('insight-pattern-profile'), formatProfileLines(gatherProfileSnapshot(), data.bodyMassTargetKg));
+  renderInsightLines(document.getElementById('insight-pattern-profile'), formatProfileLines(gatherProfileSnapshot(), data.bodyMassHealthyKg));
   const tbody = document.getElementById('insight-pattern-body');
   tbody.innerHTML = '';
 
@@ -111,7 +111,7 @@ function formatFatLossPatternPrompt(data) {
     .filter((r) => r.loggedDays)
     .map((r) => FAT_LOSS_PATTERN_COLUMNS.map(([, read]) => read(r)).join(' | '));
   return [
-    ...formatProfileLines(gatherProfileSnapshot(), data.bodyMassTargetKg),
+    ...formatProfileLines(gatherProfileSnapshot(), data.bodyMassHealthyKg),
     '',
     `PERIODS (${data.chunkDays}-day averages, oldest first):`,
     header,
@@ -142,7 +142,7 @@ Write a short plain-text report with exactly these sections, each starting on it
 
 Best periods: which period(s) had the most fat loss and which had the highest Offset, with their figures.
 Pattern: the habits that line up with more fat loss and with a higher Offset, quoting the numbers on both sides, and how confident each is.
-Do this: 2-4 concrete changes, each on its own numbered line ("1. ", "2. ", …), naming the target figure.
+Do this: 2-4 concrete changes, each on its own numbered line ("1. ", "2. ", …), naming the desired figure.
 Caveats: 1-2 lines on what the data can't tell yet and what to log to make it clearer.
 
 If an additional question from the user is included after the data, also answer it directly in a final section, "Answer: text".

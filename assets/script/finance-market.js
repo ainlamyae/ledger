@@ -21,7 +21,7 @@ let analysisListenersAttached = false;
 const MARKET_ANALYSIS_SYSTEM_PROMPT = `You explain a pre-computed, rule-based signal summary for one stock to a long-term investor (holding weeks to months, not day trading; low risk preferred).
 
 Rules:
-- Use only the numbers supplied. Never invent a price, target, level, earnings figure or headline. If a figure is n/a, say it needs more price history.
+- Use only the numbers supplied. Never invent a price, forecast, level, earnings figure or headline. If a figure is n/a, say it needs more price history.
 - The Verdict is computed by fixed rules: restate it exactly. You may explain why caution is warranted, but never change it.
 - Cite every headline you use with its date and source in brackets, e.g. [2026-10-08, Reuters]. Call headlines older than 30 days stale. If no headlines are supplied, say so.
 - Evidence: the trend filter (close vs 200-day / 10-month average) mainly reduces drawdowns; 12-1 month momentum and nearness to the 52-week high have the strongest research support among price signals, yet none is close to 95% reliable. The trailing stop is a risk-control habit, not a proven edge.
@@ -383,7 +383,7 @@ function drawAnalysisChart() {
 
   const series = [
     { label: `${symbol} (close)`, data: shown.map((b) => b.c), color: chartColor('--chart-blue'), order: 1 },
-    { label: 'SMA200 (200-day average close)', data: pick(sma200), color: targetMarkColor() },
+    { label: 'SMA200 (200-day average close)', data: pick(sma200), color: desiredMarkColor() },
     { label: '52-week high (highest high, 252 days)', data: pick(high52), color: chartColor('--chart-good'), dash: true },
     { label: `Trailing stop (highest close of 22 days − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14)`, data: pick(stops), color: chartColor('--chart-bad'), dash: true },
     { label: `${analysisBenchmark(symbol)} (market, rebased to the first close)`, data: rebased, color: chartColor('--chart-purple') },

@@ -11,7 +11,7 @@ let healthCarbChart = null;
 function renderHealthCarbChart(entries) {
   const ctx = document.getElementById('health-carb-chart');
 
-  const band = getCarbTargetBandG(entries);
+  const band = getCarbDesiredBandG(entries);
 
   const carbEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.carbG !== null && e.carbG !== undefined);
   // Shared with every other chart in the panel — see the Sleep chart's own copy of this
@@ -36,41 +36,45 @@ function renderHealthCarbChart(entries) {
     borderWidth: 0,
     pointRadius: 0,
     tension: 0,
-    isTargetLine: true,
+    isDesiredLine: true,
     order: 3,
     ...extra,
   });
 
-  // targetMarkColor() is near-black in light mode, near-white in dark — the same colour
-  // every other target cap on this panel uses, just as a continuous dashed line here
+  // Cyan, the colour of every other desired mark on this panel, as a dashed line here
   // instead of a per-column tick.
-  const targetLine = (value, label) => ({
+  const desiredLine = (value, label) => ({
     type: 'line',
     label,
     data: new Array(dates.length).fill(value),
-    borderColor: targetMarkColor(),
+    borderColor: chartColor('--chart-cyan'),
     borderWidth: 2,
     borderDash: [6, 4],
     pointRadius: 0,
     tension: 0,
-    isTargetLine: true,
+    isDesiredLine: true,
     order: 0,
   });
 
-  const targetDatasets = band.max > band.min
+  const desiredDatasets = band.max > band.min
     ? [
       bandFill(band.max, { fill: '+1', backgroundColor: chartColor('--chart-good', 0.1) }),
       bandFill(band.min),
-      targetLine(band.max, `${band.max} g upper target`),
-      targetLine(band.min, `${band.min} g target floor`),
+      desiredLine(band.max, `${band.max} g desired upper end`),
+      desiredLine(band.min, `${band.min} g desired floor`),
     ]
-    : [targetLine(band.min, `${band.min} g target`)];
+    : [desiredLine(band.min, `${band.min} g desired`)];
 
   const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
 
   const gTopCarb = Math.max(...values, band.max, band.min, 1);
   const gStepCarb = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopCarb / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
   const gMaxCarb = Math.ceil(gTopCarb / gStepCarb) * gStepCarb;
+
+  // Legend entries switched off (renderToggleLegend below); bars by their colour's name.
+  const hidden = legendHiddenNames('health-carb-legend');
+  const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Within desired'
+    : c === chartColor('--chart-bad') ? 'Over desired' : 'Under desired'));
 
   healthCarbChart = upsertChart(healthCarbChart, ctx, {
     data: {
@@ -79,12 +83,13 @@ function renderHealthCarbChart(entries) {
         {
           type: 'bar',
           label: 'Actual Intake',
-          data: values,
+          data: maskHiddenClasses(values, barClasses, hidden),
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg),
-        ...targetDatasets,
+        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        // The band's two fill edges go with the band entry, every other mark with the desired one.
+        ...desiredDatasets.map((ds) => ({ ...ds, hidden: hidden.has(ds.label.endsWith('band edge') ? 'Desired Carbohydrate band' : 'Desired Carbohydrate') })),
       ],
     },
     options: {
@@ -94,7 +99,7 @@ function renderHealthCarbChart(entries) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          filter: (item) => !item.dataset.isDesiredLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
@@ -132,5 +137,15 @@ function renderHealthCarbChart(entries) {
       },
     },
   });
+
+  // Swatches under the chart, named as in the hover.
+  renderToggleLegend('health-carb-legend', dates.length === 0 ? [] : [
+    { name: 'Within desired', color: chartColor('--chart-good') },
+    { name: 'Over desired', color: chartColor('--chart-bad') },
+    { name: 'Under desired', color: CARB_UNDER_BAND_COLOR },
+    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: 'Desired Carbohydrate', color: chartColor('--chart-cyan') },
+    ...(band.max > band.min ? [{ name: 'Desired Carbohydrate band', color: chartColor('--chart-good', 0.25) }] : []),
+  ], () => renderHealthCarbChart(entries));
 }
 

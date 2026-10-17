@@ -4,7 +4,7 @@ let healthProteinChart = null;
 function renderHealthProteinChart(entries) {
   const ctx = document.getElementById('health-protein-chart');
 
-  const band = getProteinTargetBandG(entries);
+  const band = getProteinDesiredBandG(entries);
 
   const proteinEntries = entries.filter((e) => e.category === 'Calories; Protein' && e.amount2 !== null);
   // Shared with every other chart in the panel — see the Sleep chart's own copy of this
@@ -28,7 +28,7 @@ function renderHealthProteinChart(entries) {
     borderWidth: 0,
     pointRadius: 0,
     tension: 0,
-    isTargetLine: true,
+    isDesiredLine: true,
     order: 3,
     ...extra,
   });
@@ -46,17 +46,18 @@ function renderHealthProteinChart(entries) {
   });
 
   // Zero-based and auto-topped, so the span is whatever is tallest — a bar or the band.
-  const capHalf = targetCapHalf(Math.max(band.max, ...values, 1));
-  const capFor = (value, label) => targetCapDataset(label, new Array(dates.length).fill(value), capHalf, { isTargetLine: true });
+  const capHalf = desiredCapHalf(Math.max(band.max, ...values, 1));
+  // Cyan, the desired mark's colour on the other Health charts, apart from the 7-Day Average.
+  const capFor = (value, label) => desiredCapDataset(label, new Array(dates.length).fill(value), capHalf, { isDesiredLine: true, backgroundColor: chartColor('--chart-cyan') });
 
-  const targetDatasets = band.max > band.min
+  const desiredDatasets = band.max > band.min
     ? [
       bandFill(band.max, { fill: '+1', backgroundColor: chartColor('--chart-good', 0.1) }),
       bandFill(band.min),
-      capFor(band.max, `${band.max} g upper target`),
-      capFor(band.min, `${band.min} g target floor`),
+      capFor(band.max, `${band.max} g desired upper end`),
+      capFor(band.min, `${band.min} g desired floor`),
     ]
-    : [capFor(band.min, `${band.min} g target`)];
+    : [capFor(band.min, `${band.min} g desired`)];
 
   // Logged days only, so the zero stand-ins don't pull the week under the band's floor.
   const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
@@ -65,6 +66,11 @@ function renderHealthProteinChart(entries) {
   const gStepProtein = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopProtein / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
   const gMaxProtein = Math.ceil(gTopProtein / gStepProtein) * gStepProtein;
 
+  // Legend entries switched off (renderToggleLegend below); bars by their colour's name.
+  const hidden = legendHiddenNames('health-protein-legend');
+  const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Within desired'
+    : c === PROTEIN_OVER_BAND_COLOR ? 'Over desired' : 'Under desired'));
+
   healthProteinChart = upsertChart(healthProteinChart, ctx, {
     data: {
       labels: dates,
@@ -72,12 +78,13 @@ function renderHealthProteinChart(entries) {
         {
           type: 'bar',
           label: 'Actual Intake',
-          data: values,
+          data: maskHiddenClasses(values, barClasses, hidden),
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg),
-        ...targetDatasets,
+        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        // The band's two fill edges go with the band entry, every other mark with the desired one.
+        ...desiredDatasets.map((ds) => ({ ...ds, hidden: hidden.has(ds.label.endsWith('band edge') ? 'Desired Protein band' : 'Desired Protein') })),
       ],
     },
     options: {
@@ -90,15 +97,15 @@ function renderHealthProteinChart(entries) {
         tooltip: {
           // The band's lines are the same constant every day, so as rows they'd repeat
           // identically on every hover. Stated once by afterBody instead.
-          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          filter: (item) => !item.dataset.isDesiredLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
               const text = `P (Actual Protein): ${item.parsed.y} g`;
               return privacyMode ? maskDigits(text) : text;
             },
-            // Both ends, flush left and last — the Actual/Target shape the other charts
-            // use. A zero-width band reads as one target, not an equal Min and Max.
+            // Both ends, flush left and last — the Actual/Desired shape the other charts
+            // use. A zero-width band reads as one desired figure, not an equal Min and Max.
             afterBody: (items) => {
               const lines = band.max > band.min
                 ? [`P_min (Desired Protein, lower end): ${band.min} g`, `P_max (Desired Protein, upper end): ${band.max} g`]
@@ -130,5 +137,15 @@ function renderHealthProteinChart(entries) {
       },
     },
   });
+
+  // Swatches under the chart, named as in the hover.
+  renderToggleLegend('health-protein-legend', dates.length === 0 ? [] : [
+    { name: 'Within desired', color: chartColor('--chart-good') },
+    { name: 'Over desired', color: PROTEIN_OVER_BAND_COLOR },
+    { name: 'Under desired', color: chartColor('--chart-bad') },
+    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: 'Desired Protein', color: chartColor('--chart-cyan') },
+    ...(band.max > band.min ? [{ name: 'Desired Protein band', color: chartColor('--chart-good', 0.25) }] : []),
+  ], () => renderHealthProteinChart(entries));
 }
 

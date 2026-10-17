@@ -327,7 +327,7 @@
                     <span class="body-mass-progress-meter-stat">
                         <span id="body-mass-progress-meter-remaining" class="body-mass-progress-meter-pct">—</span>
                         <span class="body-mass-progress-meter-stat-label">left</span>
-                        <span id="body-mass-progress-meter-target" class="body-mass-progress-meter-target"></span>
+                        <span id="body-mass-progress-meter-healthy" class="body-mass-progress-meter-healthy"></span>
                     </span>
                 </div>
 
@@ -343,7 +343,7 @@
                         <span class="body-mass-progress-meter-stat">
                             <span id="time-progress-meter-remaining" class="body-mass-progress-meter-pct">—</span>
                             <span class="body-mass-progress-meter-stat-label">ahead</span>
-                            <span id="time-progress-meter-eta" class="body-mass-progress-meter-target"></span>
+                            <span id="time-progress-meter-eta" class="body-mass-progress-meter-healthy"></span>
                         </span>
                     </div>
                 </div>
@@ -390,6 +390,7 @@
                 <div class="chart-box chart-box-flush">
                     <canvas id="health-body-mass-chart"></canvas>
                 </div>
+                <div class="donut-legend" id="health-body-mass-legend"></div>
             </div>
 
             <div class="body-mass-projection-wrap card">
@@ -399,6 +400,7 @@
                 <div class="chart-box chart-box-flush">
                     <canvas id="health-energy-balance-chart"></canvas>
                 </div>
+                <div class="donut-legend" id="health-energy-balance-legend"></div>
             </div>
 
             <div class="donut-grid health-metrics-grid">
@@ -407,6 +409,7 @@
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-calories-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="health-calories-legend"></div>
                 </div>
 
                 <div class="card">
@@ -414,6 +417,7 @@
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-protein-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="health-protein-legend"></div>
                 </div>
 
                 <div class="card">
@@ -421,6 +425,7 @@
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-fiber-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="health-fiber-legend"></div>
                 </div>
 
                 <div class="card">
@@ -428,6 +433,7 @@
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-fat-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="health-fat-legend"></div>
                 </div>
 
                 <div class="card">
@@ -435,6 +441,7 @@
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-carb-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="health-carb-legend"></div>
                 </div>
 
                 <div class="card">
@@ -442,6 +449,7 @@
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-activity-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="health-activity-legend"></div>
                 </div>
 
                 <div class="card">
@@ -449,6 +457,7 @@
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-sleep-chart"></canvas>
                     </div>
+                    <div class="donut-legend" id="health-sleep-legend"></div>
                 </div>
             </div>
 
@@ -560,7 +569,7 @@
                         <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
                         <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
                         <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
-                        <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
+                        <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your desired protein this ingredient should cover">%</th>
                         <!-- Uses column retired (health-nutrition.js keeps its code commented).
                         <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
                         -->
@@ -747,7 +756,7 @@
                     <fieldset class="formula-solve-for">
                         <legend>Solve for</legend>
                         <label><input type="radio" name="formula-solve-for" value="EIN"> Calories</label>
-                        <label><input type="radio" name="formula-solve-for" value="TARGET_MASS"> Healthy body mass</label>
+                        <label><input type="radio" name="formula-solve-for" value="HEALTHY_MASS"> Healthy body mass</label>
                         <label><input type="radio" name="formula-solve-for" value="TAU"> Activity</label>
                         <label><input type="radio" name="formula-solve-for" value="DELTA_M" checked> Weekly fat loss</label>
                         <!-- The odd one out, and named for what you hold rather than what it solves:
@@ -895,7 +904,7 @@
                         <label class="formula-row">
                             <span class="formula-sym">m_des</span>
                             <span class="formula-name">healthy body mass</span>
-                            <input type="text" id="formula-target" inputmode="decimal">
+                            <input type="text" id="formula-healthy" inputmode="decimal">
                             <span class="formula-unit">kg</span>
                         </label>
                         <!-- m_des's other face, and the same two-way pair Δm%/Δm are: one quantity in
@@ -906,7 +915,7 @@
                         <label class="formula-row" title="The BMI your healthy body mass comes to at your height — BMI = m_des / (h/100)². Type a healthy mass and this follows it; type a BMI here and the healthy mass follows instead. The healthy band is 18.5–24.9, and outside it the box goes red. In Solve for → Healthy body mass both are answers, so neither is typed.">
                             <span class="formula-sym">BMI_des</span>
                             <span class="formula-name">healthy body mass index</span>
-                            <input type="text" id="formula-target-bmi" inputmode="decimal">
+                            <input type="text" id="formula-healthy-bmi" inputmode="decimal">
                             <span class="formula-unit">kg/m²</span>
                         </label>
                         <label class="formula-row" title="Body-fat %, U.S. Navy (Hodgdon & Beckett): for men, 495 / (1.0324 − 0.19077×log10(C_waist − C_neck) + 0.15456×log10(h)) − 450; for women, 495 / (1.29579 − 0.35004×log10(C_waist + C_hip − C_neck) + 0.22100×log10(h)) − 450. Not editable: derived from C_neck, C_waist, C_hip, h and σ.">
@@ -1035,7 +1044,7 @@
                         <hr class="formula-divider">
                         <!-- The sleep length the PLAN assumes, not a log of what actually happened — see
                              the Sleep chart's own dot for the night-by-night reading. Defaults to the
-                             sleep target itself (0 kcal effect) so an untouched box changes nothing. -->
+                             desired sleep itself (0 kcal effect) so an untouched box changes nothing. -->
                         <label class="formula-row" title="How much sleep the plan assumes you're actually getting, compared against the desired sleep in Settings. Short of it and the Sleep Efficiency Factor η below 1 means the same weekly fat-loss rate needs a bigger real deficit — see the Deprivation Effect row right below. Defaults to the desired sleep itself, which is 0 effect.">
                             <span class="formula-sym">s</span>
                             <span class="formula-name">sleep length</span>
@@ -2586,17 +2595,17 @@
             <label>Key
                 <input type="text" id="setting-key" list="setting-key-options">
                 <datalist id="setting-key-options">
-                    <option>BODY_MASS_TARGET_KG</option>
-                    <option>CALORIE_TARGET_KCAL</option>
-                    <option>SLEEP_TARGET_HOURS</option>
-                    <option>FIBER_TARGET_G</option>
-                    <option>ACTIVITY_TARGET_MIN</option>
-                    <option>PROTEIN_TARGET_G</option>
-                    <option>PROTEIN_TARGET_G_PER_KG</option>
-                    <option>PROTEIN_TARGET_G_PER_KG_MIN</option>
-                    <option>PROTEIN_TARGET_G_PER_KG_MAX</option>
-                    <option>PROTEIN_TARGET_G_MIN</option>
-                    <option>PROTEIN_TARGET_G_MAX</option>
+                    <option>BODY_MASS_HEALTHY_KG</option>
+                    <option>CALORIE_DESIRED_KCAL</option>
+                    <option>SLEEP_DESIRED_HOURS</option>
+                    <option>FIBER_DESIRED_G</option>
+                    <option>ACTIVITY_DESIRED_MIN</option>
+                    <option>PROTEIN_DESIRED_G</option>
+                    <option>PROTEIN_DESIRED_G_PER_KG</option>
+                    <option>PROTEIN_DESIRED_G_PER_KG_MIN</option>
+                    <option>PROTEIN_DESIRED_G_PER_KG_MAX</option>
+                    <option>PROTEIN_DESIRED_G_MIN</option>
+                    <option>PROTEIN_DESIRED_G_MAX</option>
                     <option>PROTEIN_G_PER_KG_LBM_MIN</option>
                     <option>PROTEIN_G_PER_KG_LBM_MAX</option>
                     <option>HEIGHT_CM</option>
@@ -2625,7 +2634,7 @@
                     <option>PORTFOLIO_WRITE_MARKET_VALUE</option>
                 </datalist>
             </label>
-            <!-- Multi-line, since some values are long (a JSON target list, an API key). -->
+            <!-- Multi-line, since some values are long (a JSON list, an API key). -->
             <label>Value
                 <textarea id="setting-value" rows="4" spellcheck="false"></textarea>
             </label>
@@ -2818,19 +2827,19 @@
                         <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Unit</th></tr>
                         </thead>
                         <tbody>
-                        <tr title="This day's body-mass reading; Desire is the Body Mass target ± the glycogen swing"><td>m</td><td id="physique-mass-reading">—</td><td id="physique-mass-reading-desire">—</td><td>kg</td></tr>
-                        <tr title="The L_p-day rolling average body-mass; Desire is the Body Mass target under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td>kg</td></tr>
+                        <tr title="This day's body-mass reading; Desire is the healthy body mass ± the glycogen swing"><td>m</td><td id="physique-mass-reading">—</td><td id="physique-mass-reading-desire">—</td><td>kg</td></tr>
+                        <tr title="The L_p-day rolling average body-mass; Desire is the healthy body mass under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td>kg</td></tr>
                         <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta">—</td><td id="physique-mass-delta-desire">—</td><td>kg</td></tr>
-                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the Body Mass target"><td>BMI</td><td id="physique-mass-bmi">—</td><td id="physique-mass-bmi-desire">—</td><td>kg/m²</td></tr>
+                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the healthy body mass"><td>BMI</td><td id="physique-mass-bmi">—</td><td id="physique-mass-bmi-desire">—</td><td>kg/m²</td></tr>
                         <tr><td>BMR_mif</td><td id="physique-bmr-mif">—</td><td>—</td><td>kcal</td></tr>
                         <tr><td>BMR_kat</td><td id="physique-bmr-kat">—</td><td>—</td><td>kcal</td></tr>
                         <tr><td>BMR_cal</td><td id="physique-bmr-cal">—</td><td>—</td><td>kcal</td></tr>
                         <tr class="physique-derived-group-end"><td>BMR_adp</td><td id="physique-bmr-adp">—</td><td>—</td><td>kcal</td></tr>
-                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the calorie target (Settings/Tune)"><td>TEI</td><td id="physique-tei">—</td><td id="physique-tei-desire">—</td><td>kcal</td></tr>
-                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the calorie target"><td>TEF</td><td id="physique-tef-derived">—</td><td id="physique-tef-desire">—</td><td>kcal</td></tr>
-                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the Activity target (Settings)"><td>AEE</td><td id="physique-aee">—</td><td id="physique-aee-desire">—</td><td>kcal</td></tr>
+                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei">—</td><td id="physique-tei-desire">—</td><td>kcal</td></tr>
+                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived">—</td><td id="physique-tef-desire">—</td><td>kcal</td></tr>
+                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee">—</td><td id="physique-aee-desire">—</td><td>kcal</td></tr>
                         <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation">—</td><td id="physique-sleep-deprivation-desire">—</td><td>kcal</td></tr>
-                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own target deficit"><td>D</td><td id="physique-balance">—</td><td id="physique-balance-desire">—</td><td>kcal</td></tr>
+                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own desired deficit"><td>D</td><td id="physique-balance">—</td><td id="physique-balance-desire">—</td><td>kcal</td></tr>
                         <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime">—</td><td id="physique-mass-delta-prime-desire">—</td><td>g</td></tr>
                         </tbody>
                     </table>
@@ -2931,8 +2940,8 @@
                 <label>Category
                     <input type="text" id="activity-category" list="activity-category-options" placeholder="e.g. Strength, Cardio, NEAT">
                 </label>
-                <label>Weekly Target
-                    <input type="text" id="activity-weekly-target" placeholder="optional — sessions/week this Group should hit, e.g. 7 for NEAT — same on every row of the Group, leave blank to exclude from Activity Rotation">
+                <label>Weekly Desired
+                    <input type="text" id="activity-weekly-desired" placeholder="optional — sessions/week this Group should hit, e.g. 7 for NEAT — same on every row of the Group, leave blank to exclude from Activity Rotation">
                 </label>
                 <label>Group
                     <input type="text" id="activity-group" list="activity-group-options" placeholder="e.g. Push, Pull, Legs">
@@ -3288,7 +3297,7 @@
 <script src="assets/script/ui-helpers.js"></script>
 <script src="assets/script/ai.js"></script>
 <script src="assets/script/health-nutrition-usda.js"></script>
-<script src="assets/script/health-nutrient-targets.js"></script>
+<script src="assets/script/health-nutrient-desired.js"></script>
 <script src="assets/script/health-nutrition.js"></script>
 <script src="assets/script/health-physique-estimator.js"></script>
 <script src="assets/script/ledger-widgets.js"></script>

@@ -175,39 +175,39 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     document.getElementById(`physique-bmr-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
-  // Desire — the plan-level target each figure is read against, the same ones the
+  // Desire — the plan-level figure each one is read against, the same ones the
   // Status card's own rows pair with (health-chart.js setStatusEnergyTile): the
-  // Body Mass target, its BMI, the weekly fat-loss rate as a daily mass/calorie
-  // figure, the calorie target, and the Activity/Deprivation/Balance targets that
+  // healthy body mass, its BMI, the weekly fat-loss rate as a daily mass/calorie
+  // figure, the desired calories, and the desired Activity/Deprivation/Balance that
   // follow from it. A plan figure, not a per-day one — it doesn't move as
-  // Calories In/Out are typed, only Body Mass (the Activity target's own input).
+  // Calories In/Out are typed, only Body Mass (the desired Activity's own input).
   const setDesire = (id, value) => {
-    const target = document.getElementById(id);
+    const cell = document.getElementById(id);
     const text = value !== null && value !== undefined ? `${value}` : '—';
-    target.textContent = privacyMode ? maskDigits(text) : text;
+    cell.textContent = privacyMode ? maskDigits(text) : text;
   };
   const heightCm = getSetting('HEIGHT_CM', null);
-  const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const healthyMassKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
   const healthEntries = physiqueAsHealthEntries();
   const planMassKg = planBodyMassKg(healthEntries);
-  const calTarget = getCalorieTarget(healthEntries);
-  const digTarget = Math.round(calTarget.kcal * (1 - tefDivisor()));
-  const actTargetKcal = day.bodyMass !== null ? Math.round(getActivityTargetKcal(day.bodyMass)) : null;
+  const calDesired = getCalorieDesired(healthEntries);
+  const digDesired = Math.round(calDesired.kcal * (1 - tefDivisor()));
+  const actDesiredKcal = day.bodyMass !== null ? Math.round(getActivityDesiredKcal(day.bodyMass)) : null;
   const weeklyFatLossKg = weeklyFatLossKgAt(planMassKg);
   const desiredKgPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) / 1000 : null;
   const desiredGPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
 
-  // The target ± glycogen swing, as the Progress meter shows it.
+  // The healthy mass ± glycogen swing, as the Progress meter shows it.
   const swingKg = glycogenSwingKg(day.bodyMass, heightCm, getSettingString('SEX', null));
   setDesire('physique-mass-reading-desire', swingKg === null ? healthyMassKg : `${healthyMassKg} ± ${Math.round(swingKg * 10) / 10}`);
   setDesire('physique-mass-mean-desire', healthyMassKg);
   setDesire('physique-mass-delta-desire', desiredKgPerDay);
   setDesire('physique-mass-bmi-desire', heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null);
-  setDesire('physique-tei-desire', calTarget.kcal);
-  setDesire('physique-tef-desire', -digTarget);
-  setDesire('physique-aee-desire', actTargetKcal !== null ? -actTargetKcal : null);
+  setDesire('physique-tei-desire', calDesired.kcal);
+  setDesire('physique-tef-desire', -digDesired);
+  setDesire('physique-aee-desire', actDesiredKcal !== null ? -actDesiredKcal : null);
   setDesire('physique-sleep-deprivation-desire', 0);
-  setDesire('physique-balance-desire', targetBalanceKcal(planMassKg));
+  setDesire('physique-balance-desire', desiredBalanceKcal(planMassKg));
   setDesire('physique-mass-delta-prime-desire', desiredGPerDay);
 }
 
@@ -653,7 +653,7 @@ function physiqueEnergyBalance(day, sleepHours, bmrFigures, { sleepOptional = fa
       day.caloriesOut ?? 0,
       tef,
       sleepHours,
-      getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT),
+      getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT),
     ),
   };
 }
@@ -814,7 +814,7 @@ async function convertPhysiqueBreakdownAmountsToGrams() {
 // Settings that change a stored BMR or Deprivation.
 const PHYSIQUE_BMR_SETTING_KEYS = ['HEIGHT_CM', 'BIRTH_DATE', 'SEX', BMR_FORMULA_KEY, BMR_BASIS_KEY,
   ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_CAP_KEY, BMR_CALIBRATION_PERIOD_COUNT_KEY,
-  BMR_CALIBRATION_PERIOD_DAYS_KEY, 'SLEEP_TARGET_HOURS', TEF_PERCENT_KEY];
+  BMR_CALIBRATION_PERIOD_DAYS_KEY, 'SLEEP_DESIRED_HOURS', TEF_PERCENT_KEY];
 
 // Rewrites every day's BMR and Deprivation, in one request, when a saved setting
 // they depend on changed (saveSettingValues / submitSettingForm, other-settings.js).
@@ -988,14 +988,14 @@ function todaysPhysiqueDay() {
   return allPhysiqueEntries.find((p) => p.date === today) ?? null;
 }
 
-// Confetti when today's saved body mass is closer to the target than the last earlier reading.
+// Confetti when today's saved body mass is closer to the healthy mass than the last earlier reading.
 function celebrateBodyMassProgress(date, bodyMass) {
   const today = isoFromDate(new Date());
   if (date !== today || !bodyMass) return;
   const previous = physiqueDatedAscending().filter((p) => p.date < today && p.bodyMass !== null).at(-1)?.bodyMass;
   if (previous == null) return;
-  const target = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
-  if (Math.abs(bodyMass - target) < Math.abs(previous - target)) celebrateWithConfetti();
+  const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
+  if (Math.abs(bodyMass - healthyKg) < Math.abs(previous - healthyKg)) celebrateWithConfetti();
 }
 
 // Which days came across incomplete. console only — a chart gap is otherwise

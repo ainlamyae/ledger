@@ -141,7 +141,7 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
     // all depend on the body doing the lifting, so the coach shouldn't be
     // reasoning about this log without knowing whose it is.
     profile: gatherProfileSnapshot(),
-    bodyMassTargetKg: getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT),
+    bodyMassHealthyKg: getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT),
     activityDaysLogged: current.activityDaysLogged,
     prevActivityDaysLogged: previous.activityDaysLogged,
     avgActivityMins: current.avgActivityMins,
@@ -223,7 +223,7 @@ function formatMuscleGroupLines(rows) {
 
 function formatActivityInsightPrompt(m) {
   const lines = [
-    ...formatProfileLines(m.profile, m.bodyMassTargetKg),
+    ...formatProfileLines(m.profile, m.bodyMassHealthyKg),
     '',
     `Total resistance-training reps, all muscle groups: ${m.totalRepsInRange} — previous period: ${m.prevTotalRepsInRange}`,
     ...formatActivityBreakdownLines(m),
@@ -256,7 +256,7 @@ Write a short plain-text report with exactly these four sections, each starting 
 Overview: one or two sentences on the overall picture — consistency and volume trend vs. the previous period.
 Going well: what's on track — muscle groups being trained regularly, volume holding or increasing.
 Needs attention: which muscle group(s) are most neglected (longest gap or lowest volume), any volume decline vs. the previous period, and any group resting on too few exercises.
-Suggestions: 2-4 concrete, specific next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — prioritize the most neglected muscle group(s) for the next session, name actual exercises from their own breakdown, and give any target as total reps rather than sets by reps or as minutes.
+Suggestions: 2-4 concrete, specific next steps, each on its own line (e.g. a line starting "1. ", then a new line starting "2. ", and so on) — prioritize the most neglected muscle group(s) for the next session, name actual exercises from their own breakdown, and give any desired amount as total reps rather than sets by reps or as minutes.
 
 If an additional question from the user is included after the data, also answer it directly in a fifth section, "Answer: text".
 

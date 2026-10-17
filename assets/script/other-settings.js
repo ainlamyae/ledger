@@ -103,7 +103,7 @@ function initSettingTabs() {
 }
 
 // A setting's address segment: its key in lowercase, underscores kept
-// (BODY_MASS_TARGET_KG -> body_mass_target_kg).
+// (BODY_MASS_HEALTHY_KG -> body_mass_healthy_kg).
 function settingRouteSlug(setting) {
   return setting.key.trim().toLowerCase();
 }
@@ -200,7 +200,7 @@ function renderSettingsTable({ bodyId, includes }) {
 
     // Full-masked (not just digits) since values include API keys and city
     // names — letters carry just as much sensitive content as digits do
-    // here, unlike a plain number. The Key column (e.g. BODY_MASS_TARGET_KG)
+    // here, unlike a plain number. The Key column (e.g. BODY_MASS_HEALTHY_KG)
     // isn't sensitive on its own and stays visible.
     // No hover-reveal of a masked value — that would defeat the privacy toggle
     // (or, for a secret, the reveal click).

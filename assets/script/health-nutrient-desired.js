@@ -1,16 +1,16 @@
-// Ideal/day targets for the Health Insight Micronutrients table
+// Ideal/day desired amounts for the Health Insight Micronutrients table
 // (health-insight-micronutrient.js). Defaults are the FDA's 2016 Daily Values (21
 // CFR 101.9(c)), plus ALA's NASEM Adequate Intake since omega-3 isn't on the
 // FDA label at all. Not personalized — sex/age/body mass aren't factored in.
 // Only nutrients with an official reference are listed; the rest of what FDC
 // reports (fatty-acid isomers, amino acids, individual sugars...) has none.
 //
-// Override via a MICRONUTRIENT_DAILY_TARGETS_JSON Setting, same shape as
+// Override via a MICRONUTRIENT_DAILY_DESIRED_JSON Setting, same shape as
 // below — only the names it sets are replaced. Keyed by exact FDC nutrient name.
 //
 // `kind`: 'floor' = get enough of (gap = too low), 'ceiling' = limit (gap =
 // too high, e.g. sodium/saturated fat), 'reference' = shown, not flagged.
-const NUTRIENT_DAILY_TARGETS_DEFAULT = {
+const NUTRIENT_DAILY_DESIRED_DEFAULT = {
   'Total lipid (fat)': { unit: 'g', amount: 78, kind: 'reference' },
   'Fatty acids, total saturated': { unit: 'g', amount: 20, kind: 'ceiling' },
   'Cholesterol': { unit: 'mg', amount: 300, kind: 'ceiling' },
@@ -45,7 +45,7 @@ const NUTRIENT_DAILY_TARGETS_DEFAULT = {
   'Chromium, Cr': { unit: 'µg', amount: 35, kind: 'floor' },
   'Molybdenum, Mo': { unit: 'µg', amount: 45, kind: 'floor' },
   'Choline, total': { unit: 'mg', amount: 550, kind: 'floor' },
-  // EPA/DHA get no target: the only cited figure (DGA, ~250mg/day) is for the
+  // EPA/DHA get no desired amount: the only cited figure (DGA, ~250mg/day) is for the
   // two combined, and FDC reports them as separate rows.
   'PUFA 18:3 n-3 c,c,c (ALA)': { unit: 'g', amount: 1.6, kind: 'floor' },
   // NASEM 2004 Adequate Intake, total water from food AND beverages — men's
@@ -58,7 +58,7 @@ const NUTRIENT_DAILY_TARGETS_DEFAULT = {
   // FDA consumer guidance (not a formal DRI): up to ~400mg/day is not
   // associated with adverse effects in most healthy adults.
   'Caffeine': { unit: 'mg', amount: 400, kind: 'ceiling' },
-  // No alcohol target: even a "moderate" ceiling reads as an allowance, and zero has
+  // No desired alcohol: even a "moderate" ceiling reads as an allowance, and zero has
   // no downside.
   // NASEM 2005 indispensable-amino-acid RDA (mg/kg body mass/day),
   // multiplied by a 70kg reference adult — an actual computation, not a
@@ -78,41 +78,41 @@ const NUTRIENT_DAILY_TARGETS_DEFAULT = {
   'Valine': { unit: 'g', amount: 1.68, kind: 'floor' },
 };
 
-function nutrientDailyTargets() {
-  const raw = getSettingString('MICRONUTRIENT_DAILY_TARGETS_JSON', null);
-  if (!raw) return NUTRIENT_DAILY_TARGETS_DEFAULT;
+function nutrientDailyDesired() {
+  const raw = getSettingString('MICRONUTRIENT_DAILY_DESIRED_JSON', null);
+  if (!raw) return NUTRIENT_DAILY_DESIRED_DEFAULT;
   try {
     // The setting is the whole list, not overrides on top of the defaults: a nutrient
-    // deleted from it has no target. The defaults above only stand in until the key
-    // exists (and seed it, patchMicronutrientDailyTargetAmounts below).
-    const targets = JSON.parse(raw);
-    Object.values(targets).forEach((t) => { if (t && t.unit) t.unit = standardUnit(t.unit); });
-    return targets;
+    // deleted from it has no desired amount. The defaults above only stand in until the key
+    // exists (and seed it, patchMicronutrientDailyDesiredAmounts below).
+    const desired = JSON.parse(raw);
+    Object.values(desired).forEach((t) => { if (t && t.unit) t.unit = standardUnit(t.unit); });
+    return desired;
   } catch {
-    return NUTRIENT_DAILY_TARGETS_DEFAULT;
+    return NUTRIENT_DAILY_DESIRED_DEFAULT;
   }
 }
 
-// Patches one or more nutrients' `amount` inside the MICRONUTRIENT_DAILY_TARGETS_JSON
+// Patches one or more nutrients' `amount` inside the MICRONUTRIENT_DAILY_DESIRED_JSON
 // override, preserving each one's unit/kind (and every other nutrient) untouched — the
 // Tune's Save calls this so this table's own Protein/Fiber rows track the
 // band it just computed instead of sitting on the shipped FDA Daily Value forever. An
 // entry gains an override even if the setting was never customized before, since the
 // starting point is the shipped default for whichever name isn't already overridden.
-function patchMicronutrientDailyTargetAmounts(patch) {
-  const raw = getSettingString('MICRONUTRIENT_DAILY_TARGETS_JSON', null);
-  // The setting is the whole list (nutrientDailyTargets), so a first write starts
+function patchMicronutrientDailyDesiredAmounts(patch) {
+  const raw = getSettingString('MICRONUTRIENT_DAILY_DESIRED_JSON', null);
+  // The setting is the whole list (nutrientDailyDesired), so a first write starts
   // from every default rather than just the patched names.
-  let overrides = { ...NUTRIENT_DAILY_TARGETS_DEFAULT };
+  let overrides = { ...NUTRIENT_DAILY_DESIRED_DEFAULT };
   if (raw) {
     try {
       overrides = JSON.parse(raw);
     } catch {
-      overrides = { ...NUTRIENT_DAILY_TARGETS_DEFAULT };
+      overrides = { ...NUTRIENT_DAILY_DESIRED_DEFAULT };
     }
   }
   Object.entries(patch).forEach(([name, amount]) => {
-    const base = overrides[name] || NUTRIENT_DAILY_TARGETS_DEFAULT[name] || { unit: 'g', kind: 'floor' };
+    const base = overrides[name] || NUTRIENT_DAILY_DESIRED_DEFAULT[name] || { unit: 'g', kind: 'floor' };
     overrides[name] = { ...base, amount };
   });
   return JSON.stringify(overrides);
@@ -123,12 +123,12 @@ const NUTRIENT_GAP_MILD_FLOOR_RATIO = 0.8;
 
 // Only flags a genuine shortfall on a get-enough-of nutrient — running OVER an
 // ideal (a ceiling nutrient like sodium/alcohol, or a floor nutrient eaten well
-// past its target) is never colored, even though it may be worth noting in the
+// past its desired amount) is never colored, even though it may be worth noting in the
 // AI report; the row coloring is reserved for "a lot less than the ideal/day".
-function nutrientGapSeverity(kind, avgPerDay, targetAmount) {
+function nutrientGapSeverity(kind, avgPerDay, desiredAmount) {
   if (kind !== 'floor') return null;
-  if (!targetAmount || avgPerDay === null) return null;
-  const ratio = avgPerDay / targetAmount;
+  if (!desiredAmount || avgPerDay === null) return null;
+  const ratio = avgPerDay / desiredAmount;
 
   if (ratio < NUTRIENT_GAP_SEVERE_FLOOR_RATIO) return 'severe';
   if (ratio < NUTRIENT_GAP_MILD_FLOOR_RATIO) return 'mild';

@@ -97,17 +97,17 @@ function renderHealthActivityChart(entries) {
 
   const hasData = activityDatasets.some((ds) => ds.data.some((v) => v !== 0));
 
-  // Scored against what that day's own body mass would burn at ACTIVITY_TARGET_MIN — or
+  // Scored against what that day's own body mass would burn at ACTIVITY_DESIRED_MIN — or
   // the pinned calorie burn, if that's what's pinned instead — via the same
-  // getActivityTargetKcal the activity tile uses, so the two can't disagree. Met is
-  // green, short by up to ACTIVITY_NEAR_TARGET_FRACTION gray, further short red. Without
-  // a body mass there's no target, so the dot stays neutral violet.
+  // getActivityDesiredKcal the activity tile uses, so the two can't disagree. Met is
+  // green, short by up to ACTIVITY_NEAR_DESIRED_FRACTION gray, further short red. Without
+  // a body mass there's no desired burn, so the dot stays neutral violet.
   const dotColor = (date, kcal) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
     if (kcal === null || bodyMassKg === null) return chartColor('--chart-purple');
-    const target = getActivityTargetKcal(bodyMassKg);
-    if (kcal >= target) return chartColor('--chart-good');
-    return target - kcal <= target * ACTIVITY_NEAR_TARGET_FRACTION ? chartColor('--chart-neutral') : chartColor('--chart-bad');
+    const desiredKcal = getActivityDesiredKcal(bodyMassKg);
+    if (kcal >= desiredKcal) return chartColor('--chart-good');
+    return desiredKcal - kcal <= desiredKcal * ACTIVITY_NEAR_DESIRED_FRACTION ? chartColor('--chart-neutral') : chartColor('--chart-bad');
   };
 
   // Dots, not a connected line: each day's burn is independent, and a line would bridge
@@ -127,39 +127,40 @@ function renderHealthActivityChart(entries) {
     order: 0,
   };
 
-  // TARGET BURN on the kcal axis, not the flat minutes target it used to be — that sat
+  // DESIRED BURN on the kcal axis, not the flat desired minutes it used to be — that sat
   // on the other axis from the dots it appeared to judge, so a day could clear it on a
   // walk while burning less than a day that lifted. It moves day to day when time is
-  // what's pinned, since activityTargetKcal scales with body mass; flat when calorie
+  // what's pinned, since activityDesiredKcal scales with body mass; flat when calorie
   // burn is pinned instead. No body mass, no figure, so it breaks there rather than
   // inventing one.
-  const targetBurnKcal = dates.map((date) => {
+  const desiredBurnKcal = dates.map((date) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
-    return bodyMassKg === null ? null : getActivityTargetKcal(bodyMassKg);
+    return bodyMassKg === null ? null : getActivityDesiredKcal(bodyMassKg);
   });
 
   // A cap per column, the same mark Caloric Intake and Calorie Balance use. It was a
-  // dashed line while the target was flat; now that it moves with body mass, a line
+  // dashed line while the desired burn was flat; now that it moves with body mass, a line
   // spanning the window would read as one shared limit however it's dashed.
   const burnMagnitudes = [
     ...caloriesData.filter((v) => v !== null),
-    ...targetBurnKcal.filter((v) => v !== null),
+    ...desiredBurnKcal.filter((v) => v !== null),
   ];
   const capHalf = (burnMagnitudes.length ? Math.max(...burnMagnitudes) : 1) * 0.006;
-  const targetLineDataset = {
+  const desiredLineDataset = {
     type: 'bar',
-    label: 'Target Burn',
-    data: targetBurnKcal.map((v) => (v === null ? null : [-v - capHalf, -v + capHalf])),
+    label: 'Desired Burn',
+    data: desiredBurnKcal.map((v) => (v === null ? null : [-v - capHalf, -v + capHalf])),
     yAxisID: 'y1',
-    backgroundColor: targetMarkColor(),
+    // Cyan, the desired mark's colour on the other Health charts.
+    backgroundColor: chartColor('--chart-cyan'),
     grouped: false,
     // Lowest order paints last: bars (2), the weekly average and this cap (both 1, the
     // cap second so it wins the tie), then the dots (0) above everything.
     order: 1,
-    isTargetLine: true,
+    isDesiredLine: true,
   };
 
-  // On the kcal axis, not the minutes one — Target Burn lives there, and it's what the
+  // On the kcal axis, not the minutes one — Desired Burn lives there, and it's what the
   // week is compared against. Negated like the dots it's fit to.
   const weeklyBurnAvg = emaSeries(caloriesData);
   const weeklyBurnDataset = trendLineDataset(
@@ -168,10 +169,20 @@ function renderHealthActivityChart(entries) {
     { yAxisID: 'y1' },
   );
 
+  // Legend entries switched off (renderToggleLegend below): activities and lines by
+  // name, burn dots by their colour's name.
+  const hidden = legendHiddenNames('health-activity-legend');
+  activityDatasets.forEach((ds) => { ds.hidden = hidden.has(ds.label); });
+  weeklyBurnDataset.hidden = hidden.has('7-Day Average Burn');
+  desiredLineDataset.hidden = hidden.has('Desired Burn');
+  const dotClasses = caloriesDataset.pointBackgroundColor.map((c) => (c === chartColor('--chart-good') ? 'Desired met'
+    : c === chartColor('--chart-neutral') ? 'Near desired' : c === chartColor('--chart-bad') ? 'Missed desired' : null));
+  caloriesDataset.data = maskHiddenClasses(caloriesDataset.data, dotClasses, hidden);
+
   healthActivityChart = upsertChart(healthActivityChart, ctx, {
     data: {
       labels: dates,
-      datasets: [...activityDatasets, weeklyBurnDataset, targetLineDataset, caloriesDataset],
+      datasets: [...activityDatasets, weeklyBurnDataset, desiredLineDataset, caloriesDataset],
     },
     options: {
       responsive: true,
@@ -188,9 +199,9 @@ function renderHealthActivityChart(entries) {
         },
         tooltip: {
           // Empty slots and the cap, whose `[from, to]` pair goes to afterBody instead.
-          filter: (item) => item.raw !== null && !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          filter: (item) => item.raw !== null && !item.dataset.isDesiredLine && !item.dataset.isWeeklyAverage,
           // Dataset order. Without it Chart.js sorts by `order`, which controls DRAW
-          // order, and put the dots above the bars — away from the Target Burn figure
+          // order, and put the dots above the bars — away from the Desired Burn figure
           // they should be read against.
           itemSort: (a, b) => a.datasetIndex - b.datasetIndex,
           callbacks: {
@@ -211,12 +222,12 @@ function renderHealthActivityChart(entries) {
               const text = `${item.dataset.label}: ${isKcal ? v : Math.abs(v)} ${isKcal ? 'kcal' : 'min'}`;
               return privacyMode ? maskDigits(text) : text;
             },
-            // Flush left and last, the placement Caloric Intake gives its own target.
+            // Flush left and last, the placement Caloric Intake gives its own desired intake.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
               const lines = [];
-              if (targetBurnKcal[i] !== null) lines.push(`AEE (Desired Activity Energy Expenditure): ${-Math.round(targetBurnKcal[i])} kcal`);
+              if (desiredBurnKcal[i] !== null) lines.push(`AEE (Desired Activity Energy Expenditure): ${-Math.round(desiredBurnKcal[i])} kcal`);
               if (weeklyBurnAvg[i] !== null) lines.push(`7-Day Average Burn: ${-Math.round(weeklyBurnAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -226,7 +237,7 @@ function renderHealthActivityChart(entries) {
       scales: {
         x: { ...wellnessCategoryXScale(dates), stacked: true },
         // kcal left with the gridlines, minutes right with none: the comparison this
-        // chart exists for — Actual against Target Burn — happens on the kcal scale,
+        // chart exists for — Actual against Desired Burn — happens on the kcal scale,
         // so the lines have to be spaced in kcal. Only the sides move; the axis ids are
         // untouched. Both run from 0 downward, since everything is negated, but they
         // label differently: calories keep the minus because that energy left the body,
@@ -248,5 +259,15 @@ function renderHealthActivityChart(entries) {
       },
     },
   });
+
+  // Swatches under the chart: each activity's bar colour, then the burn dots and lines.
+  renderToggleLegend('health-activity-legend', !hasData ? [] : [
+    ...descriptions.map((d, i) => ({ name: shortActivityLabel(d), color: descriptionColors[i] })),
+    { name: 'Desired met', color: chartColor('--chart-good') },
+    { name: 'Near desired', color: chartColor('--chart-neutral') },
+    { name: 'Missed desired', color: chartColor('--chart-bad') },
+    { name: '7-Day Average Burn', color: desiredMarkColor() },
+    { name: 'Desired Burn', color: chartColor('--chart-cyan') },
+  ], () => renderHealthActivityChart(entries));
 }
 

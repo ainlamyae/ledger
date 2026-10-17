@@ -239,7 +239,7 @@ async function refreshNutrition(forceRefresh = false) {
       // Amount–Carbohydrates locked (nutritionLockedNames).
       verified: String(cell(row, 'legacyVerified') || '').trim() === '1',
       // Blank means "not tracked" by Protein Source Rotation; a number is the % of
-      // your protein target this ingredient should cover.
+      // your desired protein this ingredient should cover.
       proteinPercent: numberOrNull(cell(row, 'proteinPercent')),
       // JSON: the six top values, then the micronutrients, each with its lock tick.
       micronutrients: (cell(row, 'micronutrients') || '').trim(),
@@ -576,7 +576,7 @@ function renderNutritionList() {
       nutritionMacroCell(macros.fat, macros.typed.fat),
       nutritionMacroCell(macros.carb, macros.typed.carb),
       nutritionMacroCell(macros.tef, macros.typed.tef, 'Typed by you.', 'Estimated: Protein (typed) plus Carb/Fat (typed or from 🧬 Micronutrients) at the Atwater/TEF-share rates set in Settings.'),
-      makeCell(n.proteinPercent !== null ? `${n.proteinPercent}%` : '—', 'Tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover'),
+      makeCell(n.proteinPercent !== null ? `${n.proteinPercent}%` : '—', 'Tracked by the Protein Source Rotation chart when set — the % of your desired protein this ingredient should cover'),
       // usesCell(n),
     );
 
@@ -1000,11 +1000,11 @@ function estimateNutritionFormTef() {
 // --- Scan: a photographed Nutrition Facts label fills the form ----------------
 
 // The names a label line may map to: the top rows, then the USDA panel names the
-// micronutrient rows use (health-nutrient-targets.js), plus label lines with no target.
+// micronutrient rows use (health-nutrient-desired.js), plus label lines with no desired figure.
 function nutritionLabelNames() {
   const top = NUTRITION_TOP_ROWS.filter((r) => r.panel).map((r) => ({ name: r.name, unit: r.unit }));
   const skip = new Set([...NUTRITION_TOP_PANEL_KEYS, 'Protein', 'Water']);
-  const micros = Object.entries(NUTRIENT_DAILY_TARGETS_DEFAULT)
+  const micros = Object.entries(NUTRIENT_DAILY_DESIRED_DEFAULT)
     .filter(([name]) => !skip.has(name))
     .map(([name, t]) => ({ name, unit: t.unit }));
   const extras = ['Fatty acids, total trans', 'Fatty acids, total monounsaturated', 'Fatty acids, total polyunsaturated',
@@ -1039,7 +1039,7 @@ function labelLineAmount(line, unit) {
     return amount * MASS_UNIT_GRAMS[from] / MASS_UNIT_GRAMS[unit];
   }
   const percent = Number.parseFloat(line.percentDV);
-  const dv = CANADA_DAILY_VALUES[line.name] || NUTRIENT_DAILY_TARGETS_DEFAULT[line.name];
+  const dv = CANADA_DAILY_VALUES[line.name] || NUTRIENT_DAILY_DESIRED_DEFAULT[line.name];
   if (!Number.isFinite(percent) || !dv || !MASS_UNIT_GRAMS[dv.unit]) return null;
   return (percent / 100) * dv.amount * MASS_UNIT_GRAMS[dv.unit] / MASS_UNIT_GRAMS[unit];
 }
@@ -1490,7 +1490,7 @@ async function deleteNutritionEntry(entry) {
 
 // Consolidates duplicates/near-duplicates (e.g. "Chicken Breast" logged
 // once by the app's own fallback and again by hand with slightly different
-// text) into one row — target is whichever selected row is lowest, blanks
+// text) into one row — the kept one is whichever selected row is lowest, blanks
 // on it are filled in from the others, nothing is summed (unlike the
 // Physique's numeric-reading rollup, these are catalog entries, not
 // measurements).
@@ -1498,9 +1498,9 @@ async function mergeSelectedNutritionEntries() {
   const selected = allNutritionEntries.filter((n) => selectedNutritionRows.has(n.row)).sort((a, b) => a.row - b.row);
   if (selected.length < 2) return;
 
-  const target = selected[0];
+  const kept = selected[0];
   const others = selected.slice(1);
-  const merged = { ...target };
+  const merged = { ...kept };
   if (!merged.group) merged.group = (others.find((o) => o.group) || {}).group || '';
   if (!merged.amount) merged.amount = (others.find((o) => o.amount) || {}).amount || '';
   if (merged.calories === null) merged.calories = (others.find((o) => o.calories !== null) || {}).calories ?? null;
@@ -1512,14 +1512,14 @@ async function mergeSelectedNutritionEntries() {
   if (merged.tef === null) merged.tef = (others.find((o) => o.tef !== null) || {}).tef ?? null;
 
   await confirmAndDelete(
-    `Merge ${selected.length} ingredients into "${target.name}"? ` +
-    `${others.map((o) => o.name).join(', ')} will be combined into "${target.name}" and their rows deleted. ` +
-    `Fields already filled on "${target.name}" are kept as-is; blanks are filled in from the others. This cannot be undone.`,
+    `Merge ${selected.length} ingredients into "${kept.name}"? ` +
+    `${others.map((o) => o.name).join(', ')} will be combined into "${kept.name}" and their rows deleted. ` +
+    `Fields already filled on "${kept.name}" are kept as-is; blanks are filled in from the others. This cannot be undone.`,
     async () => {
       if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
       if (merged.fiber !== null || merged.fat !== null || merged.carb !== null || merged.tef !== null) await ensureNutritionColumns();
 
-      await writeNutritionRow(target.row, { ...merged, cells: target.cells });
+      await writeNutritionRow(kept.row, { ...merged, cells: kept.cells });
 
       const deleteRequests = others
         .map((o) => o.row)
@@ -1769,12 +1769,12 @@ function foldTrailingS(s) {
 // typed as "2 eggs" still hits an existing "egg" row (or vice versa) instead
 // of banking a same-food duplicate under the pluralized name.
 function findNutritionEntry(name) {
-  const target = String(name || '').trim().toLowerCase();
-  if (!target) return null;
-  const exact = allNutritionEntries.find((n) => n.name.toLowerCase() === target);
+  const query = String(name || '').trim().toLowerCase();
+  if (!query) return null;
+  const exact = allNutritionEntries.find((n) => n.name.toLowerCase() === query);
   if (exact) return exact;
-  const targetFolded = foldTrailingS(target);
-  return allNutritionEntries.find((n) => foldTrailingS(n.name.toLowerCase()) === targetFolded) || null;
+  const nameFolded = foldTrailingS(query);
+  return allNutritionEntries.find((n) => foldTrailingS(n.name.toLowerCase()) === nameFolded) || null;
 }
 
 // Appends a fallback-computed ingredient so it's a trusted lookup hit next

@@ -3,7 +3,7 @@
 // hasn't been filled in yet: the last 4 weeks. Body Mass appears here as well as in
 // State Trend & Forecast without duplicating it — that one is the trajectory over the
 // whole history and ignores this window, this one scores each day's move toward the
-// target or away from it.
+// healthy mass or away from it.
 const HEALTH_METRICS_DAYS = 28;
 
 function lastNDates(n) {
@@ -48,7 +48,7 @@ function renderHealthCharts(entries) {
 }
 
 // The charts answer "how's the trend", not "am I on track right now" — these tiles give
-// today's actual-vs-target for every Health Chart metric without reading the
+// today's actual-vs-desired for every Health Chart metric without reading the
 // rightmost bar of each chart. Ordered to match that panel: Body Mass, then the
 // donut-grid order (Caloric, Protein, Fiber, Fat, Carbohydrate, Activity, Sleep).
 function renderTodayGlanceCards(entries) {
@@ -95,27 +95,27 @@ function renderTodayGlanceCards(entries) {
     }
   });
 
-  const calorieTarget = getCalorieTarget(entries);
-  const proteinBand = getProteinTargetBandG(entries);
-  const fiberBand = getFiberTargetBandG(entries);
-  const fatBand = getFatTargetBandG(entries);
-  const carbBand = getCarbTargetBandG(entries);
-  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const calorieDesired = getCalorieDesired(entries);
+  const proteinBand = getProteinDesiredBandG(entries);
+  const fiberBand = getFiberDesiredBandG(entries);
+  const fatBand = getFatDesiredBandG(entries);
+  const carbBand = getCarbDesiredBandG(entries);
+  const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
   const bodyMassKg = latestBodyMassKg(entries);
   // Minutes when time is what's pinned; rises with a lighter body mass when calorie burn
-  // is pinned instead — see getActivityTargetMin.
-  const activityTarget = Math.round(getActivityTargetMin(bodyMassKg));
+  // is pinned instead — see getActivityDesiredMin.
+  const activityDesired = Math.round(getActivityDesiredMin(bodyMassKg));
 
   // Protein is the one metric judged against a RANGE, and the one where overshooting
   // still counts as a hit — see withinProteinBand and the chart's PROTEIN_OVER_BAND_COLOR.
   const proteinInBand = protein !== null && withinProteinBand(protein, proteinBand);
   const proteinOverBand = protein !== null && protein > proteinBand.max;
 
-  // Same in-band/over-band split as protein — see withinFiberBand/getFiberTargetBandG.
+  // Same in-band/over-band split as protein — see withinFiberBand/getFiberDesiredBandG.
   const fiberInBand = fiber !== null && withinFiberBand(fiber, fiberBand);
   const fiberOverBand = fiber !== null && fiber > fiberBand.max;
 
-  // Same shape again — see withinFatBand/getFatTargetBandG and the chart's
+  // Same shape again — see withinFatBand/getFatDesiredBandG and the chart's
   // FAT_OVER_BAND_COLOR.
   const fatInBand = fat !== null && withinFatBand(fat, fatBand);
   const fatOverBand = fat !== null && fat > fatBand.max;
@@ -134,15 +134,15 @@ function renderTodayGlanceCards(entries) {
   const activityKcal = activityEntriesToday.length
     ? Math.round(activityEntriesToday.reduce((sum, e) => sum + activityEntryKcal(e, bodyMassKg), 0))
     : null;
-  // What hitting the minutes target would burn — pinned flat if calorie burn is what's
-  // pinned, else via the same rate the calorie target is built from, so the two can't
+  // What hitting the desired minutes would burn — pinned flat if calorie burn is what's
+  // pinned, else via the same rate the desired intake is built from, so the two can't
   // quote different numbers for one day.
-  const activityTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
+  const activityDesiredKcal = Math.round(getActivityDesiredKcal(bodyMassKg));
 
   // Same three buckets the Physical Activity chart stacks by (Activity sheet's own
   // Category column, physiqueActivityByCategory) — matched by prefix rather than an exact
   // string, since a sheet can use "Strength" or "Strength Training" for the same bucket.
-  // Purely informational: no target to score against, so no green/red here.
+  // Purely informational: no desired figure to score against, so no green/red here.
   const activityCategoryLine = (prefix) => {
     const matches = activityEntriesToday.filter((e) => e.description?.toLowerCase().startsWith(prefix));
     if (!matches.length) return '0 min (0 kcal)';
@@ -159,11 +159,11 @@ function renderTodayGlanceCards(entries) {
   // The macro tiles show a whole-gram figure — floored, not rounded, so the readout never
   // claims a gram that isn't fully there. Band colouring above stays on the true value.
   const floorG = (g) => (g !== null ? Math.floor(g) : null);
-  setTodayGlanceTile('today-protein', floorG(protein), formatProteinTargetBand(proteinBand), 'g', proteinInBand || proteinOverBand ? 'income' : 'expense');
-  setTodayGlanceTile('today-fiber', floorG(fiber), formatProteinTargetBand(fiberBand), 'g', fiberInBand || fiberOverBand ? 'income' : 'expense');
-  setTodayGlanceTile('today-fat', floorG(fat), formatProteinTargetBand(fatBand), 'g', fatInBand || fatOverBand ? 'income' : 'expense');
-  setTodayGlanceTile('today-carb', floorG(carb), formatProteinTargetBand(carbBand), 'g', carbInBand ? 'income' : (carbUnderBand ? 'neutral' : 'expense'));
-  setTodayGlanceTile('today-sleep-duration', sleepHours, sleepTarget, 'hr', sleepHours !== null && sleepHours >= sleepTarget ? 'income' : 'expense');
+  setTodayGlanceTile('today-protein', floorG(protein), formatProteinDesiredBand(proteinBand), 'g', proteinInBand || proteinOverBand ? 'income' : 'expense');
+  setTodayGlanceTile('today-fiber', floorG(fiber), formatProteinDesiredBand(fiberBand), 'g', fiberInBand || fiberOverBand ? 'income' : 'expense');
+  setTodayGlanceTile('today-fat', floorG(fat), formatProteinDesiredBand(fatBand), 'g', fatInBand || fatOverBand ? 'income' : 'expense');
+  setTodayGlanceTile('today-carb', floorG(carb), formatProteinDesiredBand(carbBand), 'g', carbInBand ? 'income' : (carbUnderBand ? 'neutral' : 'expense'));
+  setTodayGlanceTile('today-sleep-duration', sleepHours, sleepDesired, 'hr', sleepHours !== null && sleepHours >= sleepDesired ? 'income' : 'expense');
   const windowText = sleepBedMin !== null && sleepWakeMin !== null
     ? `${formatClockTime24(sleepBedMin)}-${formatClockTime24(sleepWakeMin)}`
     : '—';
@@ -182,47 +182,47 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // than worked out; only a day saved before the column existed falls back to them.
   const stored = storedMassAsOf(isoFromDate(new Date()));
   const bodyMassKg = stored?.m ?? latestBodyMassKg(entries);
-  const isCut = getCalorieTargetKind(entries) === 'max';
+  const isCut = getCalorieDesiredKind(entries) === 'max';
 
   // m — the latest raw body-mass reading (bodyMassKg, already computed above), against the same
-  // healthy-mass target BMI uses. Shown for comparison only, same as the Formula
+  // healthy body mass BMI uses. Shown for comparison only, same as the Formula
   // Tune's read-only m row: water and glycogen move this one day to day, which is
   // exactly why every plan figure below reads m̄ instead.
-  const healthyMassKg = getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT);
+  const healthyMassKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
   // m̄, the L_p-day rolling average every plan figure reads; BMI below reads it too.
   const mBar = stored?.m_avg ?? planBodyMassKg(entries);
-  // The glycogen/water swing at the latest reading, beside the target (as on the
-  // Progress card): a reading within it of the target is water, not a miss.
+  // The glycogen/water swing at the latest reading, beside the healthy mass (as on the
+  // Progress card): a reading within it of the healthy mass is water, not a miss.
   const swingKg = glycogenSwingKg(bodyMassKg, heightCm, getSettingString('SEX', null));
   const swingText = swingKg === null ? '' : ` ± ${Math.round(swingKg * 10) / 10}`;
-  // One line for both: today's reading, the rolling average in brackets, the target.
+  // One line for both: today's reading, the rolling average in brackets, the healthy mass.
   const mEl = document.getElementById('today-status-m-value');
   mEl.classList.remove('income', 'expense');
   const averageText = mBar !== null ? ` (${mBar})` : '';
   const mText = bodyMassKg !== null ? `${bodyMassKg}${averageText} / ${healthyMassKg}${swingText} kg` : '—';
   mEl.textContent = privacyMode ? maskDigits(mText) : mText;
   if (bodyMassKg !== null) {
-    const mGood = bodyMassTargetIsDownward(entries) ? bodyMassKg <= healthyMassKg : bodyMassKg >= healthyMassKg;
+    const mGood = bodyMassHealthyIsDownward(entries) ? bodyMassKg <= healthyMassKg : bodyMassKg >= healthyMassKg;
     mEl.classList.add(mGood ? 'income' : 'expense');
   }
 
-  // BMI — m̄ against the healthy-mass target, rescaled by height (computeBmi is a fixed
-  // linear rescale of mass, so "good" follows the target's direction). Needs
+  // BMI — m̄ against the healthy body mass, rescaled by height (computeBmi is a fixed
+  // linear rescale of mass, so "good" follows the healthy mass's direction). Needs
   // only height, so it survives a profile missing birth date or sex.
   const bmiEl = document.getElementById('today-status-bmi-value');
   bmiEl.classList.remove('income', 'expense');
   const bmi = stored?.BMI ?? (mBar !== null && heightCm !== null ? computeBmi(mBar, heightCm) : null);
-  const targetBmi = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
-  const bmiText = bmi !== null && targetBmi !== null ? `${bmi} / ${targetBmi} kg/m²` : '—';
+  const healthyBmi = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
+  const bmiText = bmi !== null && healthyBmi !== null ? `${bmi} / ${healthyBmi} kg/m²` : '—';
   bmiEl.textContent = privacyMode ? maskDigits(bmiText) : bmiText;
-  if (bmi !== null && targetBmi !== null) {
-    const bmiGood = bodyMassTargetIsDownward(entries) ? bmi <= targetBmi : bmi >= targetBmi;
+  if (bmi !== null && healthyBmi !== null) {
+    const bmiGood = bodyMassHealthyIsDownward(entries) ? bmi <= healthyBmi : bmi >= healthyBmi;
     bmiEl.classList.add(bmiGood ? 'income' : 'expense');
   }
 
   // Δm (Changed Mass) — the Body Mass chart's figure for the latest body-mass reading: the slope of
   // the same smoothed trend (computeBodyMassTrend over every reading), in g/day. Green when
-  // it moves toward the target, red when away.
+  // it moves toward the healthy mass, red when away.
   const changedEl = document.getElementById('today-status-changed-mass-value');
   changedEl.classList.remove('income', 'expense');
   let changedGPerDay = massChangeGPerDay(stored);
@@ -244,43 +244,43 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     : '—';
   changedEl.textContent = privacyMode ? maskDigits(changedText) : changedText;
   if (changedGPerDay !== null && changedGPerDay !== 0) {
-    const changedGood = bodyMassTargetIsDownward(entries) ? changedGPerDay < 0 : changedGPerDay > 0;
+    const changedGood = bodyMassHealthyIsDownward(entries) ? changedGPerDay < 0 : changedGPerDay > 0;
     changedEl.classList.add(changedGood ? 'income' : 'expense');
   }
 
-  // Intake — the one positive contribution to Balance, shown against its target
+  // Intake — the one positive contribution to Balance, shown against desired intake
   // (a cut wants intake under the cap, a bulk over the floor; the color carries
   // that sense, not the separator).
-  const calTarget = getCalorieTarget(entries);
+  const calDesired = getCalorieDesired(entries);
   const intakeEl = document.getElementById('today-status-intake-value');
   intakeEl.classList.remove('income', 'expense');
   const intakeText = caloriesToday !== null
-    ? `${Math.round(caloriesToday)} / ${calTarget.kcal} kcal`
+    ? `${Math.round(caloriesToday)} / ${calDesired.kcal} kcal`
     : '—';
   intakeEl.textContent = privacyMode ? maskDigits(intakeText) : intakeText;
-  if (caloriesToday !== null) intakeEl.classList.add(withinCalorieTarget(caloriesToday, calTarget) ? 'income' : 'expense');
+  if (caloriesToday !== null) intakeEl.classList.add(withinCalorieDesired(caloriesToday, calDesired) ? 'income' : 'expense');
 
   // Activity — a burn, signed negative. No activity logged today reads as 0 (the
   // same "0 kcal burned so far, not unknown" rule the Cardio/NEAT/Strength lines
   // use), not a dash.
-  const actTargetKcal = Math.round(getActivityTargetKcal(bodyMassKg));
+  const actDesiredKcal = Math.round(getActivityDesiredKcal(bodyMassKg));
   const activityKcalSoFar = activityKcalToday ?? 0;
-  const actText = `${activityKcalSoFar > 0 ? '-' : ''}${activityKcalSoFar} / -${actTargetKcal} kcal`;
+  const actText = `${activityKcalSoFar > 0 ? '-' : ''}${activityKcalSoFar} / -${actDesiredKcal} kcal`;
   const activityEl = document.getElementById('today-status-activity-value');
   activityEl.classList.remove('income', 'expense');
   activityEl.textContent = privacyMode ? maskDigits(actText) : actText;
-  activityEl.classList.add(activityKcalSoFar >= actTargetKcal ? 'income' : 'expense');
+  activityEl.classList.add(activityKcalSoFar >= actDesiredKcal ? 'income' : 'expense');
 
   // Digestion (TEF) — the other expenditure, measured if we have a figure else the
-  // non-TEF share of intake, shown against its own target.
+  // non-TEF share of intake, shown against its own desired figure.
   const digKcal = tefKcalToday !== null
     ? Math.round(tefKcalToday)
     : (caloriesToday !== null ? Math.round(caloriesToday * (1 - tefDivisor())) : null);
-  const digTarget = Math.round(calTarget.kcal * (1 - tefDivisor()));
-  const digText = digKcal !== null ? `${-digKcal} / ${-digTarget} kcal` : '—';
+  const digDesired = Math.round(calDesired.kcal * (1 - tefDivisor()));
+  const digText = digKcal !== null ? `${-digKcal} / ${-digDesired} kcal` : '—';
   document.getElementById('today-status-digestion-value').textContent = privacyMode ? maskDigits(digText) : digText;
 
-  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
   let balanceKcal = null;
   let deprivationKcal = null;
@@ -301,7 +301,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
       ? Math.round(tefKcalToday)
       : Math.round(caloriesToday * (1 - tefDivisor()));
     ({ deprivationKcal, balance: balanceKcal } = dailyEnergyBalanceKcal(
-      Math.round(caloriesToday), effectiveMaintenanceKcal, activity, tef, sleepHoursToday, sleepTarget,
+      Math.round(caloriesToday), effectiveMaintenanceKcal, activity, tef, sleepHoursToday, sleepDesired,
     ));
   }
 
@@ -344,14 +344,14 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
 
   const balanceEl = document.getElementById('today-status-balance-value');
   balanceEl.classList.remove('income', 'expense');
-  const balanceTargetKcal = targetBalanceKcal(planBodyMassKg(entries));
+  const balanceDesiredKcal = desiredBalanceKcal(planBodyMassKg(entries));
   const balanceText = balanceKcal !== null
-    ? `${balanceKcal}${balanceTargetKcal !== null ? ` / ${balanceTargetKcal}` : ''} kcal`
+    ? `${balanceKcal}${balanceDesiredKcal !== null ? ` / ${balanceDesiredKcal}` : ''} kcal`
     : '—';
   balanceEl.textContent = privacyMode ? maskDigits(balanceText) : balanceText;
   if (balanceKcal !== null) {
-    const balanceGood = balanceTargetKcal !== null
-      ? (isCut ? balanceKcal <= balanceTargetKcal : balanceKcal >= balanceTargetKcal)
+    const balanceGood = balanceDesiredKcal !== null
+      ? (isCut ? balanceKcal <= balanceDesiredKcal : balanceKcal >= balanceDesiredKcal)
       : (isCut ? balanceKcal < 0 : balanceKcal > 0);
     balanceEl.classList.add(balanceGood ? 'income' : 'expense');
   }
@@ -360,23 +360,23 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // fat-equivalent GENERIC_KCAL_PER_KG_FAT), shown against the plan's own expected fat-loss
   // rate (WEEKLY_FAT_LOSS_KG spread over 7 days). Both are signed mass changes (negative =
   // losing), so WEEKLY_FAT_LOSS_KG — stored positive for a cut — is negated here the same
-  // way targetBalanceKcal negates it for D, its own deficit target.
+  // way desiredBalanceKcal negates it for D, its own desired deficit.
   const dmActual = balanceKcal !== null ? Math.round((balanceKcal / GENERIC_KCAL_PER_KG_FAT) * 1000) : null;
   const weeklyFatLossKg = weeklyFatLossKgAt(planBodyMassKg(entries));
-  const dmTarget = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
+  const dmDesired = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
   const dmText = dmActual !== null
-    ? `${dmActual}${dmTarget !== null ? ` / ${dmTarget}` : ''} g`
+    ? `${dmActual}${dmDesired !== null ? ` / ${dmDesired}` : ''} g`
     : '—';
   document.getElementById('today-status-deltam-value').textContent = privacyMode ? maskDigits(dmText) : dmText;
 }
 
-// `target` is a number, or a preformatted string for Protein's band — both interpolate
+// `desired` is a number, or a preformatted string for Protein's band — both interpolate
 // and mask alike. `tone` is the value's colour class: 'income', 'expense' or 'neutral'.
-function setTodayGlanceTile(idPrefix, value, target, unit, tone) {
+function setTodayGlanceTile(idPrefix, value, desired, unit, tone) {
   const el = document.getElementById(`${idPrefix}-value`);
   el.classList.remove('income', 'expense', 'neutral');
 
-  const text = `${value !== null ? value : '—'} / ${target} ${unit}`;
+  const text = `${value !== null ? value : '—'} / ${desired} ${unit}`;
   el.textContent = privacyMode ? maskDigits(text) : text;
   if (value !== null) el.classList.add(tone);
 }
@@ -464,18 +464,18 @@ function calorieLogEntries(entries) {
   return entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
 }
 
-// The x-axis Caloric Intake and Body Mass BOTH plot on. Body Mass deliberately doesn't
-// clip to its own log the way every other metric chart does: the two are read as a
-// stacked pair, and different start days would slide their dates out of line.
+// The one x-axis every dated Health chart plots on, from the first calorie log or
+// body-mass reading in range, so their gridlines land on the same dates.
 function healthCalorieChartDates(entries) {
-  return healthWindowDates(calorieLogEntries(entries));
+  const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
+  return healthWindowDates([...calorieLogEntries(entries), ...bodyMassEntries]);
 }
 
-// Down on a cut, up on a bulk. Via getCalorieTargetKind rather than re-reading
-// BODY_MASS_TARGET_KG, so this chart's green and Caloric Intake's max/min come from one read
-// of the target, fallbacks included.
-function bodyMassTargetIsDownward(entries) {
-  return getCalorieTargetKind(entries) === 'max';
+// Down on a cut, up on a bulk. Via getCalorieDesiredKind rather than re-reading
+// BODY_MASS_HEALTHY_KG, so this chart's green and Caloric Intake's max/min come from one read
+// of the healthy mass, fallbacks included.
+function bodyMassHealthyIsDownward(entries) {
+  return getCalorieDesiredKind(entries) === 'max';
 }
 
 // Boer 1984 (Am J Physiol 247:F632): lean body mass (kg) from mass, height and sex —
@@ -554,7 +554,7 @@ const GLYCOGEN_WATER_RATIO_DEFAULT = 3; // g H2O / g glycogen
 // evaluated at the defaults rather than whatever's currently typed there. This is the
 // day-to-day swing glycogen and its bound water alone can account for, at this body —
 // the noise floor State Trend & Forecast measures its smoothing against.
-// The swing every display uses (Status, Progress, the charts, the arrival target):
+// The swing every display uses (Status, Progress, the charts, the arrival mass):
 // the GLYCOGEN_SWING_KG setting, saved once and changed only by Tune's Save or by
 // editing it. It moves ~10 g per kg of body mass, so it barely changes; before it's
 // saved, it's worked out from the given body (computeGlycogenSwingKg).
@@ -586,14 +586,14 @@ function computeGlycogenSwingKg(bodyMassKg, heightCm, sex) {
   return (glycogenG * (1 + GLYCOGEN_WATER_RATIO_DEFAULT)) / 1000;
 }
 
-// The target actually used to decide "have I arrived" — past the raw target by the
+// The mass actually used to decide "have I arrived" — past the raw healthy mass by the
 // glycogen/water swing, in the direction travel is already headed, so a bad-water-day
-// reading can't land on the wrong side of the real target. Shared by calcProjection and
+// reading can't land on the wrong side of the real healthy mass. Shared by calcProjection and
 // the Tune so both count arrival the same way and can't disagree. Falls
-// back to the raw target when the swing can't be estimated (no height/sex on file).
-function arrivalTargetKg(targetKg, bodyMassKg, heightCm, sex, isDownward) {
+// back to the raw healthy mass when the swing can't be estimated (no height/sex on file).
+function arrivalHealthyKg(healthyKg, bodyMassKg, heightCm, sex, isDownward) {
   const swingKg = glycogenSwingKg(bodyMassKg, heightCm, sex);
-  return swingKg === null ? targetKg : targetKg + (isDownward ? -swingKg : swingKg);
+  return swingKg === null ? healthyKg : healthyKg + (isDownward ? -swingKg : swingKg);
 }
 
 // Step candidates for macro gram axes; same max-gridlines guard as the kg axis.
@@ -607,7 +607,7 @@ function lerpHex(hexA, hexB, t) {
 
 // Steps and timed entries onto one comparable scale. ~100 steps/min is walking
 // pace; WORKOUT_STEPS_PER_MIN overrides it for a longer or shorter stride, and
-// applies everywhere at once — this chart, the Activity target, and the workout
+// applies everywhere at once — this chart, desired activity, and the workout
 // estimator's own duration (activeSecondsForNoteLine, health-activity-estimator.js).
 // The default lives here rather than beside WORKOUT_REP_SEC_DEFAULT because
 // this file loads first: a const in the later file would still be in its dead
@@ -631,17 +631,17 @@ function computeBmi(bodyMassKg, heightCm) {
 }
 
 // The inverse — the body mass a BMI implies at this height. Only one place needs it, the
-// Tune's target-BMI box, but it lives here beside computeBmi so the pair can't
+// Tune's healthy-BMI box, but it lives here beside computeBmi so the pair can't
 // drift apart the way two copies of one rearrangement eventually do.
 function bodyMassKgFromBmi(bmi, heightCm) {
   const heightM = heightCm / 100;
   return Math.round(bmi * heightM * heightM * 10) / 10;
 }
 
-// The WHO bands, for the one place a BMI is a GOAL rather than a reading: a target body mass
+// The WHO bands, for the one place a BMI is a GOAL rather than a reading: a healthy body mass
 // is a number you choose, and the whole reason to show its BMI is to say whether the choice
 // lands somewhere sensible. Both ends matter here, unlike the fat-loss band where only the
-// ceiling is a warning — an underweight target is as much a problem as an obese one.
+// ceiling is a warning — an underweight choice is as much a problem as an obese one.
 const BMI_HEALTHY_MIN = 18.5;
 const BMI_HEALTHY_MAX = 24.9;
 
@@ -687,13 +687,13 @@ function withExplicitSign(value) {
 // Takes a body mass because a pinned percentage makes the rate depend on it; unpinned the
 // argument is ignored and this is the flat WEEKLY_FAT_LOSS_KG it always was.
 //
-// Routed through calorieTargetDetail (which now folds in PLAN_SLEEP_HOURS — see
+// Routed through calorieDesiredDetail (which now folds in PLAN_SLEEP_HOURS — see
 // sleepAdjustedDeficitKcal in health-math.js) whenever a full profile is on file, so this
-// chart's own dash and the Sleep chart's dot can't quote a smaller target deficit than the
+// chart's own dash and the Sleep chart's dot can't quote a smaller desired deficit than the
 // real Eᵢₙ was actually built from. Falls back to the un-adjusted rate with no profile,
-// same as calorieTargetDetail's own callers do.
-function targetBalanceKcal(bodyMassKg) {
-  const detail = calorieTargetDetail(bodyMassKg);
+// same as calorieDesiredDetail's own callers do.
+function desiredBalanceKcal(bodyMassKg) {
+  const detail = calorieDesiredDetail(bodyMassKg);
   if (detail !== null) return -Math.round(detail.deficit);
   const weeklyKg = weeklyFatLossKgAt(bodyMassKg);
   if (weeklyKg === null || weeklyKg === 0) return null;

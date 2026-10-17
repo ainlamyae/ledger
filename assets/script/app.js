@@ -234,8 +234,8 @@ function setupKeyboardShortcuts() {
       return;
     }
 
-    const target = document.activeElement;
-    const isTyping = target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
+    const focused = document.activeElement;
+    const isTyping = focused && (['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName) || focused.isContentEditable);
     if (isTyping) return;
 
     // Both work from any page: on Finance's own pages in place, elsewhere by going to
@@ -502,7 +502,7 @@ let lastLoadedSettings = null;
 //
 // A read failure is NOT the same as "there are no settings", though, and
 // conflating the two was a real bug: returning {} here silently wiped every
-// setting in memory on one transient read error. Targets reverted to their defaults and Health Insight
+// setting in memory on one transient read error. Desired values reverted to their defaults and Health Insight
 // reported age and height as "not set" — all while the spreadsheet itself was
 // perfectly intact, which is exactly why it looked like a dozen unrelated bugs.
 // So: keep the
@@ -668,7 +668,7 @@ async function loadDashboard(forceRefresh = false) {
   try {
     // Never throws (see loadSettings). Settings fetches concurrently with
     // every other module below instead of blocking them first — only
-    // initPhysique (target-line charts) and initTravel (BIRTH_DATE credit)
+    // initPhysique (desired-line charts) and initTravel (BIRTH_DATE credit)
     // actually read currentSettings, so just those two wait on it.
     const settingsPromise = loadSettings(forceRefresh).then((settings) => {
       currentSettings = settings;
@@ -710,8 +710,8 @@ async function loadDashboard(forceRefresh = false) {
     // (/health/, /finance/, /track/, /other/) loads its own blocks alone; the home page
     // loads the glance cards (Health status, Finance summary), plus every block
     // when Show blocks is on. Car Service (Track) is drawn from Transactions, so
-    // Track loads those too. The home page also reads Transactions and Work Time for
-    // its tiles' badges (Car Service's days left, Work Time's Log).
+    // Track loads those too. The home page also reads Transactions, Work Time and Accounts for
+    // its tiles' badges (Car Service's days left, Work Time's Log, Account's Pay).
     const section = window.ledgerSectionPage?.section ?? null;
     const home = section === null;
     const shows = (id) => loadBlocks && (home || section === id);
@@ -741,14 +741,14 @@ async function loadDashboard(forceRefresh = false) {
         physiquePromise.then(() => seedGlycogenSwingSetting()).catch((err) => console.error('Saving GLYCOGEN_SWING_KG failed:', err)),
         // Protein Source Rotation needs Physique (actual servings eaten),
         // Nutrition (live per-serving calories/protein), and settings
-        // (protein target) all loaded — refresh only once all three are in.
+        // (desired protein) all loaded — refresh only once all three are in.
         Promise.all([physiquePromise, nutritionPromise]).then(() => {
           renderProteinRotationChart(healthDateRange());
           // Needs both tabs: the grams come from each food's Nutrition row.
           convertPhysiqueBreakdownAmountsToGrams();
         }),
         // Activity Rotation needs Physique (logged Workout notes) and Activities
-        // (each exercise's Group and Weekly Target) both loaded.
+        // (each exercise's Group and Weekly Desired) both loaded.
         Promise.all([physiquePromise, activitiesPromise]).then(() => {
           renderActivityRotationChart(healthDateRange());
           // The GYM modal's own copy (instruction-rotation-card, index.html) — its
@@ -762,6 +762,8 @@ async function loadDashboard(forceRefresh = false) {
       ] : []),
       ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
       ...(home && !shows('track') ? [initWorkTime(forceRefresh)] : []),
+      // Accounts for the Account tile's Pay badge.
+      ...(home && !shows('finance') ? [initAccountManager(forceRefresh)] : []),
       // Watchlist alerts badge the Watch List and Market tiles, here and on home;
       // the price check runs in the background once the keys (settings) are in.
       ...((shows('finance') || home) ? [initWatchlist(forceRefresh).then(() => {

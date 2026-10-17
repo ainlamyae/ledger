@@ -11,33 +11,33 @@ const ENERGY_BALANCE_TICK_KCAL = 250;
 
 let healthEnergyBalanceChart = null;
 
-// Against the target line, not just the sign: at or beyond it on the day itself is a
+// Against the desired line, not just the sign: at or beyond it on the day itself is a
 // darker green — a proper hit, not just a near-miss. Short of it falls back to the
-// week: a 7-day average that's still made the target reads as real progress despite
+// week: a 7-day average that's still made the desired figure reads as real progress despite
 // the one off day (green), but an average that's ALSO short means the day isn't an
-// outlier, it's the trend, so it reads red like the wrong-side-of-zero case. No target
-// means no band to compare against, so it falls back to the sign alone.
-function energyBalanceColor(balance, isCut, target, weeklyAvg) {
-  const towardTarget = isCut ? balance < 0 : balance > 0;
-  if (!towardTarget) return chartColor('--chart-bad');
-  if (target === null) return chartColor('--chart-good');
-  if (isCut ? balance <= target : balance >= target) return chartColor('--chart-good-high');
-  const weekOnTarget = weeklyAvg !== null && weeklyAvg !== undefined
-    && (isCut ? weeklyAvg <= target : weeklyAvg >= target);
-  return weekOnTarget ? chartColor('--chart-good') : chartColor('--chart-bad');
+// outlier, it's the trend, so it reads red like the wrong-side-of-zero case. No desired
+// figure means no band to compare against, so it falls back to the sign alone.
+function energyBalanceColor(balance, isCut, desired, weeklyAvg) {
+  const towardDesired = isCut ? balance < 0 : balance > 0;
+  if (!towardDesired) return chartColor('--chart-bad');
+  if (desired === null) return chartColor('--chart-good');
+  if (isCut ? balance <= desired : balance >= desired) return chartColor('--chart-good-high');
+  const weekAsDesired = weeklyAvg !== null && weeklyAvg !== undefined
+    && (isCut ? weeklyAvg <= desired : weeklyAvg >= desired);
+  return weekAsDesired ? chartColor('--chart-good') : chartColor('--chart-bad');
 }
 
 // Eaten minus spent per day, with the fat change that balance implies on a twin axis.
 //
 // Spend is Mifflin-St Jeor BMR at that day's carried-forward body mass PLUS its logged
 // activity burn — no lifestyle multiplier, since logged activity is already real kcal
-// and scaling BMR too would count the same movement twice. The calorie target is built
-// the same way, so the two agree on any day activity hits the target.
+// and scaling BMR too would count the same movement twice. The desired intake is built
+// the same way, so the two agree on any day activity hits the desired burn.
 //
-// The COLOURS follow the target, not the sign — a deficit is only progress for someone
+// The COLOURS follow the desired balance, not the sign — a deficit is only progress for someone
 // heading down, so the app's green and red keep meaning "toward" and "away" rather than
 // congratulating a bulker for undereating. Which side is progress comes from
-// getCalorieTargetKind, the same read Caloric Intake uses. Within that side the target
+// getCalorieDesiredKind, the same read Caloric Intake uses. Within that side the desired line
 // splits green from gray, so falling behind reads differently from going backwards.
 //
 // Grams is balance ÷ kcal-per-kg, a fixed linear rescale off two population constants,
@@ -56,7 +56,7 @@ function renderHealthEnergyBalanceChart(entries) {
   // No profile means no maintenance figure, no body-mass reading means no body mass to feed it.
   // Either way the chart shows its explanatory empty state, not a misleading partial.
   const canCompute = haveProfile && bodyMassEntries.length > 0;
-  const labels = canCompute ? healthWindowDates(intakeEntries) : [];
+  const labels = canCompute ? healthCalorieChartDates(entries) : [];
   const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(bodyMassEntries), labels);
 
   const intakeByDate = new Map();
@@ -79,12 +79,12 @@ function renderHealthEnergyBalanceChart(entries) {
     activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
   });
 
-  // Which side of zero is progress. Same read Caloric Intake's target is built on, so
+  // Which side of zero is progress. Same read Caloric Intake's desired figure is built on, so
   // the two charts can't disagree about which way the user is headed.
-  const isCut = getCalorieTargetKind(entries) === 'max';
+  const isCut = getCalorieDesiredKind(entries) === 'max';
 
-  // Sleep Deprivation Effect: how much of the day's OWN balance (not the flat plan
-  // target — see the Sleep chart's dot for that) a short night cost — shrinking a
+  // Sleep Deprivation Effect: how much of the day's OWN balance (not the flat desired
+  // deficit — see the Sleep chart's dot for that) a short night cost — shrinking a
   // deficit's fat loss, or growing a surplus's fat gain, whichever side of zero the day
   // was already on. Folded straight into "balance" itself, so this chart, its
   // weekly average, and State Trend & Forecast's Calorie-Implied Trajectory (which
@@ -92,7 +92,7 @@ function renderHealthEnergyBalanceChart(entries) {
   const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
   const sleepHoursByDate = new Map();
   sleepEntries.forEach((e) => sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount));
-  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
   const detailByDate = new Map();
 
@@ -117,7 +117,7 @@ function renderHealthEnergyBalanceChart(entries) {
     const tefMeasured = tefByDate.has(date);
     const tef = Math.round(tefMeasured ? tefByDate.get(date) : intake * (1 - tefDivisor()));
     const { rawBalance, deprivationKcal, balance } = dailyEnergyBalanceKcal(
-      intake, maintenance, activity, tef, sleepHoursByDate.get(date), sleepTarget,
+      intake, maintenance, activity, tef, sleepHoursByDate.get(date), sleepDesired,
     );
 
     detailByDate.set(date, {
@@ -134,20 +134,30 @@ function renderHealthEnergyBalanceChart(entries) {
   // days that all undershot them.
   // At the smoothed body mass, since a pinned percentage makes the deficit a function of body
   // mass: one dashed line for the whole window, drawn at the rate the plan's mass implies.
-  const target = hasData ? targetBalanceKcal(planBodyMassKg(entries)) : null;
+  const desired = hasData ? desiredBalanceKcal(planBodyMassKg(entries)) : null;
 
-  const maxDeficit = Math.max(0, ...values.map((v) => -v), target === null ? 0 : -target);
-  const maxSurplus = Math.max(0, ...values, target === null ? 0 : target);
+  const maxDeficit = Math.max(0, ...values.map((v) => -v), desired === null ? 0 : -desired);
+  const maxSurplus = Math.max(0, ...values, desired === null ? 0 : desired);
   const upToTick = (v) => Math.ceil(Math.max(v * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL) / ENERGY_BALANCE_TICK_KCAL)
     * ENERGY_BALANCE_TICK_KCAL;
   const yMin = -upToTick(maxDeficit);
   const yMax = upToTick(maxSurplus);
 
   // A fraction of the axis span, so the dash stays a hairline at any range.
-  const targetHalf = (yMax - yMin) * 0.004;
+  const desiredHalf = (yMax - yMin) * 0.004;
 
   // balanceData already nulls the unlogged days, so they sit out of the fit.
   const weeklyAvg = emaSeries(balanceData);
+
+  // Legend entries switched off (renderToggleLegend below); bars by their colour's name.
+  const hidden = legendHiddenNames('health-energy-balance-legend');
+  const word = desired !== null && desired < 0 ? 'Deficit' : 'Surplus';
+  const barColors = balanceData.map((v, i) => energyBalanceColor(v, isCut, desired, weeklyAvg[i]));
+  const barClasses = barColors.map((c) => {
+    if (desired === null) return c === chartColor('--chart-bad') ? 'Away from desired' : 'Toward desired';
+    if (c === chartColor('--chart-good-high')) return 'Desired met';
+    return c === chartColor('--chart-good') ? 'Week on desired pace' : 'Missed desired';
+  });
 
   healthEnergyBalanceChart = upsertChart(healthEnergyBalanceChart, ctx, {
     data: {
@@ -156,21 +166,23 @@ function renderHealthEnergyBalanceChart(entries) {
         {
           type: 'bar',
           label: 'Calorie balance',
-          data: balanceData,
-          backgroundColor: balanceData.map((v, i) => energyBalanceColor(v, isCut, target, weeklyAvg[i])),
+          data: maskHiddenClasses(balanceData, barClasses, hidden),
+          backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg),
-        // A dash per day, the idiom Caloric Intake uses for its own target: a continuous
-        // line reads as one shared limit, a mark on each bar says the target belongs to
+        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        // A dash per day, the idiom Caloric Intake uses for its own desired intake: a continuous
+        // line reads as one shared limit, a mark on each bar says the desired figure belongs to
         // that day.
-        ...(target === null ? [] : [{
+        ...(desired === null ? [] : [{
           type: 'bar',
-          label: 'Target for the day',
-          data: labels.map(() => [target - targetHalf, target + targetHalf]),
-          backgroundColor: targetMarkColor(),
+          label: 'Desired for the day',
+          data: labels.map(() => [desired - desiredHalf, desired + desiredHalf]),
+          // Cyan, as Body Mass's healthy mark, so it can't pass for the 7-Day Average.
+          backgroundColor: chartColor('--chart-cyan'),
           grouped: false,
-          isTargetLine: true,
+          isDesiredLine: true,
+          hidden: hidden.has(`Desired ${word}`),
           // Lowest order paints last, so it stays visible on a bar that overshot it.
           order: 0,
         }]),
@@ -194,7 +206,7 @@ function renderHealthEnergyBalanceChart(entries) {
         tooltip: {
           // The dashes are filtered out — a floating bar would report itself as a
           // `[from, to]` pair — and stated in afterBody instead.
-          filter: (item) => !item.dataset.isTargetLine && !item.dataset.isWeeklyAverage,
+          filter: (item) => !item.dataset.isDesiredLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             // The chart IS the subtraction, so every term is spelled out — a bare
@@ -228,7 +240,7 @@ function renderHealthEnergyBalanceChart(entries) {
                 // Added, not subtracted: on a deficit this is how much less of it became
                 // fat loss; on a surplus it's how much MORE was gained, since short sleep
                 // drives hunger and cuts NEAT rather than sitting out surplus days. Shown
-                // on every day, 0 when the night met the target (or none was logged).
+                // on every day, 0 when the night met desired sleep (or none was logged).
                 `SD (Sleep Deprivation Effect): ${Math.round(d.deprivationKcal ?? 0)} kcal`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -237,9 +249,9 @@ function renderHealthEnergyBalanceChart(entries) {
             // else here so it reads off the axis its dash is drawn on.
             afterBody: (items) => {
               const lines = [];
-              if (target !== null) {
-                const word = target < 0 ? 'Deficit' : 'Surplus';
-                lines.push(`D (Desired ${word}): ${target} kcal/day`);
+              if (desired !== null) {
+                const word = desired < 0 ? 'Deficit' : 'Surplus';
+                lines.push(`D (Desired ${word}): ${desired} kcal/day`);
               }
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) {
@@ -277,5 +289,19 @@ function renderHealthEnergyBalanceChart(entries) {
       },
     },
   });
+
+  // Swatches under the chart, named as in the hover; bar colours from energyBalanceColor.
+  renderToggleLegend('health-energy-balance-legend', labels.length === 0 ? [] : [
+    ...(desired !== null ? [
+      { name: 'Desired met', color: chartColor('--chart-good-high') },
+      { name: 'Week on desired pace', color: chartColor('--chart-good') },
+      { name: 'Missed desired', color: chartColor('--chart-bad') },
+    ] : [
+      { name: 'Toward desired', color: chartColor('--chart-good') },
+      { name: 'Away from desired', color: chartColor('--chart-bad') },
+    ]),
+    { name: '7-Day Average', color: desiredMarkColor() },
+    ...(desired !== null ? [{ name: `Desired ${word}`, color: chartColor('--chart-cyan') }] : []),
+  ], () => renderHealthEnergyBalanceChart(entries));
 }
 

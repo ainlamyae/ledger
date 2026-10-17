@@ -18,7 +18,7 @@ function renderExpenseBreakdownTrendChart(months) {
   // Income leads the legend: it's the line every bar is read against, not another
   // slice of the stack. Same order as `datasets` below, which is what lets the
   // legend index BE the dataset index.
-  const legendItems = [{ name: 'Income', color: targetMarkColor() }, ...categories];
+  const legendItems = [{ name: 'Income', color: desiredMarkColor() }, ...categories];
 
   // No y max: Chart.js fits the tallest month, and re-fits when a series is hidden.
   expenseBreakdownTrendChart = upsertChart(expenseBreakdownTrendChart, ctx, {
@@ -30,7 +30,7 @@ function renderExpenseBreakdownTrendChart(months) {
           type: 'line',
           label: 'Income',
           data: months.map((m) => Math.abs(m.income || 0)),
-          borderColor: targetMarkColor(),
+          borderColor: desiredMarkColor(),
           borderWidth: 2,
           pointRadius: 0,
           pointHoverRadius: 4,

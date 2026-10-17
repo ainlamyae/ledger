@@ -15,11 +15,11 @@
   - Calculate sends the typed ingredient text only.
   - The USDA lookup sends the ingredient name only.
   - Physique's **Scan** sends the meal photo you pick; Nutrition's **Scan** sends the label photo you pick (resized to 1600px, as JPEG) and the list of nutrient names it may fill.
-  - Wellness Insight sends age, height, BMI, body mass/target and aggregated averages.
+  - Wellness Insight sends age, height, BMI, body mass/healthy body mass and aggregated averages.
   - Food Insight sends the ingredient list grouped by Group plus your question — no real vitamin/mineral data, just the model's own inference from the ingredient names.
   - Micronutrient Insight sends real, USDA-measured nutrient totals (from ingredients you've priced via Nutrition's Pull Micronutrients) and their Ideal/day reference figures — the one mode that does send vitamin/mineral data, because unlike Food Insight it's measured, not inferred.
   - Activity Insight sends the activity-type and per-muscle-group breakdown.
-  - Plan Insight sends your plan settings (height, age, sex, current and target body mass, activity target, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
+  - Plan Insight sends your plan settings (height, age, sex, current and healthy body mass, desired activity, fat-loss rate, protein rule) alongside the same aggregated averages Wellness sends.
   - Pattern Insight sends the profile block plus period averages over Tune's L_p days (body mass and its change, intake, macros, activity by type, energy balance and BMR offset).
   - Finance Market's AI read sends one stock's signal rows, levels, last 5 closes, a year of month-end chart values (public prices) and Finnhub headlines, plus your shares and average cost only when **Include my position** is ticked.
   - Nothing is sent until that panel's Send to AI is clicked.

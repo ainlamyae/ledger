@@ -182,10 +182,10 @@ function currentRoutedPanel() {
 }
 
 // The route a click lands on: a block's heading or one of its routed buttons.
-function routeHit(target) {
-  const button = target.closest('#dashboard .panel[data-route] button[data-route]');
+function routeHit(element) {
+  const button = element.closest('#dashboard .panel[data-route] button[data-route]');
   if (button) return { panel: button.closest('.panel[data-route]'), button };
-  const heading = target.closest('#dashboard .panel[data-route] h2');
+  const heading = element.closest('#dashboard .panel[data-route] h2');
   const panel = heading?.closest('.panel[data-route]');
   return panel && panel.querySelector('h2') === heading ? { panel, button: null } : null;
 }

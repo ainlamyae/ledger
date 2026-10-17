@@ -263,7 +263,7 @@ function renderPortfolioCharts() {
   ];
   const value = [
     { label: 'Market value', data: series.marketValueCad, color: chartColor('--chart-blue') },
-    { label: 'Cost basis (ACB)', data: series.costBasisCad, color: targetMarkColor(), dash: true },
+    { label: 'Cost basis (ACB)', data: series.costBasisCad, color: desiredMarkColor(), dash: true },
   ];
   const draw = () => {
     const visible = (list) => list.map((s) => ({ ...s, hidden: portfolioHiddenSeries.has(s.label) }));

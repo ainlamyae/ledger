@@ -303,11 +303,17 @@ function renderTransactions() {
     tbody.appendChild(renderEmptyRow(8, message));
   }
 
+  const sameReceipt = (a, b) => a && b && a.date === b.date && a.account === b.account && a.payee === b.payee;
+  let receiptTotal = 0;
+  let receiptLines = 0;
+
   pageItems.forEach((t, i) => {
     const tr = document.createElement('tr');
-    // A line where the receipt (payee or date) changes.
+    // A line where the receipt (date, account or payee) changes.
     const prev = pageItems[i - 1];
-    if (prev && (prev.payee !== t.payee || prev.date !== t.date)) tr.classList.add('tx-receipt-start');
+    if (prev && !sameReceipt(prev, t)) tr.classList.add('tx-receipt-start');
+    receiptTotal += t.amount;
+    receiptLines += 1;
 
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
@@ -352,11 +358,28 @@ function renderTransactions() {
 
     tr.append(checkboxCell, dateCell, accountCell, payeeCell, categoryCell, descCell, amountCell, actionsCell);
     tbody.appendChild(tr);
+
+    // UI-only total under a receipt of 2+ lines; not a sheet row.
+    if (sameReceipt(t, pageItems[i + 1])) return;
+    if (receiptLines > 1) tbody.appendChild(renderReceiptTotalRow(receiptTotal));
+    receiptTotal = 0;
+    receiptLines = 0;
   });
 
   updateSelectAllCheckbox(pageItems);
   updateBulkActionsUI();
   renderPagination(totalPages);
+}
+
+function renderReceiptTotalRow(total) {
+  const tr = document.createElement('tr');
+  tr.className = 'tx-receipt-total';
+  tr.title = 'Receipt total, shown here only, not a row in the sheet';
+  const amountCell = document.createElement('td');
+  amountCell.className = 'num';
+  amountCell.textContent = formatCurrency(total);
+  tr.append(...Array.from({ length: 6 }, () => document.createElement('td')), amountCell, document.createElement('td'));
+  return tr;
 }
 
 function updateSelectAllCheckbox(pageItems) {
@@ -425,7 +448,7 @@ let updateBalanceWanted = true;
 // Reflects what "Update the account balance" can actually do for the account now
 // selected. An account whose Balance the sheet computes for itself gets the box
 // turned off and the reason printed under it, rather than a tick that would have
-// double-counted the row on save (finance-account.js: accountBalanceTarget).
+// double-counted the row on save (finance-account.js: accountBalanceCell).
 //
 // Deliberately doesn't disable the box while the read is in flight: a tick lost
 // to a slow read would be worse than the late correction, and the save path
@@ -442,14 +465,14 @@ async function syncUpdateBalanceBox() {
     return;
   }
 
-  const target = await accountBalanceTarget(name);
+  const cell = await accountBalanceCell(name);
   // The account may have been changed again while this was out.
   if (document.getElementById('tx-account').value !== name) return;
 
-  box.disabled = !target.writable;
-  box.checked = target.writable && updateBalanceWanted;
-  note.hidden = target.writable;
-  if (!target.writable) note.textContent = target.reason;
+  box.disabled = !cell.writable;
+  box.checked = cell.writable && updateBalanceWanted;
+  note.hidden = cell.writable;
+  if (!cell.writable) note.textContent = cell.reason;
 }
 
 // The chosen account's institution, type and balance after it, as Transfer's From/To.
@@ -499,7 +522,7 @@ function closeTransactionForm() {
 }
 
 // Confetti on saving money in: an Income category with a positive amount —
-// same burst Physique fires when body mass moves toward its target
+// same burst Physique fires when body mass moves toward the healthy mass
 // (celebrateWithConfetti, confetti.js). Category is free text, so matched
 // without regard to case or stray spaces.
 function isIncomeTransaction(category, amount) {

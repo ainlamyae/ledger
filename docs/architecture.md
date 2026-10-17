@@ -144,7 +144,7 @@ flowchart TD
     Idle --> InsightPanel["Insight panel<br/>(nothing computed on load)"]
     InsightPanel --> InsightMode{"Wellness / Food / Activity<br/>button clicked?"}
     InsightMode -- no --> Idle
-    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>ingredient rollup by Group /<br/>real Micronutrients totals vs. Ideal/day<br/>(health-nutrient-targets.js) + coverage count /<br/>per-muscle-group reps — no API call"]
+    InsightMode -- yes --> InsightPreview["Client-side preview of that mode:<br/>shared profile block +<br/>range vs. prior-period aggregation /<br/>ingredient rollup by Group /<br/>real Micronutrients totals vs. Ideal/day<br/>(health-nutrient-desired.js) + coverage count /<br/>per-muscle-group reps — no API call"]
     InsightPreview --> InsightSend{"Send to AI<br/>clicked?"}
     InsightSend -- yes --> InsightReport["Groq chat-completions API<br/>renders free-text report,<br/>saved to that mode's INSIGHT_* keys"] --> Idle
     InsightSend -- no --> Idle
@@ -166,12 +166,12 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
 | 7 | `ai.js` | AI chat client for Groq or OpenRouter (`AI_PROVIDER`), models from `GROQ_MODELS`/`OPENROUTER_MODELS`; tolerant JSON parsing; never rewrites the user's own Notes; vision calls (`aiAnalyzeFoodImage`, `aiReadNutritionLabel`) for photo scans |
 | 8 | `health-nutrition-usda.js` | USDA FoodData Central client; returns several candidates, not just the top hit, each carrying its full nutrient panel (vitamins/minerals included) straight from the search response |
-| 9 | `health-nutrient-targets.js` | Ideal/day reference amounts (mostly FDA Daily Values) and gap-severity thresholds for the Micronutrients mode, overridable via a `MICRONUTRIENT_DAILY_TARGETS_JSON` Setting |
+| 9 | `health-nutrient-desired.js` | Ideal/day reference amounts (mostly FDA Daily Values) and gap-severity thresholds for the Micronutrients mode, overridable via a `MICRONUTRIENT_DAILY_DESIRED_JSON` Setting |
 | 10 | `health-nutrition.js` | Nutrition table, Group column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry`, Log into today's Physique Consumption |
 | 11 | `health-physique-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
 | 12 | `ledger-widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
-| 14 | `health-math.js` | Pure health/target formulas with no chart or DOM code: BMR/TEF/calorie-target math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, target-date projection |
+| 14 | `health-math.js` | Pure health/desired-figure formulas with no chart or DOM code: BMR/TEF/calorie-desired math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, until-date projection |
 | 15 | `health-chart.js` | Chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
 | 16 | `finance-chart.js` | Finance Chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Account Allocation) |
 | 17 | `track-work-time-chart.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
@@ -192,15 +192,15 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 32 | `track-application.js` | Parses header+status-update rows into Ongoing/Closed cards |
 | 33 | `health-insight-wellness.js` | Shared profile/aggregation/render helpers, plus the Wellness mode |
 | 34 | `health-insight-food.js` | Food mode: per-ingredient rollup **grouped by Group** |
-| 35 | `health-insight-micronutrient.js` | Micronutrient mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `health-nutrient-targets.js`'s Ideal/day figures |
+| 35 | `health-insight-micronutrient.js` | Micronutrient mode: sums real, USDA-sourced nutrient totals off the Nutrition table's Micronutrients column, scaled to what was actually eaten, against `health-nutrient-desired.js`'s Ideal/day figures |
 | 36 | `health-insight-activity.js` | Activity mode: consistency, rep volume, per-muscle-group breakdown |
-| 37 | `health-insight-protein.js` | Protein mode: target vs. actual share per tracked source, reusing `computeProteinRotationRows` |
+| 37 | `health-insight-protein.js` | Protein mode: desired vs. actual share per tracked source, reusing `computeProteinRotationRows` |
 | 38 | `health-insight-plan.js` | Plan mode: the Tune's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
 | 39 | `health-insight-pattern.js` | Pattern mode: the BMR_cal periods plus macro/activity-type averages, and the pattern-finding prompt |
 | 40 | `health-insight.js` | The panel itself: mode table, load buttons, AI call, per-mode save/restore |
 | 41 | `health-chart-protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Group |
 | 42 | `health-tune-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
-| 43 | `health-tune-render.js` | Tune's substituted-formula display, per-nutrient section renderers, target/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
+| 43 | `health-tune-render.js` | Tune's substituted-formula display, per-nutrient section renderers, desired/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
 | 44 | `health-tune.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
 | 45 | `finance-insight.js` | Finance Insight panel: net worth/cash flow/category-spend/account snapshot, AI call |
 | 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |

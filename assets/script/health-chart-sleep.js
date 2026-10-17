@@ -41,11 +41,11 @@ function computeSleepAxisRange(shiftedPairs) {
   };
 }
 
-// Red -> amber -> green from half the target up to the target, in the app's own
+// Red -> amber -> green from half the desired sleep up to all of it, in the app's own
 // expense/calories/income colours. Solid at either end.
-function sleepStatusColor(durationHr, targetHr) {
-  const minHr = targetHr / 2;
-  const ratio = Math.min(1, Math.max(0, (durationHr - minHr) / (targetHr - minHr)));
+function sleepStatusColor(durationHr, desiredHr) {
+  const minHr = desiredHr / 2;
+  const ratio = Math.min(1, Math.max(0, (durationHr - minHr) / (desiredHr - minHr)));
   return ratio < 0.5
     ? lerpHex(chartColor('--chart-bad'), chartColor('--chart-warn'), ratio / 0.5)
     : lerpHex(chartColor('--chart-warn'), chartColor('--chart-good'), (ratio - 0.5) / 0.5);
@@ -55,8 +55,8 @@ function sleepStatusColor(durationHr, targetHr) {
 // same kcal figure the dot's position and the glance tile's number already show, not a
 // separate hours-based reading, so the colour can't tell a different story than the
 // value beside it. Full red at 60 kcal/day: roughly what one night a couple of hours
-// short costs a typical few-hundred-kcal target deficit — an hours-based ratio against
-// the full sleep target left ordinary night-to-night variation reading as the same
+// short costs a typical few-hundred-kcal desired deficit — an hours-based ratio against
+// the full desired sleep left ordinary night-to-night variation reading as the same
 // solid green. Shared by the Sleep chart's dot and the Deprivation Effect glance tile.
 const SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL = 60;
 
@@ -69,13 +69,13 @@ function sleepDeprivationDotColor(deprivationEffectKcal) {
 function renderHealthSleepChart(entries) {
   const ctx = document.getElementById('health-sleep-chart');
 
-  const sleepTarget = getSetting('SLEEP_TARGET_HOURS', SLEEP_TARGET_HOURS_DEFAULT);
+  const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
   const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
   // Shared with every other chart in the panel (healthCalorieChartDates), not this
   // metric's own earliest log — a Sleep chart clipped to its own first entry could pick
   // a different-length date list than Body Mass/Calorie Balance/etc, and
-  // wellnessTickIndices (charts-base.js) would then choose DIFFERENT Mondays for its
+  // wellnessTickIndices (charts-base.js) would then choose DIFFERENT dates for its
   // ticks even though every chart runs the identical selection algorithm. One shared list is the
   // only way every chart's gridlines are guaranteed to land on the same dates.
   const dates = healthCalorieChartDates(entries);
@@ -112,7 +112,7 @@ function renderHealthSleepChart(entries) {
     if (!shifted) { barColors.push(null); return null; }
     const { start, end, e } = shifted;
     rangeByDate.set(d, { bedMin: e.sleepBedMin, wakeMin: e.sleepWakeMin, durationHr: e.amount });
-    barColors.push(sleepStatusColor(e.amount, sleepTarget));
+    barColors.push(sleepStatusColor(e.amount, sleepDesired));
     return [start, end];
   });
 
@@ -121,13 +121,13 @@ function renderHealthSleepChart(entries) {
   const bedAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null));
   const wakeAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null));
 
-  // Deprivation Effect = Target Deficit × (1 - Sleep Efficiency Factor) — the kcal of
-  // the plan's own deficit (targetBalanceKcal, not the day's actual eaten-vs-burned
+  // Deprivation Effect = Desired Deficit × (1 - Sleep Efficiency Factor) — the kcal of
+  // the plan's own deficit (desiredBalanceKcal, not the day's actual eaten-vs-burned
   // balance — that adjustment lives in Calorie Balance instead) that a short night cost,
   // dotted on each night's bar. Zero — green — at a full night; red and rising the
-  // further that night fell short of the target. This is the impact, not what survived
+  // further that night fell short of desired sleep. This is the impact, not what survived
   // it, so a good night reads as "nothing lost" rather than a number worth reading.
-  const targetDeficitKcal = targetBalanceKcal(planBodyMassKg(entries));
+  const desiredDeficitKcal = desiredBalanceKcal(planBodyMassKg(entries));
   const sleepHoursByDate = new Map();
   sleepEntries.forEach((e) => {
     sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount);
@@ -135,11 +135,21 @@ function renderHealthSleepChart(entries) {
   const dotColors = [];
   const deprivationEffectData = dates.map((d) => {
     const sleepHrs = sleepHoursByDate.get(d);
-    if (sleepHrs === undefined || targetDeficitKcal === null) { dotColors.push(null); return null; }
-    const factor = sleepEfficiencyFactor(sleepHrs, sleepTarget);
-    const kcal = Math.round(Math.abs(targetDeficitKcal) * (1 - factor));
+    if (sleepHrs === undefined || desiredDeficitKcal === null) { dotColors.push(null); return null; }
+    const factor = sleepEfficiencyFactor(sleepHrs, sleepDesired);
+    const kcal = Math.round(Math.abs(desiredDeficitKcal) * (1 - factor));
     dotColors.push(sleepDeprivationDotColor(kcal));
     return kcal;
+  });
+
+  // Legend entries switched off (renderToggleLegend below); nights by how far short of
+  // the desired sleep they fell, the cut-offs the gradient runs between.
+  const hidden = legendHiddenNames('health-sleep-legend');
+  const nightClasses = dates.map((d) => {
+    const r = rangeByDate.get(d);
+    if (!r) return null;
+    if (r.durationHr >= sleepDesired) return 'Desired sleep met';
+    return r.durationHr <= sleepDesired / 2 ? 'Half of desired or less' : 'Short of desired';
   });
 
   wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
@@ -149,13 +159,13 @@ function renderHealthSleepChart(entries) {
         {
           type: 'bar',
           label: 'Sleep',
-          data: sleepData,
+          data: maskHiddenClasses(sleepData, nightClasses, hidden),
           backgroundColor: barColors,
           yAxisID: 'y1',
           order: 2,
         },
-        trendLineDataset('7-Day Avg Bed', bedAvg, { yAxisID: 'y1' }),
-        trendLineDataset('7-Day Avg Wake', wakeAvg, { yAxisID: 'y1' }),
+        trendLineDataset('7-Day Avg Bed', bedAvg, { yAxisID: 'y1', hidden: hidden.has('7-Day Average Bed & Wake') }),
+        trendLineDataset('7-Day Avg Wake', wakeAvg, { yAxisID: 'y1', hidden: hidden.has('7-Day Average Bed & Wake') }),
         {
           type: 'line',
           label: 'Deprivation Effect',
@@ -167,7 +177,8 @@ function renderHealthSleepChart(entries) {
           pointBackgroundColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           pointBorderColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           yAxisID: 'y',
-          // Paints on top of the bar it sits on, same convention as the target caps.
+          hidden: hidden.has('Sleep Deprivation Effect (dot, green to red)'),
+          // Paints on top of the bar it sits on, same convention as the desired caps.
           order: 0,
         },
       ],
@@ -229,5 +240,14 @@ function renderHealthSleepChart(entries) {
       },
     },
   });
+
+  // Swatches under the chart; both 7-Day lines share one colour, so one entry.
+  renderToggleLegend('health-sleep-legend', rangeByDate.size === 0 ? [] : [
+    { name: 'Desired sleep met', color: chartColor('--chart-good') },
+    { name: 'Short of desired', color: chartColor('--chart-warn') },
+    { name: 'Half of desired or less', color: chartColor('--chart-bad') },
+    { name: '7-Day Average Bed & Wake', color: desiredMarkColor() },
+    ...(desiredDeficitKcal !== null ? [{ name: 'Sleep Deprivation Effect (dot, green to red)', color: sleepDeprivationDotColor(SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL / 2) }] : []),
+  ], () => renderHealthSleepChart(entries));
 }
 

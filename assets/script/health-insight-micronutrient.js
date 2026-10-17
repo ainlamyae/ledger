@@ -36,16 +36,16 @@ function endsNutritionFactsLines(nutrients, i) {
 }
 
 // True on the row just above the first nutrient past the Nutrition Facts lines with
-// no daily target, when a targeted one sits above it: the rule between the
+// no desired daily amount, when a judged one sits above it: the rule between the
 // nutrients judged against a goal and the reference-only ones.
-function endsTargetedNutrients(nutrients, i) {
+function endsDesiredNutrients(nutrients, i) {
   const next = nutrients[i + 1];
   return !!next && !next.factsLine && next.ideal === null && !nutrients[i].factsLine && nutrients[i].ideal !== null;
 }
 
 // One table row's class for either rule; both draw the same line.
 function nutrientSectionEnd(nutrients, i) {
-  return endsNutritionFactsLines(nutrients, i) || endsTargetedNutrients(nutrients, i);
+  return endsNutritionFactsLines(nutrients, i) || endsDesiredNutrients(nutrients, i);
 }
 
 // Every date in [from, to] that actually has a Calculate-derived breakdown —
@@ -117,17 +117,17 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
     });
   });
 
-  // Read once per aggregation, not once per nutrient — nutrientDailyTargets()
-  // (health-nutrient-targets.js) re-parses a Setting value on every call, and this
+  // Read once per aggregation, not once per nutrient — nutrientDailyDesired()
+  // (health-nutrient-desired.js) re-parses a Setting value on every call, and this
   // loop runs over the whole nutrient list.
-  const targets = nutrientDailyTargets();
+  const dailyDesired = nutrientDailyDesired();
   // The Nutrition Facts lines lead, in label order and under the label's names
   // (Saturated, Omega-3, Sodium, …), as in the ingredient form (NUTRITION_FACTS_ORDER, health-nutrition.js).
   const factsRanks = nutritionFactsRanks([...totals.keys()]);
   const nutrients = [...totals.entries()]
     .map(([name, v]) => {
       const perDay = daysLogged > 0 ? Math.round((v.total / daysLogged) * 1000) / 1000 : null;
-      const target = targets[name] || null;
+      const desired = dailyDesired[name] || null;
       return {
         name,
         displayName: factsRanks.get(name)?.label || NUTRIENT_DISPLAY_NAME[name] || name,
@@ -135,16 +135,16 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
         unit: v.unit,
         total: Math.round(v.total * 1000) / 1000,
         perDay,
-        ideal: target ? target.amount : null,
-        idealUnit: target ? target.unit : null,
-        kind: target ? target.kind : null,
-        severity: target ? nutrientGapSeverity(target.kind, perDay, target.amount) : null,
+        ideal: desired ? desired.amount : null,
+        idealUnit: desired ? desired.unit : null,
+        kind: desired ? desired.kind : null,
+        severity: desired ? nutrientGapSeverity(desired.kind, perDay, desired.amount) : null,
       };
     })
-    // Zero eaten with no target (or a zero one) says nothing; a zero against a real target is a gap.
+    // Zero eaten with no desired amount (or a zero one) says nothing; a zero against a real one is a gap.
     .filter((n) => n.total !== 0 || (n.ideal !== null && n.ideal !== 0))
     // The Nutrition Facts lines first, in label order. Then nutrients with a known
-    // target (alphabetical), then everything without one (alphabetical) — so the
+    // desired amount (alphabetical), then everything without one (alphabetical) — so the
     // rows worth judging against a goal aren't scattered through dozens of
     // reference-only ones.
     .sort((a, b) => {
@@ -178,7 +178,7 @@ const TEF_CARB_SHARE_DEFAULT = 7.5;
 const TEF_FAT_SHARE_DEFAULT = 2;
 
 // Standard Atwater energy factors (kcal/g), keyed by the exact FDC nutrient
-// name so this reads straight off the same panel health-nutrient-targets.js's Daily
+// name so this reads straight off the same panel health-nutrient-desired.js's Daily
 // Value table already keys by, no separate lookup needed. tefShare is read
 // fresh from Settings on every call rather than baked in here, so a value
 // edited in the Settings panel takes effect on the next Calculate/estimate
@@ -321,7 +321,7 @@ function formatMicronutrientCoverageLine(data) {
 
 function renderMicronutrientInsightPreview(data) {
   renderInsightLines(document.getElementById('insight-micro-profile'), [
-    ...formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)),
+    ...formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)),
     formatMicronutrientCoverageLine(data),
   ]);
 
@@ -353,7 +353,7 @@ function renderMicronutrientInsightPreview(data) {
 const MICRONUTRIENT_INSIGHT_DEFAULT_QUESTION = 'Is this amount enough? What is missing, and what should I eat to fix it?';
 
 function formatMicronutrientInsightPrompt(data, { from, to, question }) {
-  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_TARGET_KG', BODY_MASS_TARGET_KG_DEFAULT)).join('\n');
+  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)).join('\n');
   const coverage = formatMicronutrientCoverageLine(data);
   const header = `Real, measured nutrient totals (from USDA FoodData Central, via each ingredient's own Nutrition-table entry) for the ingredients logged from ${from} to ${to} that have been priced for micronutrients — name: total over the period (average per day), ideal/day (a fixed FDA Daily Value, not personalized to this user), and whether the app's own math already flags a gap:`;
   const body = data.nutrients.length

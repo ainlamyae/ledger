@@ -281,19 +281,19 @@ function extractIngredientQuantity(segment) {
 // The calorie figure this item was anchored to, or null if none was typed.
 // Everything downstream works in kcal, so a kJ amount was already converted
 // to kcal back in stripLeadingIngredientTokens.
-function extractEnergyTarget({ anchors }) {
+function extractEnergyDesired({ anchors }) {
   return (anchors && anchors.kcal !== undefined) ? Math.max(0, anchors.kcal) : null;
 }
 
 // The inverse of the usual grams → calories scaling: how much of a food of
-// known density adds up to a target calorie count. A zero/unknown density
+// known density adds up to a desired calorie count. A zero/unknown density
 // (e.g. "300kcal water" — a contradiction) would divide to Infinity, so it
 // falls back to the AI's own gram estimate for the item instead.
 function gramsForEnergy(energyKcal, kcalPer100g, fallbackGrams) {
   return kcalPer100g > 0 ? (energyKcal / kcalPer100g) * 100 : fallbackGrams;
 }
 
-// Protein/fiber/fat/carb-anchor equivalents of extractEnergyTarget above —
+// Protein/fiber/fat/carb-anchor equivalents of extractEnergyDesired above —
 // "20p chicken" gives the protein grams eaten directly rather than a weight
 // to derive it from. Unlike the energy anchor these are never used to derive
 // a weight themselves (see gramsForProtein) — a food can have several of
@@ -301,16 +301,16 @@ function gramsForEnergy(energyKcal, kcalPer100g, fallbackGrams) {
 // tried to drive it; only energy (or, failing that, the AI/USDA's own
 // estimate) ever picks the weight. Every other typed anchor is instead
 // applied directly as this line's true figure, whatever weight was picked.
-function extractProteinTarget({ anchors }) {
+function extractProteinDesired({ anchors }) {
   return (anchors && anchors.protein !== undefined) ? Math.max(0, anchors.protein) : null;
 }
-function extractFiberTarget({ anchors }) {
+function extractFiberDesired({ anchors }) {
   return (anchors && anchors.fiber !== undefined) ? Math.max(0, anchors.fiber) : null;
 }
-function extractFatTarget({ anchors }) {
+function extractFatDesired({ anchors }) {
   return (anchors && anchors.fat !== undefined) ? Math.max(0, anchors.fat) : null;
 }
-function extractCarbTarget({ anchors }) {
+function extractCarbDesired({ anchors }) {
   return (anchors && anchors.carb !== undefined) ? Math.max(0, anchors.carb) : null;
 }
 function gramsForProtein(proteinG, proteinPer100g, fallbackGrams) {
@@ -450,16 +450,16 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     //    "300kcal cookie" is most useful rewritten as the weight to put on
     //    the scale, so ×N is only used for a row that has no gram figure at
     //    all (e.g. "1 rice cake") and therefore can't express one.
-    const energyKcal = pairingReliable ? extractEnergyTarget(segmentQuantities[i]) : null;
+    const energyKcal = pairingReliable ? extractEnergyDesired(segmentQuantities[i]) : null;
     // Protein anchor ("20p chicken") — same backwards read as the energy
     // anchor above, off protein density instead of calorie density. Energy
     // and protein can now both be typed on the same segment (only energy
-    // ever drives the derived weight below — see extractProteinTarget), and
+    // ever drives the derived weight below — see extractProteinDesired), and
     // either/both can be joined by a fiber/fat/carb anchor too.
-    const proteinG = pairingReliable ? extractProteinTarget(segmentQuantities[i]) : null;
-    const fiberG = pairingReliable ? extractFiberTarget(segmentQuantities[i]) : null;
-    const fatG = pairingReliable ? extractFatTarget(segmentQuantities[i]) : null;
-    const carbG = pairingReliable ? extractCarbTarget(segmentQuantities[i]) : null;
+    const proteinG = pairingReliable ? extractProteinDesired(segmentQuantities[i]) : null;
+    const fiberG = pairingReliable ? extractFiberDesired(segmentQuantities[i]) : null;
+    const fatG = pairingReliable ? extractFatDesired(segmentQuantities[i]) : null;
+    const carbG = pairingReliable ? extractCarbDesired(segmentQuantities[i]) : null;
     const anchored = energyKcal !== null || proteinG !== null;
     const tableAnchorUsable = !!tableEntry && (
       (energyKcal !== null && tableEntry.calories > 0) || (proteinG !== null && tableEntry.protein > 0)
@@ -578,7 +578,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     // determined: the real gram weight for a weight-resolved item
     // (Nutrition or USDA/AI), or the matched unit count for a
     // count-resolved one, since that's more informative than leaving "1x"
-    // (or the calorie target, which the Amount field now carries anyway) in
+    // (or the desired calories, which the Amount field now carries anyway) in
     // the saved note once the real number is known.
     let noteQuantity;
     if (originalUnit && !anchored) {
@@ -689,7 +689,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 // user reviews it here: either click 💾 to bank it as-is, or leave it
 // and fix/retype the ingredient in Notes then Calculate again if the name
 // was wrong (e.g. a typo not matching an existing row).
-function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, target) {
+function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, form) {
   const btn = document.createElement('button');
   btn.type = 'button';
   // Beside ✏️ in the breakdown row, so styled like it.
@@ -707,11 +707,11 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, t
       // across two Notes lines) — clear all matching rows' newRow so a
       // second click can't bank the same name twice in one go.
       breakdown.forEach((r) => { if (r.newRow && r.newRow.name === row.newRow.name) r.newRow = null; });
-      renderCalcBreakdown(breakdown, totalCalories, totalProtein, target);
+      renderCalcBreakdown(breakdown, totalCalories, totalProtein, form);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '💾';
-      showFieldError(`${target}-form-error`, err.message);
+      showFieldError(`${form}-form-error`, err.message);
     }
   });
   return btn;
@@ -725,7 +725,7 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, t
 // correcting any other Nutrition row. Save both banks the corrected figures
 // (same as 💾 would) AND folds the correction into today's own Consumption
 // breakdown/total in one step — see applyEditedRowToBreakdown below.
-function makeEditNewRowButton(row, breakdown, target) {
+function makeEditNewRowButton(row, breakdown, form) {
   return makeRowActionButton({
     emoji: '✏️',
     title: `Not quite right? Fix "${row.name}"'s numbers before saving — Save banks the correction and updates this line`,
@@ -747,7 +747,7 @@ function makeEditNewRowButton(row, breakdown, target) {
         verified: false,
         proteinPercent: null,
         micronutrients: null,
-      }, (saved) => applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, target));
+      }, (saved) => applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, form));
     },
   });
 }
@@ -777,7 +777,7 @@ function scaleFactorBetweenAmounts(basisAmount, consumedAmount) {
 // made stale) makeAddToNutritionButton doesn't need, since banking a row
 // as-is never changes the numbers already used for today's totals, but
 // correcting them here does.
-function applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, target) {
+function applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, form) {
   const scale = scaleFactorBetweenAmounts(saved.amount, consumedAmount);
   const idx = breakdown.indexOf(row);
   if (idx === -1) return;
@@ -801,17 +801,17 @@ function applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, target
   const totalProtein = Math.round(breakdown.reduce((sum, r) => sum + r.protein, 0) * 10) / 10;
   // Re-derives Fiber/Fat/Carbohydrate/TEF from the (now table-matched)
   // breakdown and writes Calories In/Protein In — before the render below,
-  // so what gets drawn (and, for target 'physique', written into the
+  // so what gets drawn (and, for form 'physique', written into the
   // Breakdown field) already reflects it rather than going stale a beat later.
-  if (target === 'physique') syncPhysiqueTotalsFromBreakdown(breakdown, totalCalories, totalProtein);
-  renderCalcBreakdown(breakdown, totalCalories, totalProtein, target);
+  if (form === 'physique') syncPhysiqueTotalsFromBreakdown(breakdown, totalCalories, totalProtein);
+  renderCalcBreakdown(breakdown, totalCalories, totalProtein, form);
 }
 
 // Renders the per-item breakdown table under Notes so the combined Amount
 // can be checked by eye/pure arithmetic before saving — the Total row uses
 // the exact same rounded totals written into the Amount field, not a
 // re-sum of the (individually rounded, so slightly lossy) per-item rows.
-// `target` names the form whose table to draw into — currently only Physique's
+// `form` names the form whose table to draw into — currently only Physique's
 // (health-physique.js), which keeps the same JSON in a field of its own and so gets it
 // rewritten here too.
 // Source and Save are one column, because they're two halves of the same fact
@@ -840,7 +840,7 @@ const NUTRITION_TABLE_SOURCE_LABEL = CONFIG.SHEETS.NUTRITION;
 // back into the words it was collapsed from, on rows nothing has touched since.
 const NUTRITION_TABLE_SOURCE_LABELS = [NUTRITION_TABLE_SOURCE_LABEL, 'Nutrition', 'Nutrition Facts'];
 
-function sourceCell(row, breakdown, totalCalories, totalProtein, target) {
+function sourceCell(row, breakdown, totalCalories, totalProtein, form) {
   const cell = document.createElement('td');
   const fromTable = NUTRITION_TABLE_SOURCE_LABELS.includes(row.source);
 
@@ -851,8 +851,8 @@ function sourceCell(row, breakdown, totalCalories, totalProtein, target) {
 
   if (row.newRow) {
     cell.append(
-      ' ', makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, target),
-      ' ', makeEditNewRowButton(row, breakdown, target),
+      ' ', makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, form),
+      ' ', makeEditNewRowButton(row, breakdown, form),
     );
   }
   return cell;
@@ -867,8 +867,8 @@ function macroCell(value, decimals = 1) {
   return makeCell(value === undefined ? '—' : value.toFixed(decimals));
 }
 
-function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'physique') {
-  const tbody = document.getElementById(`${target}-calc-breakdown-body`);
+function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'physique') {
+  const tbody = document.getElementById(`${form}-calc-breakdown-body`);
   tbody.innerHTML = '';
 
   // Merged for DISPLAY only — two Notes lines for the same ingredient (e.g.
@@ -893,7 +893,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       macroCell(row.fat),
       macroCell(row.carbohydrate),
       macroCell(row.tef, 0),
-      sourceCell(row, breakdown, totalCalories, totalProtein, target),
+      sourceCell(row, breakdown, totalCalories, totalProtein, form),
     );
     tbody.appendChild(tr);
 
@@ -920,33 +920,33 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
 
   // What the day above is aiming for, so the Total row has something to compare itself
   // against without leaving the table — same "Ideal/day" idiom health-insight-food.js's own
-  // table uses, reusing the exact targets the tiles/charts already compute
-  // (getCalorieTarget, getProteinTargetBandG/getFiberTargetBandG) rather than a second
+  // table uses, reusing the exact desired figures the tiles/charts already compute
+  // (getCalorieDesired, getProteinDesiredBandG/getFiberDesiredBandG) rather than a second
   // copy of the arithmetic. Fat/Carbohydrate fall back to the FDA Daily Value reference
-  // (no personalized formula for either yet); TEF and Source get no target at all.
+  // (no personalized formula for either yet); TEF and Source get no desired figure.
   // Physique-only, and only today's own form: every other day is read after the
   // fact, so "still left to reach today's goal" doesn't apply to it the way it
   // does to the one day actually being logged.
-  if (target === 'physique' && physiqueField('date').value === isoFromDate(new Date())) {
+  if (form === 'physique' && physiqueField('date').value === isoFromDate(new Date())) {
     const healthEntries = physiqueAsHealthEntries();
-    const calorieTarget = getCalorieTarget(healthEntries);
-    const proteinBand = getProteinTargetBandG(healthEntries);
-    const fiberBand = getFiberTargetBandG(healthEntries);
-    const dailyTargets = nutrientDailyTargets();
+    const calorieDesired = getCalorieDesired(healthEntries);
+    const proteinBand = getProteinDesiredBandG(healthEntries);
+    const fiberBand = getFiberDesiredBandG(healthEntries);
+    const dailyDesired = nutrientDailyDesired();
 
-    const desireCalories = Math.round(calorieTarget.kcal);
-    // Null when the Setting's target list leaves the nutrient out: shown as —.
-    const desireFat = dailyTargets['Total lipid (fat)']?.amount ?? null;
-    const desireCarb = dailyTargets['Carbohydrate, by difference']?.amount ?? null;
-    // TEF the calorie target itself would produce at the current thermic rate — the same
-    // `calTarget.kcal × (1 − tefDivisor())` the Tune's "energy spent digesting" field
+    const desireCalories = Math.round(calorieDesired.kcal);
+    // Null when the Setting's desired list leaves the nutrient out: shown as —.
+    const desireFat = dailyDesired['Total lipid (fat)']?.amount ?? null;
+    const desireCarb = dailyDesired['Carbohydrate, by difference']?.amount ?? null;
+    // TEF the desired calories would produce at the current thermic rate — the same
+    // `calDesired.kcal × (1 − tefDivisor())` the Tune's "energy spent digesting" field
     // and the Status TEF row show. Blank when TEF isn't being counted (rate 0, the default),
     // matching the Tune, which hides a zero TEF.
-    const desireTef = Math.round(calorieTarget.kcal * (1 - tefDivisor()));
-    const targetRow = document.createElement('tr');
-    targetRow.className = 'calc-breakdown-target';
-    targetRow.append(
-      makeCell('Desire', `${calorieTarget.full} calorie target, current protein/fiber band floors (${formatProteinTargetBand(proteinBand)} / ${formatProteinTargetBand(fiberBand)} full range), Fat/Carbohydrate FDA Daily Values and the TEF that target's own digestion costs — from Tune and Settings, not today's Consumption`),
+    const desireTef = Math.round(calorieDesired.kcal * (1 - tefDivisor()));
+    const desiredRow = document.createElement('tr');
+    desiredRow.className = 'calc-breakdown-desired';
+    desiredRow.append(
+      makeCell('Desire', `${calorieDesired.full} desired calories, current protein/fiber band floors (${formatProteinDesiredBand(proteinBand)} / ${formatProteinDesiredBand(fiberBand)} full range), Fat/Carbohydrate FDA Daily Values and the TEF their own digestion costs — from Tune and Settings, not today's Consumption`),
       makeCell(''),
       makeCell(String(desireCalories)),
       makeCell(String(proteinBand.min)),
@@ -956,11 +956,11 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
       makeCell(desireTef > 0 ? String(desireTef) : '—'),
       makeCell(''),
     );
-    tbody.appendChild(targetRow);
+    tbody.appendChild(desiredRow);
 
-    // Remain — Desire minus Total for each column that has a target (Source has none),
+    // Remain — Desire minus Total for each column with a desired figure (Source has none),
     // i.e. how much of each is still left to hit the day's goal. Unclamped, so a column
-    // already past its target reads as a negative surplus rather than a flat zero.
+    // already past its desired figure reads as a negative surplus rather than a flat zero.
     const remainingRow = document.createElement('tr');
     remainingRow.className = 'calc-breakdown-remaining';
     remainingRow.append(
@@ -980,17 +980,17 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, target = 'p
   // Physique stores the same JSON in a visible field rather than a hidden
   // column, so every re-render (including 💾 clearing a row's newRow) keeps
   // that field in step with the table above it.
-  if (target === 'physique') {
+  if (form === 'physique') {
     document.getElementById('physique-breakdown').value = breakdownToJson(breakdown);
   }
 
-  document.getElementById(`${target}-calc-breakdown`).hidden = false;
+  document.getElementById(`${form}-calc-breakdown`).hidden = false;
 }
 
 // Tears the table down when there's nothing parseable to show. Only the table:
 // Physique's Breakdown field is the user's to edit, so health-physique.js clears that
 // explicitly where it's actually meant.
-function hideCalcBreakdown(target = 'physique') {
-  document.getElementById(`${target}-calc-breakdown`).hidden = true;
-  document.getElementById(`${target}-calc-breakdown-body`).innerHTML = '';
+function hideCalcBreakdown(form = 'physique') {
+  document.getElementById(`${form}-calc-breakdown`).hidden = true;
+  document.getElementById(`${form}-calc-breakdown-body`).innerHTML = '';
 }

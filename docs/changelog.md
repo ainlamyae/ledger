@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.15.0** | feat(charts): add intake chart and optional detail charts |
+| (this commit) | **3.16.0** | feat(charts): render chart tooltips over the page |
+| `6692857` | **3.15.0** | feat(charts): add intake chart and optional detail charts |
 | `88ef559` | **3.14.0** | feat(charts): export health and finance charts as PNG |
 | `abbdc66` | **3.13.0** | feat(charts): refit health chart axes to visible legend entries |
 | `9881a46` | **3.12.0** | feat(tune): add BMR_avg basis and tidy settings and action buttons |

@@ -507,7 +507,7 @@ function renderHealthBodyMassChart(entries) {
           position: 'left',
           min: yMin,
           max: yMax,
-          afterFit: fixTrendYAxisWidth,
+          afterFit: fixDatedYAxisWidth,
           // autoSkip off so the step is honoured exactly.
           ticks: { stepSize: kgStep, autoSkip: false, callback: maskedUnitTick('kg', kgStep < 1 ? 1 : 0) },
         },
@@ -523,7 +523,7 @@ function renderHealthBodyMassChart(entries) {
               min: computeBmi(yMin, heightCm),
               max: computeBmi(yMax, heightCm),
               position: 'right',
-              afterFit: fixTrendYAxisWidth,
+              afterFit: fixDatedYAxisWidth,
               grid: { drawOnChartArea: false },
               ticks: {
                 stepSize: bmiStep,

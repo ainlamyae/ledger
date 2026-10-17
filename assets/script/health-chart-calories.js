@@ -222,7 +222,7 @@ function renderHealthCaloriesChart(entries) {
           // From 0 kcal, like the other intake charts.
           min: axis.min,
           max: axis.max,
-          afterFit: fixTrendYAxisWidth,
+          afterFit: fixDatedYAxisWidth,
           ticks: { callback: maskedUnitTick('kcal') },
         },
         y1: ghostRightAxis(),

@@ -29,6 +29,14 @@ function renderHealthIntakeChart(entries) {
     const g = e[key] ?? 0;
     return key === 'carbG' ? Math.max(0, g - (e.fiberG ?? 0)) : g;
   };
+  // Grams as logged, for the hover.
+  const gramsByMacro = INTAKE_MACROS.map(({ key }) => {
+    const m = new Map();
+    macroEntries.forEach((e) => {
+      if (e[key] !== null && e[key] !== undefined) m.set(e.date, (m.get(e.date) || 0) + e[key]);
+    });
+    return m;
+  });
   const kcalByMacro = INTAKE_MACROS.map(({ key, kcalPerG }) => {
     const m = new Map();
     macroEntries.forEach((e) => {
@@ -47,21 +55,27 @@ function renderHealthIntakeChart(entries) {
   });
   const macroColors = INTAKE_MACROS.map(({ hue }) => seriesColor(hue, { lightness: '--chart-series-light' }));
 
-  // The five BMR caps, as on Caloric Intake.
-  const BMR_CAPS = [
-    { key: 'BMR_mif', color: chartColor('--chart-blue') },
-    { key: 'BMR_kat', color: chartColor('--chart-orange') },
-    { key: 'BMR_cal', color: chartColor('--chart-indigo') },
-    { key: 'BMR_adp', color: chartColor('--chart-purple') },
-    { key: 'BMR_avg', color: chartColor('--chart-warn') },
-  ];
-  const bmrByKey = Object.fromEntries(BMR_CAPS.map(({ key }) => [key, new Map()]));
+  // Only the BMR selected in Tune, coloured as on Caloric Intake; a day missing it
+  // falls back to the equation, as pickBmrForBasis does.
+  const BMR_COLORS = {
+    BMR_mif: chartColor('--chart-blue'),
+    BMR_kat: chartColor('--chart-orange'),
+    BMR_cal: chartColor('--chart-indigo'),
+    BMR_adp: chartColor('--chart-purple'),
+    BMR_avg: chartColor('--chart-warn'),
+  };
+  const tuneBmrKey = { bmr_cal: 'BMR_cal', bmr_adp: 'BMR_adp', bmr_avg: 'BMR_avg' }[bmrBasis()] ?? BMR_EQUATION_KEYS[bmrFormula()];
+  const BMR_CAPS = [{ key: tuneBmrKey, color: BMR_COLORS[tuneBmrKey] }];
+  const bmrByKey = { [tuneBmrKey]: new Map() };
+  const bmrKeyByDate = new Map();
   const restingKcalByDate = new Map();
   dates.forEach((d) => {
     const figures = bmrFiguresForDate(d);
-    BMR_CAPS.forEach(({ key }) => {
-      if (figures[key] !== undefined) bmrByKey[key].set(d, figures[key]);
-    });
+    const selected = pickBmrForBasis(figures);
+    if (selected !== null) {
+      bmrByKey[tuneBmrKey].set(d, selected);
+      bmrKeyByDate.set(d, selectedBmrKey(figures));
+    }
     const plain = pickBmrForBasis(figures, 'bmr');
     if (plain !== null) restingKcalByDate.set(d, plain);
   });
@@ -174,9 +188,11 @@ function renderHealthIntakeChart(entries) {
               return { borderColor: fill, backgroundColor: fill };
             },
             label: (item) => {
-              const macro = INTAKE_MACROS.find((m) => m.label === item.dataset.label);
+              const m = INTAKE_MACROS.findIndex((x) => x.label === item.dataset.label);
+              const macro = INTAKE_MACROS[m];
+              const grams = macro ? gramsByMacro[m].get(item.label) : undefined;
               const text = macro
-                ? `${macro.label}: ${Math.round(item.parsed.y)} kcal`
+                ? `${macro.label}: ${Math.round(item.parsed.y)} kcal${grams !== undefined ? ` (${Math.round(grams * 10) / 10} g)` : ''}`
                 : `TEI (Total Energy Intake): ${item.parsed.y} kcal`;
               return privacyMode ? maskDigits(text) : text;
             },
@@ -184,10 +200,8 @@ function renderHealthIntakeChart(entries) {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
               const lines = [`Desired ${desired.word}: ${desiredByDay[i].kcal} kcal`];
-              BMR_CAPS.forEach(({ key }) => {
-                const kcal = bmrByKey[key].get(items[0].label);
-                if (kcal !== undefined) lines.push(`${bmrHoverLabel(key)}: ${Math.round(kcal)} kcal`);
-              });
+              const kcal = bmrByKey[tuneBmrKey].get(items[0].label);
+              if (kcal !== undefined) lines.push(`${bmrHoverLabel(bmrKeyByDate.get(items[0].label))}: ${Math.round(kcal)} kcal`);
               if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -202,7 +216,7 @@ function renderHealthIntakeChart(entries) {
           min: axis.min,
           max: axis.max,
           position: 'left',
-          afterFit: fixTrendYAxisWidth,
+          afterFit: fixDatedYAxisWidth,
           ticks: { callback: maskedUnitTick('kcal') },
         },
       },

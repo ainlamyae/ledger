@@ -14,7 +14,7 @@ One name, one unit and one format for each thing, app-wide.
 
 ## BMR names
 
-The five BMR figures are always `BMR_mif`, `BMR_kat`, `BMR_cal`, `BMR_adp`, `BMR_avg` (Average BMR) — in the Physique form, Status card, Tune, Caloric Intake chart and every hover.
+The five BMR figures are always `BMR_mif`, `BMR_kat`, `BMR_cal`, `BMR_adp`, `BMR_avg` (Average BMR) — in the Physique form, Status card, Tune, Caloric Intake chart and every hover. Where only one is shown (Status card, Intake, Calorie Balance), it is the one selected in Tune (`selectedBmrKey`).
 
 The Physique form shows them on one line, names grouped then values, unit once:
 

@@ -442,7 +442,7 @@ function localIngredientCalories(quantity, unit, name) {
   return tableGrams ? (entry.calories / tableGrams) * (quantity * gramsPerUnit) : null;
 }
 
-// Local-only tidy-up for a Consumption block, run by Calculate and the bulk Tidy:
+// Local-only tidy-up for a Consumption block, run by Calculate (form and bulk):
 // combines lines that are really the same entry typed twice (e.g. two
 // separate "38g onion" additions through the day), orders the rest by
 // calories (the same "highest first" order Calculate itself settles on), and
@@ -451,9 +451,9 @@ function localIngredientCalories(quantity, unit, name) {
 // "100g rice" and "1cup rice" stay separate rather than guessing a conversion
 // between them. A line with no parseable quantity (rare — Consumption is
 // meant to always lead with an amount) is left exactly as typed — never
-// merged, never recased. Pure text in, text out — no DOM, so Calculate and the
-// bulk Tidy further down share the exact same logic instead of two copies that
-// could drift apart.
+// merged, never recased. Pure text in, text out — no DOM, so the form's and the
+// bulk Calculate share the exact same logic instead of two copies that could
+// drift apart.
 function combineAndSortConsumptionText(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return { text, combinedCount: 0 };
@@ -473,9 +473,8 @@ function combineAndSortConsumptionText(text) {
   const rebuilt = [...groups.values()].map((g) => {
     if (g.quantity === null) return g.raw;
     const unitText = g.unit ? (UNIT_CANONICAL[g.unit] || g.unit) : '';
-    // Capitalized here too (titleCaseIngredientName, health-nutrition.js) — Tidy
-    // folds what used to be a separate Capitalize Names button into this
-    // same rebuild, so one click combines, sorts, AND fixes casing.
+    // Capitalized here too (titleCaseIngredientName, health-nutrition.js), so one
+    // Calculate combines, sorts, AND fixes casing.
     return `${Math.round(g.quantity * 100) / 100}${unitText} ${titleCaseIngredientName(g.name)}`.trim();
   });
 
@@ -786,65 +785,6 @@ function openPhysiqueMicronutrientsFromForm() {
     return;
   }
   openPhysiqueMicronutrients(entry, true);
-}
-
-// --- Bulk Tidy ---------------------------------------------------------
-//
-// Sits beside 🧮 Calculate in the same bulk actions bar, but never touches
-// Groq/USDA: for each selected day, combineAndSortConsumptionText combines
-// duplicate lines, sorts by calories, AND title-cases every name (folding in
-// what used to be a separate Capitalize Names button), then writes the
-// result straight back — the same per-row read/write bulkCalculatePhysique
-// uses. Calories In/Protein In are untouched — none of this changes the
-// day's totals, only how its Consumption text reads, so there's nothing for
-// Calculate's actual estimate to redo here.
-function eligibleForBulkCombine(p) {
-  return Boolean(p.consumption.trim());
-}
-
-async function bulkCombineAndSortPhysique() {
-  const selected = allPhysiqueEntries.filter((p) => selectedPhysiqueRows.has(p.row));
-  const eligible = selected.filter(eligibleForBulkCombine);
-  const skipped = selected.length - eligible.length;
-
-  if (!eligible.length) {
-    alert('None of the selected days have a Consumption to tidy.');
-    return;
-  }
-
-  const summaryEl = document.getElementById('physique-bulk-summary');
-  const snapshots = eligible.map((p) => ({ row: p.row, values: physiqueDayCopy(p) }));
-
-  let done = 0;
-  let combinedTotal = 0;
-  let changedCount = 0;
-  const succeeded = [];
-  const results = await Promise.allSettled(eligible.map(async (p, i) => {
-    try {
-      const { text, combinedCount } = combineAndSortConsumptionText(p.consumption);
-      if (text !== p.consumption) {
-        const day = physiqueDayCopy(p);
-        day.consumption = text;
-        await writePhysiqueRow(p.row, day);
-        changedCount += 1;
-        combinedTotal += combinedCount;
-        succeeded.push(snapshots[i]);
-      }
-    } finally {
-      done += 1;
-      summaryEl.textContent = `Tidying ${done}/${eligible.length}…`;
-    }
-  }));
-
-  selectedPhysiqueRows.clear();
-  await refreshPhysique(true);
-
-  const failed = results.filter((r) => r.status === 'rejected').length;
-  const parts = [`${changedCount} day${changedCount === 1 ? '' : 's'} tidied (${combinedTotal} duplicate line${combinedTotal === 1 ? '' : 's'} combined)`];
-  if (skipped) parts.push(`${skipped} skipped (nothing to tidy)`);
-  if (failed) parts.push(`${failed} failed`);
-
-  showUndoToast(`${parts.join(', ')}.`, () => restorePhysiqueSnapshots(succeeded));
 }
 
 async function handlePhysiqueScanInput(e) {

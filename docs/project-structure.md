@@ -25,55 +25,55 @@ ledger/
 │       ├── cache.js              # Numeric-expression evaluator; clears old cache keys
 │       ├── ui-helpers.js         # Shared table/modal/busy-button helpers
 │       ├── ai.js                 # AI chat client (Groq or OpenRouter)
-│       ├── usda.js               # USDA FoodData Central client
-│       ├── nutrient-targets.js   # Ideal/day targets for Micronutrient mode
-│       ├── nutrition.js          # Nutrition table, Group, USDA lookup
-│       ├── calorie-estimator.js  # Calculate for food
-│       ├── activity-estimator.js # Calculate for workouts
-│       ├── widgets.js            # Time / Date / Azan / Weather bulbs
+│       ├── health-nutrition-usda.js               # USDA FoodData Central client
+│       ├── health-nutrient-targets.js   # Ideal/day targets for Micronutrient mode
+│       ├── health-nutrition.js          # Nutrition table, Group, USDA lookup
+│       ├── health-physique-estimator.js  # Calculate for food
+│       ├── health-activity-estimator.js # Calculate for workouts
+│       ├── ledger-widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
 │       ├── confetti.js           # Confetti burst for body-mass progress and income saves
-│       ├── wellness-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
-│       ├── wellness-charts.js    # Indicator chart renderers
-│       ├── finance-charts.js     # Finance Indicator chart renderers
-│       ├── market-data.js        # Stock prices/news: Twelve Data, Alpha Vantage, Finnhub; IndexedDB cache, rate limits
-│       ├── market-math.js        # Indicators, trailing stop, risk measures and the verdict (pure)
-│       ├── portfolio-math.js     # Average-cost holdings and gain series (pure)
-│       ├── market-charts.js      # Range buttons and price/gain line charts
-│       ├── market.js             # Finance Watch List page (Watchlist tab)
-│       ├── portfolio.js          # Finance Portfolio page (Trade tab)
-│       ├── stock-analysis.js     # Finance Market page: picker, chart, signals, news, AI read with Chart history (Analysis tab)
-│       ├── timesheet-charts.js   # Work Time chart renderers
-│       ├── travel-charts.js      # Travel chart renderers (incl. world map)
-│       ├── transactions.js       # Transaction Log
-│       ├── car-service.js        # Car Service block: odometer fit + predicted services
-│       ├── accounts.js           # Account panel
-│       ├── breakdown.js          # Breakdown panel (Category/Type rows, formula-safe)
-│       ├── timesheet.js          # Work panel + analytics data
+│       ├── health-math.js      # Pure health/target formulas (BMR, TEF, projection, …)
+│       ├── health-chart.js    # Chart renderers
+│       ├── finance-chart.js     # Finance Chart renderers
+│       ├── finance-market-data.js        # Stock prices/news: Twelve Data, Alpha Vantage, Finnhub; IndexedDB cache, rate limits
+│       ├── finance-market-math.js        # Indicators, trailing stop, risk measures and the verdict (pure)
+│       ├── finance-portfolio-math.js     # Average-cost holdings and gain series (pure)
+│       ├── finance-market-chart.js      # Range buttons and price/gain line charts
+│       ├── finance-watchlist.js             # Finance Watch List page (Watchlist tab)
+│       ├── finance-portfolio.js          # Finance Portfolio page (Trade tab)
+│       ├── finance-market.js     # Finance Market page: picker, chart, signals, news, AI read with Chart history (Analysis tab)
+│       ├── track-work-time-chart.js   # Work Time chart renderers
+│       ├── track-travel-chart.js      # Travel chart renderers (incl. world map)
+│       ├── finance-transaction.js       # Transaction Log
+│       ├── track-car-service.js        # Car Service block: odometer fit + predicted services
+│       ├── finance-account.js           # Account panel
+│       ├── finance-breakdown.js          # Breakdown panel (Category/Type rows, formula-safe)
+│       ├── track-work-time.js          # Work panel + analytics data
 │       ├── csv.js                # CSV import/export + filter engine
-│       ├── physique.js           # Physique (one row per day)
-│       ├── physique-breakdown.js # Physique's Calculate + Consumption autocomplete
-│       ├── strength-plan.js      # Activity Plan
-│       ├── contacts.js           # Contact panel
-│       ├── settings-panel.js     # Settings table
-│       ├── travel.js             # Travel panel
-│       ├── applications.js       # Applications cards
-│       ├── leetcode.js           # LeetCode roadmap and solve log
-│       ├── leetcode-roadmap.js   # NeetCode 250 problem list
-│       ├── insight.js            # Insight shared helpers + Wellness mode
-│       ├── food-insight.js       # Insight Food mode
-│       ├── micronutrient-insight.js # Insight Micronutrient mode
-│       ├── activity-insight.js   # Insight Activity mode
-│       ├── protein-source-rotation-insight.js # Insight Protein mode
-│       ├── plan-insight.js       # Insight Plan mode
-│       ├── fat-loss-pattern-insight.js # Insight Pattern mode
-│       ├── insight-panel.js      # Insight panel shell
-│       ├── protein-rotation.js   # Protein Source Rotation
-│       ├── formula-fields.js     # Tune field descriptors + input utils
-│       ├── formula-render.js     # Tune substituted-formula renderers
-│       ├── formula-playground.js # Tune block lifecycle
-│       ├── bmr-calibration.js    # BMR calibration — back-solves BMR_cal from logged data (Tune)
-│       ├── financial-insight.js  # Finance Insight panel
+│       ├── health-physique.js           # Physique (one row per day)
+│       ├── health-physique-breakdown.js # Physique's Calculate + Consumption autocomplete
+│       ├── health-activity.js      # Activity Plan
+│       ├── other-contact.js           # Contact panel
+│       ├── other-settings.js     # Settings table
+│       ├── track-travel.js             # Travel panel
+│       ├── track-application.js       # Applications cards
+│       ├── track-leetcode.js           # LeetCode roadmap and solve log
+│       ├── track-leetcode-roadmap.js   # NeetCode 250 problem list
+│       ├── health-insight-wellness.js            # Insight shared helpers + Wellness mode
+│       ├── health-insight-food.js       # Insight Food mode
+│       ├── health-insight-micronutrient.js # Insight Micronutrient mode
+│       ├── health-insight-activity.js   # Insight Activity mode
+│       ├── health-insight-protein.js # Insight Protein mode
+│       ├── health-insight-plan.js       # Insight Plan mode
+│       ├── health-insight-pattern.js # Insight Pattern mode
+│       ├── health-insight.js      # Insight panel shell
+│       ├── health-chart-protein-rotation.js   # Protein Source Rotation
+│       ├── health-tune-fields.js     # Tune field descriptors + input utils
+│       ├── health-tune-render.js     # Tune substituted-formula renderers
+│       ├── health-tune.js # Tune block lifecycle
+│       ├── health-tune-calibration.js    # BMR calibration — back-solves BMR_cal from logged data (Tune)
+│       ├── finance-insight.js  # Finance Insight panel
 │       ├── gate.js               # Pre-login flow
 │       ├── version.js            # APP_VERSION, written by scripts/version.cjs (post-commit hook)
 │       ├── app.js                # Orchestration
@@ -87,9 +87,7 @@ ledger/
 │   ├── version.cjs                    # Conventional Commits → version (feat = minor, fix = patch)
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template
 │   ├── serve.py                       # Local server with GitHub Pages' 404.html fallback
-│   ├── build_sitemap.py               # sitemap.xml from the address stub folders
-│   ├── fetch_activity_images.mjs      # Still exercise guides → assets/images/activities
-│   └── fetch_activity_animations.mjs  # Animated exercise loops → assets/images/activities
+│   └── build_sitemap.py               # sitemap.xml from the address stub folders
 ├── docs/                         # Reference docs; features/ holds one file per section
 ├── 404.html                      # Fallback page: row Edit addresses (see router.js)
 ├── LICENSE

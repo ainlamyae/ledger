@@ -15,7 +15,7 @@
 
 ## Verdict
 
-Four checks (`computeSignals`, `market-math.js`):
+Four checks (`computeSignals`, `finance-market-math.js`):
 
 | Check | Passes when | Research |
 |---|---|---|
@@ -35,7 +35,7 @@ Four checks (`computeSignals`, `market-math.js`):
 - **Evidence**: the four checks above, each Pass / Fail / n/a.
 - **Risk**: volatility 3m and 1y (annualized), ATR14 (Wilder), max drawdown 1y, Sharpe 1y, Sortino 1y, beta vs the benchmark.
 - **Levels**:
-  - **Trailing stop** = highest close of the last 22 trading days − `MARKET_ATR_MULT` × ATR14 (default 4, chosen for holds of weeks to months: 2.5 stopped QQQ out 15 times in a year, 4 three times), the chandelier exit (`trailingStopSeries`, `market-math.js`). It follows new highs up, and it can ease down when an old high leaves the 22-day window or ATR grows. A risk-control habit for long holds, not a proven edge. It is for a position you **hold**: a close at or below it reads Fail (exit signal). After a sharp fall it can sit above the close (already broken), so it is never used as a buy-side level.
+  - **Trailing stop** = highest close of the last 22 trading days − `MARKET_ATR_MULT` × ATR14 (default 4, chosen for holds of weeks to months: 2.5 stopped QQQ out 15 times in a year, 4 three times), the chandelier exit (`trailingStopSeries`, `finance-market-math.js`). It follows new highs up, and it can ease down when an old high leaves the 22-day window or ATR grows. A risk-control habit for long holds, not a proven edge. It is for a position you **hold**: a close at or below it reads Fail (exit signal). After a sharp fall it can sit above the close (already broken), so it is never used as a buy-side level.
   - **Entry stop** = close − `MARKET_ATR_MULT` × ATR14: where a buy made **today** would exit. Always under the close.
   - **Position size** = shares so a stop-out at the entry stop loses `MARKET_RISK_PCT` (default 1%) of your Investment accounts' Market Value.
 - **Caution**: the 5-day move.
@@ -58,7 +58,7 @@ Four checks (`computeSignals`, `market-math.js`):
 
 ## Loading and limits
 
-- **When prices load**: only when this page opens (`registerPageShow`, `router.js`), never with the rest of Finance. Each stock's history is fetched once, then topped up (`market-data.js`; see [Caching](../caching.md)).
+- **When prices load**: only when this page opens (`registerPageShow`, `router.js`), never with the rest of Finance. Each stock's history is fetched once, then topped up (`finance-market-data.js`; see [Caching](../caching.md)).
 - **Rate limits** are queued per service; Alpha Vantage calls are also spaced 1.5 s apart (its 1-per-second burst limit). A per-minute limit shows "Waiting for … (N s)"; a used-up day shows saved prices and "resets 00:00 UTC".
 - Prices are public, so they aren't hidden by Privacy mode.
 
@@ -87,7 +87,7 @@ Four checks (`computeSignals`, `market-math.js`):
   - end with one machine-read line: `Alerts: below=<price or none>; above=<price or none>; belowAvg=yes|no; aboveAvg=yes|no; belowStop=yes|no`, prices only from the data sent; below must be under today's close and above over it, and a rule already met isn't suggested
   - the Levels lines give each level's distance from the close ("close is 2.04 below it"), so the AI needn't compute one
 - **Checks on the answer**: a fixed "Not financial advice" line is added below it. Any price in Levels that isn't anywhere in the data sent is flagged in red.
-- **Suggested alerts** (`parseAlertLine`, `market-math.js`): the Alerts line is read back and shown under the answer ("Suggested alerts: <20.16 · <avg · <stop"). Left out, each with the reason shown: a price that isn't in the data sent, a below at or over today's close, an above at or under it, and a rule already met (e.g. below the trailing stop when the close is under it). The ✏️ form refuses a new below/above price already met on the latest close for the same reason.
+- **Suggested alerts** (`parseAlertLine`, `finance-market-math.js`): the Alerts line is read back and shown under the answer ("Suggested alerts: <20.16 · <avg · <stop"). Left out, each with the reason shown: a price that isn't in the data sent, a below at or over today's close, an above at or under it, and a rule already met (e.g. below the trailing stop when the close is under it). The ✏️ form refuses a new below/above price already met on the latest close for the same reason.
   - **📌** applies them to that stock on Watch List, replacing its alerts, with Undo.
 - **Saved**: every read is appended to the `Analysis` tab (Date | Symbol | Verdict | Score | Close | Stop | Report).
   - The newest read per stock shows when you come back; the older ones are your track record.

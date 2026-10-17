@@ -305,39 +305,25 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     ));
   }
 
-  // BMR_mif and BMR_kat rows: both stored equations as signed expenditures, whichever
-  // one Tune has selected.
-  ['mif', 'kat'].forEach((key) => {
-    const value = todayBmrFigures[`BMR_${key}`];
-    const text = maintenanceKcal !== null && value !== undefined ? `${-value} kcal` : '—';
-    document.getElementById(`today-status-bmr-${key}-value`).textContent = privacyMode ? maskDigits(text) : text;
-  });
+  // Only the BMR Tune has selected, named by its own key; a missing BMR_cal/BMR_adp/BMR_avg
+  // falls back to the equation, as pickBmrForBasis does.
+  const equationKey = BMR_EQUATION_KEYS[bmrFormula()];
+  const basisKey = { bmr_cal: 'BMR_cal', bmr_adp: 'BMR_adp', bmr_avg: 'BMR_avg' }[bmrBasis()];
+  const bmrSelected = pickBmrForBasis(todayBmrFigures);
+  const basisValue = basisKey === 'BMR_avg'
+    ? todayBmrFigures.BMR_avg ?? bmrAverageOf(todayBmrFigures)
+    : todayBmrFigures[basisKey];
+  const bmrKey = basisKey && basisValue != null ? basisKey : equationKey;
+  document.getElementById('today-status-bmr-label').textContent = bmrKey;
+  document.getElementById('today-status-bmr-row').title = BMR_DEFINITIONS[bmrKey] ?? '';
+  const bmrText = maintenanceKcal !== null && bmrSelected !== null ? `${-bmrSelected} kcal` : '—';
+  document.getElementById('today-status-bmr-value').textContent = privacyMode ? maskDigits(bmrText) : bmrText;
 
-  // BMR_adp — always shown regardless of which basis Balance/Δm actually run on, so all
-  // three can be compared here at once. The stored BMR × (1 − λt) for today.
-  const bmrAdaptEl = document.getElementById('today-status-bmr-adapt-value');
-  const bmrAdaptText = (maintenanceKcal !== null && todayBmrFigures.BMR_adp !== undefined)
-    ? `${-todayBmrFigures.BMR_adp} kcal`
+  // M — maintenance, BMR + AEE: with today's AEE, then the desired AEE. Signed as expenditure.
+  const mainText = maintenanceKcal !== null && bmrSelected !== null
+    ? `${-Math.round(bmrSelected + activityKcalSoFar)} / ${-Math.round(bmrSelected + actDesiredKcal)} kcal`
     : '—';
-  bmrAdaptEl.textContent = privacyMode ? maskDigits(bmrAdaptText) : bmrAdaptText;
-
-  // BMR_avg — the mean of today's known four, also shown whatever the basis.
-  const bmrAvg = todayBmrFigures.BMR_avg ?? bmrAverageOf(todayBmrFigures);
-  const bmrAvgText = maintenanceKcal !== null && bmrAvg !== null ? `${-bmrAvg} kcal` : '—';
-  document.getElementById('today-status-bmr-avg-value').textContent = privacyMode ? maskDigits(bmrAvgText) : bmrAvgText;
-
-  // BMR_cal — same "always shown regardless of basis" idea. Hidden entirely (not just
-  // dashed) until today's stored figures carry one: the rolling n_p × L_p calibration,
-  // absent in the first n_p × L_p days of data.
-  const bmrCalRow = document.getElementById('today-status-bmr-cal-row');
-  const bmrCalEl = document.getElementById('today-status-bmr-cal-value');
-  if (todayBmrFigures.BMR_cal !== undefined && maintenanceKcal !== null) {
-    bmrCalRow.hidden = false;
-    const bmrCalText = `${-todayBmrFigures.BMR_cal} kcal`;
-    bmrCalEl.textContent = privacyMode ? maskDigits(bmrCalText) : bmrCalText;
-  } else {
-    bmrCalRow.hidden = true;
-  }
+  document.getElementById('today-status-maintenance-value').textContent = privacyMode ? maskDigits(mainText) : mainText;
 
   // Deprivation — the Sleep Deprivation Effect as a signed addition to Balance,
   // against a desired figure of 0 (a full night costs nothing).
@@ -373,6 +359,14 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     ? `${dmActual}${dmDesired !== null ? ` / ${dmDesired}` : ''} g`
     : '—';
   document.getElementById('today-status-deltam-value').textContent = privacyMode ? maskDigits(dmText) : dmText;
+
+  // ETA — the plan's forecast, as the Progress card's days ahead and date (calcProjection).
+  const projection = calcProjection(entries);
+  const etaText = projection?.status === 'reached' ? '0 days'
+    : projection?.status === 'ok'
+      ? `${projection.daysToHealthy} ${projection.daysToHealthy === 1 ? 'day' : 'days'} (${isoFromDate(projection.etaDate)})`
+      : '—';
+  document.getElementById('today-status-eta-value').textContent = privacyMode ? maskDigits(etaText) : etaText;
 }
 
 // `desired` is a number, or a preformatted string for Protein's band — both interpolate

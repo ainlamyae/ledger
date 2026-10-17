@@ -10,19 +10,19 @@
 
 | Constant | Value | Where |
 |---|---|---|
-| `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `wellness-math.js` |
-| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `wellness-math.js` |
-| `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort with no body mass on file | `wellness-math.js` |
-| `WORKOUT_REP_SEC_DEFAULT` | `3` s per rep — a brisk tempo. Overridable via `WORKOUT_REP_SEC` | `activity-estimator.js` |
-| `WORKOUT_STEPS_PER_MIN_DEFAULT` | `100` steps/min. Overridable via `WORKOUT_STEPS_PER_MIN` | `wellness-charts.js` |
-| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `wellness-math.js`, `activity-estimator.js` |
-| `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `wellness-math.js` |
-| `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `wellness-math.js` |
-| `GLYCOGEN_SKELETAL_FRAC_DEFAULT` | `45 %` of LBM is skeletal muscle | `wellness-charts.js` |
-| `GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT` | `14` g glycogen / kg muscle | `wellness-charts.js` |
-| `GLYCOGEN_LIVER_G_DEFAULT` | `100` g liver glycogen reserve | `wellness-charts.js` |
-| `GLYCOGEN_WATER_RATIO_DEFAULT` | `3` g H₂O bound per g glycogen | `wellness-charts.js` |
-| `GLYCOGEN_ZONE_SMOOTHING_ALPHA` | `1 / BODY_MASS_TREND_WINDOW_SIZE` (`0.2`) | `wellness-math.js` |
+| `GENERIC_KCAL_PER_KG_FAT` | `7700` kcal/kg adipose | `health-math.js` |
+| `MET_ML_O2_PER_KG_MIN_DEFAULT` / `ML_O2_PER_KCAL` | `3.5` / `200` (ACSM). Numerator overridable via `KCAL_PER_MET_KG_MIN` | `health-math.js` |
+| `GENERIC_KCAL_PER_ACTIVE_MIN` | `5` kcal/min — last resort with no body mass on file | `health-math.js` |
+| `WORKOUT_REP_SEC_DEFAULT` | `3` s per rep — a brisk tempo. Overridable via `WORKOUT_REP_SEC` | `health-activity-estimator.js` |
+| `WORKOUT_STEPS_PER_MIN_DEFAULT` | `100` steps/min. Overridable via `WORKOUT_STEPS_PER_MIN` | `health-chart.js` |
+| `ACTIVITY_MET_FALLBACK` / `EXERCISE_MET_DEFAULT` | `3.5` | `health-math.js`, `health-activity-estimator.js` |
+| `BODY_MASS_TREND_WINDOW_SIZE` | `5` logged points | `health-math.js` |
+| `PLATEAU_WINDOW_DAYS` / `PLATEAU_THRESHOLD_KG` | `10` days / `0.3` kg | `health-math.js` |
+| `GLYCOGEN_SKELETAL_FRAC_DEFAULT` | `45 %` of LBM is skeletal muscle | `health-chart.js` |
+| `GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT` | `14` g glycogen / kg muscle | `health-chart.js` |
+| `GLYCOGEN_LIVER_G_DEFAULT` | `100` g liver glycogen reserve | `health-chart.js` |
+| `GLYCOGEN_WATER_RATIO_DEFAULT` | `3` g H₂O bound per g glycogen | `health-chart.js` |
+| `GLYCOGEN_ZONE_SMOOTHING_ALPHA` | `1 / BODY_MASS_TREND_WINDOW_SIZE` (`0.2`) | `health-math.js` |
 
 ## Scoring thresholds
 
@@ -48,7 +48,7 @@ LBM (kg)           = 0.407·kg + 0.267·cm − 19.2     ♂       (Boer 1984)
                      rounded to 0.1 kg before anything scales off it
 ```
 
-- **Boer, not `kg × (1 − bodyFat%)`.** That route would square a BMI-only approximation; Boer was regressed against measured lean mass directly, and is the LBM equation clinical dosing uses. Age doesn't enter it. Lives in `wellness-charts.js` as `boerLeanBodyMassKg`, next to the Deurenberg chain it deliberately doesn't reuse.
+- **Boer, not `kg × (1 − bodyFat%)`.** That route would square a BMI-only approximation; Boer was regressed against measured lean mass directly, and is the LBM equation clinical dosing uses. Age doesn't enter it. Lives in `health-chart.js` as `boerLeanBodyMassKg`, next to the Deurenberg chain it deliberately doesn't reuse.
 
 ```
 trend[i]           = mean(values[i−2 … i+2])   centered SMA over logged points
@@ -100,12 +100,12 @@ target = round( (BMR + activityTargetKcal − D) / (1 − f) )
 - **`CALORIE_TARGET_FIXED_KCAL` pins it.** Set (via the Tune's **Pin target daily intake**, or by hand) and that one number wins everywhere — today's tile, the per-day chart line and the forecast's E_in — instead of being recalculated from each body-mass reading. Blank means the tracking behaviour above, unchanged; it's a separate key from `CALORIE_TARGET_KCAL` precisely so an existing sheet's stale fallback can't silently start overriding the calculated figure.
 - The two are genuinely different plans, which is worth knowing before choosing: **tracking** re-cuts intake as you lighten, holding `WEEKLY_FAT_LOSS_KG` roughly steady (a straight line to the goal); **pinned** holds intake still, so the deficit shrinks as maintenance falls and loss decelerates. The forecast below has always modelled the pinned one — it solves `dm/dt` at a constant E_in — so pinning is also what makes the target you eat and the date you're shown the same plan. On a 94 → 82 kg example at 0.5 kg/week, tracking arrives in ~168 days and pinned in ~207.
 - Max when target < current, min when target > current; otherwise the sign of `WEEKLY_FAT_LOSS_KG` decides.
-- **Nothing clamps `WEEKLY_FAT_LOSS_KG`**, but it is judged: `weeklyFatLossPct` expresses it as `100 × Δm / m`, and both the Tune's `Δm%` box and the Plan prompt hold it against the `WEEKLY_FAT_LOSS_PCT_FLOOR`/`_CEILING` pair (0.5 and 1% of body mass per week). Above the ceiling the playground colours the verdict; it still computes and still saves.
-- **`WEEKLY_FAT_LOSS_PCT` replaces the rate rather than scaling it.** Set (via the playground's **Pin target fat-loss %**, or by hand) and `weeklyFatLossKgAt` recomputes the kilograms from whichever body mass the target is being evaluated at — so the figure above becomes `(p·m/100 × 7700) / 7` and moves with every body-mass reading, per day on the chart. Blank means the flat `WEEKLY_FAT_LOSS_KG` behaviour, unchanged. It's mutually exclusive with `CALORIE_TARGET_FIXED_KCAL`: pinning either blanks the other.
+- **Nothing clamps `WEEKLY_FAT_LOSS_KG`**, but it is judged: `weeklyFatLossPct` expresses it as `100 × Δm / m`, and both the Tune's `Δm%` box and the Plan prompt hold it against the `WEEKLY_FAT_LOSS_PCT_FLOOR`/`_CEILING` pair (0.5 and 1% of body mass per week). Above the ceiling the Tune colours the verdict; it still computes and still saves.
+- **`WEEKLY_FAT_LOSS_PCT` replaces the rate rather than scaling it.** Set (via the Tune's **Pin target fat-loss %**, or by hand) and `weeklyFatLossKgAt` recomputes the kilograms from whichever body mass the target is being evaluated at — so the figure above becomes `(p·m/100 × 7700) / 7` and moves with every body-mass reading, per day on the chart. Blank means the flat `WEEKLY_FAT_LOSS_KG` behaviour, unchanged. It's mutually exclusive with `CALORIE_TARGET_FIXED_KCAL`: pinning either blanks the other.
 - Uses the raw, pin-blind `activityTargetKcal` — same as the Tune's own live preview — so a pinned activity calorie-burn target (below) doesn't move today's calorie-intake figure; that's a deliberately separate dial.
 - **`ACTIVITY_TARGET_FIXED_KCAL` pins the activity target itself** the same way `CALORIE_TARGET_FIXED_KCAL` pins intake (via the Tune's **Pin target calorie burn**, or by hand): the Activity tile, the Physical Activity chart's target line/dot colour, and Activity Insight's stated target all switch from `activityTargetKcal`/flat `ACTIVITY_TARGET_MIN` to `getActivityTargetKcal`/`getActivityTargetMin`, so the calorie burn stays put and the minutes needed rise as body mass falls, instead of the reverse.
 
-## Calibrate BMR (`bmr-calibration.js`)
+## Calibrate BMR (`health-tune-calibration.js`)
 
 Measures how wrong the equation's BMR actually is, from actual logged data — Tune's `BMR_cal`, over `n_p` × `L_p`. Two INDEPENDENT estimates of the same deficit, compared; the gap between them is the correction.
 
@@ -143,9 +143,9 @@ expected g  = (balance / 7700) × 1000
 - A day with no food logged is a gap, not a day of eating nothing.
 - The `TEF` term is a share of what was **actually eaten**, not of the target — this row scores the day that happened. At the default `f = 0` it's absent from the arithmetic and from the tooltip; it exists so that switching digestion on can't raise the target intake in one chart without also raising the cost of eating it here. The target dash is drawn at the smoothed body mass, like every other plan-level figure.
 - **Measured wins over estimated.** `TEF = f × intake` is the fallback — whenever a day's Physique row has its own TEF column calculated (see [`Physique`](data-model.md#physique)), that figure is used instead, and the tooltip's Digestion row says which one produced the bar (`measured` vs. `est.`). State Trend & Forecast's gray Calorie-Implied Trajectory line gives the same day the same precedence, so the two charts can't disagree about which TEF a given day used.
-- **`deprivation` is zero without that day's own sleep logged** — no basis to apply `η` to, not assumed perfect. Calorie Balance's hover shows the `SD (Sleep Deprivation Effect)` line on every day, 0 included. This is the *reverse* question from the calorie-target `D` above (`sleepDeprivationKcal` vs. `sleepAdjustedDeficitKcal`, both `wellness-math.js`) — "how much did last night cost the balance that actually happened" rather than "how much bigger does the planned deficit need to be" — so it multiplies by `(1 − η)` instead of dividing by `η`.
+- **`deprivation` is zero without that day's own sleep logged** — no basis to apply `η` to, not assumed perfect. Calorie Balance's hover shows the `SD (Sleep Deprivation Effect)` line on every day, 0 included. This is the *reverse* question from the calorie-target `D` above (`sleepDeprivationKcal` vs. `sleepAdjustedDeficitKcal`, both `health-math.js`) — "how much did last night cost the balance that actually happened" rather than "how much bigger does the planned deficit need to be" — so it multiplies by `(1 − η)` instead of dividing by `η`.
 
-## 7-day trend line (all nine scored Indicator charts)
+## 7-day trend line (all nine scored charts)
 
 ```
 ema(i) = i is the first logged day ? value[i]
@@ -172,9 +172,9 @@ m_gly  = g_musc × m_musc + g_liver                  per-kg-muscle and liver con
 ΔM_gly = m_gly × (1 + r) / 1000                     r = GLYCOGEN_WATER_RATIO_DEFAULT, → kg
 ```
 
-- `glycogenSwingKg` (`wellness-charts.js`) — the day-to-day swing glycogen and its bound water alone can account for, at this body. Same identity the Tune's glycogen block walks through (`readGlycogenSwingFormula`), evaluated at its default knobs rather than whatever's currently typed there, so a reader who never opens that modal still gets the figure it would report for their own body. `null` without `HEIGHT_CM`/`SEX` on file, which the zone and the swing-adjusted arrival below both fall back around.
+- `glycogenSwingKg` (`health-chart.js`) — the day-to-day swing glycogen and its bound water alone can account for, at this body. Same identity the Tune's glycogen block walks through (`readGlycogenSwingFormula`), evaluated at its default knobs rather than whatever's currently typed there, so a reader who never opens that modal still gets the figure it would report for their own body. `null` without `HEIGHT_CM`/`SEX` on file, which the zone and the swing-adjusted arrival below both fall back around.
 - **Trend zone** — a transparent band drawn at `trend(t) ± ΔM_gly`, centred not on the trend line itself but on an EMA of it (`computeGlycogenZoneAnchor`, `α = GLYCOGEN_ZONE_SMOOTHING_ALPHA`) — deliberately smoother/slower-moving than the trend, so the zone reads as the stable reference and the trend as what moves inside it.
-  - **State Trend & Forecast's own chart** (`wellnessProjectionChart`) draws this yellow band anchored to that day's gray Calorie-Implied Trajectory instead — `[anchor − ΔM_gly, anchor]`, unshifted at the top so the band's own upper edge draws exactly on the gray line — then shades the gap **red** wherever the green trend line drops below the band's floor: glycogen and water alone don't explain a drop that size, so past the floor reads as a real loss, not the zone's own normal noise. A second, near-invisible dataset (`Muscle Loss (below swing zone)`, `renderWellnessProjectionChart`) sits flush on the floor whenever the trend is inside or above it, and only opens up — filling red down to the trend's own value — for the stretch it's genuinely below.
+  - **State Trend & Forecast's own chart** (`healthProjectionChart`) draws this yellow band anchored to that day's gray Calorie-Implied Trajectory instead — `[anchor − ΔM_gly, anchor]`, unshifted at the top so the band's own upper edge draws exactly on the gray line — then shades the gap **red** wherever the green trend line drops below the band's floor: glycogen and water alone don't explain a drop that size, so past the floor reads as a real loss, not the zone's own normal noise. A second, near-invisible dataset (`Muscle Loss (below swing zone)`, `renderHealthProjectionChart`) sits flush on the floor whenever the trend is inside or above it, and only opens up — filling red down to the trend's own value — for the stretch it's genuinely below.
 - **Arrival target** — `arrivalTargetKg(target, m̄, h, sex, isDownward) = target ∓ ΔM_gly`, past the raw target by the swing **in the direction travel is already headed** (cutting subtracts, bulking adds) — so a reading on a high-water day still can't land on the wrong side of the real target. This is what `target` means everywhere below; the progress meter's raw kg-to-go bar and the drawn target line still use the unadjusted figure, shown alongside its `± ΔM_gly`.
 
 **Target-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the target being *followed*.
@@ -192,7 +192,7 @@ t      = (ρ / B) · ln[ (m̄ − m∞) / (target∓ΔM_gly − m∞) ]
 - `t` is the exact closed-form solution of `dm/dt = (E_in − A − B·m) / ρ`, verified against numeric integration.
 - Maintenance is affine in body mass, so the trajectory is exponential decay, not a straight line.
 - **`m̄` (`planBodyMassKg`), not the last raw body-mass reading** — the same smoothed mass the Tune's own boxes run on, so the two start the curve from the same point.
-- `calcProjection` (`wellness-math.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Tune makes — rather than a second copy of this formula. The chart and the playground read one function, so they cannot print two different day counts for the same profile.
+- `calcProjection` (`health-math.js`) reads `t`, its `status` and `equilibriumKg` **directly off `targetProjectionFromSettings`'s own return** — the exact `projectTargetDays` / `projectTargetDaysAtFixedPct` call the Tune makes — rather than a second copy of this formula. The chart and the Tune read one function, so they cannot print two different day counts for the same profile.
 - **With `WEEKLY_FAT_LOSS_PCT` pinned it's a different journey**, and `projectTargetDaysAtFixedPct` is the one that runs. A constant share of a falling mass is `dm/dt = −k·m`, `k = −ln(1 − p/100)/7` per day:
 
 ```
@@ -202,7 +202,7 @@ t    = 7 · ln(m / m_des) / −ln(1 − p/100)
 
   - Returned in `projectTargetDays`' own shape with `equilibriumKg: 0`, because both journeys are the same exponential with different coefficients — one curve-drawing routine serves both. The coefficient it hands back is `decayPerKg` (`k·ρ` here, `B` there): the chart reads that rather than `B`, since `B` is only the right rate for the constant-intake journey.
   - **The only plan with no plateau to fall short of** — a constant fraction of a falling mass crosses any positive target eventually, so this journey has no `asymptote` case. Its `unreachable` means the target isn't below the current mass, and it carries a `reason` string rather than an equilibrium figure to describe.
-  - `targetJourneyProjection` picks between the two from the pins, and the chart, the Plan prompt and the playground's forward `t` all go through it (`pct > 0` only — a pinned zero or negative rate falls back to the constant-E_in form, which reports a hold or a gain properly).
+  - `targetJourneyProjection` picks between the two from the pins, and the chart, the Plan prompt and the Tune's forward `t` all go through it (`pct > 0` only — a pinned zero or negative rate falls back to the constant-E_in form, which reports a hold or a gain properly).
   - Verified: 86.9 → 82 kg at 1%/week is 40 days, the chart's own day count agrees to the day, and its weekly curve points step down by exactly 1% of the running mass.
 - Worked example (87.5 → 72 kg, 170 cm, 35 y, male, κ=3, τ=100, 0.84 kg/wk): `BMR 1768`, `E_act 459`, `D 924`, `E_in 1303`, `A 893`, `B 15.25`, `m∞ 26.9 kg`, `t 149 days`.
 
@@ -267,8 +267,8 @@ in band?     = g ≥ min AND (max == min OR g ≤ max)
 protein/100kcal = protein / calories × 100
 ```
 
-- Three sources, most specific first. The **absolute gram band wins**: it is already a mass × a per-kg figure (the playground's `p × LBM`), so re-scaling it by a basis mass would double-count. The g/kg band is next, and the flat `PROTEIN_TARGET_G` last.
-- Absolute grams don't drift as you diet — which is what the g/kg band needs `BODY_MASS_TARGET_KG` for. A gram figure is frozen at the lean mass it was computed from and only moves when you re-save the playground.
+- Three sources, most specific first. The **absolute gram band wins**: it is already a mass × a per-kg figure (the Tune's `p × LBM`), so re-scaling it by a basis mass would double-count. The g/kg band is next, and the flat `PROTEIN_TARGET_G` last.
+- Absolute grams don't drift as you diet — which is what the g/kg band needs `BODY_MASS_TARGET_KG` for. A gram figure is frozen at the lean mass it was computed from and only moves when you re-save the Tune.
 - Written by the [Tune](features/health-tune.md#health--tune) as `p_min/p_max × LBM`, which is the only place in the app that scales anything to **lean** mass rather than total mass. Set the pair by hand on the `Setting` tab and it behaves the same; either end alone is enough, and a backwards pair is sorted.
 
 **Protein Source Rotation**, per tracked ingredient:
@@ -322,7 +322,7 @@ minutes  = max(1, round(Σ activeSec / 60))
 calories = Σ metKcal( MET(exercise) ?? 3.5, bodyMassKg, activeSecᵢ / 60 )
 ```
 
-- `activeSecondsForNoteLine` (`activity-estimator.js`) is the single place this is decided — Log's prefill and Calculate both read it.
+- `activeSecondsForNoteLine` (`health-activity-estimator.js`) is the single place this is decided — Log's prefill and Calculate both read it.
 - **Only the two converted units are tunable**, both from `Setting`: `WORKOUT_REP_SEC` (default `3`, a brisk tempo — a controlled machine rep is nearer 4-5 s) and `WORKOUT_STEPS_PER_MIN` (default `100`). A hold carries its own seconds and a cardio row its own minutes, so neither has anything to set. The tempo is global, not per exercise — the whole session moves together when you change it. `WORKOUT_STEPS_PER_MIN` also rescales the Activity chart and target, since both convert steps the same way.
 - Note parsing: `30x Name` → 30 total reps; legacy `3x10 Name` → 30; `135sec`, `30min`, `6000step`.
 - A second Log the same day appends its new lines to today's entry rather than opening a new row.
@@ -353,10 +353,10 @@ divided ("200/5g bar") — resolved before any of the above runs:
 - Count wins normally: an exact count beats an estimated gram mass.
 - Weight wins on an anchored path (energy or protein): "300kcal cookie" and "20p chicken" are both most useful as a number to put on the scale.
 - A new row is always banked per 100 g, whatever unit that mention used.
-- **A division in the quantity** (`200/5g`, `1/2cup`, …) is resolved arithmetically — `resolveDivisionQuantities`, `calorie-estimator.js` — before Groq or the Nutrition table ever see the text, rather than trusting the model to divide (not guaranteed reproducible run to run). It resolves in whatever unit it was typed in, so a weight or volume unit still gets its normal density handling (table hit, USDA, or AI estimate) afterward. A `2-3` range is left untouched — that's uncertainty, not arithmetic.
+- **A division in the quantity** (`200/5g`, `1/2cup`, …) is resolved arithmetically — `resolveDivisionQuantities`, `health-physique-estimator.js` — before Groq or the Nutrition table ever see the text, rather than trusting the model to divide (not guaranteed reproducible run to run). It resolves in whatever unit it was typed in, so a weight or volume unit still gets its normal density handling (table hit, USDA, or AI estimate) afterward. A `2-3` range is left untouched — that's uncertainty, not arithmetic.
 - **`p` is a protein anchor**, the protein-flavoured twin of the kcal anchor: `20p chicken` means 20 g of protein were eaten, not 20 g of chicken. Either anchor rewrites Consumption with the real weight/count Calculate worked out — `20p chicken` → `74g chicken`, same as `300kcal cookie` resolving to a gram figure.
-- **Multiple macro anchors can share one line** — `100kcal 5p 4fiber 5fat 8carb homemade energy bar` (`pro`/`df`/`carbs` also parse, as aliases). Each anchor is applied **exactly as typed** as this line's true figure, whatever branch above priced the weight — unlike the single-anchor case, energy and protein no longer have to be mutually exclusive, and fiber/fat/carb ride alongside either. Only energy (falling back to the estimator's own gram guess) ever drives the derived weight; the others never fight over it. Whichever of the five you leave out still gets filled from USDA when a plausible match exists — same "fill the gaps, never override what you typed" rule USDA already follows for calories/protein — and a fresh miss banks whatever it found (typed or looked-up) into the new Nutrition row's own Fiber/Fat/Carb columns, per-100g, alongside Calories/Protein (`stripLeadingIngredientTokens`, `calorie-estimator.js`).
-- **✏️ next to 💾** on an estimated (non-table) breakdown row opens the same Add/Edit Ingredient modal Nutrition's own **Add** uses, prefilled with that row's guess (name, amount, Calories/Protein/Fiber/Fat/Carb). Save both banks the corrected row — same as 💾 would — **and** rescales the correction onto today's own line (by the saved Amount vs. what this line actually logged) and re-renders the breakdown/total in place, instead of only fixing the Nutrition table for next time (`makeEditNewRowButton`/`applyEditedRowToBreakdown`, `calorie-estimator.js`; the modal's `openNutritionForm` takes an optional one-shot `onSaved` callback for this).
+- **Multiple macro anchors can share one line** — `100kcal 5p 4fiber 5fat 8carb homemade energy bar` (`pro`/`df`/`carbs` also parse, as aliases). Each anchor is applied **exactly as typed** as this line's true figure, whatever branch above priced the weight — unlike the single-anchor case, energy and protein no longer have to be mutually exclusive, and fiber/fat/carb ride alongside either. Only energy (falling back to the estimator's own gram guess) ever drives the derived weight; the others never fight over it. Whichever of the five you leave out still gets filled from USDA when a plausible match exists — same "fill the gaps, never override what you typed" rule USDA already follows for calories/protein — and a fresh miss banks whatever it found (typed or looked-up) into the new Nutrition row's own Fiber/Fat/Carb columns, per-100g, alongside Calories/Protein (`stripLeadingIngredientTokens`, `health-physique-estimator.js`).
+- **✏️ next to 💾** on an estimated (non-table) breakdown row opens the same Add/Edit Ingredient modal Nutrition's own **Add** uses, prefilled with that row's guess (name, amount, Calories/Protein/Fiber/Fat/Carb). Save both banks the corrected row — same as 💾 would — **and** rescales the correction onto today's own line (by the saved Amount vs. what this line actually logged) and re-renders the breakdown/total in place, instead of only fixing the Nutrition table for next time (`makeEditNewRowButton`/`applyEditedRowToBreakdown`, `health-physique-estimator.js`; the modal's `openNutritionForm` takes an optional one-shot `onSaved` callback for this).
 
 ---
 

@@ -18,7 +18,7 @@ const CONFIG = {
     BALANCE: 'Account',
     ACCOUNTS: 'Account',
     INSIGHT: 'Breakdown',
-    TIMESHEET: 'eTimeSheet',
+    WORK_TIME: 'eTimeSheet',
     PHYSIQUE: 'Physique',
     ACTIVITIES: 'Activity',
     NUTRITION: 'Nutrition',

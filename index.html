@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>Ledger</title>
 
-<meta name="description" content="Ledger is a private, serverless personal life dashboard. Track net worth, expenditure, time, and health — all backed by your own Google Sheet.">
+<meta name="description" content="Ledger is a private, serverless personal life dashboard. Track health, finances, time, travel, applications, LeetCode and contacts — all backed by your own Google Sheet.">
 <meta name="author" content="ALI">
 <link rel="canonical" href="https://ainlamyae.github.io/ledger/">
 <meta name="theme-color" content="#0d2e4f">
@@ -17,14 +17,14 @@
 <meta property="og:url" content="https://ainlamyae.github.io/ledger/">
 <meta property="og:site_name" content="Ledger">
 <meta property="og:title" content="Ledger — Private Personal Life Dashboard">
-<meta property="og:description" content="Private, serverless personal life dashboard. Track net worth, expenditure, time, and health — all backed by your own Google Sheet.">
+<meta property="og:description" content="Private, serverless personal life dashboard. Track health, finances, time, travel, applications, LeetCode and contacts — all backed by your own Google Sheet.">
 <meta property="og:image" content="https://ainlamyae.github.io/ledger/assets/images/social-preview.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Ledger — Private Personal Life Dashboard">
-<meta name="twitter:description" content="Private, serverless personal life dashboard. Track net worth, expenditure, time, and health — all backed by your own Google Sheet.">
+<meta name="twitter:description" content="Private, serverless personal life dashboard. Track health, finances, time, travel, applications, LeetCode and contacts — all backed by your own Google Sheet.">
 <meta name="twitter:image" content="https://ainlamyae.github.io/ledger/assets/images/social-preview.png">
 
 <!-- Who made this and what it is, for search engines and AI crawlers: the footer's
@@ -36,7 +36,7 @@
     "@type": "WebApplication",
     "name": "Ledger",
     "url": "https://ainlamyae.github.io/ledger/",
-    "description": "Ledger is a private, serverless personal life dashboard. Track net worth, expenditure, time, and health — all backed by your own Google Sheet.",
+    "description": "Ledger is a private, serverless personal life dashboard. Track health, finances, time, travel, applications, LeetCode and contacts — all backed by your own Google Sheet.",
     "applicationCategory": "FinanceApplication",
     "operatingSystem": "Any (web browser)",
     "image": "https://ainlamyae.github.io/ledger/assets/images/social-preview.png",
@@ -352,22 +352,22 @@
             </div>
         </div>
 
-        <div class="panel" data-route="indicator">
+        <div class="panel" data-route="chart">
             <div class="panel-header">
-                <h2>Indicator</h2>
+                <h2>Chart</h2>
             </div>
 
             <!-- Market's range row (renderRangeButtons), ending today; governs every chart below. -->
-            <div class="pagination panel-range" id="wellness-range"></div>
+            <div class="pagination panel-range" id="health-range"></div>
 
             <div class="body-mass-projection-wrap">
-                <!-- From/To replaced by the range buttons above (wellness-charts.js).
+                <!-- From/To replaced by the range buttons above (health-chart.js).
                 <div class="export-date-range">
                     <label>From
-                        <input type="date" id="wellness-date-from">
+                        <input type="date" id="health-date-from">
                     </label>
                     <label>To
-                        <input type="date" id="wellness-date-to">
+                        <input type="date" id="health-date-to">
                     </label>
                 </div>
                 -->
@@ -377,7 +377,7 @@
                     <h4>State Trend &amp; Forecast</h4>
                 </div>
                 <div class="chart-box chart-box-flush">
-                    <canvas id="wellness-projection-chart"></canvas>
+                    <canvas id="health-projection-chart"></canvas>
                 </div>
                 -->
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
@@ -388,7 +388,7 @@
                     <h3>Body Mass</h3>
                 </div>
                 <div class="chart-box chart-box-flush">
-                    <canvas id="wellness-body-mass-chart"></canvas>
+                    <canvas id="health-body-mass-chart"></canvas>
                 </div>
             </div>
 
@@ -397,57 +397,57 @@
                     <h3>Calorie Balance</h3>
                 </div>
                 <div class="chart-box chart-box-flush">
-                    <canvas id="wellness-energy-balance-chart"></canvas>
+                    <canvas id="health-energy-balance-chart"></canvas>
                 </div>
             </div>
 
-            <div class="donut-grid wellness-metrics-grid">
+            <div class="donut-grid health-metrics-grid">
                 <div class="card">
-                    <h3 id="wellness-calories-label">Caloric Intake</h3>
+                    <h3 id="health-calories-label">Caloric Intake</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-calories-chart"></canvas>
+                        <canvas id="health-calories-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Protein Intake</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-protein-chart"></canvas>
+                        <canvas id="health-protein-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Dietary Fiber Intake</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-fiber-chart"></canvas>
+                        <canvas id="health-fiber-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Fat Intake</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-fat-chart"></canvas>
+                        <canvas id="health-fat-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Carbohydrate Intake</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-carb-chart"></canvas>
+                        <canvas id="health-carb-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Physical Activity</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-activity-chart"></canvas>
+                        <canvas id="health-activity-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Sleep</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="wellness-sleep-chart"></canvas>
+                        <canvas id="health-sleep-chart"></canvas>
                     </div>
                 </div>
             </div>
@@ -561,7 +561,7 @@
                         <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
                         <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
                         <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your protein target this ingredient should cover">%</th>
-                        <!-- Uses column retired (nutrition.js keeps its code commented).
+                        <!-- Uses column retired (health-nutrition.js keeps its code commented).
                         <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
                         -->
                         <th></th>
@@ -593,7 +593,7 @@
                 <button type="button" id="add-activity-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an exercise or activity to the plan" aria-label="Add">➕</button>
             </div>
 
-            <!-- Rebuilt from the Activity sheet tab by activities.js -->
+            <!-- Rebuilt from the Activity sheet tab by health-activity-catalogue.js -->
             <div id="activity-plan-tables"></div>
         </div>
 
@@ -601,7 +601,7 @@
             <h2>Insight</h2>
             <p class="hint" id="insight-hint"></p>
 
-            <!-- From/To replaced by the range buttons below (insight-panel.js).
+            <!-- From/To replaced by the range buttons below (health-insight.js).
             <div class="export-date-range">
                 <label>From
                     <input type="date" id="insight-date-from">
@@ -611,7 +611,7 @@
                 </label>
             </div>
             -->
-            <!-- Indicator's range row (WELLNESS_RANGES), ending today. -->
+            <!-- Indicator's range row (HEALTH_RANGES), ending today. -->
             <div class="pagination panel-range" id="insight-range"></div>
 
             <!-- The modes, in one card titled Insight, as a hub's tiles are. -->
@@ -1130,7 +1130,7 @@
                         <!-- Not part of the algebra above — a read on how hard the cut is, not a term
                              any other row is built from. Directly under TEI because that's the one box
                              it compares against BMR. Flags red past DEFICIT_VS_BMR_PCT_CEILING
-                             (formula-render.js): a deficit that size relative to resting rate is where
+                             (health-tune-render.js): a deficit that size relative to resting rate is where
                              more of what comes off tends to be lean mass rather than fat. -->
                         <label class="formula-row" title="How far intake sits below resting rate: (BMR − TEI) / BMR × 100. A negative figure means TEI is above BMR — a surplus, not a deficit. Not editable: it is derived from BMR and TEI above.">
                             <span class="formula-sym">D_bmr%</span>
@@ -1362,7 +1362,7 @@
                     </div>
                 </div>
 
-                <!-- The model's equations (FORMULA_EXPRESSION, formula-fields.js). -->
+                <!-- The model's equations (FORMULA_EXPRESSION, health-tune-fields.js). -->
                 <div class="card formula-card">
                     <h3>Equations</h3>
                     <div id="formula-expression" class="formula-substituted"></div>
@@ -1376,7 +1376,7 @@
                     <h3>Calculations</h3>
                     <div id="formula-substituted" class="formula-substituted"></div>
 
-                    <!-- BMR_cal's own working over Tune's n_p × L_p (bmr-calibration.js). -->
+                    <!-- BMR_cal's own working over Tune's n_p × L_p (health-tune-calibration.js). -->
                     <h4>Periods</h4>
                     <div class="table-responsive">
                         <table>
@@ -1445,12 +1445,12 @@
             </div>
         </div>
 
-        <div class="panel" data-route="indicator">
+        <div class="panel" data-route="chart">
         <div class="panel-header">
-            <h2>Indicator</h2>
+            <h2>Chart</h2>
         </div>
 
-        <!-- Market's range row: window for Net Worth and Expenditure Trend (finance-charts.js). -->
+        <!-- Market's range row: window for Net Worth and Expenditure Trend (finance-chart.js). -->
         <div class="pagination panel-range" id="finance-trend-range"></div>
 
         <div class="panel-section card">
@@ -1512,7 +1512,7 @@
 
         <!-- Spending Breakdown by Type — the per-category donut wall (Housing,
              Transportation, Grocery, Personal, Household …), four periods each plus an
-             Untyped remainder; renderTypeBreakdownCharts (finance-charts.js) fills this
+             Untyped remainder; renderTypeBreakdownCharts (finance-chart.js) fills this
              with one card per category, like every other Indicator chart. -->
         <div class="panel-section" id="type-breakdown-container"></div>
 
@@ -1625,7 +1625,7 @@
         <!-- The Breakdown tab, as a table you can maintain rather than only a chart
              source. Its four money columns are the SHEET's own formulas — the app
              reads them and never writes them, so only Category and Type are
-             editable here (breakdown.js). -->
+             editable here (finance-breakdown.js). -->
         <div class="panel" data-route="breakdown">
             <div class="panel-header">
                 <h2>Breakdown</h2>
@@ -1656,7 +1656,7 @@
             <div class="pagination" id="breakdown-pagination"></div>
         </div>
 
-        <!-- Buy/sell log at average cost (portfolio.js, portfolio-math.js). -->
+        <!-- Buy/sell log at average cost (finance-portfolio.js, finance-portfolio-math.js). -->
         <div class="panel" id="portfolio-panel" data-route="portfolio">
             <div class="panel-header">
                 <h2>Portfolio</h2>
@@ -1757,7 +1757,7 @@
             <p class="hint">Average cost (ACB) per account and symbol, fees included; CAD figures use each trade's own FX rate. The superficial-loss rule isn't applied.</p>
         </div>
 
-        <!-- Watchlist stocks and their latest moves (market.js); prices load when this page opens. -->
+        <!-- Watchlist stocks and their latest moves (finance-watchlist.js); prices load when this page opens. -->
         <div class="panel" id="watchlist-panel" data-route="watchlist">
             <div class="panel-header">
                 <h2>Watch List</h2>
@@ -1785,7 +1785,7 @@
             </div>
         </div>
 
-        <!-- One stock's chart, rule-based signals, news and AI read (stock-analysis.js, market-math.js). -->
+        <!-- One stock's chart, rule-based signals, news and AI read (finance-market.js, finance-market-math.js). -->
         <div class="panel" id="stock-analysis-panel" data-route="market" data-tile-host="financial-insight-mode-actions">
             <div class="panel-header">
                 <h2>Market</h2>
@@ -1952,45 +1952,45 @@
                 <div class="card">
                     <h3>Arrival Distribution</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="timesheet-start-distribution-chart"></canvas>
+                        <canvas id="work-time-start-distribution-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Departure Distribution</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="timesheet-end-distribution-chart"></canvas>
+                        <canvas id="work-time-end-distribution-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Hours Worked Distribution</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="timesheet-duration-distribution-chart"></canvas>
+                        <canvas id="work-time-duration-distribution-chart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
                     <h3>Daily Hours Average</h3>
                     <div class="chart-box chart-box-flush">
-                        <canvas id="timesheet-daily-average-chart"></canvas>
+                        <canvas id="work-time-daily-average-chart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <p id="timesheet-overtime-summary" class="timesheet-overtime-summary"></p>
+            <p id="work-time-overtime-summary" class="work-time-overtime-summary"></p>
 
             <div class="export-date-range">
                 <label>From
-                    <input type="date" id="timesheet-date-from">
+                    <input type="date" id="work-time-date-from">
                 </label>
                 <label>To
-                    <input type="date" id="timesheet-date-to">
+                    <input type="date" id="work-time-date-to">
                 </label>
             </div>
 
             <div class="table-responsive">
-                <table id="timesheet-table" class="table-compact">
+                <table id="work-time-table" class="table-compact">
                     <thead>
                     <tr>
                         <th>Company</th>
@@ -2005,7 +2005,7 @@
                     </tr>
                     </thead>
 
-                    <tbody id="timesheet-body"></tbody>
+                    <tbody id="work-time-body"></tbody>
                 </table>
             </div>
 
@@ -2018,8 +2018,8 @@
             </div>
 
             <!-- Read off Transportation transactions whose description carries the odometer
-                 ("@28902km"); predictions in car-service.js. -->
-            <div class="donut-grid wellness-metrics-grid">
+                 ("@28902km"); predictions in track-car-service.js. -->
+            <div class="donut-grid health-metrics-grid">
                 <div class="card">
                     <h3>Odometer &amp; Service</h3>
                     <div class="chart-box chart-box-flush">
@@ -2125,12 +2125,12 @@
                 <button id="add-leetcode-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a solved problem" aria-label="Log">📝</button>
             </div>
 
-            <!-- NeetCode 250 by category, ticked from the LeetCode tab (leetcode.js). -->
+            <!-- NeetCode 250 by category, ticked from the LeetCode tab (track-leetcode.js). -->
             <p id="leetcode-summary" class="app-card-meta"></p>
 
             <!-- Spaced as Car Service's cards: Past Year (solves per day, like LeetCode's
                  profile), Roadmap (a node per category, opening its card below), then the cards. -->
-            <div class="donut-grid wellness-metrics-grid">
+            <div class="donut-grid health-metrics-grid">
                 <div class="card">
                     <h3>Past Year</h3>
                     <div class="table-responsive" id="leetcode-heatmap-scroll">
@@ -2206,7 +2206,7 @@
                 <button id="add-setting-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a setting" aria-label="Add">➕</button>
             </div>
 
-            <!-- Tabs: the Market range row's buttons, each its own address (settings-panel.js). -->
+            <!-- Tabs: the Market range row's buttons, each its own address (other-settings.js). -->
             <div class="pagination" id="settings-tabs">
                 <button type="button" class="btn" data-route="ai" data-route-view aria-pressed="false">AI &amp; Keys</button>
                 <button type="button" class="btn" data-route="responses" data-route-view aria-pressed="false">AI Responses</button>
@@ -2407,7 +2407,7 @@
                 <input type="text" id="account-current-value" placeholder="optional — today's cash-out value, if different from Balance">
             </label>
             <label title="Optional — the day of the month to pay the balance back, 1 to 31; a red badge shows once it passes unpaid">Payment Day
-                <span class="timesheet-break-inputs">
+                <span class="work-time-break-inputs">
                     <input type="number" id="account-payment-day" inputmode="numeric" min="1" max="31" step="1" aria-label="Payment day of the month">of the month
                 </span>
             </label>
@@ -2449,7 +2449,7 @@
                 <input type="text" id="watchlist-notes" placeholder="Optional">
             </label>
 
-            <!-- Alerts, checked on each day's close (checkAlerts, market-math.js); stored as JSON in column F. -->
+            <!-- Alerts, checked on each day's close (checkAlerts, finance-market-math.js); stored as JSON in column F. -->
             <p class="hint" id="watchlist-alert-levels">Alerts: a red badge on Watch List and Market when a rule is met on a day's close.</p>
             <div class="form-row">
                 <label>Alert: close below
@@ -2643,44 +2643,44 @@
     </div>
 </div>
 
-<div id="timesheet-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="timesheet-modal-title" hidden>
+<div id="work-time-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="work-time-modal-title" hidden>
     <div class="modal-card">
-        <h2 id="timesheet-modal-title">Log a Work Time</h2>
+        <h2 id="work-time-modal-title">Log a Work Time</h2>
 
-        <form id="timesheet-form" class="app-form">
+        <form id="work-time-form" class="app-form">
             <label>Company
-                <input type="text" id="timesheet-company" list="timesheet-company-options">
+                <input type="text" id="work-time-company" list="work-time-company-options">
             </label>
-            <datalist id="timesheet-company-options"></datalist>
+            <datalist id="work-time-company-options"></datalist>
             <label>Date
-                <input type="date" id="timesheet-date">
+                <input type="date" id="work-time-date">
             </label>
             <label class="checkbox-inline-label">
-                <input type="checkbox" id="timesheet-holiday">
+                <input type="checkbox" id="work-time-holiday">
                 Holiday / day off
             </label>
             <label>Start
-                <input type="time" id="timesheet-start">
+                <input type="time" id="work-time-start">
             </label>
             <label>End
-                <input type="time" id="timesheet-end">
+                <input type="time" id="work-time-end">
             </label>
             <label>Break
-                <span class="timesheet-break-inputs">
-                    <input type="number" id="timesheet-break-h" inputmode="numeric" min="0" max="23" step="1" value="0" aria-label="Break hours">h
-                    <input type="number" id="timesheet-break-m" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="Break minutes">m
+                <span class="work-time-break-inputs">
+                    <input type="number" id="work-time-break-h" inputmode="numeric" min="0" max="23" step="1" value="0" aria-label="Break hours">h
+                    <input type="number" id="work-time-break-m" inputmode="numeric" min="0" max="59" step="1" value="0" aria-label="Break minutes">m
                 </span>
             </label>
-            <p>Log Time: <span id="timesheet-live-duration">—</span></p>
+            <p>Log Time: <span id="work-time-live-duration">—</span></p>
             <label>Task
-                <textarea id="timesheet-task" rows="4" placeholder="e.g. Federal Statutory Holiday"></textarea>
+                <textarea id="work-time-task" rows="4" placeholder="e.g. Federal Statutory Holiday"></textarea>
             </label>
 
-            <p id="timesheet-form-error" class="status" hidden></p>
+            <p id="work-time-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
-                <button type="button" id="timesheet-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+                <button type="button" id="work-time-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
         </form>
     </div>
@@ -2805,7 +2805,7 @@
             <!-- Derived figures, moved off the form into one dropdown rather than
                  interleaved between the fields that price them. Collapsed on any
                  day but today, same as Consumption and Workout above. Same label
-                 set (TEI/TEF/AEE/SD/D/Δm′) as the Status card (wellness-charts.js
+                 set (TEI/TEF/AEE/SD/D/Δm′) as the Status card (health-chart.js
                  setStatusEnergyTile), just off this form's own typed fields rather
                  than a saved/typed entry. Plain (non-compact) table, so every row's
                  own border-bottom is a real table horizontal line, same as the
@@ -2885,7 +2885,7 @@
     <div class="modal-card">
         <h2 id="activity-instruction-title">Instructions on the Activities</h2>
 
-        <!-- One tile per Group (activities.js's renderInstructionList), in one card
+        <!-- One tile per Group (health-activity-catalogue.js's renderInstructionList), in one card
              titled Workouts, as a hub's tiles are; a group's page lists its activities below. -->
         <div class="card" id="instruction-groups-card">
             <h3>Workouts</h3>
@@ -2893,7 +2893,7 @@
         </div>
         <div class="instruction-body" id="instruction-body"></div>
 
-        <!-- A copy of the Indicator panel's own Activity Rotation card (activity-rotation.js),
+        <!-- A copy of the Indicator panel's own Activity Rotation card (health-chart-activity-rotation.js),
              same chart and donut off the same data, just also visible here so the gym's own
              tiles page shows the rotation without leaving for Health → Indicator. Hidden
              alongside the tiles themselves (renderInstructionList) once a Group's own page
@@ -3010,7 +3010,7 @@
             </label>
 
             <!-- One row per value, Tune's layout: lock tick, name, box, unit. A ticked row is
-                 kept as typed — Complete never overwrites it (nutrition.js). Pulled
+                 kept as typed — Complete never overwrites it (health-nutrition.js). Pulled
                  micronutrient rows are appended below the divider. -->
             <div class="formula-inputs" id="nutrition-fields">
                 <label class="formula-row">
@@ -3287,58 +3287,68 @@
 <script src="assets/script/cache.js"></script>
 <script src="assets/script/ui-helpers.js"></script>
 <script src="assets/script/ai.js"></script>
-<script src="assets/script/usda.js"></script>
-<script src="assets/script/nutrient-targets.js"></script>
-<script src="assets/script/nutrition.js"></script>
-<script src="assets/script/calorie-estimator.js"></script>
-<script src="assets/script/widgets.js"></script>
+<script src="assets/script/health-nutrition-usda.js"></script>
+<script src="assets/script/health-nutrient-targets.js"></script>
+<script src="assets/script/health-nutrition.js"></script>
+<script src="assets/script/health-physique-estimator.js"></script>
+<script src="assets/script/ledger-widgets.js"></script>
 <script src="assets/script/charts-base.js"></script>
 <script src="assets/script/confetti.js"></script>
-<script src="assets/script/wellness-math.js"></script>
-<script src="assets/script/wellness-charts.js"></script>
-<script src="assets/script/finance-charts.js"></script>
-<script src="assets/script/market-data.js"></script>
-<script src="assets/script/market-math.js"></script>
-<script src="assets/script/portfolio-math.js"></script>
-<script src="assets/script/market-charts.js"></script>
-<script src="assets/script/timesheet-charts.js"></script>
-<script src="assets/script/travel-charts.js"></script>
-<script src="assets/script/transactions.js"></script>
-<script src="assets/script/car-service.js"></script>
-<script src="assets/script/accounts.js"></script>
-<script src="assets/script/breakdown.js"></script>
-<script src="assets/script/market.js"></script>
-<script src="assets/script/portfolio.js"></script>
-<script src="assets/script/stock-analysis.js"></script>
-<script src="assets/script/timesheet.js"></script>
+<script src="assets/script/health-math.js"></script>
+<script src="assets/script/health-chart.js"></script>
+<script src="assets/script/health-chart-body-mass.js"></script>
+<script src="assets/script/health-chart-calories.js"></script>
+<script src="assets/script/health-chart-protein.js"></script>
+<script src="assets/script/health-chart-fiber.js"></script>
+<script src="assets/script/health-chart-fat.js"></script>
+<script src="assets/script/health-chart-carb.js"></script>
+<script src="assets/script/health-chart-activity.js"></script>
+<script src="assets/script/health-chart-sleep.js"></script>
+<script src="assets/script/health-chart-projection.js"></script>
+<script src="assets/script/health-chart-energy-balance.js"></script>
+<script src="assets/script/finance-chart.js"></script>
+<script src="assets/script/finance-market-data.js"></script>
+<script src="assets/script/finance-market-math.js"></script>
+<script src="assets/script/finance-portfolio-math.js"></script>
+<script src="assets/script/finance-market-chart.js"></script>
+<script src="assets/script/track-work-time-chart.js"></script>
+<script src="assets/script/track-travel-chart.js"></script>
+<script src="assets/script/finance-transaction.js"></script>
+<script src="assets/script/track-car-service.js"></script>
+<script src="assets/script/finance-account.js"></script>
+<script src="assets/script/finance-breakdown.js"></script>
+<script src="assets/script/finance-watchlist.js"></script>
+<script src="assets/script/finance-portfolio.js"></script>
+<script src="assets/script/finance-market.js"></script>
+<script src="assets/script/track-work-time.js"></script>
 <script src="assets/script/csv.js"></script>
-<script src="assets/script/activities.js"></script>
-<script src="assets/script/physique.js"></script>
-<script src="assets/script/physique-breakdown.js"></script>
-<script src="assets/script/strength-plan.js"></script>
-<script src="assets/script/activity-estimator.js"></script>
-<script src="assets/script/contacts.js"></script>
-<script src="assets/script/settings-panel.js"></script>
-<script src="assets/script/travel.js"></script>
-<script src="assets/script/applications.js"></script>
-<script src="assets/script/leetcode-roadmap.js"></script>
-<script src="assets/script/leetcode.js"></script>
-<script src="assets/script/insight.js"></script>
-<script src="assets/script/food-insight.js"></script>
-<script src="assets/script/micronutrient-insight.js"></script>
-<script src="assets/script/activity-insight.js"></script>
-<script src="assets/script/protein-source-rotation-insight.js"></script>
-<script src="assets/script/plan-insight.js"></script>
-<script src="assets/script/fat-loss-pattern-insight.js"></script>
+<script src="assets/script/health-activity-catalogue.js"></script>
+<script src="assets/script/health-physique.js"></script>
+<script src="assets/script/health-physique-breakdown.js"></script>
+<script src="assets/script/health-activity.js"></script>
+<script src="assets/script/health-activity-estimator.js"></script>
+<script src="assets/script/other-contact.js"></script>
+<script src="assets/script/other-settings.js"></script>
+<script src="assets/script/track-travel.js"></script>
+<script src="assets/script/track-application.js"></script>
+<script src="assets/script/track-leetcode-roadmap.js"></script>
+<script src="assets/script/track-leetcode.js"></script>
+<script src="assets/script/health-insight-wellness.js"></script>
+<script src="assets/script/health-insight-food.js"></script>
+<script src="assets/script/health-insight-micronutrient.js"></script>
+<script src="assets/script/health-insight-activity.js"></script>
+<script src="assets/script/health-insight-protein.js"></script>
+<script src="assets/script/health-insight-plan.js"></script>
+<script src="assets/script/health-insight-pattern.js"></script>
 <!-- After the five above: INSIGHT_MODES reads their prompt constants by value. -->
-<script src="assets/script/insight-panel.js"></script>
-<script src="assets/script/formula-fields.js"></script>
-<script src="assets/script/formula-render.js"></script>
-<script src="assets/script/formula-playground.js"></script>
-<script src="assets/script/bmr-calibration.js"></script>
-<script src="assets/script/protein-rotation.js"></script>
-<script src="assets/script/activity-rotation.js"></script>
-<script src="assets/script/financial-insight.js"></script>
+<script src="assets/script/health-insight.js"></script>
+<script src="assets/script/health-tune-fields.js"></script>
+<script src="assets/script/health-tune-render.js"></script>
+<script src="assets/script/health-tune.js"></script>
+<script src="assets/script/health-tune-calibration.js"></script>
+<script src="assets/script/health-chart-protein-rotation.js"></script>
+<script src="assets/script/health-chart-activity-rotation.js"></script>
+<script src="assets/script/finance-insight.js"></script>
 <script src="assets/script/gate.js"></script>
 <script src="assets/script/version.js"></script>
 <script src="assets/script/app.js"></script>

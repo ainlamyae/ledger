@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.13.0** | feat(charts): refit health chart axes to visible legend entries |
+| (this commit) | **3.14.0** | feat(charts): export health and finance charts as PNG |
+| `abbdc66` | **3.13.0** | feat(charts): refit health chart axes to visible legend entries |
 | `9881a46` | **3.12.0** | feat(tune): add BMR_avg basis and tidy settings and action buttons |
 | `6fdb621` | **3.11.0** | feat(health): adopt section-page naming and add chart legends |
 | `5111d62` | **3.10.0** | feat(nav): hide breakdown from tiles and title-case workout names |

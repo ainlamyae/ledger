@@ -193,6 +193,16 @@ function niceAxisBound(value) {
 // keeps its own manual destroy.
 const PANEL_COLLAPSE_TRANSITION_MS = 400;
 
+// Charts not yet scrolled near, by canvas; buildPendingCharts draws them now.
+const pendingChartBuilds = new Map();
+
+// Unanimated, so a capture right after sees them finished.
+function buildPendingCharts(root) {
+  [...pendingChartBuilds].forEach(([forceBuild, canvas]) => {
+    if (root.contains(canvas)) forceBuild();
+  });
+}
+
 function upsertChart(existingChart, ctx, config) {
   if (existingChart) existingChart.destroy();
 
@@ -200,7 +210,17 @@ function upsertChart(existingChart, ctx, config) {
   const box = canvas.closest('.chart-box') || canvas;
   const state = { chart: null, observer: null, timer: null };
 
-  const build = () => { state.chart = new Chart(ctx, config); };
+  const build = () => {
+    pendingChartBuilds.delete(forceBuild);
+    state.chart = new Chart(ctx, config);
+  };
+  const forceBuild = () => {
+    state.observer?.disconnect();
+    clearTimeout(state.timer);
+    config.options = { ...config.options, animation: false };
+    build();
+  };
+  pendingChartBuilds.set(forceBuild, canvas);
 
   const startObserving = () => {
     state.observer = new IntersectionObserver((entries) => {
@@ -229,6 +249,7 @@ function upsertChart(existingChart, ctx, config) {
     get(_, prop) {
       if (prop === 'destroy') {
         return () => {
+          pendingChartBuilds.delete(forceBuild);
           state.chart?.destroy();
           state.observer?.disconnect();
           clearTimeout(state.timer);
@@ -415,4 +436,81 @@ function wellnessCategoryXScale(dates) {
     // autoSkip off, or it would thin the ticks set above.
     ticks: { maxRotation: 45, minRotation: 45, autoSkip: false, callback: shortDateTickCallback },
   };
+}
+
+// 📤 on a chart page: the whole page as a PNG, named by the button's data-screenshot.
+// html2canvas-pro (reads color-mix, unlike html2canvas) loads on first use only.
+const HTML2CANVAS_URL = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js';
+let html2canvasPromise = null;
+// What body's system-ui resolves to on each platform; html2canvas can't draw system-ui itself.
+const SCREENSHOT_FONT_STACK = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif';
+
+function loadHtml2canvas() {
+  html2canvasPromise ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = HTML2CANVAS_URL;
+    script.onload = () => resolve(window.html2canvas);
+    script.onerror = () => { html2canvasPromise = null; reject(new Error('html2canvas failed to load')); };
+    document.head.appendChild(script);
+  });
+  return html2canvasPromise;
+}
+
+// Phone: the share sheet (Save Image → gallery). Laptop: a download.
+async function saveScreenshot(blob, filename) {
+  const file = new File([blob], filename, { type: 'image/png' });
+  if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function capturePageScreenshot(button) {
+  const panel = button.closest('.panel');
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = '⏳';
+  try {
+    const html2canvas = await loadHtml2canvas();
+    buildPendingCharts(panel);
+    const canvas = await html2canvas(panel, {
+      backgroundColor: getComputedStyle(document.body).backgroundColor,
+      scale: Math.min(2, window.devicePixelRatio || 1),
+      // Not every display:none element: <head>, <link> and <style> are, and the clone lost its CSS.
+      ignoreElements: (el) => el.classList.contains('panel-header-actions'),
+      onclone: (doc) => {
+        doc.body.style.fontFamily = SCREENSHOT_FONT_STACK;
+        // html2canvas boxes a <button> whatever its CSS; a legend entry is a swatch and a word.
+        doc.querySelectorAll('button.donut-legend-item-toggle').forEach((legendButton) => {
+          const span = doc.createElement('span');
+          span.className = legendButton.className;
+          span.append(...legendButton.childNodes);
+          legendButton.replaceWith(span);
+        });
+      },
+    });
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    await saveScreenshot(blob, `${button.dataset.screenshot}-${localIso()}.png`);
+  } catch (err) {
+    console.error('Screenshot failed', err);
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
+function initPageScreenshots() {
+  document.querySelectorAll('button[data-screenshot]').forEach((button) => {
+    button.addEventListener('click', () => capturePageScreenshot(button));
+  });
 }

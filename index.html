@@ -1999,6 +1999,74 @@
     <section id="track" class="panel-group">
         <h2 class="panel-group-title"><a href="track/">Track</a></h2>
 
+        <div class="panel" data-route="leetcode">
+            <div class="panel-header">
+                <h2>LeetCode</h2>
+                <button id="add-leetcode-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a solved problem" aria-label="Log">📝</button>
+            </div>
+
+            <!-- NeetCode 250 by category, ticked from the LeetCode tab (track-leetcode.js). -->
+            <!-- As Health's Progress card: solved and left of the NeetCode 250, then time to finish. -->
+            <div class="card body-mass-progress-meter" id="leetcode-progress-meter">
+                <h3>Progress</h3>
+                <div class="body-mass-progress-meter-track-wrap">
+                    <span class="body-mass-progress-meter-callout" id="leetcode-progress-meter-callout"></span>
+                    <div class="body-mass-progress-meter-track">
+                        <div class="body-mass-progress-meter-fill"></div>
+                    </div>
+                </div>
+                <div class="body-mass-progress-meter-stats">
+                    <span class="body-mass-progress-meter-stat">
+                        <span id="leetcode-progress-meter-done" class="body-mass-progress-meter-pct">—</span>
+                        <span class="body-mass-progress-meter-stat-label">solved</span>
+                    </span>
+                    <span class="body-mass-progress-meter-stat">
+                        <span id="leetcode-progress-meter-remaining" class="body-mass-progress-meter-pct">—</span>
+                        <span class="body-mass-progress-meter-stat-label">left</span>
+                    </span>
+                </div>
+
+                <div class="body-mass-progress-meter time-progress-meter" id="leetcode-time-meter">
+                    <div class="body-mass-progress-meter-track">
+                        <div class="body-mass-progress-meter-fill"></div>
+                    </div>
+                    <div class="body-mass-progress-meter-stats">
+                        <span class="body-mass-progress-meter-stat">
+                            <span id="leetcode-time-meter-elapsed" class="body-mass-progress-meter-pct">—</span>
+                            <span class="body-mass-progress-meter-stat-label">elapsed</span>
+                        </span>
+                        <span class="body-mass-progress-meter-stat">
+                            <span id="leetcode-time-meter-remaining" class="body-mass-progress-meter-pct">—</span>
+                            <span class="body-mass-progress-meter-stat-label">ahead</span>
+                            <span id="leetcode-time-meter-eta" class="body-mass-progress-meter-healthy"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spaced as Car Service's cards: Past Year (solves per day, like LeetCode's
+                 profile), Roadmap (a node per category, opening its card below), then the cards. -->
+            <div class="donut-grid health-metrics-grid">
+                <div class="card">
+                    <h3 id="leetcode-heatmap-title">Past Year</h3>
+                    <div class="table-responsive" id="leetcode-heatmap-scroll">
+                        <div class="leetcode-heatmap-months" id="leetcode-heatmap-months"></div>
+                        <div class="leetcode-heatmap" id="leetcode-heatmap"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Roadmap</h3>
+                    <p id="leetcode-summary" class="app-card-meta"></p>
+                    <div class="table-responsive">
+                        <svg class="leetcode-roadmap" id="leetcode-roadmap" role="group" aria-label="NeetCode roadmap"></svg>
+                    </div>
+                </div>
+
+                <div id="leetcode-list"></div>
+            </div>
+        </div>
+
         <div class="panel" data-route="work-time">
             <div class="panel-header">
                 <h2>Work Time</h2>
@@ -2179,37 +2247,6 @@
             </div>
 
             <div id="applications-list"></div>
-        </div>
-
-        <div class="panel" data-route="leetcode">
-            <div class="panel-header">
-                <h2>LeetCode</h2>
-                <button id="add-leetcode-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a solved problem" aria-label="Log">📝</button>
-            </div>
-
-            <!-- NeetCode 250 by category, ticked from the LeetCode tab (track-leetcode.js). -->
-            <p id="leetcode-summary" class="app-card-meta"></p>
-
-            <!-- Spaced as Car Service's cards: Past Year (solves per day, like LeetCode's
-                 profile), Roadmap (a node per category, opening its card below), then the cards. -->
-            <div class="donut-grid health-metrics-grid">
-                <div class="card">
-                    <h3>Past Year</h3>
-                    <div class="table-responsive" id="leetcode-heatmap-scroll">
-                        <div class="leetcode-heatmap-months" id="leetcode-heatmap-months"></div>
-                        <div class="leetcode-heatmap" id="leetcode-heatmap"></div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3>Roadmap</h3>
-                    <div class="table-responsive">
-                        <svg class="leetcode-roadmap" id="leetcode-roadmap" role="group" aria-label="NeetCode roadmap"></svg>
-                    </div>
-                </div>
-
-                <div id="leetcode-list"></div>
-            </div>
         </div>
     </section>
 

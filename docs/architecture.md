@@ -215,7 +215,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 55 | `finance-portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
 | 56 | `finance-market.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
 | 57 | `track-leetcode-roadmap.js` | The NeetCode 250 problem list and NeetCode's roadmap graph (category positions and parents); data only |
-| 58 | `track-leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), category cards, past-year heatmap, roadmap graph |
+| 58 | `track-leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), Progress card with a finish-date forecast, category cards, past-year heatmap, roadmap graph |
 
 `section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 56 above into a page that has none of them (see [Section pages](#section-pages)).
 

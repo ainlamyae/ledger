@@ -10,7 +10,7 @@
 
   | Kind | Wash | Tiles |
   |---|---|---|
-  | Database | Gray | Physique, Nutrition, Activity, Transaction, Account, Breakdown, Portfolio, Watch List, Work Time, Car Service, Travel, Application, LeetCode, Contact, Settings |
+  | Database | Gray | Physique, Nutrition, Activity, Transaction, Account, Breakdown, Portfolio, Watch List, LeetCode, Work Time, Car Service, Travel, Application, Contact, Settings |
   | Form | Green | Tune, Today, Workouts |
   | Chart | Orange | Chart (Health, Finance) |
   | AI | Purple | Insight (Health, Finance), Market, and Insight's own mode tiles (Plan, Wellness… Snapshot) |

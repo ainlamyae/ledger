@@ -172,7 +172,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 12 | `ledger-widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
 | 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
 | 14 | `health-math.js` | Pure health/desired-figure formulas with no chart or DOM code: BMR/TEF/calorie-desired math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, until-date projection |
-| 15 | `health-chart.js` | Chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep) plus the Today-glance tiles |
+| 15 | `health-chart.js` | Chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Intake, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep, one `health-chart-*.js` file each) plus the Today-glance tiles and the 🔍 detail toggle |
 | 16 | `finance-chart.js` | Finance Chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Account Allocation) |
 | 17 | `track-work-time-chart.js` | Work Time chart renderers (arrival/departure/hours distributions, daily average, overtime summary) |
 | 18 | `track-travel-chart.js` | Travel chart renderers, including the country choropleth |
@@ -198,7 +198,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 38 | `health-insight-plan.js` | Plan mode: the Tune's plan (identities, inputs, substituted arithmetic) plus Wellness' actuals, and the feasibility prompt |
 | 39 | `health-insight-pattern.js` | Pattern mode: the BMR_cal periods plus macro/activity-type averages, and the pattern-finding prompt |
 | 40 | `health-insight.js` | The panel itself: mode table, load buttons, AI call, per-mode save/restore |
-| 41 | `health-chart-protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Group |
+| 41 | `health-chart-protein-rotation.js` | Protein Source Rotation bars + donut, grouped and coloured by Group; drawn on Health → Chart and atop Nutrition |
 | 42 | `health-tune-fields.js` | Tune's field-descriptor arrays, mutable known/pin state, mode helpers, and input reading/formatting utils |
 | 43 | `health-tune-render.js` | Tune's substituted-formula display, per-nutrient section renderers, desired/weekly-loss sync, BMR/adaptation row builders, and the `renderFormulaPreview` orchestrator |
 | 44 | `health-tune.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |

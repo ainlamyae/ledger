@@ -10,7 +10,7 @@
   3. TEI, TEF, AEE, SD, then **M**, maintenance (BMR + AEE).
   4. D, **Δm′**, the change calculated from D (primed to tell it from measured Δm), and **ETA**, the days to the healthy mass.
 - Intake Macros, Physical Activity and Sleep (Window, then Duration) stack beside Status, aligned top and bottom.
-- **Progress** card, full width below: kg and days bars marked every 10%, healthy mass as `→ 70 ± 1.9 kg`; the bubble over the bar reads today's weight then m̄ in brackets (`79.1 (80) kg`). Shows `—` from first paint; ends at its last bar unless it has a note (reached, no change, wrong direction, levelling off).
+- **Progress** card, full width below: kg bar marked every 2 kg, days bar every 4 weeks (from the first reading), healthy mass as `→ 70 ± 1.9 kg`; the bubble over the bar reads today's weight then m̄ in brackets (`79.1 (80) kg`). Shows `—` from first paint; ends at its last bar unless it has a note (reached, no change, wrong direction, levelling off).
 
 ## Health — Today at a glance
 

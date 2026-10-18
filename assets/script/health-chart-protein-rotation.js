@@ -202,16 +202,27 @@ function proteinRotationWindow(toIso, days) {
   return { from: isoFromDate(from), to: toIso };
 }
 
-let proteinRotationChart = null;
-let proteinRotationDonut = null;
+// The Chart panel's card and Nutrition's copy, each with its own chart handles.
+const proteinRotationCharts = {
+  chart: { chart: null, donut: null },
+  nutrition: { chart: null, donut: null },
+};
+const PROTEIN_ROTATION_DEFAULT_IDS = {
+  chart: 'protein-rotation-chart', donut: 'protein-rotation-donut',
+  legend: 'protein-rotation-legend', ingredientLegend: 'protein-rotation-ingredient-legend',
+};
+const PROTEIN_ROTATION_NUTRITION_IDS = {
+  chart: 'protein-rotation-chart-nutrition', donut: 'protein-rotation-donut-nutrition',
+  legend: 'protein-rotation-legend-nutrition', ingredientLegend: 'protein-rotation-ingredient-legend-nutrition',
+};
 
 // Same group order and colors as the bar chart — one group is one color
 // everywhere in the panel, in every ring and in its bar, which is what makes
 // the donut readable without a legend of its own. The rings are told apart by
 // position (outermost = reference desired, then 4 weeks, then last week),
 // never by shade.
-function renderProteinRotationDonut(rows, barColors, toIso) {
-  const ctx = document.getElementById('protein-rotation-donut');
+function renderProteinRotationDonut(rows, barColors, toIso, slot, ids) {
+  const ctx = document.getElementById(ids.donut);
   const labels = rows.map((r) => r.name);
 
   // Not a time window like the two below it — each source's own Protein %
@@ -238,7 +249,7 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
   const hasData = rings.some((ring) => ring.total > 0);
   const allRings = [referenceRing, ...rings];
 
-  proteinRotationDonut = upsertChart(proteinRotationDonut, ctx, {
+  proteinRotationCharts[slot].donut = upsertChart(proteinRotationCharts[slot].donut, ctx, {
     type: 'doughnut',
     data: {
       labels,
@@ -285,8 +296,8 @@ function renderProteinRotationDonut(rows, barColors, toIso) {
   });
 }
 
-function renderProteinRotationChart({ from, to }) {
-  const ctx = document.getElementById('protein-rotation-chart');
+function renderProteinRotationChart({ from, to }, slot = 'chart', ids = PROTEIN_ROTATION_DEFAULT_IDS) {
+  const ctx = document.getElementById(ids.chart);
   const sourceRows = computeProteinRotationRows(from, to);
   const rows = groupProteinRotationRows(sourceRows);
 
@@ -299,7 +310,7 @@ function renderProteinRotationChart({ from, to }) {
   const stackRows = rows.flatMap((g) => sourceRows.filter((r) => r.group === g.group));
   const stackColors = proteinRotationPalette(stackRows).barColors;
   // Second legend line: one swatch per ingredient, in stack order.
-  renderCategoryLegend('protein-rotation-ingredient-legend', stackRows.map((r, i) => ({ name: r.name, color: stackColors[i] })));
+  renderCategoryLegend(ids.ingredientLegend, stackRows.map((r, i) => ({ name: r.name, color: stackColors[i] })));
   // One stacked dataset per ingredient, filled only on its own group's row.
   const stackDatasets = stackRows.map((r, i) => ({
     type: 'bar',
@@ -313,7 +324,7 @@ function renderProteinRotationChart({ from, to }) {
 
   // One swatch per group — the bars are labelled by group too, but the donut
   // isn't, and this is what names its slices.
-  renderCategoryLegend('protein-rotation-legend', legend);
+  renderCategoryLegend(ids.legend, legend);
 
   const hasData = labels.length > 0;
 
@@ -322,7 +333,7 @@ function renderProteinRotationChart({ from, to }) {
   // eaten/desired value instead, with a little headroom.
   const maxValue = Math.ceil(Math.max(1, ...actualData, ...desiredData)) + 1;
 
-  proteinRotationChart = upsertChart(proteinRotationChart, ctx, {
+  proteinRotationCharts[slot].chart = upsertChart(proteinRotationCharts[slot].chart, ctx, {
     data: {
       labels,
       datasets: [
@@ -391,7 +402,7 @@ function renderProteinRotationChart({ from, to }) {
     },
   });
 
-  renderProteinRotationDonut(rows, barColors, to);
+  renderProteinRotationDonut(rows, barColors, to, slot, ids);
 }
 
 // No From/To pair of its own any more: this chart is the last block of the Health
@@ -400,4 +411,5 @@ function renderProteinRotationChart({ from, to }) {
 // that's left here is the first, usually data-less render.
 function initProteinRotationPanel() {
   renderProteinRotationChart(healthDateRange());
+  renderProteinRotationChart(healthDateRange(), 'nutrition', PROTEIN_ROTATION_NUTRITION_IDS);
 }

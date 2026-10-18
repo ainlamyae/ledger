@@ -104,7 +104,7 @@ function updatePhysiqueSleepDuration() {
   const bed = parseClockTime(physiqueField('bedtime').value);
   const wake = parseClockTime(physiqueField('wake-time').value);
   const sleepHours = (bed !== null && wake !== null) ? sleepDurationHours(bed, wake) : null;
-  updatePhysiqueSleepDeprivation(sleepHours);
+  return updatePhysiqueSleepDeprivation(sleepHours);
 }
 
 // Same dailyEnergyBalanceKcal the Status card's own energy-balance tile runs
@@ -112,10 +112,10 @@ function updatePhysiqueSleepDuration() {
 // fields rather than a saved entry — so what's about to be saved already
 // shows what a short night is costing (or adding to) this day's balance.
 // Falls back to '—' whenever a piece it needs (profile, body mass, calories
-// in) isn't there yet.
+// in) isn't there yet. Returns D and its desire, for the save's warning.
 function updatePhysiqueSleepDeprivation(sleepHours) {
   const el = document.getElementById('physique-sleep-deprivation');
-  if (!el) return;
+  if (!el) return null;
 
   // The same derivation Save stores (physiqueDerivedFigures), off the typed fields.
   const read = (id) => evaluateNumberExpression(physiqueField(id).value.trim());
@@ -207,8 +207,10 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   setDesire('physique-tef-desire', -digDesired);
   setDesire('physique-aee-desire', actDesiredKcal !== null ? -actDesiredKcal : null);
   setDesire('physique-sleep-deprivation-desire', 0);
-  setDesire('physique-balance-desire', desiredBalanceKcal(planMassKg));
+  const balanceDesired = desiredBalanceKcal(planMassKg);
+  setDesire('physique-balance-desire', balanceDesired);
   setDesire('physique-mass-delta-prime-desire', desiredGPerDay);
+  return { balance: energy ? energy.balance : null, balanceDesired };
 }
 
 // The two activity categories physiqueAsHealthEntries emits and every
@@ -998,6 +1000,13 @@ function todaysPhysiqueDay() {
   return allPhysiqueEntries.find((p) => p.date === today) ?? null;
 }
 
+// Red pulse when the saved day's D (Balance) is above its desire, i.e. short of the desired deficit.
+function warnBalanceShortOfDesire(derived) {
+  if (!derived) return;
+  const { balance, balanceDesired } = derived;
+  if (balance !== null && balanceDesired !== null && balance > balanceDesired) warnWithPulse();
+}
+
 // Confetti when today's saved body mass is closer to the healthy mass than the last earlier reading.
 function celebrateBodyMassProgress(date, bodyMass) {
   const today = isoFromDate(new Date());
@@ -1368,12 +1377,11 @@ function openPhysiqueForm(entry, duplicate = false) {
     ? formTitleWithDate(baseTitle, physiqueField('date').value)
     : baseTitle;
 
-  // Derived, Consumption and Workout start collapsed on any day but today —
-  // today's is the one actually being logged, so its boxes are left open by
-  // default. A Pattern opens Consumption too: the food is what a pattern is for.
+  // Derived is open on every day. Consumption and Workout start collapsed on any
+  // day but today; a Pattern opens Consumption too.
   const isToday = physiqueField('date').value === isoFromDate(new Date());
   const isPattern = document.getElementById('physique-is-pattern').checked;
-  document.getElementById('physique-derived-details').open = isToday;
+  document.getElementById('physique-derived-details').open = true;
   document.getElementById('physique-consumption-details').open = isToday || isPattern;
   document.getElementById('physique-workout-details').open = isToday;
 
@@ -1587,6 +1595,7 @@ async function submitPhysiqueForm(event) {
       stayOnSavedForm('physique-modal', physiqueRouteStep(saved));
     }
     showFormSaved('physique-form-error');
+    if (!isPattern) warnBalanceShortOfDesire(updatePhysiqueSleepDuration());
     // Only a new or changed reading celebrates, so re-saving the same day doesn't.
     if ((before?.bodyMass ?? null) !== (day.bodyMass ?? null)) celebrateBodyMassProgress(date, day.bodyMass);
   } catch (err) {

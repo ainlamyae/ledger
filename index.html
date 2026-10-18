@@ -355,6 +355,7 @@
             <div class="panel-header">
                 <h2>Chart</h2>
                 <button type="button" data-screenshot="health-chart" class="btn btn-icon panel-header-btn" title="Screenshot the whole page: save to the phone's gallery, or download on a laptop" aria-label="Screenshot">📤</button>
+                <button type="button" id="health-detail-btn" class="btn btn-icon panel-header-btn" title="Show the detailed charts: Caloric, Protein, Dietary Fiber, Fat and Carbohydrate Intake, Protein Source Rotation and Activity Rotation" aria-label="More detail" aria-pressed="false">🔍</button>
             </div>
 
             <!-- Market's range row (renderRangeButtons), ending today; governs every chart below. -->
@@ -405,6 +406,14 @@
 
             <div class="donut-grid health-metrics-grid">
                 <div class="card">
+                    <h3>Intake</h3>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="health-intake-chart"></canvas>
+                    </div>
+                    <div class="donut-legend" id="health-intake-legend"></div>
+                </div>
+
+                <div class="card health-detail-chart" hidden>
                     <h3 id="health-calories-label">Caloric Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-calories-chart"></canvas>
@@ -412,7 +421,7 @@
                     <div class="donut-legend" id="health-calories-legend"></div>
                 </div>
 
-                <div class="card">
+                <div class="card health-detail-chart" hidden>
                     <h3>Protein Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-protein-chart"></canvas>
@@ -420,7 +429,7 @@
                     <div class="donut-legend" id="health-protein-legend"></div>
                 </div>
 
-                <div class="card">
+                <div class="card health-detail-chart" hidden>
                     <h3>Dietary Fiber Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-fiber-chart"></canvas>
@@ -428,7 +437,7 @@
                     <div class="donut-legend" id="health-fiber-legend"></div>
                 </div>
 
-                <div class="card">
+                <div class="card health-detail-chart" hidden>
                     <h3>Fat Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-fat-chart"></canvas>
@@ -436,7 +445,7 @@
                     <div class="donut-legend" id="health-fat-legend"></div>
                 </div>
 
-                <div class="card">
+                <div class="card health-detail-chart" hidden>
                     <h3>Carbohydrate Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-carb-chart"></canvas>
@@ -464,7 +473,7 @@
             <!-- Was its own "Protein Source Rotation" panel, moved in last so every
                  Health chart is in one place and they collapse together. The wrap is
                  what makes its heading one of the set, not a style of its own. -->
-            <div class="body-mass-projection-wrap card">
+            <div class="body-mass-projection-wrap card health-detail-chart" hidden>
                 <h3>Protein Source Rotation</h3>
 
                 <div class="protein-rotation-charts">
@@ -483,7 +492,7 @@
             <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
                  (sessions done vs. desired per Group this window) and one rotational
                  donut (reference weekly split, last 4 weeks, last week). -->
-            <div class="body-mass-projection-wrap card">
+            <div class="body-mass-projection-wrap card health-detail-chart" hidden>
                 <h3>Activity Rotation</h3>
 
                 <div class="protein-rotation-charts">
@@ -550,6 +559,23 @@
                 <button id="add-nutrition-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an ingredient to the catalogue" aria-label="Add">➕</button>
             </div>
 
+            <!-- A copy of Health → Chart's Protein Source Rotation card, same data and window. -->
+            <div class="body-mass-projection-wrap card page-rotation-card">
+                <h3>Protein Source Rotation</h3>
+
+                <div class="protein-rotation-charts">
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="protein-rotation-chart-nutrition"></canvas>
+                    </div>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="protein-rotation-donut-nutrition"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-legend" id="protein-rotation-legend-nutrition"></div>
+                <div class="donut-legend" id="protein-rotation-ingredient-legend-nutrition"></div>
+            </div>
+
             <div class="filters">
                 <input type="text" id="nutrition-search" placeholder="🔍 Search" title="Search group or ingredient name" aria-label="Search">
             </div>
@@ -599,6 +625,22 @@
                 <button type="button" id="activity-instruction-btn" data-route="workouts" class="btn btn-icon panel-header-btn" title="How to run the activities in this plan" aria-label="Workouts">💪</button>
                 <button type="button" id="log-workout-btn" class="btn btn-icon panel-header-btn" title="Log the ticked activities as today's workout" aria-label="Log">📝</button>
                 <button type="button" id="add-activity-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an exercise or activity to the plan" aria-label="Add">➕</button>
+            </div>
+
+            <!-- A copy of Health → Chart's Activity Rotation card, same data and window. -->
+            <div class="body-mass-projection-wrap card page-rotation-card">
+                <h3>Activity Rotation</h3>
+
+                <div class="protein-rotation-charts">
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="activity-rotation-chart-activity"></canvas>
+                    </div>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="activity-rotation-donut-activity"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-legend" id="activity-rotation-legend-activity"></div>
             </div>
 
             <!-- Rebuilt from the Activity sheet tab by health-activity-catalogue.js -->
@@ -2905,14 +2947,6 @@
     <div class="modal-card">
         <h2 id="activity-instruction-title">Instructions on the Activities</h2>
 
-        <!-- One tile per Group (health-activity-catalogue.js's renderInstructionList), in one card
-             titled Workouts, as a hub's tiles are; a group's page lists its activities below. -->
-        <div class="card" id="instruction-groups-card">
-            <h3>Workouts</h3>
-            <div class="page-tiles instruction-groups" id="instruction-groups"></div>
-        </div>
-        <div class="instruction-body" id="instruction-body"></div>
-
         <!-- A copy of the Indicator panel's own Activity Rotation card (health-chart-activity-rotation.js),
              same chart and donut off the same data, just also visible here so the gym's own
              tiles page shows the rotation without leaving for Health → Indicator. Hidden
@@ -2920,7 +2954,7 @@
              is open. Builds lazily the same way the original does (upsertChart's
              IntersectionObserver, charts-base.js) — behind this modal's own `hidden` until
              it's first opened. -->
-        <div class="body-mass-projection-wrap card" id="instruction-rotation-card">
+        <div class="body-mass-projection-wrap card page-rotation-card" id="instruction-rotation-card">
             <h3>Activity Rotation</h3>
 
             <div class="protein-rotation-charts">
@@ -2934,6 +2968,14 @@
 
             <div class="donut-legend" id="activity-rotation-legend-gym"></div>
         </div>
+
+        <!-- One tile per Group (health-activity-catalogue.js's renderInstructionList), in one card
+             titled Workouts, as a hub's tiles are; a group's page lists its activities below. -->
+        <div class="card" id="instruction-groups-card">
+            <h3>Workouts</h3>
+            <div class="page-tiles instruction-groups" id="instruction-groups"></div>
+        </div>
+        <div class="instruction-body" id="instruction-body"></div>
 
         <div class="modal-actions">
             <button type="button" id="guide-log-btn" class="btn btn-icon" title="Tick activities to log them" aria-label="Log ticked" hidden disabled>📝</button>
@@ -3318,6 +3360,7 @@
 <script src="assets/script/health-chart.js"></script>
 <script src="assets/script/health-chart-body-mass.js"></script>
 <script src="assets/script/health-chart-calories.js"></script>
+<script src="assets/script/health-chart-intake.js"></script>
 <script src="assets/script/health-chart-protein.js"></script>
 <script src="assets/script/health-chart-fiber.js"></script>
 <script src="assets/script/health-chart-fat.js"></script>

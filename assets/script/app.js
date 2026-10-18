@@ -744,6 +744,7 @@ async function loadDashboard(forceRefresh = false) {
         // (desired protein) all loaded — refresh only once all three are in.
         Promise.all([physiquePromise, nutritionPromise]).then(() => {
           renderProteinRotationChart(healthDateRange());
+          renderProteinRotationChart(healthDateRange(), 'nutrition', PROTEIN_ROTATION_NUTRITION_IDS);
           // Needs both tabs: the grams come from each food's Nutrition row.
           convertPhysiqueBreakdownAmountsToGrams();
         }),
@@ -756,6 +757,7 @@ async function loadDashboard(forceRefresh = false) {
           // was in, so it needs the same post-load refresh the line above gives
           // the Chart panel's copy.
           renderActivityRotationChart(healthDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);
+          renderActivityRotationChart(healthDateRange(), 'activity', ACTIVITY_ROTATION_ACTIVITY_IDS);
           renderActivityPlanTables();
           renderInstructionList();
         }),
@@ -1127,6 +1129,7 @@ function bootDashboard() {
   // Before the panel below it: this fills the From/To pair every Health Chart
   // chart reads, and its first render is one of the readers.
   initHealthRangeControl();
+  initHealthDetailToggle();
   initPageScreenshots();
   initProteinRotationPanel();
   initActivityRotationPanel();

@@ -32,7 +32,7 @@ ledger/
 │       ├── health-activity-estimator.js # Calculate for workouts
 │       ├── ledger-widgets.js            # Time / Date / Azan / Weather bulbs
 │       ├── charts-base.js        # Shared chart theming/axis/legend helpers + upsertChart
-│       ├── confetti.js           # Confetti burst for body-mass progress and income saves
+│       ├── confetti.js           # Confetti burst for body-mass progress and income saves; warnWithPulse (red pulse + shake) for a day short of the desired deficit
 │       ├── health-math.js      # Pure health/desired-figure formulas (BMR, TEF, projection, …)
 │       ├── health-chart.js    # Chart renderers
 │       ├── finance-chart.js     # Finance Chart renderers

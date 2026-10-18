@@ -642,6 +642,13 @@ function pickBmrForBasis(figures, basis = bmrBasis()) {
   return plain;
 }
 
+// The key of the figure pickBmrForBasis returns: Tune's basis, else the equation.
+function selectedBmrKey(figures) {
+  const basisKey = { bmr_cal: 'BMR_cal', bmr_adp: 'BMR_adp', bmr_avg: 'BMR_avg' }[bmrBasis()];
+  const basisValue = basisKey === 'BMR_avg' ? figures.BMR_avg ?? bmrAverageOf(figures) : figures[basisKey];
+  return basisKey && basisValue != null ? basisKey : BMR_EQUATION_KEYS[bmrFormula()];
+}
+
 function storedBmrForDate(date, basis = bmrBasis()) {
   return pickBmrForBasis(bmrFiguresForDate(date), basis);
 }

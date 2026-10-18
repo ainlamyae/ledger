@@ -306,15 +306,9 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     ));
   }
 
-  // Only the BMR Tune has selected, named by its own key; a missing BMR_cal/BMR_adp/BMR_avg
-  // falls back to the equation, as pickBmrForBasis does.
-  const equationKey = BMR_EQUATION_KEYS[bmrFormula()];
-  const basisKey = { bmr_cal: 'BMR_cal', bmr_adp: 'BMR_adp', bmr_avg: 'BMR_avg' }[bmrBasis()];
+  // Only the BMR Tune has selected, named by its own key.
   const bmrSelected = pickBmrForBasis(todayBmrFigures);
-  const basisValue = basisKey === 'BMR_avg'
-    ? todayBmrFigures.BMR_avg ?? bmrAverageOf(todayBmrFigures)
-    : todayBmrFigures[basisKey];
-  const bmrKey = basisKey && basisValue != null ? basisKey : equationKey;
+  const bmrKey = selectedBmrKey(todayBmrFigures);
   document.getElementById('today-status-bmr-label').textContent = bmrKey;
   document.getElementById('today-status-bmr-row').title = BMR_DEFINITIONS[bmrKey] ?? '';
   const bmrText = maintenanceKcal !== null && bmrSelected !== null ? `${-bmrSelected} kcal` : '—';

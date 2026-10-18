@@ -493,7 +493,7 @@ function renderHealthProjectionChart(entries) {
     y: {
       min: yMin,
       max: yMax,
-      afterFit: fixTrendYAxisWidth,
+      afterFit: fixDatedYAxisWidth,
       // Pinned: once min/max are explicit (needed to lock the BMI axis to this range),
       // Chart.js's auto step-size stopped producing the clean 1 kg steps.
       ticks: { stepSize: 1, callback: maskedUnitTick('kg') },
@@ -505,7 +505,7 @@ function renderHealthProjectionChart(entries) {
       min: computeBmi(yMin, heightCm),
       max: computeBmi(yMax, heightCm),
       position: 'right',
-      afterFit: fixTrendYAxisWidth,
+      afterFit: fixDatedYAxisWidth,
       grid: { drawOnChartArea: false },
       ticks: {
         stepSize: 1,
@@ -530,7 +530,7 @@ function renderHealthProjectionChart(entries) {
           // Off, like the rest of the section: Chart.js draws it inside the canvas, so a
           // legend here left this plot area ~30px shorter. Series are named in the tooltip.
           legend: { display: false },
-          tooltip: { enabled: false },
+          tooltip: { external: null },
         },
         scales,
       },

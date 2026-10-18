@@ -7,6 +7,10 @@ function applyChartTheme() {
   // The page's own font family, not Chart.js's Helvetica/Arial.
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 
+  // Every tooltip drawn over the page (htmlTooltip), so a tall one isn't cut at the canvas.
+  Chart.defaults.plugins.tooltip.enabled = false;
+  Chart.defaults.plugins.tooltip.external = htmlTooltip;
+
   // privacyMode is read at call time; loadDashboard rebuilds the charts on toggle.
   Chart.defaults.scales.linear.ticks.callback = function (value) {
     const label = this.getLabelForValue(value);
@@ -51,13 +55,83 @@ function fixTrendYAxisWidth(scale) {
   scale.width = scale.position === 'right' ? TREND_Y_AXIS_RIGHT_WIDTH : TREND_Y_AXIS_WIDTH;
 }
 
+// The dated Health charts' y axes, both sides one width: just wide enough for their
+// widest label ("-1500 kcal"), so the labels sit on the card's edges; the same width
+// on every chart keeps their gridlines lined up.
+const DATED_Y_AXIS_WIDEST_LABEL = '-1500 kcal';
+function fixDatedYAxisWidth(scale) {
+  const { ctx, options } = scale;
+  ctx.save();
+  ctx.font = Chart.helpers.toFont(options.ticks.font).string;
+  const labelWidth = ctx.measureText(DATED_Y_AXIS_WIDEST_LABEL).width;
+  ctx.restore();
+  // tickLength even when ticks aren't drawn, so ghostRightAxis matches a real axis.
+  scale.width = Math.ceil(labelWidth + options.ticks.padding + options.grid.tickLength);
+}
+
+// Chart.js's own tooltip, drawn as a page overlay instead of on the canvas, so a hover
+// taller than its chart isn't cut off. Every chart's default (applyChartTheme).
+function htmlTooltip({ chart, tooltip }) {
+  let el = document.querySelector('.chart-tooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'chart-tooltip';
+    el.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(el);
+    // Fixed to the screen, so a scroll would leave it behind its chart.
+    document.addEventListener('scroll', () => { el.hidden = true; }, { passive: true, capture: true });
+  }
+  if (tooltip.opacity === 0 || !chart.canvas.isConnected) {
+    el.hidden = true;
+    return;
+  }
+
+  const row = (text, color, bold = false) => {
+    const line = document.createElement('div');
+    line.className = 'chart-tooltip-row';
+    if (bold) line.style.fontWeight = '700';
+    if (color) {
+      const swatch = document.createElement('span');
+      swatch.className = 'chart-tooltip-swatch';
+      swatch.style.background = color.backgroundColor;
+      swatch.style.borderColor = color.borderColor;
+      line.appendChild(swatch);
+    }
+    line.appendChild(document.createTextNode(text));
+    return line;
+  };
+  el.replaceChildren(
+    ...tooltip.title.map((t) => row(t, null, true)),
+    ...tooltip.beforeBody.map((t) => row(t)),
+    ...tooltip.body.flatMap((b, i) => [
+      ...b.before.map((t) => row(t)),
+      ...b.lines.map((t) => row(t, tooltip.labelColors[i])),
+      ...b.after.map((t) => row(t)),
+    ]),
+    ...tooltip.afterBody.map((t) => row(t)),
+    ...tooltip.footer.map((t) => row(t, null, true)),
+  );
+  el.style.fontSize = `${chartFontSize()}px`;
+  el.hidden = false;
+
+  // Beside the caret, flipped and clamped so it stays on screen.
+  const rect = chart.canvas.getBoundingClientRect();
+  const gap = 10;
+  const { width, height } = el.getBoundingClientRect();
+  let left = rect.left + tooltip.caretX + gap;
+  if (left + width > window.innerWidth - gap) left = rect.left + tooltip.caretX - gap - width;
+  const top = rect.top + tooltip.caretY - height / 2;
+  el.style.left = `${Math.max(gap, left)}px`;
+  el.style.top = `${Math.max(gap, Math.min(top, window.innerHeight - height - gap))}px`;
+}
+
 // Invisible spacer reserving the same width as a real right axis, so a chart without
 // one doesn't stretch further right and misalign the section's date labels. A factory,
 // since afterFit mutates the scale it's handed.
 function ghostRightAxis() {
   return {
     position: 'right',
-    afterFit: fixTrendYAxisWidth,
+    afterFit: fixDatedYAxisWidth,
     grid: { drawOnChartArea: false, drawTicks: false },
     border: { display: false },
     ticks: { display: false },

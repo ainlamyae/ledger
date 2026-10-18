@@ -231,14 +231,14 @@ function renderHealthSleepChart(entries) {
         x: wellnessCategoryXScale(dates),
         y: {
           min: 0,
-          afterFit: fixTrendYAxisWidth,
+          afterFit: fixDatedYAxisWidth,
           ticks: { callback: maskedUnitTick('kcal') },
         },
         y1: {
           position: 'right',
           min: axisMin,
           max: axisMax,
-          afterFit: fixTrendYAxisWidth,
+          afterFit: fixDatedYAxisWidth,
           grid: { drawOnChartArea: false },
           ticks: { stepSize: 3, callback: sleepAxisTickLabel },
         },

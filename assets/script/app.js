@@ -1149,7 +1149,7 @@ function bootDashboard() {
   initWidgets();
 
   document.getElementById('footer-year').textContent = new Date().getFullYear();
-  // Stamped by scripts/hooks/pre-commit; see docs/versioning.md.
+  // Stamped by scripts/hooks/post-commit; see docs/versioning.md.
   if (typeof APP_VERSION !== 'undefined') document.getElementById('footer-version').textContent = `v${APP_VERSION}`;
 }
 

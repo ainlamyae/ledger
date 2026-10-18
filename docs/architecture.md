@@ -170,7 +170,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 10 | `health-nutrition.js` | Nutrition table, Group column + datalist, USDA lookup button, merge, bulk Pull Micronutrients, `findNutritionEntry`, Log into today's Physique Consumption |
 | 11 | `health-physique-estimator.js` | Calculate for food: deterministic split, table-first lookup, USDA fallback, breakdown table |
 | 12 | `ledger-widgets.js` | The 4 dashboard bulbs; geolocation, prayer times, calendars, weather |
-| 13 | `charts-base.js` | Shared chart theming, axis/legend helpers, and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
+| 13 | `charts-base.js` | Shared chart theming, axis/legend helpers (`fixDatedYAxisWidth`), the page-overlay tooltip every chart uses (`htmlTooltip`), and `upsertChart` — destroy-then-construct, lazy via `IntersectionObserver` so an off-screen/collapsed chart doesn't build until it's actually scrolled into view |
 | 14 | `health-math.js` | Pure health/desired-figure formulas with no chart or DOM code: BMR/TEF/calorie-desired math, protein/fiber/fat/carb bands, body-mass trend/plateau detection, until-date projection |
 | 15 | `health-chart.js` | Chart renderers (State Trend & Forecast, Body Mass, Calorie Balance, Intake, Physical Activity, Caloric/Protein/Fiber/Fat/Carb Intake, Sleep, one `health-chart-*.js` file each) plus the Today-glance tiles and the 🔍 detail toggle |
 | 16 | `finance-chart.js` | Finance Chart renderers (Cumulative Net Worth, Category Expenditure Trend, spending breakdowns, Account Allocation) |

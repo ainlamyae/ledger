@@ -103,7 +103,7 @@ function renderHealthEnergyBalanceChart(entries) {
 
     const intake = Math.round(intakeByDate.get(date));
     // The day's stored Derived cell (Physique's Derived column); the BMR basis setting picks
-    // which figure drives the bar, and the hover lists all four.
+    // which figure drives the bar and the hover.
     const bmrFigures = bmrFiguresForDate(date);
     const maintenance = pickBmrForBasis(bmrFigures);
     if (maintenance === null) return null;
@@ -232,9 +232,8 @@ function renderHealthEnergyBalanceChart(entries) {
               // as something ADDED to the day.
               const lines = [
                 `TEI (Total Energy Intake): ${d.intake} kcal`,
-                // All four stored BMR figures, as in Caloric Intake's hover.
-                ...BMR_JSON_ORDER.filter((key) => d.bmrFigures[key] !== undefined)
-                  .map((key) => `${bmrHoverLabel(key)}: ${-d.bmrFigures[key]} kcal`),
+                // Only the BMR Tune has selected, the one the bar runs on.
+                `${bmrHoverLabel(selectedBmrKey(d.bmrFigures))}: ${-d.maintenance} kcal`,
                 `AEE (Activity Energy Expenditure): ${-d.activity} kcal`,
                 // Only when there IS one. At the default f = 0 the row would be a
                 // permanent "-0", which reads as a term that failed to compute rather
@@ -273,7 +272,7 @@ function renderHealthEnergyBalanceChart(entries) {
         y: {
           min: yMin,
           max: yMax,
-          afterFit: fixTrendYAxisWidth,
+          afterFit: fixDatedYAxisWidth,
           // Zero is the line the chart is read against, so it takes the tick-label
           // colour instead of receding into the gridlines. Evaluated at draw time, so a
           // theme switch recolours it.
@@ -288,7 +287,7 @@ function renderHealthEnergyBalanceChart(entries) {
           min: (yMin / GENERIC_KCAL_PER_KG_FAT) * 1000,
           max: (yMax / GENERIC_KCAL_PER_KG_FAT) * 1000,
           position: 'right',
-          afterFit: fixTrendYAxisWidth,
+          afterFit: fixDatedYAxisWidth,
           grid: { drawOnChartArea: false },
           ticks: { includeBounds: false, callback: maskedUnitTick('g') },
         },

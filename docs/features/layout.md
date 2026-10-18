@@ -56,7 +56,7 @@
 | Header | 10 |
 | Dropdowns | 20–21 |
 | Modals | 100 |
-| Toasts, phone suggestion lists | 110 |
+| Toasts, phone suggestion lists, chart hovers | 110 |
 | Confetti, warning pulse | 120 |
 
 A form's ❌ is the last button in its own actions row, so a long form closes from wherever you scrolled to.

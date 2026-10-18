@@ -704,6 +704,32 @@ header .btn:hover {
     z-index: 110;
 }
 
+/* htmlTooltip (charts-base.js): Chart.js's default tooltip look, over the page. */
+.chart-tooltip {
+    position: fixed;
+    z-index: 110;
+    pointer-events: none;
+    background: rgba(0, 0, 0, .8);
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.chart-tooltip-row + .chart-tooltip-row {
+    margin-top: 2px;
+}
+
+.chart-tooltip-swatch {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: 4px;
+    vertical-align: -0.15em;
+    border: 1px solid;
+}
+
 /* Confetti over everything, toast included (confetti.js); clicks pass through. */
 .confetti-canvas,
 .warning-pulse {

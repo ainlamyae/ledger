@@ -6,171 +6,172 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | 3.21.2 | chore: commit-msg only strips co-author and attribution lines, and the pre-commit and pre-push hooks go; version.js's comment names post-commit as what stamps it; docs |
-| `c7925d7` | 3.21.1 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids; sidebar comments and the navigation doc trimmed |
-| `9830b16` | **3.21.0** | feat: LeetCode gains a Progress card above Past Year (Health's meter over the NeetCode 250, solved and left, a mark every 25) with a time bar under it, days since the first solve against days to go at last week's pace and the finish date; the heatmap starts weeks on Monday, stretches its square cells to the card and on a phone shows Past 16 Weeks; the roadmap shrinks to the card on a phone; the solved summary moves under Roadmap's title; LeetCode comes first in Track, before Work Time; docs |
-| `7eb238d` | **3.20.0** | feat: every chart's hover is drawn over the page (htmlTooltip, Chart.js's own look and callbacks) so a tall one such as Intake's or Calorie Balance's is no longer cut at the chart's bottom; Intake's hover adds each macro's logged grams after its kcal and Intake and Calorie Balance show only the BMR selected in Tune (selectedBmrKey, shared with the Status card); the dated Health charts' y axes are fitted to their widest label, one width on both sides (fixDatedYAxisWidth), while the Rotation charts keep 120px; docs |
-| `7291620` | **3.19.0** | feat: Health Chart gains Intake under Calorie Balance, each day's Protein, Dietary Fiber, Fat and Carbohydrate as stacked kcal (carbohydrate net of fiber, scaled so the stack equals TEI) under Caloric Intake's own TEI dots, 7-Day Average, Desired cap and five BMR caps; 🔍 beside 📤 shows Caloric/Protein/Dietary Fiber/Fat/Carbohydrate Intake, Protein Source Rotation and Activity Rotation, hidden by default and on every reload (🙈 hides them); Protein Source Rotation tops Nutrition and Activity Rotation tops Activity and, above the tiles, Workouts; Progress marks every 2 kg and every 4 weeks with one smooth red-to-green fill; saving a Physique day whose D is above its Desire pulses the page edge red and shakes the form; Derived is open on every date; docs |
-| `1a88526` | **3.18.0** | feat: 📤 on Health and Finance Chart saves the whole page as a PNG (phone share sheet to the gallery, laptop download), drawing charts not yet scrolled near first (buildPendingCharts) with html2canvas-pro, keeping the page's CSS, fonts and unboxed legends; Market leaves the sidebar now its tile lives on Finance Insight; the Status card shows only the BMR selected in Tune, adds M (maintenance, BMR + AEE) between lines under SD and ETA, the plan's days and date to the healthy mass as on Progress; docs |
-| `0fa3790` | **3.17.0** | feat: every dated Health chart's axes refit to what its legend still shows (Body Mass, Caloric Intake, Calorie Balance, Protein, Carbohydrate, Fat, Dietary Fiber and Sleep's clock axis skip hidden entries, as Physical Activity already did); Body Mass, Physical Activity and Sleep dots shrink with the range like bars (fitPointRadius, fitPointBorderWidth: at most 40% of a day's slot, border thinning with it); Protein Source Rotation and Activity Rotation draw a 550px bar chart beside the donut; print starts on sheet 1 (a chart box, not a page-tall panel, avoids a break), prints legend swatch colours and keeps donuts round; docs |
-| `a41f171` | **3.16.0** | feat: Tune's Basal metabolic rate gains BMR_avg, the average of BMR_mif, BMR_kat, BMR_cal and BMR_adp (BMR_adp as of today), as a basis the whole plan can run on (the active equation scaled by BMR_avg / equation), with a BMR_avg row under m-inf_adp, its Equations and Calculations lines, a stored BMR_avg in every Physique day's Derived JSON, a Derived and Status row, a fifth Caloric Intake cap and the hovers; the Setting tab's old target keys are renamed with their duplicates merged, every key the app writes has a default Note filled on save and on load; bulk Calculate tidies Consumption and the Tidy button goes, as does Save & Add Another; Transfer, Capitalize Names, Import CSV, Update Market Value and the two contact exports become emoji buttons and Transfer's commit a Save; Amount reads gr, gram and grams as grams; docs |
-| `cc28007` | **3.15.0** | feat: "target" leaves the whole project, code, setting keys, ids, classes, file names, comments and docs, for the UI's words: healthy for the body-mass goal (BODY_MASS_HEALTHY_KG, healthyKg) and desired for every other goal (SLEEP_DESIRED_HOURS, getCalorieDesired), health-nutrient-targets.js now health-nutrient-desired.js; every dated Health chart gets a swatch legend under it whose entries click to hide their series or bars/dots of that colour, desired marks turn cyan apart from the 7-Day Average, results read Desired met / Near desired / Missed desired alike, 8 evenly spaced gridlines with the first and last date on the plot edges at every range and a 120px left y axis so Rotation names fit; Body Mass draws Tune's healthy body mass, joins its dots with a thin gray line across gaps, plots a lone old reading, restarts its trend lines after a 14-day gap and draws the Calorie Trend in indigo; Tune opens a fresh user on the user's own figures (m_des 70 kg, L_p 7, n_p 4, gamma 3, kappa 3, walking MET 3, f 13.5, b_min 17, q 30-50, Delta-m% 1, a 170 cm / 35 y / 38-91-99 cm profile); a receipt of 2+ transactions ends in a blue UI-only total, the Pay badge shows only for the 3 days after Payment Day and on the home tile too; docs |
-| `a4b3550` | 3.14.1 | refactor: rename every feature file, identifier, comment and doc to the UI section-page scheme (health-/finance-/track-/other-/ledger-*; wellness→health, Indicator→Chart, Timesheet→Work Time, Formula Playground→Tune), shared infra left neutral and the Wellness insight feature kept as-is; split the Health chart module into one file per chart; align the Health Chart vertical gridlines at every range via a fixed y-axis width; printer-friendly @media print rules; Body Mass chart joins its dots with a connecting line; fix the physique data-load crash by coercing text cells to strings; add the system-architecture diagram to the README and correct the social-preview description order; remove the one-off activity-image fetch scripts; add walk/backstroke/run activity gifs |
-| `0b92582` | **3.14.0** | feat: Breakdown leaves the Finance and home tiles and the sidebar (PAGES_WITHOUT_TILES in page-nav.js; /finance/breakdown/ still opens, and commenting its entry out brings them back); Calculate title-cases each exercise name in a day's Workout box, and the Workout table under it shows names that way, as Consumption does for ingredients; docs |
-| `d00eef5` | **3.13.0** | feat: Tune adds neck, waist and hip under age, U.S. Navy body-fat % (Hodgdon & Beckett) under BMI_des and LBM_navy above the Boer LBM, now LBM_boer, with their Equations and Calculations lines in Variables order; a Lean body mass question above Basal metabolic rate picks Boer or U.S. Navy for Katch-McArdle, A/B, protein and glycogen app-wide (LBM_FORMULA); new settings get a default Note; an account's Payment Day (1-31, Break-sized box) shows a red Pay <n>d badge on its row and the Account tile once passed unpaid; Activity Rotation runs furthest below desired first, like Protein Source Rotation; docs |
-| `469f13a` | **3.12.0** | feat: home and hub tiles are liquid-glass capsules (frosted, top shine, lit rim, soft shadow) over their old colour coding, while sidebar links go back to plain list items; Contact, Refresh data, Clear cache and Settings sit above the switches, now named Dark mode, Amounts, Widgets and Bulbs, which show and work before sign-in from this browser's last values (Widgets and Bulbs off by default) and take the Settings tab's once it loads; Market's tile moves beside Snapshot on Finance Insight; Portfolio Allocation is renamed Account Allocation; docs |
-| `bd80d0b` | **3.11.0** | feat: Contact and Settings open from the account menu, and Other leaves the tab bar, sidebar and home page (its /other/ addresses still work); sidebar links are liquid-glass capsules with a lit rim, top shine and a lift on hover, blue glass when selected; docs |
-| `ef565cd` | 3.10.1 | fix: Physique's Derived table shows TEF from intake alone, and before Bed and Wake are typed reads SD as 0 with D and Δm′ worked out from it; ticking Pattern also hides Workout (with its table) and Derived, and a pattern saves Workout, Duration and AEE blank; Protein Source Rotation, Activity Rotation (both copies) and Finance's Cumulative Net Worth sit flush under their headings like every other chart; docs |
-| `ffaaa03` | **3.10.0** | feat: a new exercise in a day's Workout is priced by AI on Calculate (MET, Category, Group, Muscle Group, Sets x Reps and Rest), its row showing AI with 💾 to save it to the Activity sheet and ✏️ to fix it first, and ✅ for one already there, as Consumption does for a new ingredient; table columns 5px apart everywhere; commit-msg strips every attribution trailer; Add Activity's Save finds the saved row by Name, not Category; docs |
-| `96fb73f` | **3.9.0** | feat: sidebar's bottom panel holds Refresh data, Clear cache and the show/hide settings as iPhone-style switches (Dark mode, Show amounts, Show widgets, Show bulbs) above an account row with the Google picture, name and email that opens the account menu above it; links scroll on their own above the panel; with the sidebar hidden or below 1180px they sit in the account menu instead; docs |
-| `ea2ff8c` | 3.8.1 | chore: version.js and changelog for 3.8.0, which the post-commit hook skipped while WSL had no node |
-| `d03ad65` | **3.8.0** | feat: sidebar hides with a panel button in the logo row (or Ctrl+.), leaving the Ledger logo as the button to bring it back, remembered before first paint; hub tiles colour-coded by function (gray database, green form, orange chart, purple AI incl. Market and Insight modes); Portfolio between Breakdown and Watch List; Health ranges add 6m and 5y, Finance Indicator adds 5y; Caloric Intake y axis from 0 kcal; Protein Source Rotation scales Protein % to 100% and targets the protein band's top; docs |
-| `c83852d` | **3.7.0** | feat: Track LeetCode page with the NeetCode 250 roadmap by category (✅, Solved, Problem, Difficulty, 🎥 NeetCode video and 🔗 LeetCode buttons), one category open at a time; Past Year heatmap and NeetCode's roadmap graph cards; 📝 Log form (Date, Problem, Category, Difficulty, LeetCode, NeetCode Video, Notes) saving to a LeetCode tab with columns found by header; docs |
-| `3badffc` | **3.6.0** | feat: changelog of every commit with its version, rewritten by the post-commit hook; version counted from 0.0.0 over the whole history with judged legacy commits (Finance Market as 3.0.0); commit-msg strips co-author and attribution lines; docs |
-| `82a83d5` | **3.5.0** | feat: version from commit messages (Conventional Commits, as in CELPiPi): feat bumps minor, fix/other bumps patch, feat! bumps major; post-commit hook stamps version.js; docs |
-| `b6ebc3a` | **3.4.0** | Weather widget: today's sunrise and sunset on the current-conditions line (icon and temperature, condition on hover) to keep it one line; docs |
-| `3cc41ca` | **3.3.0** | Range buttons (1w/1m/3m/1y/All) replace From/To on Health Indicator and Health Insight; Finance Indicator 3m/6m/1y/All for Net Worth and Expenditure Trend, uncapped y axis; Settings tabs with own addresses and Note/Key/Value columns; every table fits its content; Protein Source Rotation stacked by ingredient with ingredient legend; Nutrition drops Uses, orders used-today then protein; Transaction line per receipt; docs |
-| `139b73a` | **3.2.0** | Watch List price alerts (below/above price, long-term average, trailing stop) with red badges on Watch List and Market, dismiss, 4-hour background check; AI suggests alerts in a fixed line with 📌 apply and checks; entry stop for buying today and position size; Market and Portfolio cards 2x2 on phones; docs |
-| `8e2e7d2` | **3.1.0** | Finance: Watch List page (🔬 opens Market) and Market page merging the chart with Analysis; watchlist picker; long-term chart lines (SMA200, 52-week high, trailing stop, market) with Chart history sent to AI; trailing stop default 4 ATR; TSE: AC symbol input; Alpha Vantage spacing and TSX news message; docs |
-| `bc8e50c` | **3.0.0** | Finance Market, Portfolio and Analysis pages: watchlist and price history, ACB trade log in CAD, evidence-based signals with AI read; smaller phone tab labels; docs |
-| `c5f5d82` | 2.94.1 | Activity: one table with Category and Group columns, a line at each Group change; docs |
-| `82adbf7` | **2.94.0** | Red day-count badges: Finance Insight Snapshot, Transaction over 30 days, Work Time days since last log; keep Insight badges after tile redraw; docs |
-| `b5045bf` | **2.93.0** | AI provider switch (Groq or OpenRouter) with models from Settings; 30-day red badges on Insight tiles; docs |
-| `ddfb6f8` | 2.92.1 | Tune: shorter variable names and BMR label; Equations in the site font, headings dark, equations gray; docs |
-| `68d262d` | **2.92.0** | Tune as four cards with one BMR choice and desired wording; account details beside Account; one side-by-side field gap; docs |
-| `d8926da` | **2.91.0** | Workouts (was GYM) with Cardio and NEAT; desktop footer strip as phone; even glass sidebar; sidebar closes open form; m̄ in progress bubble; docs |
-| `274f921` | 2.90.7 | Phone polish: top safe-area strip, faded footer, lighter bottom bars, plain tab colours, iOS-style search boxes, m row in Derived |
-| `f3c7eec` | 2.90.6 | Tiles: neutral gray capsules with 12px labels |
-| `a522dc4` | 2.90.5 | Four tiles a row on a phone |
-| `9a5cc6d` | 2.90.4 | Body text 13px |
-| `d001be3` | 2.90.3 | Footer "© year ALI — Ledger vX"; author meta and schema.org JSON-LD |
-| `993bff1` | 2.90.2 | Footer as "Ledger vX • © year ALI"; card text 12px |
-| `4de1719` | 2.90.1 | Body text back to .9rem |
-| `7c7f8b4` | **2.90.0** | Track section, Apple-style look, titled tile cards, one type scale |
-| `5d88f8c` | **2.89.0** | Confetti on saving an income transaction; darker hover shadow |
-| `accce2b` | **2.88.0** | Nutrition Group, grams-first Amount, Protein Rotation by Group; Pattern form; Finance tweaks |
-| `3b076a5` | **2.87.0** | Physique: collapsible Derived table with Desire targets, calibration ramp-up/clamp; Activity Rotation on GYM; Body Mass dots |
-| `954b5cf` | 2.86.3 | Nav: bottom bar through tablet widths, no top-bar gap before the sidebar |
-| `3917540` | 2.86.2 | Transaction filters: dates on top, the four filters in a 2x2 grid on phones |
-| `ff294e4` | 2.86.1 | Fix local-date bugs, suggestion placement and stale docs; remove dead code |
-| `3085fc2` | **2.86.0** | Automatic version in the footer; confetti fires on save |
-| `cf4fa52` | **2.85.0** | Split README and features into topic docs; pin phone suggestions to the top; confetti on body-mass progress |
-| `b51a07d` | 2.84.8 | Rename Physique's BMR column to Derived, underline Activity table headers |
-| `8ad63bb` | 2.84.7 | Widgets as bulbs, one gap across the home page |
-| `16c25c0` | 2.84.6 | Same gap from the last bulb to the tiles as between bulbs |
-| `2649136` | 2.84.5 | Charts and GYM activities as bulbs; Micronutrients tables compact |
-| `e2c360c` | 2.84.4 | One font family, Today before GYM, even gap under date rows |
-| `27d7835` | 2.84.3 | No auto-zoom on iPhone, header-row lines, Insight views reload in place |
-| `381897a` | 2.84.2 | Tables size columns by the table alone; cards keep their padding on phones |
-| `d0d4f28` | 2.84.1 | Tables: fixed row heights, row buttons never stacked |
-| `967f9b0` | **2.84.0** | GYM page, quick logging, and one consistent style system |
-| `dbeba06` | 2.83.2 | Day form: Sleep Duration/Deprivation line in the m̄/Δm/BMI style |
-| `27d3920` | 2.83.1 | README: stored glycogen swing, load timing logs, body-mass and Load wording |
-| `fb10c4f` | **2.83.0** | Finance: Cumulative Net Worth glance card under the summary cards |
-| `34b8769` | 2.82.9 | Remove Health's Settings block; Other's Settings is the one page |
-| `596b5be` | 2.82.8 | Log where a load's time goes |
-| `819e2c7` | 2.82.7 | Day form: m̄/Δm/BMI line with each unit once |
-| `d792a28` | 2.82.6 | Day form: m_d shown in kg |
-| `3d3915c` | 2.82.5 | Day form: m_avg/m_d/BMI line, each in its own unit |
-| `84cce25` | 2.82.4 | m_d stored in kg/day like every other body-mass figure |
-| `3f9e17c` | 2.82.3 | Body-mass figures stored in the BMR cell, not a new column |
-| `c4dc8ce` | 2.82.2 | Tune's Update: say it recomputes m_avg too |
-| `fdf9e3c` | 2.82.1 | Activity: an exercise's Weight is shown as Load |
-| `1418728` | **2.82.0** | Stored Mass column: m, BMI, m_avg and m_d saved per day; body-mass wording |
-| `21baaed` | 2.81.17 | Glycogen swing saved once as GLYCOGEN_SWING_KG |
-| `fc4db1c` | 2.81.16 | Phone footer: copyright line 10px lower |
-| `96be42b` | 2.81.15 | README: phone footer strip, left-aligned date/time fields |
-| `e1b8394` | 2.81.14 | Phone: copyright line in a strip under the bottom bar |
-| `8c4b821` | 2.81.13 | Phone: no scroll on a short page, footer resting on the bottom bar |
-| `3f43ca5` | 2.81.12 | Forms: date and time values pinned left on iOS too |
-| `37bd22b` | 2.81.11 | Forms: date and time values left-aligned |
-| `bcc7827` | 2.81.10 | README: drop the short-page height note (reverted) |
-| `fe0b25b` | 2.81.9 | Revert "Short pages fit the screen; footer above the phone bottom bar" |
-| `6ad6f2e` | 2.81.8 | README: logged rows, Progress card note |
-| `1360399` | 2.81.7 | Progress card: no empty line under the last bar |
-| `1fd7b7d` | 2.81.6 | Status: one m row with the rolling average in brackets |
-| `82e1dbf` | 2.81.5 | Status: m shows the glycogen/water swing beside its target too |
-| `2254a7f` | 2.81.4 | Activity: no hover note on a logged row, like Nutrition |
-| `8176577` | 2.81.3 | Activity: a logged row is green with no tick, like Nutrition |
-| `4e46374` | 2.81.2 | README: Workout suggestions, page height and footer |
-| `d1e808e` | 2.81.1 | Short pages fit the screen; footer above the phone bottom bar |
-| `deaef4e` | **2.81.0** | Physique form: exercise-name suggestions for Workout |
-| `dab39f3` | 2.80.11 | README: actions in one place, phone bar spacing, form button order |
-| `60c0103` | 2.80.10 | Phone bottom bar a quarter closer to the bottom edge |
-| `8fefaec` | 2.80.9 | Actions at the top on every page, in the phone bar's order |
-| `df90f5c` | 2.80.8 | Reload of a row address: no lowercase name in the breadcrumb |
-| `c9efbf9` | 2.80.7 | Ingredient form: Scan before Complete |
-| `78d5d19` | 2.80.6 | Ingredient form: name and unit columns at the page's text size |
-| `35cf4e3` | 2.80.5 | Ingredient form: name column as wide as its text |
-| `52cd4e1` | 2.80.4 | Phone bottom bar: half the gap between buttons and the account circle |
-| `7137608` | 2.80.3 | Phone bar spacing even at both ends; Physique form: Scan first |
-| `4795914` | 2.80.2 | README: first-paint layout, Ledger tab, phone bar details |
-| `f070296` | 2.80.1 | Hub/page layout from the first paint |
-| `f83a5bf` | **2.80.0** | Car Service: winter changeover and rust protection on 1 Dec |
-| `41f484e` | 2.79.1 | Phone bottom bar: long labels wrap onto two lines |
-| `199fd86` | **2.79.0** | Phone tab bar: Ledger tab for the home page |
-| `c43c932` | 2.78.2 | Phone: account avatar the same circle as the bottom bar's close |
-| `046ae67` | 2.78.1 | Hide bulbs: keep the cards on section pages |
-| `f54433d` | **2.78.0** | Hide bulbs: account-menu toggle for the home page's glance cards |
-| `4a9241a` | 2.77.3 | Phone bottom bars float above the home indicator |
-| `b3143ac` | 2.77.2 | Pill bottom bars, round close, emoji buttons always white |
-| `4664ffd` | 2.77.1 | Selection-bar buttons and Physique's Today as white emoji |
-| `e190d06` | **2.77.0** | Emoji action buttons, badges, saves stay open, exports in Settings |
-| `15c1271` | 2.76.2 | Phone bottom bars: one height, one button style |
-| `4249d5e` | 2.76.1 | Six text colours, thinner tables, home breadcrumb, compact BMR line |
-| `c63446f` | **2.76.0** | Every form a page, no top bar, Insight mode pages, all styling in styles.css |
-| `f13f049` | 2.75.4 | Breadcrumb: link a row's date over its 🧬 view |
-| `cffe6a0` | 2.75.3 | README: batched reads, per-page loading, breadcrumb root |
-| `4097879` | 2.75.2 | Breadcrumbs start at Ledger, linking to the home page |
-| `709442c` | 2.75.1 | Contact table: columns fit their text, scrolling sideways |
-| `0b373b0` | **2.75.0** | One bottom bar at a time on phones, ❌ on every page, direct form loads |
-| `7e02cb3` | 2.74.4 | Section hubs: breadcrumb in place of the centred title |
-| `6801eed` | 2.74.3 | Health hub: Today as the first tile, before Tune |
-| `bc41aa7` | 2.74.2 | Settings tables: actions and key on one line |
-| `2e6a7a8` | 2.74.1 | Health hub: keep Today, drop Log |
-| `45cff47` | **2.74.0** | Today and Log on the Health hub |
-| `9e48a55` | **2.73.0** | Form pages styled like block pages; home overview with tiles; name-only tiles |
-| `68df48d` | **2.72.0** | Forms open as pages on section pages |
-| `9eff94f` | 2.71.1 | Finance: Financial Indicator/Insight become Indicator and Insight |
-| `6e258bb` | **2.71.0** | Section pages as a hub and pages, with a sidebar on wide screens |
-| `81fd025` | 2.70.1 | Load only the current section's blocks |
-| `9530945` | **2.70.0** | Batch Sheets reads and share the tab list; add Clear cache |
-| `53277bc` | 2.69.2 | Pattern table: content width, one line per cell, compact padding |
-| `487763a` | 2.69.1 | Profile order: sex, height, age, then body mass |
-| `3cc4e2e` | **2.69.0** | Health Settings block; read walking MET and BMR_cal from their sheets |
-| `468624b` | 2.68.1 | Insight mode names and order, Food macro fallback, consistent hover units |
-| `a5fd64f` | **2.68.0** | Nutrition Facts order and names, setting-driven targets, more row addresses |
-| `e22ffa8` | 2.67.6 | Progress card: regular-weight figures and lost/left, elapsed/ahead labels |
-| `6b94f4d` | 2.67.5 | Remove all caching; smooth m̄ over L_p; Status, Progress and unit cleanups |
-| `d16cac6` | 2.67.4 | Car Service: wrap Basis in a narrow column; bump shell cache to v29 |
-| `b47e9c6` | 2.67.3 | Stop iOS Safari text inflation (Car Service Basis column) |
-| `c4e86a3` | 2.67.2 | Progress card: stat text at the Status rows' font size |
-| `184ffbd` | 2.67.1 | README: Status, Progress card, ingredient form and Pattern micronutrients |
-| `76bbef7` | **2.67.0** | Health glance: drop m̄ and t, Progress card with 10% marks under the cards, tighter stack, Sleep Window first |
-| `e723d71` | **2.66.0** | Physique Patterns: own micronutrients table and pattern-N addresses |
-| `115189c` | 2.65.2 | Ingredient form: Amount as a stacked field like Classification and Name |
-| `e01c605` | 2.65.1 | Ingredient form: label-matched names and units, fixed right-aligned fields |
-| `66d8732` | **2.65.0** | Standard units, editable Patterns period length, sheet-matching sleep labels |
-| `b69db71` | **2.64.0** | Nutrition lock table, per-row edit addresses, Insight prompt templates |
-| `61d6cc6` | **2.63.0** | Add Equations and Calculation dropdowns to Tune |
-| `863c47a` | **2.62.0** | Add Car Service reminder flag and daily notification |
-| `5186cf9` | **2.61.0** | Add Car Service block with service history and predictions; chart hover consistency |
-| `c475eca` | **2.60.0** | Add block/form addresses, Tune block, and stored per-day BMR in Physique |
-| `23e4fe9` | **2.59.0** | Pin form actions to the bottom on mobile, update balances on edit, add progress bar bands |
-| `d924b1c` | 2.58.1 | Sort Activity plan and Instructions modal by rotation completion |
-| `7c1897e` | **2.58.0** | Add export confirmation dialogs and reorder Status card rows |
-| `1a105f2` | 2.57.3 | Fix Breakdown action buttons wrapping on mobile, Sleep header abbreviation, integer macros in Physique table |
-| `82316e7` | 2.57.2 | Improve Transaction and Physique UX across filters, exports, and table display |
-| `2462979` | 2.57.1 | Make forms full-screen on mobile and fix background scroll |
-| `f20de78` | **2.57.0** | Add block-visibility toggle, catalogue propagation, and Health Plan parity |
-| `fcacd7d` | 2.56.1 | Make Health Insight tables/profile consistent across modes |
-| `5bf2912` | **2.56.0** | Make Health Insight's Patterns period length user-editable |
-| `1581d0a` | **2.55.0** | Add a Patterns mode to Health Insight |
-| `e5eed46` | **2.54.0** | Add BMR calibration, fix Calculate/basis bugs, and clean up small UX gaps |
-| `87fa0e1` | **2.53.0** | Replace the Health Indicator charts' weekly-bucket trend with a continuous EMA |
-| `8a5a37b` | 2.52.1 | Make the phone bottom nav a real tab bar with thumb-sized tap targets |
-| `34b2f76` | **2.52.0** | Overhaul the mobile layout: bottom nav, auto-hiding header, fixed dark-mode colors |
-| `da98f24` | 2.51.2 | Ignore local editor settings |
+| (this commit) | 3.21.3 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids |
+| `4bcef48` | 3.21.2 | chore: commit-msg only strips co-author and attribution lines, and the pre-commit and pre-push hooks go; version.js's comment names post-commit as what stamps it; docs |
+| `589dfc1` | 3.21.1 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids; sidebar comments and the navigation doc trimmed |
+| `33136a5` | **3.21.0** | feat: LeetCode gains a Progress card above Past Year (Health's meter over the NeetCode 250, solved and left, a mark every 25) with a time bar under it, days since the first solve against days to go at last week's pace and the finish date; the heatmap starts weeks on Monday, stretches its square cells to the card and on a phone shows Past 16 Weeks; the roadmap shrinks to the card on a phone; the solved summary moves under Roadmap's title; LeetCode comes first in Track, before Work Time; docs |
+| `5bc8256` | **3.20.0** | feat: every chart's hover is drawn over the page (htmlTooltip, Chart.js's own look and callbacks) so a tall one such as Intake's or Calorie Balance's is no longer cut at the chart's bottom; Intake's hover adds each macro's logged grams after its kcal and Intake and Calorie Balance show only the BMR selected in Tune (selectedBmrKey, shared with the Status card); the dated Health charts' y axes are fitted to their widest label, one width on both sides (fixDatedYAxisWidth), while the Rotation charts keep 120px; docs |
+| `16a68d0` | **3.19.0** | feat: Health Chart gains Intake under Calorie Balance, each day's Protein, Dietary Fiber, Fat and Carbohydrate as stacked kcal (carbohydrate net of fiber, scaled so the stack equals TEI) under Caloric Intake's own TEI dots, 7-Day Average, Desired cap and five BMR caps; 🔍 beside 📤 shows Caloric/Protein/Dietary Fiber/Fat/Carbohydrate Intake, Protein Source Rotation and Activity Rotation, hidden by default and on every reload (🙈 hides them); Protein Source Rotation tops Nutrition and Activity Rotation tops Activity and, above the tiles, Workouts; Progress marks every 2 kg and every 4 weeks with one smooth red-to-green fill; saving a Physique day whose D is above its Desire pulses the page edge red and shakes the form; Derived is open on every date; docs |
+| `4596a90` | **3.18.0** | feat: 📤 on Health and Finance Chart saves the whole page as a PNG (phone share sheet to the gallery, laptop download), drawing charts not yet scrolled near first (buildPendingCharts) with html2canvas-pro, keeping the page's CSS, fonts and unboxed legends; Market leaves the sidebar now its tile lives on Finance Insight; the Status card shows only the BMR selected in Tune, adds M (maintenance, BMR + AEE) between lines under SD and ETA, the plan's days and date to the healthy mass as on Progress; docs |
+| `3e3249a` | **3.17.0** | feat: every dated Health chart's axes refit to what its legend still shows (Body Mass, Caloric Intake, Calorie Balance, Protein, Carbohydrate, Fat, Dietary Fiber and Sleep's clock axis skip hidden entries, as Physical Activity already did); Body Mass, Physical Activity and Sleep dots shrink with the range like bars (fitPointRadius, fitPointBorderWidth: at most 40% of a day's slot, border thinning with it); Protein Source Rotation and Activity Rotation draw a 550px bar chart beside the donut; print starts on sheet 1 (a chart box, not a page-tall panel, avoids a break), prints legend swatch colours and keeps donuts round; docs |
+| `a43c757` | **3.16.0** | feat: Tune's Basal metabolic rate gains BMR_avg, the average of BMR_mif, BMR_kat, BMR_cal and BMR_adp (BMR_adp as of today), as a basis the whole plan can run on (the active equation scaled by BMR_avg / equation), with a BMR_avg row under m-inf_adp, its Equations and Calculations lines, a stored BMR_avg in every Physique day's Derived JSON, a Derived and Status row, a fifth Caloric Intake cap and the hovers; the Setting tab's old target keys are renamed with their duplicates merged, every key the app writes has a default Note filled on save and on load; bulk Calculate tidies Consumption and the Tidy button goes, as does Save & Add Another; Transfer, Capitalize Names, Import CSV, Update Market Value and the two contact exports become emoji buttons and Transfer's commit a Save; Amount reads gr, gram and grams as grams; docs |
+| `930177f` | **3.15.0** | feat: "target" leaves the whole project, code, setting keys, ids, classes, file names, comments and docs, for the UI's words: healthy for the body-mass goal (BODY_MASS_HEALTHY_KG, healthyKg) and desired for every other goal (SLEEP_DESIRED_HOURS, getCalorieDesired), health-nutrient-targets.js now health-nutrient-desired.js; every dated Health chart gets a swatch legend under it whose entries click to hide their series or bars/dots of that colour, desired marks turn cyan apart from the 7-Day Average, results read Desired met / Near desired / Missed desired alike, 8 evenly spaced gridlines with the first and last date on the plot edges at every range and a 120px left y axis so Rotation names fit; Body Mass draws Tune's healthy body mass, joins its dots with a thin gray line across gaps, plots a lone old reading, restarts its trend lines after a 14-day gap and draws the Calorie Trend in indigo; Tune opens a fresh user on the user's own figures (m_des 70 kg, L_p 7, n_p 4, gamma 3, kappa 3, walking MET 3, f 13.5, b_min 17, q 30-50, Delta-m% 1, a 170 cm / 35 y / 38-91-99 cm profile); a receipt of 2+ transactions ends in a blue UI-only total, the Pay badge shows only for the 3 days after Payment Day and on the home tile too; docs |
+| `734ce48` | 3.14.1 | refactor: rename every feature file, identifier, comment and doc to the UI section-page scheme (health-/finance-/track-/other-/ledger-*; wellness→health, Indicator→Chart, Timesheet→Work Time, Formula Playground→Tune), shared infra left neutral and the Wellness insight feature kept as-is; split the Health chart module into one file per chart; align the Health Chart vertical gridlines at every range via a fixed y-axis width; printer-friendly @media print rules; Body Mass chart joins its dots with a connecting line; fix the physique data-load crash by coercing text cells to strings; add the system-architecture diagram to the README and correct the social-preview description order; remove the one-off activity-image fetch scripts; add walk/backstroke/run activity gifs |
+| `10d6a65` | **3.14.0** | feat: Breakdown leaves the Finance and home tiles and the sidebar (PAGES_WITHOUT_TILES in page-nav.js; /finance/breakdown/ still opens, and commenting its entry out brings them back); Calculate title-cases each exercise name in a day's Workout box, and the Workout table under it shows names that way, as Consumption does for ingredients; docs |
+| `9d36bf5` | **3.13.0** | feat: Tune adds neck, waist and hip under age, U.S. Navy body-fat % (Hodgdon & Beckett) under BMI_des and LBM_navy above the Boer LBM, now LBM_boer, with their Equations and Calculations lines in Variables order; a Lean body mass question above Basal metabolic rate picks Boer or U.S. Navy for Katch-McArdle, A/B, protein and glycogen app-wide (LBM_FORMULA); new settings get a default Note; an account's Payment Day (1-31, Break-sized box) shows a red Pay <n>d badge on its row and the Account tile once passed unpaid; Activity Rotation runs furthest below desired first, like Protein Source Rotation; docs |
+| `adcf1f7` | **3.12.0** | feat: home and hub tiles are liquid-glass capsules (frosted, top shine, lit rim, soft shadow) over their old colour coding, while sidebar links go back to plain list items; Contact, Refresh data, Clear cache and Settings sit above the switches, now named Dark mode, Amounts, Widgets and Bulbs, which show and work before sign-in from this browser's last values (Widgets and Bulbs off by default) and take the Settings tab's once it loads; Market's tile moves beside Snapshot on Finance Insight; Portfolio Allocation is renamed Account Allocation; docs |
+| `8a677e6` | **3.11.0** | feat: Contact and Settings open from the account menu, and Other leaves the tab bar, sidebar and home page (its /other/ addresses still work); sidebar links are liquid-glass capsules with a lit rim, top shine and a lift on hover, blue glass when selected; docs |
+| `4dadc62` | 3.10.1 | fix: Physique's Derived table shows TEF from intake alone, and before Bed and Wake are typed reads SD as 0 with D and Δm′ worked out from it; ticking Pattern also hides Workout (with its table) and Derived, and a pattern saves Workout, Duration and AEE blank; Protein Source Rotation, Activity Rotation (both copies) and Finance's Cumulative Net Worth sit flush under their headings like every other chart; docs |
+| `c3430bd` | **3.10.0** | feat: a new exercise in a day's Workout is priced by AI on Calculate (MET, Category, Group, Muscle Group, Sets x Reps and Rest), its row showing AI with 💾 to save it to the Activity sheet and ✏️ to fix it first, and ✅ for one already there, as Consumption does for a new ingredient; table columns 5px apart everywhere; commit-msg strips every attribution trailer; Add Activity's Save finds the saved row by Name, not Category; docs |
+| `a68f15e` | **3.9.0** | feat: sidebar's bottom panel holds Refresh data, Clear cache and the show/hide settings as iPhone-style switches (Dark mode, Show amounts, Show widgets, Show bulbs) above an account row with the Google picture, name and email that opens the account menu above it; links scroll on their own above the panel; with the sidebar hidden or below 1180px they sit in the account menu instead; docs |
+| `4b74105` | 3.8.1 | chore: version.js and changelog for 3.8.0, which the post-commit hook skipped while WSL had no node |
+| `ff5defc` | **3.8.0** | feat: sidebar hides with a panel button in the logo row (or Ctrl+.), leaving the Ledger logo as the button to bring it back, remembered before first paint; hub tiles colour-coded by function (gray database, green form, orange chart, purple AI incl. Market and Insight modes); Portfolio between Breakdown and Watch List; Health ranges add 6m and 5y, Finance Indicator adds 5y; Caloric Intake y axis from 0 kcal; Protein Source Rotation scales Protein % to 100% and targets the protein band's top; docs |
+| `322f6db` | **3.7.0** | feat: Track LeetCode page with the NeetCode 250 roadmap by category (✅, Solved, Problem, Difficulty, 🎥 NeetCode video and 🔗 LeetCode buttons), one category open at a time; Past Year heatmap and NeetCode's roadmap graph cards; 📝 Log form (Date, Problem, Category, Difficulty, LeetCode, NeetCode Video, Notes) saving to a LeetCode tab with columns found by header; docs |
+| `3c8a9e3` | **3.6.0** | feat: changelog of every commit with its version, rewritten by the post-commit hook; version counted from 0.0.0 over the whole history with judged legacy commits (Finance Market as 3.0.0); commit-msg strips co-author and attribution lines; docs |
+| `412c5c0` | **3.5.0** | feat: version from commit messages (Conventional Commits, as in CELPiPi): feat bumps minor, fix/other bumps patch, feat! bumps major; post-commit hook stamps version.js; docs |
+| `f447c5c` | **3.4.0** | Weather widget: today's sunrise and sunset on the current-conditions line (icon and temperature, condition on hover) to keep it one line; docs |
+| `3d8b026` | **3.3.0** | Range buttons (1w/1m/3m/1y/All) replace From/To on Health Indicator and Health Insight; Finance Indicator 3m/6m/1y/All for Net Worth and Expenditure Trend, uncapped y axis; Settings tabs with own addresses and Note/Key/Value columns; every table fits its content; Protein Source Rotation stacked by ingredient with ingredient legend; Nutrition drops Uses, orders used-today then protein; Transaction line per receipt; docs |
+| `69c518a` | **3.2.0** | Watch List price alerts (below/above price, long-term average, trailing stop) with red badges on Watch List and Market, dismiss, 4-hour background check; AI suggests alerts in a fixed line with 📌 apply and checks; entry stop for buying today and position size; Market and Portfolio cards 2x2 on phones; docs |
+| `6169fb2` | **3.1.0** | Finance: Watch List page (🔬 opens Market) and Market page merging the chart with Analysis; watchlist picker; long-term chart lines (SMA200, 52-week high, trailing stop, market) with Chart history sent to AI; trailing stop default 4 ATR; TSE: AC symbol input; Alpha Vantage spacing and TSX news message; docs |
+| `5eb69fc` | **3.0.0** | Finance Market, Portfolio and Analysis pages: watchlist and price history, ACB trade log in CAD, evidence-based signals with AI read; smaller phone tab labels; docs |
+| `619e127` | 2.94.1 | Activity: one table with Category and Group columns, a line at each Group change; docs |
+| `e9e46e6` | **2.94.0** | Red day-count badges: Finance Insight Snapshot, Transaction over 30 days, Work Time days since last log; keep Insight badges after tile redraw; docs |
+| `f5bfe53` | **2.93.0** | AI provider switch (Groq or OpenRouter) with models from Settings; 30-day red badges on Insight tiles; docs |
+| `313e756` | 2.92.1 | Tune: shorter variable names and BMR label; Equations in the site font, headings dark, equations gray; docs |
+| `01bdcb6` | **2.92.0** | Tune as four cards with one BMR choice and desired wording; account details beside Account; one side-by-side field gap; docs |
+| `156bc7a` | **2.91.0** | Workouts (was GYM) with Cardio and NEAT; desktop footer strip as phone; even glass sidebar; sidebar closes open form; m̄ in progress bubble; docs |
+| `a4882d1` | 2.90.7 | Phone polish: top safe-area strip, faded footer, lighter bottom bars, plain tab colours, iOS-style search boxes, m row in Derived |
+| `8a9fcab` | 2.90.6 | Tiles: neutral gray capsules with 12px labels |
+| `16ffcbf` | 2.90.5 | Four tiles a row on a phone |
+| `78971d0` | 2.90.4 | Body text 13px |
+| `592f678` | 2.90.3 | Footer "© year ALI — Ledger vX"; author meta and schema.org JSON-LD |
+| `c884349` | 2.90.2 | Footer as "Ledger vX • © year ALI"; card text 12px |
+| `a444e6b` | 2.90.1 | Body text back to .9rem |
+| `7c66b3d` | **2.90.0** | Track section, Apple-style look, titled tile cards, one type scale |
+| `29a2b03` | **2.89.0** | Confetti on saving an income transaction; darker hover shadow |
+| `284a6a2` | **2.88.0** | Nutrition Group, grams-first Amount, Protein Rotation by Group; Pattern form; Finance tweaks |
+| `ff99ef5` | **2.87.0** | Physique: collapsible Derived table with Desire targets, calibration ramp-up/clamp; Activity Rotation on GYM; Body Mass dots |
+| `d278ec8` | 2.86.3 | Nav: bottom bar through tablet widths, no top-bar gap before the sidebar |
+| `9893807` | 2.86.2 | Transaction filters: dates on top, the four filters in a 2x2 grid on phones |
+| `f65142f` | 2.86.1 | Fix local-date bugs, suggestion placement and stale docs; remove dead code |
+| `6af2000` | **2.86.0** | Automatic version in the footer; confetti fires on save |
+| `da0671b` | **2.85.0** | Split README and features into topic docs; pin phone suggestions to the top; confetti on body-mass progress |
+| `0c6a8cb` | 2.84.8 | Rename Physique's BMR column to Derived, underline Activity table headers |
+| `4ec6d52` | 2.84.7 | Widgets as bulbs, one gap across the home page |
+| `e4d4821` | 2.84.6 | Same gap from the last bulb to the tiles as between bulbs |
+| `4b96240` | 2.84.5 | Charts and GYM activities as bulbs; Micronutrients tables compact |
+| `54bff7d` | 2.84.4 | One font family, Today before GYM, even gap under date rows |
+| `57a8dbe` | 2.84.3 | No auto-zoom on iPhone, header-row lines, Insight views reload in place |
+| `0ad8287` | 2.84.2 | Tables size columns by the table alone; cards keep their padding on phones |
+| `051ae78` | 2.84.1 | Tables: fixed row heights, row buttons never stacked |
+| `06fc9f3` | **2.84.0** | GYM page, quick logging, and one consistent style system |
+| `84a3906` | 2.83.2 | Day form: Sleep Duration/Deprivation line in the m̄/Δm/BMI style |
+| `4e42a73` | 2.83.1 | README: stored glycogen swing, load timing logs, body-mass and Load wording |
+| `212a483` | **2.83.0** | Finance: Cumulative Net Worth glance card under the summary cards |
+| `eee7d99` | 2.82.9 | Remove Health's Settings block; Other's Settings is the one page |
+| `a04f9eb` | 2.82.8 | Log where a load's time goes |
+| `720638d` | 2.82.7 | Day form: m̄/Δm/BMI line with each unit once |
+| `4e1950b` | 2.82.6 | Day form: m_d shown in kg |
+| `b3965b2` | 2.82.5 | Day form: m_avg/m_d/BMI line, each in its own unit |
+| `de1ce27` | 2.82.4 | m_d stored in kg/day like every other body-mass figure |
+| `3f90ecc` | 2.82.3 | Body-mass figures stored in the BMR cell, not a new column |
+| `f2e1d89` | 2.82.2 | Tune's Update: say it recomputes m_avg too |
+| `2f7d058` | 2.82.1 | Activity: an exercise's Weight is shown as Load |
+| `06977ca` | **2.82.0** | Stored Mass column: m, BMI, m_avg and m_d saved per day; body-mass wording |
+| `cca6907` | 2.81.17 | Glycogen swing saved once as GLYCOGEN_SWING_KG |
+| `ce6e0fc` | 2.81.16 | Phone footer: copyright line 10px lower |
+| `cf171e6` | 2.81.15 | README: phone footer strip, left-aligned date/time fields |
+| `a08d82b` | 2.81.14 | Phone: copyright line in a strip under the bottom bar |
+| `515d949` | 2.81.13 | Phone: no scroll on a short page, footer resting on the bottom bar |
+| `ecb5c27` | 2.81.12 | Forms: date and time values pinned left on iOS too |
+| `1dc8333` | 2.81.11 | Forms: date and time values left-aligned |
+| `b9525ff` | 2.81.10 | README: drop the short-page height note (reverted) |
+| `1ba4c66` | 2.81.9 | Revert "Short pages fit the screen; footer above the phone bottom bar" |
+| `d02dca6` | 2.81.8 | README: logged rows, Progress card note |
+| `00aa7ee` | 2.81.7 | Progress card: no empty line under the last bar |
+| `5882a18` | 2.81.6 | Status: one m row with the rolling average in brackets |
+| `770e101` | 2.81.5 | Status: m shows the glycogen/water swing beside its target too |
+| `0c7de79` | 2.81.4 | Activity: no hover note on a logged row, like Nutrition |
+| `d100306` | 2.81.3 | Activity: a logged row is green with no tick, like Nutrition |
+| `9343aaf` | 2.81.2 | README: Workout suggestions, page height and footer |
+| `e697250` | 2.81.1 | Short pages fit the screen; footer above the phone bottom bar |
+| `f58ac8a` | **2.81.0** | Physique form: exercise-name suggestions for Workout |
+| `61a671a` | 2.80.11 | README: actions in one place, phone bar spacing, form button order |
+| `2f37698` | 2.80.10 | Phone bottom bar a quarter closer to the bottom edge |
+| `db5d9a9` | 2.80.9 | Actions at the top on every page, in the phone bar's order |
+| `a02ebd9` | 2.80.8 | Reload of a row address: no lowercase name in the breadcrumb |
+| `f8b42c5` | 2.80.7 | Ingredient form: Scan before Complete |
+| `00b3c00` | 2.80.6 | Ingredient form: name and unit columns at the page's text size |
+| `337fd56` | 2.80.5 | Ingredient form: name column as wide as its text |
+| `d6a2f49` | 2.80.4 | Phone bottom bar: half the gap between buttons and the account circle |
+| `25fc629` | 2.80.3 | Phone bar spacing even at both ends; Physique form: Scan first |
+| `4fff572` | 2.80.2 | README: first-paint layout, Ledger tab, phone bar details |
+| `aff63c5` | 2.80.1 | Hub/page layout from the first paint |
+| `a025c9a` | **2.80.0** | Car Service: winter changeover and rust protection on 1 Dec |
+| `e62a511` | 2.79.1 | Phone bottom bar: long labels wrap onto two lines |
+| `5662572` | **2.79.0** | Phone tab bar: Ledger tab for the home page |
+| `ddfb4ac` | 2.78.2 | Phone: account avatar the same circle as the bottom bar's close |
+| `83d4aea` | 2.78.1 | Hide bulbs: keep the cards on section pages |
+| `3e620cb` | **2.78.0** | Hide bulbs: account-menu toggle for the home page's glance cards |
+| `578f519` | 2.77.3 | Phone bottom bars float above the home indicator |
+| `a66a2d3` | 2.77.2 | Pill bottom bars, round close, emoji buttons always white |
+| `c8fc851` | 2.77.1 | Selection-bar buttons and Physique's Today as white emoji |
+| `9939df6` | **2.77.0** | Emoji action buttons, badges, saves stay open, exports in Settings |
+| `82ecd29` | 2.76.2 | Phone bottom bars: one height, one button style |
+| `6d1fa98` | 2.76.1 | Six text colours, thinner tables, home breadcrumb, compact BMR line |
+| `547301a` | **2.76.0** | Every form a page, no top bar, Insight mode pages, all styling in styles.css |
+| `16db0b1` | 2.75.4 | Breadcrumb: link a row's date over its 🧬 view |
+| `0c5b0a5` | 2.75.3 | README: batched reads, per-page loading, breadcrumb root |
+| `0474aa1` | 2.75.2 | Breadcrumbs start at Ledger, linking to the home page |
+| `b8f744c` | 2.75.1 | Contact table: columns fit their text, scrolling sideways |
+| `0e037be` | **2.75.0** | One bottom bar at a time on phones, ❌ on every page, direct form loads |
+| `c25d0ac` | 2.74.4 | Section hubs: breadcrumb in place of the centred title |
+| `8596c61` | 2.74.3 | Health hub: Today as the first tile, before Tune |
+| `d427cbf` | 2.74.2 | Settings tables: actions and key on one line |
+| `c60bd2d` | 2.74.1 | Health hub: keep Today, drop Log |
+| `b073902` | **2.74.0** | Today and Log on the Health hub |
+| `4b01e98` | **2.73.0** | Form pages styled like block pages; home overview with tiles; name-only tiles |
+| `0295264` | **2.72.0** | Forms open as pages on section pages |
+| `3fec6bb` | 2.71.1 | Finance: Financial Indicator/Insight become Indicator and Insight |
+| `143d6e6` | **2.71.0** | Section pages as a hub and pages, with a sidebar on wide screens |
+| `2756349` | 2.70.1 | Load only the current section's blocks |
+| `5235c43` | **2.70.0** | Batch Sheets reads and share the tab list; add Clear cache |
+| `dbb839f` | 2.69.2 | Pattern table: content width, one line per cell, compact padding |
+| `df33878` | 2.69.1 | Profile order: sex, height, age, then body mass |
+| `f20991c` | **2.69.0** | Health Settings block; read walking MET and BMR_cal from their sheets |
+| `6f5c28e` | 2.68.1 | Insight mode names and order, Food macro fallback, consistent hover units |
+| `5b54392` | **2.68.0** | Nutrition Facts order and names, setting-driven targets, more row addresses |
+| `66683f0` | 2.67.6 | Progress card: regular-weight figures and lost/left, elapsed/ahead labels |
+| `dd44a67` | 2.67.5 | Remove all caching; smooth m̄ over L_p; Status, Progress and unit cleanups |
+| `c000fef` | 2.67.4 | Car Service: wrap Basis in a narrow column; bump shell cache to v29 |
+| `463e654` | 2.67.3 | Stop iOS Safari text inflation (Car Service Basis column) |
+| `e9b24be` | 2.67.2 | Progress card: stat text at the Status rows' font size |
+| `1620617` | 2.67.1 | README: Status, Progress card, ingredient form and Pattern micronutrients |
+| `bd5630b` | **2.67.0** | Health glance: drop m̄ and t, Progress card with 10% marks under the cards, tighter stack, Sleep Window first |
+| `bc23e56` | **2.66.0** | Physique Patterns: own micronutrients table and pattern-N addresses |
+| `fa432aa` | 2.65.2 | Ingredient form: Amount as a stacked field like Classification and Name |
+| `62c5a63` | 2.65.1 | Ingredient form: label-matched names and units, fixed right-aligned fields |
+| `aa60537` | **2.65.0** | Standard units, editable Patterns period length, sheet-matching sleep labels |
+| `8095e7e` | **2.64.0** | Nutrition lock table, per-row edit addresses, Insight prompt templates |
+| `ea3405b` | **2.63.0** | Add Equations and Calculation dropdowns to Tune |
+| `d36ef6d` | **2.62.0** | Add Car Service reminder flag and daily notification |
+| `597b92c` | **2.61.0** | Add Car Service block with service history and predictions; chart hover consistency |
+| `df9cb14` | **2.60.0** | Add block/form addresses, Tune block, and stored per-day BMR in Physique |
+| `bff4116` | **2.59.0** | Pin form actions to the bottom on mobile, update balances on edit, add progress bar bands |
+| `33e62d4` | 2.58.1 | Sort Activity plan and Instructions modal by rotation completion |
+| `d094584` | **2.58.0** | Add export confirmation dialogs and reorder Status card rows |
+| `600323c` | 2.57.3 | Fix Breakdown action buttons wrapping on mobile, Sleep header abbreviation, integer macros in Physique table |
+| `2f91e5c` | 2.57.2 | Improve Transaction and Physique UX across filters, exports, and table display |
+| `71d6dbf` | 2.57.1 | Make forms full-screen on mobile and fix background scroll |
+| `dc8e284` | **2.57.0** | Add block-visibility toggle, catalogue propagation, and Health Plan parity |
+| `d0d70cd` | 2.56.1 | Make Health Insight tables/profile consistent across modes |
+| `ba2e7ce` | **2.56.0** | Make Health Insight's Patterns period length user-editable |
+| `fec16c3` | **2.55.0** | Add a Patterns mode to Health Insight |
+| `32ee985` | **2.54.0** | Add BMR calibration, fix Calculate/basis bugs, and clean up small UX gaps |
+| `329db21` | **2.53.0** | Replace the Health Indicator charts' weekly-bucket trend with a continuous EMA |
+| `d091319` | 2.52.1 | Make the phone bottom nav a real tab bar with thumb-sized tap targets |
+| `a13027a` | **2.52.0** | Overhaul the mobile layout: bottom nav, auto-hiding header, fixed dark-mode colors |
+| `547035a` | 2.51.2 | Ignore local editor settings |
 | `6eca558` | 2.51.1 | Show 28 dated days plus every Pattern row per Physique page |
 | `b25aa1d` | **2.51.0** | Add a Log button to the Add/Edit Activity modal |
 | `e4bb4e2` | 2.50.1 | Document that Settings masks API keys/tokens by default |

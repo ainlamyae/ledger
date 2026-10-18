@@ -67,6 +67,7 @@ A form's ❌ is the last button in its own actions row, so a long form closes fr
 - **Saving never closes a form** (`showFormSaved`, `stayOnSavedForm`): 💾 writes the row and shows "Saved"; an Add or Log becomes that row's Edit, its address and breadcrumb moved to the row. Transfer clears its amount; Bulk Edit keeps its rows ticked. Only ❌, Back, Cancel or Esc close a form.
 - **Physique's page has no From/To dates**: its table is narrowed by the search box alone.
 - **Exports live in Settings** (account menu): **Export Transactions** and **Export Physique** download every row as CSV (`exportTransactionsCSV`, `exportPhysiqueCSV`, `csv.js`), whatever the filters.
+- **Printing** (`@media print`, `styles.css`) — drops the nav, sidebar, footer, buttons and range pickers; a single chart box, not a whole panel, avoids a page break (a page-tall panel was pushed whole to sheet 2, leaving sheet 1 blank); legend swatches print their colour without Background graphics; canvases keep their proportions (`object-fit: contain`), so donuts stay round; the Rotation row keeps its 550px bar beside the donut on A4.
 - **Accessibility** — `role="dialog"`/`aria-modal` on dialogs, focus trap and restore, keyboard-operable headers, visible focus rings.
 - **Dark mode** — floating toggle, persisted.
 - **Privacy mode** — floating toggle masks amounts, health figures, contact details and Settings values.

@@ -610,6 +610,22 @@ function lerpHex(hexA, hexB, t) {
   return `rgb(${rgb.join(',')})`;
 }
 
+// Dot radius that shrinks with the range, like bar width: at most 80% of a day's slot.
+function fitPointRadius(maxRadius) {
+  return (ctx) => {
+    const chart = ctx.chart;
+    const width = chart.chartArea ? chart.chartArea.width : chart.width;
+    const slot = width / Math.max(1, chart.data.labels.length);
+    return Math.max(1, Math.min(maxRadius, slot * 0.4));
+  };
+}
+
+// Border thins with the dot so small dots keep their colour.
+function fitPointBorderWidth(maxRadius, maxBorder) {
+  const radius = fitPointRadius(maxRadius);
+  return (ctx) => Math.min(maxBorder, radius(ctx) / 3);
+}
+
 // Steps and timed entries onto one comparable scale. ~100 steps/min is walking
 // pace; WORKOUT_STEPS_PER_MIN overrides it for a longer or shorter stride, and
 // applies everywhere at once — this chart, desired activity, and the workout

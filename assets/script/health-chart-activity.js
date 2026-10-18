@@ -119,11 +119,11 @@ function renderHealthActivityChart(entries) {
     data: caloriesData.map((v) => (v === null ? null : -v)),
     yAxisID: 'y1',
     showLine: false,
-    pointRadius: 5,
-    pointHoverRadius: 7,
+    pointRadius: fitPointRadius(5),
+    pointHoverRadius: fitPointRadius(7),
     pointBackgroundColor: dates.map((date, i) => dotColor(date, caloriesData[i])),
     pointBorderColor: chartColor('--chart-point-border'),
-    pointBorderWidth: 1.5,
+    pointBorderWidth: fitPointBorderWidth(5, 1.5),
     order: 0,
   };
 

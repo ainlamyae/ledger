@@ -1127,6 +1127,7 @@ function bootDashboard() {
   // Before the panel below it: this fills the From/To pair every Health Chart
   // chart reads, and its first render is one of the readers.
   initHealthRangeControl();
+  initPageScreenshots();
   initProteinRotationPanel();
   initActivityRotationPanel();
   initFinancialInsight();

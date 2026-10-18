@@ -280,17 +280,15 @@
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
                 <div class="widget-row"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
                 <div class="widget-row widget-row-divider" title="Changed mass: the slope of the smoothed body-mass trend at the latest body-mass reading, the same Δm (Changed Mass) the Body Mass chart shows"><span>Δm</span><span id="today-status-changed-mass-value">—</span></div>
-                <div class="widget-row"><span>BMR_mif</span><span id="today-status-bmr-mif-value">—</span></div>
-                <div class="widget-row"><span>BMR_kat</span><span id="today-status-bmr-kat-value">—</span></div>
-                <div class="widget-row" id="today-status-bmr-cal-row" hidden><span>BMR_cal</span><span id="today-status-bmr-cal-value">—</span></div>
-                <div class="widget-row"><span>BMR_adp</span><span id="today-status-bmr-adapt-value">—</span></div>
-                <div class="widget-row widget-row-divider" title="Average basal metabolic rate: the mean of today's known BMR_mif, BMR_kat, BMR_cal and BMR_adp"><span>BMR_avg</span><span id="today-status-bmr-avg-value">—</span></div>
+                <div class="widget-row widget-row-divider" id="today-status-bmr-row"><span id="today-status-bmr-label">BMR</span><span id="today-status-bmr-value">—</span></div>
                 <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
                 <div class="widget-row"><span>TEF</span><span id="today-status-digestion-value">—</span></div>
                 <div class="widget-row"><span>AEE</span><span id="today-status-activity-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>SD</span><span id="today-status-deprivation-value">—</span></div>
+                <div class="widget-row widget-row-divider" title="Maintenance: BMR + AEE, the intake that would hold body mass still — today's AEE, then the desired AEE"><span>M</span><span id="today-status-maintenance-value">—</span></div>
                 <div class="widget-row"><span>D</span><span id="today-status-balance-value">—</span></div>
                 <div class="widget-row" title="Calculated change: today's energy balance D as fat mass (D / ρ), against the planned daily loss — not measured on the scale (that is Δm under BMI)"><span>Δm′</span><span id="today-status-deltam-value">—</span></div>
+                <div class="widget-row" title="Time to healthy mass: the plan's forecast days to m_des past the glycogen swing, and the date, as the Progress card shows"><span>ETA</span><span id="today-status-eta-value">—</span></div>
             </div>
             <div class="today-glance-stack">
                 <div class="card">
@@ -356,6 +354,7 @@
         <div class="panel" data-route="chart">
             <div class="panel-header">
                 <h2>Chart</h2>
+                <button type="button" data-screenshot="health-chart" class="btn btn-icon panel-header-btn" title="Screenshot the whole page: save to the phone's gallery, or download on a laptop" aria-label="Screenshot">📤</button>
             </div>
 
             <!-- Market's range row (renderRangeButtons), ending today; governs every chart below. -->
@@ -1468,6 +1467,7 @@
         <div class="panel" data-route="chart">
         <div class="panel-header">
             <h2>Chart</h2>
+            <button type="button" data-screenshot="finance-chart" class="btn btn-icon panel-header-btn" title="Screenshot the whole page: save to the phone's gallery, or download on a laptop" aria-label="Screenshot">📤</button>
         </div>
 
         <!-- Market's range row: window for Net Worth and Expenditure Trend (finance-chart.js). -->

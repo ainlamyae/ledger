@@ -250,7 +250,8 @@ function buildSideNav(sections) {
     heading.textContent = section.label;
     heading.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
     links.appendChild(heading);
-    section.panels.filter((panel) => pageHasTile(section, panel)).forEach((panel) => {
+    // A block whose tile lives on another page (data-tile-host) is reached from there.
+    section.panels.filter((panel) => pageHasTile(section, panel) && !panel.dataset.tileHost).forEach((panel) => {
       const link = document.createElement('a');
       link.className = 'side-nav-page';
       link.href = pageHref(section, panel);

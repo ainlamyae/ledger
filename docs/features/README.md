@@ -30,5 +30,5 @@ Each file opens with an **At a glance** summary, followed by the details.
 | [Health — Physique](health-physique.md) | Daily log, stored figures (BMR_avg among them), bulk 🧮 Calculate that also tidies Consumption, day form (a new Workout exercise priced by AI, with 💾 to save it to the Activity sheet and ✅ for one already there; Derived open on every date), progress confetti, a red pulse and shake on saving a day short of the desired deficit |
 | [Health — Nutrition](health-nutrition.md) | Ingredient catalogue (used-today first, then protein), Group, grams-first Amount (g, gr, gram or grams), Complete, Scan, Norm |
 | [Health — Activity & Workouts](health-activity.md) | Activity Rotation on top of Activity Plan, and Workouts groups under their own Activity Rotation |
-| [Track](track.md) | Work Time, Car Service, Travel, Applications, LeetCode |
+| [Track](track.md) | LeetCode, Work Time, Car Service, Travel, Applications |
 | [Other](other.md) | Contacts, Settings (tabs with their own addresses, Note / Key / Value, a default Note for every key), both opened from the account menu |

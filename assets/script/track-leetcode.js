@@ -21,6 +21,8 @@ let editingLeetcodeRow = null;
 let leetcodeListenersAttached = false;
 let editLeetcodeLog = null;
 let openLeetcodeCategory; // one at a time; undefined until first shown
+// A phone shows the heatmap's last 16 weeks, not the year.
+const leetcodePhoneQuery = window.matchMedia('(max-width: 820px)');
 
 async function initLeetcode() {
   if (!leetcodeListenersAttached) {
@@ -29,6 +31,7 @@ async function initLeetcode() {
     editLeetcodeLog = routedRowEdit('leetcode', () => allLeetcodeLogs, (l) => `${l.date} ${l.name}`, openLeetcodeForm);
     document.getElementById('leetcode-cancel-btn').addEventListener('click', closeLeetcodeForm);
     onFormSubmit('leetcode-form', submitLeetcodeForm);
+    leetcodePhoneQuery.addEventListener('change', renderLeetcodeHeatmap);
     document.getElementById('leetcode-problem').addEventListener('change', () => fillLeetcodeLinks());
     populateSelect(document.getElementById('leetcode-category'), Object.keys(NEETCODE_ROADMAP), '');
     const options = document.getElementById('leetcode-problem-options');
@@ -91,6 +94,7 @@ function renderLeetcode() {
   });
   document.getElementById('leetcode-summary').textContent = `Solved ${solved.length}/${NEETCODE_250.length} · ${byDifficulty.join(' · ')}`;
 
+  renderLeetcodeProgress(solves);
   renderLeetcodeHeatmap();
   renderLeetcodeRoadmap(solves);
 
@@ -107,14 +111,69 @@ function renderLeetcode() {
   });
 }
 
-// Solves per day for the past year: columns are weeks (Sunday first), the last
-// one holding today; 1 solve is level 1, the busiest day level 4.
+// Health's Progress meter over the NeetCode 250, a mark every 25, then the time
+// meter: days since the first solve against days to go at last week's pace.
+function renderLeetcodeProgress(solves) {
+  const total = NEETCODE_250.length;
+  const done = NEETCODE_250.filter((p) => solves.has(p.slug)).length;
+  const pct = (done / total) * 100;
+  const meter = document.getElementById('leetcode-progress-meter');
+  meter.style.setProperty('--meter-pct', `${pct}`);
+  meter.style.setProperty('--fill-pct', `${Math.round(pct)}`);
+  meter.querySelector('.body-mass-progress-meter-track').style.setProperty('--mark-step', `${(25 / total) * 100}`);
+  document.getElementById('leetcode-progress-meter-callout').textContent = `${done}/${total}`;
+  document.getElementById('leetcode-progress-meter-done').textContent = String(done);
+  document.getElementById('leetcode-progress-meter-remaining').textContent = String(total - done);
+
+  const time = document.getElementById('leetcode-time-meter');
+  const elapsedEl = document.getElementById('leetcode-time-meter-elapsed');
+  const remainingEl = document.getElementById('leetcode-time-meter-remaining');
+  const etaEl = document.getElementById('leetcode-time-meter-eta');
+  time.style.setProperty('--meter-pct', '0');
+  time.style.removeProperty('--fill-pct');
+  const timeTrack = time.querySelector('.body-mass-progress-meter-track');
+  timeTrack.style.removeProperty('--mark-step');
+  elapsedEl.textContent = '—';
+  remainingEl.textContent = '—';
+  etaEl.textContent = '';
+  const firstDates = [...solves.values()].map((s) => s[0].date).filter(Boolean).sort();
+  if (!firstDates.length) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayMs = parseIsoDateUTC(isoFromDate(today));
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  // New problems a day over the last 7 days, today included.
+  const rate = firstDates.filter((d) => d >= isoFromDate(weekAgo)).length / 7;
+  const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(firstDates[0])) / 86400000));
+  const days = (n) => `${n} ${n === 1 ? 'day' : 'days'}`;
+  elapsedEl.textContent = days(daysElapsed);
+  if (done < total && !rate) return;
+
+  const daysToGo = Math.ceil((total - done) / (rate || 1));
+  const totalDays = daysElapsed + daysToGo;
+  const timePct = totalDays ? (daysElapsed / totalDays) * 100 : 100;
+  time.style.setProperty('--meter-pct', `${timePct}`);
+  time.style.setProperty('--fill-pct', `${Math.round(timePct)}`);
+  // A mark every 4 weeks from the first solve.
+  if (totalDays) timeTrack.style.setProperty('--mark-step', `${(28 / totalDays) * 100}`);
+  remainingEl.textContent = days(daysToGo);
+  const eta = new Date(today);
+  eta.setDate(eta.getDate() + daysToGo);
+  etaEl.textContent = `→ ${isoFromDate(eta)}`;
+}
+
+// Solves per day for the past year (16 weeks on a phone): columns are weeks
+// (Monday first), the last one holding today; 1 solve is level 1, the busiest day level 4.
 function renderLeetcodeHeatmap() {
+  const weeks = leetcodePhoneQuery.matches ? 16 : 53;
+  document.getElementById('leetcode-heatmap-title').textContent = leetcodePhoneQuery.matches ? 'Past 16 Weeks' : 'Past Year';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(today);
-  start.setDate(start.getDate() - 364);
-  start.setDate(start.getDate() - start.getDay());
+  start.setDate(start.getDate() - (weeks - 1) * 7);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
   const startIso = isoFromDate(start);
 
   const perDay = new Map();
@@ -135,13 +194,15 @@ function renderLeetcodeHeatmap() {
     cell.title = `${iso}: ${count} solve${count === 1 ? '' : 's'}`;
     grid.appendChild(cell);
     // A month's name over the first week it starts in.
-    if (d.getDate() <= 7 && d.getDay() === 0) {
+    if (d.getDate() <= 7 && d.getDay() === 1) {
       const label = document.createElement('span');
       label.textContent = d.toLocaleString('en', { month: 'short' });
       label.style.gridColumn = String(Math.floor(i / 7) + 1);
       months.appendChild(label);
     }
   }
+  grid.style.setProperty('--weeks', String(weeks));
+  months.style.setProperty('--weeks', String(weeks));
   const scroll = document.getElementById('leetcode-heatmap-scroll');
   scroll.scrollLeft = scroll.scrollWidth;
 }

@@ -16,7 +16,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
   - [Finance — Watch List](docs/features/finance-watchlist.md) — the stocks you follow, their latest moves and price alerts.
   - [Finance — Market](docs/features/finance-market.md) — one stock's chart 1d to All, rule-based verdict, risk, news and an AI read.
   - [Finance — Portfolio](docs/features/finance-portfolio.md) — trade log at average cost, gain/loss in CAD.
-  - [Track — LeetCode](docs/features/track.md#track) — the NeetCode 250 roadmap ticked off from your logged solves, a past-year heatmap and NeetCode's roadmap graph.
+  - [Track — LeetCode](docs/features/track.md#track) — the NeetCode 250 roadmap ticked off from your logged solves, a Progress card with a finish date at last week's pace, a past-year heatmap (16 weeks on a phone) and NeetCode's roadmap graph.
 - [Design System](docs/design-system.md) — colours, type sizes, spacing, tables, buttons.
 - [Naming & Display Conventions](docs/conventions.md) — wording, BMR names, units, dates, hover format.
 

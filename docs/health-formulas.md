@@ -75,7 +75,7 @@ BMR_adp(atDate)           = BMR × (1 − λt(atDate))
 BMR_avg                   = (BMR_mif + BMR_kat + BMR_cal + BMR_adp) / n, over the n a day has
 applyBmrBasis(BMR,atDate) = BMR_adp(atDate)          if BMR_BASIS=bmr_adp
                           = BMR + BMR_CAL_OFFSET     if BMR_BASIS=bmr_cal (0 if never calibrated)
-                          = BMR × BMR_avg/BMR_eq     if BMR_BASIS=bmr_avg (latest stored day; 1 if none)
+                          = BMR × BMR_avg/BMR_eq     if BMR_BASIS=bmr_avg (today at m̄, as the Tune; 1 if none)
                           = BMR                       otherwise
 
 activityDesiredKcal(kg)    = metKcal(WALK_MET, kg, ACTIVITY_DESIRED_MIN)

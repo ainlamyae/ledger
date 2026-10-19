@@ -105,21 +105,6 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
       makeCell(''),
     );
     tbody.appendChild(desiredRow);
-
-    // Remaining — Desire minus Total, the duration/burn still left to hit the goal. Left
-    // unclamped, so once the Total overshoots the Desire it reads as a negative surplus
-    // rather than a flat zero.
-    const remainingRow = document.createElement('tr');
-    remainingRow.className = 'calc-breakdown-remaining';
-    remainingRow.append(
-      makeCell('Remain', 'Desire − Total — duration/burn still left to reach the goal (negative once you\'ve passed it)'),
-      makeCell(''),
-      makeCell(''),
-      makeCell(String(Math.round(desireMin - minutes))),
-      makeCell(String(Math.round(desireKcal - calories))),
-      makeCell(''),
-    );
-    tbody.appendChild(remainingRow);
   }
 
   document.getElementById('physique-activity-breakdown').hidden = document.getElementById('physique-is-pattern').checked;

@@ -631,6 +631,15 @@ function bmrFiguresForDate(date) {
   return figures;
 }
 
+// Today's figures at m̄, computed as the Tune does; cached per mass and settings.
+function todayBmrFigures() {
+  const date = isoFromDate(new Date());
+  const mass = planBodyMassKg(physiqueAsHealthEntries());
+  const key = `today:${date}:${mass}:${JSON.stringify(currentSettings)}`;
+  if (!bmrFiguresCache.has(key)) bmrFiguresCache.set(key, computePhysiqueBmrFigures(date, mass ?? undefined));
+  return bmrFiguresCache.get(key);
+}
+
 // One figure from a day's set for `basis` ('bmr', 'bmr_cal', 'bmr_adp', 'bmr_avg'). Plain
 // BMR stands in for a missing one, as before. Null without a profile.
 function pickBmrForBasis(figures, basis = bmrBasis()) {

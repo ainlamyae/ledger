@@ -31,7 +31,7 @@ const LEGACY = {
   major: [
     'd6610f3', // Build full Ledger app → 1.0.0
     '4f9b480', // Health Log replaced by the per-day Physique tab → 2.0.0
-    'bc8e50c', // Finance Market, Portfolio and Analysis pages → 3.0.0
+    '5eb69fc', // Finance Market, Portfolio and Analysis pages → 3.0.0
   ],
   feat: `
     45a69a0 e49512c addfed9 3b266f1 ec5b8d0 d9b9f1a f7cc7f1 4264c46 0382a1c 0053b04
@@ -44,12 +44,12 @@ const LEGACY = {
     3bd58d2 ae00e59 0a9179b cada066 b37c737 fdba793 a1eca3b 8ae6574 9466d96 ca48f4a
     6cda756 50e66bb cfd16af 0f6871a 04f8c4f ddf8d89 01e0c09 755e9f3 84108d7 0bd4256
     81f59fd d5c1178 296d3e0 a518e7a 46e43ff 2e0045e c902a68 9545c1b 9dff321 714ace0
-    f4d0d2c a50b5b5 c217fa8 a689a04 70f2c9b b25aa1d 34b2f76 87fa0e1 e5eed46 1581d0a
-    5bf2912 f20de78 7c1897e 23e4fe9 c475eca 5186cf9 863c47a 61d6cc6 b69db71 66d8732
-    e723d71 76bbef7 a5fd64f 3cc4e2e 9530945 6e258bb 68df48d 9e48a55 45cff47 0b373b0
-    c63446f e190d06 f54433d 199fd86 f83a5bf deaef4e 1418728 fb10c4f 967f9b0 cf4fa52
-    3085fc2 3b076a5 accce2b 5d88f8c 7c7f8b4 d8926da 68d262d b5045bf 82adbf7
-    8e2e7d2 139b73a 3cc41ca b6ebc3a
+    f4d0d2c a50b5b5 c217fa8 a689a04 70f2c9b b25aa1d a13027a 329db21 32ee985 fec16c3
+    ba2e7ce dc8e284 d094584 bff4116 df9cb14 597b92c d36ef6d ea3405b 8095e7e aa60537
+    bc23e56 bd5630b 5b54392 f20991c 5235c43 143d6e6 0295264 4b01e98 b073902 0e037be
+    547301a 9939df6 3e620cb 5662572 a025c9a f58ac8a 06977ca 212a483 06fc9f3 da0671b
+    6af2000 ff99ef5 284a6a2 29a2b03 7c66b3d 156bc7a 01bdcb6 f5bfe53 e9e46e6
+    6169fb2 69c518a 3d8b026 f447c5c
   `.trim().split(/\s+/),
 };
 

@@ -35,6 +35,7 @@ function datesInRange(fromIso, toIso) {
 
 function renderHealthCharts(entries) {
   renderTodayGlanceCards(entries);
+  renderHealthHeatmap(entries);
   renderHealthBodyMassChart(entries);
   renderHealthIntakeChart(entries);
   renderHealthCaloriesChart(entries);
@@ -403,7 +404,6 @@ const HEALTH_RANGES = [
   { slug: '3m', label: '3m', months: 3 },
   { slug: '6m', label: '6m', months: 6 },
   { slug: '1y', label: '1y', months: 12 },
-  { slug: '5y', label: '5y', months: 60 },
   { slug: 'all', label: 'All' },
 ];
 let healthRangeSlug = '1m';
@@ -608,6 +608,49 @@ function arrivalHealthyKg(healthyKg, bodyMassKg, heightCm, sex, isDownward) {
 
 // Step candidates for macro gram axes; same max-gridlines guard as the kg axis.
 const MACRO_G_TICK_STEPS = [5, 10, 25, 50, 100, 200, 500, 1000];
+// A day is rarely on its desired figure to the kcal or gram, so it is graded by r, the
+// share of the desired change it made (1 exactly the desired figure, 0 none of it, below
+// 0 the wrong way), on five steps instead of met or missed. The 7-day average's own r
+// lifts a day to one step under the week's grade: one off day in a week on pace reads
+// as a dip, not a failure. Body Mass, Calorie Balance, Intake, Caloric Intake, Physical
+// Activity, Sleep and the heatmap all grade this way.
+const DESIRED_GRADES = [
+  { name: 'Beat desired', min: 1.1, color: '--chart-good-high' },
+  { name: 'Desired met', min: 0.85, color: '--chart-good' },
+  { name: 'Near desired', min: 0.6, color: '--chart-near' },
+  { name: 'Short of desired', min: 0.3, color: '--chart-warn' },
+  { name: 'Missed desired', min: -Infinity, color: '--chart-bad' },
+];
+
+function desiredGradeIndex(r) {
+  if (r === null || r === undefined || !Number.isFinite(r)) return null;
+  return DESIRED_GRADES.findIndex((g) => r >= g.min);
+}
+
+// {name, color} for a day's r and its week's, or null with no r to grade.
+function desiredGrade(r, weekR = null) {
+  const day = desiredGradeIndex(r);
+  if (day === null) return null;
+  const week = desiredGradeIndex(weekR);
+  const grade = DESIRED_GRADES[week === null ? day : Math.min(day, week + 1)];
+  return { name: grade.name, color: chartColor(grade.color) };
+}
+
+function desiredGradeLegend() {
+  return DESIRED_GRADES.map((g) => ({ name: g.name, color: chartColor(g.color) }));
+}
+
+// r for a day's intake: the share of the desired balance D it leaves, against the
+// maintenance M = desired intake − D that day's desired figure is built on, so it reads
+// exactly as Calorie Balance's balance ÷ D. With no D, the intake against the cap or floor.
+function intakeDesiredR(kcal, dayDesired, balanceKcal) {
+  if (kcal === null || kcal === undefined) return null;
+  // D on the other side of zero from the cap or floor's direction can't be read as a share.
+  if (!balanceKcal || (balanceKcal < 0) !== dayDesired.isMax) return dayDesired.isMax ? dayDesired.kcal / kcal : kcal / dayDesired.kcal;
+  const maintenance = dayDesired.kcal - balanceKcal;
+  return (kcal - maintenance) / balanceKcal;
+}
+
 function lerpHex(hexA, hexB, t) {
   const a = [1, 3, 5].map((i) => parseInt(hexA.slice(i, i + 2), 16));
   const b = [1, 3, 5].map((i) => parseInt(hexB.slice(i, i + 2), 16));

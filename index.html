@@ -384,6 +384,19 @@
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
             </div>
 
+            <!-- LeetCode's heatmap over the range row's days, each coloured as its
+                 Calorie Balance bar (health-chart-heatmap.js). -->
+            <div class="body-mass-projection-wrap card health-heatmap-card">
+                <h3>Daily Progress</h3>
+                <div class="chart-box chart-box-flush health-heatmap-box">
+                    <div class="table-responsive" id="health-heatmap-scroll">
+                        <div class="leetcode-heatmap-months" id="health-heatmap-months"></div>
+                        <div class="leetcode-heatmap" id="health-heatmap"></div>
+                    </div>
+                </div>
+                <div class="donut-legend" id="health-heatmap-legend"></div>
+            </div>
+
             <div class="body-mass-projection-wrap card">
                 <div class="body-mass-projection-header">
                     <h3>Body Mass</h3>
@@ -3411,6 +3424,7 @@
 <script src="assets/script/health-chart-sleep.js"></script>
 <script src="assets/script/health-chart-projection.js"></script>
 <script src="assets/script/health-chart-energy-balance.js"></script>
+<script src="assets/script/health-chart-heatmap.js"></script>
 <script src="assets/script/finance-chart.js"></script>
 <script src="assets/script/finance-market-data.js"></script>
 <script src="assets/script/finance-market-math.js"></script>

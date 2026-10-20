@@ -280,11 +280,11 @@
                 <div class="widget-row"><span>m</span><span id="today-status-m-value">—</span></div>
                 <div class="widget-row"><span>BMI</span><span id="today-status-bmi-value">—</span></div>
                 <div class="widget-row widget-row-divider" title="Changed mass: the slope of the smoothed body-mass trend at the latest body-mass reading, the same Δm (Changed Mass) the Body Mass chart shows"><span>Δm</span><span id="today-status-changed-mass-value">—</span></div>
-                <div class="widget-row widget-row-divider" id="today-status-bmr-row"><span id="today-status-bmr-label">BMR</span><span id="today-status-bmr-value">—</span></div>
                 <div class="widget-row"><span>TEI</span><span id="today-status-intake-value">—</span></div>
                 <div class="widget-row"><span>TEF</span><span id="today-status-digestion-value">—</span></div>
                 <div class="widget-row"><span>AEE</span><span id="today-status-activity-value">—</span></div>
                 <div class="widget-row widget-row-divider"><span>SD</span><span id="today-status-deprivation-value">—</span></div>
+                <div class="widget-row widget-row-divider" id="today-status-bmr-row"><span id="today-status-bmr-label">BMR</span><span id="today-status-bmr-value">—</span></div>
                 <div class="widget-row widget-row-divider" title="Maintenance: BMR + AEE, the intake that would hold body mass still — today's AEE, then the desired AEE"><span>M</span><span id="today-status-maintenance-value">—</span></div>
                 <div class="widget-row"><span>D</span><span id="today-status-balance-value">—</span></div>
                 <div class="widget-row" title="Calculated change: today's energy balance D as fat mass (D / ρ), against the planned daily loss — not measured on the scale (that is Δm under BMI)"><span>Δm′</span><span id="today-status-deltam-value">—</span></div>
@@ -2913,29 +2913,29 @@
                 <div class="table-responsive table-compact">
                     <table id="physique-derived-table">
                         <thead>
-                        <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Unit</th></tr>
+                        <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Remain</th><th>Unit</th></tr>
                         </thead>
                         <tbody>
-                        <tr title="This day's body-mass reading; Desire is the healthy body mass ± the glycogen swing"><td>m</td><td id="physique-mass-reading">—</td><td id="physique-mass-reading-desire">—</td><td>kg</td></tr>
-                        <tr title="The L_p-day rolling average body-mass; Desire is the healthy body mass under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td>kg</td></tr>
-                        <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta">—</td><td id="physique-mass-delta-desire">—</td><td>kg</td></tr>
-                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the healthy body mass"><td>BMI</td><td id="physique-mass-bmi">—</td><td id="physique-mass-bmi-desire">—</td><td>kg/m²</td></tr>
-                        <tr title="Protein from the Consumption breakdown; Desire is the protein band (Settings/Tune), as the Intake Macros card shows it"><td>Pro</td><td id="physique-macro-protein">—</td><td id="physique-macro-protein-desire">—</td><td>g</td></tr>
-                        <tr title="Dietary fibre from the Consumption breakdown; Desire is the fibre band"><td>DF</td><td id="physique-macro-fiber">—</td><td id="physique-macro-fiber-desire">—</td><td>g</td></tr>
-                        <tr title="Fat from the Consumption breakdown; Desire is the fat band"><td>Fat</td><td id="physique-macro-fat">—</td><td id="physique-macro-fat-desire">—</td><td>g</td></tr>
-                        <tr class="physique-derived-group-end" title="Carbohydrate from the Consumption breakdown; Desire is the carbohydrate band"><td>Carb</td><td id="physique-macro-carb">—</td><td id="physique-macro-carb-desire">—</td><td>g</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-mif">—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-kat">—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-cal">—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-adp">—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-avg">—</td><td>—</td><td>kcal</td></tr>
-                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei">—</td><td id="physique-tei-desire">—</td><td>kcal</td></tr>
-                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived">—</td><td id="physique-tef-desire">—</td><td>kcal</td></tr>
-                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee">—</td><td id="physique-aee-desire">—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation">—</td><td id="physique-sleep-deprivation-desire">—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end" title="Maintenance: BMR + AEE, the intake that would hold body mass still; Desire is BMR + the desired AEE, as the Status card shows it"><td>M</td><td id="physique-maintenance">—</td><td id="physique-maintenance-desire">—</td><td>kcal</td></tr>
-                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own desired deficit"><td>D</td><td id="physique-balance">—</td><td id="physique-balance-desire">—</td><td>kcal</td></tr>
-                        <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime">—</td><td id="physique-mass-delta-prime-desire">—</td><td>g</td></tr>
+                        <tr title="This day's body-mass reading; Desire is the healthy body mass ± the glycogen swing"><td>m</td><td id="physique-mass-reading">—</td><td id="physique-mass-reading-desire">—</td><td id="physique-mass-reading-remain">—</td><td>kg</td></tr>
+                        <tr title="The L_p-day rolling average body-mass; Desire is the healthy body mass under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td id="physique-mass-mean-remain">—</td><td>kg</td></tr>
+                        <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta">—</td><td id="physique-mass-delta-desire">—</td><td id="physique-mass-delta-remain">—</td><td>kg</td></tr>
+                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the healthy body mass"><td>BMI</td><td id="physique-mass-bmi">—</td><td id="physique-mass-bmi-desire">—</td><td id="physique-mass-bmi-remain">—</td><td>kg/m²</td></tr>
+                        <tr title="Protein from the Consumption breakdown; Desire is the protein band (Settings/Tune), as the Intake Macros card shows it"><td>Pro</td><td id="physique-macro-protein">—</td><td id="physique-macro-protein-desire">—</td><td id="physique-macro-protein-remain">—</td><td>g</td></tr>
+                        <tr title="Dietary fibre from the Consumption breakdown; Desire is the fibre band"><td>DF</td><td id="physique-macro-fiber">—</td><td id="physique-macro-fiber-desire">—</td><td id="physique-macro-fiber-remain">—</td><td>g</td></tr>
+                        <tr title="Fat from the Consumption breakdown; Desire is the fat band"><td>Fat</td><td id="physique-macro-fat">—</td><td id="physique-macro-fat-desire">—</td><td id="physique-macro-fat-remain">—</td><td>g</td></tr>
+                        <tr class="physique-derived-group-end" title="Carbohydrate from the Consumption breakdown; Desire is the carbohydrate band"><td>Carb</td><td id="physique-macro-carb">—</td><td id="physique-macro-carb-desire">—</td><td id="physique-macro-carb-remain">—</td><td>g</td></tr>
+                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei">—</td><td id="physique-tei-desire">—</td><td id="physique-tei-remain">—</td><td>kcal</td></tr>
+                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived">—</td><td id="physique-tef-desire">—</td><td id="physique-tef-derived-remain">—</td><td>kcal</td></tr>
+                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee">—</td><td id="physique-aee-desire">—</td><td id="physique-aee-remain">—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation">—</td><td id="physique-sleep-deprivation-desire">—</td><td id="physique-sleep-deprivation-remain">—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-mif">—</td><td>—</td><td>—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-kat">—</td><td>—</td><td>—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-cal">—</td><td>—</td><td>—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-adp">—</td><td>—</td><td>—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-avg">—</td><td>—</td><td>—</td><td>kcal</td></tr>
+                        <tr class="physique-derived-group-end" title="Maintenance: BMR + AEE, the intake that would hold body mass still; Desire is BMR + the desired AEE, as the Status card shows it"><td>M</td><td id="physique-maintenance">—</td><td id="physique-maintenance-desire">—</td><td id="physique-maintenance-remain">—</td><td>kcal</td></tr>
+                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own desired deficit"><td>D</td><td id="physique-balance">—</td><td id="physique-balance-desire">—</td><td id="physique-balance-remain">—</td><td>kcal</td></tr>
+                        <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime">—</td><td id="physique-mass-delta-prime-desire">—</td><td id="physique-mass-delta-prime-remain">—</td><td>g</td></tr>
                         </tbody>
                     </table>
                 </div>

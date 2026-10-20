@@ -450,7 +450,7 @@ function bmrBasis() {
 }
 
 // BMR_avg: the mean of a day's known BMR_mif, BMR_kat, BMR_cal and BMR_adp. The plan runs it
-// as the active equation scaled by BMR_avg / equation on the latest stored day (Tune's own
+// as the active equation scaled by BMR_avg / equation today at m̄ (Tune's own
 // boxes while it previews), so the affine model keeps the equation's shape.
 const BMR_AVG_RATIO_PREVIEW_KEY = 'BMR_AVG_RATIO_PREVIEW';
 const BMR_AVERAGED_KEYS = ['BMR_mif', 'BMR_kat', 'BMR_cal', 'BMR_adp'];
@@ -465,15 +465,12 @@ function currentBmrAverageRatio() {
   if (bmrBasis() !== 'bmr_avg') return 1;
   const preview = currentSettings[BMR_AVG_RATIO_PREVIEW_KEY];
   if (typeof preview === 'number' && Number.isFinite(preview)) return preview;
-  if (typeof physiqueDatedAscending !== 'function') return 1;
-  const equationKey = BMR_EQUATION_KEYS[bmrFormula()];
-  const days = physiqueDatedAscending();
-  for (let i = days.length - 1; i >= 0; i--) {
-    const figures = days[i].bmr;
-    const avg = bmrAverageOf(figures);
-    if (avg !== null && Number.isFinite(figures?.[equationKey]) && figures[equationKey] > 0) return avg / figures[equationKey];
-  }
-  return 1;
+  // Today at m̄, not the last stored row: that can be a pre-logged future day.
+  if (typeof todayBmrFigures !== 'function') return 1;
+  const figures = todayBmrFigures();
+  const avg = bmrAverageOf(figures);
+  const equation = figures?.[BMR_EQUATION_KEYS[bmrFormula()]];
+  return avg !== null && equation > 0 ? avg / equation : 1;
 }
 
 // The current BMR calibration: an empirically back-solved BMR from actual logged

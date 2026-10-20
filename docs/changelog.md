@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | 3.21.3 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids |
+| (this commit) | 3.21.4 | fix: the plan's BMR_avg ratio is today's at m̄, figured as the Tune does (todayBmrFigures), not the last stored Physique row, which a pre-logged future day could be; Progress and the Status card's ETA now match the Tune's t; docs |
+| `628561f` | 3.21.3 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids |
 | `4bcef48` | 3.21.2 | chore: commit-msg only strips co-author and attribution lines, and the pre-commit and pre-push hooks go; version.js's comment names post-commit as what stamps it; docs |
 | `589dfc1` | 3.21.1 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids; sidebar comments and the navigation doc trimmed |
 | `33136a5` | **3.21.0** | feat: LeetCode gains a Progress card above Past Year (Health's meter over the NeetCode 250, solved and left, a mark every 25) with a time bar under it, days since the first solve against days to go at last week's pace and the finish date; the heatmap starts weeks on Monday, stretches its square cells to the card and on a phone shows Past 16 Weeks; the roadmap shrinks to the card on a phone; the solved summary moves under Roadmap's title; LeetCode comes first in Track, before Work Time; docs |

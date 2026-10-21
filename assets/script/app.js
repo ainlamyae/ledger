@@ -764,6 +764,8 @@ async function loadDashboard(forceRefresh = false) {
       ] : []),
       ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
       ...(home && !shows('track') ? [initWorkTime(forceRefresh)] : []),
+      // LeetCode for its tile's solves-owed badge.
+      ...(home && !shows('track') ? [initLeetcode()] : []),
       // Accounts for the Account tile's Pay badge.
       ...(home && !shows('finance') ? [initAccountManager(forceRefresh)] : []),
       // Watchlist alerts badge the Watch List and Market tiles, here and on home;

@@ -239,31 +239,35 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   setDesire('physique-balance-desire', balanceDesired);
   setDesire('physique-mass-delta-prime-desire', desiredGPerDay);
 
-  // Remain — Desire − Amount, unclamped (negative once past it); a band's floor for the macros.
+  // Remain — Desire − Amount, a band's floor for the macros; "—" once Amount is past Desire.
+  // `dir` is the way Amount moves toward Desire (+1 up, −1 down; kcal out are negative).
+  const downward = bodyMassHealthyIsDownward(healthEntries);
+  const massDir = downward ? -1 : 1;
+  const rateDir = (desire) => Math.sign(desire || 0) || massDir;
   const bmiDesired = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
   const showsMassDelta = mass.m_d !== undefined && !massChangeStoredInGrams(mass);
   const sdKcal = energy ? energy.deprivationKcal : sleepHours === null ? 0 : null;
   [
-    ['mass-reading', day.bodyMass, healthyMassKg, 1],
-    ['mass-mean', mass.m_avg, healthyMassKg, 1],
-    ['mass-delta', showsMassDelta ? mass.m_d : null, desiredKgPerDay, 3],
-    ['mass-bmi', mass.BMI, bmiDesired, 1],
-    ...Object.entries(bands).map(([id, band]) => [`macro-${id}`, macroG[id], band.min, 0]),
-    ['tei', day.caloriesIn, calDesired.kcal, 0],
-    ['tef-derived', tefKcal !== null ? -tefKcal : null, -digDesired, 0],
-    ['aee', -day.caloriesOut, actDesiredKcal !== null ? -actDesiredKcal : null, 0],
-    ['sleep-deprivation', sdKcal, 0, 0],
-    ['maintenance', bmrShown !== undefined ? -Math.round(bmrShown + day.caloriesOut) : null, mDesired, 0],
-    ['balance', energy ? energy.balance : null, balanceDesired, 0],
-    ['mass-delta-prime', energy ? Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000) : null, desiredGPerDay, 0],
-  ].forEach(([id, amount, desire, digits]) => {
+    ['mass-reading', day.bodyMass, healthyMassKg, 1, massDir],
+    ['mass-mean', mass.m_avg, healthyMassKg, 1, massDir],
+    ['mass-delta', showsMassDelta ? mass.m_d : null, desiredKgPerDay, 3, rateDir(desiredKgPerDay)],
+    ['mass-bmi', mass.BMI, bmiDesired, 1, massDir],
+    ...Object.entries(bands).map(([id, band]) => [`macro-${id}`, macroG[id], band.min, 0, 1]),
+    ['tei', day.caloriesIn, calDesired.kcal, 0, 1],
+    ['tef-derived', tefKcal !== null ? -tefKcal : null, -digDesired, 0, -1],
+    ['aee', -day.caloriesOut, actDesiredKcal !== null ? -actDesiredKcal : null, 0, -1],
+    ['sleep-deprivation', sdKcal, 0, 0, -1],
+    ['maintenance', bmrShown !== undefined ? -Math.round(bmrShown + day.caloriesOut) : null, mDesired, 0, -1],
+    ['balance', energy ? energy.balance : null, balanceDesired, 0, rateDir(balanceDesired)],
+    ['mass-delta-prime', energy ? Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000) : null, desiredGPerDay, 0, rateDir(desiredGPerDay)],
+  ].forEach(([id, amount, desire, digits, dir]) => {
     const known = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
     const scale = 10 ** digits;
-    setDesire(`physique-${id}-remain`, known(amount) && known(desire) ? Math.round((desire - amount) * scale) / scale : null);
+    const passed = known(amount) && known(desire) && dir * (amount - desire) > 0;
+    setDesire(`physique-${id}-remain`, known(amount) && known(desire) && !passed ? Math.round((desire - amount) * scale) / scale : null);
   });
 
   // Amount green/red by the Status and Intake Macros cards' own rules (health-chart.js).
-  const downward = bodyMassHealthyIsDownward(healthEntries);
   const towardHealthy = (v, healthy) => (downward ? v <= healthy : v >= healthy);
   const bandTone = (g, band, within) => (within(g, band) || g > band.max ? 'income' : 'expense');
   const isCut = getCalorieDesiredKind(healthEntries) === 'max';

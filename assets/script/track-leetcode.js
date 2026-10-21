@@ -96,6 +96,7 @@ function renderLeetcode() {
 
   renderLeetcodeProgress(solves);
   renderLeetcodeHeatmap();
+  checkLeetcodeBadge();
   renderLeetcodeRoadmap(solves);
 
   const container = document.getElementById('leetcode-list');
@@ -109,6 +110,24 @@ function renderLeetcode() {
     const problems = NEETCODE_250.filter((p) => p.category === category);
     container.appendChild(buildLeetcodeCategory(category, problems, solves));
   });
+}
+
+// A red badge of the solves today still owes: the last 7 days' average (rounded up)
+// less today's solves.
+function checkLeetcodeBadge() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIso = isoFromDate(today);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoIso = isoFromDate(weekAgo);
+  const weekSolves = allLeetcodeLogs.filter((l) => l.date >= weekAgoIso && l.date < todayIso).length;
+  const todaySolves = allLeetcodeLogs.filter((l) => l.date === todayIso).length;
+  const owed = Math.ceil(weekSolves / 7) - todaySolves;
+  setPageBadge('track', 'leetcode', owed > 0 ? {
+    text: String(owed),
+    title: `${owed} more to match the last 7 days' average of ${(weekSolves / 7).toFixed(1)} solves a day (${todaySolves} today)`,
+  } : null);
 }
 
 // Health's Progress meter over the NeetCode 250, a mark every 25, then the time

@@ -52,8 +52,9 @@ const SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL = 60;
 
 function sleepDeprivationDotColor(deprivationEffectKcal) {
   if (deprivationEffectKcal === null || deprivationEffectKcal === undefined) return chartColor('--chart-good');
+  // Along the desired grades' blend: 0 kcal at Desired met's green, the full-red kcal at Missed.
   const ratio = Math.min(1, Math.max(0, deprivationEffectKcal / SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL));
-  return lerpHex(chartColor('--chart-good'), chartColor('--chart-bad'), ratio);
+  return desiredGradeBlend(DESIRED_GRADES[1].min * (1 - ratio));
 }
 
 function renderHealthSleepChart(entries) {
@@ -100,12 +101,12 @@ function renderHealthSleepChart(entries) {
     return [start, end];
   });
 
-  // Each night graded by hours slept ÷ desired sleep (desiredGrade), lifted to one step
+  // Each night graded by hours slept ÷ desired sleep (desiredGradeBlended), lifted to one step
   // under its 7-day average duration's grade, as every other Health chart.
   const durations = dates.map((d) => rangeByDate.get(d)?.durationHr ?? null);
   const durationAvg = emaSeries(durations);
   const nightGrades = durations.map((hr, i) => (hr === null ? null
-    : desiredGrade(hr / sleepDesired, durationAvg[i] === null ? null : durationAvg[i] / sleepDesired)));
+    : desiredGradeBlended(hr / sleepDesired, durationAvg[i] === null ? null : durationAvg[i] / sleepDesired)));
   const barColors = nightGrades.map((g) => g?.color ?? null);
 
   // Fit in AXIS units, not clock minutes: the shift has already unwrapped midnight, so

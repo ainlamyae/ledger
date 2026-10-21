@@ -1,5 +1,5 @@
-// Owns the page shown before the dashboard is reachable: the sign-in error
-// banner, the "connect your spreadsheet" file-gate, and the auth-state-driven
+// Owns the page shown before the dashboard is reachable: the
+// "connect your spreadsheet" file-gate, and the auth-state-driven
 // switch between them and the dashboard itself. Kept out of app.js (the
 // dashboard proper) so the pre-login flow can be read and changed on its
 // own, without wading through unrelated dashboard code.
@@ -20,57 +20,15 @@ function setUIState(state) {
   document.getElementById('signin-btn').hidden = state !== 'signedOut';
   document.getElementById('account-menu').hidden = state === 'signedOut';
   document.getElementById('refresh-btn').hidden = state !== 'dashboard';
-  if (state !== 'signedOut') removeSignInBanner();
   // A form address loaded while signed out (or without a file) can't open its form.
   if (state !== 'dashboard' && typeof abandonPendingFormPage === 'function') abandonPendingFormPage();
 }
 
-// Prepended to #dashboard rather than a full-page gate, so every block stays
-// visible (with its placeholder content) behind it — matches showDashboardError's
-// pattern in app.js. Only ever shown for an actual sign-in failure: the plain
-// "you're signed out" case has no banner at all — the header's sign-in icon is
-// the only cue, and any gated action (setupAuthGatedActions in app.js) signs
-// the user in on click and then carries on with whatever they clicked.
-function removeSignInBanner() {
-  document.getElementById('signin-banner')?.remove();
-}
-
-function showSignInBanner(errorMessage) {
-  if (!errorMessage) {
-    removeSignInBanner();
-    return;
-  }
-
-  const dashboard = document.getElementById('dashboard');
-  let banner = document.getElementById('signin-banner');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = 'signin-banner';
-
-    const text = document.createElement('span');
-    banner.appendChild(text);
-
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary';
-    btn.textContent = 'Sign in';
-    btn.addEventListener('click', signIn);
-    banner.appendChild(btn);
-
-    dashboard.prepend(banner);
-  }
-
-  banner.className = 'status error-banner';
-  banner.firstElementChild.textContent = errorMessage;
-}
-
 function handleAuthChange(token, error) {
-  const errorMessage = (error && !error.silent)
-    ? `Sign-in failed: ${error.type || error.error || 'unknown error'}${error.message ? ` — ${error.message}` : ''}`
-    : null;
-
   if (!token) {
+    // A failed sign-in leaves the 🔑 icon to try again; no banner.
+    if (error && !error.silent) console.warn('Sign-in failed:', error.type || error.error || 'unknown error', error.message || '');
     setUIState('signedOut');
-    showSignInBanner(errorMessage);
     return;
   }
 

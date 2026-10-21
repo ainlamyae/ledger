@@ -100,13 +100,13 @@ function renderHealthActivityChart(entries) {
   // Scored against what that day's own body mass would burn at ACTIVITY_DESIRED_MIN — or
   // the pinned calorie burn, if that's what's pinned instead — via the same
   // getActivityDesiredKcal the activity tile uses, so the two can't disagree. Graded by
-  // burn ÷ desired burn (desiredGrade), lifted to one step under the 7-Day Average Burn's
+  // burn ÷ desired burn (desiredGradeBlended), lifted to one step under the 7-Day Average Burn's
   // grade. Without a body mass there's no desired burn, so the dot stays neutral violet.
   const dotGrade = (date, kcal, weekKcal) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
     if (kcal === null || bodyMassKg === null) return { name: null, color: chartColor('--chart-purple') };
     const desiredKcal = getActivityDesiredKcal(bodyMassKg);
-    return desiredGrade(kcal / desiredKcal, weekKcal === null ? null : weekKcal / desiredKcal);
+    return desiredGradeBlended(kcal / desiredKcal, weekKcal === null ? null : weekKcal / desiredKcal);
   };
 
   // Dots, not a connected line: each day's burn is independent, and a line would bridge

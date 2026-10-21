@@ -636,6 +636,25 @@ function desiredGrade(r, weekR = null) {
   return { name: grade.name, color: chartColor(grade.color) };
 }
 
+// desiredGrade's colour blended along the steps instead of fixed per step: each step's
+// colour sits at its min (Missed at r = 0), and the week's lift raises r to that floor.
+function desiredGradeBlend(r, weekR = null) {
+  const week = desiredGradeIndex(weekR);
+  const floor = week === null ? -Infinity : (DESIRED_GRADES[week + 1]?.min ?? -Infinity);
+  const x = Math.max(r, floor);
+  const stops = DESIRED_GRADES.map((g) => ({ at: Math.max(g.min, 0), color: chartColor(g.color) }));
+  if (x >= stops[0].at) return stops[0].color;
+  if (x <= 0) return stops[stops.length - 1].color;
+  const i = stops.findIndex((s) => x >= s.at);
+  return lerpHex(stops[i].color, stops[i - 1].color, (x - stops[i].at) / (stops[i - 1].at - stops[i].at));
+}
+
+// desiredGrade named by its step, coloured along the blend.
+function desiredGradeBlended(r, weekR = null) {
+  const grade = desiredGrade(r, weekR);
+  return grade && { ...grade, color: desiredGradeBlend(r, weekR) };
+}
+
 function desiredGradeLegend() {
   return DESIRED_GRADES.map((g) => ({ name: g.name, color: chartColor(g.color) }));
 }

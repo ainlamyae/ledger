@@ -168,11 +168,26 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     document.getElementById(`physique-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
-  // The five BMR figures Save will store, each its own row — "kcal" is the Unit
-  // column. Shown negative, same as the Status card's own BMR rows: an expenditure.
+  // Only the BMR picked in the Tune; shown negative, as the Status card's: an expenditure.
+  const shownBmrKey = selectedBmrKey(bmr);
   [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp'], ['avg', 'BMR_avg']].forEach(([id, key]) => {
     const text = bmr[key] !== undefined ? `${-bmr[key]}` : '—';
-    document.getElementById(`physique-bmr-${id}`).textContent = privacyMode ? maskDigits(text) : text;
+    const cell = document.getElementById(`physique-bmr-${id}`);
+    cell.textContent = privacyMode ? maskDigits(text) : text;
+    cell.parentElement.hidden = key !== shownBmrKey;
+  });
+
+  // M — BMR + AEE, signed as expenditure; its Desire is set with the others below.
+  const bmrShown = bmr[shownBmrKey];
+  const mText = bmrShown !== undefined ? `${-Math.round(bmrShown + day.caloriesOut)}` : '—';
+  document.getElementById('physique-maintenance').textContent = privacyMode ? maskDigits(mText) : mText;
+
+  // The day's macros off its Consumption breakdown, floored as the Intake Macros card does.
+  const breakdown = parsePhysiqueBreakdown(document.getElementById('physique-breakdown').value);
+  [['protein', 'protein'], ['fiber', 'fiber'], ['fat', 'fat'], ['carb', 'carbohydrate']].forEach(([id, key]) => {
+    const rows = breakdown.filter((r) => Number.isFinite(r[key]));
+    const text = rows.length ? `${Math.floor(rows.reduce((sum, r) => sum + r[key], 0))}` : '—';
+    document.getElementById(`physique-macro-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
   // Desire — the plan-level figure each one is read against, the same ones the
@@ -192,7 +207,9 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const planMassKg = planBodyMassKg(healthEntries);
   const calDesired = getCalorieDesired(healthEntries);
   const digDesired = Math.round(calDesired.kcal * (1 - tefDivisor()));
-  const actDesiredKcal = day.bodyMass !== null ? Math.round(getActivityDesiredKcal(day.bodyMass)) : null;
+  // At the latest reading on or before the day when it has none of its own.
+  const actMassKg = day.bodyMass ?? physiqueBodyMassAsOf(day.date);
+  const actDesiredKcal = actMassKg !== null ? Math.round(getActivityDesiredKcal(actMassKg)) : null;
   const weeklyFatLossKg = weeklyFatLossKgAt(planMassKg);
   const desiredKgPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) / 1000 : null;
   const desiredGPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
@@ -203,10 +220,15 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   setDesire('physique-mass-mean-desire', healthyMassKg);
   setDesire('physique-mass-delta-desire', desiredKgPerDay);
   setDesire('physique-mass-bmi-desire', heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null);
+  setDesire('physique-macro-protein-desire', formatProteinDesiredBand(getProteinDesiredBandG(healthEntries)));
+  setDesire('physique-macro-fiber-desire', formatProteinDesiredBand(getFiberDesiredBandG(healthEntries)));
+  setDesire('physique-macro-fat-desire', formatProteinDesiredBand(getFatDesiredBandG(healthEntries)));
+  setDesire('physique-macro-carb-desire', formatProteinDesiredBand(getCarbDesiredBandG(healthEntries)));
   setDesire('physique-tei-desire', calDesired.kcal);
   setDesire('physique-tef-desire', -digDesired);
   setDesire('physique-aee-desire', actDesiredKcal !== null ? -actDesiredKcal : null);
   setDesire('physique-sleep-deprivation-desire', 0);
+  setDesire('physique-maintenance-desire', bmrShown !== undefined && actDesiredKcal !== null ? -Math.round(bmrShown + actDesiredKcal) : null);
   const balanceDesired = desiredBalanceKcal(planMassKg);
   setDesire('physique-balance-desire', balanceDesired);
   setDesire('physique-mass-delta-prime-desire', desiredGPerDay);

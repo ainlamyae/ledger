@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | 3.17.1 | fix(tune): compute the BMR_avg ratio from today's figures |
+| (this commit) | **3.18.0** | feat(physique): show selected BMR, macro rows and M in derived table |
+| `fba760d` | 3.17.1 | fix(tune): compute the BMR_avg ratio from today's figures |
 | `6295120` | **3.17.0** | feat(leetcode): add progress card and responsive heatmap |
 | `838020d` | **3.16.0** | feat(charts): render chart tooltips over the page |
 | `6692857` | **3.15.0** | feat(charts): add intake chart and optional detail charts |

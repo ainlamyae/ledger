@@ -957,24 +957,6 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
       makeCell(''),
     );
     tbody.appendChild(desiredRow);
-
-    // Remain — Desire minus Total for each column with a desired figure (Source has none),
-    // i.e. how much of each is still left to hit the day's goal. Unclamped, so a column
-    // already past its desired figure reads as a negative surplus rather than a flat zero.
-    const remainingRow = document.createElement('tr');
-    remainingRow.className = 'calc-breakdown-remaining';
-    remainingRow.append(
-      makeCell('Remain', 'Desire − Total — how much of each column is still left to reach the day\'s goal (negative once you\'ve passed it)'),
-      makeCell(''),
-      makeCell(String(desireCalories - totalCalories)),
-      makeCell((proteinBand.min - totalProtein).toFixed(1)),
-      makeCell((fiberBand.min - (totalFiber || 0)).toFixed(1)),
-      makeCell(desireFat === null ? '—' : (desireFat - (totalFat || 0)).toFixed(1)),
-      makeCell(desireCarb === null ? '—' : (desireCarb - (totalCarbohydrate || 0)).toFixed(1)),
-      makeCell(desireTef > 0 ? String(Math.round(desireTef - (totalTef || 0))) : '—'),
-      makeCell(''),
-    );
-    tbody.appendChild(remainingRow);
   }
 
   // Physique stores the same JSON in a visible field rather than a hidden

@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | 3.21.4 | fix: the plan's BMR_avg ratio is today's at m̄, figured as the Tune does (todayBmrFigures), not the last stored Physique row, which a pre-logged future day could be; Progress and the Status card's ETA now match the Tune's t; docs |
+| (this commit) | **3.22.0** | feat: Physique's Derived table shows only the BMR picked in Tune, labelled plain BMR, under new Pro/DF/Fat/Carb rows (the Consumption breakdown's grams against the Intake Macros bands), and gains an M row (BMR + AEE, Desire BMR + the desired AEE) between lines under SD; the desired AEE falls back to the latest reading before the day; the Remain row leaves both Calculate tables; docs |
+| `636c126` | 3.21.4 | fix: the plan's BMR_avg ratio is today's at m̄, figured as the Tune does (todayBmrFigures), not the last stored Physique row, which a pre-logged future day could be; Progress and the Status card's ETA now match the Tune's t; docs |
 | `628561f` | 3.21.3 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids |
 | `4bcef48` | 3.21.2 | chore: commit-msg only strips co-author and attribution lines, and the pre-commit and pre-push hooks go; version.js's comment names post-commit as what stamps it; docs |
 | `589dfc1` | 3.21.1 | chore: version.cjs's legacy commit ids follow the rewritten history (every version unchanged) and the changelog is rebuilt with the new ids; sidebar comments and the navigation doc trimmed |

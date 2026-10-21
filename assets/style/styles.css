@@ -1320,13 +1320,6 @@ td:has(.btn) {
     border-top: 1px dashed var(--color-border);
 }
 
-/* Remain — Desire − Total, sitting directly under the Desire it's derived from. No
-   border of its own so it reads as a continuation of that goal line, just muted. */
-#physique-calc-breakdown tr.calc-breakdown-remaining td,
-#physique-activity-breakdown tr.calc-breakdown-remaining td {
-    color: var(--color-text-muted);
-}
-
 /* Both Calculate tables sit between two fields and are where the day's four
    totals are now read, the fields themselves being hidden. The field above
    supplies only its own .35rem, so without a matching gap below, the next

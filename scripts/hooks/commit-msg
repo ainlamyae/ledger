@@ -1,10 +1,6 @@
 #!/bin/sh
-# No co-authors, no names or emails in any commit message. Plain sh (no node),
-# so it runs wherever git does.
-#
-# Drops every attribution line: any "Something-by:" trailer (Co-authored-by,
-# Signed-off-by, …), any trailer carrying a <name@email>, "Generated with/by"
-# lines, 🤖 lines and noreply@ addresses.
+# Tidies the commit message: drops trailer lines and trailing blank lines.
+# Plain sh (no node), so it runs wherever git does.
 msg="$1"
 tmp="$msg.ledger-tmp"
 

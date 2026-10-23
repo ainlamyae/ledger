@@ -99,20 +99,23 @@ function renderHealthActivityChart(entries) {
 
   // Scored against what that day's own body mass would burn at ACTIVITY_DESIRED_MIN — or
   // the pinned calorie burn, if that's what's pinned instead — via the same
-  // getActivityDesiredKcal the activity tile uses, so the two can't disagree. Met is
-  // green, short by up to ACTIVITY_NEAR_DESIRED_FRACTION gray, further short red. Without
-  // a body mass there's no desired burn, so the dot stays neutral violet.
-  const dotColor = (date, kcal) => {
+  // getActivityDesiredKcal the activity tile uses, so the two can't disagree. Graded by
+  // burn ÷ desired burn (desiredGrade), lifted to one step under the 7-Day Average Burn's
+  // grade. Without a body mass there's no desired burn, so the dot stays neutral violet.
+  const dotGrade = (date, kcal, weekKcal) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
-    if (kcal === null || bodyMassKg === null) return chartColor('--chart-purple');
+    if (kcal === null || bodyMassKg === null) return { name: null, color: chartColor('--chart-purple') };
     const desiredKcal = getActivityDesiredKcal(bodyMassKg);
-    if (kcal >= desiredKcal) return chartColor('--chart-good');
-    return desiredKcal - kcal <= desiredKcal * ACTIVITY_NEAR_DESIRED_FRACTION ? chartColor('--chart-neutral') : chartColor('--chart-bad');
+    return desiredGrade(kcal / desiredKcal, weekKcal === null ? null : weekKcal / desiredKcal);
   };
 
   // Dots, not a connected line: each day's burn is independent, and a line would bridge
   // the unlogged days as though they were a trend.
   const caloriesData = dates.map((date) => (caloriesByDate.has(date) ? caloriesByDate.get(date) : null));
+  // On the kcal axis, not the minutes one — Desired Burn lives there, and it's what the
+  // week is compared against.
+  const weeklyBurnAvg = emaSeries(caloriesData);
+  const dotGrades = dates.map((date, i) => dotGrade(date, caloriesData[i], weeklyBurnAvg[i]));
   const caloriesDataset = {
     type: 'line',
     label: 'Actual Burn',
@@ -121,7 +124,7 @@ function renderHealthActivityChart(entries) {
     showLine: false,
     pointRadius: fitPointRadius(5),
     pointHoverRadius: fitPointRadius(7),
-    pointBackgroundColor: dates.map((date, i) => dotColor(date, caloriesData[i])),
+    pointBackgroundColor: dotGrades.map((g) => g.color),
     pointBorderColor: chartColor('--chart-point-border'),
     pointBorderWidth: fitPointBorderWidth(5, 1.5),
     order: 0,
@@ -160,9 +163,7 @@ function renderHealthActivityChart(entries) {
     isDesiredLine: true,
   };
 
-  // On the kcal axis, not the minutes one — Desired Burn lives there, and it's what the
-  // week is compared against. Negated like the dots it's fit to.
-  const weeklyBurnAvg = emaSeries(caloriesData);
+  // Negated like the dots it's fit to.
   const weeklyBurnDataset = trendLineDataset(
     '7-Day Average Burn',
     weeklyBurnAvg.map((v) => (v === null ? null : -v)),
@@ -175,8 +176,7 @@ function renderHealthActivityChart(entries) {
   activityDatasets.forEach((ds) => { ds.hidden = hidden.has(ds.label); });
   weeklyBurnDataset.hidden = hidden.has('7-Day Average Burn');
   desiredLineDataset.hidden = hidden.has('Desired Burn');
-  const dotClasses = caloriesDataset.pointBackgroundColor.map((c) => (c === chartColor('--chart-good') ? 'Desired met'
-    : c === chartColor('--chart-neutral') ? 'Near desired' : c === chartColor('--chart-bad') ? 'Missed desired' : null));
+  const dotClasses = dotGrades.map((g) => g.name);
   caloriesDataset.data = maskHiddenClasses(caloriesDataset.data, dotClasses, hidden);
 
   healthActivityChart = upsertChart(healthActivityChart, ctx, {
@@ -263,9 +263,7 @@ function renderHealthActivityChart(entries) {
   // Swatches under the chart: each activity's bar colour, then the burn dots and lines.
   renderToggleLegend('health-activity-legend', !hasData ? [] : [
     ...descriptions.map((d, i) => ({ name: shortActivityLabel(d), color: descriptionColors[i] })),
-    { name: 'Desired met', color: chartColor('--chart-good') },
-    { name: 'Near desired', color: chartColor('--chart-neutral') },
-    { name: 'Missed desired', color: chartColor('--chart-bad') },
+    ...desiredGradeLegend(),
     { name: '7-Day Average Burn', color: desiredMarkColor() },
     { name: 'Desired Burn', color: chartColor('--chart-cyan') },
   ], () => renderHealthActivityChart(entries));

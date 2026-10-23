@@ -28,13 +28,14 @@
 
 | Threshold | Value | Effect |
 |---|---|---|
-| `CALORIE_DESIRED_NEAR_FRACTION` | `5 %` | Past the desired intake by ≤5 % is grey, beyond is red |
-| `ACTIVITY_NEAR_DESIRED_FRACTION` | `5 %` | Short of the implied burn by ≤5 % is grey |
-| `BODY_MASS_STALL_RED_AFTER_DAYS` | `2` days | A flat reading is grey until the plateau holds this long. Holding *at* the healthy mass stays green |
 | Protein over-band | — | Above the top end is a darker green (`#166534`), not red or grey. Below the floor stays red |
-| Calorie Balance vs. desired | — | At/beyond desired green, short but right side of zero grey, wrong side red |
-| Body Mass vs. its own 7-Day Trend | sign of the rate | A day scored red (moved the wrong way since the last reading) regrades to grey if the smoothed curve's own trailing-7-day rate (`emaSlopePerSpan`) still points toward the healthy mass. Stall-reds (a flat reading held too long) are untouched — a different signal |
-| Caloric Intake vs. its own 7-Day Average | `withinCalorieDesired` | A red bar (past the desired intake beyond `CALORIE_DESIRED_NEAR_FRACTION`) regrades to grey if the EMA-smoothed average (`emaSeries`) is still on the desired intake's right side |
+| `DESIRED_GRADES` (`health-chart.js`) | r ≥ 1.1 / 0.85 / 0.6 / 0.3 | **Beat desired** (dark green), **Desired met** (green), **Near desired** (lime), **Short of desired** (amber), **Missed desired** (red), by r, the share of the desired change a day made. Body Mass, Calorie Balance, Intake, Caloric Intake, Physical Activity, Sleep and the heatmap |
+| Calorie Balance r | balance ÷ D | No D: toward (green) or away (red) by the sign |
+| Intake / Caloric Intake r | (intake − M) ÷ D, M = desired intake − D (`intakeDesiredR`) | The same share as Calorie Balance's, read off the intake. No D: cap ÷ intake (floor: intake ÷ floor) |
+| Sleep r | hours slept ÷ `SLEEP_DESIRED_HOURS` | Lifted by the 7-day average duration |
+| Physical Activity r | burn ÷ desired burn (`getActivityDesiredKcal`) | No body mass: violet, unscored |
+| Body Mass r | (Δm ÷ days since the last reading) ÷ (D ÷ 7700 kcal/kg) | At the healthy mass: Desired met. No D: toward/away by the sign. A first reading or one after a gap is Unscored |
+| 7-Day lift | `desiredGrade(r, weekR)` | A day grades at least one step under its 7-day average's (Body Mass: the 7-Day Trend's rate; Physical Activity: the 7-Day Average Burn), so one off day in a week on pace reads as a dip, not red |
 
 ## Body
 
@@ -293,7 +294,7 @@ chart bar = Σ desiredG and Σ actualG over each Group's tracked ingredients, so
 - Carb's under-band case reads grey, not red — same as its chart's bar coloring.
 - Status's **AEE** sums `activityEntryKcal` per entry rather than just the logged minutes, so it agrees with the Activity/Calorie Balance charts. Physical Activity's Cardio/NEAT/Strength split that same set of entries by the `Activity` sheet's Category column (prefix-matched), each unscored (`N min (-N kcal)`, `0 min (0 kcal)` rather than `—` for a bucket with nothing logged — that's a real zero, not a missing reading).
 - Status is the per-day form of `dailyEnergyBalanceKcal` (`setStatusEnergyTile`): **BMR** is Mifflin at the smoothed mass; **TEI** is intake vs. the desired intake with a `<`/`>` per the desired kind; **TEF** is `calDesired.kcal × (1 − tefDivisor())`; **SD** is the sleep-deprivation effect vs. `0`; **D** is intake − BMR − AEE − TEF (+SD) against `desiredBalanceKcal(planBodyMassKg(entries))`, the same arithmetic the Calorie Balance chart plots for one day; **BMI** is `planBodyMassKg` vs. `BODY_MASS_HEALTHY_KG`, rescaled by height; **Δm** is `D ÷ GENERIC_KCAL_PER_KG_FAT` against `-weeklyFatLossKgAt ÷ 7` — negated the same way `desiredBalanceKcal` negates it for D, so a positive (cut) `WEEKLY_FAT_LOSS_KG` reads as a negative desired mass change, matching Δm's own actual-value sign convention (negative = losing).
-- Sleep's Duration is colored by `sleepStatusColor` (the chart's own red→amber→green gradient), not a flat two-colour split; Window is `sleepBedMin`-`sleepWakeMin` as one `HH:MM-HH:MM` range.
+- Sleep's Duration is green at or over the desired sleep, red under it; Window is `sleepBedMin`-`sleepWakeMin` as one `HH:MM-HH:MM` range.
 
 ## Sleep
 

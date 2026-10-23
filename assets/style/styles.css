@@ -94,6 +94,8 @@ textarea {
     --chart-good: var(--color-income);
     --chart-good-high: #166534;
     --chart-good-light: #4ade80;
+    /* Near desired: between Desired met's green and Short of desired's amber. */
+    --chart-near: #a3e635;
     --chart-bad: var(--color-danger);
     --chart-warn: #f59e0b;
     --chart-orange: #d97706;
@@ -1666,6 +1668,39 @@ th.sortable:hover {
 .leetcode-heatmap > .heat-2 { background: color-mix(in srgb, var(--color-income) 70%, black); }
 .leetcode-heatmap > .heat-3 { background: var(--color-income); }
 .leetcode-heatmap > .heat-4 { background: color-mix(in srgb, var(--color-income) 55%, white); }
+
+/* Health Chart's copy of the grid, one column per week of the range, each day coloured
+   inline as its Calorie Balance bar. It sits in a .chart-box, the same height as every
+   chart on the page, and its square cells are the largest that fit both that height
+   (7 rows under the month names) and the card's width; under 11px they stop shrinking
+   and the grid scrolls. */
+.health-heatmap-box {
+    container-type: size;
+}
+
+.health-heatmap-box > .table-responsive {
+    height: 100%;
+    overflow-y: hidden;
+}
+
+.health-heatmap-box .leetcode-heatmap,
+.health-heatmap-box .leetcode-heatmap-months {
+    --cell: max(11px, min(
+        calc((100cqh - 1.2rem - var(--space-xs) - 18px) / 7),
+        calc((100cqw - (var(--weeks, 53) - 1) * 3px) / var(--weeks, 53))
+    ));
+    grid-template-columns: repeat(var(--weeks, 53), var(--cell));
+    min-width: 0;
+}
+
+.health-heatmap-box .leetcode-heatmap {
+    grid-template-rows: repeat(7, var(--cell));
+}
+
+.health-heatmap-box .leetcode-heatmap-months {
+    height: 1.2rem;
+    line-height: 1.2rem;
+}
 
 .leetcode-heatmap > [class^="heat-"] {
     border-color: transparent;

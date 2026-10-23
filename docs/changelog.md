@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.19.0** | feat(physique): add remain column and colour-coded derived amounts |
+| (this commit) | **3.20.0** | feat(charts): add daily progress heatmap and five-step grading |
+| `545b8e9` | **3.19.0** | feat(physique): add remain column and colour-coded derived amounts |
 | `336175e` | **3.18.0** | feat(physique): show selected BMR, macro rows and M in derived table |
 | `fba760d` | 3.17.1 | fix(tune): compute the BMR_avg ratio from today's figures |
 | `6295120` | **3.17.0** | feat(leetcode): add progress card and responsive heatmap |

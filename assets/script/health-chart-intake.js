@@ -68,7 +68,6 @@ function renderHealthIntakeChart(entries) {
   const BMR_CAPS = [{ key: tuneBmrKey, color: BMR_COLORS[tuneBmrKey] }];
   const bmrByKey = { [tuneBmrKey]: new Map() };
   const bmrKeyByDate = new Map();
-  const restingKcalByDate = new Map();
   dates.forEach((d) => {
     const figures = bmrFiguresForDate(d);
     const selected = pickBmrForBasis(figures);
@@ -76,43 +75,24 @@ function renderHealthIntakeChart(entries) {
       bmrByKey[tuneBmrKey].set(d, selected);
       bmrKeyByDate.set(d, selectedBmrKey(figures));
     }
-    const plain = pickBmrForBasis(figures, 'bmr');
-    if (plain !== null) restingKcalByDate.set(d, plain);
   });
 
   const desiredByDay = calorieDesiredSeries(entries, dates);
   const dayDesired = (i) => ({ ...desired, kcal: desiredByDay[i].kcal });
 
-  // Dot colours graded exactly as Caloric Intake's bars.
-  const CALORIE_NEAR_DESIRED_COLOR = chartColor('--chart-neutral');
+  // Dot colours graded exactly as Caloric Intake's bars (intakeDesiredR, desiredGrade).
   const values = dates.map((d) => (byDate.has(d) ? byDate.get(d) : null));
-  const dotColors = dates.map((d, i) => {
-    if (!byDate.has(d)) return chartColor('--chart-good');
-    const value = values[i];
-    const dt = dayDesired(i);
-    if (withinCalorieDesired(value, dt)) return chartColor('--chart-good');
-    const bmr = desired.isMax ? restingKcalByDate.get(d) : undefined;
-    if (bmr === undefined || bmr === null || bmr <= dt.kcal) {
-      return calorieDesiredScore(value, dt) === 'near' ? CALORIE_NEAR_DESIRED_COLOR : chartColor('--chart-bad');
-    }
-    if (value >= bmr) return chartColor('--chart-bad');
-    return lerpHex(chartColor('--chart-good'), chartColor('--chart-bad'), (value - dt.kcal) / (bmr - dt.kcal));
-  });
-
   const weeklyAvg = emaSeries(values);
-
-  // A miss in a week still on the desired side reads gray.
-  dotColors.forEach((color, i) => {
-    if (color !== chartColor('--chart-bad')) return;
-    const avg = weeklyAvg[i];
-    if (avg === null || avg === undefined) return;
-    if (withinCalorieDesired(avg, dayDesired(i))) dotColors[i] = CALORIE_NEAR_DESIRED_COLOR;
-  });
+  const balanceKcal = desiredBalanceKcal(planBodyMassKg(entries));
+  const dotGrades = dates.map((d, i) => desiredGrade(
+    intakeDesiredR(values[i], dayDesired(i), balanceKcal),
+    intakeDesiredR(weeklyAvg[i], dayDesired(i), balanceKcal),
+  ) ?? { name: null, color: chartColor('--chart-good') });
+  const dotColors = dotGrades.map((g) => g.color);
 
   // Hidden legend entries leave the axes too.
   const hidden = legendHiddenNames('health-intake-legend');
-  const dotClasses = dotColors.map((c) => (c === chartColor('--chart-good') ? 'Desired met'
-    : c === CALORIE_NEAR_DESIRED_COLOR ? 'Near desired' : 'Missed desired'));
+  const dotClasses = dotGrades.map((g) => g.name);
   const shownValues = maskHiddenClasses(values, dotClasses, hidden);
 
   const macroDatasets = INTAKE_MACROS.map(({ label }, m) => ({
@@ -225,9 +205,7 @@ function renderHealthIntakeChart(entries) {
 
   renderToggleLegend('health-intake-legend', dates.length === 0 ? [] : [
     ...INTAKE_MACROS.map(({ label }, m) => ({ name: label, color: macroColors[m] })),
-    { name: 'Desired met', color: chartColor('--chart-good') },
-    { name: 'Near desired', color: CALORIE_NEAR_DESIRED_COLOR },
-    { name: 'Missed desired', color: chartColor('--chart-bad') },
+    ...desiredGradeLegend(),
     { name: '7-Day Average', color: desiredMarkColor() },
     { name: `Desired ${desired.word}`, color: chartColor('--chart-cyan') },
     ...BMR_CAPS.filter(({ key }) => bmrByKey[key].size > 0).map(({ key, color }) => ({ name: BMR_DEFINITIONS[key], color })),

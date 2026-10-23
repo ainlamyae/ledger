@@ -52,8 +52,7 @@ function renderHealthCaloriesChart(entries) {
   // Resting metabolic rate per day, as stored in that day's Derived cell (Physique's
   // Derived column: the day's own carried-forward body mass and age), not recalculated here.
   // All four figures are drawn regardless of the BMR basis setting, so they can be
-  // compared; each map skips the days its figure is missing. restingKcalByDate is the
-  // active equation's plain BMR, which the bar colour grades against.
+  // compared; each map skips the days its figure is missing.
   const BMR_CAPS = [
     { key: 'BMR_mif', color: chartColor('--chart-blue') },
     { key: 'BMR_kat', color: chartColor('--chart-orange') },
@@ -62,14 +61,11 @@ function renderHealthCaloriesChart(entries) {
     { key: 'BMR_avg', color: chartColor('--chart-warn') },
   ];
   const bmrByKey = Object.fromEntries(BMR_CAPS.map(({ key }) => [key, new Map()]));
-  const restingKcalByDate = new Map();
   dates.forEach((d) => {
     const figures = bmrFiguresForDate(d);
     BMR_CAPS.forEach(({ key }) => {
       if (figures[key] !== undefined) bmrByKey[key].set(d, figures[key]);
     });
-    const plain = pickBmrForBasis(figures, 'bmr');
-    if (plain !== null) restingKcalByDate.set(d, plain);
   });
 
   // Re-evaluated per day, so there's no single figure to draw: each bar carries its own
@@ -77,59 +73,28 @@ function renderHealthCaloriesChart(entries) {
   const desiredByDay = calorieDesiredSeries(entries, dates);
   const dayDesired = (i) => ({ ...desired, kcal: desiredByDay[i].kcal });
 
-  // Each bar against its OWN day's figure: green on the right side, gray within
-  // CALORIE_DESIRED_NEAR_FRACTION past it, red beyond — so the colour IS the read, and a
-  // near-miss is called neither a win nor a failure. No shaded out-of-bounds region:
-  // the desired figure moves by tens of kcal across a window, far too little for a filled zone
-  // to follow, so the wash only ever communicated a fixed limit the chart doesn't have.
+  // Each bar against its OWN day's figure, graded by how much of the desired balance D
+  // the day's intake leaves (intakeDesiredR, desiredGrade): Beat, Desired met, Near,
+  // Short of and Missed desired, lifted by the 7-day average's own grade so one off day
+  // in a week on pace reads as a dip. No shaded out-of-bounds region: the desired figure
+  // moves by tens of kcal across a window, far too little for a filled zone to follow.
   // An unlogged day plots as 0 and takes the green — a missing log, not a fast, and
   // invisible at zero height anyway rather than the worst day on the chart under a floor.
-  const CALORIE_NEAR_DESIRED_COLOR = chartColor('--chart-neutral');
   const values = dates.map((d) => byDate.get(d) || 0);
-  // On a desired "Max", red beyond it isn't flat — green at the desired figure sliding
-  // to red at that day's own Basal Metabolic Rate (restingKcalByDate, above), since
-  // eating up to BMR alone already erases the deficit before activity or TEF even
-  // factor in: the real ceiling it sits a step under. Solid red at or past
-  // BMR itself. A desired "Min" (a bulk) has no such ceiling to gradient toward, so
-  // it keeps the old flat near/missed split, as does a Max day BMR can't be priced
-  // for yet (no profile, or no body mass logged).
-  const barColors = dates.map((d, i) => {
-    if (!byDate.has(d)) return chartColor('--chart-good');
-    const value = values[i];
-    const dt = dayDesired(i);
-    if (withinCalorieDesired(value, dt)) return chartColor('--chart-good');
-    const bmr = desired.isMax ? restingKcalByDate.get(d) : undefined;
-    if (bmr === undefined || bmr === null || bmr <= dt.kcal) {
-      return calorieDesiredScore(value, dt) === 'near' ? CALORIE_NEAR_DESIRED_COLOR : chartColor('--chart-bad');
-    }
-    if (value >= bmr) return chartColor('--chart-bad');
-    return lerpHex(chartColor('--chart-good'), chartColor('--chart-bad'), (value - dt.kcal) / (bmr - dt.kcal));
-  });
-
-  // Fit off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins don't
-  // count as days of fasting. A per-week least-squares trend, not a sliding average —
-  // a sliding window reacts to a spike on either side of it, before or after it
-  // actually happened; a trend fit to a fixed week only moves once, at the week's own
-  // pace. Computed here, ahead of the axis, so a missed day can be graded against it
-  // below.
+  // Off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins don't count
+  // as days of fasting.
   const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
-
-  // A single day's overshoot reads as noise, not a habit, when the week around it is
-  // still landing on the desired side — gray it out rather than calling it a
-  // miss. Only a 'missed' bar moves: 'met' is already green and 'near' is already this
-  // same gray.
-  barColors.forEach((color, i) => {
-    if (color !== chartColor('--chart-bad')) return;
-    const avg = weeklyAvg[i];
-    if (avg === null || avg === undefined) return;
-    if (withinCalorieDesired(avg, dayDesired(i))) barColors[i] = CALORIE_NEAR_DESIRED_COLOR;
-  });
+  const balanceKcal = desiredBalanceKcal(planBodyMassKg(entries));
+  const barGrades = dates.map((d, i) => (byDate.has(d) ? desiredGrade(
+    intakeDesiredR(values[i], dayDesired(i), balanceKcal),
+    intakeDesiredR(weeklyAvg[i], dayDesired(i), balanceKcal),
+  ) : null) ?? { name: null, color: chartColor('--chart-good') });
+  const barColors = barGrades.map((g) => g.color);
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by
-  // their colour's name, a gradient one counting as missed.
+  // their grade's name.
   const hidden = legendHiddenNames('health-calories-legend');
-  const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Desired met'
-    : c === CALORIE_NEAR_DESIRED_COLOR ? 'Near desired' : 'Missed desired'));
+  const barClasses = barGrades.map((g) => g.name);
   const shownValues = maskHiddenClasses(values, barClasses, hidden);
 
   const restingKcalValues = BMR_CAPS.filter(({ key }) => !hidden.has(BMR_DEFINITIONS[key]))
@@ -232,9 +197,7 @@ function renderHealthCaloriesChart(entries) {
 
   // Swatches under the chart, named as in the hover; BMR names without their symbols.
   renderToggleLegend('health-calories-legend', dates.length === 0 ? [] : [
-    { name: 'Desired met', color: chartColor('--chart-good') },
-    { name: 'Near desired', color: CALORIE_NEAR_DESIRED_COLOR },
-    { name: 'Missed desired', color: chartColor('--chart-bad') },
+    ...desiredGradeLegend(),
     { name: '7-Day Average', color: desiredMarkColor() },
     { name: `Desired ${desired.word}`, color: chartColor('--chart-cyan') },
     ...BMR_CAPS.filter(({ key }) => bmrByKey[key].size > 0).map(({ key, color }) => ({ name: BMR_DEFINITIONS[key], color })),

@@ -69,6 +69,7 @@ ledger/
 │       ├── health-insight-pattern.js # Insight Pattern mode
 │       ├── health-insight.js      # Insight panel shell
 │       ├── health-chart-protein-rotation.js   # Protein Source Rotation
+│       ├── health-chart-heatmap.js   # Health Chart's Daily Progress heatmap
 │       ├── health-tune-fields.js     # Tune field descriptors + input utils
 │       ├── health-tune-render.js     # Tune substituted-formula renderers
 │       ├── health-tune.js # Tune block lifecycle

@@ -41,16 +41,6 @@ function computeSleepAxisRange(shiftedPairs) {
   };
 }
 
-// Red -> amber -> green from half the desired sleep up to all of it, in the app's own
-// expense/calories/income colours. Solid at either end.
-function sleepStatusColor(durationHr, desiredHr) {
-  const minHr = desiredHr / 2;
-  const ratio = Math.min(1, Math.max(0, (durationHr - minHr) / (desiredHr - minHr)));
-  return ratio < 0.5
-    ? lerpHex(chartColor('--chart-bad'), chartColor('--chart-warn'), ratio / 0.5)
-    : lerpHex(chartColor('--chart-warn'), chartColor('--chart-good'), (ratio - 0.5) / 0.5);
-}
-
 // Green at 0 kcal, sliding to red as the Deprivation Effect itself grows — driven by the
 // same kcal figure the dot's position and the glance tile's number already show, not a
 // separate hours-based reading, so the colour can't tell a different story than the
@@ -102,15 +92,21 @@ function renderHealthSleepChart(entries) {
   });
 
   const rangeByDate = new Map(); // date -> { bedMin, wakeMin, durationHr }
-  const barColors = [];
   const sleepData = dates.map((d) => {
     const shifted = shiftedByDate.get(d);
-    if (!shifted) { barColors.push(null); return null; }
+    if (!shifted) return null;
     const { start, end, e } = shifted;
     rangeByDate.set(d, { bedMin: e.sleepBedMin, wakeMin: e.sleepWakeMin, durationHr: e.amount });
-    barColors.push(sleepStatusColor(e.amount, sleepDesired));
     return [start, end];
   });
+
+  // Each night graded by hours slept ÷ desired sleep (desiredGrade), lifted to one step
+  // under its 7-day average duration's grade, as every other Health chart.
+  const durations = dates.map((d) => rangeByDate.get(d)?.durationHr ?? null);
+  const durationAvg = emaSeries(durations);
+  const nightGrades = durations.map((hr, i) => (hr === null ? null
+    : desiredGrade(hr / sleepDesired, durationAvg[i] === null ? null : durationAvg[i] / sleepDesired)));
+  const barColors = nightGrades.map((g) => g?.color ?? null);
 
   // Fit in AXIS units, not clock minutes: the shift has already unwrapped midnight, so
   // a plain fit works where clock times would average 23:30 and 00:30 into midday.
@@ -139,14 +135,9 @@ function renderHealthSleepChart(entries) {
   });
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; nights by
-  // how far short of the desired sleep they fell, the cut-offs the gradient runs between.
+  // their grade's name.
   const hidden = legendHiddenNames('health-sleep-legend');
-  const nightClasses = dates.map((d) => {
-    const r = rangeByDate.get(d);
-    if (!r) return null;
-    if (r.durationHr >= sleepDesired) return 'Desired sleep met';
-    return r.durationHr <= sleepDesired / 2 ? 'Half of desired or less' : 'Short of desired';
-  });
+  const nightClasses = nightGrades.map((g) => g?.name ?? null);
   const shownPairs = dates.map((d, i) => (hidden.has(nightClasses[i]) ? null : shiftedByDate.get(d)))
     .filter(Boolean);
   if (!hidden.has('7-Day Average Bed & Wake')) {
@@ -248,9 +239,7 @@ function renderHealthSleepChart(entries) {
 
   // Swatches under the chart; both 7-Day lines share one colour, so one entry.
   renderToggleLegend('health-sleep-legend', rangeByDate.size === 0 ? [] : [
-    { name: 'Desired sleep met', color: chartColor('--chart-good') },
-    { name: 'Short of desired', color: chartColor('--chart-warn') },
-    { name: 'Half of desired or less', color: chartColor('--chart-bad') },
+    ...desiredGradeLegend(),
     { name: '7-Day Average Bed & Wake', color: desiredMarkColor() },
     ...(desiredDeficitKcal !== null ? [{ name: 'Sleep Deprivation Effect (dot, green to red)', color: sleepDeprivationDotColor(SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL / 2) }] : []),
   ], () => renderHealthSleepChart(entries));

@@ -905,14 +905,16 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
 
   const totalRow = document.createElement('tr');
   totalRow.className = 'calc-breakdown-total';
+  // Whole grams, floored as the Derived table and Intake Macros card show them.
+  const totalCell = (value) => makeCell(value === undefined ? '—' : String(Math.floor(value)));
   totalRow.append(
     makeCell('Total'),
     makeCell(''),
-    makeCell(String(totalCalories)),
-    makeCell(totalProtein.toFixed(1)),
-    macroCell(totalFiber),
-    macroCell(totalFat),
-    macroCell(totalCarbohydrate),
+    totalCell(totalCalories),
+    totalCell(totalProtein),
+    totalCell(totalFiber),
+    totalCell(totalFat),
+    totalCell(totalCarbohydrate),
     macroCell(totalTef, 0),
     makeCell(''),
   );

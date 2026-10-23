@@ -184,9 +184,11 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
 
   // The day's macros off its Consumption breakdown, floored as the Intake Macros card does.
   const breakdown = parsePhysiqueBreakdown(document.getElementById('physique-breakdown').value);
+  const macroG = {};
   [['protein', 'protein'], ['fiber', 'fiber'], ['fat', 'fat'], ['carb', 'carbohydrate']].forEach(([id, key]) => {
     const rows = breakdown.filter((r) => Number.isFinite(r[key]));
-    const text = rows.length ? `${Math.floor(rows.reduce((sum, r) => sum + r[key], 0))}` : '—';
+    if (rows.length) macroG[id] = Math.floor(rows.reduce((sum, r) => sum + r[key], 0));
+    const text = rows.length ? `${macroG[id]}` : '—';
     document.getElementById(`physique-macro-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
@@ -220,18 +222,72 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   setDesire('physique-mass-mean-desire', healthyMassKg);
   setDesire('physique-mass-delta-desire', desiredKgPerDay);
   setDesire('physique-mass-bmi-desire', heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null);
-  setDesire('physique-macro-protein-desire', formatProteinDesiredBand(getProteinDesiredBandG(healthEntries)));
-  setDesire('physique-macro-fiber-desire', formatProteinDesiredBand(getFiberDesiredBandG(healthEntries)));
-  setDesire('physique-macro-fat-desire', formatProteinDesiredBand(getFatDesiredBandG(healthEntries)));
-  setDesire('physique-macro-carb-desire', formatProteinDesiredBand(getCarbDesiredBandG(healthEntries)));
+  const bands = {
+    protein: getProteinDesiredBandG(healthEntries),
+    fiber: getFiberDesiredBandG(healthEntries),
+    fat: getFatDesiredBandG(healthEntries),
+    carb: getCarbDesiredBandG(healthEntries),
+  };
+  Object.entries(bands).forEach(([id, band]) => setDesire(`physique-macro-${id}-desire`, formatProteinDesiredBand(band)));
   setDesire('physique-tei-desire', calDesired.kcal);
   setDesire('physique-tef-desire', -digDesired);
   setDesire('physique-aee-desire', actDesiredKcal !== null ? -actDesiredKcal : null);
   setDesire('physique-sleep-deprivation-desire', 0);
-  setDesire('physique-maintenance-desire', bmrShown !== undefined && actDesiredKcal !== null ? -Math.round(bmrShown + actDesiredKcal) : null);
+  const mDesired = bmrShown !== undefined && actDesiredKcal !== null ? -Math.round(bmrShown + actDesiredKcal) : null;
+  setDesire('physique-maintenance-desire', mDesired);
   const balanceDesired = desiredBalanceKcal(planMassKg);
   setDesire('physique-balance-desire', balanceDesired);
   setDesire('physique-mass-delta-prime-desire', desiredGPerDay);
+
+  // Remain — Desire − Amount, unclamped (negative once past it); a band's floor for the macros.
+  const bmiDesired = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
+  const showsMassDelta = mass.m_d !== undefined && !massChangeStoredInGrams(mass);
+  const sdKcal = energy ? energy.deprivationKcal : sleepHours === null ? 0 : null;
+  [
+    ['mass-reading', day.bodyMass, healthyMassKg, 1],
+    ['mass-mean', mass.m_avg, healthyMassKg, 1],
+    ['mass-delta', showsMassDelta ? mass.m_d : null, desiredKgPerDay, 3],
+    ['mass-bmi', mass.BMI, bmiDesired, 1],
+    ...Object.entries(bands).map(([id, band]) => [`macro-${id}`, macroG[id], band.min, 0]),
+    ['tei', day.caloriesIn, calDesired.kcal, 0],
+    ['tef-derived', tefKcal !== null ? -tefKcal : null, -digDesired, 0],
+    ['aee', -day.caloriesOut, actDesiredKcal !== null ? -actDesiredKcal : null, 0],
+    ['sleep-deprivation', sdKcal, 0, 0],
+    ['maintenance', bmrShown !== undefined ? -Math.round(bmrShown + day.caloriesOut) : null, mDesired, 0],
+    ['balance', energy ? energy.balance : null, balanceDesired, 0],
+    ['mass-delta-prime', energy ? Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000) : null, desiredGPerDay, 0],
+  ].forEach(([id, amount, desire, digits]) => {
+    const known = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
+    const scale = 10 ** digits;
+    setDesire(`physique-${id}-remain`, known(amount) && known(desire) ? Math.round((desire - amount) * scale) / scale : null);
+  });
+
+  // Amount green/red by the Status and Intake Macros cards' own rules (health-chart.js).
+  const downward = bodyMassHealthyIsDownward(healthEntries);
+  const towardHealthy = (v, healthy) => (downward ? v <= healthy : v >= healthy);
+  const bandTone = (g, band, within) => (within(g, band) || g > band.max ? 'income' : 'expense');
+  const isCut = getCalorieDesiredKind(healthEntries) === 'max';
+  const carbTone = (g) => (withinCarbBand(g, bands.carb) ? 'income' : g > bands.carb.max ? 'expense' : 'neutral');
+  [
+    ['mass-reading', day.bodyMass !== null ? towardHealthy(day.bodyMass, healthyMassKg) : null],
+    ['mass-mean', mass.m_avg !== undefined ? towardHealthy(mass.m_avg, healthyMassKg) : null],
+    ['mass-delta', showsMassDelta && mass.m_d !== 0 ? (downward ? mass.m_d < 0 : mass.m_d > 0) : null],
+    ['mass-bmi', mass.BMI !== undefined && bmiDesired !== null ? towardHealthy(mass.BMI, bmiDesired) : null],
+    ['macro-protein', macroG.protein !== undefined ? bandTone(macroG.protein, bands.protein, withinProteinBand) : null],
+    ['macro-fiber', macroG.fiber !== undefined ? bandTone(macroG.fiber, bands.fiber, withinFiberBand) : null],
+    ['macro-fat', macroG.fat !== undefined ? bandTone(macroG.fat, bands.fat, withinFatBand) : null],
+    ['macro-carb', macroG.carb !== undefined ? carbTone(macroG.carb) : null],
+    ['tei', day.caloriesIn !== null ? withinCalorieDesired(day.caloriesIn, calDesired) : null],
+    ['aee', actDesiredKcal !== null ? day.caloriesOut >= actDesiredKcal : null],
+    ['sleep-deprivation', sdKcal !== null ? sdKcal <= 0 : null],
+    ['balance', energy ? (balanceDesired !== null
+      ? (isCut ? energy.balance <= balanceDesired : energy.balance >= balanceDesired)
+      : (isCut ? energy.balance < 0 : energy.balance > 0)) : null],
+  ].forEach(([id, good]) => {
+    const cell = document.getElementById(`physique-${id}`);
+    cell.classList.remove('income', 'expense', 'neutral');
+    if (good !== null) cell.classList.add(typeof good === 'string' ? good : good ? 'income' : 'expense');
+  });
   return { balance: energy ? energy.balance : null, balanceDesired };
 }
 

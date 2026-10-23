@@ -1307,6 +1307,16 @@ td:has(.btn) {
     border-bottom: 1px solid var(--color-border);
 }
 
+/* Physique's number columns line up on the last digit, like .num. */
+#physique-derived-table th:nth-child(n+2):nth-child(-n+4),
+#physique-derived-table td:nth-child(n+2):nth-child(-n+4),
+#physique-calc-breakdown th:not(:first-child):not(:last-child),
+#physique-calc-breakdown td:not(:first-child):not(:last-child),
+#physique-activity-breakdown th:not(:first-child):not(:last-child),
+#physique-activity-breakdown td:not(:first-child):not(:last-child) {
+    text-align: right;
+}
+
 /* Desired — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
    Duration/Cal workout goal (activity table), directly under the Total they're measured
    against. A desired value, not a measurement, so it's set off with a dashed top border instead

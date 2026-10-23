@@ -564,9 +564,6 @@ function restingMaintenanceKcal(entries) {
   return applyBmrBasis(bmrKcal(bodyMassKg, heightCm, age, sex));
 }
 
-// Inside this margin the Physical Activity dot goes gray rather than red. Same 5% as
-// CALORIE_DESIRED_NEAR_FRACTION, kept separate because the two score different things.
-const ACTIVITY_NEAR_DESIRED_FRACTION = 0.05;
 
 // What ACTIVITY_DESIRED_MIN implies at `bodyMassKg`. Gross, not net of resting — Calorie
 // Balance also adds gross activity to plain BMR, so both maintenance figures agree.
@@ -902,18 +899,6 @@ function getCalorieDesired(entries) {
 // at-or-over a floor — hitting it exactly counts as met either way.
 function withinCalorieDesired(kcal, desired) {
   return desired.isMax ? kcal <= desired.kcal : kcal >= desired.kcal;
-}
-
-// Inside this margin a day is neither scored nor condemned — a few percent is within
-// the noise of the estimate and of the log itself.
-const CALORIE_DESIRED_NEAR_FRACTION = 0.05;
-
-// 'met' on the right side, 'near' within CALORIE_DESIRED_NEAR_FRACTION past it, 'missed'
-// beyond. Distance is measured alike for a ceiling and a floor, so a bulk's
-// under-eating grades exactly like a cut's over-eating.
-function calorieDesiredScore(kcal, desired) {
-  if (withinCalorieDesired(kcal, desired)) return 'met';
-  return Math.abs(kcal - desired.kcal) <= desired.kcal * CALORIE_DESIRED_NEAR_FRACTION ? 'near' : 'missed';
 }
 
 // Least-squares fit. The intercept is only needed by the Body Mass weekly trend,

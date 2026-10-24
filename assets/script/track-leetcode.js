@@ -5,22 +5,27 @@
 // column can't shift values into the wrong cell.
 const LEETCODE_COLUMNS = [
   ['date', 'Date'], ['name', 'Problem'], ['category', 'Category'], ['difficulty', 'Difficulty'],
-  ['link', 'LeetCode'], ['video', 'NeetCode Video'], ['notes', 'Notes'],
+  ['link', 'LeetCode'], ['neetcode', 'NeetCode Page'], ['youtube', 'YouTube Video'], ['minutes', 'Duration'],
+  ['notes', 'Notes'],
 ];
+// Old headers still read, renamed on the next save.
+const LEETCODE_OLD_HEADERS = { neetcode: 'neetcode video', minutes: 'video minutes' };
+let leetcodeOldHeaders = []; // keys found under an old header
 const LEETCODE_HEADERS = LEETCODE_COLUMNS.map(([, header]) => header);
 const LEETCODE_RANGE = () => `'${CONFIG.SHEETS.LEETCODE}'!A1:Z`;
 let leetcodeColumnIndex = {}; // key -> 0-based column, from the header row
 const NEETCODE_BY_SLUG = new Map(NEETCODE_250.map((p) => [p.slug, p]));
 
 const leetcodeLink = (p) => `https://leetcode.com/problems/${p.slug}/`;
-const neetcodeVideoLink = (p) => `https://neetcode.io/solutions/${p.slug}`;
+const neetcodePageLink = (p) => `https://neetcode.io/solutions/${p.slug}`;
+const youtubeLink = (p) => `https://www.youtube.com/watch?v=${p.youtube}`;
 
 let allLeetcodeLogs = [];
 let leetcodeSheetId = null;
 let editingLeetcodeRow = null;
 let leetcodeListenersAttached = false;
 let editLeetcodeLog = null;
-let openLeetcodeCategory; // one at a time; undefined until first shown
+let openLeetcodeCategory = null; // one at a time; all closed on load
 // A phone shows the heatmap's last 16 weeks, not the year.
 const leetcodePhoneQuery = window.matchMedia('(max-width: 820px)');
 
@@ -52,8 +57,13 @@ async function refreshLeetcode() {
     const [header = [], ...rows] = (await getValues(LEETCODE_RANGE(), VALUE_PARAMS)).values || [];
     const names = header.map((h) => String(h ?? '').trim().toLowerCase());
     leetcodeColumnIndex = {};
+    leetcodeOldHeaders = [];
     LEETCODE_COLUMNS.forEach(([key, h]) => {
-      const i = names.indexOf(h.toLowerCase());
+      let i = names.indexOf(h.toLowerCase());
+      if (i === -1 && LEETCODE_OLD_HEADERS[key]) {
+        i = names.indexOf(LEETCODE_OLD_HEADERS[key]);
+        if (i !== -1) leetcodeOldHeaders.push(key);
+      }
       if (i !== -1) leetcodeColumnIndex[key] = i;
     });
     const cell = (row, key) => String(row[leetcodeColumnIndex[key]] ?? '').trim();
@@ -68,7 +78,9 @@ async function refreshLeetcode() {
         category: cell(row, 'category') || p?.category || '',
         difficulty: cell(row, 'difficulty') || p?.difficulty || '',
         link: cell(row, 'link'),
-        video: cell(row, 'video'),
+        neetcode: cell(row, 'neetcode'),
+        youtube: cell(row, 'youtube'),
+        minutes: Number(cell(row, 'minutes')) || 0,
         notes: cell(row, 'notes'),
       };
     }).filter((l) => l.slug);
@@ -102,10 +114,6 @@ function renderLeetcode() {
   const container = document.getElementById('leetcode-list');
   container.innerHTML = '';
   const categories = [...new Set(NEETCODE_250.map((p) => p.category))];
-  // Opens on the first category not yet finished.
-  if (openLeetcodeCategory === undefined) {
-    openLeetcodeCategory = categories.find((c) => NEETCODE_250.some((p) => p.category === c && !solves.has(p.slug))) ?? null;
-  }
   categories.forEach((category) => {
     const problems = NEETCODE_250.filter((p) => p.category === category);
     container.appendChild(buildLeetcodeCategory(category, problems, solves));
@@ -143,6 +151,20 @@ function renderLeetcodeProgress(solves) {
   document.getElementById('leetcode-progress-meter-callout').textContent = `${done}/${total}`;
   document.getElementById('leetcode-progress-meter-done').textContent = String(done);
   document.getElementById('leetcode-progress-meter-remaining').textContent = String(total - done);
+
+  // Video minutes: a solve's logged minutes, else its video's.
+  const minutesOf = (p) => solves.get(p.slug)?.at(-1).minutes || p.minutes;
+  const allMinutes = NEETCODE_250.reduce((sum, p) => sum + minutesOf(p), 0);
+  const doneMinutes = NEETCODE_250.filter((p) => solves.has(p.slug)).reduce((sum, p) => sum + minutesOf(p), 0);
+  const minutesPct = allMinutes ? (doneMinutes / allMinutes) * 100 : 0;
+  const minutesMeter = document.getElementById('leetcode-minutes-meter');
+  minutesMeter.style.setProperty('--meter-pct', `${minutesPct}`);
+  minutesMeter.style.setProperty('--fill-pct', `${Math.round(minutesPct)}`);
+  // A mark every 10 hours.
+  minutesMeter.querySelector('.body-mass-progress-meter-track').style.setProperty('--mark-step', `${(600 / allMinutes) * 100}`);
+  const hours = (m) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+  document.getElementById('leetcode-minutes-meter-done').textContent = hours(doneMinutes);
+  document.getElementById('leetcode-minutes-meter-remaining').textContent = hours(allMinutes - doneMinutes);
 
   const time = document.getElementById('leetcode-time-meter');
   const elapsedEl = document.getElementById('leetcode-time-meter-elapsed');
@@ -340,7 +362,7 @@ function buildLeetcodeCategory(category, problems, solves) {
   scroller.className = 'table-responsive';
   const table = document.createElement('table');
   table.className = 'table-compact';
-  table.innerHTML = '<thead><tr><th></th><th>Solved</th><th>Problem</th><th>Difficulty</th><th></th></tr></thead>';
+  table.innerHTML = '<thead><tr><th></th><th>Solved</th><th>Problem</th><th>Difficulty</th><th>Duration</th><th></th></tr></thead>';
   const tbody = document.createElement('tbody');
   const today = isoFromDate(new Date());
   problems.forEach((p) => {
@@ -352,10 +374,11 @@ function buildLeetcodeCategory(category, problems, solves) {
     const solvedText = logs.length ? `${logs[0].date}${logs.length > 1 ? ` ×${logs.length}` : ''}` : '';
     const actions = document.createElement('td');
     actions.className = 'workout-actions-cell';
-    // 🎥 NeetCode's video and 🔗 the LeetCode problem, as buttons like ✏️/🗑️.
+    // 🎥 the YouTube video, 📄 NeetCode's page and 🔗 the LeetCode problem, as buttons like ✏️/🗑️.
     const open = (href) => () => window.open(href, '_blank', 'noopener');
     actions.append(
-      makeRowActionButton({ emoji: '🎥', title: 'NeetCode video', onClick: open(latest?.video || neetcodeVideoLink(p)) }),
+      makeRowActionButton({ emoji: '🎥', title: 'YouTube video', onClick: open(latest?.youtube || youtubeLink(p)) }),
+      makeRowActionButton({ emoji: '📄', title: 'NeetCode page', onClick: open(latest?.neetcode || neetcodePageLink(p)) }),
       makeRowActionButton({ emoji: '🔗', title: 'LeetCode problem', onClick: open(latest?.link || leetcodeLink(p)) }),
     );
     if (latest) {
@@ -372,7 +395,8 @@ function buildLeetcodeCategory(category, problems, solves) {
     }
     tr.append(
       makeCell(logs.length ? '✅' : ''), makeCell(solvedText, logs.map((l) => l.date).join(', ') + (notes ? ` — ${notes}` : '')),
-      makeCell(p.name), makeCell(latest?.difficulty || p.difficulty), actions,
+      makeCell(p.name), makeCell(latest?.difficulty || p.difficulty),
+      makeCell(`${latest?.minutes || p.minutes} min`), actions,
     );
     tbody.appendChild(tr);
   });
@@ -393,7 +417,9 @@ function openLeetcodeForm(log = null, problem = null) {
   document.getElementById('leetcode-category').value = log?.category || problem?.category || '';
   document.getElementById('leetcode-difficulty').value = log?.difficulty || problem?.difficulty || '';
   document.getElementById('leetcode-link').value = log?.link || '';
-  document.getElementById('leetcode-video').value = log?.video || '';
+  document.getElementById('leetcode-neetcode').value = log?.neetcode || '';
+  document.getElementById('leetcode-youtube').value = log?.youtube || '';
+  document.getElementById('leetcode-minutes').value = log?.minutes || '';
   fillLeetcodeLinks(Boolean(log));
   document.getElementById('leetcode-notes').value = log?.notes || '';
   clearFieldError('leetcode-form-error');
@@ -405,7 +431,7 @@ function closeLeetcodeForm() {
   editingLeetcodeRow = null;
 }
 
-// Category, difficulty and links follow the problem picked; saved ones or a pasted video link are kept.
+// Category, difficulty and links follow the problem picked; saved ones or a pasted link are kept.
 function fillLeetcodeLinks(keepDifficulty = false) {
   const problem = findNeetcodeProblem(document.getElementById('leetcode-problem').value);
   if (!problem) return;
@@ -414,9 +440,13 @@ function fillLeetcodeLinks(keepDifficulty = false) {
     document.getElementById('leetcode-difficulty').value = problem.difficulty;
   }
   const link = document.getElementById('leetcode-link');
-  const video = document.getElementById('leetcode-video');
+  const page = document.getElementById('leetcode-neetcode');
+  const youtube = document.getElementById('leetcode-youtube');
   if (findNeetcodeProblem(link.value) !== problem) link.value = leetcodeLink(problem);
-  if (!video.value || /neetcode\.io\/solutions\//.test(video.value)) video.value = neetcodeVideoLink(problem);
+  if (!page.value || /neetcode\.io\/solutions\//.test(page.value)) page.value = neetcodePageLink(problem);
+  if (!youtube.value || /youtube\.com\/watch\?v=/.test(youtube.value)) youtube.value = youtubeLink(problem);
+  const minutes = document.getElementById('leetcode-minutes');
+  if (!keepDifficulty || !minutes.value) minutes.value = problem.minutes;
 }
 
 // A roadmap problem from its name, LeetCode slug or LeetCode/NeetCode link.
@@ -439,7 +469,9 @@ async function submitLeetcodeForm() {
       category: document.getElementById('leetcode-category').value || problem.category,
       difficulty: document.getElementById('leetcode-difficulty').value || problem.difficulty,
       link: document.getElementById('leetcode-link').value.trim() || leetcodeLink(problem),
-      video: document.getElementById('leetcode-video').value.trim() || neetcodeVideoLink(problem),
+      neetcode: document.getElementById('leetcode-neetcode').value.trim() || neetcodePageLink(problem),
+      youtube: document.getElementById('leetcode-youtube').value.trim() || youtubeLink(problem),
+      minutes: Number(document.getElementById('leetcode-minutes').value) || problem.minutes,
       notes: document.getElementById('leetcode-notes').value.trim(),
     };
     const savedRow = await writeLeetcodeLog(log, editingLeetcodeRow);
@@ -464,11 +496,12 @@ async function writeLeetcodeLog(log, row = null) {
   if (!Object.keys(leetcodeColumnIndex).length) await refreshLeetcode();
   const header = [];
   LEETCODE_COLUMNS.forEach(([key, h]) => {
-    if (leetcodeColumnIndex[key] !== undefined) return;
-    leetcodeColumnIndex[key] = Math.max(-1, ...Object.values(leetcodeColumnIndex)) + 1;
+    if (leetcodeColumnIndex[key] !== undefined && !leetcodeOldHeaders.includes(key)) return;
+    if (leetcodeColumnIndex[key] === undefined) leetcodeColumnIndex[key] = Math.max(-1, ...Object.values(leetcodeColumnIndex)) + 1;
     header.push({ range: `'${tab}'!${physiqueColumnLetter(leetcodeColumnIndex[key])}1`, values: [[h]] });
   });
   if (header.length) await batchUpdateValues(header, 'RAW');
+  leetcodeOldHeaders = [];
   if (!row) {
     const width = Math.max(...Object.values(leetcodeColumnIndex)) + 1;
     const values = Array(width).fill('');

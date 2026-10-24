@@ -31,7 +31,7 @@ Four checks (`computeSignals`, `finance-market-math.js`):
 
 ## Signals table
 
-- Same layout as Physique's Derived table, grouped by lines.
+- Same layout as Physique's Summary table, grouped by lines.
 - **Evidence**: the four checks above, each Pass / Fail / n/a.
 - **Risk**: volatility 3m and 1y (annualized), ATR14 (Wilder), max drawdown 1y, Sharpe 1y, Sortino 1y, beta vs the benchmark.
 - **Levels**:

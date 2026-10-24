@@ -2806,24 +2806,27 @@
                 <input type="checkbox" id="physique-is-pattern">
                 Pattern
             </label>
-            <!-- Both rows are hidden while Pattern is ticked (syncPhysiquePatternMode):
-                 a pattern has no date, body mass or sleep of its own. -->
-            <div class="form-row" id="physique-date-row">
-                <label>Date
-                    <input type="date" id="physique-date">
-                </label>
-                <label>Body Mass
-                    <input type="text" id="physique-body-mass" inputmode="decimal" placeholder="e.g. 94 (kg)">
-                </label>
-            </div>
-            <div class="form-row" id="physique-sleep-row">
-                <label>Bed
-                    <input type="time" id="physique-bedtime">
-                </label>
-                <label>Wake
-                    <input type="time" id="physique-wake-time">
-                </label>
-            </div>
+            <!-- Hidden while Pattern is ticked: a pattern has no date, body mass or sleep.
+                 Open on today only, like Consumption and Workout. -->
+            <details id="physique-day-details">
+                <summary>Day</summary>
+                <div class="form-row" id="physique-date-row">
+                    <label>Date
+                        <input type="date" id="physique-date">
+                    </label>
+                    <label>Body Mass
+                        <input type="text" id="physique-body-mass" inputmode="decimal" placeholder="e.g. 94 (kg)">
+                    </label>
+                </div>
+                <div class="form-row" id="physique-sleep-row">
+                    <label>Bed
+                        <input type="time" id="physique-bedtime">
+                    </label>
+                    <label>Wake
+                        <input type="time" id="physique-wake-time">
+                    </label>
+                </div>
+            </details>
             <!-- Collapsed by default on any day but today (openPhysiqueForm), same
                  disclosure style as Tune's Equations — today's is left open since
                  that's the day actually being logged. -->
@@ -2838,25 +2841,7 @@
                 <textarea id="physique-breakdown" rows="4"></textarea>
             </label>
 
-            <div id="physique-calc-breakdown" class="table-responsive table-compact" hidden>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Amount</th>
-                        <th title="Calories">Cal</th>
-                        <th title="Protein (g)">Pro</th>
-                        <th title="Fiber (g) — this ingredient's own typed Fiber if it has one, else read from its pulled 🧬 Micronutrients">DF</th>
-                        <th title="Fat (g) — this ingredient's own typed Fat if it has one, else read from its pulled 🧬 Micronutrients">Fat</th>
-                        <th title="Carbohydrate (g) — this ingredient's own typed Carb if it has one, else read from its pulled 🧬 Micronutrients">Carb</th>
-                        <th title="Estimated Thermic Effect of Food (kcal) — this ingredient's own typed TEF if it has one, else Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default (tune under Settings: TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT)">TEF</th>
-                        <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time" aria-label="Source"></th>
-                    </tr>
-                    </thead>
-                    <tbody id="physique-calc-breakdown-body"></tbody>
-                </table>
-            </div>
-            <!-- All totals are read off the breakdown table's Total row above,
+            <!-- All totals are read off the breakdown table's Total row below,
                  so the fields Calculate writes them into stay hidden — they're
                  still what Save sends to columns G, H, I, J, K and L. -->
             <label hidden>Calories In
@@ -2888,22 +2873,7 @@
                     <ul id="physique-workout-suggestions" class="autocomplete-suggestions" hidden></ul>
                 </div>
             </details>
-            <div id="physique-activity-breakdown" class="table-responsive table-compact" hidden>
-                <table>
-                    <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Amount</th>
-                        <th title="Metabolic Equivalent of Task — the intensity this exercise is priced at">MET</th>
-                        <th title="Active time in minutes, net of rest">Dur</th>
-                        <th title="Calories">Cal</th>
-                        <th title="✅ means the exercise was found in your own Activity sheet; AI means its MET was estimated, followed by 💾 to save it and ✏️ to fix it first; Default means it was priced at the default MET" aria-label="Source"></th>
-                    </tr>
-                    </thead>
-                    <tbody id="physique-activity-breakdown-body"></tbody>
-                </table>
-            </div>
-            <!-- Read off the activity table's Total row above, same as Calories
+            <!-- Read off the activity table's Total row below, same as Calories
                  In / Protein In are read off the breakdown's. Still the fields
                  Calculate writes and Save sends to columns N and O. -->
             <label hidden>Activity Duration
@@ -2912,47 +2882,6 @@
             <label hidden>Calories Out
                 <input type="text" id="physique-calories-out" placeholder="e.g. 520 (kcal)">
             </label>
-
-            <!-- Derived figures, moved off the form into one dropdown rather than
-                 interleaved between the fields that price them. Collapsed on any
-                 day but today, same as Consumption and Workout above. Same label
-                 set (TEI/TEF/AEE/SD/D/Δm′) as the Status card (health-chart.js
-                 setStatusEnergyTile), just off this form's own typed fields rather
-                 than a saved/typed entry. Plain (non-compact) table, so every row's
-                 own border-bottom is a real table horizontal line, same as the
-                 breakdown table above. -->
-            <details id="physique-derived-details">
-                <summary>Derived</summary>
-                <div class="table-responsive table-compact">
-                    <table id="physique-derived-table">
-                        <thead>
-                        <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Remain</th><th>Unit</th></tr>
-                        </thead>
-                        <tbody>
-                        <tr title="This day's body-mass reading; Desire is the healthy body mass ± the glycogen swing"><td>m</td><td id="physique-mass-reading">—</td><td id="physique-mass-reading-desire">—</td><td id="physique-mass-reading-remain">—</td><td>kg</td></tr>
-                        <tr title="The L_p-day rolling average body-mass; Desire is the healthy body mass under Settings"><td>m̄</td><td id="physique-mass-mean">—</td><td id="physique-mass-mean-desire">—</td><td id="physique-mass-mean-remain">—</td><td>kg</td></tr>
-                        <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta">—</td><td id="physique-mass-delta-desire">—</td><td id="physique-mass-delta-remain">—</td><td>kg</td></tr>
-                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the healthy body mass"><td>BMI</td><td id="physique-mass-bmi">—</td><td id="physique-mass-bmi-desire">—</td><td id="physique-mass-bmi-remain">—</td><td>kg/m²</td></tr>
-                        <tr title="Protein from the Consumption breakdown; Desire is the protein band (Settings/Tune), as the Intake Macros card shows it"><td>Pro</td><td id="physique-macro-protein">—</td><td id="physique-macro-protein-desire">—</td><td id="physique-macro-protein-remain">—</td><td>g</td></tr>
-                        <tr title="Dietary fibre from the Consumption breakdown; Desire is the fibre band"><td>DF</td><td id="physique-macro-fiber">—</td><td id="physique-macro-fiber-desire">—</td><td id="physique-macro-fiber-remain">—</td><td>g</td></tr>
-                        <tr title="Fat from the Consumption breakdown; Desire is the fat band"><td>Fat</td><td id="physique-macro-fat">—</td><td id="physique-macro-fat-desire">—</td><td id="physique-macro-fat-remain">—</td><td>g</td></tr>
-                        <tr class="physique-derived-group-end" title="Carbohydrate from the Consumption breakdown; Desire is the carbohydrate band"><td>Carb</td><td id="physique-macro-carb">—</td><td id="physique-macro-carb-desire">—</td><td id="physique-macro-carb-remain">—</td><td>g</td></tr>
-                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei">—</td><td id="physique-tei-desire">—</td><td id="physique-tei-remain">—</td><td>kcal</td></tr>
-                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived">—</td><td id="physique-tef-desire">—</td><td id="physique-tef-derived-remain">—</td><td>kcal</td></tr>
-                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee">—</td><td id="physique-aee-desire">—</td><td id="physique-aee-remain">—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation">—</td><td id="physique-sleep-deprivation-desire">—</td><td id="physique-sleep-deprivation-remain">—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-mif">—</td><td>—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-kat">—</td><td>—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-cal">—</td><td>—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-adp">—</td><td>—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-avg">—</td><td>—</td><td>—</td><td>kcal</td></tr>
-                        <tr class="physique-derived-group-end" title="Maintenance: BMR + AEE, the intake that would hold body mass still; Desire is BMR + the desired AEE, as the Status card shows it"><td>M</td><td id="physique-maintenance">—</td><td id="physique-maintenance-desire">—</td><td id="physique-maintenance-remain">—</td><td>kcal</td></tr>
-                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own desired deficit"><td>D</td><td id="physique-balance">—</td><td id="physique-balance-desire">—</td><td id="physique-balance-remain">—</td><td>kcal</td></tr>
-                        <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime">—</td><td id="physique-mass-delta-prime-desire">—</td><td id="physique-mass-delta-prime-remain">—</td><td>g</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </details>
 
             <p id="physique-form-error" class="status" hidden></p>
 
@@ -2970,6 +2899,79 @@
                 <button type="button" id="physique-calc-btn" class="btn btn-icon" title="Calculate" aria-label="Calculate">🧮</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="physique-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+            </div>
+
+            <div id="physique-calc-breakdown" class="card" hidden>
+                <h3>Consumption Breakdown</h3>
+                <div class="table-responsive table-compact">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Amount</th>
+                        <th title="Calories">Cal</th>
+                        <th title="Protein (g)">Pro</th>
+                        <th title="Fiber (g) — this ingredient's own typed Fiber if it has one, else read from its pulled 🧬 Micronutrients">DF</th>
+                        <th title="Fat (g) — this ingredient's own typed Fat if it has one, else read from its pulled 🧬 Micronutrients">Fat</th>
+                        <th title="Carbohydrate (g) — this ingredient's own typed Carb if it has one, else read from its pulled 🧬 Micronutrients">Carb</th>
+                        <th title="Estimated Thermic Effect of Food (kcal) — this ingredient's own typed TEF if it has one, else Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default (tune under Settings: TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT)">TEF</th>
+                        <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time" aria-label="Source"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="physique-calc-breakdown-body"></tbody>
+                </table>
+                </div>
+            </div>
+            <div id="physique-activity-breakdown" class="card" hidden>
+                <h3>Workout Breakdown</h3>
+                <div class="table-responsive table-compact">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Amount</th>
+                        <th title="Metabolic Equivalent of Task — the intensity this exercise is priced at">MET</th>
+                        <th title="Active time in minutes, net of rest">Dur</th>
+                        <th title="Calories">Cal</th>
+                        <th title="✅ means the exercise was found in your own Activity sheet; AI means its MET was estimated, followed by 💾 to save it and ✏️ to fix it first; Default means it was priced at the default MET" aria-label="Source"></th>
+                    </tr>
+                    </thead>
+                    <tbody id="physique-activity-breakdown-body"></tbody>
+                </table>
+                </div>
+            </div>
+            <!-- Same labels as the Status card (setStatusEnergyTile), off this form's typed fields. -->
+            <div id="physique-derived" class="card">
+                <h3>Summary</h3>
+                <div class="table-responsive table-compact">
+                    <table id="physique-derived-table">
+                        <thead>
+                        <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Remain</th><th>Unit</th><th title="✅ meets the desired figure, ❌ misses it" aria-label="Status"></th></tr>
+                        </thead>
+                        <tbody>
+                        <tr title="This day's body-mass reading; Desire is the healthy body mass ± the glycogen swing"><td>m</td><td id="physique-mass-reading"></td><td id="physique-mass-reading-desire"></td><td id="physique-mass-reading-remain"></td><td>kg</td><td></td></tr>
+                        <tr title="The L_p-day rolling average body-mass; Desire is the healthy body mass under Settings"><td>m̄</td><td id="physique-mass-mean"></td><td id="physique-mass-mean-desire"></td><td id="physique-mass-mean-remain"></td><td>kg</td><td></td></tr>
+                        <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta"></td><td id="physique-mass-delta-desire"></td><td id="physique-mass-delta-remain"></td><td>kg</td><td></td></tr>
+                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the healthy body mass"><td>BMI</td><td id="physique-mass-bmi"></td><td id="physique-mass-bmi-desire"></td><td id="physique-mass-bmi-remain"></td><td>kg/m²</td><td></td></tr>
+                        <tr title="Protein from the Consumption breakdown; Desire is the protein band (Settings/Tune), as the Intake Macros card shows it"><td>Pro</td><td id="physique-macro-protein"></td><td id="physique-macro-protein-desire"></td><td id="physique-macro-protein-remain"></td><td>g</td><td></td></tr>
+                        <tr title="Dietary fibre from the Consumption breakdown; Desire is the fibre band"><td>DF</td><td id="physique-macro-fiber"></td><td id="physique-macro-fiber-desire"></td><td id="physique-macro-fiber-remain"></td><td>g</td><td></td></tr>
+                        <tr title="Fat from the Consumption breakdown; Desire is the fat band"><td>Fat</td><td id="physique-macro-fat"></td><td id="physique-macro-fat-desire"></td><td id="physique-macro-fat-remain"></td><td>g</td><td></td></tr>
+                        <tr class="physique-derived-group-end" title="Carbohydrate from the Consumption breakdown; Desire is the carbohydrate band"><td>Carb</td><td id="physique-macro-carb"></td><td id="physique-macro-carb-desire"></td><td id="physique-macro-carb-remain"></td><td>g</td><td></td></tr>
+                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei"></td><td id="physique-tei-desire"></td><td id="physique-tei-remain"></td><td>kcal</td><td></td></tr>
+                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived"></td><td id="physique-tef-desire"></td><td id="physique-tef-derived-remain"></td><td>kcal</td><td></td></tr>
+                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee"></td><td id="physique-aee-desire"></td><td id="physique-aee-remain"></td><td>kcal</td><td></td></tr>
+                        <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation"></td><td id="physique-sleep-deprivation-desire"></td><td id="physique-sleep-deprivation-remain"></td><td>kcal</td><td></td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-mif"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-kat"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-cal"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-adp"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-avg"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                        <tr class="physique-derived-group-end" title="Maintenance: BMR + AEE, the intake that would hold body mass still; Desire is BMR + the desired AEE, as the Status card shows it"><td>M</td><td id="physique-maintenance"></td><td id="physique-maintenance-desire"></td><td id="physique-maintenance-remain"></td><td>kcal</td><td></td></tr>
+                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own desired deficit"><td>D</td><td id="physique-balance"></td><td id="physique-balance-desire"></td><td id="physique-balance-remain"></td><td>kcal</td><td></td></tr>
+                        <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime"></td><td id="physique-mass-delta-prime-desire"></td><td id="physique-mass-delta-prime-remain"></td><td>g</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </form>
     </div>

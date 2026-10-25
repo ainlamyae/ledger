@@ -80,11 +80,11 @@ function renderHealthIntakeChart(entries) {
   const desiredByDay = calorieDesiredSeries(entries, dates);
   const dayDesired = (i) => ({ ...desired, kcal: desiredByDay[i].kcal });
 
-  // Dot colours graded exactly as Caloric Intake's bars (intakeDesiredR, desiredGrade).
+  // Dots graded as Caloric Intake's bars (intakeDesiredR), coloured along the blend.
   const values = dates.map((d) => (byDate.has(d) ? byDate.get(d) : null));
   const weeklyAvg = emaSeries(values);
   const balanceKcal = desiredBalanceKcal(planBodyMassKg(entries));
-  const dotGrades = dates.map((d, i) => desiredGrade(
+  const dotGrades = dates.map((d, i) => desiredGradeBlended(
     intakeDesiredR(values[i], dayDesired(i), balanceKcal),
     intakeDesiredR(weeklyAvg[i], dayDesired(i), balanceKcal),
   ) ?? { name: null, color: chartColor('--chart-good') });

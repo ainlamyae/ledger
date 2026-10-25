@@ -76,7 +76,7 @@ flowchart TD
     TokenCheck -- yes --> HandleAuth["handleAuthChange(token)"]
     TokenCheck -- no --> Silent{"Silent requestAccessToken<br/>(prompt: none) succeeds?"}
     Silent -- yes --> HandleAuth
-    Silent -- no --> SignInBtn["Sign-in banner, prepended over<br/>the still-visible dashboard shell<br/>(showSignInBanner, gate.js) —<br/>not a full-page gate"]
+    Silent -- no --> SignInBtn["Header 🔑 sign-in icon over<br/>the still-visible dashboard shell<br/>(no banner, even on a failed sign-in)"]
     SignInBtn --> Consent["Full OAuth consent prompt"] --> HandleAuth
 
     HandleAuth --> FileCheck{"getActiveSpreadsheetId()<br/>set in localStorage?"}

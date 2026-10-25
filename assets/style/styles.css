@@ -1650,7 +1650,7 @@ th.sortable:hover {
 .leetcode-heatmap-months {
     font-size: var(--text-small);
     color: var(--color-text-muted);
-    margin-bottom: var(--space-xs);
+    margin-top: var(--space-xs);
 }
 
 .leetcode-heatmap-months span {
@@ -3702,6 +3702,9 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     font-weight: 600;
     line-height: 1.2;
     white-space: nowrap;
+    /* Its own height, so a lone digit is a circle. */
+    min-width: calc(1.2em + 2 * var(--space-xs));
+    text-align: center;
 }
 
 .page-tile .page-badge {

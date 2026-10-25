@@ -21,10 +21,6 @@ The footer shows the app version as `vMAJOR.MINOR.PATCH` (e.g. `v3.5.0`).
 - `app.js` fills `#footer-version` from `APP_VERSION`. No runtime call, no build step.
 - The changelog's newest row reads *(this commit)*: a commit can't contain its own id (folding the file in changes it), so the next commit's run fills it in. `node scripts/version.cjs --changelog` rewrites it by hand with every id filled.
 
-## Commit authorship
-
-No co-authors, no names or emails in any commit message: `scripts/hooks/commit-msg` (plain `sh`, no `node` needed) strips every attribution line — any `Something-by:` trailer (`Co-authored-by:`, `Signed-off-by:`, …), any trailer carrying a `<name@email>`, "Generated with/by" lines, 🤖 lines and `noreply@` addresses.
-
 ## Setup (once per clone)
 
 ```sh

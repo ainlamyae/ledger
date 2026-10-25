@@ -174,7 +174,7 @@ function renderHealthSleepChart(entries) {
           pointBackgroundColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           pointBorderColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           yAxisID: 'y',
-          hidden: hidden.has('Sleep Deprivation Effect (dot, green to red)'),
+          hidden: hidden.has('Sleep Deprivation Effect'),
           // Paints on top of the bar it sits on, same convention as the desired caps.
           order: 0,
         },
@@ -242,7 +242,7 @@ function renderHealthSleepChart(entries) {
   renderToggleLegend('health-sleep-legend', rangeByDate.size === 0 ? [] : [
     ...desiredGradeLegend(),
     { name: '7-Day Average Bed & Wake', color: desiredMarkColor() },
-    ...(desiredDeficitKcal !== null ? [{ name: 'Sleep Deprivation Effect (dot, green to red)', color: sleepDeprivationDotColor(SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL / 2) }] : []),
+    ...(desiredDeficitKcal !== null ? [{ name: 'Sleep Deprivation Effect', color: sleepDeprivationDotColor(SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL / 2) }] : []),
   ], () => renderHealthSleepChart(entries));
 }
 

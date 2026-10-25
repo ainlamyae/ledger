@@ -21,7 +21,7 @@ function energyBalanceGrade(balance, isCut, desired, weeklyAvg) {
       ? { name: 'Toward desired', color: chartColor('--chart-good') }
       : { name: 'Away from desired', color: chartColor('--chart-bad') };
   }
-  return desiredGrade(balance / desired, weeklyAvg === null || weeklyAvg === undefined ? null : weeklyAvg / desired);
+  return desiredGradeBlended(balance / desired, weeklyAvg === null || weeklyAvg === undefined ? null : weeklyAvg / desired);
 }
 
 // Each label's sleep-adjusted balance (null on a day with no food logged, or no BMR),

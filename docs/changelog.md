@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.21.0** | feat(charts): blend grade colours and add leetcode daily badge |
+| (this commit) | **3.22.0** | feat(charts): start the calorie trend at an averaged baseline |
+| `9783edb` | **3.21.0** | feat(charts): blend grade colours and add leetcode daily badge |
 | `4889e79` | **3.20.0** | feat(charts): add daily progress heatmap and five-step grading |
 | `545b8e9` | **3.19.0** | feat(physique): add remain column and colour-coded derived amounts |
 | `336175e` | **3.18.0** | feat(physique): show selected BMR, macro rows and M in derived table |

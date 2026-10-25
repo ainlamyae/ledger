@@ -153,7 +153,7 @@ function renderHealthBodyMassChart(entries) {
   const swingKg = lastTrendDate !== undefined ? glycogenSwingKg(byDate.get(lastTrendDate), heightCm, sex) : null;
 
   // Calorie-implied trajectory: same walk the (now-hidden) State Trend & Forecast chart
-  // built — start at the first body-mass reading and advance by each day's calorie balance. Used
+  // built — start at the mean of the run's first L_p days of body mass and advance by each day's calorie balance. Used
   // here for the indigo reference line, the yellow zone, and the Muscle Loss red zone.
   // Requires a full profile (height/age/sex) for BMR; omitted otherwise.
   const calorieTrendMap = new Map();
@@ -191,7 +191,9 @@ function renderHealthBodyMassChart(entries) {
         }
       });
       const cSleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
-      let running = byDate.get(runStartDate);
+      // Starts at the run's first L_p days' mean, so a bloated first day can't skew it.
+      const startWindowEnd = datesInRange(runStartDate, dates[dates.length - 1])[bodyMassSmoothingDays() - 1] ?? dates[dates.length - 1];
+      let running = smoothedBodyMassKg(bodyMassEntries.filter((e) => e.date >= runStartDate && e.date <= startWindowEnd));
       calorieTrendDates.forEach((d) => {
         // Plotted BEFORE this day's own balance is folded in — calorieTrendMap.get(d) is
         // the trajectory as of the START of d (last night's number), and d's own balance

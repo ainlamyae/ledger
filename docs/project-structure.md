@@ -83,7 +83,6 @@ ledger/
 │       └── section-page.js       # Loaded only by the section stubs above
 ├── scripts/
 │   ├── hooks/post-commit              # Stamps version.js and rewrites docs/changelog.md (see docs/versioning.md)
-│   ├── hooks/commit-msg               # Strips co-author and attribution lines
 │   ├── version.cjs                    # Conventional Commits → version (feat = minor, fix = patch)
 │   ├── build_template.py              # Scrubbed demo workbook for the Sheets template
 │   ├── serve.py                       # Local server with GitHub Pages' 404.html fallback

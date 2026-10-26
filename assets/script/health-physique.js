@@ -111,7 +111,7 @@ function updatePhysiqueSleepDuration() {
 // (health-chart.js setStatusEnergyTile), just off the form's own typed
 // fields rather than a saved entry — so what's about to be saved already
 // shows what a short night is costing (or adding to) this day's balance.
-// Falls back to '—' whenever a piece it needs (profile, body mass, calories
+// Left blank whenever a piece it needs (profile, body mass, calories
 // in) isn't there yet. Returns D and its desire, for the save's warning.
 function updatePhysiqueSleepDeprivation(sleepHours) {
   const el = document.getElementById('physique-sleep-deprivation');
@@ -131,27 +131,27 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const bmr = document.getElementById('physique-is-pattern').checked ? {} : physiqueBmrForSave(day.date, day.bodyMass);
   // No Bed/Wake yet: SD = 0, so D and Δm′ still show.
   const energy = physiqueEnergyBalance(day, sleepHours, bmr, { sleepOptional: true });
-  el.textContent = energy ? `${energy.deprivationKcal}` : sleepHours === null ? '0' : '—';
+  el.textContent = energy ? `${energy.deprivationKcal}` : sleepHours === null ? '0' : '';
 
   // TEI, TEF and AEE as typed/estimated for this day, the same three
   // dailyEnergyBalanceKcal weighs against maintenance and SD to land on D —
   // TEF and AEE shown as the expenditures they are (negative), like the
   // Status card's own Digestion/Activity rows. Units are the table's own
   // Unit column, not repeated in each cell's own text.
-  const teiText = day.caloriesIn !== null ? `${day.caloriesIn}` : '—';
+  const teiText = day.caloriesIn !== null ? `${day.caloriesIn}` : '';
   document.getElementById('physique-tei').textContent = privacyMode ? maskDigits(teiText) : teiText;
   // Needs only intake, not the sleep times D does.
   const tefKcal = energy ? energy.tef : day.tef ?? (day.caloriesIn !== null ? Math.round(day.caloriesIn * (1 - tefDivisor())) : null);
-  const tefText = tefKcal !== null ? `${-tefKcal}` : '—';
+  const tefText = tefKcal !== null ? `${-tefKcal}` : '';
   document.getElementById('physique-tef-derived').textContent = privacyMode ? maskDigits(tefText) : tefText;
   const aeeText = `${day.caloriesOut > 0 ? '-' : ''}${day.caloriesOut}`;
   document.getElementById('physique-aee').textContent = privacyMode ? maskDigits(aeeText) : aeeText;
 
   // D (Balance) and Δm′, the mass change it implies (Balance ÷ ~7700 kcal/kg,
   // GENERIC_KCAL_PER_KG_FAT) — same pair the Status card's own D/Δm′ rows show.
-  const dText = energy ? `${energy.balance}` : '—';
+  const dText = energy ? `${energy.balance}` : '';
   document.getElementById('physique-balance').textContent = privacyMode ? maskDigits(dText) : dText;
-  const dmPrimeText = energy ? `${Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000)}` : '—';
+  const dmPrimeText = energy ? `${Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000)}` : '';
   document.getElementById('physique-mass-delta-prime').textContent = privacyMode ? maskDigits(dmPrimeText) : dmPrimeText;
 
   // The Mass figures Save will store (the saved ones while Body Mass is unchanged).
@@ -164,14 +164,14 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     ['mass-delta', mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? mass.m_d : undefined],
     ['mass-bmi', mass.BMI],
   ].forEach(([id, value]) => {
-    const text = value !== undefined ? `${value}` : '—';
+    const text = value !== undefined ? `${value}` : '';
     document.getElementById(`physique-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
   // Only the BMR picked in the Tune; shown negative, as the Status card's: an expenditure.
   const shownBmrKey = selectedBmrKey(bmr);
   [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp'], ['avg', 'BMR_avg']].forEach(([id, key]) => {
-    const text = bmr[key] !== undefined ? `${-bmr[key]}` : '—';
+    const text = bmr[key] !== undefined ? `${-bmr[key]}` : '';
     const cell = document.getElementById(`physique-bmr-${id}`);
     cell.textContent = privacyMode ? maskDigits(text) : text;
     cell.parentElement.hidden = key !== shownBmrKey;
@@ -179,7 +179,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
 
   // M — BMR + AEE, signed as expenditure; its Desire is set with the others below.
   const bmrShown = bmr[shownBmrKey];
-  const mText = bmrShown !== undefined ? `${-Math.round(bmrShown + day.caloriesOut)}` : '—';
+  const mText = bmrShown !== undefined ? `${-Math.round(bmrShown + day.caloriesOut)}` : '';
   document.getElementById('physique-maintenance').textContent = privacyMode ? maskDigits(mText) : mText;
 
   // The day's macros off its Consumption breakdown, floored as the Intake Macros card does.
@@ -188,7 +188,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   [['protein', 'protein'], ['fiber', 'fiber'], ['fat', 'fat'], ['carb', 'carbohydrate']].forEach(([id, key]) => {
     const rows = breakdown.filter((r) => Number.isFinite(r[key]));
     if (rows.length) macroG[id] = Math.floor(rows.reduce((sum, r) => sum + r[key], 0));
-    const text = rows.length ? `${macroG[id]}` : '—';
+    const text = rows.length ? `${macroG[id]}` : '';
     document.getElementById(`physique-macro-${id}`).textContent = privacyMode ? maskDigits(text) : text;
   });
 
@@ -200,7 +200,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   // Calories In/Out are typed, only Body Mass (the desired Activity's own input).
   const setDesire = (id, value) => {
     const cell = document.getElementById(id);
-    const text = value !== null && value !== undefined ? `${value}` : '—';
+    const text = value !== null && value !== undefined ? `${value}` : '';
     cell.textContent = privacyMode ? maskDigits(text) : text;
   };
   const heightCm = getSetting('HEIGHT_CM', null);
@@ -239,7 +239,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   setDesire('physique-balance-desire', balanceDesired);
   setDesire('physique-mass-delta-prime-desire', desiredGPerDay);
 
-  // Remain — Desire − Amount, a band's floor for the macros; "—" once Amount is past Desire.
+  // Remain — Desire − Amount, a band's floor for the macros; blank once Amount is past Desire.
   // `dir` is the way Amount moves toward Desire (+1 up, −1 down; kcal out are negative).
   const downward = bodyMassHealthyIsDownward(healthEntries);
   const massDir = downward ? -1 : 1;
@@ -272,6 +272,12 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const bandTone = (g, band, within) => (within(g, band) || g > band.max ? 'income' : 'expense');
   const isCut = getCalorieDesiredKind(healthEntries) === 'max';
   const carbTone = (g) => (withinCarbBand(g, bands.carb) ? 'income' : g > bands.carb.max ? 'expense' : 'neutral');
+  const balanceGood = energy ? (balanceDesired !== null
+    ? (isCut ? energy.balance <= balanceDesired : energy.balance >= balanceDesired)
+    : (isCut ? energy.balance < 0 : energy.balance > 0)) : null;
+  // BMR: the calibrated BMR above the mean of Mifflin-St Jeor and Katch-McArdle.
+  const bmrGood = [bmr.BMR_cal, bmr.BMR_mif, bmr.BMR_kat].every(Number.isFinite)
+    ? bmr.BMR_cal > (bmr.BMR_mif + bmr.BMR_kat) / 2 : null;
   [
     ['mass-reading', day.bodyMass !== null ? towardHealthy(day.bodyMass, healthyMassKg) : null],
     ['mass-mean', mass.m_avg !== undefined ? towardHealthy(mass.m_avg, healthyMassKg) : null],
@@ -282,15 +288,22 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     ['macro-fat', macroG.fat !== undefined ? bandTone(macroG.fat, bands.fat, withinFatBand) : null],
     ['macro-carb', macroG.carb !== undefined ? carbTone(macroG.carb) : null],
     ['tei', day.caloriesIn !== null ? withinCalorieDesired(day.caloriesIn, calDesired) : null],
+    // TEF no more than its desire; M at least its desire (the BMR is shared, so it's AEE's test).
+    ['tef-derived', tefKcal !== null ? tefKcal <= digDesired : null],
     ['aee', actDesiredKcal !== null ? day.caloriesOut >= actDesiredKcal : null],
     ['sleep-deprivation', sdKcal !== null ? sdKcal <= 0 : null],
-    ['balance', energy ? (balanceDesired !== null
-      ? (isCut ? energy.balance <= balanceDesired : energy.balance >= balanceDesired)
-      : (isCut ? energy.balance < 0 : energy.balance > 0)) : null],
+    ...['mif', 'kat', 'cal', 'adp', 'avg'].map((id) => [`bmr-${id}`, bmrGood]),
+    ['maintenance', bmrShown !== undefined && actDesiredKcal !== null ? day.caloriesOut >= actDesiredKcal : null],
+    ['balance', balanceGood],
+    // Δm′ is D in grams, so it reads as D does.
+    ['mass-delta-prime', balanceGood],
   ].forEach(([id, good]) => {
     const cell = document.getElementById(`physique-${id}`);
     cell.classList.remove('income', 'expense', 'neutral');
-    if (good !== null) cell.classList.add(typeof good === 'string' ? good : good ? 'income' : 'expense');
+    const tone = good === null ? null : typeof good === 'string' ? good : good ? 'income' : 'expense';
+    if (tone) cell.classList.add(tone);
+    // The row's last cell: ✅ for green, ❌ otherwise (Carb under its band too).
+    cell.parentElement.lastElementChild.textContent = tone === 'income' ? '✅' : tone ? '❌' : '';
   });
   return { balance: energy ? energy.balance : null, balanceDesired };
 }
@@ -1429,9 +1442,8 @@ function physiqueField(id) {
 // on a pattern; unticking Pattern brings back whatever was typed.
 function syncPhysiquePatternMode() {
   const isPattern = document.getElementById('physique-is-pattern').checked;
-  document.getElementById('physique-date-row').hidden = isPattern;
-  document.getElementById('physique-sleep-row').hidden = isPattern;
-  document.getElementById('physique-derived-details').hidden = isPattern;
+  document.getElementById('physique-day-details').hidden = isPattern;
+  document.getElementById('physique-derived').hidden = isPattern;
   document.getElementById('physique-workout-details').hidden = isPattern;
   const workoutTable = document.getElementById('physique-activity-breakdown');
   workoutTable.hidden = isPattern || !document.getElementById('physique-activity-breakdown-body').children.length;
@@ -1475,11 +1487,10 @@ function openPhysiqueForm(entry, duplicate = false) {
     ? formTitleWithDate(baseTitle, physiqueField('date').value)
     : baseTitle;
 
-  // Derived is open on every day. Consumption and Workout start collapsed on any
-  // day but today; a Pattern opens Consumption too.
+  // Day, Consumption and Workout start collapsed on any day but today; a Pattern opens Consumption too.
   const isToday = physiqueField('date').value === isoFromDate(new Date());
   const isPattern = document.getElementById('physique-is-pattern').checked;
-  document.getElementById('physique-derived-details').open = true;
+  document.getElementById('physique-day-details').open = isToday;
   document.getElementById('physique-consumption-details').open = isToday || isPattern;
   document.getElementById('physique-workout-details').open = isToday;
 

@@ -37,4 +37,4 @@ Every date reads `YYYY-MM-DD` (`2026-10-04`), or `YYYY-MM` on a month axis — t
 | `label (definition): number unit` | `TEI (Total Energy Intake): 829 kcal` |
 | Sign only on negatives | Calorie Balance lines |
 | 7-Day Average is an amount, no `/day` | `1309 kcal`, `134 g`; sleep averages are clock times |
-| 7-Day Trend is a slope, always `/day` | `-71 g/day` |
+| L_p-Day Trend is a slope, always `/day` | `-71 g/day` |

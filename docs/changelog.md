@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.23.0** | feat(physique): reorganise the form into labelled cards |
+| (this commit) | **3.24.0** | feat(leetcode): add video links, durations and watch progress |
+| `939b4d5` | **3.23.0** | feat(physique): reorganise the form into labelled cards |
 | `1eabba7` | **3.22.0** | feat(charts): start the calorie trend at an averaged baseline |
 | `9783edb` | **3.21.0** | feat(charts): blend grade colours and add leetcode daily badge |
 | `4889e79` | **3.20.0** | feat(charts): add daily progress heatmap and five-step grading |

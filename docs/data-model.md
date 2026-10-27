@@ -166,7 +166,7 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 
 ## `LeetCode` (created by the app)
 
-- Columns (found by header name, so they can be moved; a missing one is added at the end on save): Date, Problem, Category (the roadmap's, e.g. Arrays & Hashing), Difficulty (Easy/Medium/Hard), LeetCode (link), NeetCode Video (link), Notes. One row per solve; the LeetCode link (or the Problem name) ticks that problem off the NeetCode 250 roadmap. Written `RAW`.
+- Columns (found by header name, so they can be moved; a missing one is added at the end on save): Date, Problem, Category (the roadmap's, e.g. Arrays & Hashing), Difficulty (Easy/Medium/Hard), LeetCode (link), NeetCode Page (link; an old NeetCode Video header is read and renamed on the next save), YouTube Video (link), Duration (the video's minutes), Notes. One row per solve; the LeetCode link (or the Problem name) ticks that problem off the NeetCode 250 roadmap. Written `RAW`.
 
 ## `Watchlist` (created by the app)
 

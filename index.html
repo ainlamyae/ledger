@@ -2019,7 +2019,7 @@
             </div>
 
             <!-- NeetCode 250 by category, ticked from the LeetCode tab (track-leetcode.js). -->
-            <!-- As Health's Progress card: solved and left of the NeetCode 250, then time to finish. -->
+            <!-- As Health's Progress card: solved and left of the NeetCode 250, video hours, then time to finish. -->
             <div class="card body-mass-progress-meter" id="leetcode-progress-meter">
                 <h3>Progress</h3>
                 <div class="body-mass-progress-meter-track-wrap">
@@ -2037,6 +2037,23 @@
                         <span id="leetcode-progress-meter-remaining" class="body-mass-progress-meter-pct">—</span>
                         <span class="body-mass-progress-meter-stat-label">left</span>
                     </span>
+                </div>
+
+                <!-- Video time: hours of the solved problems' videos out of all 250. -->
+                <div class="body-mass-progress-meter time-progress-meter" id="leetcode-minutes-meter">
+                    <div class="body-mass-progress-meter-track">
+                        <div class="body-mass-progress-meter-fill"></div>
+                    </div>
+                    <div class="body-mass-progress-meter-stats">
+                        <span class="body-mass-progress-meter-stat">
+                            <span id="leetcode-minutes-meter-done" class="body-mass-progress-meter-pct">—</span>
+                            <span class="body-mass-progress-meter-stat-label">watched</span>
+                        </span>
+                        <span class="body-mass-progress-meter-stat">
+                            <span id="leetcode-minutes-meter-remaining" class="body-mass-progress-meter-pct">—</span>
+                            <span class="body-mass-progress-meter-stat-label">to watch</span>
+                        </span>
+                    </div>
                 </div>
 
                 <div class="body-mass-progress-meter time-progress-meter" id="leetcode-time-meter">
@@ -3336,8 +3353,14 @@
             <label>LeetCode
                 <input type="url" id="leetcode-link" placeholder="Filled from the problem">
             </label>
-            <label>NeetCode Video
-                <input type="url" id="leetcode-video" placeholder="Filled from the problem">
+            <label>NeetCode Page
+                <input type="url" id="leetcode-neetcode" placeholder="Filled from the problem">
+            </label>
+            <label>YouTube Video
+                <input type="url" id="leetcode-youtube" placeholder="Filled from the problem">
+            </label>
+            <label>Duration
+                <input type="number" id="leetcode-minutes" min="1" step="1" inputmode="numeric" placeholder="Filled from the problem">
             </label>
             <label>Notes
                 <input type="text" id="leetcode-notes" placeholder="Optional">

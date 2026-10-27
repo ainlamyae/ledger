@@ -820,8 +820,10 @@ kbd {
     box-shadow: var(--shadow-card);
 }
 
+/* Same corner as the input boxes. */
 .card {
     font-size: var(--card-text-size);
+    border-radius: var(--radius-md);
 }
 
 .card h3 {
@@ -1332,10 +1334,7 @@ td:has(.btn) {
     border-top: 1px dashed var(--color-border);
 }
 
-/* Both Calculate tables sit between two fields and are where the day's four
-   totals are now read, the fields themselves being hidden. The field above
-   supplies only its own .35rem, so without a matching gap below, the next
-   label would sit against the Total row's border. */
+/* Gap between the stacked table cards at the form's foot. */
 #physique-calc-breakdown,
 #physique-activity-breakdown {
     margin-bottom: var(--space-s);
@@ -1386,6 +1385,27 @@ td:has(.btn) {
 #physique-calc-breakdown td:not(:first-child),
 #physique-activity-breakdown th:not(:first-child),
 #physique-activity-breakdown td:not(:first-child) {
+    white-space: nowrap;
+}
+
+/* All three Physique tables fill their cards: Name takes the spare width, and shrinks first on a phone. */
+#physique-calc-breakdown table,
+#physique-activity-breakdown table,
+#physique-derived-table {
+    width: 100%;
+}
+
+#physique-calc-breakdown th:first-child,
+#physique-calc-breakdown td:first-child,
+#physique-activity-breakdown th:first-child,
+#physique-activity-breakdown td:first-child,
+#physique-derived-table th:first-child,
+#physique-derived-table td:first-child {
+    width: 100%;
+}
+
+#physique-derived-table th:not(:first-child),
+#physique-derived-table td:not(:first-child) {
     white-space: nowrap;
 }
 
@@ -2810,7 +2830,7 @@ html.home-hub .page-tiles,
 #insight-prompt-details summary,
 #analysis-prompt-details summary,
 #analysis-descriptive-details summary,
-#physique-derived-details summary,
+#physique-day-details summary,
 #physique-consumption-details summary,
 #physique-workout-details summary {
     cursor: pointer;
@@ -2818,13 +2838,13 @@ html.home-hub .page-tiles,
 }
 
 /* Matches .app-form label's own size/spacing, since these replace a label. */
-#physique-derived-details,
+#physique-day-details,
 #physique-consumption-details,
 #physique-workout-details {
     margin-bottom: var(--space-xs);
 }
 
-#physique-derived-details summary,
+#physique-day-details summary,
 #physique-consumption-details summary,
 #physique-workout-details summary {
     font-size: var(--text-small);

@@ -1008,6 +1008,17 @@ kbd {
     cursor: pointer;
 }
 
+/* Taller rows on touch so a finger hits one option. */
+@media (pointer: coarse) {
+    .autocomplete-suggestions li {
+        padding: var(--space-m) var(--space-s);
+    }
+
+    .autocomplete-suggestions li + li {
+        border-top: 1px solid var(--color-border);
+    }
+}
+
 .location-picker-manual {
     display: flex;
     gap: var(--space-s);

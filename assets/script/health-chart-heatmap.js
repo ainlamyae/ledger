@@ -25,7 +25,7 @@ function renderHealthHeatmap(entries) {
   const hasData = balanceData.some((v) => v !== null);
   const desired = hasData ? desiredBalanceKcal(planBodyMassKg(entries)) : null;
   const isCut = getCalorieDesiredKind(entries) === 'max';
-  const weeklyAvg = emaSeries(balanceData);
+  const weeklyAvg = emaSeries(balanceData, bodyMassSmoothingDays());
   const hidden = legendHiddenNames('health-heatmap-legend');
 
   grid.innerHTML = '';

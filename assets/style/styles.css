@@ -1661,9 +1661,8 @@ th.sortable:hover {
     fill: var(--color-income);
 }
 
-/* LeetCode's past-year heatmap: 7 day rows, one column per week (--weeks, set in
-   JS), stretched to the card, 11px at least. 1 solve is dark green, the busiest
-   day near light green, none an empty square. */
+/* LeetCode's heatmap: 7 day rows, one column per week (--weeks, set in JS), 11px
+   cells at least. LeetCode's days hold their solve count, shaded inline by minutes. */
 .leetcode-heatmap,
 .leetcode-heatmap-months {
     display: grid;
@@ -1695,10 +1694,13 @@ th.sortable:hover {
     border: 1px solid var(--color-border);
 }
 
-.leetcode-heatmap > .heat-1 { background: color-mix(in srgb, var(--color-income) 45%, black); }
-.leetcode-heatmap > .heat-2 { background: color-mix(in srgb, var(--color-income) 70%, black); }
-.leetcode-heatmap > .heat-3 { background: var(--color-income); }
-.leetcode-heatmap > .heat-4 { background: color-mix(in srgb, var(--color-income) 55%, white); }
+#leetcode-heatmap > span {
+    display: grid;
+    place-items: center;
+    font-size: calc(var(--cell, 11px) * 0.6);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
 
 /* Health Chart's copy of the grid, one column per week of the range, each day coloured
    inline as its Calorie Balance bar. It sits in a .chart-box, the same height as every

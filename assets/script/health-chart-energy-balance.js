@@ -12,7 +12,7 @@ const ENERGY_BALANCE_TICK_KCAL = 250;
 let healthEnergyBalanceChart = null;
 
 // Graded against the desired balance D (desiredGrade): the day's balance ÷ D, lifted by
-// its 7-day average's. No desired figure means nothing to grade against, so it falls back
+// its L_p-day average's. No desired figure means nothing to grade against, so it falls back
 // to the sign alone, toward or away from the way the user is headed.
 function energyBalanceGrade(balance, isCut, desired, weeklyAvg) {
   if (balance === null) return { name: null, color: chartColor('--chart-neutral') };
@@ -143,7 +143,7 @@ function renderHealthEnergyBalanceChart(entries) {
   const desired = hasData ? desiredBalanceKcal(planBodyMassKg(entries)) : null;
 
   // balanceData already nulls the unlogged days, so they sit out of the fit.
-  const weeklyAvg = emaSeries(balanceData);
+  const weeklyAvg = emaSeries(balanceData, bodyMassSmoothingDays());
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-energy-balance-legend');
@@ -155,7 +155,7 @@ function renderHealthEnergyBalanceChart(entries) {
   const shownBalance = maskHiddenClasses(balanceData, barClasses, hidden);
   const shown = [
     ...shownBalance,
-    ...(hidden.has('7-Day Average') ? [] : weeklyAvg),
+    ...(hidden.has(healthAvgName()) ? [] : weeklyAvg),
     ...(desired === null || hidden.has(`Desired ${word}`) ? [] : [desired]),
   ].filter((v) => v !== null);
   const maxDeficit = Math.max(0, ...shown.map((v) => -v));
@@ -179,7 +179,7 @@ function renderHealthEnergyBalanceChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: hidden.has(healthAvgName()) }),
         // A dash per day, the idiom Caloric Intake uses for its own desired intake: a continuous
         // line reads as one shared limit, a mark on each bar says the desired figure belongs to
         // that day.
@@ -187,7 +187,7 @@ function renderHealthEnergyBalanceChart(entries) {
           type: 'bar',
           label: 'Desired for the day',
           data: labels.map(() => [desired - desiredHalf, desired + desiredHalf]),
-          // Cyan, as Body Mass's healthy mark, so it can't pass for the 7-Day Average.
+          // Cyan, as Body Mass's healthy mark, so it can't pass for the L_p-Day Average.
           backgroundColor: chartColor('--chart-cyan'),
           grouped: false,
           isDesiredLine: true,
@@ -263,7 +263,7 @@ function renderHealthEnergyBalanceChart(entries) {
               }
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) {
-                lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
+                lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} kcal`);
               }
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -304,7 +304,7 @@ function renderHealthEnergyBalanceChart(entries) {
       { name: 'Toward desired', color: chartColor('--chart-good') },
       { name: 'Away from desired', color: chartColor('--chart-bad') },
     ]),
-    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: healthAvgName(), color: desiredMarkColor() },
     ...(desired !== null ? [{ name: `Desired ${word}`, color: chartColor('--chart-cyan') }] : []),
   ], () => renderHealthEnergyBalanceChart(entries));
 }

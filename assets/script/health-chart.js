@@ -610,7 +610,7 @@ function arrivalHealthyKg(healthyKg, bodyMassKg, heightCm, sex, isDownward) {
 const MACRO_G_TICK_STEPS = [5, 10, 25, 50, 100, 200, 500, 1000];
 // A day is rarely on its desired figure to the kcal or gram, so it is graded by r, the
 // share of the desired change it made (1 exactly the desired figure, 0 none of it, below
-// 0 the wrong way), on five steps instead of met or missed. The 7-day average's own r
+// 0 the wrong way), on five steps instead of met or missed. The L_p-day average's own r
 // lifts a day to one step under the week's grade: one off day in a week on pace reads
 // as a dip, not a failure. Body Mass, Calorie Balance, Intake, Caloric Intake, Physical
 // Activity, Sleep and the heatmap all grade this way.

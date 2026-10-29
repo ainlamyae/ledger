@@ -280,7 +280,11 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     : (caloriesToday !== null ? Math.round(caloriesToday * (1 - tefDivisor())) : null);
   const digDesired = Math.round(calDesired.kcal * (1 - tefDivisor()));
   const digText = digKcal !== null ? `${-digKcal} / ${-digDesired} kcal` : '—';
-  document.getElementById('today-status-digestion-value').textContent = privacyMode ? maskDigits(digText) : digText;
+  const digestionEl = document.getElementById('today-status-digestion-value');
+  digestionEl.classList.remove('income', 'expense');
+  digestionEl.textContent = privacyMode ? maskDigits(digText) : digText;
+  // Green past its desire toward the mass goal: more TEF on a cut, less on a bulk.
+  if (digKcal !== null) digestionEl.classList.add((isCut ? digKcal >= digDesired : digKcal <= digDesired) ? 'income' : 'expense');
 
   const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 

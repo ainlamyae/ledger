@@ -1,7 +1,7 @@
 // Health Chart's heatmap, LeetCode's grid over the range buttons' days (healthDateRange):
 // one cell per day, columns are weeks (Monday first), the last one holding the range's
 // end. A day's colour is its Calorie Balance bar's (energyBalanceGrade); a day with no
-// food logged is an empty square.
+// food logged is an empty square. Each cell holds its day of the month.
 
 function renderHealthHeatmap(entries) {
   const grid = document.getElementById('health-heatmap');
@@ -33,6 +33,7 @@ function renderHealthHeatmap(entries) {
   dates.forEach((iso, i) => {
     const balance = balanceData[i];
     const cell = document.createElement('span');
+    cell.textContent = String(dateFromIso(iso).getDate());
     if (balance === null) {
       cell.title = `${iso}: no calories logged`;
     } else {
@@ -40,6 +41,7 @@ function renderHealthHeatmap(entries) {
       if (!hidden.has(grade.name)) {
         cell.className = 'heat-graded';
         cell.style.background = grade.color;
+        cell.style.color = '#fff';
       }
       const text = `${iso}: ${balance > 0 ? '+' : ''}${Math.round(balance)} kcal · ${grade.name}`;
       cell.title = privacyMode ? maskDigits(text) : text;

@@ -75,7 +75,7 @@ function renderHealthCaloriesChart(entries) {
 
   // Each bar against its OWN day's figure, graded by how much of the desired balance D
   // the day's intake leaves (intakeDesiredR, desiredGrade): Beat, Desired met, Near,
-  // Short of and Missed desired, lifted by the 7-day average's own grade so one off day
+  // Short of and Missed desired, lifted by the L_p-day average's own grade so one off day
   // in a week on pace reads as a dip. No shaded out-of-bounds region: the desired figure
   // moves by tens of kcal across a window, far too little for a filled zone to follow.
   // An unlogged day plots as 0 and takes the green — a missing log, not a fast, and
@@ -83,7 +83,7 @@ function renderHealthCaloriesChart(entries) {
   const values = dates.map((d) => byDate.get(d) || 0);
   // Off the LOGGED days only, so `values`' zero-for-nothing-logged stand-ins don't count
   // as days of fasting.
-  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), bodyMassSmoothingDays());
   const balanceKcal = desiredBalanceKcal(planBodyMassKg(entries));
   const barGrades = dates.map((d, i) => (byDate.has(d) ? desiredGrade(
     intakeDesiredR(values[i], dayDesired(i), balanceKcal),
@@ -121,7 +121,7 @@ function renderHealthCaloriesChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: hidden.has(healthAvgName()) }),
         {
           type: 'bar',
           label: `${desired.word} for the day`,
@@ -175,7 +175,7 @@ function renderHealthCaloriesChart(entries) {
                 const kcal = bmrByKey[key].get(items[0].label);
                 if (kcal !== undefined) lines.push(`${bmrHoverLabel(key)}: ${Math.round(kcal)} kcal`);
               });
-              if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
+              if (weeklyAvg[i] !== null) lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -198,7 +198,7 @@ function renderHealthCaloriesChart(entries) {
   // Swatches under the chart, named as in the hover; BMR names without their symbols.
   renderToggleLegend('health-calories-legend', dates.length === 0 ? [] : [
     ...desiredGradeLegend(),
-    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: healthAvgName(), color: desiredMarkColor() },
     { name: `Desired ${desired.word}`, color: chartColor('--chart-cyan') },
     ...BMR_CAPS.filter(({ key }) => bmrByKey[key].size > 0).map(({ key, color }) => ({ name: BMR_DEFINITIONS[key], color })),
   ], () => renderHealthCaloriesChart(entries));

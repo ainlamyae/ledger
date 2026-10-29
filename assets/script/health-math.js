@@ -124,6 +124,11 @@ function bodyMassSmoothingDays() {
   return getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
 }
 
+// Health Chart's average lines, over L_p days as Body Mass's trend.
+function healthAvgName(suffix = '') {
+  return `${bodyMassSmoothingDays()}-Day Average${suffix}`;
+}
+
 function smoothedBodyMassKg(entries, windowDays = bodyMassSmoothingDays()) {
   const readings = entries
     .filter((e) => e.category === 'Body Mass' && e.amount !== null)

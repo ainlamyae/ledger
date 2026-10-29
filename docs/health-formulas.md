@@ -32,9 +32,9 @@
 | `DESIRED_GRADES` (`health-chart.js`) | r ≥ 1.1 / 0.85 / 0.6 / 0.3 | **Beat desired** (dark green), **Desired met** (green), **Near desired** (lime), **Short of desired** (amber), **Missed desired** (red), by r, the share of the desired change a day made. Calorie Balance, Intake, Caloric Intake, Physical Activity, Sleep and the heatmap |
 | Calorie Balance r | balance ÷ D | No D: toward (green) or away (red) by the sign |
 | Intake / Caloric Intake r | (intake − M) ÷ D, M = desired intake − D (`intakeDesiredR`) | The same share as Calorie Balance's, read off the intake. No D: cap ÷ intake (floor: intake ÷ floor) |
-| Sleep r | hours slept ÷ `SLEEP_DESIRED_HOURS` | Lifted by the 7-day average duration |
+| Sleep r | hours slept ÷ `SLEEP_DESIRED_HOURS` | Lifted by the L_p-day average duration |
 | Physical Activity r | burn ÷ desired burn (`getActivityDesiredKcal`) | No body mass: violet, unscored |
-| 7-Day lift | `desiredGrade(r, weekR)` | A day grades at least one step under its 7-day average's (Physical Activity: the 7-Day Average Burn), so one off day in a week on pace reads as a dip, not red |
+| L_p-Day lift | `desiredGrade(r, weekR)` | A day grades at least one step under its L_p-day average's (Physical Activity: the L_p-Day Average Burn), so one off day in a week on pace reads as a dip, not red |
 
 ## Body
 

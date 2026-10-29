@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.25.0** | feat(charts): simplify body mass dots and use an L_p-day trend |
+| (this commit) | **3.26.0** | feat(charts): smooth averages over L_p and redesign leetcode heatmap |
+| `23d30d5` | **3.25.0** | feat(charts): simplify body mass dots and use an L_p-day trend |
 | `5e0c6c2` | **3.24.0** | feat(leetcode): add video links, durations and watch progress |
 | `939b4d5` | **3.23.0** | feat(physique): reorganise the form into labelled cards |
 | `1eabba7` | **3.22.0** | feat(charts): start the calorie trend at an averaged baseline |

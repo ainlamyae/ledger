@@ -853,17 +853,26 @@ function renderDeficitVsBmrField(plan) {
 // depends on the BMR picked. Kept for the Calculations row under m∞_adp.
 let tuneBmrAverage = null;
 
+// BMR_cal clamped to the equations as Physique stores it (clampBmrCal), so Tune's BMR_avg
+// and Health's Progress card read the same figure. Null without a calibration.
+function tuneClampedBmrCal(bmr, calibration, parts) {
+  if (!calibration?.result.ok) return null;
+  const figures = Object.fromEntries(parts.map(([key, v]) => [key, Math.round(v)]));
+  return clampBmrCal(Math.round(bmr + calibration.result.offsetKcal), figures);
+}
+
 function computeTuneBmrAverage({ bodyMassKg, heightCm, age, sex, bmr, calibration }) {
   const parts = [];
   if (age !== null) parts.push(['BMR_mif', bmrKcal(bodyMassKg, heightCm, age, sex, 'mifflin')]);
   parts.push(['BMR_kat', bmrKcal(bodyMassKg, heightCm, age, sex, 'katch')]);
-  if (calibration?.result.ok) parts.push(['BMR_cal', bmr + calibration.result.offsetKcal]);
   const { pctPerWeek, pctCap } = readAdaptationInputs();
   const bodyMassEntries = physiqueAsHealthEntries().filter((e) => e.category === 'Body Mass' && e.amount !== null);
   const daysOnDiet = daysSinceFirstWeighIn(bodyMassEntries);
   if (pctPerWeek !== null && pctCap !== null && daysOnDiet !== null) {
     parts.push(['BMR_adp', bmr * (1 - adaptationFraction(daysOnDiet, pctPerWeek, pctCap))]);
   }
+  const bmrCal = tuneClampedBmrCal(bmr, calibration, parts);
+  if (bmrCal !== null) parts.splice(parts.length - (parts.at(-1)[0] === 'BMR_adp' ? 1 : 0), 0, ['BMR_cal', bmrCal]);
   const rounded = parts.filter(([, v]) => Number.isFinite(v)).map(([key, v]) => [key, Math.round(v)]);
   if (!rounded.length) return null;
   const avg = Math.round(rounded.reduce((sum, [, v]) => sum + v, 0) / rounded.length);
@@ -1018,9 +1027,10 @@ function renderFormulaPreviewOnLeanChoice() {
   setComputedField('formula-bmr-katch', String(Math.round(bmrKcal(bodyMassKg, heightCm, age, sex, 'katch'))));
   // Live over n_p × L_p, on the plain active equation (whatever basis is picked below).
   const calibration = tuneBmrCalibration();
-  setComputedField('formula-bmr-cal', calibration?.result.ok ? String(Math.round(bmr + calibration.result.offsetKcal)) : '—');
   // BMR_avg, and the ratio the bmr_avg basis previews on (BMR_AVG_RATIO_PREVIEW_KEY, never saved).
   tuneBmrAverage = computeTuneBmrAverage({ bodyMassKg, heightCm, age, sex, bmr, calibration });
+  const tuneBmrCal = tuneBmrAverage?.parts.find(([key]) => key === 'BMR_cal')?.[1];
+  setComputedField('formula-bmr-cal', tuneBmrCal !== undefined ? String(tuneBmrCal) : '—');
   setComputedField('formula-bmr-avg', tuneBmrAverage ? String(tuneBmrAverage.avg) : '—');
   if (tuneBmrAverage && bmr > 0) preview[BMR_AVG_RATIO_PREVIEW_KEY] = tuneBmrAverage.avg / bmr;
   // The same window's working, under Calculations.
@@ -1035,6 +1045,9 @@ function renderFormulaPreviewOnLeanChoice() {
     heightCm, age, sex, met, kappa, formula, tef, bodyMassKg,
   };
   const bmrRows = formulaBmrRows(bmr, { bodyMassKg, heightCm, age, sex, formula });
+  // Under the BMR basis, as calorieDesiredDetail's: TAU, HEALTHY_MASS and DELTA_M solve
+  // from it, so their t matches EIN's and Health's Progress card.
+  const basisBmr = withFormulaOverrides(preview, () => applyBmrBasis(bmr));
 
   noteEl.textContent = '';
   saveBtn.disabled = false;
@@ -1134,7 +1147,7 @@ function renderFormulaPreviewOnLeanChoice() {
     let tau;
     if (knownField === 'ein') {
       // Eᵢₙ×(1−f) = BMR + m·MET·τ·κ/ε − D  ⇒  m·MET·τ·κ/ε = Eᵢₙ×(1−f) + D − BMR
-      const activityKcalNeeded = einKcal * divisor + deficit - bmr;
+      const activityKcalNeeded = einKcal * divisor + deficit - basisBmr;
       tau = Math.round((activityKcalNeeded * ML_O2_PER_KCAL) / (met * bodyMassKg * kappa));
     } else {
       // t and m_g typed instead of Eᵢₙ: no algebra isolates τ here (see
@@ -1164,7 +1177,7 @@ function renderFormulaPreviewOnLeanChoice() {
     // When t was typed, Eᵢₙ was never given — it's exactly what the solved τ
     // implies via the same flat equation the 'ein' direction runs forward, thermic
     // divisor and all.
-    const einForDisplay = knownField === 'ein' ? einKcal : (bmr + activityKcal - deficit) / divisor;
+    const einForDisplay = knownField === 'ein' ? einKcal : (basisBmr + activityKcal - deficit) / divisor;
 
     // Pin-aware only in the Eᵢₙ-known direction, where t is computed forward from the rate.
     // The other direction SOLVED τ from a typed t through the constant-Eᵢₙ decay identity
@@ -1204,7 +1217,7 @@ function renderFormulaPreviewOnLeanChoice() {
       ...renderWeeklyLossPctField(),
       ['D', formulaDeficitTraceLine(sleepInfo)],
       ...renderTefField(),
-      ...formulaEinRows(coefficients, { bmr, activityKcal, deficit, einKcal: einForDisplay }),
+      ...formulaEinRows(coefficients, { bmr: basisBmr, activityKcal, deficit, einKcal: einForDisplay }),
       ...renderHealthyBmiField(),
     );
     if (proj.journey !== 'pct') {
@@ -1217,7 +1230,7 @@ function renderFormulaPreviewOnLeanChoice() {
     renderFormulaSubstituted(rows, {
       intakeKcal: einForDisplay,
       coefficients,
-      bmr,
+      bmr: basisBmr,
       activityKcal,
       deficit,
       // Typed in the t-known direction, projected in the other — either way it's the horizon
@@ -1256,7 +1269,7 @@ function renderFormulaPreviewOnLeanChoice() {
     // applies (sleepDeprivationKcal, same as DELTA_M and the BMR_cal calculation):
     // how much of that fixed deficit ISN'T real fat loss because of short sleep.
     const currentActivityKcal = withFormulaOverrides(preview, () => activityDesiredKcal(bodyMassKg));
-    const currentDeficit = bmr + currentActivityKcal - einKcal * coefficients.tefDivisor;
+    const currentDeficit = basisBmr + currentActivityKcal - einKcal * coefficients.tefDivisor;
     const healthyMassPlanSleepHours = preview.PLAN_SLEEP_HOURS;
     const healthyMassSleepDesiredHours = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
     const healthyMassDeprivationKcal = sleepDeprivationKcal(currentDeficit, healthyMassPlanSleepHours, healthyMassSleepDesiredHours) ?? 0;
@@ -1277,7 +1290,7 @@ function renderFormulaPreviewOnLeanChoice() {
       // box can have in a mode that solves for a future one.
       intakeKcal: einKcal,
       coefficients,
-      bmr,
+      bmr: basisBmr,
       activityKcal: currentActivityKcal,
       deficit: currentDeficit,
       days,
@@ -1312,8 +1325,10 @@ function renderFormulaPreviewOnLeanChoice() {
   // The thermic share comes off the intake before the deficit is read from it: D is what's
   // left of maintenance once the intake and its own digestion cost are accounted for, which
   // is the same Eᵢₙ×(1−f) = BMR + Eₐ − D line every other mode solves.
-  const deficit = bmr + activityKcal - einForDisplay * coefficients.tefDivisor;
-  const deltaMSolved = Math.round((deficit * 7 / GENERIC_KCAL_PER_KG_FAT) * 100) / 100;
+  const deficit = basisBmr + activityKcal - einForDisplay * coefficients.tefDivisor;
+  // Three decimals, as weeklyFatLossKgFromPct: two turned a 0.95% pin's 0.735 into 0.74,
+  // read back as 0.96%, and t landed a day off Health's Progress card.
+  const deltaMSolved = Math.round((deficit * 7 / GENERIC_KCAL_PER_KG_FAT) * 1000) / 1000;
   if (!Number.isFinite(deltaMSolved)) { cantCompute(); return; }
   setComputedField('formula-weekly-loss', String(deltaMSolved));
 
@@ -1354,7 +1369,7 @@ function renderFormulaPreviewOnLeanChoice() {
     renderFormulaSubstituted([
       ...bmrRows,
       ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
-      ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
+      ...formulaDeficitRows(coefficients, { bmr: basisBmr, activityKcal, einKcal: einForDisplay, deficit }),
       ...renderTefField(),
       ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
       ...(deprivationKcal > 0 ? [['SD', `|${Math.round(deficit)}| × (1 − η)  =  ${deprivationKcal} kcal/day of it not real fat loss`]] : []),
@@ -1368,7 +1383,7 @@ function renderFormulaPreviewOnLeanChoice() {
     ], {
       intakeKcal: einForDisplay,
       coefficients,
-      bmr,
+      bmr: basisBmr,
       activityKcal,
       deficit,
       days: proj.status === 'ok' ? proj.days : null,
@@ -1391,7 +1406,7 @@ function renderFormulaPreviewOnLeanChoice() {
     ...renderTefField(),
     ...bmrRows,
     ['AEE', `${met} × ${bodyMassKg} × ${tau} × ${kappa} / 200  =  ${Math.round(activityKcal)} kcal/day`],
-    ...formulaDeficitRows(coefficients, { bmr, activityKcal, einKcal: einForDisplay, deficit }),
+    ...formulaDeficitRows(coefficients, { bmr: basisBmr, activityKcal, einKcal: einForDisplay, deficit }),
     ['Δm', `${Math.round(deficit)} × 7 / 7700  =  ${deltaMSolved} kg/week`],
     ...(deprivationKcal > 0 ? [['SD', `|${Math.round(deficit)}| × (1 − η)  =  ${deprivationKcal} kcal/day of it not real fat loss`]] : []),
     ...renderHealthyBmiField(),
@@ -1399,7 +1414,7 @@ function renderFormulaPreviewOnLeanChoice() {
   ], {
     intakeKcal: einForDisplay,
     coefficients,
-    bmr,
+    bmr: basisBmr,
     activityKcal,
     deficit,
     days,

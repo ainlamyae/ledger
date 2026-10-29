@@ -66,7 +66,7 @@ function renderHealthFatChart(entries) {
     ]
     : [desiredLine(band.min, `${band.min} g desired`)];
 
-  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), bodyMassSmoothingDays());
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-fat-legend');
@@ -74,7 +74,7 @@ function renderHealthFatChart(entries) {
     : c === FAT_OVER_BAND_COLOR ? 'Over desired' : 'Under desired'));
   const shownValues = maskHiddenClasses(values, barClasses, hidden);
   const shownDesired = hidden.has('Desired Fat') && (band.max === band.min || hidden.has('Desired Fat band')) ? [] : [band.max, band.min];
-  const shownAvg = hidden.has('7-Day Average') ? [] : weeklyAvg;
+  const shownAvg = hidden.has(healthAvgName()) ? [] : weeklyAvg;
   const gTopFat = Math.max(...shownValues, ...shownAvg, ...shownDesired, 1);
   const gStepFat = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopFat / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
   const gMaxFat = Math.ceil(gTopFat / gStepFat) * gStepFat;
@@ -91,7 +91,7 @@ function renderHealthFatChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: hidden.has(healthAvgName()) }),
         // The band's two fill edges go with the band entry, every other mark with the desired one.
         ...desiredDatasets.map((ds) => ({ ...ds, hidden: hidden.has(ds.label.endsWith('band edge') ? 'Desired Fat band' : 'Desired Fat') })),
       ],
@@ -115,7 +115,7 @@ function renderHealthFatChart(entries) {
                 ? [`G_min (Desired Fat, lower end): ${band.min} g`, `G_max (Desired Fat, upper end): ${band.max} g`]
                 : [`G_min (Desired Fat): ${band.min} g`];
               const i = items[0]?.dataIndex;
-              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -147,7 +147,7 @@ function renderHealthFatChart(entries) {
     { name: 'Within desired', color: chartColor('--chart-good') },
     { name: 'Over desired', color: FAT_OVER_BAND_COLOR },
     { name: 'Under desired', color: chartColor('--chart-bad') },
-    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: healthAvgName(), color: desiredMarkColor() },
     { name: 'Desired Fat', color: chartColor('--chart-cyan') },
     ...(band.max > band.min ? [{ name: 'Desired Fat band', color: chartColor('--chart-good', 0.25) }] : []),
   ], () => renderHealthFatChart(entries));

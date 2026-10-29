@@ -2074,14 +2074,16 @@
                 </div>
             </div>
 
-            <!-- Spaced as Car Service's cards: Past Year (solves per day, like LeetCode's
-                 profile), Roadmap (a node per category, opening its card below), then the cards. -->
+            <!-- Spaced as Car Service's cards: Daily Progress (solves per day since the first,
+                 sized as Health Chart's), Roadmap (a node per category, opening its card below), then the cards. -->
             <div class="donut-grid health-metrics-grid">
                 <div class="card">
-                    <h3 id="leetcode-heatmap-title">Past Year</h3>
-                    <div class="table-responsive" id="leetcode-heatmap-scroll">
-                        <div class="leetcode-heatmap" id="leetcode-heatmap"></div>
-                        <div class="leetcode-heatmap-months" id="leetcode-heatmap-months"></div>
+                    <h3>Daily Progress</h3>
+                    <div class="chart-box chart-box-flush health-heatmap-box">
+                        <div class="table-responsive" id="leetcode-heatmap-scroll">
+                            <div class="leetcode-heatmap" id="leetcode-heatmap"></div>
+                            <div class="leetcode-heatmap-months" id="leetcode-heatmap-months"></div>
+                        </div>
                     </div>
                 </div>
 

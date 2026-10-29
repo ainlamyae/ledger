@@ -614,8 +614,10 @@ function handleConsumptionSuggestionKey(e) {
     [...list.children].forEach((li, i) => li.classList.toggle('active', i === consumptionSuggestionIndex));
     list.children[consumptionSuggestionIndex].scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter' || e.key === 'Tab') {
+    // Only an arrow-picked suggestion; otherwise the key acts as usual.
+    if (consumptionSuggestionIndex < 0) { hideConsumptionSuggestions(); return; }
     e.preventDefault();
-    applyConsumptionSuggestion(consumptionSuggestionMatches[consumptionSuggestionIndex] ?? consumptionSuggestionMatches[0]);
+    applyConsumptionSuggestion(consumptionSuggestionMatches[consumptionSuggestionIndex]);
   } else if (e.key === 'Escape') {
     hideConsumptionSuggestions();
   }
@@ -736,8 +738,9 @@ function handleWorkoutSuggestionKey(e) {
     [...list.children].forEach((li, i) => li.classList.toggle('active', i === workoutSuggestionIndex));
     list.children[workoutSuggestionIndex].scrollIntoView({ block: 'nearest' });
   } else if (e.key === 'Enter' || e.key === 'Tab') {
+    if (workoutSuggestionIndex < 0) { hideWorkoutSuggestions(); return; }
     e.preventDefault();
-    applyWorkoutSuggestion(workoutSuggestionMatches[workoutSuggestionIndex] ?? workoutSuggestionMatches[0]);
+    applyWorkoutSuggestion(workoutSuggestionMatches[workoutSuggestionIndex]);
   } else if (e.key === 'Escape') {
     hideWorkoutSuggestions();
   }

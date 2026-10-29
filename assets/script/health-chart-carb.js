@@ -65,7 +65,7 @@ function renderHealthCarbChart(entries) {
     ]
     : [desiredLine(band.min, `${band.min} g desired`)];
 
-  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), bodyMassSmoothingDays());
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-carb-legend');
@@ -73,7 +73,7 @@ function renderHealthCarbChart(entries) {
     : c === chartColor('--chart-bad') ? 'Over desired' : 'Under desired'));
   const shownValues = maskHiddenClasses(values, barClasses, hidden);
   const shownDesired = hidden.has('Desired Carbohydrate') && (band.max === band.min || hidden.has('Desired Carbohydrate band')) ? [] : [band.max, band.min];
-  const shownAvg = hidden.has('7-Day Average') ? [] : weeklyAvg;
+  const shownAvg = hidden.has(healthAvgName()) ? [] : weeklyAvg;
   const gTopCarb = Math.max(...shownValues, ...shownAvg, ...shownDesired, 1);
   const gStepCarb = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopCarb / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
   const gMaxCarb = Math.ceil(gTopCarb / gStepCarb) * gStepCarb;
@@ -90,7 +90,7 @@ function renderHealthCarbChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: hidden.has(healthAvgName()) }),
         // The band's two fill edges go with the band entry, every other mark with the desired one.
         ...desiredDatasets.map((ds) => ({ ...ds, hidden: hidden.has(ds.label.endsWith('band edge') ? 'Desired Carbohydrate band' : 'Desired Carbohydrate') })),
       ],
@@ -114,7 +114,7 @@ function renderHealthCarbChart(entries) {
                 ? [`C_min (Desired Carbohydrate, lower end): ${band.min} g`, `C_max (Desired Carbohydrate, upper end): ${band.max} g`]
                 : [`C_min (Desired Carbohydrate): ${band.min} g`];
               const i = items[0]?.dataIndex;
-              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -146,7 +146,7 @@ function renderHealthCarbChart(entries) {
     { name: 'Within desired', color: chartColor('--chart-good') },
     { name: 'Over desired', color: chartColor('--chart-bad') },
     { name: 'Under desired', color: CARB_UNDER_BAND_COLOR },
-    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: healthAvgName(), color: desiredMarkColor() },
     { name: 'Desired Carbohydrate', color: chartColor('--chart-cyan') },
     ...(band.max > band.min ? [{ name: 'Desired Carbohydrate band', color: chartColor('--chart-good', 0.25) }] : []),
   ], () => renderHealthCarbChart(entries));

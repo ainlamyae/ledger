@@ -102,17 +102,17 @@ function renderHealthSleepChart(entries) {
   });
 
   // Each night graded by hours slept ÷ desired sleep (desiredGradeBlended), lifted to one step
-  // under its 7-day average duration's grade, as every other Health chart.
+  // under its L_p-day average duration's grade, as every other Health chart.
   const durations = dates.map((d) => rangeByDate.get(d)?.durationHr ?? null);
-  const durationAvg = emaSeries(durations);
+  const durationAvg = emaSeries(durations, bodyMassSmoothingDays());
   const nightGrades = durations.map((hr, i) => (hr === null ? null
     : desiredGradeBlended(hr / sleepDesired, durationAvg[i] === null ? null : durationAvg[i] / sleepDesired)));
   const barColors = nightGrades.map((g) => g?.color ?? null);
 
   // Fit in AXIS units, not clock minutes: the shift has already unwrapped midnight, so
   // a plain fit works where clock times would average 23:30 and 00:30 into midday.
-  const bedAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null));
-  const wakeAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null));
+  const bedAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null), bodyMassSmoothingDays());
+  const wakeAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null), bodyMassSmoothingDays());
 
   // Deprivation Effect = Desired Deficit × (1 - Sleep Efficiency Factor) — the kcal of
   // the plan's own deficit (desiredBalanceKcal, not the day's actual eaten-vs-burned
@@ -141,7 +141,7 @@ function renderHealthSleepChart(entries) {
   const nightClasses = nightGrades.map((g) => g?.name ?? null);
   const shownPairs = dates.map((d, i) => (hidden.has(nightClasses[i]) ? null : shiftedByDate.get(d)))
     .filter(Boolean);
-  if (!hidden.has('7-Day Average Bed & Wake')) {
+  if (!hidden.has(healthAvgName(' Bed & Wake'))) {
     dates.forEach((d, i) => {
       if (bedAvg[i] !== null && wakeAvg[i] !== null) shownPairs.push({ start: bedAvg[i], end: wakeAvg[i] });
     });
@@ -160,8 +160,8 @@ function renderHealthSleepChart(entries) {
           yAxisID: 'y1',
           order: 2,
         },
-        trendLineDataset('7-Day Avg Bed', bedAvg, { yAxisID: 'y1', hidden: hidden.has('7-Day Average Bed & Wake') }),
-        trendLineDataset('7-Day Avg Wake', wakeAvg, { yAxisID: 'y1', hidden: hidden.has('7-Day Average Bed & Wake') }),
+        trendLineDataset(`${bodyMassSmoothingDays()}-Day Avg Bed`, bedAvg, { yAxisID: 'y1', hidden: hidden.has(healthAvgName(' Bed & Wake')) }),
+        trendLineDataset(`${bodyMassSmoothingDays()}-Day Avg Wake`, wakeAvg, { yAxisID: 'y1', hidden: hidden.has(healthAvgName(' Bed & Wake')) }),
         {
           type: 'line',
           label: 'Deprivation Effect',
@@ -211,8 +211,8 @@ function renderHealthSleepChart(entries) {
               const i = items[0]?.dataIndex;
               if (i === undefined || bedAvg[i] === null) return '';
               const lines = [
-                `7-Day Average Bed: ${formatClockTime24(sleepAxisClockMin(bedAvg[i]))}`,
-                `7-Day Average Wake: ${formatClockTime24(sleepAxisClockMin(wakeAvg[i]))}`,
+                `${healthAvgName(' Bed')}: ${formatClockTime24(sleepAxisClockMin(bedAvg[i]))}`,
+                `${healthAvgName(' Wake')}: ${formatClockTime24(sleepAxisClockMin(wakeAvg[i]))}`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
@@ -238,10 +238,10 @@ function renderHealthSleepChart(entries) {
     },
   });
 
-  // Swatches under the chart; both 7-Day lines share one colour, so one entry.
+  // Swatches under the chart; both L_p-Day lines share one colour, so one entry.
   renderToggleLegend('health-sleep-legend', rangeByDate.size === 0 ? [] : [
     ...desiredGradeLegend(),
-    { name: '7-Day Average Bed & Wake', color: desiredMarkColor() },
+    { name: healthAvgName(' Bed & Wake'), color: desiredMarkColor() },
     ...(desiredDeficitKcal !== null ? [{ name: 'Sleep Deprivation Effect', color: sleepDeprivationDotColor(SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL / 2) }] : []),
   ], () => renderHealthSleepChart(entries));
 }

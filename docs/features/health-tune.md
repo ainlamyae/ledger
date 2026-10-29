@@ -5,7 +5,7 @@
 ## At a glance
 
 - A block of its own after Insight (formerly the Tune); it does BMR calibration itself.
-- `n_p` × `L_p` (default 4 × 7 days, ending yesterday) give `BMR_cal` live. Save stores only `n_p` and `L_p`; **Update** recomputes every day's stored `BMR_cal`.
+- `n_p` × `L_p` (default 4 × 7 days, ending yesterday) give `BMR_cal` live, clamped to within 10% of `BMR_mif`, `BMR_kat` and `BMR_adp` as Physique stores it (`clampBmrCal`). Every Solve-for mode reads BMR under the chosen basis and keeps `Δm` to three decimals, so `t` and the arrival date match Health's Progress card. Save stores only `n_p` and `L_p`; **Update** recomputes every day's stored `BMR_cal`.
 - Both BMR choices offer `BMR_mif`, `BMR_kat`, `BMR_cal`, `BMR_adp`, `BMR_avg`, always in step; adaptation rows (λ, λt_max, BMR_adp, m∞_adp) sit under `BMR_cal`, then a divider and `BMR_avg` (average basal metabolic rate).
 - Variable order: `σ`, `h`, `a`, `m`, `L_p`, `m̄`, the same order as Insight profiles and the Plan prompt.
 - `m̄` is the `L_p`-day rolling average body mass everywhere: `m̄ = (1/L_p) × Σ m(t−i), i = 0…L_p−1`, re-smoothed live as `L_p` is typed.

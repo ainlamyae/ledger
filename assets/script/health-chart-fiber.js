@@ -54,7 +54,7 @@ function renderHealthFiberChart(entries) {
     ]
     : [capFor(band.min, `${band.min} g desired`)];
 
-  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), bodyMassSmoothingDays());
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-fiber-legend');
@@ -62,7 +62,7 @@ function renderHealthFiberChart(entries) {
     : c === FIBER_OVER_BAND_COLOR ? 'Over desired' : 'Under desired'));
   const shownValues = maskHiddenClasses(values, barClasses, hidden);
   const shownDesired = hidden.has('Desired Dietary Fiber') && (band.max === band.min || hidden.has('Desired Dietary Fiber band')) ? [] : [band.max, band.min];
-  const shownAvg = hidden.has('7-Day Average') ? [] : weeklyAvg;
+  const shownAvg = hidden.has(healthAvgName()) ? [] : weeklyAvg;
   const gTopFiber = Math.max(...shownValues, ...shownAvg, ...shownDesired, 1);
   const gStepFiber = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopFiber / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
   const gMaxFiber = Math.ceil(gTopFiber / gStepFiber) * gStepFiber;
@@ -79,7 +79,7 @@ function renderHealthFiberChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: hidden.has(healthAvgName()) }),
         // The band's two fill edges go with the band entry, every other mark with the desired one.
         ...desiredDatasets.map((ds) => ({ ...ds, hidden: hidden.has(ds.label.endsWith('band edge') ? 'Desired Dietary Fiber band' : 'Desired Dietary Fiber') })),
       ],
@@ -103,7 +103,7 @@ function renderHealthFiberChart(entries) {
                 ? [`F_min (Desired Dietary Fiber, lower end): ${band.min} g`, `F_max (Desired Dietary Fiber, upper end): ${band.max} g`]
                 : [`F_min (Desired Dietary Fiber): ${band.min} g`];
               const i = items[0]?.dataIndex;
-              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -135,7 +135,7 @@ function renderHealthFiberChart(entries) {
     { name: 'Within desired', color: chartColor('--chart-good') },
     { name: 'Over desired', color: FIBER_OVER_BAND_COLOR },
     { name: 'Under desired', color: chartColor('--chart-bad') },
-    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: healthAvgName(), color: desiredMarkColor() },
     { name: 'Desired Dietary Fiber', color: chartColor('--chart-cyan') },
     ...(band.max > band.min ? [{ name: 'Desired Dietary Fiber band', color: chartColor('--chart-good', 0.25) }] : []),
   ], () => renderHealthFiberChart(entries));

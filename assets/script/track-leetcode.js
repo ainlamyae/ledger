@@ -26,8 +26,6 @@ let editingLeetcodeRow = null;
 let leetcodeListenersAttached = false;
 let editLeetcodeLog = null;
 let openLeetcodeCategory = null; // one at a time; all closed on load
-// A phone shows the heatmap's last 16 weeks, not the year.
-const leetcodePhoneQuery = window.matchMedia('(max-width: 820px)');
 
 async function initLeetcode() {
   if (!leetcodeListenersAttached) {
@@ -36,7 +34,6 @@ async function initLeetcode() {
     editLeetcodeLog = routedRowEdit('leetcode', () => allLeetcodeLogs, (l) => `${l.date} ${l.name}`, openLeetcodeForm);
     document.getElementById('leetcode-cancel-btn').addEventListener('click', closeLeetcodeForm);
     onFormSubmit('leetcode-form', submitLeetcodeForm);
-    leetcodePhoneQuery.addEventListener('change', renderLeetcodeHeatmap);
     document.getElementById('leetcode-problem').addEventListener('change', () => fillLeetcodeLinks());
     populateSelect(document.getElementById('leetcode-category'), Object.keys(NEETCODE_ROADMAP), '');
     const options = document.getElementById('leetcode-problem-options');
@@ -205,23 +202,25 @@ function renderLeetcodeProgress(solves) {
   etaEl.textContent = `→ ${isoFromDate(eta)}`;
 }
 
-// Solves per day for the past year (16 weeks on a phone): columns are weeks
-// (Monday first), the last one holding today; 1 solve is level 1, the busiest day level 4.
+// Solves per day from the first solve's Monday to today, as Health Chart's All:
+// columns are weeks, the last one holding today. Each day shows its solve count,
+// shaded by its video minutes from empty (0) to dark green (the longest day).
 function renderLeetcodeHeatmap() {
-  const weeks = leetcodePhoneQuery.matches ? 16 : 53;
-  document.getElementById('leetcode-heatmap-title').textContent = leetcodePhoneQuery.matches ? 'Past 16 Weeks' : 'Past Year';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const start = new Date(today);
-  start.setDate(start.getDate() - (weeks - 1) * 7);
+  const first = allLeetcodeLogs.map((l) => l.date).filter(Boolean).sort()[0];
+  const start = first ? dateFromIso(first) : new Date(today);
   start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const startIso = isoFromDate(start);
+  const weeks = Math.max(1, Math.ceil((Math.round((today - start) / 86400000) + 1) / 7));
 
-  const perDay = new Map();
+  const perDay = new Map(); // date -> {count, minutes}
   allLeetcodeLogs.forEach((l) => {
-    if (l.date >= startIso) perDay.set(l.date, (perDay.get(l.date) || 0) + 1);
+    const day = perDay.get(l.date) || { count: 0, minutes: 0 };
+    day.count += 1;
+    day.minutes += l.minutes || NEETCODE_BY_SLUG.get(l.slug)?.minutes || 0;
+    perDay.set(l.date, day);
   });
-  const max = Math.max(1, ...perDay.values());
+  const maxMinutes = Math.max(1, ...[...perDay.values()].map((day) => day.minutes));
 
   const grid = document.getElementById('leetcode-heatmap');
   const months = document.getElementById('leetcode-heatmap-months');
@@ -229,10 +228,16 @@ function renderLeetcodeHeatmap() {
   months.innerHTML = '';
   for (let d = new Date(start), i = 0; d <= today; d.setDate(d.getDate() + 1), i++) {
     const iso = isoFromDate(d);
-    const count = perDay.get(iso) || 0;
+    const { count = 0, minutes = 0 } = perDay.get(iso) || {};
     const cell = document.createElement('span');
-    if (count) cell.className = `heat-${max === 1 ? 1 : 1 + Math.round((3 * (count - 1)) / (max - 1))}`;
-    cell.title = `${iso}: ${count} solve${count === 1 ? '' : 's'}`;
+    if (count) {
+      const pct = Math.round((minutes / maxMinutes) * 100);
+      cell.className = 'heat-graded';
+      cell.style.background = `color-mix(in srgb, color-mix(in srgb, var(--color-income) 45%, black) ${pct}%, transparent)`;
+      if (pct >= 50) cell.style.color = '#fff';
+      cell.textContent = String(count);
+    }
+    cell.title = `${iso}: ${count} solve${count === 1 ? '' : 's'} · ${minutes} min`;
     grid.appendChild(cell);
     // A month's name over the first week it starts in.
     if (d.getDate() <= 7 && d.getDay() === 1) {

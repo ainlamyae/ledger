@@ -82,7 +82,7 @@ function renderHealthIntakeChart(entries) {
 
   // Dots graded as Caloric Intake's bars (intakeDesiredR), coloured along the blend.
   const values = dates.map((d) => (byDate.has(d) ? byDate.get(d) : null));
-  const weeklyAvg = emaSeries(values);
+  const weeklyAvg = emaSeries(values, bodyMassSmoothingDays());
   const balanceKcal = desiredBalanceKcal(planBodyMassKg(entries));
   const dotGrades = dates.map((d, i) => desiredGradeBlended(
     intakeDesiredR(values[i], dayDesired(i), balanceKcal),
@@ -109,7 +109,7 @@ function renderHealthIntakeChart(entries) {
   const restingKcalValues = BMR_CAPS.filter(({ key }) => !hidden.has(BMR_DEFINITIONS[key]))
     .flatMap(({ key }) => [...bmrByKey[key].values()]);
   const axis = calorieAxisBounds(
-    shownValues.filter((v) => v !== null).concat(stackTops.filter((v) => v > 0), hidden.has('7-Day Average') ? [] : weeklyAvg.filter((v) => v !== null)),
+    shownValues.filter((v) => v !== null).concat(stackTops.filter((v) => v > 0), hidden.has(healthAvgName()) ? [] : weeklyAvg.filter((v) => v !== null)),
     (hidden.has(`Desired ${desired.word}`) ? [] : desiredByDay.map((b) => b.kcal)).concat(restingKcalValues),
   );
   const capHalf = (axis.max - axis.min) * 0.004;
@@ -120,7 +120,7 @@ function renderHealthIntakeChart(entries) {
       labels: dates,
       datasets: [
         ...macroDatasets,
-        trendLineDataset('7-Day Average', weeklyAvg, { yAxisID: 'y1', hidden: hidden.has('7-Day Average') }),
+        trendLineDataset(healthAvgName(), weeklyAvg, { yAxisID: 'y1', hidden: hidden.has(healthAvgName()) }),
         {
           type: 'bar',
           label: `${desired.word} for the day`,
@@ -182,7 +182,7 @@ function renderHealthIntakeChart(entries) {
               const lines = [`Desired ${desired.word}: ${desiredByDay[i].kcal} kcal`];
               const kcal = bmrByKey[tuneBmrKey].get(items[0].label);
               if (kcal !== undefined) lines.push(`${bmrHoverLabel(bmrKeyByDate.get(items[0].label))}: ${Math.round(kcal)} kcal`);
-              if (weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} kcal`);
+              if (weeklyAvg[i] !== null) lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -206,7 +206,7 @@ function renderHealthIntakeChart(entries) {
   renderToggleLegend('health-intake-legend', dates.length === 0 ? [] : [
     ...INTAKE_MACROS.map(({ label }, m) => ({ name: label, color: macroColors[m] })),
     ...desiredGradeLegend(),
-    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: healthAvgName(), color: desiredMarkColor() },
     { name: `Desired ${desired.word}`, color: chartColor('--chart-cyan') },
     ...BMR_CAPS.filter(({ key }) => bmrByKey[key].size > 0).map(({ key, color }) => ({ name: BMR_DEFINITIONS[key], color })),
   ], () => renderHealthIntakeChart(entries));

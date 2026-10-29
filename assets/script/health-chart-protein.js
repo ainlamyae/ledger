@@ -47,7 +47,7 @@ function renderHealthProteinChart(entries) {
 
   // Zero-based and auto-topped, so the span is whatever is tallest — a bar or the band.
   const capHalf = desiredCapHalf(Math.max(band.max, ...values, 1));
-  // Cyan, the desired mark's colour on the other Health charts, apart from the 7-Day Average.
+  // Cyan, the desired mark's colour on the other Health charts, apart from the L_p-Day Average.
   const capFor = (value, label) => desiredCapDataset(label, new Array(dates.length).fill(value), capHalf, { isDesiredLine: true, backgroundColor: chartColor('--chart-cyan') });
 
   const desiredDatasets = band.max > band.min
@@ -60,7 +60,7 @@ function renderHealthProteinChart(entries) {
     : [capFor(band.min, `${band.min} g desired`)];
 
   // Logged days only, so the zero stand-ins don't pull the week under the band's floor.
-  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)));
+  const weeklyAvg = emaSeries(dates.map((d) => (byDate.has(d) ? byDate.get(d) : null)), bodyMassSmoothingDays());
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-protein-legend');
@@ -68,7 +68,7 @@ function renderHealthProteinChart(entries) {
     : c === PROTEIN_OVER_BAND_COLOR ? 'Over desired' : 'Under desired'));
   const shownValues = maskHiddenClasses(values, barClasses, hidden);
   const shownDesired = hidden.has('Desired Protein') && (band.max === band.min || hidden.has('Desired Protein band')) ? [] : [band.max, band.min];
-  const shownAvg = hidden.has('7-Day Average') ? [] : weeklyAvg;
+  const shownAvg = hidden.has(healthAvgName()) ? [] : weeklyAvg;
   const gTopProtein = Math.max(...shownValues, ...shownAvg, ...shownDesired, 1);
   const gStepProtein = MACRO_G_TICK_STEPS.find((s) => Math.ceil(gTopProtein / s) <= BODY_MASS_MAX_GRIDLINES) ?? MACRO_G_TICK_STEPS[MACRO_G_TICK_STEPS.length - 1];
   const gMaxProtein = Math.ceil(gTopProtein / gStepProtein) * gStepProtein;
@@ -85,7 +85,7 @@ function renderHealthProteinChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset('7-Day Average', weeklyAvg, { hidden: hidden.has('7-Day Average') }),
+        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: hidden.has(healthAvgName()) }),
         // The band's two fill edges go with the band entry, every other mark with the desired one.
         ...desiredDatasets.map((ds) => ({ ...ds, hidden: hidden.has(ds.label.endsWith('band edge') ? 'Desired Protein band' : 'Desired Protein') })),
       ],
@@ -114,7 +114,7 @@ function renderHealthProteinChart(entries) {
                 ? [`P_min (Desired Protein, lower end): ${band.min} g`, `P_max (Desired Protein, upper end): ${band.max} g`]
                 : [`P_min (Desired Protein): ${band.min} g`];
               const i = items[0]?.dataIndex;
-              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`7-Day Average: ${Math.round(weeklyAvg[i])} g`);
+              if (i !== undefined && weeklyAvg[i] !== null) lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} g`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -146,7 +146,7 @@ function renderHealthProteinChart(entries) {
     { name: 'Within desired', color: chartColor('--chart-good') },
     { name: 'Over desired', color: PROTEIN_OVER_BAND_COLOR },
     { name: 'Under desired', color: chartColor('--chart-bad') },
-    { name: '7-Day Average', color: desiredMarkColor() },
+    { name: healthAvgName(), color: desiredMarkColor() },
     { name: 'Desired Protein', color: chartColor('--chart-cyan') },
     ...(band.max > band.min ? [{ name: 'Desired Protein band', color: chartColor('--chart-good', 0.25) }] : []),
   ], () => renderHealthProteinChart(entries));

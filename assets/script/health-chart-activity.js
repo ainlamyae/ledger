@@ -100,7 +100,7 @@ function renderHealthActivityChart(entries) {
   // Scored against what that day's own body mass would burn at ACTIVITY_DESIRED_MIN — or
   // the pinned calorie burn, if that's what's pinned instead — via the same
   // getActivityDesiredKcal the activity tile uses, so the two can't disagree. Graded by
-  // burn ÷ desired burn (desiredGradeBlended), lifted to one step under the 7-Day Average Burn's
+  // burn ÷ desired burn (desiredGradeBlended), lifted to one step under the L_p-Day Average Burn's
   // grade. Without a body mass there's no desired burn, so the dot stays neutral violet.
   const dotGrade = (date, kcal, weekKcal) => {
     const bodyMassKg = activityBodyMassForDate.get(date) ?? null;
@@ -114,7 +114,7 @@ function renderHealthActivityChart(entries) {
   const caloriesData = dates.map((date) => (caloriesByDate.has(date) ? caloriesByDate.get(date) : null));
   // On the kcal axis, not the minutes one — Desired Burn lives there, and it's what the
   // week is compared against.
-  const weeklyBurnAvg = emaSeries(caloriesData);
+  const weeklyBurnAvg = emaSeries(caloriesData, bodyMassSmoothingDays());
   const dotGrades = dates.map((date, i) => dotGrade(date, caloriesData[i], weeklyBurnAvg[i]));
   const caloriesDataset = {
     type: 'line',
@@ -165,7 +165,7 @@ function renderHealthActivityChart(entries) {
 
   // Negated like the dots it's fit to.
   const weeklyBurnDataset = trendLineDataset(
-    '7-Day Average Burn',
+    healthAvgName(' Burn'),
     weeklyBurnAvg.map((v) => (v === null ? null : -v)),
     { yAxisID: 'y1' },
   );
@@ -174,7 +174,7 @@ function renderHealthActivityChart(entries) {
   // name, burn dots by their colour's name.
   const hidden = legendHiddenNames('health-activity-legend');
   activityDatasets.forEach((ds) => { ds.hidden = hidden.has(ds.label); });
-  weeklyBurnDataset.hidden = hidden.has('7-Day Average Burn');
+  weeklyBurnDataset.hidden = hidden.has(healthAvgName(' Burn'));
   desiredLineDataset.hidden = hidden.has('Desired Burn');
   const dotClasses = dotGrades.map((g) => g.name);
   caloriesDataset.data = maskHiddenClasses(caloriesDataset.data, dotClasses, hidden);
@@ -228,7 +228,7 @@ function renderHealthActivityChart(entries) {
               if (i === undefined) return '';
               const lines = [];
               if (desiredBurnKcal[i] !== null) lines.push(`AEE (Desired Activity Energy Expenditure): ${-Math.round(desiredBurnKcal[i])} kcal`);
-              if (weeklyBurnAvg[i] !== null) lines.push(`7-Day Average Burn: ${-Math.round(weeklyBurnAvg[i])} kcal`);
+              if (weeklyBurnAvg[i] !== null) lines.push(`${healthAvgName(' Burn')}: ${-Math.round(weeklyBurnAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -264,7 +264,7 @@ function renderHealthActivityChart(entries) {
   renderToggleLegend('health-activity-legend', !hasData ? [] : [
     ...descriptions.map((d, i) => ({ name: shortActivityLabel(d), color: descriptionColors[i] })),
     ...desiredGradeLegend(),
-    { name: '7-Day Average Burn', color: desiredMarkColor() },
+    { name: healthAvgName(' Burn'), color: desiredMarkColor() },
     { name: 'Desired Burn', color: chartColor('--chart-cyan') },
   ], () => renderHealthActivityChart(entries));
 }

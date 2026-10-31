@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.28.0** | feat(nutrition): list top USDA matches when completing a food |
+| (this commit) | **3.29.0** | feat(leetcode): add a printable Python cheat sheet |
+| `6792674` | **3.28.0** | feat(nutrition): list top USDA matches when completing a food |
 | `c0532d5` | **3.27.0** | feat(charts): show dates in heatmap cells and grade TEF by goal |
 | `b0c0ef6` | **3.26.0** | feat(charts): smooth averages over L_p and redesign leetcode heatmap |
 | `23d30d5` | **3.25.0** | feat(charts): simplify body mass dots and use an L_p-day trend |

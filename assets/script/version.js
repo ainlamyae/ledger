@@ -1,2 +1,2 @@
 // Written by scripts/version.cjs (post-commit hook); do not edit.
-const APP_VERSION = '3.28.0';
+const APP_VERSION = '3.29.0';

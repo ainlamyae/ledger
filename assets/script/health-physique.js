@@ -1737,8 +1737,13 @@ async function recalculatePhysiqueDay(p, bodyMassKg) {
     if (dayMacros.fat !== null) day.fat = dayMacros.fat;
     if (dayMacros.carbohydrate !== null) day.carbohydrate = dayMacros.carbohydrate;
     if (tef) day.tef = tef.tefKcal;
-    // Tidied as the form's Calculate does: duplicates combined, sorted by calories, names capitalized.
-    day.consumption = combineAndSortConsumptionText(breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n')).text;
+    // Tidied as the form's Calculate does: duplicates combined, sorted by the
+    // breakdown's real calories (so the box matches the Breakdown table even for
+    // USDA/AI-priced items), names capitalized.
+    day.consumption = combineAndSortConsumptionText(
+      breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n'),
+      breakdownCaloriesLookup(breakdown),
+    ).text;
     day.breakdown = breakdownToJson(breakdown);
     day.caloriesIn = calories;
     day.proteinIn = protein;

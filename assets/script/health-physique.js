@@ -254,7 +254,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     ['mass-bmi', mass.BMI, bmiDesired, 1, massDir],
     ...Object.entries(bands).map(([id, band]) => [`macro-${id}`, macroG[id], band.min, 0, 1]),
     ['tei', day.caloriesIn, calDesired.kcal, 0, 1],
-    ['tef-derived', tefKcal !== null ? -tefKcal : null, -digDesired, 0, -1],
+    ['tef-derived', tefKcal !== null ? -tefKcal : null, -digDesired, 0, massDir],
     ['aee', -day.caloriesOut, actDesiredKcal !== null ? -actDesiredKcal : null, 0, -1],
     ['sleep-deprivation', sdKcal, 0, 0, -1],
     ['maintenance', bmrShown !== undefined ? -Math.round(bmrShown + day.caloriesOut) : null, mDesired, 0, -1],
@@ -288,8 +288,8 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     ['macro-fat', macroG.fat !== undefined ? bandTone(macroG.fat, bands.fat, withinFatBand) : null],
     ['macro-carb', macroG.carb !== undefined ? carbTone(macroG.carb) : null],
     ['tei', day.caloriesIn !== null ? withinCalorieDesired(day.caloriesIn, calDesired) : null],
-    // TEF no more than its desire; M at least its desire (the BMR is shared, so it's AEE's test).
-    ['tef-derived', tefKcal !== null ? tefKcal <= digDesired : null],
+    // TEF past its desire toward the mass goal (more when losing); M at least its desire (AEE's test).
+    ['tef-derived', tefKcal !== null ? (downward ? tefKcal >= digDesired : tefKcal <= digDesired) : null],
     ['aee', actDesiredKcal !== null ? day.caloriesOut >= actDesiredKcal : null],
     ['sleep-deprivation', sdKcal !== null ? sdKcal <= 0 : null],
     ...['mif', 'kat', 'cal', 'adp', 'avg'].map((id) => [`bmr-${id}`, bmrGood]),

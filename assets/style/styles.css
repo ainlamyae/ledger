@@ -1694,7 +1694,8 @@ th.sortable:hover {
     border: 1px solid var(--color-border);
 }
 
-#leetcode-heatmap > span {
+#leetcode-heatmap > span,
+#health-heatmap > span {
     display: grid;
     place-items: center;
     font-size: calc(var(--cell, 11px) * 0.6);

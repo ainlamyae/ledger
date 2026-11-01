@@ -42,6 +42,7 @@ async function initLeetcode() {
       option.value = p.name;
       options.appendChild(option);
     });
+    renderLeetcodeCheatsheet();
   }
   await refreshLeetcode();
 }
@@ -83,6 +84,24 @@ async function refreshLeetcode() {
     }).filter((l) => l.slug);
   }
   renderLeetcode();
+}
+
+function renderLeetcodeCheatsheet() {
+  // One table, each category a th row, so text stays the card's size.
+  const body = document.getElementById('leetcode-cheatsheet-body');
+  body.innerHTML = '';
+  Object.entries(LEETCODE_CHEATSHEET).forEach(([category, rows]) => {
+    const row = body.insertRow();
+    row.className = 'leetcode-cheatsheet-start';
+    const th = row.appendChild(document.createElement('th'));
+    th.colSpan = 2;
+    th.textContent = category;
+    rows.forEach(([code, , use]) => {
+      const tr = body.insertRow();
+      tr.insertCell().appendChild(document.createElement('code')).textContent = code;
+      tr.insertCell().textContent = use;
+    });
+  });
 }
 
 // Slug -> its solves, oldest first.

@@ -1300,7 +1300,8 @@ td:has(.btn) {
    otherwise just stop. Activity's table does the same where the Group changes. */
 #breakdown-table tr.breakdown-category-start td,
 .workout-table-strength tr.workout-group-start td,
-#transactions-table tr.tx-receipt-start td {
+#transactions-table tr.tx-receipt-start td,
+#leetcode-cheatsheet-body tr.leetcode-cheatsheet-start th {
     border-top: 1px solid var(--color-border);
 }
 

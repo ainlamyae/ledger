@@ -60,6 +60,7 @@ ledger/
 │       ├── track-application.js       # Applications cards
 │       ├── track-leetcode.js           # LeetCode roadmap and solve log
 │       ├── track-leetcode-roadmap.js   # NeetCode 250 problem list, videos and lengths
+│       ├── track-leetcode-cheatsheet.js # Python used across NeetCode's solutions
 │       ├── health-insight-wellness.js            # Insight shared helpers + Wellness mode
 │       ├── health-insight-food.js       # Insight Food mode
 │       ├── health-insight-micronutrient.js # Insight Micronutrient mode

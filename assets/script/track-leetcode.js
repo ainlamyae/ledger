@@ -31,6 +31,7 @@ async function initLeetcode() {
   if (!leetcodeListenersAttached) {
     leetcodeListenersAttached = true;
     document.getElementById('add-leetcode-btn').addEventListener('click', () => openLeetcodeForm());
+    document.getElementById('print-leetcode-cheatsheet-btn').addEventListener('click', printLeetcodeCheatsheet);
     editLeetcodeLog = routedRowEdit('leetcode', () => allLeetcodeLogs, (l) => `${l.date} ${l.name}`, openLeetcodeForm);
     document.getElementById('leetcode-cancel-btn').addEventListener('click', closeLeetcodeForm);
     onFormSubmit('leetcode-form', submitLeetcodeForm);
@@ -87,21 +88,47 @@ async function refreshLeetcode() {
 }
 
 function renderLeetcodeCheatsheet() {
-  // One table, each category a th row, so text stays the card's size.
-  const body = document.getElementById('leetcode-cheatsheet-body');
-  body.innerHTML = '';
+  // A table per category so the two columns break between them.
+  const box = document.getElementById('leetcode-cheatsheet');
+  box.innerHTML = '';
   Object.entries(LEETCODE_CHEATSHEET).forEach(([category, rows]) => {
-    const row = body.insertRow();
+    const table = box.appendChild(document.createElement('table'));
+    table.className = 'table-compact';
+    const row = table.createTHead().insertRow();
     row.className = 'leetcode-cheatsheet-start';
     const th = row.appendChild(document.createElement('th'));
     th.colSpan = 2;
     th.textContent = category;
+    const body = table.createTBody();
     rows.forEach(([code, , use]) => {
       const tr = body.insertRow();
       tr.insertCell().appendChild(document.createElement('code')).textContent = code;
       tr.insertCell().textContent = use;
     });
   });
+}
+
+// Prints only the Cheat Sheet (html.print-cheatsheet in styles.css), its font
+// the largest that fits one Letter page inside @page cheatsheet's 0.25in margins.
+function printLeetcodeCheatsheet() {
+  const root = document.documentElement;
+  const card = document.getElementById('leetcode-cheatsheet-card');
+  const maxHeight = 10.5 * 96 - 8; // px, with a little slack
+  root.classList.add('print-cheatsheet');
+  card.style.setProperty('--cheatsheet-width', '8in');
+  let lo = 5, hi = 12;
+  for (let i = 0; i < 10; i++) {
+    const mid = (lo + hi) / 2;
+    card.style.setProperty('--cheatsheet-font', `${mid}pt`);
+    if (card.offsetHeight <= maxHeight) lo = mid; else hi = mid;
+  }
+  card.style.setProperty('--cheatsheet-font', `${lo}pt`);
+  window.addEventListener('afterprint', () => {
+    root.classList.remove('print-cheatsheet');
+    card.style.removeProperty('--cheatsheet-width');
+    card.style.removeProperty('--cheatsheet-font');
+  }, { once: true });
+  window.print();
 }
 
 // Slug -> its solves, oldest first.

@@ -215,8 +215,8 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 55 | `finance-portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
 | 56 | `finance-market.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
 | 57 | `track-leetcode-roadmap.js` | The NeetCode 250 problem list (with each YouTube video id and length) and NeetCode's roadmap graph (category positions and parents); data only |
-| 58 | `track-leetcode-cheatsheet.js` | The Cheat Sheet's Python constructs, pages using each and a short use, read off every NeetCode 250 neetcode.io page; data only |
-| 59 | `track-leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), Progress card with video hours and a finish-date forecast, category cards, Daily Progress heatmap, roadmap graph, Cheat Sheet |
+| 58 | `track-leetcode-cheatsheet.js` | The Cheat Sheet's Python constructs, basic to advanced, pages using each (0 for interview extras) and a short use, read off every NeetCode 250 neetcode.io page; data only |
+| 59 | `track-leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), Progress card with video hours and a finish-date forecast, category cards, Daily Progress heatmap, roadmap graph, two-column Cheat Sheet and its one-page print |
 
 `section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 56 above into a page that has none of them (see [Section pages](#section-pages)).
 

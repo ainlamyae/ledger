@@ -2015,6 +2015,7 @@
         <div class="panel" data-route="leetcode">
             <div class="panel-header">
                 <h2>LeetCode</h2>
+                <button type="button" id="print-leetcode-cheatsheet-btn" class="btn btn-icon panel-header-btn" title="Print the Cheat Sheet on one Letter page" aria-label="Print Cheat Sheet">🖨️</button>
                 <button id="add-leetcode-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a solved problem" aria-label="Log">📝</button>
             </div>
 
@@ -2097,14 +2098,10 @@
 
                 <div id="leetcode-list"></div>
 
-                <!-- Python from every NeetCode page, most used first (track-leetcode-cheatsheet.js). -->
-                <div class="card">
+                <!-- Python for the NeetCode 250, basic to advanced, two columns (track-leetcode-cheatsheet.js). -->
+                <div class="card" id="leetcode-cheatsheet-card">
                     <h3>Cheat Sheet</h3>
-                    <div class="table-responsive">
-                        <table class="table-compact">
-                            <tbody id="leetcode-cheatsheet-body"></tbody>
-                        </table>
-                    </div>
+                    <div class="leetcode-cheatsheet" id="leetcode-cheatsheet"></div>
                 </div>
             </div>
         </div>

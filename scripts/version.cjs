@@ -29,27 +29,27 @@ const CHANGELOG_PATH = 'docs/changelog.md';
 // works as a whole; feat = something new to use; everything else = patch.
 const LEGACY = {
   major: [
-    'd6610f3', // Build full Ledger app → 1.0.0
-    '4f9b480', // Health Log replaced by the per-day Physique tab → 2.0.0
-    '5eb69fc', // Finance Market, Portfolio and Analysis pages → 3.0.0
+    '765fbd8', // Build full Ledger app → 1.0.0
+    '7ea44f1', // Health Log replaced by the per-day Physique tab → 2.0.0
+    '40c813a', // Finance Market, Portfolio and Analysis pages → 3.0.0
   ],
   feat: `
-    45a69a0 e49512c addfed9 3b266f1 ec5b8d0 d9b9f1a f7cc7f1 4264c46 0382a1c 0053b04
-    9296a8c ebda02c 61381e4 eefeb99 04d2364 468de10 1b60730 b06e644 2080991 a3fa60d
-    f44cc1d 56db6ee ecc1734 cee2164 23f28df e0d50e2 60e6037 ab8c678 482079f e6c3758
-    3b9508c 38b3948 95aa539 ab4ab7d 36c8134 4825785 5a026ea 0ca482f 1703b0f 5604060
-    4e89365 d12df95 49d8002 b75614b adeecdb 4e22a51 ea506f7 6b13472 2db2439 d5c61dd
-    dc3e05b c556d5a 1c78335 00ae473 14edb76 c5f34bc e35f27e 0052148 eea4e27 a30fce0
-    4446fce 1513803 6d5fe5d e1547bf 32c6a86 a3e3f33 6448f78 3d72cc2 0bd83e4 747086f
-    3bd58d2 ae00e59 0a9179b cada066 b37c737 fdba793 a1eca3b 8ae6574 9466d96 ca48f4a
-    6cda756 50e66bb cfd16af 0f6871a 04f8c4f ddf8d89 01e0c09 755e9f3 84108d7 0bd4256
-    81f59fd d5c1178 296d3e0 a518e7a 46e43ff 2e0045e c902a68 9545c1b 9dff321 714ace0
-    f4d0d2c a50b5b5 c217fa8 a689a04 70f2c9b b25aa1d a13027a 329db21 32ee985 fec16c3
-    ba2e7ce dc8e284 d094584 bff4116 df9cb14 597b92c d36ef6d ea3405b 8095e7e aa60537
-    bc23e56 bd5630b 5b54392 f20991c 5235c43 143d6e6 0295264 4b01e98 b073902 0e037be
-    547301a 9939df6 3e620cb 5662572 a025c9a f58ac8a 06977ca 212a483 06fc9f3 da0671b
-    6af2000 ff99ef5 284a6a2 29a2b03 7c66b3d 156bc7a 01bdcb6 f5bfe53 e9e46e6
-    6169fb2 69c518a 3d8b026 f447c5c
+    e608995 3090b89 5b7dbc5 8567e64 0ed8b3f 96aa2e7 48beac6 6160f62 2a5df9b f680119
+    78e231a f5250cc 4046cc0 38dae07 cdf3b26 de9dadc b1c902f 07dd529 ea5edc8 df4fa3d
+    3e98fe7 f970bfa d829aff e07ea68 3a787e8 3020fcc 68dbef8 0d77431 dfab9c6 dd1e063
+    b8e03b3 605101a 6c74430 bada1d0 20ae6a9 b474cca 5782775 8414fa7 6e8715c 27c4305
+    dd850bb 78f4679 59062b5 73b5fbf 178bc9a 94dab22 951510c babcdc0 0508956 b68a8e2
+    deb116b a064c90 468c178 c57b6b8 c18b8d6 bcfb691 f4be546 c00f770 8ba40ca 8ab79cf
+    6384853 bb9b993 2692be8 cf138b6 b53a7be 3439f1f 801fe0e f47e694 812afcd f109a77
+    5020f27 4356fcd 79fd189 6aef9c2 6b0a077 dc28863 14c346c a1ade7f ea0d324 040b4ec
+    61ce5b9 0d25123 e937246 a796452 ceaf9a8 afd9c10 c209d81 810f5d0 7167a57 4fd67f6
+    cc937ba e379be1 6fde846 e521a8c 6299c8c b8a34b7 77d92f2 ec51720 5268746 1c06c9e
+    c707705 25d8973 33ed153 3eca770 2b200bb d0329bd c8cf130 12bcc3c d99d1a6 c4fbfc7
+    1d4ebae 35086f7 6747dbf dc2fa83 b56aa8e cc1b712 b6dbe9f 8c6d09a 12e82c0 56bbad4
+    051749f 2145eac 4c95ce6 244a145 77fcb9e 92576ce 26ef72b 67748ab f90856d 30aa4d8
+    57da33a 690d225 8bc518d 046f454 ebcab15 efd9a05 d121a18 0ff62cc 2ee886c 53e01d3
+    5a021a7 732bcfb 0fcbf0e 12b09a3 cc8df16 0629ebc 0fa0022 16305cd 0251c20
+    c6ba7c1 c23c09f 8629ee8 cd5ebbb
   `.trim().split(/\s+/),
 };
 

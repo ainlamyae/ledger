@@ -99,15 +99,17 @@ let undoToastTimer = null;
 // Shared by single and bulk transaction delete. Re-showing the toast before
 // the previous one's timer fires (e.g. deleting twice in quick succession)
 // clears the old timer so it can't dismiss the new toast early.
-function showUndoToast(message, onUndo) {
+function showUndoToast(message, onUndo, error = false) {
   clearTimeout(undoToastTimer);
 
   const toast = document.getElementById('undo-toast');
+  toast.classList.toggle('toast-error', error);
   document.getElementById('undo-toast-message').textContent = message;
 
   const btn = document.getElementById('undo-toast-btn');
   const newBtn = btn.cloneNode(true);
   btn.replaceWith(newBtn);
+  newBtn.hidden = !onUndo;
   newBtn.addEventListener('click', () => {
     clearTimeout(undoToastTimer);
     toast.hidden = true;
@@ -115,7 +117,14 @@ function showUndoToast(message, onUndo) {
   });
 
   toast.hidden = false;
-  undoToastTimer = setTimeout(() => { toast.hidden = true; }, 6000);
+  // Longer messages stay longer: 3s to 12s without Undo, errors 6s or more.
+  const ms = onUndo ? 6000 : Math.min(Math.max(2000 + message.length * 50, error ? 6000 : 3000), 12000);
+  undoToastTimer = setTimeout(() => { toast.hidden = true; }, ms);
+}
+
+// The same box with no Undo: results, progress and (red) errors.
+function showToast(message, error = false) {
+  showUndoToast(message, null, error);
 }
 
 let currentReport = null;
@@ -1107,6 +1116,7 @@ function setupAuthGatedActions() {
 // The view the address names: block toggles, then the tiles and breadcrumb the
 // hub/page views show (page-nav.js), then the router reading the address.
 function routeDashboard() {
+  initMotion();
   setupPanelToggles();
   initPageNav();
   initRouter();

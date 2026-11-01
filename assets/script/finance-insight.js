@@ -215,7 +215,7 @@ function refreshFinancialInsightPreview() {
   document.getElementById('financial-insight-panel').dataset.insightMode = 'snapshot';
 
   if (!currentReport || !accountsDataLoaded) {
-    statusEl.textContent = 'Still loading your accounts — try again in a moment.';
+    showToast('Still loading your accounts — try again in a moment.');
     btn.disabled = true;
     return;
   }

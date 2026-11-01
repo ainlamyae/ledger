@@ -285,7 +285,7 @@ async function saveFormulaSettings() {
     const calibrationNote = !calibration ? '' : calibration.result.ok
       ? ` BMR_cal is now ${calibration.result.bmrCal} kcal/day (${withExplicitSign(calibration.result.offsetKcal)} kcal from the equation), over ${calibration.periodCount} × ${calibration.periodDays} days.`
       : ' The saved BMR_cal was left alone — this window has too little logged to measure.';
-    showFieldError('formula-status', `Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${fatNote}${carbNote}${micronutrientNote} ${modelNote}${tefNote}${calibrationNote}`);
+    showToast(`Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${fatNote}${carbNote}${micronutrientNote} ${modelNote}${tefNote}${calibrationNote}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {

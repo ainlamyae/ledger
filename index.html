@@ -86,6 +86,16 @@
     // they sit in the raw page (every one open, Indicator's charts first) while the
     // scripts load. page-nav.js and router.js add the same classes later and fill
     // in the rest — the tiles, and which block a page shows — on the same layout.
+    window.addEventListener('pagereveal', (event) => {
+        // Across page loads (styles.css @view-transition): Back, or up to a shorter
+        // address (a section to home), slides the other way.
+        const act = window.navigation && navigation.activation;
+        if (!event.viewTransition || !act || !act.from) return;
+        if (act.navigationType === 'reload') return event.viewTransition.skipTransition();
+        const depth = (url) => new URL(url).pathname.split('/').filter(Boolean).length;
+        const back = act.navigationType === 'traverse' ? act.entry.index < act.from.index : depth(act.entry.url) < depth(act.from.url);
+        event.viewTransition.types.add(back ? 'back' : 'forward');
+    });
     if (!window.ledgerSectionPage) {
         document.documentElement.classList.add('home-hub');
     } else {
@@ -3509,6 +3519,7 @@
 <script src="assets/script/finance-insight.js"></script>
 <script src="assets/script/gate.js"></script>
 <script src="assets/script/version.js"></script>
+<script src="assets/script/motion.js"></script>
 <script src="assets/script/app.js"></script>
 <script src="assets/script/router.js"></script>
 <script src="assets/script/page-nav.js"></script>

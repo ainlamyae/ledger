@@ -963,5 +963,5 @@ async function calculatePhysiqueDay() {
   btn.disabled = false;
   btn.textContent = originalLabel;
 
-  if (messages.length) showFieldError('physique-form-error', messages.join(' '));
+  if (messages.length) showToast(messages.join(' '));
 }

@@ -204,19 +204,20 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 44 | `health-tune.js` | The Tune block's lifecycle: live term-by-term substitution, solve-for-any-field, the Mifflin/Katch BMR switch, the smoothed `m̄` every identity runs on, the thermic-effect and metabolic-adaptation terms, the two-way `Δm%`/`Δm` fat-loss-rate pair with its 1%/week ceiling, the lean-mass protein band, the fiber and fat bands, save back to `Setting`, and the deficit/intake and time/calorie-burn pins |
 | 45 | `finance-insight.js` | Finance Insight panel: net worth/cash flow/category-spend/account snapshot, AI call |
 | 46 | `gate.js` | Pre-login flow: sign-in banner over the still-visible dashboard shell, file gate, auth-state transitions |
-| 47 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
-| 48 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |
-| 49 | `track-car-service.js` | Car Service block: Transportation `@km` transactions → odometer fit, next service per rule (Toyota km schedule, winter tires, rust protection), chart + table |
-| 50 | `finance-market-data.js` | The only code that calls Twelve Data, Alpha Vantage and Finnhub: daily/monthly/intraday bars, symbol search, news, USD/CAD; IndexedDB price cache, per-service rate-limit queue (Alpha Vantage spaced 1.5 s), `normalizeSymbol` (`TSE: AC` → `AC.TO`) |
-| 51 | `finance-market-math.js` | Pure indicators (SMA, ATR, RSI, MACD, Bollinger), the trailing stop (`trailingStopSeries`, `MARKET_ATR_MULT_DEFAULT` = 4), risk measures the four-check verdict, `checkAlerts` and `parseAlertLine` |
-| 52 | `finance-portfolio-math.js` | Pure average-cost (ACB) holdings and the daily portfolio series in CAD |
-| 53 | `finance-market-chart.js` | Range buttons, `marketLineChart`, series legend, status and % cells shared by the stock pages |
-| 54 | `finance-watchlist.js` | Watch List page: Watchlist tab CRUD, symbol search, Close and 1d/1m/1y per row, 🔬 opens Market; alerts (`checkWatchlistAlerts`, badges, ✅ dismiss) |
-| 55 | `finance-portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
-| 56 | `finance-market.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
-| 57 | `track-leetcode-roadmap.js` | The NeetCode 250 problem list (with each YouTube video id and length) and NeetCode's roadmap graph (category positions and parents); data only |
-| 58 | `track-leetcode-cheatsheet.js` | The Cheat Sheet's Python constructs, basic to advanced, pages using each (0 for interview extras) and a short use, read off every NeetCode 250 neetcode.io page; data only |
-| 59 | `track-leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), Progress card with video hours and a finish-date forecast, category cards, Daily Progress heatmap, roadmap graph, two-column Cheat Sheet and its one-page print |
+| 47 | `motion.js` | Windows/iOS-style motion: forms grow out of the button that opened them and minimize back into it on close (a copy of the card shrinks while the real one is already hidden), pages grow from and minimize into their hub tile, page to page an iOS push/pop over a copy of the old page (taken in router.js's `showSectionPage`); Web Animations on top of every `.modal`'s `hidden` |
+| 48 | `app.js` | Orchestration, report aggregation, nav, panels, dark/privacy mode, shortcuts |
+| 49 | `router.js` | Block/button addresses (`<group>/<block>/<button>/`): pushState/replaceState as blocks and forms open and close, and reopening them from the address on load |
+| 50 | `track-car-service.js` | Car Service block: Transportation `@km` transactions → odometer fit, next service per rule (Toyota km schedule, winter tires, rust protection), chart + table |
+| 51 | `finance-market-data.js` | The only code that calls Twelve Data, Alpha Vantage and Finnhub: daily/monthly/intraday bars, symbol search, news, USD/CAD; IndexedDB price cache, per-service rate-limit queue (Alpha Vantage spaced 1.5 s), `normalizeSymbol` (`TSE: AC` → `AC.TO`) |
+| 52 | `finance-market-math.js` | Pure indicators (SMA, ATR, RSI, MACD, Bollinger), the trailing stop (`trailingStopSeries`, `MARKET_ATR_MULT_DEFAULT` = 4), risk measures the four-check verdict, `checkAlerts` and `parseAlertLine` |
+| 53 | `finance-portfolio-math.js` | Pure average-cost (ACB) holdings and the daily portfolio series in CAD |
+| 54 | `finance-market-chart.js` | Range buttons, `marketLineChart`, series legend, status and % cells shared by the stock pages |
+| 55 | `finance-watchlist.js` | Watch List page: Watchlist tab CRUD, symbol search, Close and 1d/1m/1y per row, 🔬 opens Market; alerts (`checkWatchlistAlerts`, badges, ✅ dismiss) |
+| 56 | `finance-portfolio.js` | Portfolio page: Trade tab CRUD, holdings, gain/loss charts, opt-in Market Value write-back |
+| 57 | `finance-market.js` | Market page: watchlist picker, chart lines, signals, news, the AI read with Chart history, Analysis tab |
+| 58 | `track-leetcode-roadmap.js` | The NeetCode 250 problem list (with each YouTube video id and length) and NeetCode's roadmap graph (category positions and parents); data only |
+| 59 | `track-leetcode-cheatsheet.js` | The Cheat Sheet's Python constructs, basic to advanced, pages using each (0 for interview extras) and a short use, read off every NeetCode 250 neetcode.io page; data only |
+| 60 | `track-leetcode.js` | LeetCode page: LeetCode tab CRUD (columns found by header), Progress card with video hours and a finish-date forecast, category cards, Daily Progress heatmap, roadmap graph, two-column Cheat Sheet and its one-page print |
 
 `section-page.js` is deliberately **not** in that list: only the section-page stubs load it, and its whole job is to bring the 56 above into a page that has none of them (see [Section pages](#section-pages)).
 

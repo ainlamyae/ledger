@@ -12,6 +12,17 @@
 // last path segment against each link's href, so the list of sections has one
 // home: that markup.
 
+window.addEventListener('pagereveal', (event) => {
+  // Across page loads (styles.css @view-transition): Back, or up to a shorter
+  // address (a section to home), slides the other way.
+  const act = window.navigation && navigation.activation;
+  if (!event.viewTransition || !act || !act.from) return;
+  if (act.navigationType === 'reload') return event.viewTransition.skipTransition();
+  const depth = (url) => new URL(url).pathname.split('/').filter(Boolean).length;
+  const back = act.navigationType === 'traverse' ? act.entry.index < act.from.index : depth(act.entry.url) < depth(act.from.url);
+  event.viewTransition.types.add(back ? 'back' : 'forward');
+});
+
 (function () {
   // Pinned absolute, so the router's pushState can't shift relative URLs.
   const base = document.querySelector('base');

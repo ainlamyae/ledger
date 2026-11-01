@@ -1610,7 +1610,8 @@ function mergePhysiqueEntryIntoForm(saved) {
 
   editingPhysiqueRow = saved.row;
   document.getElementById('physique-modal-title').textContent = 'Edit Physique';
-  showFieldError('physique-form-error', `↩︎ Merged — Save again.`);
+  clearFieldError('physique-form-error');
+  showToast('↩︎ Merged — Save again.');
 }
 
 function fillPhysiqueFieldIfBlank(id, savedValue) {

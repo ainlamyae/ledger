@@ -439,7 +439,15 @@ function localIngredientCalories(quantity, unit, name) {
 // merged, never recased. Pure text in, text out — no DOM, so the form's and the
 // bulk Calculate share the exact same logic instead of two copies that could
 // drift apart.
-function combineAndSortConsumptionText(text) {
+//
+// `caloriesForName` lets a caller supply the per-ingredient calories to rank by
+// — Calculate passes the breakdown's real (USDA/AI-priced) figures so the field
+// lands in the SAME order as the Breakdown table (mergeDuplicateBreakdownRows),
+// not the order a local-catalogue lookup alone would give (which can't price a
+// USDA/AI item at all and so would sink it to the bottom). Called by name, with
+// localIngredientCalories as the fallback for any line it doesn't cover — so the
+// bulk Tidy, which has no breakdown to pass, keeps its old local-only ranking.
+function combineAndSortConsumptionText(text, caloriesForName = null) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return { text, combinedCount: 0 };
 
@@ -465,14 +473,32 @@ function combineAndSortConsumptionText(text) {
 
   const scored = rebuilt.map((line) => {
     const { quantity, unit } = extractIngredientQuantity(line);
-    return { line, calories: localIngredientCalories(quantity, unit, extractIngredientName(line)) };
+    const name = extractIngredientName(line);
+    const supplied = caloriesForName ? caloriesForName(name) : null;
+    return { line, calories: supplied ?? localIngredientCalories(quantity, unit, name) };
   });
-  // Unranked (no local match) lines sort after every ranked one, keeping
-  // their relative order among themselves — Array#sort is stable, and
+  // Unranked (no supplied/local match) lines sort after every ranked one,
+  // keeping their relative order among themselves — Array#sort is stable, and
   // there's nothing here to break a tie between two nulls.
   scored.sort((a, b) => (b.calories ?? -Infinity) - (a.calories ?? -Infinity));
 
   return { text: scored.map((s) => s.line).join('\n'), combinedCount };
+}
+
+// A name -> real-calories lookup over a Calculate breakdown, for ranking the
+// Consumption field by the same figures the Breakdown table sorts on. Duplicate
+// rows (the same ingredient typed twice) are summed, matching how the table
+// merges them before sorting (mergeDuplicateBreakdownRows). Names are matched
+// case-insensitively so the field's title-cased lines line up with whatever
+// casing the breakdown items carry; returns null for a name not in the
+// breakdown, letting combineAndSortConsumptionText fall back to local pricing.
+function breakdownCaloriesLookup(breakdown) {
+  const byName = new Map();
+  breakdown.forEach((item) => {
+    const key = item.name.toLowerCase();
+    byName.set(key, (byName.get(key) || 0) + (item.calories || 0));
+  });
+  return (name) => (byName.has(name.toLowerCase()) ? byName.get(name.toLowerCase()) : null);
 }
 
 // Ingredient-name suggestions for the Consumption textarea, scoped to
@@ -896,7 +922,8 @@ async function calculatePhysiqueDay() {
       // then straight through the tidy-up (combine, sort, capitalize), so
       // Calculate leaves Consumption tidy with no separate step.
       const rebuiltConsumption = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
-      const { text: sortedConsumption, combinedCount } = combineAndSortConsumptionText(rebuiltConsumption);
+      const { text: sortedConsumption, combinedCount } =
+        combineAndSortConsumptionText(rebuiltConsumption, breakdownCaloriesLookup(breakdown));
       physiqueField('consumption').value = sortedConsumption;
       if (combinedCount > 0) messages.push(`🔗 ${combinedCount} combined.`);
       physiqueField('calories-in').value = calories;

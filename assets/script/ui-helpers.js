@@ -29,19 +29,17 @@ async function confirmAndDelete(message, deleteFn, errorPrefix = 'Failed to dele
   }
 }
 
+// Every form/panel message is a toast now; red unless it's progress ("…").
 function showFieldError(elId, message) {
-  const el = document.getElementById(elId);
-  el.textContent = message;
-  el.classList.remove('status-ok');
-  el.hidden = false;
+  document.getElementById(elId).hidden = true;
+  showToast(message, !message.endsWith('…'));
 }
 
-// A save never closes its form: the form's own status line says "Saved" instead.
+// A save never closes its form: "Saved" shows in the toast, and any old
+// message in the form's status line goes.
 function showFormSaved(elId) {
-  const el = document.getElementById(elId);
-  el.textContent = 'Saved';
-  el.classList.add('status-ok');
-  el.hidden = false;
+  clearFieldError(elId);
+  showToast('Saved');
 }
 
 function clearFieldError(elId) {

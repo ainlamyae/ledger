@@ -1501,7 +1501,7 @@ async function updateNutritionEntryAndPropagate() {
 
   const updatedEntry = { name: fields.name, amount: fields.amount, calories: fields.calories, protein: fields.protein };
   const candidates = allPhysiqueEntries.filter((p) => p.consumption.trim());
-  showFieldError('nutrition-form-error', `Checking ${candidates.length} Physique day${candidates.length === 1 ? '' : 's'}…`);
+  showToast(`Checking ${candidates.length} Physique day${candidates.length === 1 ? '' : 's'}…`);
 
   let linesChanged = 0;
   const edits = candidates.map((p) => {
@@ -1560,7 +1560,7 @@ async function updateNutritionEntryAndPropagate() {
       succeeded.push({ row: e.row, values: e.snapshot });
     } finally {
       done += 1;
-      showFieldError('nutrition-form-error', `Updating ${done}/${edits.length} Physique days…`);
+      showToast(`Updating ${done}/${edits.length} Physique days…`);
     }
   }));
 
@@ -1651,10 +1651,9 @@ async function capitalizeSelectedNutritionNames() {
     .map((n) => ({ n, newName: titleCaseIngredientName(n.name) }))
     .filter(({ n, newName }) => newName !== n.name);
 
-  statusEl.hidden = false;
-  statusEl.classList.add('status-ok');
+  statusEl.hidden = true;
   if (!changed.length) {
-    statusEl.textContent = `Already capitalized — no changes across ${rows.length} selected.`;
+    showToast(`Already capitalized — no changes across ${rows.length} selected.`);
     return;
   }
 
@@ -1666,7 +1665,7 @@ async function capitalizeSelectedNutritionNames() {
   }
   btn.textContent = originalLabel;
 
-  statusEl.textContent = `Capitalized ${changed.length} of ${rows.length} selected ingredient name${changed.length === 1 ? '' : 's'}.`;
+  showToast(`Capitalized ${changed.length} of ${rows.length} selected ingredient name${changed.length === 1 ? '' : 's'}.`);
   selectedNutritionRows.clear();
   await refreshNutrition(true);
 }
@@ -1786,9 +1785,7 @@ async function pullMicronutrientsForSelected() {
   try {
     await ensureNutritionColumns();
   } catch (err) {
-    statusEl.hidden = false;
-    statusEl.classList.remove('status-ok');
-    statusEl.textContent = `Couldn't prepare the Micronutrients column: ${err.message}`;
+    showToast(`Couldn't prepare the Micronutrients column: ${err.message}`, true);
     return;
   }
 
@@ -1805,11 +1802,9 @@ async function pullMicronutrientsForSelected() {
   }
 
   btn.textContent = originalLabel;
-  statusEl.hidden = false;
-  statusEl.classList.toggle('status-ok', skipped.length === 0);
-  statusEl.textContent = skipped.length
+  showToast(skipped.length
     ? `Pulled micronutrients for ${pulled} ingredient${pulled === 1 ? '' : 's'} — skipped: ${skipped.join('; ')}`
-    : `Pulled micronutrients for ${pulled} ingredient${pulled === 1 ? '' : 's'}.`;
+    : `Pulled micronutrients for ${pulled} ingredient${pulled === 1 ? '' : 's'}.`, skipped.length > 0);
 
   await refreshNutrition(true);
 }

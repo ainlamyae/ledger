@@ -1,11 +1,8 @@
 // Fiber chart (Health Chart). Shared math/helpers live in health-chart.js.
 
 let healthFiberChart = null;
-// Now a shaded min/max band like Protein Intake, not a flat single line — the Formula
-// Tune's fiber rows produce a band the same shape protein's do (getFiberDesiredBandG),
-// so the chart reads the same way: a floor that's a genuine miss (red) and a ceiling that's
-// still a hit (dark green), not a flat met-or-missed. Read from the same Physique-day Fiber
-// figure (fiberG) the Health tiles' own Fiber card sums — see physiqueAsHealthEntries.
+// A shaded min/max band (getFiberDesiredBandG): red under the floor or past the
+// ceiling. Reads the Physique-day fiberG the Fiber tile sums (physiqueAsHealthEntries).
 function renderHealthFiberChart(entries) {
   const ctx = document.getElementById('health-fiber-chart');
 
@@ -32,14 +29,11 @@ function renderHealthFiberChart(entries) {
     ...extra,
   });
 
-  // Same three-way split as Protein Intake: under the floor is red, in the band (or
-  // unlogged) is green, and past the ceiling is a darker green — still a hit, not a miss.
-  const FIBER_OVER_BAND_COLOR = chartColor('--chart-good-high');
+  // In the band (or unlogged) is green; under the floor or past the ceiling is red.
   const values = dates.map((d) => byDate.get(d) || 0);
-  const barColors = dates.map((d, i) => {
-    if (!byDate.has(d) || withinFiberBand(values[i], band)) return chartColor('--chart-good');
-    return values[i] > band.max ? FIBER_OVER_BAND_COLOR : chartColor('--chart-bad');
-  });
+  const barColors = dates.map((d, i) => (
+    !byDate.has(d) || withinFiberBand(values[i], band) ? chartColor('--chart-good') : chartColor('--chart-bad')
+  ));
 
   const capHalf = desiredCapHalf(Math.max(band.max, ...values, 1));
   // Cyan, the desired mark's colour on the other Health charts.
@@ -58,8 +52,8 @@ function renderHealthFiberChart(entries) {
 
   // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
   const hidden = legendHiddenNames('health-fiber-legend');
-  const barClasses = barColors.map((c) => (c === chartColor('--chart-good') ? 'Within desired'
-    : c === FIBER_OVER_BAND_COLOR ? 'Over desired' : 'Under desired'));
+  const barClasses = barColors.map((c, i) => (c === chartColor('--chart-good') ? 'Within desired'
+    : values[i] > band.max ? 'Over desired' : 'Under desired'));
   const shownValues = maskHiddenClasses(values, barClasses, hidden);
   const shownDesired = hidden.has('Desired Dietary Fiber') && (band.max === band.min || hidden.has('Desired Dietary Fiber band')) ? [] : [band.max, band.min];
   const shownAvg = hidden.has(healthAvgName()) ? [] : weeklyAvg;
@@ -133,7 +127,7 @@ function renderHealthFiberChart(entries) {
   // Swatches under the chart, named as in the hover.
   renderToggleLegend('health-fiber-legend', dates.length === 0 ? [] : [
     { name: 'Within desired', color: chartColor('--chart-good') },
-    { name: 'Over desired', color: FIBER_OVER_BAND_COLOR },
+    { name: 'Over desired', color: chartColor('--chart-bad') },
     { name: 'Under desired', color: chartColor('--chart-bad') },
     { name: healthAvgName(), color: desiredMarkColor() },
     { name: 'Desired Dietary Fiber', color: chartColor('--chart-cyan') },

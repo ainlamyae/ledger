@@ -116,7 +116,7 @@ function applyWorkoutLines(lines) {
   // If it can't run (no body mass yet) the plain-minutes prefill above stays
   // and the reason is surfaced.
   const messages = runPhysiqueWorkoutCalc();
-  if (messages.length) showFieldError('physique-form-error', messages.join(' '));
+  if (messages.length) showToast(messages.join(' '));
 }
 
 // The fast path (Workouts' 📝): the same appended lines, priced the way the

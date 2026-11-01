@@ -198,6 +198,8 @@ function routeHit(element) {
 // lands on the same view.
 function showSectionPage(panel) {
   if (!window.ledgerSectionPage) return;
+  const section = document.getElementById(routedSectionId(null));
+  const motion = motionPageBefore(panel, section);
   document.documentElement.dataset.page = panel ? 'block' : 'hub';
   document.querySelectorAll(`#${routedSectionId(null)} > .panel[data-route]`).forEach((p) => {
     const active = p === panel;
@@ -206,6 +208,7 @@ function showSectionPage(panel) {
     if (heading) setPanelCollapsed(p, heading, !active);
   });
   updatePageNav(panel);
+  motionPage(panel, section, motion);
   runPageShow(panel);
 }
 
@@ -224,6 +227,9 @@ function runPageShow(panel) {
 // A tile, sidebar link or breadcrumb: one history step, no reload.
 function navigateSectionPage(panel) {
   history.pushState({ ledgerPage: true }, '', routeUrl(panel));
+  // Up to the hub, or a view's ✕ back to its block, reads as back.
+  motionPageDir = !panel || panel === motionLastPage?.panel ? 'pop' : 'push';
+  motionPrepared = motionPageBefore(panel, document.getElementById(routedSectionId(null)));
   resetRouteViews();
   showSectionPage(panel);
   document.title = routeTitle(panel);
@@ -492,6 +498,10 @@ function initRouter() {
       // A page of its own over the block's: Back returns to the block.
       const steps = [buttonStep(hit.button)];
       if (location.href !== routeUrl(hit.panel, steps)) history.pushState({ ledgerPage: true }, '', routeUrl(hit.panel, steps));
+      // The view's page grows out of its tile once its click has drawn it.
+      motionPageDir = 'push';
+      const section = document.getElementById(routedSectionId(null));
+      motionPage(hit.panel, section, motionPageBefore(hit.panel, section, hit.button));
       document.title = routeTitle(hit.panel, steps);
       updatePageNav(hit.panel);
       window.scrollTo(0, 0);
@@ -518,6 +528,7 @@ function initRouter() {
   });
 
   window.addEventListener('popstate', () => {
+    motionPageDir = 'pop';
     const depth = history.state?.depth || 0;
     // Back: close the forms above this step, innermost first.
     while (routedForms.length > depth) {

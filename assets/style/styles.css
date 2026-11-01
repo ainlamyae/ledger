@@ -59,6 +59,8 @@ textarea {
     --shadow-hover: 0 6px 20px rgba(0,0,0,.32);
     /* Apple-like spring: a quick start that settles softly, on every transition. */
     --ease-spring: cubic-bezier(.2, .8, .2, 1);
+    /* iOS button release: springs back with a slight bounce (motion.js has the page/form spring). */
+    --ease-ios-bounce: cubic-bezier(.3, 1.3, .5, 1);
     --transition-colors: background-color .2s var(--ease-spring), color .2s var(--ease-spring), border-color .2s var(--ease-spring);
     --input-font-size: 15px;
     /* The six spacing steps — every margin, padding and gap uses one of these,
@@ -557,7 +559,7 @@ header .btn:hover {
    and the tiles, set in their own rules). Emoji buttons are square. Each kind
    only picks its font; height and padding come from here. */
 .btn {
-    transition: var(--transition-colors);
+    transition: var(--transition-colors), transform .3s var(--ease-ios-bounce);
     font: inherit;
     font-size: var(--text-small);
     border-radius: var(--radius-md);
@@ -572,6 +574,12 @@ header .btn:hover {
     padding: 0 var(--space-s);
     line-height: 1.2;
     vertical-align: middle;
+}
+
+/* iOS press: gives under the finger, springs back on release. */
+.btn:active:not(:disabled) {
+    transform: scale(.94);
+    transition: var(--transition-colors), transform .1s ease-out;
 }
 
 .btn:disabled {
@@ -701,9 +709,72 @@ header .btn:hover {
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: var(--space-m) var(--space-l);
+    /* Long results wrap instead of running off a phone. */
+    width: max-content;
+    max-width: min(560px, calc(100vw - 2rem));
     /* Above .modal's 100, keeping the order it had when the modal had no z-index:
        an undo toast has a countdown, so it can't be the one thing a form covers. */
     z-index: 110;
+}
+
+/* Across page loads (a section to another, home): an iOS push, Back reversed
+   (the 'back' type comes from the pagereveal handler in index.html / section-page.js).
+   The tab bar and sidebar stay put while the page slides. */
+@view-transition {
+    navigation: auto;
+}
+
+.nav {
+    view-transition-name: app-nav;
+}
+
+.side-nav {
+    view-transition-name: app-side-nav;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: .45s;
+    animation-timing-function: cubic-bezier(.2, .9, .3, 1);
+}
+
+::view-transition-new(root) {
+    animation-name: page-in;
+}
+
+::view-transition-old(root) {
+    animation-name: page-out;
+}
+
+html:active-view-transition-type(back)::view-transition-new(root) {
+    animation-name: page-in-back;
+}
+
+html:active-view-transition-type(back)::view-transition-old(root) {
+    animation-name: page-out-back;
+    z-index: 1;
+}
+
+@keyframes page-in {
+    from { transform: translateX(100%); }
+}
+
+@keyframes page-out {
+    to { transform: translateX(-33%); opacity: .5; }
+}
+
+@keyframes page-in-back {
+    from { transform: translateX(-33%); opacity: .5; }
+}
+
+@keyframes page-out-back {
+    to { transform: translateX(100%); }
+}
+
+/* An error in the toast (showToast's error): red text and edge. */
+.toast.toast-error {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
 }
 
 /* htmlTooltip (charts-base.js): Chart.js's default tooltip look, over the page. */

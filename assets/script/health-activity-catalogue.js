@@ -634,7 +634,7 @@ async function updateActivityAndPropagate() {
   // not repriced (there's nothing to price calories against).
   const latestBodyMassKg = physiqueBodyMassKgFromLog();
   const candidates = allPhysiqueEntries.filter((p) => p.workout.trim());
-  showFieldError('activity-form-error', `Checking ${candidates.length} Physique day${candidates.length === 1 ? '' : 's'}…`);
+  showToast(`Checking ${candidates.length} Physique day${candidates.length === 1 ? '' : 's'}…`);
 
   let linesRenamed = 0;
   const edits = candidates.map((p) => {
@@ -691,7 +691,7 @@ async function updateActivityAndPropagate() {
       succeeded.push({ row: e.row, values: e.snapshot });
     } finally {
       done += 1;
-      showFieldError('activity-form-error', `Updating ${done}/${edits.length} Physique days…`);
+      showToast(`Updating ${done}/${edits.length} Physique days…`);
     }
   }));
 

@@ -10,7 +10,7 @@ Each file opens with an **At a glance** summary, followed by the details.
 |---|---|
 | [Home Page & Widgets](home.md) | Glance cards, Time/Date/Azan/Weather widgets (Weather with sunrise/sunset), hide toggles |
 | [Hubs, Pages & Addresses](navigation.md) | Hubs, breadcrumb, sidebar (hide with the logo-row button or Ctrl+.) with a bottom panel of Contact, Refresh data, Clear cache, Settings, iPhone-style switches (Dark mode, Amounts, Widgets, Bulbs; shown before sign-in, Widgets and Bulbs off by default) and the account row (Google picture, name, email) opening the menu, plain sidebar links, liquid-glass tiles colour-coded by function, Market's tile beside Snapshot on Finance Insight and not in the sidebar, phone bars, badges (a lone digit a round circle), every address, no banner on a failed sign-in |
-| [Layout & Interaction](layout.md) | Responsive layout, content-width tables (columns 5px apart), forms, shortcuts, exports, printing, accessibility, dark/privacy mode |
+| [Layout & Interaction](layout.md) | Responsive layout, iOS-style motion (forms zoom from their button, pages push/pop), content-width tables (columns 5px apart), forms, shortcuts, exports, printing, accessibility, dark/privacy mode |
 | [Buttons](buttons.md) | Emoji actions (🔀 Transfer, 🔠 Capitalize Names, 📥 Import CSV, 📱/📧 contact exports, 🔄 Update Market Value) and button roles |
 | [Chart Conventions](charts.md) | Colours, axes, scoring, legends |
 

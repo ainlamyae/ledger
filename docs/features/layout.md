@@ -5,7 +5,8 @@
 ## At a glance
 
 - **Keyboard shortcuts** work from any page: `/` filter payees, `n` log a transaction, `Esc` close, `?` help.
-- **Saving never closes a form:** 💾 shows "Saved"; an Add becomes the new row's Edit. Only ❌ closes.
+- **Saving never closes a form:** 💾 shows "Saved" in the toast at the bottom (no Undo); an Add becomes the new row's Edit. Only ❌ closes.
+- **Results and progress are toasts** (`showToast`): Saved, Physique's 🧮 Calculate notes (♻️ reused, 🔗 combined, ⚠️), Checking/Updating N Physique days…, Capitalize, a clean Pull Micronutrients, Tune's Saved/Updated. 3s to 12s by length, wrapping on a phone. Every other message written on a page goes there too, errors in red (6s or more); only yes/no confirmations (`confirm()`) stay as they are.
 - Physique filters by its search box alone (no From/To).
 - **Export Transactions** and **Export Physique** (CSV, every row) live in Settings (account menu).
 - Notifications for Work Time and Car Service: account menu → **Enable notifications**.
@@ -31,6 +32,14 @@
   - Ledger / Health / Finance / Track become a fixed bottom tab bar; page content gets bottom padding to clear it.
   - The tab bar and the page's action bar are pills floating `--bottom-bar-inset` off the edges, with half-circle ends and ❌ as a round button. Lighter glass than the rest (40% opacity, 12px blur). No tab is marked active or changes colour on hover.
 - **Wide screens (≥1180px):** a sidebar replaces the top bar (see [Hubs, Pages & Addresses](navigation.md)). There is no intermediate top-bar state — the layout is bottom-bar-or-sidebar with nothing in between.
+
+### Motion
+
+- Windows/iOS-style, from `motion.js`: a form or dialog grows out of the button (or row) that opened it, solid and evenly scaled, and minimizes into the ✕ you clicked (or, on Back, Escape or the breadcrumb, into the button that opened it), fading only as it lands. Without that button on screen it rises in and slides down out.
+- Pages: opening one from its hub tile grows it out of that tile; closing it to the hub (✕, the breadcrumb, Back) minimizes it into its tile while the tiles settle in behind. Page to page is an iOS push: the new page slides in from the right over the old one, which drifts a third left and dims; Back reverses it. Without its tile on screen, closing slides instead. Insight's view pages (Plan, Wellness, Food, Micronutrient) grow from and minimize into their own tiles the same way.
+- Across page loads (one section to another, or to and from the home page): the same iOS push through the browser's cross-document View Transitions (`@view-transition` in styles.css), the tab bar and sidebar holding still; Back, or up to a shorter address, slides the other way (a `pagereveal` handler in index.html and section-page.js). No slide on a reload.
+- An overlay's dimmed glass backdrop fades with it, and buttons give a little under a press and spring back.
+- Restore slows as it lands, minimize speeds into the button, pages use a critically damped spring. It plays even with the system's animation effects turned off.
 
 ### Fields and alignment
 
@@ -64,7 +73,7 @@ A form's ❌ is the last button in its own actions row, so a long form closes fr
 ### Behaviour
 
 - **Keyboard shortcuts** — `/` filters transactions by payee, `n` logs a transaction, `Esc` closes a form or menu, `?` toggles help. From any page, `/` and `n` go to the Transaction page or its Log form. Ignored while typing.
-- **Saving never closes a form** (`showFormSaved`, `stayOnSavedForm`): 💾 writes the row and shows "Saved"; an Add or Log becomes that row's Edit, its address and breadcrumb moved to the row. Transfer clears its amount; Bulk Edit keeps its rows ticked. Only ❌, Back, Cancel or Esc close a form.
+- **Saving never closes a form** (`showFormSaved`, `stayOnSavedForm`): 💾 writes the row and shows "Saved" in the undo toast's box without ↩️ (`showToast`, gone after 3s); an Add or Log becomes that row's Edit, its address and breadcrumb moved to the row. Transfer clears its amount; Bulk Edit keeps its rows ticked. Only ❌, Back, Cancel or Esc close a form.
 - **Physique's page has no From/To dates**: its table is narrowed by the search box alone.
 - **Exports live in Settings** (account menu): **Export Transactions** and **Export Physique** download every row as CSV (`exportTransactionsCSV`, `exportPhysiqueCSV`, `csv.js`), whatever the filters.
 - **Printing** (`@media print`, `styles.css`) — drops the nav, sidebar, footer, buttons and range pickers; a single chart box, not a whole panel, avoids a page break (a page-tall panel was pushed whole to sheet 2, leaving sheet 1 blank); legend swatches print their colour without Background graphics; canvases keep their proportions (`object-fit: contain`), so donuts stay round; the Rotation row keeps its 550px bar beside the donut on A4.

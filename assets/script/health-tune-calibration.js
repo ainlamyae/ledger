@@ -320,7 +320,7 @@ async function updateStoredBmrCalibration() {
         [BMR_CALIBRATION_PERIOD_DAYS_KEY]: periodDays,
       });
     if (days === null) throw new Error('Writing the Derived column failed — see the console.');
-    showFieldError('formula-status', `Updated — BMR_cal over ${periodCount} × ${periodDays} days and m_avg over ${periodDays} days recomputed for ${days} days in the Physique sheet.`);
+    showToast(`Updated — BMR_cal over ${periodCount} × ${periodDays} days and m_avg over ${periodDays} days recomputed for ${days} days in the Physique sheet.`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   }

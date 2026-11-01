@@ -220,7 +220,7 @@ function loadInsightMode(modeKey) {
   // An empty in-memory array isn't the same answer as "nothing logged" — say so
   // rather than gathering a preview full of zeros from data that's still in flight.
   if (!physiqueDataLoaded || (mode.needsNutrition && !nutritionDataLoaded)) {
-    statusEl.textContent = 'Still loading your Physique data — try again in a moment.';
+    showToast('Still loading your Physique data — try again in a moment.');
     return;
   }
 
@@ -237,7 +237,8 @@ function loadInsightMode(modeKey) {
   renderSavedInsight(mode);
   setInsightModeButtons(modeKey);
 
-  statusEl.textContent = `${mode.label} data for ${from} to ${to}.`;
+  statusEl.textContent = '';
+  showToast(`${mode.label} data for ${from} to ${to}.`);
   document.getElementById('insight-generate-btn').disabled = false;
 }
 

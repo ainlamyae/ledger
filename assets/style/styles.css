@@ -238,13 +238,25 @@ b {
     font-weight: 600;
 }
 
-body {
-    font-family: system-ui, sans-serif;
+/* The wash lives on its own layer (#app-backdrop), not body's own background:
+   body is what the root view transition's page-in/page-out slide captures and
+   animates, and the wash sliding along with it read as the background itself
+   moving. The backdrop is named and held still the same way .nav/.header-actions
+   are (below), so it just stays put behind whatever page is sliding over it. */
+#app-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
     background:
         radial-gradient(60rem 40rem at 0% 0%, var(--bg-wash-1), transparent 70%),
         radial-gradient(60rem 40rem at 100% 100%, var(--bg-wash-2), transparent 70%),
         var(--color-bg);
-    background-attachment: fixed;
+    view-transition-name: app-backdrop;
+}
+
+body {
+    font-family: system-ui, sans-serif;
+    background: var(--color-bg);
     color: var(--color-text);
     display: flex;
     flex-direction: column;
@@ -587,13 +599,44 @@ header .btn:hover {
     cursor: not-allowed;
 }
 
-/* Mid-action (withButtonBusy, assets/script/ui-helpers.js) — the label already
-   carries an ellipsis, this takes the clicks away so a slow save can't be
-   fired twice. */
+/* Mid-action (withButtonBusy, assets/script/ui-helpers.js) — a word-label
+   button's label already carries an ellipsis; this takes the clicks away so a
+   slow save can't be fired twice. An icon button grows instead (below). */
 .btn[aria-busy="true"] {
     opacity: .5;
     cursor: progress;
     pointer-events: none;
+}
+
+/* An emoji icon button has no label to put an ellipsis next to: it grows in
+   place for the length of the action (a gentle pulse while it's still
+   running) and bounces back to its actual size once withButtonBusy clears it. */
+.btn.btn-icon.icon-busy,
+.btn.row-action-btn.icon-busy {
+    animation: icon-busy-grow .25s ease-out forwards,
+               icon-busy-pulse 1s ease-in-out .25s infinite;
+}
+
+.btn.btn-icon.icon-settle,
+.btn.row-action-btn.icon-settle {
+    animation: icon-busy-settle .4s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+@keyframes icon-busy-grow {
+    from { transform: scale(1); }
+    to   { transform: scale(1.4); }
+}
+
+@keyframes icon-busy-pulse {
+    0%, 100% { transform: scale(1.4); }
+    50%      { transform: scale(1.5); }
+}
+
+@keyframes icon-busy-settle {
+    0%   { transform: scale(1.4); }
+    45%  { transform: scale(.85); }
+    72%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
 }
 
 /* Colours for word buttons only: blue saves or logs, gray opens something, red
@@ -730,6 +773,46 @@ header .btn:hover {
 
 .side-nav {
     view-transition-name: app-side-nav;
+}
+
+/* The account avatar (.header-actions) is pinned bottom-left on a phone the
+   same way .nav is pinned along the bottom — it needs the same name-and-still
+   treatment, or it's unnamed and falls into the root's own sliding snapshot. */
+.header-actions {
+    view-transition-name: app-account;
+}
+
+/* The breadcrumb at the top of every page (Ledger / Health / Chart, …) — one
+   per section, but only one is ever on screen at a time — gets the same
+   treatment so it reads as a fixed header, not part of the sliding page. */
+.page-crumb {
+    view-transition-name: app-crumb;
+}
+
+/* Naming them above only keeps these out of the root's slide; the browser
+   still gives every named group its own default cross-fade/resize animation,
+   which is what actually showed as blurring and shifting on their own.
+   Switching it off here is what makes them truly "stay put". */
+::view-transition-group(app-nav),
+::view-transition-group(app-side-nav),
+::view-transition-group(app-account),
+::view-transition-group(app-crumb),
+::view-transition-group(app-backdrop) {
+    animation: none;
+}
+
+::view-transition-old(app-nav),
+::view-transition-new(app-nav),
+::view-transition-old(app-side-nav),
+::view-transition-new(app-side-nav),
+::view-transition-old(app-account),
+::view-transition-new(app-account),
+::view-transition-old(app-crumb),
+::view-transition-new(app-crumb),
+::view-transition-old(app-backdrop),
+::view-transition-new(app-backdrop) {
+    animation: none;
+    mix-blend-mode: normal;
 }
 
 ::view-transition-old(root),
@@ -3148,6 +3231,20 @@ html.home-hub .page-tiles,
         font-size: var(--text-body);
         font-weight: 600;
         line-height: 1.2;
+    }
+
+    /* A soft vertical divider between tabs, faded at both ends rather than a hard
+       line touching the bar's own top/bottom edge. */
+    .nav a:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 20%;
+        bottom: 20%;
+        right: 0;
+        width: 1px;
+        background: var(--color-text-muted);
+        -webkit-mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
+        mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
     }
 
     .gate {

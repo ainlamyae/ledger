@@ -1,6 +1,8 @@
-// iOS motion: springs, the zoom morph (a source's frame reshapes into what it
-// opens), a receding background, and navigation push/pop. Every write stays
-// synchronous; animations ride on top (live elements, or copies of what left).
+// iOS motion: springs, a sheet rising from (and sinking back off) the bottom
+// edge — the one motion every form, dialog, and tile-opened page uses to open
+// and close — a receding/zooming background, and page-to-page navigation
+// push/pop. Every write stays synchronous; animations ride on top (live
+// elements, or copies of what left).
 
 // A SwiftUI-style spring (response s, bounce 0-1, launch velocity) as a CSS
 // linear() easing plus the time it takes to settle.
@@ -20,14 +22,11 @@ function motionSpring(response, bounce = 0, v0 = 0) {
 }
 
 const MOTION_NAV = motionSpring(0.4, 0, 6); // push/pop: quick launch, soft landing
-const MOTION_ZOOM = motionSpring(0.48, 0.16, 3); // opening: a hint of overshoot
+const MOTION_ZOOM = motionSpring(0.48, 0.16, 3); // the background's zoom-past/settle: a hint of overshoot
 const MOTION_DISMISS = motionSpring(0.38, 0, 4); // closing: no overshoot
 const MOTION_POP = motionSpring(0.38, 0.28); // toast
-const MOTION_OPENER = 'button, a, tr, .page-tile, [role="button"]';
 
-const motionOpeners = new WeakMap(); // modal -> element that opened it
 const motionGhosts = new Map(); // modal -> its closing copy
-let motionLastPress = null; // { el, at }
 let motionPageDir = null; // 'push' | 'pop', set by the router
 let motionLastPage; // { panel, key } shown last; panel null = hub, key = block/view
 let motionPrepared = null; // taken before a view resets, used by showSectionPage
@@ -61,25 +60,21 @@ function motionWhile(el, styles, anim) {
   return anim;
 }
 
-// The zoom morph's start: `dst` drawn inside the source rect, aspect-filled and
-// clipped to it with the source's corners (never squashed). Origin is dst's top-left.
-function motionMorph(src, dst) {
-  const top = Math.max(dst.top, 0);
-  const visible = Math.max(Math.min(dst.top + dst.height, innerHeight) - top, 1);
-  const s = Math.min(Math.max(src.width / dst.width, src.height / visible), 1);
-  const w = src.width / s;
-  const h = src.height / s;
-  const x0 = (dst.width - w) / 2;
-  const y0 = top - dst.top;
-  const r = Math.max(src.radius, 8) / s;
-  return {
-    transformOrigin: '0 0',
-    transform: `translate(${src.left - dst.left - s * x0}px, ${src.top - dst.top - s * y0}px) scale(${s})`,
-    clipPath: `inset(${y0}px ${dst.width - x0 - w}px ${dst.height - y0 - h}px ${x0}px round ${r}px)`,
-  };
+// The bottom bar (on a phone, `.action-bar`) is `position: fixed` so it's meant
+// to stay put on screen regardless of what's animating — but it's also a DOM
+// descendant of the page or form card being animated here, and a `transform` or
+// `filter` on an ancestor (even mid-animation, even set by the Web Animations
+// API rather than CSS) makes THAT ancestor the fixed element's containing block
+// instead of the viewport, and composites it into the blur/dim filter too. Left
+// alone, the real bar gets dragged along with the page/card's motion. Detaching
+// it to <body> for the motion's length keeps it exactly where it always is.
+function motionDetachOverlays() {
+  const bar = document.querySelector('.action-bar');
+  if (!bar) return () => {};
+  const { parentNode, nextSibling } = bar;
+  document.body.appendChild(bar);
+  return () => { (nextSibling ? parentNode?.insertBefore(bar, nextSibling) : parentNode?.appendChild(bar)); };
 }
-
-const MOTION_FULL = (radius = 0) => ({ transformOrigin: '0 0', transform: 'none', clipPath: `inset(0px 0px 0px 0px round ${radius}px)` });
 
 // What's on screen in `section` now, as a fixed copy (canvases redrawn).
 function motionPageSnapshot(section) {
@@ -97,6 +92,11 @@ function motionPageSnapshot(section) {
   [...section.children].filter((el) => el.getClientRects().length).forEach((el) => {
     const copy = inner.appendChild(el.cloneNode(true));
     copy.querySelectorAll('.action-bar').forEach((bar) => bar.classList.remove('action-bar')); // phone bars stay put
+    // The breadcrumb never moves — not even shrinking/dimming as part of "the old
+    // page recedes" — so it's invisible in this copy rather than cloned live.
+    // visibility (not display/removal) keeps its layout space, so the rest of the
+    // copy still lines up with the real section's own layout underneath it.
+    if (copy.matches('.page-crumb')) copy.style.visibility = 'hidden';
     const from = el.querySelectorAll('canvas');
     copy.querySelectorAll('canvas').forEach((c, i) => {
       try { c.width = from[i].width; c.height = from[i].height; c.getContext('2d').drawImage(from[i], 0, 0); } catch { /* blank is fine */ }
@@ -113,6 +113,32 @@ function motionMiddle(el) {
 
 function motionSection() {
   return window.ledgerSectionPage && typeof routedSectionId === 'function' ? document.getElementById(routedSectionId(null)) : null;
+}
+
+// Runs the exact inverse of a translateX/Y(d) animation on root's own
+// breadcrumb (if it has one), so the two cancel out and the crumb visually
+// never moves — without reparenting it out of the DOM, which turned out to
+// have its own timing and layout pitfalls (a wrong/stale element picked up,
+// or the rest of the page reflowing into the space it briefly left behind).
+function motionCounterCrumb(root, d, timing, axis = 'Y') {
+  const crumb = root?.querySelector('.page-crumb');
+  if (!crumb) return;
+  crumb.animate([{ transform: `translate${axis}(${-d}px)` }, { transform: 'none' }], timing);
+}
+
+// Same idea, for a scale(s) animation anchored at a transform-origin (the
+// "page comes forward"/"hub settles in" effects): the inverse scale, anchored
+// at the same absolute screen point expressed in the crumb's own coordinates
+// (motionMiddle is relative to whichever element's own box it's given),
+// cancels the parent's scale exactly.
+function motionCounterCrumbScale(root, scale, timing) {
+  const crumb = root?.querySelector('.page-crumb');
+  if (!crumb) return;
+  const origin = motionMiddle(crumb);
+  crumb.animate([
+    { transformOrigin: origin, transform: `scale(${1 / scale})` },
+    { transformOrigin: origin, transform: 'none' },
+  ], timing);
 }
 
 // ── Forms and dialogs ──
@@ -141,7 +167,7 @@ function motionRecede(snap) {
   anim.finished.then(done, done);
 }
 
-function motionZoomIn(modal, from, behind) {
+function motionZoomIn(modal, behind) {
   const card = modal.querySelector('.modal-card');
   if (!card || modal.hidden) return behind?.wrap.remove();
   card.getAnimations().forEach((a) => a.cancel());
@@ -151,14 +177,15 @@ function motionZoomIn(modal, from, behind) {
     behind?.wrap.remove();
     motionBackdrop(modal, true, MOTION_DISMISS);
   }
+  // An iOS sheet rising from the bottom edge, whatever opened it. #form-crumb
+  // is a sibling of .modal-card (router.js's updateFormPage inserts it
+  // straight into the modal, not the card), so it's never actually part of
+  // this transform and needs no counter-animation of its own.
   const dst = motionBox(card);
-  const radius = parseFloat(getComputedStyle(card).borderTopLeftRadius) || 0;
-  if (from) {
-    card.animate([motionMorph(from, dst), MOTION_FULL(radius)], MOTION_ZOOM);
-  } else {
-    // No source on screen: an iOS sheet rising from the bottom edge.
-    card.animate([{ transform: `translateY(${innerHeight - Math.max(dst.top, 0)}px)` }, { transform: 'none' }], MOTION_NAV);
-  }
+  const rise = innerHeight - Math.max(dst.top, 0);
+  const restoreBar = motionDetachOverlays();
+  card.animate([{ transform: `translateY(${rise}px)` }, { transform: 'none' }], MOTION_NAV)
+    .finished.then(restoreBar, restoreBar);
 }
 
 // A copy of the card left where it was, since the real one is gone at once.
@@ -170,6 +197,7 @@ function motionGhost(modal) {
   const ghost = card.cloneNode(true);
   ghost.removeAttribute('id');
   ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+  ghost.querySelectorAll('.action-bar').forEach((bar) => bar.classList.remove('action-bar')); // phone bar stays put
   ghost.inert = true;
   ghost.setAttribute('aria-hidden', 'true');
   Object.assign(ghost.style, {
@@ -190,7 +218,7 @@ function motionGhost(modal) {
     document.body.appendChild(backdrop);
   }
   document.body.appendChild(ghost);
-  return { ghost, backdrop, page, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, radius: parseFloat(cs.borderTopLeftRadius) || 0, started: false };
+  return { ghost, backdrop, page, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, started: false };
 }
 
 function motionRemoveGhost(modal) {
@@ -210,28 +238,20 @@ function motionZoomOut(modal, g) {
   const section = g.page && motionSection();
   if (section && section.getClientRects().length) {
     const middle = motionMiddle(section);
+    const restoreBar = motionDetachOverlays();
     section.animate([
       { transformOrigin: middle, transform: 'scale(.92)', filter: 'brightness(.6)' },
       { transformOrigin: middle, transform: 'none', filter: 'brightness(1)' },
-    ], MOTION_DISMISS);
+    ], MOTION_DISMISS).finished.then(restoreBar, restoreBar);
+    motionCounterCrumbScale(section, .92, MOTION_DISMISS);
   }
-  const to = g.target || motionRect(motionOpeners.get(modal));
-  const anim = to
-    // Reshapes back into the button, landing as it does.
-    ? g.ghost.animate([
-      { ...MOTION_FULL(g.radius), opacity: 1 },
-      { opacity: 1, offset: .75 },
-      { ...motionMorph(to, g.rect), opacity: 0 },
-    ], { ...MOTION_DISMISS, fill: 'forwards' })
-    // An iOS sheet dismissed down the screen.
-    : g.ghost.animate([{ transform: 'none' }, { transform: `translateY(${innerHeight - Math.max(g.rect.top, 0)}px)` }],
-      { ...MOTION_DISMISS, fill: 'forwards' });
+  // An iOS sheet dismissed down the screen, whatever opened it.
+  const anim = g.ghost.animate([{ transform: 'none' }, { transform: `translateY(${innerHeight - Math.max(g.rect.top, 0)}px)` }],
+    { ...MOTION_DISMISS, fill: 'forwards' });
   anim.finished.then(done, done);
 }
 
 function motionOpen(modal) {
-  const press = motionLastPress;
-  const opener = press && performance.now() - press.at < 1000 && !modal.contains(press.el) ? press.el : null;
   // Closed and reopened in one go (a save): no animation either way.
   const pending = motionGhosts.get(modal);
   if (pending && !pending.started) {
@@ -239,12 +259,10 @@ function motionOpen(modal) {
     return null;
   }
   motionRemoveGhost(modal);
-  if (opener) motionOpeners.set(modal, opener);
-  const from = opener ? motionRect(opener) : null;
   // The page as it is, for receding behind the form once it takes the page's place.
   const section = motionSection();
   const behind = section && section.getClientRects().length ? motionPageSnapshot(section) : null;
-  return () => motionZoomIn(modal, from, behind);
+  return () => motionZoomIn(modal, behind);
 }
 
 function motionClose(modal) {
@@ -252,9 +270,6 @@ function motionClose(modal) {
   modal.querySelector('.modal-card')?.getAnimations().forEach((a) => a.cancel());
   const g = motionGhost(modal);
   if (!g) return null;
-  // Closed by a click inside it (✕): reshapes into that button, measured before it goes.
-  const press = motionLastPress;
-  if (press && performance.now() - press.at < 1000 && modal.contains(press.el)) g.target = motionRect(press.el);
   motionGhosts.set(modal, g);
   return () => motionZoomOut(modal, g);
 }
@@ -294,10 +309,6 @@ function initMotion() {
   if (initMotion.done || typeof Element.prototype.animate !== 'function') return;
   initMotion.done = true;
   const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  document.addEventListener('click', (event) => {
-    const el = event.target.closest?.(MOTION_OPENER);
-    if (el) motionLastPress = { el, at: performance.now() };
-  }, true);
   const hook = (el, before, onError) => Object.defineProperty(el, 'hidden', {
     configurable: true,
     get() { return native.get.call(this); },
@@ -317,8 +328,8 @@ function initMotion() {
 }
 
 // ── Pages ──
-// From the hub a page zooms out of its tile while the hub zooms past; back, it
-// reshapes into the tile and the hub settles in. Page to page is a navigation push.
+// From the hub a page rises as a sheet while the hub zooms past; back, it
+// sinks away as the hub settles in. Page to page is a navigation push.
 
 function motionTile(section, panel) {
   return panel && document.querySelector(`.page-tile[data-section="${section.id}"][data-route="${panel.dataset.route}"]`);
@@ -367,14 +378,19 @@ function motionPagePush(section, m) {
   document.body.appendChild(m.snap.wrap);
   if (m.dir === 'push') {
     m.snap.wrap.style.zIndex = '-1';
-    motionWhile(section, motionScreen(edge), section.animate([{ transform: `translateX(${off}px)` }, { transform: 'none' }], MOTION_NAV));
+    const restoreBar = motionDetachOverlays();
+    motionWhile(section, motionScreen(edge), section.animate([{ transform: `translateX(${off}px)` }, { transform: 'none' }], MOTION_NAV))
+      .finished.then(restoreBar, restoreBar);
+    motionCounterCrumb(section, off, MOTION_NAV, 'X');
     return m.snap.wrap.animate([{ transform: 'none', filter: 'brightness(1)' }, { transform: `translateX(${parallax}px)`, filter: dim }], timing);
   }
   Object.assign(m.snap.wrap.style, { zIndex: '5', ...motionScreen(edge) });
+  const restoreBar = motionDetachOverlays();
   motionWhile(section, motionScreen(), section.animate([
     { transform: `translateX(${parallax}px)`, filter: dim },
     { transform: 'none', filter: 'brightness(1)' },
-  ], MOTION_NAV));
+  ], MOTION_NAV)).finished.then(restoreBar, restoreBar);
+  motionCounterCrumb(section, parallax, MOTION_NAV, 'X');
   return m.snap.wrap.animate([{ transform: 'none' }, { transform: `translateX(${off}px)` }], timing);
 }
 
@@ -385,34 +401,35 @@ function motionPage(panel, section, m) {
     let anim = null;
     try {
       if (m.tile) {
-        // Launch: the old page zooms past and dims while this one opens out of the tile.
+        // Launch: the old page zooms past and dims while this one rises as a sheet.
         m.snap.wrap.style.zIndex = '-1';
         document.body.appendChild(m.snap.wrap);
         anim = m.snap.wrap.animate([
           { transform: 'none', filter: 'brightness(1)', opacity: 1 },
           { transform: 'scale(1.12)', filter: 'brightness(.55)', opacity: 0 },
         ], { ...MOTION_ZOOM, fill: 'forwards' });
+        const rise = innerHeight - Math.max(section.getBoundingClientRect().top, 0);
+        const restoreBar = motionDetachOverlays();
         motionWhile(section, motionScreen('0 24px 60px rgba(0, 0, 0, .25)'),
-          section.animate([motionMorph(m.tile, motionBox(section)), MOTION_FULL(0)], MOTION_ZOOM));
+          section.animate([{ transform: `translateY(${rise}px)` }, { transform: 'none' }], MOTION_NAV))
+          .finished.then(restoreBar, restoreBar);
+        motionCounterCrumb(section, rise, MOTION_NAV);
+      } else if (motionRect(m.closeTile)) {
+        // Back to the tile: the page sinks away down the screen; the hub settles in from zoomed.
+        Object.assign(m.snap.wrap.style, { zIndex: '5', ...motionScreen('0 24px 60px rgba(0, 0, 0, .25)') });
+        document.body.appendChild(m.snap.wrap);
+        const sink = innerHeight - Math.max(m.snap.box.top, 0);
+        anim = m.snap.wrap.animate([{ transform: 'none' }, { transform: `translateY(${sink}px)` }],
+          { ...MOTION_DISMISS, fill: 'forwards' });
+        const middle = motionMiddle(section);
+        const restoreBar = motionDetachOverlays();
+        section.animate([
+          { transformOrigin: middle, transform: 'scale(1.1)', filter: 'brightness(.55)', opacity: 0 },
+          { transformOrigin: middle, transform: 'none', filter: 'brightness(1)', opacity: 1 },
+        ], MOTION_DISMISS).finished.then(restoreBar, restoreBar);
+        motionCounterCrumbScale(section, 1.1, MOTION_DISMISS);
       } else {
-        const tile = motionRect(m.closeTile);
-        if (tile) {
-          // Back to the tile: the page reshapes into it; the hub settles in from zoomed.
-          Object.assign(m.snap.wrap.style, { zIndex: '5', ...motionScreen('0 24px 60px rgba(0, 0, 0, .25)') });
-          document.body.appendChild(m.snap.wrap);
-          anim = m.snap.wrap.animate([
-            { ...MOTION_FULL(0), opacity: 1 },
-            { opacity: 1, offset: .75 },
-            { ...motionMorph(tile, m.snap.box), opacity: 0 },
-          ], { ...MOTION_DISMISS, fill: 'forwards' });
-          const middle = motionMiddle(section);
-          section.animate([
-            { transformOrigin: middle, transform: 'scale(1.1)', filter: 'brightness(.55)', opacity: 0 },
-            { transformOrigin: middle, transform: 'none', filter: 'brightness(1)', opacity: 1 },
-          ], MOTION_DISMISS);
-        } else {
-          anim = motionPagePush(section, m);
-        }
+        anim = motionPagePush(section, m);
       }
       motionPageGhost = m.snap;
       const done = () => { if (motionPageGhost === m.snap) { m.snap.wrap.remove(); motionPageGhost = null; } };

@@ -617,7 +617,7 @@ async function runStockAnalysis() {
   const btn = document.getElementById('analysis-generate-btn');
   const { symbol, signals } = analysisLoaded;
   btn.disabled = true;
-  btn.textContent = '🤖…';
+  markIconBusy(btn);
   clearFieldError('analysis-form-error');
   try {
     const message = analysisUserMessage();
@@ -638,6 +638,6 @@ async function runStockAnalysis() {
     showFieldError('analysis-form-error', err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '🤖';
+    settleIconBusy(btn);
   }
 }

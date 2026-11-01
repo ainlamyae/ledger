@@ -13,15 +13,16 @@ const USDA_FDC_SEARCH_API = 'https://api.nal.usda.gov/fdc/v1/foods/search';
 // first and dropped: it 404s unreliably even against USDA's own documented
 // example, and is redundant anyway since this search response already has
 // the full panel.
-async function usdaLookupKcalCandidates(query) {
+// The form's picker passes a wider search (pageSize 10, branded foods too).
+async function usdaLookupKcalCandidates(query, { pageSize = 5, dataType = 'Foundation,SR Legacy' } = {}) {
   const apiKey = getSettingString('USDA_FDC_API_KEY', null);
   if (!apiKey) throw new Error('Add a USDA_FDC_API_KEY setting first (Settings panel).');
 
   const params = new URLSearchParams({
     api_key: apiKey,
     query,
-    pageSize: '5',
-    dataType: 'Foundation,SR Legacy',
+    pageSize: String(pageSize),
+    dataType,
   });
 
   const res = await fetch(`${USDA_FDC_SEARCH_API}?${params}`);
@@ -36,6 +37,8 @@ async function usdaLookupKcalCandidates(query) {
       return {
         description: food.description,
         fdcId: food.fdcId,
+        brand: food.brandName || food.brandOwner || '',
+        dataType: food.dataType || '',
         kcalPer100g: energy.value,
         proteinPer100g: protein ? protein.value : null,
         nutrients: (food.foodNutrients || [])

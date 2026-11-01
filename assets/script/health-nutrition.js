@@ -168,6 +168,7 @@ async function initNutrition(forceRefresh = false) {
     document.getElementById('nutrition-cancel-btn').addEventListener('click', closeNutritionForm);
     onFormSubmit('nutrition-form', submitNutritionForm);
     document.getElementById('nutrition-pull-micros-single-btn').addEventListener('click', pullMicronutrientsForForm);
+    document.getElementById('nutrition-usda-choices').addEventListener('click', pickNutritionUsdaChoice);
     document.getElementById('nutrition-scan-btn').addEventListener('click', () => document.getElementById('nutrition-scan-input').click());
     document.getElementById('nutrition-scan-input').addEventListener('change', scanNutritionLabel);
     document.getElementById('nutrition-normalize-btn').addEventListener('click', normalizeIngredientForm);
@@ -690,6 +691,8 @@ function openNutritionForm(entry, onSaved = null) {
   renderNutritionGroupOptions();
   document.getElementById('nutrition-name').value = entry ? entry.name : '';
   document.getElementById('nutrition-amount').value = entry ? entry.amount : '';
+  document.getElementById('nutrition-usda-source').hidden = true;
+  hideNutritionUsdaChoices();
   document.getElementById('nutrition-calories').value = (entry && entry.calories !== null) ? entry.calories : '';
   document.getElementById('nutrition-protein').value = (entry && entry.protein !== null) ? entry.protein : '';
   // Pre-filled from whatever resolvedNutritionMacros would already show in
@@ -934,17 +937,23 @@ function closeNutritionForm() {
   nutritionFormEntry = null;
 }
 
-// The Add/Edit Ingredient form's own Complete button — the same job as the bulk
-// one on the Nutrition table (pullNutritionFromUsda), on whatever's typed. Amount
-// is read, never written; the result lands in the form and is saved by Save.
+// The form's Complete: lists USDA's top 10 matches (branded foods too) under
+// Amount and fills the form from the one you click. Amount is never written.
+let nutritionUsdaChoices = [];
+
 async function pullMicronutrientsForForm() {
   const btn = document.getElementById('nutrition-pull-micros-single-btn');
   const name = document.getElementById('nutrition-name').value.trim();
   const amount = document.getElementById('nutrition-amount').value.trim();
 
   clearFieldError('nutrition-form-error');
+  hideNutritionUsdaChoices();
   if (!name) {
     showFieldError('nutrition-form-error', 'Type an ingredient name first — that name is what gets looked up.');
+    return;
+  }
+  if (parseGramsFromAmount(amount) === null) {
+    showFieldError('nutrition-form-error', `Couldn't pull micronutrients for "${name}" — Amount has no gram figure to scale from.`);
     return;
   }
 
@@ -952,15 +961,105 @@ async function pullMicronutrientsForForm() {
   const originalLabel = btn.textContent;
   btn.textContent = '🧲…';
 
-  const result = await pullNutritionFromUsda(name, amount);
+  let candidates = [];
+  let reason = 'no USDA match';
+  try {
+    candidates = await usdaLookupKcalCandidates(name, { pageSize: 10, dataType: 'Foundation,SR Legacy,Survey (FNDDS),Branded' });
+  } catch (err) {
+    reason = err.message;
+  }
 
   btn.disabled = false;
   btn.textContent = originalLabel;
 
-  if (!result.applied) {
-    showFieldError('nutrition-form-error', `Couldn't pull micronutrients for "${name}" — ${result.reason}.`);
+  if (!candidates.length) {
+    showFieldError('nutrition-form-error', `Couldn't pull micronutrients for "${name}" — ${reason}.`);
     return;
   }
+
+  // Closest to your ticked values first; USDA's order when nothing is ticked.
+  const grams = parseGramsFromAmount(amount);
+  const typed = nutritionFormTickedValues();
+  const ranked = candidates
+    .map((c) => ({ c, match: usdaCandidateMatch(c, grams, typed) }))
+    .sort((a, b) => (b.match ?? 0) - (a.match ?? 0));
+
+  nutritionUsdaChoices = ranked.map((r) => r.c);
+  const list = document.getElementById('nutrition-usda-choices');
+  list.replaceChildren(...ranked.map(({ c, match }, i) => {
+    const r = usdaCandidateResult(c, grams);
+    const li = document.createElement('li');
+    li.dataset.index = String(i);
+    li.textContent = [
+      c.description, c.brand, c.dataType,
+      `${r.calories} kcal, ${r.protein ?? '?'}g protein in ${grams}g`,
+      match !== null ? `${Math.round(match * 100)}% match` : '',
+    ].filter(Boolean).join(' · ');
+    return li;
+  }));
+  list.hidden = false;
+}
+
+// Ticked rows with a typed number, keyed by USDA nutrient name ('Energy' for Calories).
+function nutritionFormTickedValues() {
+  const locked = nutritionFormLockedNames();
+  const panel = readNutritionFormPanel();
+  const typed = new Map();
+  NUTRITION_TOP_ROWS.forEach((row) => {
+    if (!locked.has(row.name) || row.name === 'TEF') return;
+    const value = microAmountValue(document.getElementById(row.inputId).value);
+    if (value !== null) typed.set(row.name === 'Calories' ? 'Energy' : row.panel, value);
+  });
+  locked.forEach((name) => { if (panel[name] && !typed.has(name)) typed.set(name, panel[name].amount); });
+  return typed;
+}
+
+// 0–1 similarity of a candidate (scaled to grams) to the typed values; a missing figure counts as 0.
+function usdaCandidateMatch(candidate, grams, typed) {
+  if (!typed.size) return null;
+  const scale = grams / 100;
+  let total = 0;
+  typed.forEach((value, name) => {
+    const per100 = name === 'Energy' ? candidate.kcalPer100g : candidate.nutrients.find((n) => n.name === name)?.amountPer100g;
+    if (per100 === undefined) return;
+    const other = per100 * scale;
+    const larger = Math.max(Math.abs(value), Math.abs(other));
+    total += larger === 0 ? 1 : 1 - Math.abs(value - other) / larger;
+  });
+  return total / typed.size;
+}
+
+function hideNutritionUsdaChoices() {
+  const list = document.getElementById('nutrition-usda-choices');
+  list.hidden = true;
+  list.replaceChildren();
+  nutritionUsdaChoices = [];
+}
+
+function pickNutritionUsdaChoice(e) {
+  const item = e.target.closest('li');
+  const candidate = item && nutritionUsdaChoices[Number(item.dataset.index)];
+  if (!candidate) return;
+  hideNutritionUsdaChoices();
+  const grams = parseGramsFromAmount(document.getElementById('nutrition-amount').value.trim());
+  if (grams === null) {
+    showFieldError('nutrition-form-error', 'Amount has no gram figure to scale from.');
+    return;
+  }
+  applyNutritionUsdaResult(usdaCandidateResult(candidate, grams));
+}
+
+// Fills the form from one picked USDA result.
+function applyNutritionUsdaResult(result) {
+  // Links the USDA food the figures came from.
+  const source = document.getElementById('nutrition-usda-source');
+  source.replaceChildren('USDA: ', Object.assign(document.createElement('a'), {
+    href: `https://fdc.nal.usda.gov/food-details/${result.fdcId}/nutrients`,
+    target: '_blank',
+    rel: 'noopener',
+    textContent: result.description,
+  }));
+  source.hidden = false;
 
   // Ticked rows are kept as typed; every other row takes the USDA figure. TEF has no
   // USDA figure, so an unticked one gets the estimate from the new Protein/Carb/Fat.
@@ -1612,19 +1711,23 @@ async function pullNutritionFromUsda(name, amount) {
   try {
     const candidates = await usdaLookupKcalCandidates(name);
     if (candidates.length === 0) return { applied: false, reason: 'no USDA match' };
-
-    const candidate = candidates[0];
-    const scale = grams / 100;
-    return {
-      applied: true,
-      description: candidate.description,
-      calories: Math.round(candidate.kcalPer100g * scale),
-      protein: candidate.proteinPer100g !== null ? Math.round(candidate.proteinPer100g * scale * 10) / 10 : null,
-      nutrients: candidate.nutrients.length ? nutrientPanelFromCandidate(candidate, grams) : null,
-    };
+    return usdaCandidateResult(candidates[0], grams);
   } catch (err) {
     return { applied: false, reason: err.message };
   }
+}
+
+// One USDA candidate scaled to a gram amount, in pullNutritionFromUsda's result shape.
+function usdaCandidateResult(candidate, grams) {
+  const scale = grams / 100;
+  return {
+    applied: true,
+    description: candidate.description,
+    fdcId: candidate.fdcId,
+    calories: Math.round(candidate.kcalPer100g * scale),
+    protein: candidate.proteinPer100g !== null ? Math.round(candidate.proteinPer100g * scale * 10) / 10 : null,
+    nutrients: candidate.nutrients.length ? nutrientPanelFromCandidate(candidate, grams) : null,
+  };
 }
 
 // Scales one USDA candidate's per-100g nutrient panel to a real gram amount —

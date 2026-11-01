@@ -3264,12 +3264,14 @@ html.home-hub .page-tiles,
     margin: 0 var(--space-xs);
 }
 
-.site-footer a {
+.site-footer a,
+.hint a {
     color: var(--color-primary);
     text-decoration: none;
 }
 
-.site-footer a:hover {
+.site-footer a:hover,
+.hint a:hover {
     text-decoration: underline;
 }
 

@@ -862,8 +862,7 @@ function setupPanelToggles() {
     heading.prepend(icon);
 
     // Staggered fade/slide-in the first time the dashboard becomes visible.
-    panel.style.setProperty('--enter-index', i);
-    panel.classList.add('panel-enter');
+    Motion.enterPanel(panel, i);
 
     heading.setAttribute('role', 'button');
     heading.setAttribute('tabindex', '0');
@@ -1116,7 +1115,7 @@ function setupAuthGatedActions() {
 // The view the address names: block toggles, then the tiles and breadcrumb the
 // hub/page views show (page-nav.js), then the router reading the address.
 function routeDashboard() {
-  initMotion();
+  Motion.init();
   setupPanelToggles();
   initPageNav();
   initRouter();

@@ -509,7 +509,7 @@ function closeTransactionForm() {
 
 // Confetti on saving money in: an Income category with a positive amount —
 // same burst Physique fires when body mass moves toward the healthy mass
-// (celebrateWithConfetti, confetti.js). Category is free text, so matched
+// (Motion.confetti). Category is free text, so matched
 // without regard to case or stray spaces.
 function isIncomeTransaction(category, amount) {
   return String(category || '').trim().toLowerCase() === 'income' && amount > 0;
@@ -575,7 +575,7 @@ async function submitTransactionForm(event) {
       }
     }
 
-    if (isIncomeTransaction(values[0][3], amount)) celebrateWithConfetti();
+    if (isIncomeTransaction(values[0][3], amount)) Motion.confetti();
 
     await refreshTransactions(true);
     const saved = allTransactions.find((t) => t.row === savedRow);

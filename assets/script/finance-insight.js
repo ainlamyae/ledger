@@ -282,7 +282,7 @@ async function runFinancialInsightGeneration() {
 
   btn.disabled = true;
   textarea.disabled = true;
-  markIconBusy(btn);
+  Motion.iconBusy(btn);
 
   try {
     const text = await aiChatText(FINANCIAL_INSIGHT_SYSTEM_PROMPT, financialInsightUserMessage(data, textarea.value));
@@ -306,7 +306,7 @@ async function runFinancialInsightGeneration() {
   } finally {
     btn.disabled = false;
     textarea.disabled = false;
-    settleIconBusy(btn);
+    Motion.iconSettle(btn);
   }
 }
 

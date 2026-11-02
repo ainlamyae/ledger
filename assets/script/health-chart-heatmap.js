@@ -1,19 +1,15 @@
-// Health Chart's heatmap, LeetCode's grid over the range buttons' days (healthDateRange):
-// one cell per day, columns are weeks (Monday first), the last one holding the range's
-// end. A day's colour is its Calorie Balance bar's (energyBalanceGrade); a day with no
-// food logged is an empty square. Each cell holds its day of the month.
+// Health Chart's heatmap over the range's days (healthDateRange), laid out like LeetCode's:
+// rows are weekdays (Monday first), columns weeks, each month its own block with an empty
+// column before the next, so a week spanning two months splits. A day's colour is its
+// Calorie Balance bar's; a day with no food logged is an empty square.
 
 function renderHealthHeatmap(entries) {
   const grid = document.getElementById('health-heatmap');
   if (!grid) return;
   const months = document.getElementById('health-heatmap-months');
 
-  // Back to the range's first Monday, so every column is a whole week.
   const { from, to } = healthDateRange();
-  const start = dateFromIso(from);
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const dates = datesInRange(isoFromDate(start), to);
-  const weeks = Math.max(1, Math.ceil(dates.length / 7));
+  const dates = datesInRange(from, to);
 
   // Calorie Balance's own profile check: without one there's no BMR to subtract.
   const heightCm = getSetting('HEIGHT_CM', null);
@@ -30,10 +26,29 @@ function renderHealthHeatmap(entries) {
 
   grid.innerHTML = '';
   months.innerHTML = '';
+  let col = 0;
+  let monthLabel = null;
+  let monthStart = 0;
   dates.forEach((iso, i) => {
+    const d = dateFromIso(iso);
+    const row = (d.getDay() + 6) % 7;
+    // New month: a gap column, then its own label.
+    if (i === 0 || d.getDate() === 1) {
+      col += i === 0 ? 1 : 2;
+      monthStart = col;
+      monthLabel = document.createElement('span');
+      monthLabel.textContent = d.toLocaleString('en', { month: 'short' });
+      monthLabel.style.textAlign = 'center';
+      months.appendChild(monthLabel);
+    } else if (row === 0) {
+      col += 1;
+    }
+    monthLabel.style.gridColumn = `${monthStart} / ${col + 1}`;
     const balance = balanceData[i];
     const cell = document.createElement('span');
-    cell.textContent = String(dateFromIso(iso).getDate());
+    cell.style.gridColumn = String(col);
+    cell.style.gridRow = String(row + 1);
+    cell.textContent = String(d.getDate());
     if (balance === null) {
       cell.title = `${iso}: no calories logged`;
     } else {
@@ -47,15 +62,8 @@ function renderHealthHeatmap(entries) {
       cell.title = privacyMode ? maskDigits(text) : text;
     }
     grid.appendChild(cell);
-    // A month's name over the first week it starts in.
-    const d = dateFromIso(iso);
-    if (d.getDate() <= 7 && d.getDay() === 1) {
-      const label = document.createElement('span');
-      label.textContent = d.toLocaleString('en', { month: 'short' });
-      label.style.gridColumn = String(Math.floor(i / 7) + 1);
-      months.appendChild(label);
-    }
   });
+  const weeks = Math.max(1, col);
   grid.style.setProperty('--weeks', String(weeks));
   months.style.setProperty('--weeks', String(weeks));
   const scroll = document.getElementById('health-heatmap-scroll');

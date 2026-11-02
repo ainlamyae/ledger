@@ -46,23 +46,6 @@ function clearFieldError(elId) {
   document.getElementById(elId).hidden = true;
 }
 
-// Grows an emoji icon button while the action it started is running, then
-// bounces it back to actual size once markIconBusy's counterpart below clears
-// it (icon-busy/icon-settle keyframes, styles.css) — there's no label text to
-// put an ellipsis next to. Shared by withButtonBusy and the few call sites
-// (an AI generate button, a photo scan) that manage their own disabled state
-// instead of going through that wrapper.
-function markIconBusy(btn) {
-  btn.classList.remove('icon-settle');
-  btn.classList.add('icon-busy');
-}
-
-function settleIconBusy(btn) {
-  btn.classList.remove('icon-busy');
-  btn.classList.add('icon-settle');
-  btn.addEventListener('animationend', () => btn.classList.remove('icon-settle'), { once: true });
-}
-
 // Builds a small icon-only action button (Edit/Delete/Duplicate/prev-next,
 // etc.) with the title/aria-label pair every row action and pager control uses.
 // Marks a button busy for the length of an async action and disables it until
@@ -87,7 +70,7 @@ async function withButtonBusy(btn, run) {
   btn.dataset.busy = '1';
   btn.setAttribute('aria-busy', 'true');
   if (isIcon) {
-    markIconBusy(btn);
+    Motion.iconBusy(btn);
   } else {
     btn.textContent = `${label}…`;
   }
@@ -97,7 +80,7 @@ async function withButtonBusy(btn, run) {
     delete btn.dataset.busy;
     btn.removeAttribute('aria-busy');
     if (isIcon) {
-      settleIconBusy(btn);
+      Motion.iconSettle(btn);
     } else {
       btn.textContent = label;
     }

@@ -35,13 +35,13 @@
 
 ### Motion
 
-iOS's motion system, from `motion.js` (Web Animations over every `.modal`'s and the toast's `hidden`, so every write stays synchronous):
+iOS's motion system. All of it lives in `motion.js` (`window.Motion`): its CSS, keyframes and view transitions too, so no other file or stylesheet animates. Web Animations ride over every `.modal`'s and the toast's `hidden`, so every write stays synchronous. Only content moves; the background never does.
 
-- **Springs, not curves:** a SwiftUI-style solver (`motionSpring`): navigation (.4s response, quick launch, no bounce), opening (a hint of overshoot), dismissing (none), the toast (springy).
+- **Springs, not curves:** a SwiftUI-style solver (`spring`): navigation (.4s response, quick launch, no bounce), opening (a hint of overshoot), dismissing (none), the toast (springy).
 - **Zoom morph:** a form or dialog opens out of the button or row that opened it. That control's own frame and corners reshape into the card (clip-path plus scale, aspect-filled, never squashed). ✕ reshapes it back into the ✕ clicked; Back, Escape or the breadcrumb back into its opener. With neither on screen it rises and drops like an iOS sheet.
 - **The background reacts:** the page behind a form page recedes (scales to .92, dims, rounds its corners) as the form opens, and comes forward again as it closes; an overlay's glass backdrop fades and blurs in.
 - **Pages:** from the hub, a page zooms out of its tile while the hub zooms past and dims; back, it reshapes into the tile and the hub settles in from zoomed. Insight's views do the same with their own tiles. Page to page is a navigation push: the new page, opaque with a leading-edge shadow, slides in from the right edge while the old one drifts 30% left and dims; Back reverses it.
-- **Across page loads** (section to section, home): the same push and spring through cross-document View Transitions (`@view-transition` in styles.css), the tab bar and sidebar holding still; Back, or up to a shorter address, reverses (a `pagereveal` handler in index.html and section-page.js). No slide on a reload.
+- **Across page loads** (section to section, home): the same push and spring through cross-document View Transitions (`@view-transition`, from motion.js), the background, tab bar and sidebar holding still; Back, or up to a shorter address, reverses (motion.js's `pagereveal` handler). No slide on a reload.
 - **Toast** springs up from the bottom and sinks away. Buttons give under a press and spring back.
 - It plays even with the system's animation effects turned off.
 

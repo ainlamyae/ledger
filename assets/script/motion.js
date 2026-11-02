@@ -1,19 +1,37 @@
-// Windows/iOS-style motion: a form grows out of the button that opened it and
-// minimizes back into it on close; pages push and pop. Writes stay synchronous.
+// iOS motion: springs, a sheet rising from (and sinking back off) the bottom
+// edge — the one motion every form, dialog, and tile-opened page uses to open
+// and close — a receding/zooming background, and page-to-page navigation
+// push/pop. Every write stays synchronous; animations ride on top (live
+// elements, or copies of what left).
 
-// Critically damped spring (no overshoot), as iOS navigation.
-const MOTION_SPRING = 'linear(0, .079 5%, .236 10%, .403 15%, .551 20%, .671 25%, .764 30%, .833 35%, .883 40%, .944 50%, .974 60%, .988 70%, .995 80%, 1)';
-// Restore decelerates out of the button; minimize accelerates into it.
-const MOTION_GROW = 'cubic-bezier(.2, .9, .3, 1)';
-const MOTION_SHRINK = 'cubic-bezier(.55, 0, .8, .4)';
-const MOTION_OPENER = 'button, a, tr, .page-tile, [role="button"]';
-const motionOpeners = new WeakMap(); // modal -> element that opened it
-const motionGhosts = new Map(); // modal -> its closing ghost
-let motionLastPress = null; // { el, at }
+// A SwiftUI-style spring (response s, bounce 0-1, launch velocity) as a CSS
+// linear() easing plus the time it takes to settle.
+function motionSpring(response, bounce = 0, v0 = 0) {
+  const w0 = (2 * Math.PI) / response;
+  const z = 1 - bounce;
+  const x = (t) => {
+    if (z >= 1) return 1 - Math.exp(-w0 * t) * (1 + (w0 - v0) * t);
+    const wd = w0 * Math.sqrt(1 - z * z);
+    return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + ((z * w0 - v0) / wd) * Math.sin(wd * t));
+  };
+  let end = response * 0.5;
+  while (end < 3 && [0, 0.02, 0.05, 0.1].some((d) => Math.abs(x(end + d) - 1) > 0.002)) end += 0.01;
+  const points = [];
+  for (let i = 0; i < 40; i++) points.push(+x((end * i) / 40).toFixed(3));
+  return { duration: Math.round(end * 1000), easing: `linear(${points.join(', ')}, 1)` };
+}
+
+const MOTION_NAV = motionSpring(0.4, 0, 6); // push/pop: quick launch, soft landing
+const MOTION_ZOOM = motionSpring(0.48, 0.16, 3); // the background's zoom-past/settle: a hint of overshoot
+const MOTION_DISMISS = motionSpring(0.38, 0, 4); // closing: no overshoot
+const MOTION_POP = motionSpring(0.38, 0.28); // toast
+
+const motionGhosts = new Map(); // modal -> its closing copy
 let motionPageDir = null; // 'push' | 'pop', set by the router
 let motionLastPage; // { panel, key } shown last; panel null = hub, key = block/view
 let motionPrepared = null; // taken before a view resets, used by showSectionPage
 const motionPageTiles = new Map(); // a view page's key -> the tile that opened it
+let motionPageGhost = null;
 
 function motionRect(el) {
   if (!el?.isConnected) return null;
@@ -22,166 +40,43 @@ function motionRect(el) {
   return { left: r.left, top: r.top, width: r.width, height: r.height, radius: parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0 };
 }
 
-// Box `on` shrunk evenly (no squash) with its on-screen part centred on `at`,
-// as a minimized window over its taskbar icon. Origin is on's top-left.
-function motionMinimized(at, on) {
-  const top = Math.max(on.top, 0);
-  const bottom = Math.min(on.top + on.height, innerHeight);
-  const s = Math.max(Math.min(at.width / on.width, 1), 0.03);
-  const cx = on.left + on.width / 2;
-  const cy = (top + bottom) / 2;
-  const x = at.left + at.width / 2 - on.left - s * (cx - on.left);
-  const y = at.top + at.height / 2 - on.top - s * (cy - on.top);
-  return { transform: `translate(${x}px, ${y}px) scale(${s})`, borderRadius: `${Math.max(at.radius, 6) / s}px` };
+function motionBox(el) {
+  const r = el.getBoundingClientRect();
+  return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
 
-// Overlay backdrops (glass blur on wide screens) fade with their card.
-function motionBackdrop(el, show, fill = 'none') {
-  const cs = getComputedStyle(el);
-  const frames = [
-    { backgroundColor: 'rgba(0, 0, 0, 0)', backdropFilter: 'none' },
-    { backgroundColor: cs.backgroundColor, backdropFilter: cs.backdropFilter },
-  ];
-  return el.animate(show ? frames : frames.reverse(), { duration: 300, easing: 'ease', fill });
+// The page's own background, so a moving layer is opaque like an iOS screen.
+function motionSurface() {
+  const cs = getComputedStyle(document.body);
+  return { backgroundColor: cs.backgroundColor, backgroundImage: cs.backgroundImage, backgroundAttachment: 'fixed' };
 }
 
-function motionZoomIn(modal, from) {
-  const card = modal.querySelector('.modal-card');
-  if (!card || modal.hidden) return;
-  card.getAnimations().forEach((a) => a.cancel());
-  if (!modal.classList.contains('form-page')) motionBackdrop(modal, true);
-  const on = card.getBoundingClientRect();
-  const frames = from
-    ? [
-      { transformOrigin: '0 0', ...motionMinimized(from, on), opacity: 0 },
-      { opacity: 1, offset: .08 },
-      { transformOrigin: '0 0', transform: 'none', borderRadius: getComputedStyle(card).borderRadius, opacity: 1 },
-    ]
-    : [
-      { transform: 'translateY(24px) scale(.96)', opacity: 0 },
-      { transform: 'none', opacity: 1 },
-    ];
-  card.animate(frames, from ? { duration: 380, easing: MOTION_GROW } : { duration: 400, easing: MOTION_SPRING });
+// Inline styles for the length of an animation, then put back.
+function motionWhile(el, styles, anim) {
+  const before = Object.keys(styles).map((k) => [k, el.style[k]]);
+  Object.assign(el.style, styles);
+  const restore = () => before.forEach(([k, v]) => { el.style[k] = v; });
+  anim.finished.then(restore, restore);
+  return anim;
 }
 
-// A copy of the card left where it was, since the real one is gone at once.
-function motionGhost(modal) {
-  const card = modal.querySelector('.modal-card');
-  const r = card && card.getBoundingClientRect();
-  if (!r?.width || !r.height) return null;
-  const cs = getComputedStyle(card);
-  const ghost = card.cloneNode(true);
-  ghost.removeAttribute('id');
-  ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
-  ghost.inert = true;
-  ghost.setAttribute('aria-hidden', 'true');
-  Object.assign(ghost.style, {
-    position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
-    maxWidth: 'none', maxHeight: 'none', margin: '0', overflow: 'hidden', pointerEvents: 'none', zIndex: '1000',
-    background: cs.background, borderRadius: cs.borderRadius, boxShadow: cs.boxShadow, padding: cs.padding,
-    color: cs.color, font: cs.font,
-  });
-  let backdrop = null;
-  if (!modal.classList.contains('form-page')) {
-    const ms = getComputedStyle(modal);
-    backdrop = document.createElement('div');
-    Object.assign(backdrop.style, {
-      position: 'fixed', inset: '0', zIndex: '999', pointerEvents: 'none',
-      backgroundColor: ms.backgroundColor, backdropFilter: ms.backdropFilter,
-    });
-    document.body.appendChild(backdrop);
-  }
-  document.body.appendChild(ghost);
-  return { ghost, backdrop, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, started: false };
+// The bottom bar (on a phone, `.action-bar`) is `position: fixed` so it's meant
+// to stay put on screen regardless of what's animating — but it's also a DOM
+// descendant of the page or form card being animated here, and a `transform` or
+// `filter` on an ancestor (even mid-animation, even set by the Web Animations
+// API rather than CSS) makes THAT ancestor the fixed element's containing block
+// instead of the viewport, and composites it into the blur/dim filter too. Left
+// alone, the real bar gets dragged along with the page/card's motion. Detaching
+// it to <body> for the motion's length keeps it exactly where it always is.
+function motionDetachOverlays() {
+  const bar = document.querySelector('.action-bar');
+  if (!bar) return () => {};
+  const { parentNode, nextSibling } = bar;
+  document.body.appendChild(bar);
+  return () => { (nextSibling ? parentNode?.insertBefore(bar, nextSibling) : parentNode?.appendChild(bar)); };
 }
 
-function motionRemoveGhost(modal) {
-  const g = motionGhosts.get(modal);
-  if (!g) return;
-  motionGhosts.delete(modal);
-  g.ghost.remove();
-  g.backdrop?.remove();
-}
-
-function motionZoomOut(modal, g) {
-  if (motionGhosts.get(modal) !== g) return;
-  g.started = true;
-  const done = () => { if (motionGhosts.get(modal) === g) motionRemoveGhost(modal); };
-  if (g.backdrop) motionBackdrop(g.backdrop, false, 'forwards');
-  const to = g.target || motionRect(motionOpeners.get(modal));
-  const anim = g.ghost.animate(to
-    ? [
-      { transformOrigin: '0 0', transform: 'none', opacity: 1 },
-      { opacity: 1, offset: .85 },
-      { transformOrigin: '0 0', ...motionMinimized(to, g.rect), opacity: 0 },
-    ]
-    : [
-      { transform: 'none', opacity: 1 },
-      { transform: 'translateY(40px) scale(.97)', opacity: 0 },
-    ], to ? { duration: 320, easing: MOTION_SHRINK, fill: 'forwards' } : { duration: 300, easing: MOTION_SPRING, fill: 'forwards' });
-  anim.finished.then(done, done);
-}
-
-function motionOpen(modal) {
-  const press = motionLastPress;
-  const opener = press && performance.now() - press.at < 1000 && !modal.contains(press.el) ? press.el : null;
-  // Closed and reopened in one go (a save): no animation either way.
-  const pending = motionGhosts.get(modal);
-  if (pending && !pending.started) {
-    motionRemoveGhost(modal);
-    return null;
-  }
-  motionRemoveGhost(modal);
-  if (opener) motionOpeners.set(modal, opener);
-  return () => motionZoomIn(modal, opener ? motionRect(opener) : null);
-}
-
-function motionClose(modal) {
-  motionRemoveGhost(modal);
-  modal.querySelector('.modal-card')?.getAnimations().forEach((a) => a.cancel());
-  const g = motionGhost(modal);
-  if (!g) return null;
-  // Closed by a click inside it (✕): shrinks into that button, measured before it goes.
-  const press = motionLastPress;
-  if (press && performance.now() - press.at < 1000 && modal.contains(press.el)) g.target = motionRect(press.el);
-  motionGhosts.set(modal, g);
-  return () => motionZoomOut(modal, g);
-}
-
-// Every open and close goes through each modal's `hidden`, wherever it's set.
-function initMotion() {
-  if (initMotion.done || typeof Element.prototype.animate !== 'function') return;
-  initMotion.done = true;
-  const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
-  document.addEventListener('click', (event) => {
-    const el = event.target.closest?.(MOTION_OPENER);
-    if (el) motionLastPress = { el, at: performance.now() };
-  }, true);
-  document.querySelectorAll('.modal').forEach((modal) => {
-    Object.defineProperty(modal, 'hidden', {
-      configurable: true,
-      get() { return native.get.call(this); },
-      set(value) {
-        const changed = !!value !== native.get.call(this);
-        let after = null;
-        // Motion must never stop the write itself.
-        try { if (changed) after = value ? motionClose(this) : motionOpen(this); } catch { after = null; }
-        native.set.call(this, value);
-        if (after) requestAnimationFrame(() => { try { after(); } catch { motionRemoveGhost(this); } });
-      },
-    });
-  });
-}
-
-// Pages. Opening from the hub grows out of the tile, closing to the hub
-// minimizes into it, page to page is an iOS push/pop over a copy of the old one.
-let motionPageGhost = null;
-
-function motionTile(section, panel) {
-  return panel && document.querySelector(`.page-tile[data-section="${section.id}"][data-route="${panel.dataset.route}"]`);
-}
-
-// What's on screen now, as a fixed copy (canvases redrawn), clipped to the viewport.
+// What's on screen in `section` now, as a fixed copy (canvases redrawn).
 function motionPageSnapshot(section) {
   const r = section.getBoundingClientRect();
   const cs = getComputedStyle(section);
@@ -197,12 +92,247 @@ function motionPageSnapshot(section) {
   [...section.children].filter((el) => el.getClientRects().length).forEach((el) => {
     const copy = inner.appendChild(el.cloneNode(true));
     copy.querySelectorAll('.action-bar').forEach((bar) => bar.classList.remove('action-bar')); // phone bars stay put
+    // The breadcrumb never moves — not even shrinking/dimming as part of "the old
+    // page recedes" — so it's invisible in this copy rather than cloned live.
+    // visibility (not display/removal) keeps its layout space, so the rest of the
+    // copy still lines up with the real section's own layout underneath it.
+    if (copy.matches('.page-crumb')) copy.style.visibility = 'hidden';
     const from = el.querySelectorAll('canvas');
     copy.querySelectorAll('canvas').forEach((c, i) => {
       try { c.width = from[i].width; c.height = from[i].height; c.getContext('2d').drawImage(from[i], 0, 0); } catch { /* blank is fine */ }
     });
   });
-  return { wrap, box: { left: r.left, top: 0, width: r.width, height: innerHeight, radius: 0 } };
+  return { wrap, box: { left: r.left, top: 0, width: r.width, height: innerHeight } };
+}
+
+// The viewport's middle in `el`'s own coordinates, for scaling around the screen's centre.
+function motionMiddle(el) {
+  const r = el.getBoundingClientRect();
+  return `${innerWidth / 2 - r.left}px ${innerHeight / 2 - r.top}px`;
+}
+
+function motionSection() {
+  return window.ledgerSectionPage && typeof routedSectionId === 'function' ? document.getElementById(routedSectionId(null)) : null;
+}
+
+// Runs the exact inverse of a translateX/Y(d) animation on root's own
+// breadcrumb (if it has one), so the two cancel out and the crumb visually
+// never moves — without reparenting it out of the DOM, which turned out to
+// have its own timing and layout pitfalls (a wrong/stale element picked up,
+// or the rest of the page reflowing into the space it briefly left behind).
+function motionCounterCrumb(root, d, timing, axis = 'Y') {
+  const crumb = root?.querySelector('.page-crumb');
+  if (!crumb) return;
+  crumb.animate([{ transform: `translate${axis}(${-d}px)` }, { transform: 'none' }], timing);
+}
+
+// Same idea, for a scale(s) animation anchored at a transform-origin (the
+// "page comes forward"/"hub settles in" effects): the inverse scale, anchored
+// at the same absolute screen point expressed in the crumb's own coordinates
+// (motionMiddle is relative to whichever element's own box it's given),
+// cancels the parent's scale exactly.
+function motionCounterCrumbScale(root, scale, timing) {
+  const crumb = root?.querySelector('.page-crumb');
+  if (!crumb) return;
+  const origin = motionMiddle(crumb);
+  crumb.animate([
+    { transformOrigin: origin, transform: `scale(${1 / scale})` },
+    { transformOrigin: origin, transform: 'none' },
+  ], timing);
+}
+
+// ── Forms and dialogs ──
+
+// Overlay backdrops (glass blur on wide screens) fade with their card.
+function motionBackdrop(el, show, timing) {
+  const cs = getComputedStyle(el);
+  const frames = [
+    { backgroundColor: 'rgba(0, 0, 0, 0)', backdropFilter: 'blur(0px)' },
+    { backgroundColor: cs.backgroundColor, backdropFilter: cs.backdropFilter === 'none' ? 'blur(0px)' : cs.backdropFilter },
+  ];
+  return el.animate(show ? frames : frames.reverse(), { ...timing, fill: show ? 'none' : 'forwards' });
+}
+
+// The page behind a form page recedes, as iOS's screen under a zoom or sheet.
+function motionRecede(snap) {
+  if (!snap) return;
+  snap.wrap.style.zIndex = '-1';
+  document.body.appendChild(snap.wrap);
+  const anim = snap.wrap.animate([
+    { transform: 'none', filter: 'brightness(1)', borderRadius: '0', opacity: 1 },
+    { transform: 'scale(.92)', filter: 'brightness(.6)', borderRadius: '24px', opacity: 1, offset: .6 },
+    { transform: 'scale(.9)', filter: 'brightness(.5)', borderRadius: '24px', opacity: 0 },
+  ], { ...MOTION_ZOOM, easing: 'linear', fill: 'forwards' });
+  const done = () => snap.wrap.remove();
+  anim.finished.then(done, done);
+}
+
+function motionZoomIn(modal, behind) {
+  const card = modal.querySelector('.modal-card');
+  if (!card || modal.hidden) return behind?.wrap.remove();
+  card.getAnimations().forEach((a) => a.cancel());
+  const page = modal.classList.contains('form-page');
+  if (page) motionRecede(behind);
+  else {
+    behind?.wrap.remove();
+    motionBackdrop(modal, true, MOTION_DISMISS);
+  }
+  // An iOS sheet rising from the bottom edge, whatever opened it. #form-crumb
+  // is a sibling of .modal-card (router.js's updateFormPage inserts it
+  // straight into the modal, not the card), so it's never actually part of
+  // this transform and needs no counter-animation of its own.
+  const dst = motionBox(card);
+  const rise = innerHeight - Math.max(dst.top, 0);
+  const restoreBar = motionDetachOverlays();
+  card.animate([{ transform: `translateY(${rise}px)` }, { transform: 'none' }], MOTION_NAV)
+    .finished.then(restoreBar, restoreBar);
+}
+
+// A copy of the card left where it was, since the real one is gone at once.
+function motionGhost(modal) {
+  const card = modal.querySelector('.modal-card');
+  const r = card && card.getBoundingClientRect();
+  if (!r?.width || !r.height) return null;
+  const cs = getComputedStyle(card);
+  const ghost = card.cloneNode(true);
+  ghost.removeAttribute('id');
+  ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+  ghost.querySelectorAll('.action-bar').forEach((bar) => bar.classList.remove('action-bar')); // phone bar stays put
+  ghost.inert = true;
+  ghost.setAttribute('aria-hidden', 'true');
+  Object.assign(ghost.style, {
+    position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
+    maxWidth: 'none', maxHeight: 'none', margin: '0', overflow: 'hidden', pointerEvents: 'none', zIndex: '1000',
+    background: cs.background, borderRadius: cs.borderRadius, boxShadow: cs.boxShadow, padding: cs.padding,
+    color: cs.color, font: cs.font,
+  });
+  let backdrop = null;
+  const page = modal.classList.contains('form-page');
+  if (!page) {
+    const ms = getComputedStyle(modal);
+    backdrop = document.createElement('div');
+    Object.assign(backdrop.style, {
+      position: 'fixed', inset: '0', zIndex: '999', pointerEvents: 'none',
+      backgroundColor: ms.backgroundColor, backdropFilter: ms.backdropFilter,
+    });
+    document.body.appendChild(backdrop);
+  }
+  document.body.appendChild(ghost);
+  return { ghost, backdrop, page, rect: { left: r.left, top: r.top, width: r.width, height: r.height }, started: false };
+}
+
+function motionRemoveGhost(modal) {
+  const g = motionGhosts.get(modal);
+  if (!g) return;
+  motionGhosts.delete(modal);
+  g.ghost.remove();
+  g.backdrop?.remove();
+}
+
+function motionZoomOut(modal, g) {
+  if (motionGhosts.get(modal) !== g) return;
+  g.started = true;
+  const done = () => { if (motionGhosts.get(modal) === g) motionRemoveGhost(modal); };
+  if (g.backdrop) motionBackdrop(g.backdrop, false, MOTION_DISMISS);
+  // The page comes forward again from behind the form.
+  const section = g.page && motionSection();
+  if (section && section.getClientRects().length) {
+    const middle = motionMiddle(section);
+    const restoreBar = motionDetachOverlays();
+    section.animate([
+      { transformOrigin: middle, transform: 'scale(.92)', filter: 'brightness(.6)' },
+      { transformOrigin: middle, transform: 'none', filter: 'brightness(1)' },
+    ], MOTION_DISMISS).finished.then(restoreBar, restoreBar);
+    motionCounterCrumbScale(section, .92, MOTION_DISMISS);
+  }
+  // An iOS sheet dismissed down the screen, whatever opened it.
+  const anim = g.ghost.animate([{ transform: 'none' }, { transform: `translateY(${innerHeight - Math.max(g.rect.top, 0)}px)` }],
+    { ...MOTION_DISMISS, fill: 'forwards' });
+  anim.finished.then(done, done);
+}
+
+function motionOpen(modal) {
+  // Closed and reopened in one go (a save): no animation either way.
+  const pending = motionGhosts.get(modal);
+  if (pending && !pending.started) {
+    motionRemoveGhost(modal);
+    return null;
+  }
+  motionRemoveGhost(modal);
+  // The page as it is, for receding behind the form once it takes the page's place.
+  const section = motionSection();
+  const behind = section && section.getClientRects().length ? motionPageSnapshot(section) : null;
+  return () => motionZoomIn(modal, behind);
+}
+
+function motionClose(modal) {
+  motionRemoveGhost(modal);
+  modal.querySelector('.modal-card')?.getAnimations().forEach((a) => a.cancel());
+  const g = motionGhost(modal);
+  if (!g) return null;
+  motionGhosts.set(modal, g);
+  return () => motionZoomOut(modal, g);
+}
+
+// ── Toast: springs up from the bottom, sinks away ──
+
+function motionToast(toast, show) {
+  const cs = getComputedStyle(toast);
+  if (show) {
+    return () => toast.animate([
+      { transform: 'translate(-50%, 140%) scale(.9)', opacity: 0 },
+      { opacity: 1, offset: .3 },
+      { transform: 'translate(-50%, 0) scale(1)', opacity: 1 },
+    ], MOTION_POP);
+  }
+  const r = toast.getBoundingClientRect();
+  if (!r.width) return null;
+  const ghost = toast.cloneNode(true);
+  ghost.removeAttribute('id');
+  ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+  ghost.inert = true;
+  ghost.hidden = false;
+  Object.assign(ghost.style, { pointerEvents: 'none', bottom: cs.bottom });
+  document.body.appendChild(ghost);
+  return () => {
+    const anim = ghost.animate([
+      { transform: 'translate(-50%, 0) scale(1)', opacity: 1 },
+      { transform: 'translate(-50%, 60%) scale(.94)', opacity: 0 },
+    ], { duration: 260, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+    const done = () => ghost.remove();
+    anim.finished.then(done, done);
+  };
+}
+
+// Every open and close goes through each modal's (and the toast's) `hidden`, wherever it's set.
+function initMotion() {
+  if (initMotion.done || typeof Element.prototype.animate !== 'function') return;
+  initMotion.done = true;
+  const native = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hidden');
+  const hook = (el, before, onError) => Object.defineProperty(el, 'hidden', {
+    configurable: true,
+    get() { return native.get.call(this); },
+    set(value) {
+      const changed = !!value !== native.get.call(this);
+      let after = null;
+      // Motion must never stop the write itself.
+      try { if (changed) after = before(this, value); } catch { after = null; }
+      native.set.call(this, value);
+      if (after) requestAnimationFrame(() => { try { after(); } catch { onError(this); } });
+    },
+  });
+  document.querySelectorAll('.modal').forEach((modal) => {
+    hook(modal, (m, value) => (value ? motionClose(m) : motionOpen(m)), motionRemoveGhost);
+  });
+  document.querySelectorAll('.toast').forEach((toast) => hook(toast, (t, value) => motionToast(t, !value), () => {}));
+}
+
+// ── Pages ──
+// From the hub a page rises as a sheet while the hub zooms past; back, it
+// sinks away as the hub settles in. Page to page is a navigation push.
+
+function motionTile(section, panel) {
+  return panel && document.querySelector(`.page-tile[data-section="${section.id}"][data-route="${panel.dataset.route}"]`);
 }
 
 function motionClearPage(section) {
@@ -228,60 +358,81 @@ function motionPageBefore(panel, section, opener = null) {
   if (!dir || !from || from.key === key || !section || !initMotion.done) return null;
   motionClearPage(section);
   if (opener) motionPageTiles.set(key, opener);
-  const grow = dir === 'push' ? motionRect(opener || (from.panel === null ? motionTile(section, panel) : null)) : null;
+  const tile = dir === 'push' ? motionRect(opener || (from.panel === null ? motionTile(section, panel) : null)) : null;
   // Back to the hub: into the block's tile; back from a view: into the view's tile.
   const closeTile = dir === 'pop' ? (panel === null ? motionTile(section, from.panel) : motionPageTiles.get(from.key)) : null;
-  return { dir, from, closeTile, tile: grow, snap: grow ? null : motionPageSnapshot(section) };
+  return { dir, closeTile, tile, snap: motionPageSnapshot(section) };
 }
 
-function motionPageSlide(section, m) {
-  const w = innerWidth;
-  const push = m.dir === 'push';
-  m.snap.wrap.style.zIndex = push ? '-1' : '5'; // the page on top is the one moving most
+// The page that's moving gets the page's own background, a soft edge shadow and
+// rounded corners while it does, so it reads as one opaque screen.
+const motionScreen = (shadow = '0 0 0 transparent') => ({ ...motionSurface(), boxShadow: shadow });
+
+function motionPagePush(section, m) {
+  const left = section.getBoundingClientRect().left;
+  const off = innerWidth - left;
+  const parallax = -innerWidth * 0.3;
+  const dim = 'brightness(.72)';
+  const edge = '-16px 0 40px rgba(0, 0, 0, .18)';
+  const timing = { ...MOTION_NAV, fill: 'forwards' };
   document.body.appendChild(m.snap.wrap);
-  const timing = { duration: 450, easing: MOTION_SPRING };
-  section.animate(push
-    ? [{ transform: `translateX(${w}px)` }, { transform: 'none' }]
-    : [{ transform: `translateX(${-w / 3}px)`, opacity: .6 }, { transform: 'none', opacity: 1 }], timing);
-  return m.snap.wrap.animate(push
-    ? [{ transform: 'none', opacity: 1 }, { transform: `translateX(${-w / 3}px)`, opacity: .4 }]
-    : [{ transform: 'none' }, { transform: `translateX(${w}px)` }], { ...timing, fill: 'forwards' });
+  if (m.dir === 'push') {
+    m.snap.wrap.style.zIndex = '-1';
+    const restoreBar = motionDetachOverlays();
+    motionWhile(section, motionScreen(edge), section.animate([{ transform: `translateX(${off}px)` }, { transform: 'none' }], MOTION_NAV))
+      .finished.then(restoreBar, restoreBar);
+    motionCounterCrumb(section, off, MOTION_NAV, 'X');
+    return m.snap.wrap.animate([{ transform: 'none', filter: 'brightness(1)' }, { transform: `translateX(${parallax}px)`, filter: dim }], timing);
+  }
+  Object.assign(m.snap.wrap.style, { zIndex: '5', ...motionScreen(edge) });
+  const restoreBar = motionDetachOverlays();
+  motionWhile(section, motionScreen(), section.animate([
+    { transform: `translateX(${parallax}px)`, filter: dim },
+    { transform: 'none', filter: 'brightness(1)' },
+  ], MOTION_NAV)).finished.then(restoreBar, restoreBar);
+  motionCounterCrumb(section, parallax, MOTION_NAV, 'X');
+  return m.snap.wrap.animate([{ transform: 'none' }, { transform: `translateX(${off}px)` }], timing);
 }
 
-// After the swap (router's showSectionPage).
+// After the swap (router's showSectionPage, or a view's click).
 function motionPage(panel, section, m) {
   if (!m) return;
   requestAnimationFrame(() => {
     let anim = null;
     try {
       if (m.tile) {
-        // Hub -> page: the page grows out of the tile it was opened from.
-        const on = section.getBoundingClientRect();
-        section.animate([
-          { transformOrigin: '0 0', ...motionMinimized(m.tile, on), opacity: 0 },
-          { opacity: 1, offset: .08 },
-          { transformOrigin: '0 0', transform: 'none', borderRadius: '0', opacity: 1 },
-        ], { duration: 380, easing: MOTION_GROW });
-        return;
-      }
-      const tile = motionRect(m.closeTile);
-      if (tile) {
-        // Back to the hub or a view's block: minimizes into its tile, the tiles settle in.
+        // Launch: the old page zooms past and dims while this one rises as a sheet.
+        m.snap.wrap.style.zIndex = '-1';
         document.body.appendChild(m.snap.wrap);
         anim = m.snap.wrap.animate([
-          { transformOrigin: '0 0', transform: 'none', opacity: 1 },
-          { opacity: 1, offset: .85 },
-          { transformOrigin: '0 0', ...motionMinimized(tile, m.snap.box), opacity: 0 },
-        ], { duration: 340, easing: MOTION_SHRINK, fill: 'forwards' });
-        [...section.querySelectorAll('.page-tile')].filter((t) => t.getClientRects().length).forEach((t, i) => {
-          t.animate([{ transform: 'scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-            { duration: 320, delay: 120 + Math.min(i, 12) * 20, easing: MOTION_GROW, fill: 'backwards' });
-        });
+          { transform: 'none', filter: 'brightness(1)', opacity: 1 },
+          { transform: 'scale(1.12)', filter: 'brightness(.55)', opacity: 0 },
+        ], { ...MOTION_ZOOM, fill: 'forwards' });
+        const rise = innerHeight - Math.max(section.getBoundingClientRect().top, 0);
+        const restoreBar = motionDetachOverlays();
+        motionWhile(section, motionScreen('0 24px 60px rgba(0, 0, 0, .25)'),
+          section.animate([{ transform: `translateY(${rise}px)` }, { transform: 'none' }], MOTION_NAV))
+          .finished.then(restoreBar, restoreBar);
+        motionCounterCrumb(section, rise, MOTION_NAV);
+      } else if (motionRect(m.closeTile)) {
+        // Back to the tile: the page sinks away down the screen; the hub settles in from zoomed.
+        Object.assign(m.snap.wrap.style, { zIndex: '5', ...motionScreen('0 24px 60px rgba(0, 0, 0, .25)') });
+        document.body.appendChild(m.snap.wrap);
+        const sink = innerHeight - Math.max(m.snap.box.top, 0);
+        anim = m.snap.wrap.animate([{ transform: 'none' }, { transform: `translateY(${sink}px)` }],
+          { ...MOTION_DISMISS, fill: 'forwards' });
+        const middle = motionMiddle(section);
+        const restoreBar = motionDetachOverlays();
+        section.animate([
+          { transformOrigin: middle, transform: 'scale(1.1)', filter: 'brightness(.55)', opacity: 0 },
+          { transformOrigin: middle, transform: 'none', filter: 'brightness(1)', opacity: 1 },
+        ], MOTION_DISMISS).finished.then(restoreBar, restoreBar);
+        motionCounterCrumbScale(section, 1.1, MOTION_DISMISS);
       } else {
-        anim = motionPageSlide(section, m);
+        anim = motionPagePush(section, m);
       }
       motionPageGhost = m.snap;
-      const done = () => { if (motionPageGhost === m.snap) motionClearPage(section); };
+      const done = () => { if (motionPageGhost === m.snap) { m.snap.wrap.remove(); motionPageGhost = null; } };
       anim.finished.then(done, done);
     } catch {
       m.snap?.wrap.remove();

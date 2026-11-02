@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.30.0** | feat(motion): add opener-aware motion and unified toast messages |
+| (this commit) | **3.31.0** | feat(motion): rebuild motion on spring physics |
+| `d19971c` | **3.30.0** | feat(motion): add opener-aware motion and unified toast messages |
 | `9e64b08` | **3.29.0** | feat(leetcode): add a printable Python cheat sheet |
 | `6792674` | **3.28.0** | feat(nutrition): list top USDA matches when completing a food |
 | `c0532d5` | **3.27.0** | feat(charts): show dates in heatmap cells and grade TEF by goal |

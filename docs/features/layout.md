@@ -35,11 +35,15 @@
 
 ### Motion
 
-- Windows/iOS-style, from `motion.js`: a form or dialog grows out of the button (or row) that opened it, solid and evenly scaled, and minimizes into the ✕ you clicked (or, on Back, Escape or the breadcrumb, into the button that opened it), fading only as it lands. Without that button on screen it rises in and slides down out.
-- Pages: opening one from its hub tile grows it out of that tile; closing it to the hub (✕, the breadcrumb, Back) minimizes it into its tile while the tiles settle in behind. Page to page is an iOS push: the new page slides in from the right over the old one, which drifts a third left and dims; Back reverses it. Without its tile on screen, closing slides instead. Insight's view pages (Plan, Wellness, Food, Micronutrient) grow from and minimize into their own tiles the same way.
-- Across page loads (one section to another, or to and from the home page): the same iOS push through the browser's cross-document View Transitions (`@view-transition` in styles.css), the tab bar and sidebar holding still; Back, or up to a shorter address, slides the other way (a `pagereveal` handler in index.html and section-page.js). No slide on a reload.
-- An overlay's dimmed glass backdrop fades with it, and buttons give a little under a press and spring back.
-- Restore slows as it lands, minimize speeds into the button, pages use a critically damped spring. It plays even with the system's animation effects turned off.
+iOS's motion system, from `motion.js` (Web Animations over every `.modal`'s and the toast's `hidden`, so every write stays synchronous):
+
+- **Springs, not curves:** a SwiftUI-style solver (`motionSpring`): navigation (.4s response, quick launch, no bounce), opening (a hint of overshoot), dismissing (none), the toast (springy).
+- **Zoom morph:** a form or dialog opens out of the button or row that opened it. That control's own frame and corners reshape into the card (clip-path plus scale, aspect-filled, never squashed). ✕ reshapes it back into the ✕ clicked; Back, Escape or the breadcrumb back into its opener. With neither on screen it rises and drops like an iOS sheet.
+- **The background reacts:** the page behind a form page recedes (scales to .92, dims, rounds its corners) as the form opens, and comes forward again as it closes; an overlay's glass backdrop fades and blurs in.
+- **Pages:** from the hub, a page zooms out of its tile while the hub zooms past and dims; back, it reshapes into the tile and the hub settles in from zoomed. Insight's views do the same with their own tiles. Page to page is a navigation push: the new page, opaque with a leading-edge shadow, slides in from the right edge while the old one drifts 30% left and dims; Back reverses it.
+- **Across page loads** (section to section, home): the same push and spring through cross-document View Transitions (`@view-transition` in styles.css), the tab bar and sidebar holding still; Back, or up to a shorter address, reverses (a `pagereveal` handler in index.html and section-page.js). No slide on a reload.
+- **Toast** springs up from the bottom and sinks away. Buttons give under a press and spring back.
+- It plays even with the system's animation effects turned off.
 
 ### Fields and alignment
 

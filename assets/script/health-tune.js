@@ -229,9 +229,8 @@ async function saveFormulaSettings() {
 
   const saveBtn = document.getElementById('formula-save-btn');
   const statusEl = document.getElementById('formula-status');
-  const originalLabel = saveBtn.textContent;
   saveBtn.disabled = true;
-  saveBtn.textContent = '💾…';
+  markIconBusy(saveBtn);
   clearFieldError('formula-status');
   statusEl.classList.remove('status-ok');
 
@@ -290,7 +289,7 @@ async function saveFormulaSettings() {
     showFieldError('formula-status', err.message);
   } finally {
     saveBtn.disabled = false;
-    saveBtn.textContent = originalLabel;
+    settleIconBusy(saveBtn);
   }
 }
 

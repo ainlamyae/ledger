@@ -127,6 +127,8 @@
 
 <body>
 
+<div id="app-backdrop" aria-hidden="true"></div>
+
 <header>
     <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a><!--
      Wide screens only: hides and shows the sidebar. With the
@@ -161,21 +163,6 @@
         </a>
     </nav>
     <div class="header-actions">
-        <!-- Contact, Refresh data, Clear cache and Settings, then the show/hide settings as
-             iPhone switches. app.js's placeSettingsSwitches keeps them in the sidebar's
-             bottom panel above the account row on a wide screen with the sidebar
-             open, and in the account menu everywhere else. -->
-        <div id="settings-switches" class="settings-switches">
-            <a href="other/contact/" class="account-menu-item">Contact</a>
-            <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
-            <button id="clear-cache-btn" class="account-menu-item" title="Re-download the app's own files and reload — for when the browser is still running an older version">Clear cache</button>
-            <a href="other/settings/" class="account-menu-item">Settings</a>
-            <label class="switch-row"><span>Dark mode</span><input type="checkbox" role="switch" id="theme-toggle" class="switch"></label>
-            <label class="switch-row" id="privacy-toggle-row"><span>Amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
-            <label class="switch-row" id="widgets-toggle-row" title="The Time/Date/Azan/Weather row"><span>Widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
-            <label class="switch-row" id="bulbs-toggle-row" title="The home page's Health and Finance glance cards"><span>Bulbs</span><input type="checkbox" role="switch" id="bulbs-toggle" class="switch"></label>
-        </div>
-
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
 
         <div id="account-menu" class="account-menu" hidden>
@@ -196,6 +183,24 @@
                     <div id="account-menu-email" class="account-menu-email"></div>
                     <span id="last-updated" class="last-updated"></span>
                 </div>
+
+                <!-- Contact, Refresh data, Clear cache and Settings, then the show/hide
+                     settings as iPhone switches. Starts here (under the account row, where
+                     it belongs everywhere but a wide screen with the sidebar open) so a
+                     narrow screen's header-actions never has to lay it out and then rip it
+                     back out on first paint. app.js's placeSettingsSwitches moves it into the
+                     sidebar's bottom panel instead, only on that one wide-with-sidebar case. -->
+                <div id="settings-switches" class="settings-switches">
+                    <a href="other/contact/" class="account-menu-item">Contact</a>
+                    <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
+                    <button id="clear-cache-btn" class="account-menu-item" title="Re-download the app's own files and reload — for when the browser is still running an older version">Clear cache</button>
+                    <a href="other/settings/" class="account-menu-item">Settings</a>
+                    <label class="switch-row"><span>Dark mode</span><input type="checkbox" role="switch" id="theme-toggle" class="switch"></label>
+                    <label class="switch-row" id="privacy-toggle-row"><span>Amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
+                    <label class="switch-row" id="widgets-toggle-row" title="The Time/Date/Azan/Weather row"><span>Widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
+                    <label class="switch-row" id="bulbs-toggle-row" title="The home page's Health and Finance glance cards"><span>Bulbs</span><input type="checkbox" role="switch" id="bulbs-toggle" class="switch"></label>
+                </div>
+
                 <button id="rename-sheet-btn" class="account-menu-item">Rename Ledger file</button>
                 <button id="switch-sheet-btn" class="account-menu-item">Switch spreadsheet</button>
                 <button id="open-sheet-btn" class="account-menu-item">Open in Google Sheets</button>
@@ -365,7 +370,6 @@
             <div class="panel-header">
                 <h2>Chart</h2>
                 <button type="button" data-screenshot="health-chart" class="btn btn-icon panel-header-btn" title="Screenshot the whole page: save to the phone's gallery, or download on a laptop" aria-label="Screenshot">📤</button>
-                <button type="button" id="health-detail-btn" class="btn btn-icon panel-header-btn" title="Show the detailed charts: Caloric, Protein, Dietary Fiber, Fat and Carbohydrate Intake, Protein Source Rotation and Activity Rotation" aria-label="More detail" aria-pressed="false">🔍</button>
             </div>
 
             <!-- Market's range row (renderRangeButtons), ending today; governs every chart below. -->
@@ -436,7 +440,7 @@
                     <div class="donut-legend" id="health-intake-legend"></div>
                 </div>
 
-                <div class="card health-detail-chart" hidden>
+                <div class="card">
                     <h3 id="health-calories-label">Caloric Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-calories-chart"></canvas>
@@ -444,7 +448,7 @@
                     <div class="donut-legend" id="health-calories-legend"></div>
                 </div>
 
-                <div class="card health-detail-chart" hidden>
+                <div class="card">
                     <h3>Protein Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-protein-chart"></canvas>
@@ -452,7 +456,7 @@
                     <div class="donut-legend" id="health-protein-legend"></div>
                 </div>
 
-                <div class="card health-detail-chart" hidden>
+                <div class="card">
                     <h3>Dietary Fiber Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-fiber-chart"></canvas>
@@ -460,7 +464,7 @@
                     <div class="donut-legend" id="health-fiber-legend"></div>
                 </div>
 
-                <div class="card health-detail-chart" hidden>
+                <div class="card">
                     <h3>Fat Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-fat-chart"></canvas>
@@ -468,7 +472,7 @@
                     <div class="donut-legend" id="health-fat-legend"></div>
                 </div>
 
-                <div class="card health-detail-chart" hidden>
+                <div class="card">
                     <h3>Carbohydrate Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-carb-chart"></canvas>
@@ -496,7 +500,7 @@
             <!-- Was its own "Protein Source Rotation" panel, moved in last so every
                  Health chart is in one place and they collapse together. The wrap is
                  what makes its heading one of the set, not a style of its own. -->
-            <div class="body-mass-projection-wrap card health-detail-chart" hidden>
+            <div class="body-mass-projection-wrap card">
                 <h3>Protein Source Rotation</h3>
 
                 <div class="protein-rotation-charts">
@@ -515,7 +519,7 @@
             <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
                  (sessions done vs. desired per Group this window) and one rotational
                  donut (reference weekly split, last 4 weeks, last week). -->
-            <div class="body-mass-projection-wrap card health-detail-chart" hidden>
+            <div class="body-mass-projection-wrap card">
                 <h3>Activity Rotation</h3>
 
                 <div class="protein-rotation-charts">

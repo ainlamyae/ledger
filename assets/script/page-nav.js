@@ -501,8 +501,14 @@ function currentActionBar() {
   if (formBar) return formBar;
   const panel = document.querySelector(`#${window.ledgerSectionPage.section} > .panel.page-active`);
   if (!panel) return null;
-  return panel.querySelector(SELECTION_BAR_IDS.map((id) => `#${id}:not([hidden])`).join(', '))
-    || panel.querySelector('.panel-actions[data-page-actions]')
+  const selectionBar = panel.querySelector(SELECTION_BAR_IDS.map((id) => `#${id}:not([hidden])`).join(', '));
+  if (selectionBar) return selectionBar;
+  // A panel with its own view tiles (Insight's Plan/Wellness/Food/...) keeps its
+  // page actions (🤖 Send to AI) for whichever view is open, in the same shared
+  // row for every mode — but on the hub itself, with no view chosen, there's
+  // nothing yet for that row to act on.
+  if (panel.querySelector('[data-route-view]') && !currentRouteView(panel)) return null;
+  return panel.querySelector('.panel-actions[data-page-actions]')
     || panel.querySelector(':scope > .panel-header > .panel-header-actions');
 }
 

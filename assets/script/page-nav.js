@@ -503,11 +503,6 @@ function currentActionBar() {
   if (!panel) return null;
   const selectionBar = panel.querySelector(SELECTION_BAR_IDS.map((id) => `#${id}:not([hidden])`).join(', '));
   if (selectionBar) return selectionBar;
-  // A panel with its own view tiles (Insight's Plan/Wellness/Food/...) keeps its
-  // page actions (🤖 Send to AI) for whichever view is open, in the same shared
-  // row for every mode — but on the hub itself, with no view chosen, there's
-  // nothing yet for that row to act on.
-  if (panel.querySelector('[data-route-view]') && !currentRouteView(panel)) return null;
   return panel.querySelector('.panel-actions[data-page-actions]')
     || panel.querySelector(':scope > .panel-header > .panel-header-actions');
 }
@@ -518,6 +513,14 @@ function updateActionBar() {
     if (el !== bar) el.classList.remove('action-bar');
   });
   if (bar) bar.classList.add('action-bar');
+  // A view hub (Insight before a mode is picked) shows only ❌ in its bar.
+  const panel = bar?.closest('.panel');
+  const onHub = !!panel && !!panel.querySelector('[data-route-view]') && !currentRouteView(panel)
+    && !bar.closest(SELECTION_BAR_IDS.map((id) => `#${id}`).join(', '));
+  document.querySelectorAll('.action-bar-hub').forEach((el) => {
+    if (el !== bar || !onHub) el.classList.remove('action-bar-hub');
+  });
+  if (onHub) bar.classList.add('action-bar-hub');
   if (bar) document.documentElement.dataset.actionBar = '1';
   else delete document.documentElement.dataset.actionBar;
 }

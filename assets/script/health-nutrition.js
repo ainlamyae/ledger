@@ -958,7 +958,7 @@ async function pullMicronutrientsForForm() {
   }
 
   btn.disabled = true;
-  markIconBusy(btn);
+  Motion.iconBusy(btn);
 
   let candidates = [];
   let reason = 'no USDA match';
@@ -969,7 +969,7 @@ async function pullMicronutrientsForForm() {
   }
 
   btn.disabled = false;
-  settleIconBusy(btn);
+  Motion.iconSettle(btn);
 
   if (!candidates.length) {
     showFieldError('nutrition-form-error', `Couldn't pull micronutrients for "${name}" — ${reason}.`);
@@ -1173,7 +1173,7 @@ async function scanNutritionLabel(e) {
 
   const btn = document.getElementById('nutrition-scan-btn');
   btn.disabled = true;
-  markIconBusy(btn);
+  Motion.iconBusy(btn);
   clearFieldError('nutrition-form-error');
 
   try {
@@ -1225,7 +1225,7 @@ async function scanNutritionLabel(e) {
     showFieldError('nutrition-form-error', `Scan failed: ${err.message}`);
   } finally {
     btn.disabled = false;
-    settleIconBusy(btn);
+    Motion.iconSettle(btn);
   }
 }
 

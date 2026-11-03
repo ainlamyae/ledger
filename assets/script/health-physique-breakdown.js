@@ -808,7 +808,7 @@ async function handlePhysiqueScanInput(e) {
 
   const btn = document.getElementById('physique-scan-btn');
   btn.disabled = true;
-  markIconBusy(btn);
+  Motion.iconBusy(btn);
 
   try {
     const base64 = await new Promise((resolve, reject) => {
@@ -833,7 +833,7 @@ async function handlePhysiqueScanInput(e) {
     showFieldError('physique-form-error', `Scan failed: ${err.message}`);
   } finally {
     btn.disabled = false;
-    settleIconBusy(btn);
+    Motion.iconSettle(btn);
   }
 }
 
@@ -891,7 +891,7 @@ async function calculatePhysiqueDay() {
   }
 
   btn.disabled = true;
-  markIconBusy(btn);
+  Motion.iconBusy(btn);
   clearFieldError('physique-form-error');
 
   // New exercise names go to the AI first, so the pass below prices them.
@@ -960,7 +960,7 @@ async function calculatePhysiqueDay() {
   updatePhysiqueSleepDuration();
 
   btn.disabled = false;
-  settleIconBusy(btn);
+  Motion.iconSettle(btn);
 
   if (messages.length) showToast(messages.join(' '));
 }

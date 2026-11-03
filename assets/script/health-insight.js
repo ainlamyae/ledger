@@ -342,7 +342,7 @@ async function runInsightGeneration() {
   rangeButtons.forEach((b) => { b.disabled = true; });
   textarea.disabled = true;
   modeButtons.forEach((b) => { b.disabled = true; });
-  markIconBusy(btn);
+  Motion.iconBusy(btn);
 
   try {
     // Built from the data the preview above was rendered from, not a fresh
@@ -376,7 +376,7 @@ async function runInsightGeneration() {
     rangeButtons.forEach((b) => { b.disabled = false; });
     textarea.disabled = false;
     modeButtons.forEach((b) => { b.disabled = false; });
-    settleIconBusy(btn);
+    Motion.iconSettle(btn);
   }
 }
 

@@ -1115,7 +1115,7 @@ function todaysPhysiqueDay() {
 function warnBalanceShortOfDesire(derived) {
   if (!derived) return;
   const { balance, balanceDesired } = derived;
-  if (balance !== null && balanceDesired !== null && balance > balanceDesired) warnWithPulse();
+  if (balance !== null && balanceDesired !== null && balance > balanceDesired) Motion.warn();
 }
 
 // Confetti when today's saved body mass is closer to the healthy mass than the last earlier reading.
@@ -1125,7 +1125,7 @@ function celebrateBodyMassProgress(date, bodyMass) {
   const previous = physiqueDatedAscending().filter((p) => p.date < today && p.bodyMass !== null).at(-1)?.bodyMass;
   if (previous == null) return;
   const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
-  if (Math.abs(bodyMass - healthyKg) < Math.abs(previous - healthyKg)) celebrateWithConfetti();
+  if (Math.abs(bodyMass - healthyKg) < Math.abs(previous - healthyKg)) Motion.confetti();
 }
 
 // Which days came across incomplete. console only — a chart gap is otherwise

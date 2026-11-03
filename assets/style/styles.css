@@ -57,11 +57,6 @@ textarea {
     /* The lift on a hovered tile or panel — darker than a dropdown's, so the
        raised block reads clearly against the page. */
     --shadow-hover: 0 6px 20px rgba(0,0,0,.32);
-    /* Apple-like spring: a quick start that settles softly, on every transition. */
-    --ease-spring: cubic-bezier(.2, .8, .2, 1);
-    /* iOS button release: springs back with a slight bounce (motion.js has the page/form spring). */
-    --ease-ios-bounce: cubic-bezier(.3, 1.3, .5, 1);
-    --transition-colors: background-color .2s var(--ease-spring), color .2s var(--ease-spring), border-color .2s var(--ease-spring);
     --input-font-size: 15px;
     /* The six spacing steps — every margin, padding and gap uses one of these,
        each visibly different from the next (about 3.5px apart or more). */
@@ -185,12 +180,6 @@ textarea {
     }
 }
 
-body,
-.card,
-.modal-card {
-    transition: var(--transition-colors);
-}
-
 /* A section page before it has read its address (section-page.js): hidden, so it
    never shows the whole section before the page asked for. */
 html[data-routing] .container,
@@ -238,11 +227,7 @@ b {
     font-weight: 600;
 }
 
-/* The wash lives on its own layer (#app-backdrop), not body's own background:
-   body is what the root view transition's page-in/page-out slide captures and
-   animates, and the wash sliding along with it read as the background itself
-   moving. The backdrop is named and held still the same way .nav/.header-actions
-   are (below), so it just stays put behind whatever page is sliding over it. */
+/* The wash on its own still layer, never moved by page motion (motion.js). */
 #app-backdrop {
     position: fixed;
     inset: 0;
@@ -251,7 +236,6 @@ b {
         radial-gradient(60rem 40rem at 0% 0%, var(--bg-wash-1), transparent 70%),
         radial-gradient(60rem 40rem at 100% 100%, var(--bg-wash-2), transparent 70%),
         var(--color-bg);
-    view-transition-name: app-backdrop;
 }
 
 body {
@@ -341,7 +325,6 @@ header h1 {
     font-size: var(--text-small);
     font-weight: 600;
     padding: var(--space-s) var(--space-xs);
-    transition: color .2s var(--ease-spring);
 }
 
 .nav a:hover,
@@ -514,7 +497,6 @@ header .btn:hover {
     border-radius: 999px;
     background: var(--switch-off);
     cursor: pointer;
-    transition: background-color .25s ease;
 }
 
 .switch::before {
@@ -527,7 +509,6 @@ header .btn:hover {
     border-radius: 50%;
     background: #fff;
     box-shadow: 0 2px 5px rgba(0, 0, 0, .2), 0 0 0 .5px rgba(0, 0, 0, .04);
-    transition: transform .25s cubic-bezier(.3, 1.3, .5, 1);
 }
 
 .switch:checked {
@@ -571,7 +552,6 @@ header .btn:hover {
    and the tiles, set in their own rules). Emoji buttons are square. Each kind
    only picks its font; height and padding come from here. */
 .btn {
-    transition: var(--transition-colors), transform .3s var(--ease-ios-bounce);
     font: inherit;
     font-size: var(--text-small);
     border-radius: var(--radius-md);
@@ -588,12 +568,6 @@ header .btn:hover {
     vertical-align: middle;
 }
 
-/* iOS press: gives under the finger, springs back on release. */
-.btn:active:not(:disabled) {
-    transform: scale(.94);
-    transition: var(--transition-colors), transform .1s ease-out;
-}
-
 .btn:disabled {
     opacity: .5;
     cursor: not-allowed;
@@ -601,42 +575,11 @@ header .btn:hover {
 
 /* Mid-action (withButtonBusy, assets/script/ui-helpers.js) — a word-label
    button's label already carries an ellipsis; this takes the clicks away so a
-   slow save can't be fired twice. An icon button grows instead (below). */
+   slow save can't be fired twice. An icon button grows instead (motion.js). */
 .btn[aria-busy="true"] {
     opacity: .5;
     cursor: progress;
     pointer-events: none;
-}
-
-/* An emoji icon button has no label to put an ellipsis next to: it grows in
-   place for the length of the action (a gentle pulse while it's still
-   running) and bounces back to its actual size once withButtonBusy clears it. */
-.btn.btn-icon.icon-busy,
-.btn.row-action-btn.icon-busy {
-    animation: icon-busy-grow .25s ease-out forwards,
-               icon-busy-pulse 1s ease-in-out .25s infinite;
-}
-
-.btn.btn-icon.icon-settle,
-.btn.row-action-btn.icon-settle {
-    animation: icon-busy-settle .4s cubic-bezier(.34, 1.56, .64, 1);
-}
-
-@keyframes icon-busy-grow {
-    from { transform: scale(1); }
-    to   { transform: scale(1.4); }
-}
-
-@keyframes icon-busy-pulse {
-    0%, 100% { transform: scale(1.4); }
-    50%      { transform: scale(1.5); }
-}
-
-@keyframes icon-busy-settle {
-    0%   { transform: scale(1.4); }
-    45%  { transform: scale(.85); }
-    72%  { transform: scale(1.15); }
-    100% { transform: scale(1); }
 }
 
 /* Colours for word buttons only: blue saves or logs, gray opens something, red
@@ -760,107 +703,6 @@ header .btn:hover {
     z-index: 110;
 }
 
-/* Across page loads (a section to another, home): an iOS push, Back reversed
-   (the 'back' type comes from the pagereveal handler in index.html / section-page.js).
-   The tab bar and sidebar stay put while the page slides. */
-@view-transition {
-    navigation: auto;
-}
-
-.nav {
-    view-transition-name: app-nav;
-}
-
-.side-nav {
-    view-transition-name: app-side-nav;
-}
-
-/* The account avatar (.header-actions) is pinned bottom-left on a phone the
-   same way .nav is pinned along the bottom — it needs the same name-and-still
-   treatment, or it's unnamed and falls into the root's own sliding snapshot. */
-.header-actions {
-    view-transition-name: app-account;
-}
-
-/* The breadcrumb at the top of every page (Ledger / Health / Chart, …) — one
-   per section, but only one is ever on screen at a time — gets the same
-   treatment so it reads as a fixed header, not part of the sliding page. */
-.page-crumb {
-    view-transition-name: app-crumb;
-}
-
-/* Naming them above only keeps these out of the root's slide; the browser
-   still gives every named group its own default cross-fade/resize animation,
-   which is what actually showed as blurring and shifting on their own.
-   Switching it off here is what makes them truly "stay put". */
-::view-transition-group(app-nav),
-::view-transition-group(app-side-nav),
-::view-transition-group(app-account),
-::view-transition-group(app-crumb),
-::view-transition-group(app-backdrop) {
-    animation: none;
-}
-
-::view-transition-old(app-nav),
-::view-transition-new(app-nav),
-::view-transition-old(app-side-nav),
-::view-transition-new(app-side-nav),
-::view-transition-old(app-account),
-::view-transition-new(app-account),
-::view-transition-old(app-crumb),
-::view-transition-new(app-crumb),
-::view-transition-old(app-backdrop),
-::view-transition-new(app-backdrop) {
-    animation: none;
-    mix-blend-mode: normal;
-}
-
-::view-transition-old(root),
-::view-transition-new(root) {
-    /* motion.js's MOTION_NAV spring (response .4s, no bounce, quick launch). */
-    animation-duration: 510ms;
-    animation-timing-function: linear(0, 0.08, 0.164, 0.248, 0.329, 0.405, 0.476, 0.541, 0.599, 0.651, 0.698, 0.739, 0.775, 0.807, 0.834, 0.858, 0.879, 0.897, 0.912, 0.925, 0.937, 0.946, 0.955, 0.962, 0.968, 0.973, 0.977, 0.981, 0.984, 0.986, 0.988, 0.99, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 1);
-    mix-blend-mode: normal;
-}
-
-/* Forward: the new screen slides in over the old, with a soft leading-edge
-   shadow; the old one drifts 30% left and dims (never goes see-through). */
-::view-transition-new(root) {
-    animation-name: page-in;
-    box-shadow: -16px 0 40px rgba(0, 0, 0, .18);
-}
-
-::view-transition-old(root) {
-    animation-name: page-out;
-}
-
-html:active-view-transition-type(back)::view-transition-new(root) {
-    animation-name: page-in-back;
-    box-shadow: none;
-}
-
-html:active-view-transition-type(back)::view-transition-old(root) {
-    animation-name: page-out-back;
-    box-shadow: -16px 0 40px rgba(0, 0, 0, .18);
-    z-index: 1;
-}
-
-@keyframes page-in {
-    from { transform: translateX(100%); }
-}
-
-@keyframes page-out {
-    to { transform: translateX(-30%); filter: brightness(.72); }
-}
-
-@keyframes page-in-back {
-    from { transform: translateX(-30%); filter: brightness(.72); }
-}
-
-@keyframes page-out-back {
-    to { transform: translateX(100%); }
-}
-
 /* An error in the toast (showToast's error): red text and edge. */
 .toast.toast-error {
     color: var(--color-danger);
@@ -891,43 +733,6 @@ html:active-view-transition-type(back)::view-transition-old(root) {
     margin-right: 4px;
     vertical-align: -0.15em;
     border: 1px solid;
-}
-
-/* Confetti over everything, toast included (confetti.js); clicks pass through. */
-.confetti-canvas,
-.warning-pulse {
-    position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 120;
-}
-
-/* warnWithPulse (confetti.js): the page's edge glows red three times. */
-.warning-pulse {
-    box-shadow: inset 0 0 0 0 var(--color-danger);
-    animation: warning-pulse .8s ease-in-out 3;
-}
-
-/* warnWithPulse's shake: the open form, or the page, wobbles side to side. */
-.warning-shake {
-    animation: warning-shake .5s ease-in-out;
-}
-
-@keyframes warning-shake {
-    0%, 100% { transform: translateX(0); }
-    15%, 55% { transform: translateX(-10px); }
-    35%, 75% { transform: translateX(10px); }
-    90% { transform: translateX(-4px); }
-}
-
-@keyframes warning-pulse {
-    0%, 100% { box-shadow: inset 0 0 0 0 transparent; background: transparent; }
-    50% {
-        box-shadow: inset 0 0 80px 16px color-mix(in srgb, var(--color-danger) 70%, transparent);
-        background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-    }
 }
 
 kbd {
@@ -1195,10 +1000,6 @@ kbd {
     min-width: 0;
 }
 
-.panel {
-    transition: var(--transition-colors), transform .2s var(--ease-spring), box-shadow .2s var(--ease-spring);
-}
-
 .panel-group,
 .today-glance-stack {
     display: flex;
@@ -1256,7 +1057,6 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 .panel:hover,
 .page-tile:hover,
 .page-tile:focus-visible {
-    transform: translateY(-2px);
     box-shadow: var(--shadow-hover);
 }
 
@@ -1290,7 +1090,6 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     margin-right: var(--space-s);
     color: var(--color-text-muted);
     font-size: var(--text-title);
-    transition: transform .2s var(--ease-spring);
 }
 
 .panel.collapsed .panel-toggle-icon,
@@ -1302,8 +1101,6 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     max-height: 5000px;
     opacity: 1;
     overflow-y: hidden;
-    transition: max-height .3s var(--ease-spring), opacity .2s var(--ease-spring), margin .3s var(--ease-spring),
-        padding .3s var(--ease-spring), border-width .3s var(--ease-spring);
 }
 
 .panel.collapsed > *:not(h2):not(.panel-header) {
@@ -1319,17 +1116,6 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
 
 .panel.collapsed h2 {
     margin-bottom: calc(-1 * var(--space-xs));
-}
-
-@keyframes panel-enter {
-    from { opacity: 0; transform: translateY(16px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.panel.panel-enter {
-    animation: panel-enter .3s var(--ease-spring) both;
-    /* Staggered, one block after another (--enter-index, app.js). */
-    animation-delay: calc(var(--enter-index, 0) * 70ms);
 }
 
 .panel-actions {
@@ -1771,7 +1557,6 @@ th.sortable:hover {
     max-height: 2000px;
     opacity: 1;
     overflow: hidden;
-    transition: max-height .3s var(--ease-spring), opacity .2s var(--ease-spring), padding .3s var(--ease-spring);
 }
 
 /* A LeetCode category's table starts at the card's edge, not under its title. */
@@ -2735,7 +2520,6 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     border-radius: 3px;
     white-space: nowrap;
     pointer-events: none;
-    transition: background .3s var(--ease-spring);
 }
 
 .body-mass-progress-meter-callout::after {
@@ -2772,7 +2556,6 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
         #ef4444, #f97316, #f59e0b, #84cc16, #22c55e);
     background-size: calc(10000% / var(--fill-pct, 100)) 100%;
     background-position: left;
-    transition: width .3s var(--ease-spring);
 }
 
 .body-mass-progress-meter-stats {
@@ -3233,14 +3016,13 @@ html.home-hub .page-tiles,
         line-height: 1.2;
     }
 
-    /* A soft vertical divider between tabs, faded at both ends rather than a hard
-       line touching the bar's own top/bottom edge. */
-    .nav a:not(:last-child)::after {
+    /* Faded divider on the left of each visible tab after the first, so none after the last. */
+    .nav a:not([hidden]) ~ a:not([hidden])::after {
         content: '';
         position: absolute;
         top: 20%;
         bottom: 20%;
-        right: 0;
+        left: 0;
         width: 1px;
         background: var(--color-text-muted);
         -webkit-mask-image: linear-gradient(to bottom, transparent, black 35%, black 65%, transparent);
@@ -3859,7 +3641,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     border-radius: 999px;
     color: var(--color-text);
     text-decoration: none;
-    transition: transform .2s var(--ease-spring), box-shadow .2s var(--ease-spring), opacity .2s var(--ease-spring);
 }
 
 /* The rim: a 1px gradient ring, bright top-left, fading bottom-right. */
@@ -3917,12 +3698,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         -webkit-backdrop-filter: none;
         backdrop-filter: none;
     }
-}
-
-/* Pressed, as on iOS: dimmed and a touch smaller while the finger is down. */
-.page-tile:active {
-    opacity: .6;
-    transform: scale(.97);
 }
 
 /* A block's short sign (setPageBadge, page-nav.js): on its tile's corner and after
@@ -4107,7 +3882,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         background: none;
         color: var(--color-text-muted);
         cursor: pointer;
-        transition: var(--transition-colors);
     }
 
     .side-nav-toggle:hover,
@@ -4120,10 +3894,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         display: none;
         width: 1.25rem;
         height: 1.25rem;
-    }
-
-    .side-nav {
-        transition: transform .2s ease, visibility .2s;
     }
 
     /* Hidden: the sidebar slides away and the page centres in the full width.
@@ -4211,7 +3981,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         color: var(--color-text);
         font: inherit;
         text-align: left;
-        transition: var(--transition-colors);
     }
 
     .account-avatar-btn:hover,
@@ -4407,6 +4176,11 @@ html.section-pages[data-form-page] body.modal-open {
     display: none;
 }
 
+/* A view hub (Insight with no mode open): only ❌, no 🤖. */
+.action-bar-hub > :not(.page-action-close):not(.header-action-close) {
+    display: none !important;
+}
+
 @media (max-width: 1179px) {
     .panel-header-actions .header-action-close {
         display: none;
@@ -4418,18 +4192,12 @@ html.section-pages[data-form-page] body.modal-open {
     }
 }
 
-/* The open page sits still: the blocks' fade-in leaves a transform on them, and a
-   transformed ancestor would pin a "fixed" bottom bar to the block, not the screen. */
+/* A page sits on the page background; only its small cards are white. */
 html.section-pages .panel.page-active,
 html.section-pages .panel.page-active:hover {
-    animation: none;
-    transform: none;
-    /* A page sits on the page background; only its small cards are white. No fade
-       from the card's white on opening. */
     background: none;
     box-shadow: none;
     padding: 0;
-    transition: none;
 }
 
 /* --- One bottom bar at a time (page-nav.js's updateActionBar) -------------------

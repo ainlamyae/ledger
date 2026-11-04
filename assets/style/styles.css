@@ -1155,6 +1155,19 @@ table {
     border-collapse: collapse;
 }
 
+/* Past a phone, a card's table fills the card; wider ones still scroll. Only the data
+   columns grow: tick boxes and row buttons stay their own size. */
+@media (min-width: 821px) {
+    .card .table-responsive > table {
+        min-width: 100%;
+    }
+
+    .card .table-responsive > table :is(th, td):is(:has(> input[type="checkbox"]), :has(> .btn), :has(> .workout-check)) {
+        width: 1%;
+        white-space: nowrap;
+    }
+}
+
 /* Table rows: 19px for a line of text, 32px when it wraps onto two (16px lines), at
    every width; the cells have no vertical padding, so the row is its lines. 2.5px
    at each side, so columns sit 5px apart in every table at every width. */
@@ -2759,6 +2772,24 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 
 .insight-data-preview p:last-child {
     border-bottom: none;
+}
+
+/* In a card: the card's padding is the indent; an empty or hidden one hides its card. */
+.card > .insight-data-preview {
+    margin-bottom: var(--space-s);
+}
+
+.card > .insight-data-preview:last-child,
+.card > .insight-data-preview:empty {
+    margin-bottom: 0;
+}
+
+.card > .insight-data-preview p {
+    padding-inline: 0;
+}
+
+.panel-section:has(> .insight-data-preview[hidden], > .insight-body:empty) {
+    display: none;
 }
 
 /* Every mode's report is renderInsightText output — one <p> per line, section

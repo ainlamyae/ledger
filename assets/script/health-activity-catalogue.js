@@ -333,7 +333,10 @@ function renderActivityPlanTables() {
     .flatMap((categoryRows) => [...groupInOrder(categoryRows, 'group').values()].flat());
 
   const day = document.createElement('div');
-  day.className = 'workout-day';
+  day.className = 'workout-day panel-section card';
+  const heading = document.createElement('h3');
+  heading.textContent = 'Plan';
+  day.appendChild(heading);
   const wrap = document.createElement('div');
   wrap.className = 'table-responsive';
   wrap.appendChild(makeActivityTable(rows, activityPlanColumnVisibility(rows)));

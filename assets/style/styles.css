@@ -1825,6 +1825,11 @@ th.sortable:hover {
     margin-top: var(--space-s);
 }
 
+/* One card gap from a card grid to the card under it. */
+.donut-grid + .panel-section {
+    margin-top: var(--space-s);
+}
+
 /* Four across only works while .container is at its full 950px; between there
    and the 820px general breakpoint the tiles narrow past what two figures fit,
    so these go two-up early instead of shrinking further. Scoped by id so the
@@ -2427,9 +2432,17 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 }
 
 /* A panel's range row (both Indicators), and Nutrition's and Activity's rotation
-   cards: none above, one card gap below. */
+   cards, and Travel's cards: none above, one card gap below. */
 .pagination.panel-range,
-.body-mass-projection-wrap.page-rotation-card {
+.body-mass-projection-wrap.page-rotation-card,
+.donut-grid.travel-insights-grid {
+    margin: 0 0 var(--space-s);
+}
+
+/* Any page's first card or card grid, the same: none above, one card gap below. */
+.panel-header + .card,
+.panel-header + .cards,
+.panel-header + .donut-grid {
     margin: 0 0 var(--space-s);
 }
 

@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.32.0** | feat(motion): centralise animations and split heatmap by month |
+| (this commit) | **3.33.0** | feat(ui): place every table in a titled card |
+| `a4414ed` | **3.32.0** | feat(motion): centralise animations and split heatmap by month |
 | `1ca2f30` | **3.31.0** | feat(motion): rebuild motion on spring physics |
 | `d19971c` | **3.30.0** | feat(motion): add opener-aware motion and unified toast messages |
 | `9e64b08` | **3.29.0** | feat(leetcode): add a printable Python cheat sheet |

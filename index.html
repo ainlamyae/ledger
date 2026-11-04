@@ -538,28 +538,31 @@
                 <input type="text" id="physique-search" placeholder="🔍 Search" title="Search date, consumption, breakdown, workout" aria-label="Search">
             </div>
 
-            <div class="table-responsive">
-                <table id="physique-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
-                        <th title="Sleep — hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">S</th>
-                        <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
-                        <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
-                        <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
-                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
-                        <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
-                        <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Carb</th>
-                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
-                        <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
-                        <th class="sortable" data-sort="caloriesOut" title="AEE — Activity Energy Expenditure (Calories Out)">AEE</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="physique-body"></tbody>
-                </table>
+            <div class="panel-section card">
+                <h3>Log</h3>
+                <div class="table-responsive">
+                    <table id="physique-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
+                            <th class="sortable" data-sort="date">Date</th>
+                            <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
+                            <th title="Sleep — hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">S</th>
+                            <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
+                            <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
+                            <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
+                            <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
+                            <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
+                            <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Carb</th>
+                            <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
+                            <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
+                            <th class="sortable" data-sort="caloriesOut" title="AEE — Activity Energy Expenditure (Calories Out)">AEE</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="physique-body"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="panel-actions" id="physique-bulk-actions" hidden>
@@ -599,29 +602,32 @@
                 <input type="text" id="nutrition-search" placeholder="🔍 Search" title="Search group or ingredient name" aria-label="Search">
             </div>
 
-            <div class="table-responsive">
-                <table id="nutrition-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
-                        <th class="sortable" data-sort="group">Group</th>
-                        <th class="sortable" data-sort="name">Name</th>
-                        <th class="sortable" data-sort="amount">Amount</th>
-                        <th class="sortable" data-sort="calories" title="Calories">Cal</th>
-                        <th class="sortable" data-sort="protein" title="Protein (g)">Pro</th>
-                        <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">DF</th>
-                        <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
-                        <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
-                        <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
-                        <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your desired protein this ingredient should cover">%</th>
-                        <!-- Uses column retired (health-nutrition.js keeps its code commented).
-                        <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
-                        -->
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="nutrition-body"></tbody>
-                </table>
+            <div class="panel-section card">
+                <h3>Ingredients</h3>
+                <div class="table-responsive">
+                    <table id="nutrition-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
+                            <th class="sortable" data-sort="group">Group</th>
+                            <th class="sortable" data-sort="name">Name</th>
+                            <th class="sortable" data-sort="amount">Amount</th>
+                            <th class="sortable" data-sort="calories" title="Calories">Cal</th>
+                            <th class="sortable" data-sort="protein" title="Protein (g)">Pro</th>
+                            <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">DF</th>
+                            <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
+                            <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
+                            <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
+                            <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your desired protein this ingredient should cover">%</th>
+                            <!-- Uses column retired (health-nutrition.js keeps its code commented).
+                            <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
+                            -->
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="nutrition-body"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="panel-actions" id="nutrition-bulk-actions" hidden>
@@ -716,39 +722,45 @@
 
             <div id="insight-preview-food" hidden>
                 <div id="insight-food-profile" class="insight-data-preview"></div>
-                <div class="table-responsive">
-                    <table id="insight-food-table">
-                        <thead>
-                        <tr>
-                            <th>Ingredient</th>
-                            <th>Amount</th>
-                            <th>Calories</th>
-                            <th>Protein</th>
-                            <th title="This ingredient's own fiber grams over the picked range — its own typed Fiber if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fiber</th>
-                            <th title="This ingredient's own fat grams over the picked range — its own typed Fat if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fat</th>
-                            <th title="This ingredient's own carbohydrate grams over the picked range — its own typed Carb if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Carbohydrate</th>
-                            <th title="Estimated Thermic Effect of Food — this ingredient's own typed TEF if it has one, else its protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when neither is available">TEF</th>
-                        </tr>
-                        </thead>
-                        <tbody id="insight-food-body"></tbody>
-                    </table>
+                <div class="panel-section card">
+                    <h3>Food</h3>
+                    <div class="table-responsive">
+                        <table id="insight-food-table">
+                            <thead>
+                            <tr>
+                                <th>Ingredient</th>
+                                <th>Amount</th>
+                                <th>Calories</th>
+                                <th>Protein</th>
+                                <th title="This ingredient's own fiber grams over the picked range — its own typed Fiber if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fiber</th>
+                                <th title="This ingredient's own fat grams over the picked range — its own typed Fat if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fat</th>
+                                <th title="This ingredient's own carbohydrate grams over the picked range — its own typed Carb if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Carbohydrate</th>
+                                <th title="Estimated Thermic Effect of Food — this ingredient's own typed TEF if it has one, else its protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when neither is available">TEF</th>
+                            </tr>
+                            </thead>
+                            <tbody id="insight-food-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             <div id="insight-preview-micronutrient" hidden>
                 <div id="insight-micro-profile" class="insight-data-preview"></div>
-                <div class="table-responsive">
-                    <table id="insight-micro-table" class="table-compact">
-                        <thead>
-                        <tr>
-                            <th>Nutrient</th>
-                            <th>Total (period)</th>
-                            <th>Avg / day</th>
-                            <th>Ideal / day</th>
-                        </tr>
-                        </thead>
-                        <tbody id="insight-micro-body"></tbody>
-                    </table>
+                <div class="panel-section card">
+                    <h3>Micronutrients</h3>
+                    <div class="table-responsive">
+                        <table id="insight-micro-table" class="table-compact">
+                            <thead>
+                            <tr>
+                                <th>Nutrient</th>
+                                <th>Total (period)</th>
+                                <th>Avg / day</th>
+                                <th>Ideal / day</th>
+                            </tr>
+                            </thead>
+                            <tbody id="insight-micro-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -762,35 +774,38 @@
                     </label>
                 </div>
                 <div id="insight-pattern-profile" class="insight-data-preview"></div>
-                <div class="table-responsive">
-                    <table id="insight-pattern-table" class="table-compact">
-                        <thead>
-                        <tr>
-                            <th>Period</th>
-                            <th title="Smoothed body mass (kg) at the period's last day">m</th>
-                            <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
-                            <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
-                            <th title="Basal metabolic rate by Mifflin-St Jeor — the period's average of each day's stored BMR, kcal/day">BMR_mif</th>
-                            <th title="Basal metabolic rate by Katch-McArdle — the period's average of each day's stored BMR, kcal/day">BMR_kat</th>
-                            <th title="Calibrated basal metabolic rate — the period's average of each day's stored BMR_cal, kcal/day">BMR_cal</th>
-                            <th title="Adapted basal metabolic rate by t — the period's average of each day's stored BMR_adp, kcal/day">BMR_adp</th>
-                            <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
-                            <th title="Total energy intake, kcal/day">TEI</th>
-                            <th title="Grams/day">Protein</th>
-                            <th title="Grams/day">Dietary Fiber</th>
-                            <th title="Grams/day">Fat</th>
-                            <th title="Grams/day">Carbohydrate</th>
-                            <th title="Thermic effect of food, kcal/day">TEF</th>
-                            <th title="Activity energy expenditure, kcal/day">AEE</th>
-                            <th title="Cardio share of AEE, kcal/day">Cardio</th>
-                            <th title="NEAT share of AEE, kcal/day">NEAT</th>
-                            <th title="Strength share of AEE, kcal/day">Strength</th>
-                            <th title="Equation-implied daily balance — negative is a deficit">D</th>
-                            <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
-                        </tr>
-                        </thead>
-                        <tbody id="insight-pattern-body"></tbody>
-                    </table>
+                <div class="panel-section card">
+                    <h3>Periods</h3>
+                    <div class="table-responsive">
+                        <table id="insight-pattern-table" class="table-compact">
+                            <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th title="Smoothed body mass (kg) at the period's last day">m</th>
+                                <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
+                                <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
+                                <th title="Basal metabolic rate by Mifflin-St Jeor — the period's average of each day's stored BMR, kcal/day">BMR_mif</th>
+                                <th title="Basal metabolic rate by Katch-McArdle — the period's average of each day's stored BMR, kcal/day">BMR_kat</th>
+                                <th title="Calibrated basal metabolic rate — the period's average of each day's stored BMR_cal, kcal/day">BMR_cal</th>
+                                <th title="Adapted basal metabolic rate by t — the period's average of each day's stored BMR_adp, kcal/day">BMR_adp</th>
+                                <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
+                                <th title="Total energy intake, kcal/day">TEI</th>
+                                <th title="Grams/day">Protein</th>
+                                <th title="Grams/day">Dietary Fiber</th>
+                                <th title="Grams/day">Fat</th>
+                                <th title="Grams/day">Carbohydrate</th>
+                                <th title="Thermic effect of food, kcal/day">TEF</th>
+                                <th title="Activity energy expenditure, kcal/day">AEE</th>
+                                <th title="Cardio share of AEE, kcal/day">Cardio</th>
+                                <th title="NEAT share of AEE, kcal/day">NEAT</th>
+                                <th title="Strength share of AEE, kcal/day">Strength</th>
+                                <th title="Equation-implied daily balance — negative is a deficit">D</th>
+                                <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
+                            </tr>
+                            </thead>
+                            <tbody id="insight-pattern-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -1641,23 +1656,26 @@
                 </form>
             </div>
 
-            <div class="table-responsive">
-                <table id="transactions-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th><input type="checkbox" id="tx-select-all" aria-label="Select all transactions on this page"></th>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th class="sortable" data-sort="account">Account</th>
-                        <th class="sortable" data-sort="payee">Payee</th>
-                        <th class="sortable" data-sort="category">Category</th>
-                        <th class="sortable" data-sort="description">Description</th>
-                        <th class="sortable" data-sort="amount">Amount</th>
-                        <th></th>
-                    </tr>
-                    </thead>
+            <div class="panel-section card">
+                <h3>Transactions</h3>
+                <div class="table-responsive">
+                    <table id="transactions-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th><input type="checkbox" id="tx-select-all" aria-label="Select all transactions on this page"></th>
+                            <th class="sortable" data-sort="date">Date</th>
+                            <th class="sortable" data-sort="account">Account</th>
+                            <th class="sortable" data-sort="payee">Payee</th>
+                            <th class="sortable" data-sort="category">Category</th>
+                            <th class="sortable" data-sort="description">Description</th>
+                            <th class="sortable" data-sort="amount">Amount</th>
+                            <th></th>
+                        </tr>
+                        </thead>
 
-                    <tbody id="transactions-body"></tbody>
-                </table>
+                        <tbody id="transactions-body"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="panel-actions" id="tx-bulk-actions" hidden>
@@ -1677,29 +1695,32 @@
                 <button id="add-account-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an account" aria-label="Add">➕</button>
             </div>
 
-            <div class="table-responsive">
-                <table id="accounts-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th class="sortable" data-sort="name">Account Name</th>
-                        <th class="sortable" data-sort="institution">Institution</th>
-                        <th class="sortable" data-sort="type">Type</th>
-                        <th class="sortable" data-sort="balance">Balance</th>
-                        <th class="sortable" data-sort="currentValue">Market Value</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-
-                    <tbody id="accounts-list-body"></tbody>
-                    <tfoot>
-                        <tr id="accounts-total-row" class="accounts-total-row" hidden>
-                            <td colspan="3">Total</td>
-                            <td id="accounts-total-balance"></td>
-                            <td id="accounts-total-current-value"></td>
-                            <td></td>
+            <div class="panel-section card">
+                <h3>Accounts</h3>
+                <div class="table-responsive">
+                    <table id="accounts-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th class="sortable" data-sort="name">Account Name</th>
+                            <th class="sortable" data-sort="institution">Institution</th>
+                            <th class="sortable" data-sort="type">Type</th>
+                            <th class="sortable" data-sort="balance">Balance</th>
+                            <th class="sortable" data-sort="currentValue">Market Value</th>
+                            <th></th>
                         </tr>
-                    </tfoot>
-                </table>
+                        </thead>
+
+                        <tbody id="accounts-list-body"></tbody>
+                        <tfoot>
+                            <tr id="accounts-total-row" class="accounts-total-row" hidden>
+                                <td colspan="3">Total</td>
+                                <td id="accounts-total-balance"></td>
+                                <td id="accounts-total-current-value"></td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -1717,24 +1738,27 @@
                 <input type="text" id="breakdown-search" placeholder="🔍 Search" title="Search category or type" aria-label="Search">
             </div>
 
-            <div class="table-responsive">
-                <table id="breakdown-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th class="sortable" data-sort="category">Category</th>
-                        <th class="sortable" data-sort="type" title="Blank on a category's own total row — the one that sums every Type under it">Type</th>
-                        <th class="sortable num" data-sort="lastMonth">Last Month</th>
-                        <th class="sortable num" data-sort="lastQuarter">Last Quarter</th>
-                        <th class="sortable num" data-sort="lastYear">Last Year</th>
-                        <th class="sortable num" data-sort="lifelong">Lifelong</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="breakdown-body"></tbody>
-                </table>
-            </div>
+            <div class="panel-section card">
+                <h3>Breakdown</h3>
+                <div class="table-responsive">
+                    <table id="breakdown-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th class="sortable" data-sort="category">Category</th>
+                            <th class="sortable" data-sort="type" title="Blank on a category's own total row — the one that sums every Type under it">Type</th>
+                            <th class="sortable num" data-sort="lastMonth">Last Month</th>
+                            <th class="sortable num" data-sort="lastQuarter">Last Quarter</th>
+                            <th class="sortable num" data-sort="lastYear">Last Year</th>
+                            <th class="sortable num" data-sort="lifelong">Lifelong</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="breakdown-body"></tbody>
+                    </table>
+                </div>
 
-            <div class="pagination" id="breakdown-pagination"></div>
+                <div class="pagination" id="breakdown-pagination"></div>
+            </div>
         </div>
 
         <!-- Buy/sell log at average cost (finance-portfolio.js, finance-portfolio-math.js). -->
@@ -1847,22 +1871,25 @@
 
             <p class="hint" id="watchlist-status"></p>
 
-            <div class="table-responsive">
-                <table id="watchlist-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th class="sortable" data-sort="symbol">Symbol</th>
-                        <th class="sortable" data-sort="name">Name</th>
-                        <th class="num">Close</th>
-                        <th class="num" title="Change since the previous close">1d</th>
-                        <th class="num" title="Change over about one month (21 trading days)">1m</th>
-                        <th class="num" title="Change over about one year (252 trading days)">1y</th>
-                        <th title="Alert rules: gray while waiting, red when met on the latest close">Alert</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="watchlist-body"></tbody>
-                </table>
+            <div class="panel-section card">
+                <h3>Watching</h3>
+                <div class="table-responsive">
+                    <table id="watchlist-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th class="sortable" data-sort="symbol">Symbol</th>
+                            <th class="sortable" data-sort="name">Name</th>
+                            <th class="num">Close</th>
+                            <th class="num" title="Change since the previous close">1d</th>
+                            <th class="num" title="Change over about one month (21 trading days)">1m</th>
+                            <th class="num" title="Change over about one year (252 trading days)">1y</th>
+                            <th title="Alert rules: gray while waiting, red when met on the latest close">Alert</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="watchlist-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -1972,35 +1999,41 @@
             <div id="financial-insight-preview" class="insight-data-preview" hidden></div>
 
             <div id="financial-insight-category-preview" hidden>
-                <div class="table-responsive">
-                    <table id="financial-insight-category-table">
-                        <thead>
-                        <tr>
-                            <th>Category</th>
-                            <th>Previous Month</th>
-                            <th>Quarter avg</th>
-                            <th>Year avg</th>
-                            <th>Lifelong avg</th>
-                        </tr>
-                        </thead>
-                        <tbody id="financial-insight-category-body"></tbody>
-                    </table>
+                <div class="panel-section card">
+                    <h3>Categories</h3>
+                    <div class="table-responsive">
+                        <table id="financial-insight-category-table">
+                            <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Previous Month</th>
+                                <th>Quarter avg</th>
+                                <th>Year avg</th>
+                                <th>Lifelong avg</th>
+                            </tr>
+                            </thead>
+                            <tbody id="financial-insight-category-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             <div id="financial-insight-accounts-preview" hidden>
-                <div class="table-responsive">
-                    <table id="financial-insight-accounts-table">
-                        <thead>
-                        <tr>
-                            <th>Account</th>
-                            <th>Type</th>
-                            <th>Balance</th>
-                            <th>Market Value</th>
-                        </tr>
-                        </thead>
-                        <tbody id="financial-insight-accounts-body"></tbody>
-                    </table>
+                <div class="panel-section card">
+                    <h3>Accounts</h3>
+                    <div class="table-responsive">
+                        <table id="financial-insight-accounts-table">
+                            <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th>Type</th>
+                                <th>Balance</th>
+                                <th>Market Value</th>
+                            </tr>
+                            </thead>
+                            <tbody id="financial-insight-accounts-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -2153,38 +2186,41 @@
                 </div>
             </div>
 
-            <p id="work-time-overtime-summary" class="work-time-overtime-summary"></p>
+            <div class="panel-section card">
+                <h3>Log</h3>
+                <p id="work-time-overtime-summary" class="work-time-overtime-summary"></p>
 
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="work-time-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="work-time-date-to">
-                </label>
+                <div class="export-date-range">
+                    <label>From
+                        <input type="date" id="work-time-date-from">
+                    </label>
+                    <label>To
+                        <input type="date" id="work-time-date-to">
+                    </label>
+                </div>
+
+                <div class="table-responsive">
+                    <table id="work-time-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th class="sortable" data-sort="date">Date</th>
+                            <th>Day</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Break</th>
+                            <th>Duration</th>
+                            <th>Task</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+
+                        <tbody id="work-time-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" id="ts-pagination"></div>
             </div>
-
-            <div class="table-responsive">
-                <table id="work-time-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th>Company</th>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th>Day</th>
-                        <th>Start</th>
-                        <th>End</th>
-                        <th>Break</th>
-                        <th>Duration</th>
-                        <th>Task</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-
-                    <tbody id="work-time-body"></tbody>
-                </table>
-            </div>
-
-            <div class="pagination" id="ts-pagination"></div>
         </div>
 
         <div class="panel" data-route="car-service">
@@ -2204,33 +2240,37 @@
                 </div>
             </div>
 
-            <h4>Predicted</h4>
-            <div class="table-responsive">
-                <table id="car-service-predicted-table" class="table-compact car-service-table">
-                    <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Odometer</th>
-                        <th>Service</th>
-                        <th>Basis</th>
-                    </tr>
-                    </thead>
-                    <tbody id="car-service-predicted-body"></tbody>
-                </table>
+            <div class="panel-section card">
+                <h3>Predicted</h3>
+                <div class="table-responsive">
+                    <table id="car-service-predicted-table" class="table-compact car-service-table">
+                        <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Odometer</th>
+                            <th>Service</th>
+                            <th>Basis</th>
+                        </tr>
+                        </thead>
+                        <tbody id="car-service-predicted-body"></tbody>
+                    </table>
+                </div>
             </div>
 
-            <h4>Done</h4>
-            <div class="table-responsive">
-                <table id="car-service-done-table" class="table-compact car-service-table">
-                    <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Odometer</th>
-                        <th>Service</th>
-                    </tr>
-                    </thead>
-                    <tbody id="car-service-done-body"></tbody>
-                </table>
+            <div class="panel-section card">
+                <h3>Done</h3>
+                <div class="table-responsive">
+                    <table id="car-service-done-table" class="table-compact car-service-table">
+                        <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Odometer</th>
+                            <th>Service</th>
+                        </tr>
+                        </thead>
+                        <tbody id="car-service-done-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -2260,25 +2300,28 @@
                 <input type="text" id="travel-search" placeholder="🔍 Search" title="Search country, city, port, via, reason, detail" aria-label="Search">
             </div>
 
-            <div class="table-responsive">
-                <table id="travel-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th class="sortable" data-sort="date">Date</th>
-                        <th class="sortable" data-sort="type">Type</th>
-                        <th class="sortable" data-sort="countryCity">Country, City</th>
-                        <th class="sortable" data-sort="port">Port</th>
-                        <th>Via</th>
-                        <th>Reason</th>
-                        <th>Detail</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="travel-body"></tbody>
-                </table>
-            </div>
+            <div class="panel-section card">
+                <h3>Log</h3>
+                <div class="table-responsive">
+                    <table id="travel-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th class="sortable" data-sort="date">Date</th>
+                            <th class="sortable" data-sort="type">Type</th>
+                            <th class="sortable" data-sort="countryCity">Country, City</th>
+                            <th class="sortable" data-sort="port">Port</th>
+                            <th>Via</th>
+                            <th>Reason</th>
+                            <th>Detail</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="travel-body"></tbody>
+                    </table>
+                </div>
 
-            <div class="pagination" id="travel-pagination"></div>
+                <div class="pagination" id="travel-pagination"></div>
+            </div>
         </div>
 
         <div class="panel" data-route="application">
@@ -2313,21 +2356,24 @@
                 <input type="text" id="contacts-search" placeholder="🔍 Search" title="Search name, tags, phone, email" aria-label="Search">
             </div>
 
-            <div class="table-responsive">
-                <table id="contacts-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th><input type="checkbox" id="contacts-select-all" aria-label="Select all contacts on this page"></th>
-                        <th class="sortable" data-sort="first">First Name</th>
-                        <th class="sortable" data-sort="last">Last Name</th>
-                        <th>Phone</th>
-                        <th>Email</th>
-                        <th>Tags</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="contacts-body"></tbody>
-                </table>
+            <div class="panel-section card">
+                <h3>Contacts</h3>
+                <div class="table-responsive">
+                    <table id="contacts-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th><input type="checkbox" id="contacts-select-all" aria-label="Select all contacts on this page"></th>
+                            <th class="sortable" data-sort="first">First Name</th>
+                            <th class="sortable" data-sort="last">Last Name</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>Tags</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="contacts-body"></tbody>
+                    </table>
+                </div>
             </div>
 
             <div class="panel-actions" id="contacts-bulk-actions" hidden>
@@ -2359,18 +2405,21 @@
                 <button type="button" class="btn" data-route="all" data-route-view aria-pressed="false">All</button>
             </div>
 
-            <div class="table-responsive">
-                <table id="settings-table" class="table-compact">
-                    <thead>
-                    <tr>
-                        <th>Note</th>
-                        <th>Key</th>
-                        <th>Value</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody id="settings-body"></tbody>
-                </table>
+            <div class="panel-section card">
+                <h3>Settings</h3>
+                <div class="table-responsive">
+                    <table id="settings-table" class="table-compact">
+                        <thead>
+                        <tr>
+                            <th>Note</th>
+                            <th>Key</th>
+                            <th>Value</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="settings-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </section>

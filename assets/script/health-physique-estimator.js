@@ -881,6 +881,8 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
   let totalFat;
   let totalCarbohydrate;
   let totalTef;
+  let totalGrams = 0;
+  let totalCount = 0;
 
   mergeDuplicateBreakdownRows(breakdown).forEach((row) => {
     const tr = document.createElement('tr');
@@ -897,6 +899,9 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
     );
     tbody.appendChild(tr);
 
+    const quantity = parseFloat(row.amount.replace('×', '')) || 0;
+    if (row.amount.startsWith('×')) totalCount += quantity;
+    else totalGrams += quantity;
     if (row.fiber !== undefined) totalFiber = (totalFiber || 0) + row.fiber;
     if (row.fat !== undefined) totalFat = (totalFat || 0) + row.fat;
     if (row.carbohydrate !== undefined) totalCarbohydrate = (totalCarbohydrate || 0) + row.carbohydrate;
@@ -907,9 +912,14 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
   totalRow.className = 'calc-breakdown-total';
   // Whole grams, floored as the Derived table and Intake Macros card show them.
   const totalCell = (value) => makeCell(value === undefined ? '—' : String(Math.floor(value)));
+  // Grams and counts can't add, so each sums on its own: "850g + ×3".
+  const totalAmount = [
+    totalGrams ? `${Math.round(totalGrams * 10) / 10}g` : '',
+    totalCount ? `×${Math.round(totalCount * 10) / 10}` : '',
+  ].filter(Boolean).join(' + ');
   totalRow.append(
     makeCell('Total'),
-    makeCell(''),
+    makeCell(totalAmount),
     totalCell(totalCalories),
     totalCell(totalProtein),
     totalCell(totalFiber),

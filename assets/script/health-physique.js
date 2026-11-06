@@ -1267,9 +1267,10 @@ function renderPhysiqueList() {
       if (value === null) return '—';
       return privacyMode ? maskDigits(String(value)) : String(value);
     };
+    // Whole grams, floored as the day's breakdown Total shows them.
     const int = (value) => {
       if (value === null) return '—';
-      const s = String(Math.round(value));
+      const s = String(Math.floor(value));
       return privacyMode ? maskDigits(s) : s;
     };
     // The stored figures; computed here only for a day not yet saved with them.

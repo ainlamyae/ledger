@@ -5,13 +5,14 @@
 //
 //   1. Timing         springs and curves
 //   2. Stylesheet     transitions, keyframes, view transitions
-//   3. Page loads     cross-document push/pop
-//   4. Forms          sheets rise and sink, the page behind recedes
+//   3. Page loads     down, up or sideways between pages
+//   4. Forms          opening is down, closing up
 //   5. Toast
-//   6. Pages          in-page navigation (router.js)
+//   6. Pages          hub, page and view (router.js): down, up or sideways
 //   7. Feedback       busy icons, panel entry, confetti, warning
 //
-// Only content ever moves; the background (#app-backdrop) stays still.
+// Two motions only: down/up a level (by the breadcrumb) and sideways on the
+// same level. Only content moves; the background, bars and breadcrumb stay still.
 
 (function () {
   'use strict';
@@ -35,17 +36,16 @@
     return { duration: Math.round(end * 1000), easing: `linear(${points.join(', ')}, 1)` };
   }
 
-  const NAV = spring(0.4, 0, 6); // push/pop: quick launch, soft landing
-  const ZOOM = spring(0.48, 0.16, 3); // zoom past/settle: a hint of overshoot
-  const DISMISS = spring(0.38, 0, 4); // closing: no overshoot
   const POP = spring(0.38, 0.28); // toast
+  // Every move (down, up, sideways): one even timing, slow enough to watch.
+  const SWIPE = { duration: 1500, easing: 'cubic-bezier(.45, 0, .2, 1)' };
 
   // Curves for CSS transitions (micro-interactions).
   const EASE = 'cubic-bezier(.2, .8, .2, 1)'; // quick start, soft settle
   const EASE_BOUNCE = 'cubic-bezier(.3, 1.3, .5, 1)'; // springs back past rest
-  const PARALLAX = 0.3; // how far the page under a push drifts
-  const DIM = 'brightness(.72)';
-  const EDGE = '-16px 0 40px rgba(0, 0, 0, .18)';
+  // Same-rank sections, left to right: the nav's order, Other (account menu) last.
+  // Listed here because a section page has no nav yet when it's revealed.
+  const SECTION_ORDER = ['health', 'finance', 'track', 'other'];
 
   // ── 2. Stylesheet ─────────────────────────────────────────────────────────
 
@@ -104,6 +104,9 @@ html.section-pages .panel.page-active:hover {
   transition: none;
 }
 
+/* The breadcrumb stays over whatever moves (under the bars, 9+). */
+.page-crumb { position: relative; z-index: 8; }
+
 /* Busy icon button: grows and pulses, then bounces back (iconBusy/iconSettle) */
 .btn.btn-icon.icon-busy, .btn.row-action-btn.icon-busy {
   animation: icon-busy-grow .25s ease-out forwards, icon-busy-pulse 1s ease-in-out .25s infinite;
@@ -146,30 +149,60 @@ html.section-pages .panel.page-active:hover {
   }
 }
 
-/* Page loads: an iOS push, Back reversed. The background, bars, account and
-   breadcrumb are named out of the slide and held still. */
+/* Page loads, by html[data-move] (set below): down, up or sideways (--move-side
+   1 to the right, -1 to the left). The background, logo row (with the sidebar's toggle), sidebar,
+   bars, account, breadcrumb and footer are named out and held still. */
 @view-transition { navigation: auto; }
 #app-backdrop { view-transition-name: app-backdrop; }
 .nav { view-transition-name: app-nav; }
 .side-nav { view-transition-name: app-side-nav; }
 .header-actions { view-transition-name: app-account; }
 .page-crumb { view-transition-name: app-crumb; }
-${['app-backdrop', 'app-nav', 'app-side-nav', 'app-account', 'app-crumb'].map((n) => `
+.action-bar { view-transition-name: app-action-bar; }
+.site-footer { view-transition-name: app-footer; }
+/* The logo row on a wide screen: logo, name and the sidebar's toggle. */
+header h1 { view-transition-name: app-logo; }
+${['app-backdrop', 'app-nav', 'app-side-nav', 'app-account', 'app-crumb', 'app-action-bar', 'app-footer', 'app-logo'].map((n) => `
 ::view-transition-group(${n}) { animation: none; }
 ::view-transition-old(${n}), ::view-transition-new(${n}) { animation: none; mix-blend-mode: normal; }`).join('')}
-::view-transition-old(root), ::view-transition-new(root) {
-  animation-duration: ${NAV.duration}ms;
-  animation-timing-function: ${NAV.easing};
+/* The background never moves. What moves is the page's content alone (body, named
+   app-page while moving, see-through), never the whole page: a whole-page image
+   carries the canvas colour with it. Both pages are marked while moving (the
+   leaving one data-move-out, from pageswap), at once (a colour transition would
+   leave it solid when captured). */
+html:is([data-move], [data-move-out]) { view-transition-name: none; background: transparent; }
+html:is([data-move], [data-move-out]) body { view-transition-name: app-page; background: transparent; transition: none; }
+html:is([data-move], [data-move-out]) body::before { visibility: hidden; }
+::view-transition-group(app-page) { animation: none; }
+/* The leaving page where it was scrolled to (--move-old-y). */
+::view-transition-old(app-page) { inset-block-start: calc(var(--move-old-y, 0) * -1px); }
+/* Held parts are drawn over the moving page, so the full-screen backdrop goes under it. */
+::view-transition-group(app-backdrop) { z-index: -1; }
+/* The arriving page's own held parts and background stay hidden while it moves in,
+   so they never ride along (a section page builds them after the move has begun);
+   the leaving page's, held still, show until it lands. */
+html[data-move] :is(#app-backdrop, header h1, .nav, .side-nav, .header-actions, .page-crumb, .action-bar, .site-footer) { visibility: hidden; }
+::view-transition-old(app-page), ::view-transition-new(app-page) {
+  animation-duration: ${SWIPE.duration}ms;
+  animation-timing-function: ${SWIPE.easing};
+  animation-fill-mode: both;
   mix-blend-mode: normal;
 }
-::view-transition-new(root) { animation-name: page-in; box-shadow: ${EDGE}; }
-::view-transition-old(root) { animation-name: page-out; }
-html:active-view-transition-type(back)::view-transition-new(root) { animation-name: page-in-back; box-shadow: none; }
-html:active-view-transition-type(back)::view-transition-old(root) { animation-name: page-out-back; box-shadow: ${EDGE}; z-index: 1; }
-@keyframes page-in { from { transform: translateX(100%); } }
-@keyframes page-out { to { transform: translateX(-${PARALLAX * 100}%); filter: ${DIM}; } }
-@keyframes page-in-back { from { transform: translateX(-${PARALLAX * 100}%); filter: ${DIM}; } }
-@keyframes page-out-back { to { transform: translateX(100%); } }
+html[data-move="down"]::view-transition-old(app-page) { animation-name: down-out; }
+html[data-move="down"]::view-transition-new(app-page) { animation-name: down-in; }
+html[data-move="up"]::view-transition-old(app-page) { animation-name: up-out; z-index: 1; }
+html[data-move="up"]::view-transition-new(app-page) { animation-name: up-in; }
+html[data-move="sideways"]::view-transition-old(app-page) { animation-name: sideways-out; }
+html[data-move="sideways"]::view-transition-new(app-page) { animation-name: sideways-in; }
+/* A section page still building when revealed: both pages hold until it's built (enterPage). */
+html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-transition-new(app-page) { animation-play-state: paused; }
+/* By the screen, not the page image (as tall as the page). */
+@keyframes down-in { from { transform: translateY(100vh); } }
+@keyframes down-out { to { transform: translateY(-100vh); } }
+@keyframes up-in { from { transform: translateY(-100vh); } }
+@keyframes up-out { to { transform: translateY(100vh); } }
+@keyframes sideways-in { from { transform: translateX(calc(var(--move-side) * 100vw)); } }
+@keyframes sideways-out { to { transform: translateX(calc(var(--move-side) * -100vw)); } }
 `;
 
   function installStyles() {
@@ -181,32 +214,120 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
   }
 
   // ── 3. Page loads ─────────────────────────────────────────────────────────
+  // Each page notes its address as it leaves; the next reads it to know which
+  // way it came. No Navigation API needed, so Safari moves too.
 
-  // Back, or up to a shorter address (a section to home), slides the other way;
-  // a reload doesn't slide.
+  const FROM_KEY = 'ledger_motion_from';
+
+  // Address parts under the app root: ['health', 'physique'], [] for home.
+  function addressParts(url) {
+    const root = new URL('.', document.baseURI).pathname;
+    const path = new URL(url, location.href).pathname;
+    return (path.startsWith(root) ? path.slice(root.length) : path).split('/').filter(Boolean);
+  }
+
+  // The move between two addresses: sideways between sections (menu order),
+  // else down to a deeper address or up to a shorter one.
+  function moveBetween(fromUrl, toUrl) {
+    const from = addressParts(fromUrl);
+    const to = addressParts(toUrl);
+    const a = SECTION_ORDER.indexOf(from[0]);
+    const b = SECTION_ORDER.indexOf(to[0]);
+    if (a !== -1 && b !== -1 && a !== b) return { move: 'sideways', side: b > a ? 1 : -1 };
+    return { move: to.length < from.length ? 'up' : 'down', side: 1 };
+  }
+
+  function noteLeaving() {
+    try { sessionStorage.setItem(FROM_KEY, JSON.stringify({ url: location.href, y: Math.round(scrollY), at: Date.now() })); } catch { /* no storage: no motion */ }
+  }
+
+  // Where this load came from (a reload, or nothing recent: no motion).
+  function arrivedFrom() {
+    try {
+      const note = JSON.parse(sessionStorage.getItem(FROM_KEY) || 'null');
+      sessionStorage.removeItem(FROM_KEY);
+      if (!note || Date.now() - note.at > 10000 || note.url === location.href) return null;
+      return note;
+    } catch {
+      return null;
+    }
+  }
+
+  const cameFrom = arrivedFrom();
+  let loadMove = cameFrom && moveBetween(cameFrom.url, location.href);
+  let leftAtY = cameFrom?.y || 0;
+  const isSectionPage = SECTION_ORDER.includes(addressParts(location.href)[0]);
+  let pendingMove = loadMove && isSectionPage ? loadMove : null;
+  // A section page builds itself after load, before or after the reveal.
+  let revealed = !('onpagereveal' in window); // no reveal event coming: act on build
+  let built = false;
+  let viewMoving = false; // a page transition is carrying this load
+
+  function markMove(m) {
+    document.documentElement.dataset.move = m.move;
+    document.documentElement.style.setProperty('--move-side', m.side);
+    document.documentElement.style.setProperty('--move-old-y', leftAtY);
+  }
+
+  function clearMove() {
+    delete document.documentElement.dataset.move;
+    delete document.documentElement.dataset.moveWait;
+    document.documentElement.style.removeProperty('--move-side');
+    document.documentElement.style.removeProperty('--move-old-y');
+  }
+
+  // Only where a page transition will read it; cleared when it ends (failsafe).
+  if (loadMove && revealed === false) {
+    markMove(loadMove);
+    setTimeout(clearMove, SWIPE.duration + 4000);
+  }
+
+  // The transition moves old and new together; a page still building holds
+  // both where they are until it's built, so the new one never comes in blank.
   function onPageReveal(event) {
-    const act = window.navigation && navigation.activation;
-    if (!event.viewTransition || !act || !act.from) return;
-    if (act.navigationType === 'reload') return event.viewTransition.skipTransition();
-    const depth = (url) => new URL(url).pathname.split('/').filter(Boolean).length;
-    const back = act.navigationType === 'traverse' ? act.entry.index < act.from.index : depth(act.entry.url) < depth(act.from.url);
-    event.viewTransition.types.add(back ? 'back' : 'forward');
+    revealed = true;
+    viewMoving = false;
+    // Shown again from the back/forward cache: its own load ran long ago, so
+    // the way it came is read now (a fresh load already took the note).
+    const again = arrivedFrom();
+    if (again) {
+      loadMove = moveBetween(again.url, location.href);
+      leftAtY = again.y || 0;
+      markMove(loadMove);
+      built = true;
+      pendingMove = null;
+    }
+    const vt = event.viewTransition;
+    if (!vt) clearMove();
+    else if (!loadMove) vt.skipTransition();
+    else {
+      viewMoving = true;
+      pendingMove = null;
+      if (isSectionPage && !built) {
+        document.documentElement.dataset.moveWait = '';
+        setTimeout(() => delete document.documentElement.dataset.moveWait, 3000);
+      }
+      vt.finished.then(clearMove, clearMove);
+    }
+    if (built) moveBuiltPage();
+  }
+
+  // Called by section-page.js once the page is built.
+  function enterPage() {
+    built = true;
+    delete document.documentElement.dataset.moveWait;
+    if (revealed) moveBuiltPage();
+  }
+
+  // No page transition (an older browser): the new page's cards move in on their own.
+  function moveBuiltPage() {
+    const m = pendingMove;
+    pendingMove = null;
+    const screen = !viewMoving && m && currentScreen();
+    if (screen) moveIn(screen.matches('.modal') ? screen.querySelector('.modal-card') || screen : screen, m.move, m.side);
   }
 
   // ── Shared helpers ────────────────────────────────────────────────────────
-
-  function rectOf(el) {
-    if (!el?.isConnected) return null;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight) return null;
-    return { left: r.left, top: r.top, width: r.width, height: r.height };
-  }
-
-  // The viewport's middle in el's own coordinates, for scaling round the screen's centre.
-  function screenMiddle(el) {
-    const r = el.getBoundingClientRect();
-    return `${innerWidth / 2 - r.left}px ${innerHeight / 2 - r.top}px`;
-  }
 
   function currentSection() {
     return window.ledgerSectionPage && typeof routedSectionId === 'function' ? document.getElementById(routedSectionId(null)) : null;
@@ -214,28 +335,92 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
 
   const removeOnFinish = (anim, el) => { const done = () => el.remove(); anim.finished.then(done, done); };
 
-  // The fixed bottom bar sits inside the page being animated, and a transform on
-  // an ancestor would carry it along: it waits on <body> until the motion ends.
-  function holdBottomBar(anim) {
-    const bar = document.querySelector('.action-bar');
-    if (!bar) return anim;
-    const { parentNode, nextSibling } = bar;
-    document.body.appendChild(bar);
-    const restore = () => (nextSibling ? parentNode?.insertBefore(bar, nextSibling) : parentNode?.appendChild(bar));
-    anim.finished.then(restore, restore);
+  // ── The two motions, by the breadcrumb: down a level the new screen rises
+  // from the bottom as the old one goes off the top; up a level the reverse.
+  // On the same level, sideways: the new one sweeps in from the right (going on
+  // in the order) or the left (going back), the old one out the other side.
+  // Only cards and fields move: the breadcrumb, the bars and the background stay
+  // put, and on top.
+
+  const STILL = '.page-crumb, .action-bar';
+  const GHOST_Z = '5'; // over the page, under the breadcrumb (8) and the bars (9+)
+
+  // What moves in root: everything but STILL. Ancestors of a STILL element are
+  // split into their children, so no transform ever carries the fixed bar.
+  function movers(root) {
+    const out = [];
+    [...root.children].forEach((el) => {
+      if (!el.getClientRects().length || el.matches(STILL)) return;
+      if (el.querySelector(STILL)) out.push(...movers(el));
+      else out.push(el);
+    });
+    return out;
+  }
+
+  // Script animations only; CSS ones (busy icons, hover) are left alone.
+  function stopMoves(root) {
+    root.getAnimations({ subtree: true })
+      .filter((a) => !(a instanceof CSSAnimation) && !(a instanceof CSSTransition))
+      .forEach((a) => a.cancel());
+  }
+
+  // Where new content starts, just off screen: down from the bottom edge, up
+  // from the top edge, sideways from the right (side 1) or left (side -1) edge.
+  function startOffset(move, side, rect) {
+    if (move === 'down') return { axis: 'Y', d: innerHeight - Math.max(rect.top, 0) };
+    if (move === 'up') return { axis: 'Y', d: -Math.max(rect.bottom, 0) };
+    return { axis: 'X', d: side > 0 ? innerWidth - Math.max(rect.left, 0) : -Math.max(rect.right, 0) };
+  }
+
+  // New content in. A form card moves by top/left, not transform, so its fixed bar stays.
+  function moveIn(root, move, side = 1) {
+    const { axis, d } = startOffset(move, side, root.getBoundingClientRect());
+    if (root.matches('.modal-card')) {
+      const prop = axis === 'Y' ? 'top' : 'left';
+      const cs = getComputedStyle(root);
+      const base = parseFloat(cs[prop]) || 0;
+      const wasStatic = cs.position === 'static';
+      if (wasStatic) root.style.position = 'relative';
+      const anim = root.animate([{ [prop]: `${base + d}px` }, { [prop]: `${base}px` }], SWIPE);
+      const done = () => { if (wasStatic) root.style.position = ''; };
+      anim.finished.then(done, done);
+      return;
+    }
+    const frames = [{ transform: `translate${axis}(${d}px)` }, { transform: 'none' }];
+    movers(root).forEach((el) => el.animate(frames, SWIPE));
+  }
+
+  // The old screen's copy out: down, off the top under the new one; up, off the
+  // bottom over it; sideways, off the other side.
+  function moveOut(snap, move, side = 1) {
+    document.body.appendChild(snap.wrap);
+    snap.wrap.style.zIndex = move === 'up' ? GHOST_Z : '-1';
+    const to = move === 'down' ? `translateY(${-innerHeight}px)`
+      : move === 'up' ? `translateY(${innerHeight}px)`
+        : `translateX(${-side * innerWidth}px)`;
+    const anim = snap.wrap.animate([{ transform: 'none' }, { transform: to }], { ...SWIPE, fill: 'forwards' });
+    removeOnFinish(anim, snap.wrap);
     return anim;
   }
 
-  // The breadcrumb never moves: an exact inverse of its page's motion cancels it out.
-  function holdCrumbShift(root, d, timing, axis) {
-    root?.querySelector('.page-crumb')?.animate([{ transform: `translate${axis}(${-d}px)` }, { transform: 'none' }], timing);
+  // In a copy the breadcrumb and action bar keep their room (none, if fixed) unseen.
+  function hideStill(copy, live) {
+    const pick = (root) => [root, ...root.querySelectorAll(STILL)].filter((el) => el.matches(STILL));
+    const lives = pick(live);
+    pick(copy).forEach((el, i) => {
+      const fixed = lives[i] && getComputedStyle(lives[i]).position === 'fixed';
+      el.classList.remove('action-bar');
+      if (fixed) el.style.display = 'none';
+      else el.style.visibility = 'hidden';
+    });
   }
 
-  function holdCrumbScale(root, scale, timing) {
-    const crumb = root?.querySelector('.page-crumb');
-    if (!crumb) return;
-    const origin = screenMiddle(crumb);
-    crumb.animate([{ transformOrigin: origin, transform: `scale(${1 / scale})` }, { transformOrigin: origin, transform: 'none' }], timing);
+  // What's on screen: the open form page, else the section page.
+  function currentScreen() {
+    const form = document.querySelector('html[data-form-page] .modal.form-page:not([hidden])');
+    if (form) return form;
+    const section = currentSection();
+    return section && section.getClientRects().length ? section : null;
   }
 
   // What's on screen in section now, as a fixed copy (canvases redrawn).
@@ -253,9 +438,7 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
     Object.assign(inner.style, { display: cs.display, flexDirection: cs.flexDirection, gap: cs.gap, transform: `translateY(${r.top}px)` });
     [...section.children].filter((el) => el.getClientRects().length).forEach((el) => {
       const copy = inner.appendChild(el.cloneNode(true));
-      copy.querySelectorAll('.action-bar').forEach((bar) => bar.classList.remove('action-bar'));
-      // Kept for layout, hidden: the live breadcrumb stays put.
-      if (copy.matches('.page-crumb')) copy.style.visibility = 'hidden';
+      hideStill(copy, el);
       const from = el.querySelectorAll('canvas');
       copy.querySelectorAll('canvas').forEach((c, i) => {
         try { c.width = from[i].width; c.height = from[i].height; c.getContext('2d').drawImage(from[i], 0, 0); } catch { /* blank is fine */ }
@@ -278,30 +461,17 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
     return el.animate(show ? frames : frames.reverse(), { ...timing, fill: show ? 'none' : 'forwards' });
   }
 
-  // The page behind a form page recedes, as iOS's screen under a sheet.
-  function recede(snap) {
-    if (!snap) return;
-    snap.wrap.style.zIndex = '-1';
-    document.body.appendChild(snap.wrap);
-    removeOnFinish(snap.wrap.animate([
-      { transform: 'none', filter: 'brightness(1)', borderRadius: '0', opacity: 1 },
-      { transform: 'scale(.92)', filter: 'brightness(.6)', borderRadius: '24px', opacity: 1, offset: .6 },
-      { transform: 'scale(.9)', filter: 'brightness(.5)', borderRadius: '24px', opacity: 0 },
-    ], { ...ZOOM, easing: 'linear', fill: 'forwards' }), snap.wrap);
-  }
-
-  // A sheet rising from the bottom edge.
-  function riseIn(modal, behind) {
+  // A form is a level down: its card rises as the screen under it goes off the top.
+  function openCard(modal, behind) {
     const card = modal.querySelector('.modal-card');
     if (!card || modal.hidden) return behind?.wrap.remove();
-    card.getAnimations().forEach((a) => a.cancel());
-    if (modal.classList.contains('form-page')) recede(behind);
+    stopMoves(card);
+    if (modal.classList.contains('form-page') && behind) moveOut(behind, 'down');
     else {
       behind?.wrap.remove();
-      fadeBackdrop(modal, true, DISMISS);
+      fadeBackdrop(modal, true, SWIPE);
     }
-    const rise = innerHeight - Math.max(card.getBoundingClientRect().top, 0);
-    holdBottomBar(card.animate([{ transform: `translateY(${rise}px)` }, { transform: 'none' }], NAV));
+    moveIn(card, 'down');
   }
 
   // A copy of the card left where it was, since the real one is gone at once.
@@ -313,16 +483,18 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
     const ghost = card.cloneNode(true);
     ghost.removeAttribute('id');
     ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
-    ghost.querySelectorAll('.action-bar').forEach((bar) => bar.classList.remove('action-bar'));
+    hideStill(ghost, card);
     ghost.inert = true;
     ghost.setAttribute('aria-hidden', 'true');
+    const page = modal.classList.contains('form-page');
     Object.assign(ghost.style, {
       position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
-      maxWidth: 'none', maxHeight: 'none', margin: '0', overflow: 'hidden', pointerEvents: 'none', zIndex: '1000',
+      maxWidth: 'none', maxHeight: 'none', margin: '0', overflow: 'hidden', pointerEvents: 'none',
+      // A form page's copy stays under the bars; an overlay's over its backdrop.
+      zIndex: page ? GHOST_Z : '1000',
       background: cs.background, borderRadius: cs.borderRadius, boxShadow: cs.boxShadow, padding: cs.padding,
       color: cs.color, font: cs.font,
     });
-    const page = modal.classList.contains('form-page');
     let backdrop = null;
     if (!page) {
       const ms = getComputedStyle(modal);
@@ -345,22 +517,19 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
     g.backdrop?.remove();
   }
 
-  // The sheet sinks off the bottom edge while the page comes forward again.
-  function sinkOut(modal, g) {
+  // Closing is a level up: the card goes off the bottom as its parent (page or form) comes down.
+  function closeCard(modal, g) {
     if (ghosts.get(modal) !== g) return;
     g.started = true;
-    if (g.backdrop) fadeBackdrop(g.backdrop, false, DISMISS);
-    const section = g.page && currentSection();
-    if (section && section.getClientRects().length) {
-      const middle = screenMiddle(section);
-      holdBottomBar(section.animate([
-        { transformOrigin: middle, transform: 'scale(.92)', filter: 'brightness(.6)' },
-        { transformOrigin: middle, transform: 'none', filter: 'brightness(1)' },
-      ], DISMISS));
-      holdCrumbScale(section, .92, DISMISS);
+    if (g.backdrop) fadeBackdrop(g.backdrop, false, SWIPE);
+    const screen = g.page && currentScreen();
+    if (screen) {
+      const root = screen.matches('.modal') ? screen.querySelector('.modal-card') : screen;
+      stopMoves(root);
+      moveIn(root, 'up');
     }
     const anim = g.ghost.animate([{ transform: 'none' }, { transform: `translateY(${innerHeight - Math.max(g.top, 0)}px)` }],
-      { ...DISMISS, fill: 'forwards' });
+      { ...SWIPE, fill: 'forwards' });
     const done = () => { if (ghosts.get(modal) === g) dropGhost(modal); };
     anim.finished.then(done, done);
   }
@@ -370,9 +539,9 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
     const pending = ghosts.get(modal);
     dropGhost(modal);
     if (pending && !pending.started) return null;
-    const section = currentSection();
-    const behind = section && section.getClientRects().length ? snapshot(section) : null;
-    return () => riseIn(modal, behind);
+    const screen = currentScreen();
+    const behind = screen ? snapshot(screen) : null;
+    return () => openCard(modal, behind);
   }
 
   function beforeClose(modal) {
@@ -381,7 +550,7 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
     const g = ghostOf(modal);
     if (!g) return null;
     ghosts.set(modal, g);
-    return () => sinkOut(modal, g);
+    return () => closeCard(modal, g);
   }
 
   // ── 5. Toast: springs up from the bottom, sinks away ──────────────────────
@@ -434,109 +603,56 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
   }
 
   // ── 6. Pages ──────────────────────────────────────────────────────────────
-  // From the hub a page rises while the hub zooms past; back, it sinks away as
-  // the hub settles in. Page to page is a navigation push/pop.
+  // Hub, page and view, by the breadcrumb: hub → page and page → view are down,
+  // the reverse up; two pages, or two views, on the same level go sideways in
+  // their order on screen.
 
-  let direction = null; // 'push' | 'pop', set by the router
-  let lastPage; // { panel, key } shown last; panel null = hub, key = block/view
+  let armed = false; // the router's next swap moves (never a first show)
+  let lastPage; // { panel, view } shown last; panel null = hub
   let prepared = null; // taken before a view resets, used by the next capture
   let pageGhost = null;
-  const viewTiles = new Map(); // a view page's key -> the tile that opened it
 
-  function hubTile(section, panel) {
-    return panel && document.querySelector(`.page-tile[data-section="${section.id}"][data-route="${panel.dataset.route}"]`);
+  // 1 when b comes after a on screen, -1 before.
+  function sideOf(a, b) {
+    return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1;
   }
 
-  // Before the router swaps pages (or a view opens): what to animate from.
-  // opener is the view tile clicked, if any.
-  function capturePage(panel, section, opener = null) {
+  function pageMove(from, to) {
+    if (from.panel !== to.panel) {
+      if (!from.panel) return { move: 'down', side: 1 };
+      if (!to.panel) return { move: 'up', side: 1 };
+      return { move: 'sideways', side: sideOf(from.panel, to.panel) };
+    }
+    if (from.view === to.view) return null;
+    if (!from.view) return { move: 'down', side: 1 };
+    if (!to.view) return { move: 'up', side: 1 };
+    return { move: 'sideways', side: sideOf(from.view, to.view) };
+  }
+
+  // Before the router swaps pages (or a view opens): what to move from.
+  // view: the view button being opened (null for the page itself).
+  function capturePage(panel, section, view = panel ? currentRouteView(panel) : null) {
     if (prepared) {
       const m = prepared;
       prepared = null;
       return m;
     }
-    const dir = direction;
-    direction = null;
+    const go = armed;
+    armed = false;
     const from = lastPage;
-    const key = `${panel?.dataset.route ?? ''}/${(panel && currentRouteView(panel)?.dataset.route) ?? ''}`;
-    lastPage = { panel, key };
-    if (!dir || !from || from.key === key || !section || !ready) return null;
+    lastPage = { panel, view: view || null };
+    const m = go && from && section && ready && pageMove(from, lastPage);
+    if (!m) return null;
     pageGhost?.wrap.remove();
     pageGhost = null;
-    section.getAnimations().forEach((a) => a.cancel());
-    if (opener) viewTiles.set(key, opener);
-    const tile = dir === 'push' ? rectOf(opener || (from.panel === null ? hubTile(section, panel) : null)) : null;
-    // Back to the hub: the block's tile; back from a view: the view's tile.
-    const closeTile = dir === 'pop' ? (panel === null ? hubTile(section, from.panel) : viewTiles.get(from.key)) : null;
-    return { dir, closeTile, tile, snap: snapshot(section) };
+    stopMoves(section);
+    return { ...m, snap: snapshot(section) };
   }
 
-  // A tile, sidebar link or breadcrumb: up to the hub, or back to the block, is a pop.
+  // A tile, sidebar link or breadcrumb: captured before the views reset.
   function prepareNavigation(panel, section) {
-    direction = !panel || panel === lastPage?.panel ? 'pop' : 'push';
-    prepared = capturePage(panel, section);
-  }
-
-  // The old page fades out early instead of being covered by an opaque sheet.
-  function pushOrPop(section, m) {
-    const off = innerWidth - section.getBoundingClientRect().left;
-    const parallax = -innerWidth * PARALLAX;
-    const timing = { ...NAV, fill: 'forwards' };
-    document.body.appendChild(m.snap.wrap);
-    if (m.dir === 'push') {
-      m.snap.wrap.style.zIndex = '-1';
-      holdBottomBar(section.animate([{ transform: `translateX(${off}px)` }, { transform: 'none' }], NAV));
-      holdCrumbShift(section, off, NAV, 'X');
-      return m.snap.wrap.animate([
-        { transform: 'none', filter: 'brightness(1)', opacity: 1 },
-        { opacity: 0, offset: .4 },
-        { transform: `translateX(${parallax}px)`, filter: DIM, opacity: 0 },
-      ], timing);
-    }
-    m.snap.wrap.style.zIndex = '5';
-    holdBottomBar(section.animate([
-      { transform: `translateX(${parallax}px)`, filter: DIM, opacity: 0 },
-      { opacity: 0, offset: .3 },
-      { transform: 'none', filter: 'brightness(1)', opacity: 1 },
-    ], NAV));
-    holdCrumbShift(section, parallax, NAV, 'X');
-    return m.snap.wrap.animate([
-      { transform: 'none', opacity: 1 },
-      { opacity: 0, offset: .5 },
-      { transform: `translateX(${off}px)`, opacity: 0 },
-    ], timing);
-  }
-
-  // Launch: the old page zooms past and fades while this one rises.
-  function launch(section, m) {
-    m.snap.wrap.style.zIndex = '-1';
-    document.body.appendChild(m.snap.wrap);
-    const rise = innerHeight - Math.max(section.getBoundingClientRect().top, 0);
-    holdBottomBar(section.animate([{ transform: `translateY(${rise}px)` }, { transform: 'none' }], NAV));
-    holdCrumbShift(section, rise, NAV, 'Y');
-    return m.snap.wrap.animate([
-      { transform: 'none', filter: 'brightness(1)', opacity: 1 },
-      { opacity: 0, offset: .4 },
-      { transform: 'scale(1.12)', filter: 'brightness(.55)', opacity: 0 },
-    ], { ...ZOOM, fill: 'forwards' });
-  }
-
-  // Back to the tile: the page sinks away; the hub settles in from zoomed.
-  function settle(section, m) {
-    m.snap.wrap.style.zIndex = '5';
-    document.body.appendChild(m.snap.wrap);
-    const sink = innerHeight - Math.max(m.snap.top, 0);
-    const middle = screenMiddle(section);
-    holdBottomBar(section.animate([
-      { transformOrigin: middle, transform: 'scale(1.1)', filter: 'brightness(.55)', opacity: 0 },
-      { transformOrigin: middle, transform: 'none', filter: 'brightness(1)', opacity: 1 },
-    ], DISMISS));
-    holdCrumbScale(section, 1.1, DISMISS);
-    return m.snap.wrap.animate([
-      { transform: 'none', opacity: 1 },
-      { opacity: 0, offset: .5 },
-      { transform: `translateY(${sink}px)`, opacity: 0 },
-    ], { ...DISMISS, fill: 'forwards' });
+    armed = true;
+    prepared = capturePage(panel, section, null);
   }
 
   // After the swap (router's showSectionPage, or a view's click).
@@ -544,12 +660,10 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
     if (!m) return;
     requestAnimationFrame(() => {
       try {
-        let anim;
-        if (m.tile) anim = launch(section, m);
-        else if (rectOf(m.closeTile)) anim = settle(section, m);
-        else anim = pushOrPop(section, m);
+        const anim = moveOut(m.snap, m.move, m.side);
+        moveIn(section, m.move, m.side);
         pageGhost = m.snap;
-        const done = () => { if (pageGhost === m.snap) { m.snap.wrap.remove(); pageGhost = null; } };
+        const done = () => { if (pageGhost === m.snap) pageGhost = null; };
         anim.finished.then(done, done);
       } catch {
         m.snap?.wrap.remove();
@@ -580,6 +694,8 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
 
   // Staggered fade/slide-in, the index-th block after the first.
   function enterPanel(panel, index) {
+    // Arrived by a page move: the page sweeps in whole, its blocks already shown.
+    if (loadMove) return;
     panel.style.setProperty('--enter-index', index);
     panel.classList.add('panel-enter');
   }
@@ -657,13 +773,27 @@ html:active-view-transition-type(back)::view-transition-old(root) { animation-na
 
   installStyles();
   window.addEventListener('pagereveal', onPageReveal);
+  // Also on a link's click: the next page may start before pagehide fires.
+  window.addEventListener('pagehide', noteLeaving);
+  // Leaving with a page transition: see-through before it's captured.
+  window.addEventListener('pageswap', (event) => {
+    if (event.viewTransition) document.documentElement.dataset.moveOut = '';
+  });
+  // Back from the back/forward cache: no longer leaving.
+  window.addEventListener('pageshow', () => delete document.documentElement.dataset.moveOut);
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest?.('a[href]');
+    if (link && link.origin === location.origin) noteLeaving();
+  });
 
   window.Motion = Object.freeze({
     init,
     capturePage,
     prepareNavigation,
     playPage,
-    setDirection(dir) { direction = dir; },
+    enterPage,
+    arm() { armed = true; },
+    moveIn,
     iconBusy,
     iconSettle,
     enterPanel,

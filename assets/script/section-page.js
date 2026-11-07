@@ -183,6 +183,8 @@
     await Promise.all(ordered);
     routeSteps.forEach((step) => step());
     delete document.documentElement.dataset.routing;
+    // Its cards come in the way the load went (motion.js).
+    window.Motion?.enterPage();
 
     await Promise.all(pending);
     bootSteps.forEach((step) => step());

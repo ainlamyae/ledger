@@ -77,7 +77,7 @@ ledger/
 │       ├── finance-insight.js  # Finance Insight panel
 │       ├── gate.js               # Pre-login flow
 │       ├── version.js            # APP_VERSION, written by scripts/version.cjs (post-commit hook)
-│       ├── motion.js             # Every animation (window.Motion): springs, motion CSS, page/form/toast motion, confetti, warning
+│       ├── motion.js             # Every animation (window.Motion): down/up/sideways page and form moves, motion CSS, toast, confetti, warning
 │       ├── app.js                # Orchestration
 │       ├── router.js             # Block/button/row addresses (<group>/<block>/<button or row>/)
 │       ├── page-nav.js           # Section hub tiles, page breadcrumb, wide-screen sidebar

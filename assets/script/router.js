@@ -196,10 +196,11 @@ function routeHit(element) {
 // data-page="block" shows one block alone, opened, under its breadcrumb. Which
 // one is current always follows the address, so a reload, Back or a shared link
 // lands on the same view.
-function showSectionPage(panel) {
+// view: the view page being shown, when known before its button runs (Back/Forward).
+function showSectionPage(panel, view) {
   if (!window.ledgerSectionPage) return;
   const section = document.getElementById(routedSectionId(null));
-  const motion = Motion.capturePage(panel, section);
+  const motion = Motion.capturePage(panel, section, view);
   document.documentElement.dataset.page = panel ? 'block' : 'hub';
   document.querySelectorAll(`#${routedSectionId(null)} > .panel[data-route]`).forEach((p) => {
     const active = p === panel;
@@ -449,7 +450,13 @@ function setFormSubView(subSlug, label) {
   const top = routedForms.at(-1);
   if (!top) return;
   const base = { slug: top.steps[0].slug, label: top.steps[0].label };
+  const wasSub = top.steps[1]?.slug ?? null;
   top.steps = subSlug ? [{ ...base, view: true }, { slug: subSlug, label }] : [base];
+  // Into a group is down, back to the list up (not while the form itself opens).
+  const card = top.modal.querySelector('.modal-card');
+  if (wasSub !== subSlug && card && !card.getAnimations().length) {
+    Motion.moveIn(card, !wasSub ? 'down' : !subSlug ? 'up' : 'sideways');
+  }
   // Keeps the entry's own state (the form's depth), so Back still closes the form.
   history.replaceState(history.state, '', routeUrl(top.panel, top.steps));
   document.title = routeTitle(top.panel, top.steps);
@@ -497,7 +504,7 @@ function initRouter() {
       const steps = [buttonStep(hit.button)];
       if (location.href !== routeUrl(hit.panel, steps)) history.pushState({ ledgerPage: true }, '', routeUrl(hit.panel, steps));
       // The view's page grows out of its tile once its click has drawn it.
-      Motion.setDirection('push');
+      Motion.arm();
       const section = document.getElementById(routedSectionId(null));
       Motion.playPage(hit.panel, section, Motion.capturePage(hit.panel, section, hit.button));
       document.title = routeTitle(hit.panel, steps);
@@ -526,7 +533,7 @@ function initRouter() {
   });
 
   window.addEventListener('popstate', () => {
-    Motion.setDirection('pop');
+    Motion.arm();
     const depth = history.state?.depth || 0;
     // Back: close the forms above this step, innermost first.
     while (routedForms.length > depth) {
@@ -548,7 +555,7 @@ function initRouter() {
       return;
     }
     const { panel, button } = routeFromLocation();
-    showSectionPage(panel);
+    showSectionPage(panel, button && 'routeView' in button.dataset ? button : null);
     document.title = routeTitle(panel);
     // A view's page reopens its view (the click retitles); the block's resets it.
     if (button && 'routeView' in button.dataset) button.click();

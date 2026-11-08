@@ -40,7 +40,7 @@ Four sizes, as tokens — every `font-size` is one of them — on one 15px base 
 | Line height | 1.2 text and controls · 1.5 paragraphs |
 | Weight | One bold: 600 |
 | Disabled | One opacity: .5 |
-| Animation | .2s hover and colour · .3s open and close · one Apple-like spring curve on all of them (`--ease-spring`, `cubic-bezier(.2, .8, .2, 1)`) |
+| Animation | .2s hover and colour · .3s fold and unfold, on `--ease-spring` (`cubic-bezier(.2, .8, .2, 1)`) · page and form moves (`down`, `up`, `sideways`) 1.5s on `SWIPE` (`cubic-bezier(.45, 0, .2, 1)`), slides only, never a fade (see [Layout](features/layout.md#motion)) |
 | Borders | 1px borders · .5px table hairlines |
 
 Each look is written once: every field starts from one base rule, and cards, Total/desired rows, notes, dropdowns and field rows are single rules shared by several selectors.

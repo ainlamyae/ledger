@@ -76,7 +76,7 @@ Four checks (`computeSignals`, `finance-market-math.js`):
   - the headlines as `date | source | title`
   - your question
   - your shares and average cost **only** with **Include my position** ticked
-- The exact text is under **Prompt template**.
+- The question, the tick box and **Prompt template** (the exact text) sit in one **Ask** card; the stock picker in a **Stock** card.
 - **The prompt** tells the AI to:
   - use only the supplied numbers, for an investor holding weeks to months, not day trading
   - treat a close below the trailing stop or below SMA200 as the exit conditions, and consider entry only while the trend check passes

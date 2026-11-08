@@ -365,7 +365,10 @@
             </div>
 
             <!-- Market's range row (renderRangeButtons), ending today; governs every chart below. -->
-            <div class="pagination panel-range" id="health-range"></div>
+            <div class="panel-section card">
+                <h3>Range</h3>
+                <div class="pagination panel-range" id="health-range"></div>
+            </div>
 
             <div class="body-mass-projection-wrap">
                 <!-- From/To replaced by the range buttons above (health-chart.js).
@@ -534,12 +537,11 @@
                 <button id="add-physique-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a day's body mass, consumption and workout" aria-label="Log">📝</button>
             </div>
 
-            <div class="filters">
-                <input type="text" id="physique-search" placeholder="🔍 Search" title="Search date, consumption, breakdown, workout" aria-label="Search">
-            </div>
-
             <div class="panel-section card">
                 <h3>Log</h3>
+                <div class="filters">
+                    <input type="text" id="physique-search" placeholder="🔍 Search" title="Search date, consumption, breakdown, workout" aria-label="Search">
+                </div>
                 <div class="table-responsive">
                     <table id="physique-table" class="table-compact">
                         <thead>
@@ -563,6 +565,8 @@
                         <tbody id="physique-body"></tbody>
                     </table>
                 </div>
+
+                <div class="pagination" id="physique-pagination"></div>
             </div>
 
             <div class="panel-actions" id="physique-bulk-actions" hidden>
@@ -570,8 +574,6 @@
                 <button id="physique-bulk-calc-btn" class="btn btn-icon" title="Calculate the selected days, and tidy their Consumption (combine duplicate lines, sort by calories, capitalize names)" aria-label="Calculate">🧮</button>
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
-
-            <div class="pagination" id="physique-pagination"></div>
         </div>
 
         <div class="panel" data-route="nutrition">
@@ -598,12 +600,11 @@
                 <div class="donut-legend" id="protein-rotation-ingredient-legend-nutrition"></div>
             </div>
 
-            <div class="filters">
-                <input type="text" id="nutrition-search" placeholder="🔍 Search" title="Search group or ingredient name" aria-label="Search">
-            </div>
-
             <div class="panel-section card">
                 <h3>Ingredients</h3>
+                <div class="filters">
+                    <input type="text" id="nutrition-search" placeholder="🔍 Search" title="Search group or ingredient name" aria-label="Search">
+                </div>
                 <div class="table-responsive">
                     <table id="nutrition-table" class="table-compact">
                         <thead>
@@ -628,6 +629,8 @@
                         <tbody id="nutrition-body"></tbody>
                     </table>
                 </div>
+
+                <div class="pagination" id="nutrition-pagination"></div>
             </div>
 
             <div class="panel-actions" id="nutrition-bulk-actions" hidden>
@@ -638,8 +641,6 @@
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
-
-            <div class="pagination" id="nutrition-pagination"></div>
         </div>
 
         <div class="panel" id="workout-plan-panel" data-route="activity">
@@ -687,7 +688,10 @@
             </div>
             -->
             <!-- Indicator's range row (HEALTH_RANGES), ending today. -->
-            <div class="pagination panel-range" id="insight-range"></div>
+            <div class="panel-section card">
+                <h3>Range</h3>
+                <div class="pagination panel-range" id="insight-range"></div>
+            </div>
 
             <!-- The modes, in one card titled Insight, as a hub's tiles are. -->
             <div class="card insight-mode-actions">
@@ -703,20 +707,23 @@
                 </div>
             </div>
 
-            <label class="insight-question-label" for="insight-question">Ask a question (optional)
-                <textarea id="insight-question" rows="4" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
-            </label>
+            <div class="panel-section card">
+                <h3>Ask</h3>
+                <label class="insight-question-label" for="insight-question">Ask a question (optional)
+                    <textarea id="insight-question" rows="4" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
+                </label>
+
+                <!-- What Send to AI sends for the loaded mode, with the data already on screen
+                     left as placeholders; Tune's Equations dropdown style. -->
+                <details id="insight-prompt-details" hidden>
+                    <summary>Prompt template</summary>
+                    <div class="table-responsive">
+                        <pre id="insight-prompt-template"></pre>
+                    </div>
+                </details>
+            </div>
 
             <p class="hint" id="insight-mode-status"></p>
-
-            <!-- What Send to AI sends for the loaded mode, with the data already on screen
-                 left as placeholders; Tune's Equations dropdown style. -->
-            <details id="insight-prompt-details" hidden>
-                <summary>Prompt template</summary>
-                <div class="table-responsive">
-                    <pre id="insight-prompt-template"></pre>
-                </div>
-            </details>
 
             <div class="panel-section card">
                 <h3>Data</h3>
@@ -1553,7 +1560,10 @@
         </div>
 
         <!-- Market's range row: window for Net Worth and Expenditure Trend (finance-chart.js). -->
-        <div class="pagination panel-range" id="finance-trend-range"></div>
+        <div class="panel-section card">
+            <h3>Range</h3>
+            <div class="pagination panel-range" id="finance-trend-range"></div>
+        </div>
 
         <div class="panel-section card">
             <h3>Cumulative Net Worth</h3>
@@ -1637,33 +1647,33 @@
             <button id="import-csv-btn" class="btn btn-icon" hidden title="Import CSV" aria-label="Import CSV">📥</button>
             <input type="file" id="import-csv-input" accept=".csv" hidden>
 
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="export-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="export-date-to">
-                </label>
-            </div>
-
-            <div class="filters">
-                <select id="tx-account-filter"></select>
-                <input type="text" id="tx-payee-filter" list="tx-payee-options" placeholder="Payee">
-                <select id="tx-category-filter"></select>
-                <input type="text" id="tx-description-filter" placeholder="Description">
-            </div>
-
-            <div id="tx-advanced-filters">
-                <form id="export-form">
-                    <div id="export-filters"></div>
-                    <datalist id="export-account-options"></datalist>
-
-                    <button type="button" id="export-add-filter-btn" class="btn btn-primary">Add Filter</button>
-                </form>
-            </div>
-
             <div class="panel-section card">
                 <h3>Transactions</h3>
+                <div class="export-date-range">
+                    <label>From
+                        <input type="date" id="export-date-from">
+                    </label>
+                    <label>To
+                        <input type="date" id="export-date-to">
+                    </label>
+                </div>
+
+                <div class="filters">
+                    <select id="tx-account-filter"></select>
+                    <input type="text" id="tx-payee-filter" list="tx-payee-options" placeholder="Payee">
+                    <select id="tx-category-filter"></select>
+                    <input type="text" id="tx-description-filter" placeholder="Description">
+                </div>
+
+                <div id="tx-advanced-filters">
+                    <form id="export-form">
+                        <div id="export-filters"></div>
+                        <datalist id="export-account-options"></datalist>
+
+                        <button type="button" id="export-add-filter-btn" class="btn btn-primary">Add Filter</button>
+                    </form>
+                </div>
+
                 <div class="table-responsive">
                     <table id="transactions-table" class="table-compact">
                         <thead>
@@ -1682,6 +1692,8 @@
                         <tbody id="transactions-body"></tbody>
                     </table>
                 </div>
+
+                <div class="pagination" id="tx-pagination"></div>
             </div>
 
             <div class="panel-actions" id="tx-bulk-actions" hidden>
@@ -1690,8 +1702,6 @@
                 <button id="tx-bulk-delete-btn" class="btn btn-icon" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
-
-            <div class="pagination" id="tx-pagination"></div>
         </div>
 
         <div class="panel" data-route="account">
@@ -1740,12 +1750,11 @@
                 <button id="add-breakdown-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a category/type row — it copies an existing row's formulas, so its four totals compute themselves" aria-label="Add">➕</button>
             </div>
 
-            <div class="filters">
-                <input type="text" id="breakdown-search" placeholder="🔍 Search" title="Search category or type" aria-label="Search">
-            </div>
-
             <div class="panel-section card">
                 <h3>Breakdown</h3>
+                <div class="filters">
+                    <input type="text" id="breakdown-search" placeholder="🔍 Search" title="Search category or type" aria-label="Search">
+                </div>
                 <div class="table-responsive">
                     <table id="breakdown-table" class="table-compact">
                         <thead>
@@ -1906,8 +1915,11 @@
                 <button id="market-alert-btn" class="btn btn-icon panel-header-btn" title="Set alerts for this stock" aria-label="Alerts">🔔</button>
             </div>
 
-            <div class="filters">
-                <select id="analysis-symbol" aria-label="Stock"></select>
+            <div class="panel-section card">
+                <h3>Stock</h3>
+                <div class="filters">
+                    <select id="analysis-symbol" aria-label="Stock"></select>
+                </div>
             </div>
 
             <p class="hint" id="analysis-status"></p>
@@ -1958,20 +1970,23 @@
                 <div id="analysis-news" class="insight-data-preview"></div>
             </div>
 
-            <label class="insight-question-label" for="analysis-question">Ask a question (optional)
-                <textarea id="analysis-question" rows="3" placeholder="e.g. Is now a good entry, or should I wait for a pullback?"></textarea>
-            </label>
-            <label class="checkbox-inline-label">
-                <input type="checkbox" id="analysis-include-position">
-                Include my position (shares and average cost)
-            </label>
+            <div class="panel-section card">
+                <h3>Ask</h3>
+                <label class="insight-question-label" for="analysis-question">Ask a question (optional)
+                    <textarea id="analysis-question" rows="3" placeholder="e.g. Is now a good entry, or should I wait for a pullback?"></textarea>
+                </label>
+                <label class="checkbox-inline-label">
+                    <input type="checkbox" id="analysis-include-position">
+                    Include my position (shares and average cost)
+                </label>
 
-            <details id="analysis-prompt-details" hidden>
-                <summary>Prompt template</summary>
-                <div class="table-responsive">
-                    <pre id="analysis-prompt-template"></pre>
-                </div>
-            </details>
+                <details id="analysis-prompt-details" hidden>
+                    <summary>Prompt template</summary>
+                    <div class="table-responsive">
+                        <pre id="analysis-prompt-template"></pre>
+                    </div>
+                </details>
+            </div>
 
             <div class="panel-actions" data-page-actions>
                 <button type="button" id="analysis-generate-btn" class="btn btn-icon" disabled title="Send to AI (pick a stock first)" aria-label="Send to AI">🤖</button>
@@ -1999,9 +2014,12 @@
                 </div>
             </div>
 
-            <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
-                <textarea id="financial-insight-question" rows="4" placeholder="e.g. Should I move cash into investments?"></textarea>
-            </label>
+            <div class="panel-section card">
+                <h3>Ask</h3>
+                <label class="insight-question-label" for="financial-insight-question">Ask a question (optional)
+                    <textarea id="financial-insight-question" rows="4" placeholder="e.g. Should I move cash into investments?"></textarea>
+                </label>
+            </div>
 
             <p class="hint" id="financial-insight-status"></p>
 
@@ -2311,12 +2329,11 @@
                 </div>
             </div>
 
-            <div class="filters">
-                <input type="text" id="travel-search" placeholder="🔍 Search" title="Search country, city, port, via, reason, detail" aria-label="Search">
-            </div>
-
             <div class="panel-section card">
                 <h3>Log</h3>
+                <div class="filters">
+                    <input type="text" id="travel-search" placeholder="🔍 Search" title="Search country, city, port, via, reason, detail" aria-label="Search">
+                </div>
                 <div class="table-responsive">
                     <table id="travel-table" class="table-compact">
                         <thead>
@@ -2345,11 +2362,14 @@
                 <button id="add-application-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a job application" aria-label="Log">📝</button>
             </div>
 
-            <div class="filters">
-                <input type="text" id="applications-search" placeholder="🔍 Search" title="Search type, app number, status" aria-label="Search">
-            </div>
+            <div class="panel-section card">
+                <h3>Applications</h3>
+                <div class="filters">
+                    <input type="text" id="applications-search" placeholder="🔍 Search" title="Search type, app number, status" aria-label="Search">
+                </div>
 
-            <div id="applications-list"></div>
+                <div id="applications-list"></div>
+            </div>
         </div>
     </section>
 
@@ -2367,12 +2387,11 @@
                 <button id="export-contacts-outlook-btn" class="btn btn-icon" title="Export for Outlook" aria-label="Export for Outlook">📧</button>
             </div>
 
-            <div class="filters">
-                <input type="text" id="contacts-search" placeholder="🔍 Search" title="Search name, tags, phone, email" aria-label="Search">
-            </div>
-
             <div class="panel-section card">
                 <h3>Contacts</h3>
+                <div class="filters">
+                    <input type="text" id="contacts-search" placeholder="🔍 Search" title="Search name, tags, phone, email" aria-label="Search">
+                </div>
                 <div class="table-responsive">
                     <table id="contacts-table" class="table-compact">
                         <thead>
@@ -2389,6 +2408,8 @@
                         <tbody id="contacts-body"></tbody>
                     </table>
                 </div>
+
+                <div class="pagination" id="contacts-pagination"></div>
             </div>
 
             <div class="panel-actions" id="contacts-bulk-actions" hidden>
@@ -2399,8 +2420,6 @@
                 <button id="contacts-bulk-delete-btn" class="btn btn-icon" title="Delete Selected" aria-label="Delete Selected">🗑️</button>
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
-
-            <div class="pagination" id="contacts-pagination"></div>
         </div>
 
         <div class="panel" data-route="settings">
@@ -2411,17 +2430,16 @@
                 <button id="add-setting-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add a setting" aria-label="Add">➕</button>
             </div>
 
-            <!-- Tabs: the Market range row's buttons, each its own address (other-settings.js). -->
-            <div class="pagination" id="settings-tabs">
-                <button type="button" class="btn" data-route="ai" data-route-view aria-pressed="false">AI &amp; Keys</button>
-                <button type="button" class="btn" data-route="responses" data-route-view aria-pressed="false">AI Responses</button>
-                <button type="button" class="btn" data-route="health" data-route-view aria-pressed="false">Health</button>
-                <button type="button" class="btn" data-route="display" data-route-view aria-pressed="false">Display</button>
-                <button type="button" class="btn" data-route="all" data-route-view aria-pressed="false">All</button>
-            </div>
-
             <div class="panel-section card">
                 <h3>Settings</h3>
+                <!-- Tabs: the Market range row's buttons, each its own address (other-settings.js). -->
+                <div class="pagination panel-range" id="settings-tabs">
+                    <button type="button" class="btn" data-route="ai" data-route-view aria-pressed="false">AI &amp; Keys</button>
+                    <button type="button" class="btn" data-route="responses" data-route-view aria-pressed="false">AI Responses</button>
+                    <button type="button" class="btn" data-route="health" data-route-view aria-pressed="false">Health</button>
+                    <button type="button" class="btn" data-route="display" data-route-view aria-pressed="false">Display</button>
+                    <button type="button" class="btn" data-route="all" data-route-view aria-pressed="false">All</button>
+                </div>
                 <div class="table-responsive">
                     <table id="settings-table" class="table-compact">
                         <thead>

@@ -2452,6 +2452,11 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin: 0 0 var(--space-s);
 }
 
+/* A field row ending its card (nothing shown after it) adds no space under it. */
+.card > :is(.panel-range, .filters, .insight-question-label, .checkbox-inline-label, details):not(:has(~ :not([hidden]))) {
+    margin-bottom: 0;
+}
+
 /* Any page's first card or card grid, the same: none above, one card gap below. */
 .panel-header + .card,
 .panel-header + .cards,
@@ -3127,7 +3132,7 @@ html.home-hub .page-tiles,
     }
 
     /* Transaction's four filters: 2×2 instead of four rows. */
-    [data-route="transaction"] > .filters {
+    [data-route="transaction"] .filters {
         display: grid;
         grid-template-columns: 1fr 1fr;
     }

@@ -249,42 +249,24 @@ async function saveFormulaSettings() {
     applySolveForMode(currentSolveFor());
     renderFormulaPreview();
     statusEl.classList.add('status-ok');
-    let intakeNote = 'The deficit is what stays fixed; the Caloric Intake chart and the forecast now use these.';
-    if (pinned) {
-      intakeNote = `Daily intake is pinned at ${einKcal} kcal and no longer moves with your body mass.`;
-    } else if (pctPinned) {
-      intakeNote = `Fat loss is pinned at ${pctToPin}% of body mass a week, so the kilograms per week — and the intake that delivers them — are recalculated at every body-mass reading, and the forecast now follows the proportional journey.`;
-    }
-    const activityNote = activityPinned
-      ? `Activity burn is pinned at ${activityKcalToPin} kcal/day — the activity tile and chart now show the minutes that takes, rising as your body mass falls.`
-      : 'Activity time (τ) is what stays fixed on the desired activity; the calorie burn it implies falls as your body mass does.';
-    const proteinNote = protein === null
-      ? 'The protein band was left alone — it needs body mass, height and both per-kg ends.'
-      : `Desired protein is now ${protein.minG}–${protein.maxG} g/day, from ${protein.perKgMin}–${protein.perKgMax} g per kg of ${protein.lbmKg} kg lean mass.`;
-    const fiberNote = fiber === null
-      ? ' The fiber band was left alone — it needs body mass, Eᵢₙ and both coefficients.'
-      : ` Desired fiber is now ${fiber.minG}–${fiber.maxG} g/day, from ${fiber.perKcalMin} g per 1,000 kcal and ${fiber.perKgMax} g per kg body mass.`;
-    const fatNote = fat === null
-      ? ' The fat band was left alone — it needs Eᵢₙ and both percentages.'
-      : ` Desired fat is now ${fat.minG}–${fat.maxG} g/day, from ${fat.pctMin}–${fat.pctMax}% of ${fat.einKcal} kcal at ${KCAL_PER_G_FAT} kcal/g.`;
-    const carbNote = carb === null
-      ? ' The carb band was left alone — it needs Eᵢₙ and both percentages.'
-      : ` Desired carbohydrate is now ${carb.minG}–${carb.maxG} g/day, from ${carb.pctMin}–${carb.pctMax}% of ${carb.einKcal} kcal at ${KCAL_PER_G_CARB} kcal/g.`;
-    const micronutrientNote = Object.keys(micronutrientPatch).length > 0
-      ? ' The Micronutrients table’s Protein/Fiber/Fat/Carb floors now match these too.'
-      : '';
-    // Which BMR equation is now in force, and whether digestion is being counted — the two
-    // choices that move every calorie figure in the app at once, so a save that changed one
-    // shouldn't leave you guessing which numbers just moved and why.
-    const modelNote = currentBmrFormula() === 'katch'
-      ? 'BMR now comes from Katch-McArdle (370 + 21.6 × LBM), so age no longer enters the desired intake.'
-      : 'BMR stays on Mifflin-St Jeor.';
+    // One short line: what was pinned, the new bands, the BMR model.
+    const band = (name, b) => (b === null ? `${name} unchanged` : `${name} ${b.minG}–${b.maxG} g`);
     const tefSaved = formulaNumber('formula-tef-pct');
-    const tefNote = tefSaved ? ` The thermic effect of food is counted at ${tefSaved}% of intake, which lifts every desired figure accordingly.` : '';
-    const calibrationNote = !calibration ? '' : calibration.result.ok
-      ? ` BMR_cal is now ${calibration.result.bmrCal} kcal/day (${withExplicitSign(calibration.result.offsetKcal)} kcal from the equation), over ${calibration.periodCount} × ${calibration.periodDays} days.`
-      : ' The saved BMR_cal was left alone — this window has too little logged to measure.';
-    showToast(`Saved — ${intakeNote} ${activityNote} ${proteinNote}${fiberNote}${fatNote}${carbNote}${micronutrientNote} ${modelNote}${tefNote}${calibrationNote}`);
+    const notes = [
+      pinned ? `Intake pinned at ${einKcal} kcal` : null,
+      pctPinned && !pinned ? `Fat loss pinned at ${pctToPin}%/week` : null,
+      activityPinned ? `Activity pinned at ${activityKcalToPin} kcal/day` : null,
+      band('Protein', protein),
+      band('Fiber', fiber),
+      band('Fat', fat),
+      band('Carbs', carb),
+      `BMR: ${currentBmrFormula() === 'katch' ? 'Katch-McArdle' : 'Mifflin-St Jeor'}`,
+      tefSaved ? `TEF ${tefSaved}%` : null,
+      !calibration ? null : calibration.result.ok
+        ? `BMR_cal ${calibration.result.bmrCal} kcal/day`
+        : 'BMR_cal unchanged',
+    ].filter(Boolean);
+    showToast(`Saved — ${notes.join(' · ')}`);
   } catch (err) {
     showFieldError('formula-status', err.message);
   } finally {

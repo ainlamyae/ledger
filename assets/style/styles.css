@@ -4305,7 +4305,8 @@ html.section-pages .panel.page-active:hover {
 
     /* While an emoji grows (motion.js's iconBusy), the bar crops only its sides;
        the scroll is held by --bar-scroll. */
-    html[data-action-bar] .action-bar.bar-unclipped {
+    html[data-action-bar] .action-bar.bar-unclipped,
+    html[data-action-bar] .app-form .modal-actions.action-bar.bar-unclipped {
         overflow-x: clip;
         overflow-y: visible;
     }

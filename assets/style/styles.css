@@ -4271,13 +4271,10 @@ html.section-pages .panel.page-active:hover {
 
     html[data-action-bar] .action-bar,
     html[data-action-bar] .app-form .modal-actions.action-bar {
-        /* Clear room above and below (--bar-room) so a growing busy emoji isn't cropped;
-           the glass is drawn by ::before at the tab bar's size. */
-        --bar-room: .75rem;
         position: fixed;
         left: var(--bottom-bar-inset);
         right: var(--bottom-bar-inset);
-        bottom: calc(var(--bottom-bar-bottom) - var(--bar-room) + env(safe-area-inset-bottom, 0px));
+        bottom: calc(var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
         z-index: 20;
         display: flex;
         flex-wrap: nowrap;
@@ -4285,36 +4282,17 @@ html.section-pages .panel.page-active:hover {
         gap: var(--bottom-bar-gap);
         overflow-x: auto;
         margin: 0;
-        box-sizing: border-box;
-        height: calc(var(--bottom-bar-height) + 1px + 2 * var(--bar-room));
-        padding: var(--bar-room) var(--bottom-bar-edge);
-        background: none;
-        border: 1px solid transparent;
-        border-radius: 999px;
-        pointer-events: none;
-        scrollbar-width: none;
-    }
-
-    html[data-action-bar] .action-bar::before {
-        content: '';
-        position: fixed;
-        left: var(--bottom-bar-inset);
-        right: var(--bottom-bar-inset);
-        bottom: calc(var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
-        z-index: -1;
+        /* The tab bar's own height, which this bar replaces. */
         box-sizing: border-box;
         height: calc(var(--bottom-bar-height) + 1px);
+        padding: 0 var(--bottom-bar-edge);
         background: var(--glass-bg);
         -webkit-backdrop-filter: var(--glass-blur);
         backdrop-filter: var(--glass-blur);
         border: 1px solid var(--glass-border);
         border-radius: 999px;
         box-shadow: var(--glass-highlight), var(--glass-shadow);
-        pointer-events: auto;
-    }
-
-    html[data-action-bar] .action-bar > * {
-        pointer-events: auto;
+        scrollbar-width: none;
     }
 
     html[data-action-bar] .action-bar::-webkit-scrollbar {
@@ -4323,6 +4301,17 @@ html.section-pages .panel.page-active:hover {
 
     html[data-action-bar] .action-bar > * {
         flex: 0 0 auto;
+    }
+
+    /* While an emoji grows (motion.js's iconBusy), the bar crops only its sides;
+       the scroll is held by --bar-scroll. */
+    html[data-action-bar] .action-bar.bar-unclipped {
+        overflow-x: clip;
+        overflow-y: visible;
+    }
+
+    html[data-action-bar] .action-bar.bar-unclipped > :not(.modal-close) {
+        translate: calc(var(--bar-scroll, 0) * -1px) 0;
     }
 
     /* Shown again in the phone's action bar (hidden in the header above). */

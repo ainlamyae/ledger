@@ -27,6 +27,7 @@ A private, serverless personal life dashboard — health, finances, time trackin
 ### Engineering
 
 - [Architecture](docs/architecture.md) — system diagram, request flow, module map, data flow.
+- [Site Map](docs/site-map.md) — every page as a tree from Ledger down (sections, pages, views, forms, rows), with its breadcrumb and address.
 - [Data Model](docs/data-model.md) — every sheet tab, column by column.
 - [Health Formula Reference](docs/health-formulas.md) — every Health formula and where it lives.
 - [Tech Stack](docs/tech-stack.md) — every layer and library.

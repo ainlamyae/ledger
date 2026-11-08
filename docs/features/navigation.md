@@ -1,6 +1,6 @@
 # Hubs, Pages & Addresses
 
-[← Features](README.md) · [README](../../README.md)
+[← Features](README.md) · [README](../../README.md) · [Site Map](../site-map.md) (every page as a tree)
 
 ## At a glance
 

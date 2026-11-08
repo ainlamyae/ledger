@@ -21,11 +21,6 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/health/activity/gym/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://ainlamyae.github.io/ledger/health/activity/workouts/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -92,6 +87,11 @@
   </url>
   <url>
     <loc>https://ainlamyae.github.io/ledger/health/physique/log/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/health/physique/micronutrients/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

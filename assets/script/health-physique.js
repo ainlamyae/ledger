@@ -345,6 +345,10 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('physique-micro-close-btn').addEventListener('click', () => {
       document.getElementById('physique-micro-modal').hidden = true;
     });
+    document.getElementById('physique-micro-range-btn').addEventListener('click', openPhysiqueMicronutrientsRange);
+    document.getElementById('physique-micro-range-close-btn').addEventListener('click', () => {
+      document.getElementById('physique-micro-range-modal').hidden = true;
+    });
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
     document.getElementById('physique-scan-btn').addEventListener('click', () => document.getElementById('physique-scan-input').click());
     document.getElementById('physique-scan-input').addEventListener('change', handlePhysiqueScanInput);
@@ -1411,6 +1415,42 @@ function openPhysiqueMicronutrients(p, routed = false) {
   }
 
   document.getElementById('physique-micro-modal').hidden = false;
+}
+
+// 🧬 in the header (…/physique/micronutrients/): the same table over a picked
+// range (Health Chart's buttons), with a per-day average beside each total.
+let physiqueMicroRangeSlug = '1w';
+
+function openPhysiqueMicronutrientsRange() {
+  renderPhysiqueMicronutrientsRange();
+  document.getElementById('physique-micro-range-modal').hidden = false;
+}
+
+function renderPhysiqueMicronutrientsRange() {
+  renderRangeButtons('physique-micro-range', HEALTH_RANGES, physiqueMicroRangeSlug, (slug) => {
+    physiqueMicroRangeSlug = slug;
+    renderPhysiqueMicronutrientsRange();
+  });
+  const { from, to } = healthRangeDates(physiqueMicroRangeSlug);
+  const data = aggregateMicronutrientIntake(from, to);
+  const tbody = document.getElementById('physique-micro-range-body');
+  tbody.innerHTML = '';
+  if (data.nutrients.length === 0) {
+    tbody.appendChild(renderEmptyRow(4, 'No day in this range has 🧬 Micronutrients pulled.'));
+    return;
+  }
+  data.nutrients.forEach((n, i) => {
+    const tr = document.createElement('tr');
+    if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
+    if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
+    tr.append(
+      makeCell(n.displayName),
+      makeCell(`${n.total} ${n.unit}`),
+      makeCell(n.perDay !== null ? `${n.perDay} ${n.unit}` : '—'),
+      makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
+    );
+    tbody.appendChild(tr);
+  });
 }
 
 // Form field id suffix → entry property. Where each lands on the sheet is

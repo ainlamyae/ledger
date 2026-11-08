@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.36.0** | feat(motion): reduce navigation to vertical and sideways slides |
+| (this commit) | **3.37.0** | feat(physique): add a micronutrients page and site map |
+| `d61fd9b` | **3.36.0** | feat(motion): reduce navigation to vertical and sideways slides |
 | `03e40a0` | **3.35.0** | feat(physique): sum amounts in the consumption total row |
 | `1a4bc1f` | **3.34.0** | feat(insight): show insight data and AI replies in cards |
 | `489f641` | **3.33.0** | feat(ui): place every table in a titled card |

@@ -685,11 +685,50 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
   function iconBusy(btn) {
     btn.classList.remove('icon-settle');
     btn.classList.add('icon-busy');
+    unclipBar(btn);
   }
 
   function iconSettle(btn) {
     btn.classList.remove('icon-busy');
     playClass(btn, 'icon-settle');
+    btn.addEventListener('animationend', () => reclipBar(btn), { once: true });
+  }
+
+  // The phone's bottom bar scrolls, which crops a growing emoji top and bottom;
+  // while it grows the bar stops scrolling, everything held where it was.
+  function unclipBar(btn) {
+    const bar = btn.closest('.action-bar');
+    if (!bar || getComputedStyle(bar).position !== 'fixed') return;
+    if (bar.classList.contains('bar-unclipped')) {
+      if (bar.querySelectorAll('.icon-busy').length > 1) return;
+      resetBar(bar); // left over from a button that went before settling
+    }
+    const close = bar.querySelector(':scope > .modal-close');
+    // ❌ stays where it stuck at the right edge.
+    if (close && bar.scrollWidth > bar.clientWidth) {
+      const b = bar.getBoundingClientRect();
+      const c = close.getBoundingClientRect();
+      close.style.position = 'absolute';
+      close.style.left = `${c.left - b.left - bar.clientLeft}px`;
+      close.style.top = `${c.top - b.top - bar.clientTop}px`;
+    }
+    bar.dataset.barScroll = bar.scrollLeft;
+    bar.style.setProperty('--bar-scroll', bar.scrollLeft);
+    bar.classList.add('bar-unclipped');
+  }
+
+  function reclipBar(btn) {
+    const bar = btn.closest('.bar-unclipped');
+    if (bar && !bar.querySelector('.icon-busy')) resetBar(bar);
+  }
+
+  function resetBar(bar) {
+    const close = bar.querySelector(':scope > .modal-close');
+    if (close) ['position', 'left', 'top'].forEach((p) => close.style.removeProperty(p));
+    bar.classList.remove('bar-unclipped');
+    bar.style.removeProperty('--bar-scroll');
+    bar.scrollLeft = Number(bar.dataset.barScroll) || 0;
+    delete bar.dataset.barScroll;
   }
 
   // Staggered fade/slide-in, the index-th block after the first.

@@ -533,6 +533,7 @@
         <div class="panel" data-route="physique">
             <div class="panel-header">
                 <h2>Physique</h2>
+                <button id="physique-micro-range-btn" data-route="micronutrients" class="btn btn-icon panel-header-btn" title="Real, measured nutrient totals over a range of days, from each day's pulled 🧬 Micronutrients" aria-label="Micronutrients">🧬</button>
                 <button id="today-physique-btn" class="btn btn-icon panel-header-btn" title="Open today's entry, or start one if today isn't logged yet" aria-label="Today">📍</button>
                 <button id="add-physique-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a day's body mass, consumption and workout" aria-label="Log">📝</button>
             </div>
@@ -3095,21 +3096,57 @@
     <div class="modal-card">
         <h2 id="physique-micro-title">Micronutrients</h2>
 
-        <div class="table-responsive">
-            <table id="physique-micro-table" class="table-compact">
-                <thead>
-                <tr>
-                    <th>Nutrient</th>
-                    <th>Amount</th>
-                    <th>Ideal / day</th>
-                </tr>
-                </thead>
-                <tbody id="physique-micro-body"></tbody>
-            </table>
+        <div class="panel-section card">
+            <h3>Micronutrients</h3>
+            <div class="table-responsive">
+                <table id="physique-micro-table" class="table-compact">
+                    <thead>
+                    <tr>
+                        <th>Nutrient</th>
+                        <th>Amount</th>
+                        <th>Ideal / day</th>
+                    </tr>
+                    </thead>
+                    <tbody id="physique-micro-body"></tbody>
+                </table>
+            </div>
         </div>
 
         <div class="modal-actions">
             <button type="button" id="physique-micro-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
+        </div>
+    </div>
+</div>
+
+<!-- Physique's 🧬 page: the one-day table over a range of days (health-physique.js). -->
+<div id="physique-micro-range-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="physique-micro-range-title" hidden>
+    <div class="modal-card">
+        <h2 id="physique-micro-range-title">Micronutrients</h2>
+
+        <div class="panel-section card">
+            <h3>Range</h3>
+            <div class="pagination panel-range" id="physique-micro-range"></div>
+        </div>
+
+        <div class="panel-section card">
+            <h3>Micronutrients</h3>
+            <div class="table-responsive">
+                <table id="physique-micro-range-table" class="table-compact">
+                    <thead>
+                    <tr>
+                        <th>Nutrient</th>
+                        <th>Total (period)</th>
+                        <th>Avg / day</th>
+                        <th>Ideal / day</th>
+                    </tr>
+                    </thead>
+                    <tbody id="physique-micro-range-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button type="button" id="physique-micro-range-close-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
         </div>
     </div>
 </div>

@@ -1226,6 +1226,7 @@ td:has(.btn) {
    Contact's, Settings', Activity's and both Micronutrients' tables and both
    Physique breakdowns. */
 #physique-micro-table thead th,
+#physique-micro-range-table thead th,
 #insight-micro-table thead th,
 .car-service-table thead th,
 #travel-table thead th,
@@ -1439,18 +1440,21 @@ td:has(.btn) {
    above the first nutrient with no daily desired value. Heavier than the row borders so
    each reads as a break. */
 #insight-micro-table tr.nutrient-facts-end td,
-#physique-micro-table tr.nutrient-facts-end td {
+#physique-micro-table tr.nutrient-facts-end td,
+#physique-micro-range-table tr.nutrient-facts-end td {
     border-bottom: 1px solid var(--color-border);
 }
 
 /* A nutrient short of its daily desired value, severe or mild alike: red. */
 #insight-micro-table tr.nutrient-gap td,
-#physique-micro-table tr.nutrient-gap td {
+#physique-micro-table tr.nutrient-gap td,
+#physique-micro-range-table tr.nutrient-gap td {
     border-left: 2px solid var(--color-danger);
 }
 
 #insight-micro-table tr.nutrient-gap td:first-child,
-#physique-micro-table tr.nutrient-gap td:first-child {
+#physique-micro-table tr.nutrient-gap td:first-child,
+#physique-micro-range-table tr.nutrient-gap td:first-child {
     color: var(--color-danger);
 }
 

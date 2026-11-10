@@ -474,8 +474,6 @@ function openTransactionForm(transaction, duplicate = false) {
   editingRow = (transaction && !duplicate) ? transaction.row : null;
   editingOriginal = editingRow ? { account: transaction.account, amount: transaction.amount } : null;
 
-  const title = duplicate ? 'Duplicate Transaction' : (transaction ? 'Edit Transaction' : 'Log a Transaction');
-  document.getElementById('tx-modal-title').textContent = title;
   document.getElementById('tx-date').value = transaction ? transaction.date : isoFromDate(new Date());
   document.getElementById('tx-payee').value = transaction ? transaction.payee : '';
   document.getElementById('tx-description').value = transaction ? transaction.description : '';

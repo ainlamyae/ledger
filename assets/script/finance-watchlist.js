@@ -339,7 +339,6 @@ function fillWatchlistFromSearch() {
 
 function openWatchlistForm(entry = null) {
   editingWatchlistRow = entry?.row ?? null;
-  document.getElementById('watchlist-modal-title').textContent = entry ? 'Edit Watchlist Stock' : 'Add to Watchlist';
   document.getElementById('watchlist-symbol').value = entry?.symbol || '';
   document.getElementById('watchlist-name').value = entry?.name || '';
   document.getElementById('watchlist-exchange').value = entry?.exchange || '';

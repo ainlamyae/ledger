@@ -938,6 +938,30 @@ async function convertPhysiqueBreakdownAmountsToGrams() {
   await runPhysiqueBatch(fresh, 'converted Breakdown amounts to grams');
 }
 
+// One-off fill for days saved while USDA/AI rows got no TEF: those rows' TEF,
+// the day's TEF and its Deprivation. Needs Nutrition loaded, like the above.
+async function fillPhysiqueMissingTef() {
+  if (physiqueBatchRunning || physiqueColumnIndex.breakdown === undefined) return;
+  const has = (key) => physiqueColumnIndex[key] !== undefined;
+  const data = [];
+  allPhysiqueEntries.forEach((p) => {
+    const items = parsePhysiqueBreakdown(p.breakdown);
+    const before = items.map((item) => item.tef);
+    const result = estimateTefBreakdown(items);
+    if (!result || !items.some((item, i) => before[i] === undefined && item.tef !== undefined)) return;
+    data.push(physiqueCellUpdate('breakdown', p.row, breakdownToJson(items)));
+    if (has('tef')) data.push(physiqueCellUpdate('tef', p.row, result.tefKcal));
+    if (has('deprivation') && p.date) {
+      const day = { ...p, tef: result.tefKcal };
+      const deprivation = physiqueDeprivationKcal(day, p.sleep ?? physiqueSleepHours(p), bmrFiguresForDate(p.date));
+      if (deprivation !== null) data.push(physiqueCellUpdate('deprivation', p.row, deprivation));
+    }
+  });
+  const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
+  fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
+  await runPhysiqueBatch(fresh, 'filled TEF for USDA/AI-priced rows');
+}
+
 // Settings that change a stored BMR or Deprivation.
 const PHYSIQUE_BMR_SETTING_KEYS = ['HEIGHT_CM', 'BIRTH_DATE', 'SEX', BMR_FORMULA_KEY, BMR_BASIS_KEY,
   ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_CAP_KEY, BMR_CALIBRATION_PERIOD_COUNT_KEY,
@@ -1388,7 +1412,6 @@ function updatePhysiqueBulkActionsUI() {
 // `routed`: give it the day's address (…/<date>/micronutrients/) as it opens.
 function openPhysiqueMicronutrients(p, routed = false) {
   if (routed) routeRecordEdit('physique', physiqueRouteStep(p), { slug: 'micronutrients', label: 'Micronutrients' });
-  document.getElementById('physique-micro-title').textContent = formTitleWithDate('Micronutrients', p.date);
 
   // A Pattern has no date to look up, so it reads its own Breakdown.
   const data = p.date
@@ -1495,17 +1518,14 @@ function syncPhysiquePatternMode() {
   else if (!dateInput.value) dateInput.value = isoFromDate(new Date());
 }
 
-// A title that says what Save will do ("Add to Today's Workout"), also on Save's
-// hover, since a form page hides the title. openPhysiqueForm clears the hover.
+// What Save will do ("Add to Today's Workout"), on Save's hover. openPhysiqueForm clears it.
 function setPhysiqueFormHint(text) {
-  document.getElementById('physique-modal-title').textContent = text;
   document.querySelector('#physique-form button[type="submit"]').title = text;
 }
 
 function openPhysiqueForm(entry, duplicate = false) {
   editingPhysiqueRow = (entry && !duplicate) ? entry.row : null;
   document.querySelector('#physique-form button[type="submit"]').title = '';
-  const baseTitle = duplicate ? 'Duplicate Physique' : (entry ? 'Edit Physique' : 'Log a Physique');
 
   PHYSIQUE_FIELDS.forEach(({ id, key }) => {
     const value = entry ? entry[key] : '';
@@ -1518,15 +1538,6 @@ function openPhysiqueForm(entry, duplicate = false) {
   document.getElementById('physique-is-pattern').checked = entry ? (!entry.date && !duplicate) : false;
   if (duplicate) physiqueField('date').value = isoFromDate(new Date());
   syncPhysiquePatternMode();
-
-  // Only a real Edit gets the date suffix — Log and Duplicate both start on
-  // today's date too (syncPhysiquePatternMode just filled it in above), but
-  // that's a default still waiting to be changed or saved, not a date this
-  // day is actually logged under yet. Same "is this really an existing row"
-  // read editingPhysiqueRow above uses.
-  document.getElementById('physique-modal-title').textContent = (entry && !duplicate)
-    ? formTitleWithDate(baseTitle, physiqueField('date').value)
-    : baseTitle;
 
   // Day, Consumption and Workout start collapsed on any day but today; a Pattern opens Consumption too.
   const isToday = physiqueField('date').value === isoFromDate(new Date());
@@ -1650,7 +1661,6 @@ function mergePhysiqueEntryIntoForm(saved) {
   updatePhysiqueSleepDuration();
 
   editingPhysiqueRow = saved.row;
-  document.getElementById('physique-modal-title').textContent = 'Edit Physique';
   clearFieldError('physique-form-error');
   showToast('↩︎ Merged — Save again.');
 }

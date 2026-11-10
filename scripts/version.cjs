@@ -7,8 +7,7 @@
 //   - `feat:` / `feat(scope):`                 → minor + 1, patch = 0
 //   - anything else (fix, docs, chore, …)      → patch + 1
 // Counted from 0.0.0 over the whole history (or from the latest reachable
-// v*.*.* tag, if one is ever made). Commits from before the prefixes were used
-// are judged by hand in LEGACY below; any not listed there is a patch.
+// v*.*.* tag, if one is ever made).
 //
 // Usage:
 //   node scripts/version.cjs           print the version for HEAD
@@ -25,40 +24,6 @@ const ROOT = path.resolve(__dirname, '..');
 const VERSION_PATH = 'assets/script/version.js'; // repo-relative, for git
 const VERSION_FILE = path.join(ROOT, VERSION_PATH);
 const CHANGELOG_PATH = 'docs/changelog.md';
-// Pre-prefix commits, read one by one: major = changed how the app or its sheet
-// works as a whole; feat = something new to use; everything else = patch.
-const LEGACY = {
-  major: [
-    '5c01171', // Build full Ledger app → 1.0.0
-    '947fd74', // Health Log replaced by the per-day Physique tab → 2.0.0
-    'e00ffe7', // Finance Market, Portfolio and Analysis pages → 3.0.0
-  ],
-  feat: `
-    e608995 351a653 ae9fa28 1b1c1f8 f81dbea 3b63b40 d3f06b7 c577e1f e372c95 9370456
-    f34a310 6e5c54e f356c47 f2be2e1 d5adef8 7adf9b3 01635e1 61f7e76 c61b138 fbc3aef
-    4574d7d 081fd61 5e49ff3 7d072d5 bd95d25 2bf13f7 9eb68be 803ca46 6778a4c 7b182ca
-    5d7ef5e 183fff8 4938854 b408e93 121f7fb a0b39fa 6e5eff5 b305b8f 6129e35 b8d10cb
-    52ed849 632abf3 e002c18 273b90c 5605638 0b30840 7c142ca 306d083 9c914bc 29afbe1
-    a50bd5f 72fdc41 e73e9ae e48e13c 4719d7a 2b34928 af98648 baf798b 88b9b76 d7a886e
-    8087e4d 99c425a 2c1732c 3d7017d d88db9c 62780c6 2bf24cd f65615c 1b09191 af8304c
-    ec8636b 29e7b68 8ef5274 af930fa 96c2780 cc416b8 c83e42b 30fd4c7 a82eee8 7259918
-    702ddc3 90075b3 a2e11de b9bd316 a145a5b 0da2a17 898edf5 a3def5d 7d941d4 39a61d7
-    0f65999 ccd7668 c925855 b9b2823 7836dfe 54e9a63 f8c4dce 6c028b9 8d9fbc9 26f194d
-    31e63f2 70bc3c9 90a6a6b 59ac727 7008ceb 5e7650b 0c99819 455509d 3b21822 592a42c
-    f6f7ca8 ba34d34 7d7f67e 644a23b 229e46b 1fd6436 e9c7e59 d30516a cee1304 337871d
-    e69ef8e 7518214 6fbc532 22406b6 07fd7d1 d6788a0 a60d0cd 9703cfe e5fd877 3a29661
-    bbacabf 012ca7e 750a440 1f286b0 d8cd6c1 cddca66 831eaa9 9ac38ba d447c9e 5a94be8
-    4ff3dbd 0c2bd91 1a40681 d946716 0cfdb48 1284c06 b8a3185 39e17a0 93934ba
-    2459c0e 6bb420f 828787d d3ff8ba
-  `.trim().split(/\s+/),
-};
-
-function legacyType(hash) {
-  if (LEGACY.major.some((h) => hash.startsWith(h))) return 'major';
-  if (LEGACY.feat.some((h) => hash.startsWith(h))) return 'feat';
-  return null;
-}
-
 function git(args, opts = {}) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], ...opts }).trim();
 }
@@ -82,7 +47,7 @@ function computeHistory() {
   return commits.map((entry) => {
     const [hash, subject, body = ''] = entry.split('\x00');
     const m = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?(!)?:/i.exec(subject);
-    const type = m ? m[1].toLowerCase() : legacyType(hash);
+    const type = m ? m[1].toLowerCase() : null;
     let bump;
     if ((m && m[3]) || type === 'major' || /^BREAKING[ -]CHANGE:/m.test(body)) { major++; minor = 0; patch = 0; bump = 'major'; }
     else if (type === 'feat') { minor++; patch = 0; bump = 'minor'; }

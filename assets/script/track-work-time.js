@@ -420,7 +420,6 @@ function updateWorkTimeLiveDuration() {
 function openWorkTimeForm(dateStr) {
   const existing = allTimeEntries.find((e) => e.date === dateStr);
 
-  document.getElementById('work-time-modal-title').textContent = formTitleWithDate('Log a Work Time', dateStr);
   document.getElementById('work-time-company').value = existing?.company || getLastCompany(allTimeEntries) || '';
   document.getElementById('work-time-date').value = dateStr;
   document.getElementById('work-time-start').value = existing?.start || '';

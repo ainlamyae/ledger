@@ -222,7 +222,6 @@ const CONTACT_FIELD_IDS = [
 function openContactForm(contact) {
   editingContactRow = contact ? contact.row : null;
 
-  document.getElementById('contact-modal-title').textContent = contact ? 'Edit Contact' : 'Add Contact';
 
   CONTACT_FIELD_IDS.forEach((id) => {
     document.getElementById(`contact-${id}`).value = contact ? (contact[id] || '') : '';

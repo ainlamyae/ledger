@@ -329,7 +329,6 @@ function syncTradeActionFields() {
 
 function openTradeForm(trade = null) {
   editingTradeRow = trade?.row ?? null;
-  document.getElementById('trade-modal-title').textContent = trade ? 'Edit Trade' : 'Log a Trade';
   const last = allTrades.at(-1);
   populateSelect(document.getElementById('trade-account'), tradeAccountOptions(), trade?.account || last?.account || '');
   const symbols = document.getElementById('trade-symbol-options');

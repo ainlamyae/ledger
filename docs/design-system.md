@@ -14,7 +14,7 @@ All styling lives in `assets/style/styles.css`. Pages and scripts carry no inlin
 | Row tints | **Green** — today's row, or anything logged today · **Indigo** — a Work Time day off. No row is faded |
 | Table lines | One colour, the line **gray** (`--color-border`), as iOS separators: a .5px hairline between rows; 1px under the header, above a Total and at group breaks; 1px dashed above a Desire or Ideal/day |
 | Backgrounds | Page **off-white** (`--color-bg`) under two soft blue/violet washes (`--bg-wash-1`/`-2`, fixed to the screen); cards, inputs, buttons and Workouts figures **white** (`--color-surface`), cards rounded like the inputs (`--radius-md`); page tiles **liquid-glass** capsules as iOS 26's buttons (the same see-through 15% wash of `--tile-tint` as before — the system gray `--color-text-muted`, or the tile's kind colour — frosted, with a curved shine across the top, a 1px lit rim bright at the top-left, a soft shadow; lifted on hover, dimmed and shrunk while pressed; dimmer shine and rim in dark mode), so they stand out on a card and on the page alike — content is always solid |
-| Glass | The floating layer only, like Apple's Liquid Glass: header, phone tab bar and action bar, sticky form actions, sidebar, account menu and (wide screens) dialogs. Translucent `--glass-bg` / `--glass-bg-strong`, blurred by `--glass-blur`, a `--glass-border` rim and `--glass-highlight` top edge; text on it is `--glass-text`. Solid again when blur is unsupported or the device asks for reduced transparency |
+| Glass | The floating layer only, like Apple's Liquid Glass: header, phone tab bar and action bar, sticky form actions, sidebar, account menu and (wide screens) dialogs. Translucent `--glass-bg` / `--glass-bg-strong`, blurred by `--glass-blur`, a `--glass-border` rim and `--glass-highlight` top edge; text on it is `--glass-text`. The account menu is more solid (92% `--color-surface`) so its list reads over the page. Solid again when blur is unsupported or the device asks for reduced transparency |
 | Switches | Every show/hide setting is an iPhone switch (`.switch`, a `role="switch"` checkbox): 40×24 track, `--switch-off` gray off, `--switch-on` iOS green `#34C759` on, a white knob that slides with a slight overshoot; one per `.switch-row`, label left, switch right |
 
 ## Typography
@@ -27,7 +27,7 @@ Four sizes, as tokens — every `font-size` is one of them — on one 15px base 
 |---|---|---|
 | `--text-small` | .8rem | Card content (`--card-text-size`, set on `.card`), tile labels, table cells (every width), word buttons, labels, hints, menus, badges, formulas, footer, card labels, sidebar section names, chart text |
 | `--text-body` | 13px | Text, breadcrumb, sidebar links, status lines |
-| `--text-title` | 1.1rem | Every heading (header title, panel and form titles, `h1`–`h4`), emoji buttons |
+| `--text-title` | 1.1rem | Every heading (header title, panel titles, `h1`–`h4`), emoji buttons |
 | `--text-display` | 1.4rem | Phone bottom-bar emoji, landing title, flags |
 | `--input-font-size` | 15px (16px on touch) | Every input, select and textarea — 16px keeps iOS from zooming |
 

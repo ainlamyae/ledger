@@ -278,7 +278,6 @@ async function openAccountForm(account) {
   editingAccountRow = account ? account.row : null;
   editingAccountFormulas = {};
 
-  document.getElementById('account-modal-title').textContent = account ? 'Edit Account' : 'Add Account';
   document.getElementById('account-name').value = account ? account.name : '';
   document.getElementById('account-institution').value = account ? account.institution : '';
   document.getElementById('account-type').value = account ? account.type : '';

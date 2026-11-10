@@ -177,7 +177,6 @@ function renderBreakdownDatalist(datalistId, values) {
 function openBreakdownForm(entry) {
   editingBreakdownRow = entry ? entry.row : null;
 
-  document.getElementById('breakdown-modal-title').textContent = entry ? 'Edit Breakdown Row' : 'Add Breakdown Row';
   document.getElementById('breakdown-category').value = entry ? entry.category : '';
   document.getElementById('breakdown-type').value = entry ? entry.type : '';
   renderBreakdownDatalist('breakdown-category-options', allBreakdownRows.map((b) => b.category));

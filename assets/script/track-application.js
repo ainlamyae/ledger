@@ -238,7 +238,6 @@ const APPLICATION_FIELD_IDS = ['type', 'number', 'date', 'action'];
 function openApplicationForm(app) {
   editingApplicationRow = app ? app.headerRow : null;
 
-  document.getElementById('application-modal-title').textContent = app ? 'Edit Application' : 'Log an Application';
 
   const values = app ? [app.type, app.appNumber, app.date, app.action] : ['', '', '', 'Submited'];
   APPLICATION_FIELD_IDS.forEach((id, i) => {

@@ -218,7 +218,6 @@ function renderSettingsTable({ bodyId, includes }) {
 function openSettingForm(setting) {
   editingSettingRow = setting ? setting.row : null;
 
-  document.getElementById('setting-modal-title').textContent = setting ? 'Edit Setting' : 'Add Setting';
   document.getElementById('setting-key').value = setting ? setting.key : '';
   document.getElementById('setting-value').value = setting ? setting.value : '';
   document.getElementById('setting-notes').value = setting ? setting.notes : '';

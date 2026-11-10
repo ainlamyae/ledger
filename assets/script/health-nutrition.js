@@ -363,14 +363,7 @@ function resolvedNutritionMacros(n) {
 
   let tef = n.tef;
   let tefTyped = n.tef !== null;
-  if (tef === null && n.protein !== null) {
-    const rate = tefMacroRate();
-    tef = Math.round(
-      n.protein * rate.Protein.kcalPerGram * rate.Protein.tefShare
-      + (carb || 0) * rate['Carbohydrate, by difference'].kcalPerGram * rate['Carbohydrate, by difference'].tefShare
-      + (fat || 0) * rate['Total lipid (fat)'].kcalPerGram * rate['Total lipid (fat)'].tefShare
-    );
-  }
+  if (tef === null && n.protein !== null) tef = Math.round(tefFromMacros(n.protein, carb, fat));
 
   return {
     fiber, fat, carb, tef,
@@ -683,7 +676,6 @@ function openNutritionForm(entry, onSaved = null) {
   // not-yet-banked estimate) still adds a new row on Save, so the title
   // should say so too rather than calling it an edit of something that
   // doesn't exist on the sheet yet.
-  document.getElementById('nutrition-modal-title').textContent = (entry && entry.row) ? 'Edit Ingredient' : 'Add Ingredient';
   // Only meaningful once there's a saved row (and an old name/amount/macros)
   // to propagate FROM — an Add has nothing on the Physique sheet to find yet.
   document.getElementById('nutrition-update-btn').hidden = !(entry && entry.row);

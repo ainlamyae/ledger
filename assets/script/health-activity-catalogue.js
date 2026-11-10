@@ -361,8 +361,6 @@ function openActivityForm(activity, duplicate = false) {
   // Only meaningful once there's a saved row (and an old name/MET) to propagate
   // FROM — an Add or Duplicate has nothing on the Physique sheet to find yet.
   document.getElementById('activity-update-btn').hidden = !editingActivityEntry;
-  document.getElementById('activity-modal-title').textContent =
-    duplicate ? 'Duplicate Activity' : (activity ? 'Edit Activity' : 'Add Activity');
 
   // Category and Group are prefilled on a plain Add too — a new exercise is
   // nearly always another one in the group you were just looking at, and the

@@ -755,7 +755,7 @@ async function loadDashboard(forceRefresh = false) {
           renderProteinRotationChart(healthDateRange());
           renderProteinRotationChart(healthDateRange(), 'nutrition', PROTEIN_ROTATION_NUTRITION_IDS);
           // Needs both tabs: the grams come from each food's Nutrition row.
-          convertPhysiqueBreakdownAmountsToGrams();
+          convertPhysiqueBreakdownAmountsToGrams().then(fillPhysiqueMissingTef);
         }),
         // Activity Rotation needs Physique (logged Workout notes) and Activities
         // (each exercise's Group and Weekly Desired) both loaded.

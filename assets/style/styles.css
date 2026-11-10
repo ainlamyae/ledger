@@ -421,6 +421,11 @@ header .btn:hover {
     z-index: 20;
 }
 
+/* More solid than other glass, so its list reads over the page. */
+.account-menu-dropdown {
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+}
+
 .account-menu-info {
     margin-bottom: var(--space-m);
 }
@@ -4142,11 +4147,6 @@ html.section-pages[data-form-page] .modal.form-page {
 html.section-pages[data-form-page] .modal.form-page .form-crumb {
     display: flex;
     justify-content: flex-start;
-}
-
-/* The breadcrumb names the form; its own title would repeat it. */
-html.section-pages[data-form-page] .modal.form-page .modal-card > h2 {
-    display: none;
 }
 
 html.section-pages[data-form-page] .modal.form-page .modal-card {

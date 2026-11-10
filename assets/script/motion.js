@@ -415,6 +415,14 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     });
   }
 
+  // A copy outside the form page loses its rules, so what they hid is hidden again.
+  function hideLikeLive(copy, live) {
+    const copies = copy.querySelectorAll('*');
+    live.querySelectorAll('*').forEach((el, i) => {
+      if (copies[i] && getComputedStyle(el).display === 'none') copies[i].style.display = 'none';
+    });
+  }
+
   // What's on screen: the open form page, else the section page.
   function currentScreen() {
     const form = document.querySelector('html[data-form-page] .modal.form-page:not([hidden])');
@@ -483,6 +491,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     const ghost = card.cloneNode(true);
     ghost.removeAttribute('id');
     ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+    hideLikeLive(ghost, card);
     hideStill(ghost, card);
     ghost.inert = true;
     ghost.setAttribute('aria-hidden', 'true');

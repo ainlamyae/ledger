@@ -63,7 +63,7 @@ All of it lives in `motion.js` (`window.Motion`): its CSS, keyframes and view tr
 - Charts live in the panel of the data they describe: Work Analytics in Work Time, Travel Insights in Travel, Protein Source Rotation in Chart.
 - `.table-compact` is the one dense-table look, shared by every table of short figures; per-table widths stay scoped to their own id.
 - Every table is as wide as its columns' text (`table { width: fit-content; max-width: 100% }`), not the panel's full width, so columns carry no spare gaps; a table wider than the panel scrolls sideways.
-- A form for one calendar day appends ` — {date}` to its title (`formTitleWithDate`, `ui-helpers.js`): *Edit Physique — 2026-08-23*. A dateless Pattern keeps the bare title.
+- Forms have no title: the breadcrumb and address name them (*Physique / 2026-08-23*); each dialog's `aria-label` names it for screen readers. The copy a closing form leaves to animate hides whatever the live form hid (`hideLikeLive`, `motion.js`).
 
 ### Stacking order
 

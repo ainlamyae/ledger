@@ -462,7 +462,6 @@ function buildLeetcodeCategory(category, problems, solves) {
 
 function openLeetcodeForm(log = null, problem = null) {
   editingLeetcodeRow = log?.row ?? null;
-  document.getElementById('leetcode-modal-title').textContent = log ? 'Edit LeetCode' : 'Log LeetCode';
   document.getElementById('leetcode-date').value = log?.date || isoFromDate(new Date());
   document.getElementById('leetcode-problem').value = log?.name || problem?.name || '';
   document.getElementById('leetcode-category').value = log?.category || problem?.category || '';

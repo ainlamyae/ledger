@@ -471,7 +471,7 @@ function groupHeaderActions(panel) {
 // One place for a page's actions on every screen: the top, in the phone bar's
 // order (actions, then ❌ last). A block's own action row (Tune's ♻️ 🔄 💾,
 // Insight's Send to AI) joins its header group before ❌, and every form's action
-// row moves to the top of the form, under its title. Moved, not copied, so every
+// row moves to the top of the form. Moved, not copied, so every
 // listener (and a form's submit button) stays attached; on a phone the bar is
 // pinned to the bottom of the screen wherever it sits in the page.
 function liftPageActions(panel) {
@@ -488,10 +488,7 @@ function liftPageActions(panel) {
 function liftFormActions() {
   document.querySelectorAll('.modal .modal-actions').forEach((bar) => {
     bar.classList.add('modal-actions-top');
-    const parent = bar.parentElement;
-    const title = parent.querySelector(':scope > h2');
-    if (title) title.after(bar);
-    else parent.prepend(bar);
+    bar.parentElement.prepend(bar);
   });
 }
 

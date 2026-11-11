@@ -14,6 +14,7 @@
   - No axis maximum: Chart.js fits the tallest month in range (spend or income) and re-fits when a series is hidden in the legend.
   - **Spending Breakdown by Type** — the per-category donut wall (Housing, Transportation, Grocery, Personal, Household …, four periods each plus an *Untyped* remainder), driven by a free-text `Description` prefix convention and built dynamically from `Breakdown` by `renderTypeBreakdownCharts` (`finance-chart.js`). Each category is a card of its own, titled `<Category> by Type`, like every other chart on the Chart page; categories with no named Type get no card.
 - **Transaction Log** — searchable, filterable, sortable, paginated; add/edit/delete/duplicate.
+  - **Hold 📋** (600ms) to make several copies: it asks how many (1–100), appends them as they are and moves the account's balance by all of them (`duplicateTransactionMany`, long press via `makeRowActionButton`'s `onLongPress`). A plain click still opens the Duplicate form.
   - Filter bar: a free-text search (payee/description/account/category), a **Payee** box (autocomplete from your past payees, substring-matched so partial typing narrows), and an **All Categories** dropdown — in that left-to-right order. The Payee box and the category pick AND together, so one payee can be narrowed to one category.
   - Payee/Description/Category autocomplete from history; new categories can be typed inline.
   - The table cuts Payee at 16 characters and Description at 32, ending in `…`; hover a cell for the full text (`truncateTransactionText`).

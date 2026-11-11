@@ -327,6 +327,16 @@ function abandonPendingFormPage() {
   if ((history.state?.depth || 0) > 0) history.back();
 }
 
+// Signed out: the address stays this page's own, its breadcrumb named from the
+// address; the sign-in's data load opens the form (routerDataLoaded).
+function holdPendingFormPage() {
+  if (!initialFormRoute) return;
+  const { panel, button, record, sub } = initialFormRoute;
+  const steps = record ? [{ slug: record, label: record }] : [buttonStep(button)];
+  if (sub) steps.push({ slug: sub, label: record ? subStepLabel(sub) : sub });
+  showPendingFormPage(panel, steps);
+}
+
 // A breadcrumb link to a level between the block and the current form (a row's
 // date over its 🧬 view). When that row's form is open underneath, closing the
 // top one returns to it; otherwise every form closes and the row's own opens.

@@ -241,6 +241,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 2. `ensureAccessToken()` resolves three ways, cheapest first: a stored token with more than `TOKEN_MIN_REMAINING_MS` (2 min) left is returned with **no network call and no UI**; otherwise one silent renewal (invisible when it works); and only if that fails, the visible flow. Callers arriving while a request is open — including the scheduled hourly refresh — **join** it rather than racing a second one.
 3. **And a retry at the save anyway.** A 401 from `sheetsRequest` renews once in place and re-sends the identical request, so a form left open past the hour still saves instead of asking someone to re-type it. `retrying` bounds it to one extra attempt.
 4. The `n` shortcut goes through the Transaction button rather than calling `openTransactionForm()` directly, so it passes the same gate a click does.
+5. A row button's long press (`onLongPress`, e.g. holding 📋 on a transaction) takes its release click on `window` before the gate, so its handler calls `ensureAccessToken()` itself.
 
 **File selection** (first run, or after sign-out)
 

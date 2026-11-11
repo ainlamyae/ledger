@@ -122,7 +122,7 @@ function standardUnit(unit) {
 // promise (every delete does; the edit/duplicate ones just open a form and
 // don't) gets the busy treatment automatically, so a row delete can't be
 // double-fired while the sheet write is in flight.
-function makeRowActionButton({ emoji, title, onClick }) {
+function makeRowActionButton({ emoji, title, onClick, onLongPress }) {
   const btn = document.createElement('button');
   // row-action-btn is a hook, not a style: it's how setupAuthGatedActions (app.js)
   // recognises every ✏️/📋/🗑️ in the app as something that edits the sheet, without
@@ -131,12 +131,50 @@ function makeRowActionButton({ emoji, title, onClick }) {
   btn.textContent = emoji;
   btn.title = title;
   btn.setAttribute('aria-label', title);
-  btn.addEventListener('click', (event) => {
-    const result = onClick(event);
+  const run = (handler, event) => {
+    const result = handler(event);
     if (result && typeof result.then === 'function') return withButtonBusy(btn, () => result);
     return result;
-  });
+  };
+  btn.addEventListener('click', (event) => run(onClick, event));
+  if (onLongPress) attachLongPress(btn, (event) => run(onLongPress, event));
   return btn;
+}
+
+const LONG_PRESS_MS = 600;
+
+// Held LONG_PRESS_MS: the release runs onLongPress instead of the click, caught on
+// window ahead of the auth gate. Moving off the button cancels it.
+function attachLongPress(btn, onLongPress) {
+  let timer = null;
+  let swallow = null;
+  const disarm = () => {
+    clearTimeout(timer);
+    timer = null;
+    if (swallow) window.removeEventListener('click', swallow, true);
+    swallow = null;
+  };
+  btn.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    disarm();
+    timer = setTimeout(() => {
+      swallow = (e) => {
+        if (!btn.contains(e.target)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        disarm();
+        onLongPress(e);
+      };
+      window.addEventListener('click', swallow, true);
+      navigator.vibrate?.(15);
+    }, LONG_PRESS_MS);
+  });
+  btn.addEventListener('pointerup', () => { clearTimeout(timer); timer = null; });
+  // A touch leaves on release too, before its click: only a leave mid-press cancels.
+  btn.addEventListener('pointerleave', () => { if (timer !== null) disarm(); });
+  btn.addEventListener('pointercancel', disarm);
+  // A touch hold would otherwise open the browser's own menu.
+  btn.addEventListener('contextmenu', (event) => event.preventDefault());
 }
 
 // A plain <td> with text (and an optional title/tooltip, e.g. for a

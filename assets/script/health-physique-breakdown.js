@@ -837,38 +837,36 @@ async function handlePhysiqueScanInput(e) {
   }
 }
 
-// A whole Consumption block wrapped as "(<lines>)/<n>" — typed to log a shared
-// portion (a recipe split n ways, a fraction of a batch eaten) without hand-dividing
-// every line's own amount first. Only the OUTER wrapper is this syntax:
-// resolveDivisionQuantities's existing single-line "200/5g" still means what it
-// always has, since that's resolved deep inside stripLeadingIngredientTokens on
-// each line's own text, never on this wrapper.
-const CONSUMPTION_DIVISOR_WRAP_RE = /^\(([\s\S]*)\)\s*\/\s*([\d.]+)\s*$/;
+// Consumption lines wrapped as "(<lines>)/<n>" or "(<lines>)*<n>" (× or x too):
+// a shared portion or several servings, without scaling each line by hand. A group
+// opens with "(" at a line's start and closes with ")<op><n>" at a line's end, so
+// a field can hold several groups among plain lines. A line's own "200/5g" is
+// resolved later, per line (resolveDivisionQuantities).
+const CONSUMPTION_SCALE_GROUP_RE = /^\(([\s\S]*?)\)[ \t]*([/*×x])[ \t]*([\d.]+)[ \t]*$/gm;
 
-// Rebuilds each wrapped line as its own quantity divided by n, same
-// `${quantity}${unit} ${name}` shape combineAndSortConsumptionText's rebuilt lines
-// use — so a divided line reads exactly like one typed that way to begin with. A
-// line whose quantity can't be parsed (extractIngredientQuantity finds none) is
-// left as-is rather than guessed at. Returns null (nothing to do) when the field
-// isn't wrapped this way at all, or the divisor is 0/unparseable.
-function applyConsumptionDivisor(text) {
-  const match = CONSUMPTION_DIVISOR_WRAP_RE.exec(text.trim());
-  if (!match) return null;
+// Each grouped line rebuilt as its quantity scaled, in `${quantity}${unit} ${name}`
+// form; a line with no parseable quantity stays as typed. Null when the field has
+// no group, so Calculate leaves it alone.
+function applyConsumptionScaling(text) {
+  let found = false;
+  const scaled = text.replace(CONSUMPTION_SCALE_GROUP_RE, (group, lines, op, n) => {
+    const by = parseFloat(n);
+    if (!by) return group;
+    found = true;
+    const factor = op === '/' ? 1 / by : by;
+    return lines.split('\n').map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return trimmed;
 
-  const divisor = parseFloat(match[2]);
-  if (!divisor) return null;
+      const { quantity, unit } = extractIngredientQuantity(trimmed);
+      if (quantity === null) return trimmed;
 
-  return match[1].split('\n').map((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return trimmed;
-
-    const { quantity, unit } = extractIngredientQuantity(trimmed);
-    if (quantity === null) return trimmed;
-
-    const name = extractIngredientName(trimmed);
-    const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
-    return `${Math.round((quantity / divisor) * 100) / 100}${unitText} ${name}`.trim();
-  }).join('\n');
+      const name = extractIngredientName(trimmed);
+      const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
+      return `${Math.round(quantity * factor * 100) / 100}${unitText} ${name}`.trim();
+    }).filter(Boolean).join('\n');
+  });
+  return found ? scaled : null;
 }
 
 // Both estimators run together:
@@ -876,9 +874,9 @@ function applyConsumptionDivisor(text) {
 // Duration/Calories Out. Whichever field is empty is simply skipped, and
 // neither side's failure stops the other.
 async function calculatePhysiqueDay() {
-  const divided = applyConsumptionDivisor(physiqueField('consumption').value);
-  if (divided !== null) {
-    physiqueField('consumption').value = divided;
+  const scaled = applyConsumptionScaling(physiqueField('consumption').value);
+  if (scaled !== null) {
+    physiqueField('consumption').value = scaled;
   }
 
   const consumption = physiqueField('consumption').value.trim();

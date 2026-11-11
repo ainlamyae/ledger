@@ -1443,6 +1443,8 @@ function openPhysiqueMicronutrients(p, routed = false) {
 // 🧬 in the header (…/physique/micronutrients/): the same table over a picked
 // range (Health Chart's buttons), with a per-day average beside each total.
 let physiqueMicroRangeSlug = '1w';
+// Health Chart's ranges with 1d (today alone) in front, for this page only.
+const PHYSIQUE_MICRO_RANGES = [{ slug: '1d', label: '1d' }, ...HEALTH_RANGES];
 
 function openPhysiqueMicronutrientsRange() {
   renderPhysiqueMicronutrientsRange();
@@ -1450,11 +1452,13 @@ function openPhysiqueMicronutrientsRange() {
 }
 
 function renderPhysiqueMicronutrientsRange() {
-  renderRangeButtons('physique-micro-range', HEALTH_RANGES, physiqueMicroRangeSlug, (slug) => {
+  renderRangeButtons('physique-micro-range', PHYSIQUE_MICRO_RANGES, physiqueMicroRangeSlug, (slug) => {
     physiqueMicroRangeSlug = slug;
     renderPhysiqueMicronutrientsRange();
   });
-  const { from, to } = healthRangeDates(physiqueMicroRangeSlug);
+  const { from, to } = physiqueMicroRangeSlug === '1d'
+    ? { from: localIso(), to: localIso() }
+    : healthRangeDates(physiqueMicroRangeSlug);
   const data = aggregateMicronutrientIntake(from, to);
   const tbody = document.getElementById('physique-micro-range-body');
   tbody.innerHTML = '';

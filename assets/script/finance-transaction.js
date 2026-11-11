@@ -342,7 +342,12 @@ function renderTransactions() {
     const actionsCell = document.createElement('td');
     actionsCell.append(
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editTransaction(t) }),
-      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => editTransaction(t, 'duplicate') }),
+      makeRowActionButton({
+        emoji: '📋',
+        title: 'Duplicate (hold to make several)',
+        onClick: () => editTransaction(t, 'duplicate'),
+        onLongPress: () => duplicateTransactionMany(t),
+      }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTransaction(t.row) }),
     );
 
@@ -511,6 +516,42 @@ function closeTransactionForm() {
 // without regard to case or stray spaces.
 function isIncomeTransaction(category, amount) {
   return String(category || '').trim().toLowerCase() === 'income' && amount > 0;
+}
+
+const DUPLICATE_MANY_MAX = 100;
+
+// 📋 held: asks how many, appends that many copies as they are, and moves the
+// account's balance by all of them, as the form's default-on box would.
+async function duplicateTransactionMany(t) {
+  const answer = prompt(`How many copies of ${t.date} ${t.payee}?`, '2');
+  if (answer === null) return;
+  const count = Number(answer.trim());
+  if (!Number.isInteger(count) || count < 1 || count > DUPLICATE_MANY_MAX) {
+    showToast(`Copies must be a whole number from 1 to ${DUPLICATE_MANY_MAX}.`, true);
+    return;
+  }
+  if (!(await ensureAccessToken())) return;
+
+  const row = [t.date, t.account, t.payee, t.category, t.description, t.amount];
+  try {
+    await appendValues(TRANSACTIONS_RANGE, Array.from({ length: count }, () => [...row]));
+  } catch (err) {
+    showToast(`Couldn't duplicate: ${err.message}`, true);
+    return;
+  }
+
+  // After the rows are in, so a balance problem is reported, not a failed save.
+  let balanceNote = '';
+  try {
+    const result = await addToAccountBalance(t.account, Math.round(t.amount * count * 100) / 100);
+    if (!result.writable) balanceNote = ` ${t.account}'s balance was left as it is: ${result.reason}`;
+  } catch (err) {
+    balanceNote = ` ${t.account}'s balance couldn't be updated: ${err.message}`;
+  }
+
+  if (isIncomeTransaction(t.category, t.amount)) Motion.confetti();
+  await refreshTransactions(true);
+  showToast(`Duplicated ${count}×.${balanceNote}`, !!balanceNote);
 }
 
 async function submitTransactionForm(event) {

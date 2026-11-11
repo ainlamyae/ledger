@@ -253,14 +253,14 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // Intake — the one positive contribution to Balance, shown against desired intake
   // (a cut wants intake under the cap, a bulk over the floor; the color carries
   // that sense, not the separator).
+  // A day not logged yet reads as 0 against the desired, never a dash.
+  const intakeKcal = caloriesToday ?? 0;
   const calDesired = getCalorieDesired(entries);
   const intakeEl = document.getElementById('today-status-intake-value');
   intakeEl.classList.remove('income', 'expense');
-  const intakeText = caloriesToday !== null
-    ? `${Math.round(caloriesToday)} / ${calDesired.kcal} kcal`
-    : '—';
+  const intakeText = `${Math.round(intakeKcal)} / ${calDesired.kcal} kcal`;
   intakeEl.textContent = privacyMode ? maskDigits(intakeText) : intakeText;
-  if (caloriesToday !== null) intakeEl.classList.add(withinCalorieDesired(caloriesToday, calDesired) ? 'income' : 'expense');
+  intakeEl.classList.add(withinCalorieDesired(intakeKcal, calDesired) ? 'income' : 'expense');
 
   // Activity — a burn, signed negative. No activity logged today reads as 0 (the
   // same "0 kcal burned so far, not unknown" rule the Cardio/NEAT/Strength lines
@@ -277,14 +277,14 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // non-TEF share of intake, shown against its own desired figure.
   const digKcal = tefKcalToday !== null
     ? Math.round(tefKcalToday)
-    : (caloriesToday !== null ? Math.round(caloriesToday * (1 - tefDivisor())) : null);
+    : Math.round(intakeKcal * (1 - tefDivisor()));
   const digDesired = Math.round(calDesired.kcal * (1 - tefDivisor()));
-  const digText = digKcal !== null ? `${-digKcal} / ${-digDesired} kcal` : '—';
+  const digText = `${-digKcal} / ${-digDesired} kcal`;
   const digestionEl = document.getElementById('today-status-digestion-value');
   digestionEl.classList.remove('income', 'expense');
   digestionEl.textContent = privacyMode ? maskDigits(digText) : digText;
   // Green past its desire toward the mass goal: more TEF on a cut, less on a bulk.
-  if (digKcal !== null) digestionEl.classList.add((isCut ? digKcal >= digDesired : digKcal <= digDesired) ? 'income' : 'expense');
+  digestionEl.classList.add((isCut ? digKcal >= digDesired : digKcal <= digDesired) ? 'income' : 'expense');
 
   const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
@@ -299,15 +299,11 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   // earlier row when today has none yet), not a fresh calculation.
   const todayBmrFigures = bmrFiguresForDate(isoFromDate(new Date()));
   let maintenanceKcal = null;
-  if (caloriesToday !== null && pickBmrForBasis(todayBmrFigures, 'bmr') !== null) {
+  if (pickBmrForBasis(todayBmrFigures, 'bmr') !== null) {
     maintenanceKcal = pickBmrForBasis(todayBmrFigures, 'bmr');
     const effectiveMaintenanceKcal = pickBmrForBasis(todayBmrFigures);
-    const activity = activityKcalToday ?? 0;
-    const tef = tefKcalToday !== null
-      ? Math.round(tefKcalToday)
-      : Math.round(caloriesToday * (1 - tefDivisor()));
     ({ deprivationKcal, balance: balanceKcal } = dailyEnergyBalanceKcal(
-      Math.round(caloriesToday), effectiveMaintenanceKcal, activity, tef, sleepHoursToday, sleepDesired,
+      Math.round(intakeKcal), effectiveMaintenanceKcal, activityKcalSoFar, digKcal, sleepHoursToday, sleepDesired,
     ));
   }
 

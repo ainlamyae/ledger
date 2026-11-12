@@ -75,6 +75,30 @@ function bodyMassEmaSeries(values, span) {
   return series;
 }
 
+// The L_p-Day Trend for the plotted `dates` and its change per L_p days — the one rolling
+// average Body Mass draws and Safe Pace reads its weekly loss from, so the two can't
+// disagree. Run over the FULL history from the first reading, then cropped to the window,
+// so the window's first days carry their real smoothed value and slope instead of
+// restarting cold (no slope at all until L_p days into the range).
+function bodyMassTrendSeries(byDate, dates) {
+  const trendDays = bodyMassSmoothingDays();
+  if (!dates.length) return { trendDays, trendSeries: [], slopePerSpan: [] };
+  const firstReading = [...byDate.keys()].sort()[0];
+  const historyDates = firstReading && firstReading < dates[0]
+    ? datesInRange(firstReading, dates[dates.length - 1])
+    : dates;
+  const offset = historyDates.length - dates.length;
+  const values = historyDates.map((d) => (byDate.has(d) ? Math.round(byDate.get(d) * 100) / 100 : null));
+  const trendSeries = bodyMassEmaSeries(values, trendDays);
+  const slopePerSpan = emaSlopePerSpan(trendSeries, trendDays);
+  return { trendDays, trendSeries: trendSeries.slice(offset), slopePerSpan: slopePerSpan.slice(offset) };
+}
+
+// The chart's healthy region, in BMI (kg/m²): shaded green behind the readings. The
+// user's chosen band — bmiVerdict's 18.5–24.9 grading is a separate, clinical one.
+const BMI_HEALTHY_BAND = [20, 25];
+const BMI_HEALTHY_LEGEND_NAME = `Healthy BMI (${BMI_HEALTHY_BAND[0]}–${BMI_HEALTHY_BAND[1]})`;
+
 // One gray dot per reading, on the same dates Caloric Intake uses, so the two compare
 // bar for bar. m_des (BODY_MASS_HEALTHY_KG, Tune's healthy body
 // mass) is marked across it with the section's desired-value cap.
@@ -227,10 +251,8 @@ function renderHealthBodyMassChart(entries) {
   // little and its direction says everything. An EMA rather than a per-week fit, so the
   // line has no seam at a bucket boundary — today's own body-mass reading blends straight in,
   // same as any other day.
-  const trendDays = bodyMassSmoothingDays();
+  const { trendDays, trendSeries, slopePerSpan } = bodyMassTrendSeries(byDate, dates);
   const trendName = `${trendDays}-Day Trend`;
-  const trendSeries = bodyMassEmaSeries(values, trendDays);
-  const slopePerSpan = emaSlopePerSpan(trendSeries, trendDays);
 
   // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
   // `grace` too late to read here. The trend folds in too — a fit extended to the week's
@@ -283,6 +305,23 @@ function renderHealthBodyMassChart(entries) {
           order: 2,
         },
         trendLineDataset(trendName, trendSeries, { hidden: hidden.has(trendName) }),
+        // Healthy BMI band: two stroke-less edges at constant kg, the upper filling down
+        // to the lower ('-1', so the pair stays adjacent and in this order). Left out of
+        // the axis fit — Chart.js clips the fill to whatever range the readings set.
+        ...(heightCm !== null && dates.length ? BMI_HEALTHY_BAND.map((bmi, k) => ({
+          type: 'line',
+          label: `BMI ${bmi} edge`,
+          data: new Array(dates.length).fill(bmi * (heightCm / 100) ** 2),
+          borderWidth: 0,
+          pointRadius: 0,
+          pointHitRadius: 0,
+          tension: 0,
+          fill: k === 0 ? false : '-1',
+          backgroundColor: chartColor('--chart-good', 0.12),
+          isStateTrendOverlay: true,
+          hidden: hidden.has(BMI_HEALTHY_LEGEND_NAME),
+          order: 4,
+        })) : []),
         ...(healthyKg !== null && dates.length
           ? [desiredCapDataset('Healthy Body Mass', new Array(dates.length).fill(healthyKg), desiredCapHalf(yMax - yMin), { isDesiredLine: true, backgroundColor: BODY_MASS_HEALTHY_COLOR(), hidden: hidden.has('Healthy Body Mass') })]
           : []),
@@ -487,6 +526,7 @@ function renderHealthBodyMassChart(entries) {
     { name: 'Measured Body Mass', color: chartColor('--chart-neutral') },
     { name: trendName, color: desiredMarkColor() },
     ...(healthyKg !== null ? [{ name: 'Healthy Body Mass', color: BODY_MASS_HEALTHY_COLOR() }] : []),
+    ...(heightCm !== null ? [{ name: BMI_HEALTHY_LEGEND_NAME, color: chartColor('--chart-good', 0.4) }] : []),
     ...(haveZones ? [
       { name: 'Calorie Trend', color: chartColor('--chart-indigo') },
       { name: 'Glycogen + Water Swing', color: chartColor('--chart-warn', 0.4) },

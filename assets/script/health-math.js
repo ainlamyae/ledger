@@ -766,6 +766,16 @@ function weeklyFatLossPct(weeklyFatLossKg, bodyMassKg) {
   return Math.round((weeklyFatLossKg / bodyMassKg) * 10000) / 100;
 }
 
+// D_bmr%: how far intake sits below BMR, as a share of BMR. Past this ceiling more of
+// what a deficit costs tends to come from lean mass rather than fat — a warning (Tune's
+// box, Safe Pace chart), never a limit.
+const DEFICIT_VS_BMR_PCT_CEILING = 20;
+
+function deficitVsBmrPct(bmr, intakeKcal) {
+  if (!Number.isFinite(bmr) || bmr === 0 || !Number.isFinite(intakeKcal)) return null;
+  return Math.round(((bmr - intakeKcal) / bmr) * 1000) / 10;
+}
+
 // The inverse. Three decimals, not two: 1% of 86.9 kg is 0.869 kg/week, and rounding
 // that to 0.87 reads back as 1.001% — the two boxes would disagree by a digit every
 // time one drove the other.

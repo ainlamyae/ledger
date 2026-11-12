@@ -87,7 +87,7 @@ function gatherPlanSnapshot() {
   const calibratedBmr = calibratedBmrKcal();
   const bmiDes = heightCm ? Math.round((healthyKg / ((heightCm / 100) ** 2)) * 10) / 10 : null;
   const maintenanceKcal = Math.round(detail.bmr + detail.activityKcal);
-  const deficitVsBmrPct = detail.bmr ? Math.round(((detail.bmr - detail.kcal) / detail.bmr) * 1000) / 10 : null;
+  const deficitVsBmr = deficitVsBmrPct(detail.bmr, detail.kcal);
 
   // Macro bands — floor/ceiling pairs, exactly as renderFiber/Fat/CarbFields compute them
   // off the same rounded intake (health-tune-render.js).
@@ -112,7 +112,7 @@ function gatherPlanSnapshot() {
   return {
     bodyMassKg, rawBodyMassKg, heightCm, age, sex, healthyKg, met, tau, kappa,
     formula: coefficients.formula,
-    mifflinBmr, katchBmr, calibratedBmr, bmiDes, maintenanceKcal, deficitVsBmrPct,
+    mifflinBmr, katchBmr, calibratedBmr, bmiDes, maintenanceKcal, deficitVsBmrPct: deficitVsBmr,
     fiberPerKcalMin, fiberPerKgMax, fatPctMin, fatPctMax, carbPctMin, carbPctMax,
     fiberMinG: Math.round(fiberPerKcalMin * (detail.kcal / 1000)),
     fiberMaxG: Math.round(fiberPerKgMax * bodyMassKg),

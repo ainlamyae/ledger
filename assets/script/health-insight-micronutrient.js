@@ -20,13 +20,39 @@
 // display only. Keyed by the exact FDC name; matching/lookup elsewhere still
 // uses that raw name, only the rendered label changes.
 const NUTRIENT_DISPLAY_NAME = {
-  'PUFA 18:3 n-3 c,c,c (ALA)': 'PUFA 18:3 n-3 c,c,c (ALA, Omega-3)',
-  'PUFA 18:4': 'PUFA 18:4 (Omega-3)',
-  'PUFA 20:3 n-3': 'PUFA 20:3 n-3 (Omega-3)',
-  'PUFA 20:5 n-3 (EPA)': 'PUFA 20:5 n-3 (EPA, Omega-3)',
-  'PUFA 22:5 n-3 (DPA)': 'PUFA 22:5 n-3 (DPA, Omega-3)',
-  'PUFA 22:6 n-3 (DHA)': 'PUFA 22:6 n-3 (DHA, Omega-3)',
+  'PUFA 18:3 n-3 c,c,c (ALA)': 'Omega-3, ALA',
+  'PUFA 18:4': 'Omega-3, SDA',
+  'PUFA 20:3 n-3': 'Omega-3, ETE',
+  'PUFA 20:5 n-3 (EPA)': 'Omega-3, EPA',
+  'PUFA 22:5 n-3 (DPA)': 'Omega-3, DPA',
+  'PUFA 22:6 n-3 (DHA)': 'Omega-3, DHA',
 };
+
+// USDA's undifferentiated fatty-acid names (SR Legacy foods such as flaxseed) and the
+// specific one each is counted as when a panel has no specific figure of its own.
+const GENERIC_PUFA_AS = {
+  'PUFA 18:3': 'PUFA 18:3 n-3 c,c,c (ALA)',
+  'PUFA 18:2': 'PUFA 18:2 n-6 c,c',
+};
+
+// A nutrient's name cell, its hover listing where the amount came from (one line per
+// source, "Ingredient (amount eaten): nutrient amount").
+function nutrientNameCell(n) {
+  const td = makeCell(n.displayName);
+  if (n.sources && n.sources.length) {
+    td.title = n.sources.map((s) => `${s.from}: ${s.amount} ${n.unit}`).join('\n');
+  }
+  return td;
+}
+
+// Grouping for the reference-only rows (no desired amount, no supplement): the
+// "Vitamin …" rows 0, the omega-3 family 1 (the names NUTRIENT_DISPLAY_NAME marks
+// Omega-3, or any n-3), everything else 2.
+function nutrientFamilyRank(name) {
+  if (/^Vitamin\b/.test(name)) return 0;
+  if (/Omega-3/.test(NUTRIENT_DISPLAY_NAME[name] || '') || /\bn-3\b/.test(name)) return 1;
+  return 2;
+}
 
 // True on the last Nutrition Facts line when other nutrients follow it: that row
 // carries the rule separating the label's lines from the rest (both micronutrient
@@ -80,6 +106,50 @@ function micronutrientScaleFactor(entry, row) {
   return scale;
 }
 
+// Constant daily intake that isn't logged day by day — supplements, water, tea and
+// other calorie-free drinks — as one DAILY_SUPPLEMENTS Setting: a JSON object keyed by
+// exact FDC nutrient name, each { unit, amount } per day (the same shape as
+// MICRONUTRIENT_DAILY_DESIRED_JSON, without `kind`). Added once for every logged day
+// (aggregateMicronutrientIntake below), so it never touches Calories In or the
+// Physique rows themselves. Missing or unparseable setting = nothing added.
+const DAILY_SUPPLEMENTS_KEY = 'DAILY_SUPPLEMENTS';
+const DAILY_SUPPLEMENTS_LABEL = 'Daily supplements & drinks';
+
+function dailySupplements() {
+  const raw = getSettingString(DAILY_SUPPLEMENTS_KEY, null);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    const out = {};
+    Object.entries(parsed || {}).forEach(([name, v]) => {
+      const amount = Number(v && v.amount);
+      if (v && v.unit && Number.isFinite(amount) && amount > 0) out[name] = { unit: standardUnit(v.unit), amount };
+    });
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+// A nutrient amount in another unit: g/mg/µg through massUnit/MASS_UNIT_GRAMS
+// (health-nutrition.js), plus vitamin D's IU (40 IU = 1 µg; IU is defined per vitamin,
+// so only vitamin D's converts). Null when the units can't be converted.
+const VITAMIN_D_IU_PER_UG = 40;
+function convertNutrientAmount(name, amount, fromUnit, toUnit) {
+  if (standardUnit(fromUnit) === standardUnit(toUnit)) return amount;
+  const vitaminD = /^Vitamin D\b/.test(name);
+  const asMass = (unit, value) => {
+    if (vitaminD && standardUnit(unit) === 'IU') return { unit: 'µg', value: value / VITAMIN_D_IU_PER_UG };
+    const u = massUnit(unit);
+    return u ? { unit: u, value } : null;
+  };
+  const from = asMass(fromUnit, amount);
+  if (!from) return null;
+  if (vitaminD && standardUnit(toUnit) === 'IU') return from.value * MASS_UNIT_GRAMS[from.unit] / MASS_UNIT_GRAMS['µg'] * VITAMIN_D_IU_PER_UG;
+  const to = massUnit(toUnit);
+  return to ? from.value * MASS_UNIT_GRAMS[from.unit] / MASS_UNIT_GRAMS[to] : null;
+}
+
 // Sums every nutrient across every ingredient logged in [from, to] that has
 // both a Nutrition row and an already-pulled Micronutrients panel, scaled to
 // how much of that ingredient was actually eaten. `contributing`/`missing`
@@ -111,9 +181,16 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
     }
 
     contributing.add(row.name);
-    Object.entries(parsed).forEach(([name, v]) => {
-      if (!totals.has(name)) totals.set(name, { unit: v.unit, total: 0 });
-      totals.get(name).total += v.amount * scale;
+    const from = row.amountLabel ? `${row.name} (${row.amountLabel})` : row.name;
+    Object.entries(parsed).forEach(([rawName, v]) => {
+      // An older (SR Legacy) panel carries only the undifferentiated 18:3/18:2: counted
+      // as ALA/LA, as in food it nearly all is. A panel with the specific one keeps it.
+      const specific = GENERIC_PUFA_AS[rawName];
+      const name = specific && !(specific in parsed) ? specific : rawName;
+      if (!totals.has(name)) totals.set(name, { unit: v.unit, total: 0, sources: [] });
+      const amount = v.amount * scale;
+      totals.get(name).total += amount;
+      if (amount > 0) totals.get(name).sources.push({ from, amount });
     });
   });
 
@@ -121,9 +198,35 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
   // (health-nutrient-desired.js) re-parses a Setting value on every call, and this
   // loop runs over the whole nutrient list.
   const dailyDesired = nutrientDailyDesired();
+
+  // DAILY_SUPPLEMENTS: the same amount on every logged day, so it adds amount × days.
+  // Converted to the unit food already uses for that nutrient, else its desired unit,
+  // so it adds up and compares like for like; a unit that can't convert is skipped.
+  const supplements = dailySupplements();
+  // Each nutrient's daily supplement share, in its row's unit, for the tables' own column.
+  const supplementPerDay = new Map();
+  if (daysLogged > 0) {
+    Object.entries(supplements).forEach(([name, s]) => {
+      const unit = totals.get(name)?.unit || dailyDesired[name]?.unit || s.unit;
+      const perDay = convertNutrientAmount(name, s.amount, s.unit, unit);
+      if (perDay === null) return;
+      if (!totals.has(name)) totals.set(name, { unit, total: 0, sources: [] });
+      totals.get(name).total += perDay * daysLogged;
+      totals.get(name).sources.push({ from: `${DAILY_SUPPLEMENTS_LABEL} (${daysLogged} ${daysLogged === 1 ? 'day' : 'days'})`, amount: perDay * daysLogged });
+      supplementPerDay.set(name, perDay);
+    });
+  }
+  if (supplementPerDay.size) contributing.add(DAILY_SUPPLEMENTS_LABEL);
   // The Nutrition Facts lines lead, in label order and under the label's names
   // (Saturated, Omega-3, Sodium, …), as in the ingredient form (NUTRITION_FACTS_ORDER, health-nutrition.js).
   const factsRanks = nutritionFactsRanks([...totals.keys()]);
+  // EPA and DHA aren't Nutrition Facts lines, but they're read beside ALA, so in these
+  // tables they follow the Omega-3, ALA line (ranks are whole numbers; the fractions
+  // slot them in before the next line) and count as part of that block.
+  const alaRank = NUTRITION_FACTS_ORDER.findIndex((l) => l.label === 'Omega-3, ALA');
+  ['PUFA 20:5 n-3 (EPA)', 'PUFA 22:6 n-3 (DHA)'].forEach((name, i) => {
+    if (alaRank >= 0 && totals.has(name)) factsRanks.set(name, { rank: alaRank + (i + 1) / 10, label: NUTRIENT_DISPLAY_NAME[name] });
+  });
   const nutrients = [...totals.entries()]
     .map(([name, v]) => {
       const perDay = daysLogged > 0 ? Math.round((v.total / daysLogged) * 1000) / 1000 : null;
@@ -135,6 +238,12 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
         unit: v.unit,
         total: Math.round(v.total * 1000) / 1000,
         perDay,
+        supplementPerDay: supplementPerDay.has(name) ? Math.round(supplementPerDay.get(name) * 1000) / 1000 : null,
+        // Where the total came from: each ingredient (with how much of it was eaten) and
+        // the daily supplements, largest share first — the tables' name-cell hover.
+        sources: v.sources
+          .map((s) => ({ from: s.from, amount: Math.round(s.amount * 1000) / 1000 }))
+          .sort((a, b) => b.amount - a.amount),
         ideal: desired ? desired.amount : null,
         idealUnit: desired ? desired.unit : null,
         kind: desired ? desired.kind : null,
@@ -154,6 +263,17 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
       const aHasIdeal = a.ideal !== null;
       const bHasIdeal = b.ideal !== null;
       if (aHasIdeal !== bHasIdeal) return aHasIdeal ? -1 : 1;
+      // Among those without a desired amount: the ones a daily supplement adds to first,
+      // then the remaining vitamin forms, then the omega-3 family, then everything else.
+      if (!aHasIdeal) {
+        const aHasSupp = a.supplementPerDay !== null;
+        const bHasSupp = b.supplementPerDay !== null;
+        if (aHasSupp !== bHasSupp) return aHasSupp ? -1 : 1;
+        if (!aHasSupp) {
+          const groupDiff = nutrientFamilyRank(a.name) - nutrientFamilyRank(b.name);
+          if (groupDiff) return groupDiff;
+        }
+      }
       return a.name.localeCompare(b.name);
     });
 
@@ -357,7 +477,7 @@ function renderMicronutrientInsightPreview(data) {
   tbody.innerHTML = '';
 
   if (data.nutrients.length === 0) {
-    tbody.appendChild(renderEmptyRow(4, 'Nothing to show — see the coverage note above.'));
+    tbody.appendChild(renderEmptyRow(5, 'Nothing to show — see the coverage note above.'));
     return;
   }
 
@@ -366,9 +486,10 @@ function renderMicronutrientInsightPreview(data) {
     if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
     if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
     tr.append(
-      makeCell(n.displayName),
+      nutrientNameCell(n),
       makeCell(`${n.total} ${n.unit}`),
       makeCell(n.perDay !== null ? `${n.perDay} ${n.unit}` : '—'),
+      makeCell(n.supplementPerDay !== null ? `${n.supplementPerDay} ${n.unit}` : '—'),
       makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
     );
     tbody.appendChild(tr);

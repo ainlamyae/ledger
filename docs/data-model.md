@@ -188,6 +188,7 @@ One row per ingredient. Data starts at row 2. **Columns are found by their heade
 - Missing tab or row falls back to hardcoded defaults.
 - Written with `RAW` so a computed value round-trips byte-for-byte.
 - `TAX_RATE_PCT` — the rate the Transaction form's **Tax** button applies. Defaults to `13`.
+- `DAILY_SUPPLEMENTS` — constant daily intake that isn't logged day by day (supplements, water, tea, calorie-free drinks): a JSON object keyed by exact FDC nutrient name, each `{unit, amount}` per day, the same shape as `MICRONUTRIENT_DAILY_DESIRED_JSON` without `kind`. `aggregateMicronutrientIntake` (`health-insight-micronutrient.js`) adds it once for every logged day, converted to the unit food already uses for that nutrient (or its desired unit) — g/mg/µg via `massUnit`/`MASS_UNIT_GRAMS`, and vitamin D's IU at 40 IU = 1 µg; a unit that can't convert is skipped. It only feeds the micronutrient totals (Insight and Physique 🧬), never Calories In or the Physique rows, and is listed among the contributing sources as "Daily supplements & drinks". Missing or unparseable = nothing added. Shown in Settings' Health tab.
 
 ---
 

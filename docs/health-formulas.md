@@ -147,6 +147,21 @@ expected g  = (balance / 7700) × 1000
 - **Measured wins over estimated.** `TEF = f × intake` is the fallback — whenever a day's Physique row has its own TEF column calculated (see [`Physique`](data-model.md#physique)), that figure is used instead, and the tooltip's Digestion row says which one produced the bar (`measured` vs. `est.`). State Trend & Forecast's gray Calorie-Implied Trajectory line gives the same day the same precedence, so the two charts can't disagree about which TEF a given day used.
 - **`deprivation` is zero without that day's own sleep logged** — no basis to apply `η` to, not assumed perfect. Calorie Balance's hover shows the `SD (Sleep Deprivation Effect)` line on every day, 0 included. This is the *reverse* question from the calorie-desired `D` above (`sleepDeprivationKcal` vs. `sleepAdjustedDeficitKcal`, both `health-math.js`) — "how much did last night cost the balance that actually happened" rather than "how much bigger does the planned deficit need to be" — so it multiplies by `(1 − η)` instead of dividing by `η`.
 
+## Safe Pace (`health-chart-safe-pace.js`)
+
+```
+weeklyLoss% = (trend(d − L_p) − trend(d)) × 7 / L_p / trend(d) × 100     trend = Body Mass L_p-Day Trend
+D_bmr%      = (BMR − intake) / BMR × 100                                 per day, then L_p-Day Average
+right axis  = left axis × (DEFICIT_VS_BMR_PCT_CEILING / WEEKLY_FAT_LOSS_PCT_CEILING) = × 20
+```
+
+- Both read existing smoothing only: `bodyMassTrendSeries` (`bodyMassEmaSeries` + `emaSlopePerSpan`, the Body Mass chart's own trend line) and `emaSeries(·, L_p)`, the L_p-Day Average every other chart draws. Intake and BMR come from `energyBalanceDays`, the same figures Calorie Balance uses; the formula is `deficitVsBmrPct` (`health-math.js`), shared with Tune's D_bmr% box and the Health Plan prompt.
+- The axis ratio puts 1 % m/wk and 20 % of BMR on one line: green below it (safe), red above (too fast). Weight gain or a surplus reads below zero, still safe.
+
+## Healthy BMI band (Body Mass chart)
+
+- Green fill between `BMI_HEALTHY_BAND` = 20 and 25 kg/m², drawn at `BMI × (HEIGHT_CM / 100)²` kg. Left out of the axis fit, so it only shows where the readings' range reaches it. A chart band only — `bmiVerdict` still grades against 18.5–24.9.
+
 ## 7-day trend line (all nine scored charts)
 
 ```

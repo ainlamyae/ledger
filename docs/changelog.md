@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.38.0** | feat(physique): multiply consumption groups and add quick bulk duplicate |
+| (this commit) | **3.39.0** | feat(health): add safe pace chart, daily supplements and micronutrient gaps |
+| `89c2002` | **3.38.0** | feat(physique): multiply consumption groups and add quick bulk duplicate |
 | `1076b97` | 3.37.1 | fix(physique): give USDA and AI-priced breakdown rows a TEF |
 | `6fbf2c1` | **3.37.0** | feat(physique): add a micronutrients page and site map |
 | `d61fd9b` | **3.36.0** | feat(motion): reduce navigation to vertical and sideways slides |

@@ -758,7 +758,7 @@ const NUTRITION_FACTS_ORDER = [
   { label: 'Trans', names: ['Fatty acids, total trans'] },
   { label: 'Polyunsaturated', names: ['Fatty acids, total polyunsaturated'] },
   { label: 'Omega-6', names: ['PUFA 18:2 n-6 c,c', 'PUFA 18:2'] }, // linoleic acid
-  { label: 'Omega-3', names: ['PUFA 18:3 n-3 c,c,c (ALA)', 'PUFA 18:3'] }, // alpha-linolenic acid
+  { label: 'Omega-3, ALA', names: ['PUFA 18:3 n-3 c,c,c (ALA)', 'PUFA 18:3'] }, // alpha-linolenic acid
   { label: 'Monounsaturated', names: ['Fatty acids, total monounsaturated'] },
   { label: 'Carbohydrate', names: ['Carbohydrates'] },
   { label: 'Fibre', names: ['Dietary Fiber'] },

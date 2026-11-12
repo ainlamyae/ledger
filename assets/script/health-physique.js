@@ -1422,15 +1422,16 @@ function openPhysiqueMicronutrients(p, routed = false) {
   tbody.innerHTML = '';
 
   if (data.nutrients.length === 0) {
-    tbody.appendChild(renderEmptyRow(3, 'Nothing to show — see the coverage note above.'));
+    tbody.appendChild(renderEmptyRow(4, 'Nothing to show — see the coverage note above.'));
   } else {
     data.nutrients.forEach((n, i) => {
       const tr = document.createElement('tr');
       if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
       if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
       tr.append(
-        makeCell(n.displayName),
+        nutrientNameCell(n),
         makeCell(`${n.total} ${n.unit}`),
+        makeCell(n.supplementPerDay !== null ? `${n.supplementPerDay} ${n.unit}` : '—'),
         makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
       );
       tbody.appendChild(tr);
@@ -1463,7 +1464,7 @@ function renderPhysiqueMicronutrientsRange() {
   const tbody = document.getElementById('physique-micro-range-body');
   tbody.innerHTML = '';
   if (data.nutrients.length === 0) {
-    tbody.appendChild(renderEmptyRow(4, 'No day in this range has 🧬 Micronutrients pulled.'));
+    tbody.appendChild(renderEmptyRow(5, 'No day in this range has 🧬 Micronutrients pulled.'));
     return;
   }
   data.nutrients.forEach((n, i) => {
@@ -1471,9 +1472,10 @@ function renderPhysiqueMicronutrientsRange() {
     if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
     if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
     tr.append(
-      makeCell(n.displayName),
+      nutrientNameCell(n),
       makeCell(`${n.total} ${n.unit}`),
       makeCell(n.perDay !== null ? `${n.perDay} ${n.unit}` : '—'),
+      makeCell(n.supplementPerDay !== null ? `${n.supplementPerDay} ${n.unit}` : '—'),
       makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
     );
     tbody.appendChild(tr);

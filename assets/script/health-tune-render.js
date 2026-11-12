@@ -820,11 +820,8 @@ function formulaDeficitTraceLine(sleepInfo) {
   return `(${raw}) / ${factorRounded}  =  ${Math.round(sleepInfo.deficit)} kcal/day`;
 }
 
-// Past this share of BMR, more of what a deficit costs tends to come from lean
-// mass rather than fat — the box turns red as a warning against too harsh a cut,
-// not a hard limit (nothing here blocks the value or the save).
-const DEFICIT_VS_BMR_PCT_CEILING = 20;
-
+// The box turns red past DEFICIT_VS_BMR_PCT_CEILING (health-math.js) as a warning
+// against too harsh a cut, not a hard limit (nothing here blocks the value or the save).
 // The D_bmr% box and its trace row — how far E_in sits below BMR, as a percentage
 // of BMR. Reads plan.bmr/plan.intakeKcal rather than the formula-bmr/formula-ein
 // boxes directly: those two are set at different points across the five modes (the
@@ -842,7 +839,7 @@ function renderDeficitVsBmrField(plan) {
   }
 
   const { bmr, intakeKcal } = plan;
-  const pct = Math.round(((bmr - intakeKcal) / bmr) * 1000) / 10;
+  const pct = deficitVsBmrPct(bmr, intakeKcal);
   setComputedField('formula-deficit-bmr-pct', String(pct));
   el.classList.toggle('formula-pct-over', pct > DEFICIT_VS_BMR_PCT_CEILING);
 

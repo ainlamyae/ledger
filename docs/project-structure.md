@@ -70,6 +70,7 @@ ledger/
 │       ├── health-insight.js      # Insight panel shell
 │       ├── health-chart-protein-rotation.js   # Protein Source Rotation
 │       ├── health-chart-heatmap.js   # Health Chart's Daily Progress heatmap
+│       ├── health-chart-safe-pace.js # Safe Pace: weekly loss % and deficit vs BMR against their limits
 │       ├── health-tune-fields.js     # Tune field descriptors + input utils
 │       ├── health-tune-render.js     # Tune substituted-formula renderers
 │       ├── health-tune.js # Tune block lifecycle

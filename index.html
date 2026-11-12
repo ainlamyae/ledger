@@ -304,8 +304,7 @@
                     <div class="widget-row"><span>DF</span><span id="today-fiber-value">—</span></div>
                     <div class="widget-row"><span>Fat</span><span id="today-fat-value">—</span></div>
                     <div class="widget-row"><span>Crb</span><span id="today-carb-value">—</span></div>
-                </div>
-                <div class="card">
+                </div>                <div class="card">
                     <h3>Physical Activity</h3>
                     <div class="widget-row"><span>Cardio</span><span id="today-activity-cardio-value">—</span></div>
                     <div class="widget-row"><span>NEAT</span><span id="today-activity-neat-value">—</span></div>
@@ -316,6 +315,10 @@
                     <div class="widget-row"><span>Window</span><span id="today-sleep-window-value">—</span></div>
                     <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
                 </div>
+            </div>
+            <div class="card micro-gaps-card">
+                <h3>Micronutrient Gaps</h3>
+                <div id="today-micro-gaps" class="micro-gaps-rows"><div class="widget-row"><span>—</span></div></div>
             </div>
             <div class="card body-mass-progress-meter" id="body-mass-progress-meter">
                 <h3>Progress</h3>
@@ -414,6 +417,16 @@
                     <canvas id="health-body-mass-chart"></canvas>
                 </div>
                 <div class="donut-legend" id="health-body-mass-legend"></div>
+            </div>
+
+            <div class="body-mass-projection-wrap card">
+                <div class="body-mass-projection-header">
+                    <h3>Safe Pace</h3>
+                </div>
+                <div class="chart-box chart-box-flush">
+                    <canvas id="health-safe-pace-chart"></canvas>
+                </div>
+                <div class="donut-legend" id="health-safe-pace-legend"></div>
             </div>
 
             <div class="body-mass-projection-wrap card">
@@ -766,6 +779,7 @@
                                 <th>Nutrient</th>
                                 <th>Total (period)</th>
                                 <th>Avg / day</th>
+                                <th>Supp / day</th>
                                 <th>Ideal / day</th>
                             </tr>
                             </thead>
@@ -3082,6 +3096,7 @@
                     <tr>
                         <th>Nutrient</th>
                         <th>Amount</th>
+                        <th>Supp / day</th>
                         <th>Ideal / day</th>
                     </tr>
                     </thead>
@@ -3113,6 +3128,7 @@
                         <th>Nutrient</th>
                         <th>Total (period)</th>
                         <th>Avg / day</th>
+                        <th>Supp / day</th>
                         <th>Ideal / day</th>
                     </tr>
                     </thead>
@@ -3548,6 +3564,7 @@
 <script src="assets/script/health-chart-sleep.js"></script>
 <script src="assets/script/health-chart-projection.js"></script>
 <script src="assets/script/health-chart-energy-balance.js"></script>
+<script src="assets/script/health-chart-safe-pace.js"></script>
 <script src="assets/script/health-chart-heatmap.js"></script>
 <script src="assets/script/finance-chart.js"></script>
 <script src="assets/script/finance-market-data.js"></script>

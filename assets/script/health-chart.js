@@ -37,6 +37,7 @@ function renderHealthCharts(entries) {
   renderTodayGlanceCards(entries);
   renderHealthHeatmap(entries);
   renderHealthBodyMassChart(entries);
+  renderHealthSafePaceChart(entries);
   renderHealthIntakeChart(entries);
   renderHealthCaloriesChart(entries);
   renderHealthProteinChart(entries);
@@ -170,6 +171,41 @@ function renderTodayGlanceCards(entries) {
     ? `${formatClockTime24(sleepBedMin)}-${formatClockTime24(sleepWakeMin)}`
     : '—';
   document.getElementById('today-sleep-window-value').textContent = privacyMode ? maskDigits(windowText) : windowText;
+  renderTodayMicronutrientGaps();
+}
+
+// Micronutrient Gaps card: every nutrient flagged short of its desired amount (the same
+// severity the Micronutrients tables colour red) over the last 7 days, as average per day
+// / desired per day. Built on aggregateMicronutrientIntake (health-insight-micronutrient.js),
+// so DAILY_SUPPLEMENTS is already counted and the figures match those tables.
+function renderTodayMicronutrientGaps() {
+  const box = document.getElementById('today-micro-gaps');
+  if (!box || typeof aggregateMicronutrientIntake !== 'function') return;
+  const { from, to } = healthRangeDates('1w');
+  const data = aggregateMicronutrientIntake(from, to);
+  const gaps = data.nutrients.filter((n) => n.severity === 'severe' || n.severity === 'mild');
+  // Small amounts keep their decimals, large ones read as whole numbers.
+  const fmt = (v) => (v >= 100 ? Math.round(v) : v >= 1 ? Math.round(v * 10) / 10 : Math.round(v * 1000) / 1000);
+  box.innerHTML = '';
+  const row = (label, text, tone) => {
+    const div = document.createElement('div');
+    div.className = 'widget-row';
+    const name = document.createElement('span');
+    name.textContent = label;
+    const value = document.createElement('span');
+    value.textContent = privacyMode ? maskDigits(text) : text;
+    if (tone) value.classList.add(tone);
+    div.append(name, value);
+    box.appendChild(div);
+  };
+  if (!data.daysLogged) return row('—', 'no logged days');
+  if (!gaps.length) return row('None', 'all met', 'income');
+  // Shown in the desired amount's unit, so both figures read alike; the largest
+  // shortfall (lowest share of the desired amount) first.
+  gaps
+    .map((n) => ({ n, perDay: convertNutrientAmount(n.name, n.perDay, n.unit, n.idealUnit) ?? n.perDay }))
+    .sort((a, b) => a.perDay / a.n.ideal - b.perDay / b.n.ideal)
+    .forEach(({ n, perDay }) => row(n.displayName, `${fmt(perDay)} / ${n.ideal} ${n.idealUnit}`, 'expense'));
 }
 
 // The Status card is a single energy-budget ledger for today, read top to bottom:

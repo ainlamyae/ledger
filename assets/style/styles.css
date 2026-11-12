@@ -1214,6 +1214,16 @@ td:has(.btn) {
     border-bottom: none;
 }
 
+/* The row under the pointer is tinted, so a long row can be read across without
+   losing its line. Follows the theme's primary colour, so it works in dark mode too. */
+.table-compact tbody tr > td {
+    transition: background-color .12s ease;
+}
+
+.table-compact tbody tr:hover > td {
+    background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
 /* The 🧮 Calculate breakdown's summed last row (assets/script/health-physique-estimator.js's
    renderCalcBreakdown) and the activity table's (health-physique.js's
    renderPhysiqueActivityBreakdown) — bold and a top border set it apart from the
@@ -2491,6 +2501,24 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 
 .body-mass-progress-meter {
     margin-top: var(--space-m);
+}
+
+/* Micronutrient Gaps: full width under Status and the stack beside it, its rows
+   in two columns so a long list stays short (one column on narrow screens). */
+.today-glance-cards > .micro-gaps-card {
+    grid-column: 1 / -1;
+}
+
+.micro-gaps-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: calc(var(--space-l) * 2);
+}
+
+@media (max-width: 640px) {
+    .micro-gaps-rows {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* The meters' own card, full width under the two glance columns. */

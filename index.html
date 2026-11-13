@@ -320,7 +320,10 @@
                 <h3>Micronutrient Gaps</h3>
                 <div id="today-micro-gaps" class="micro-gaps-rows"><div class="widget-row"><span>—</span></div></div>
             </div>
-            <div class="card body-mass-progress-meter" id="body-mass-progress-meter">
+        </div>
+
+        <!-- Moved under the Health tile card by buildPageTiles (page-nav.js). -->
+        <div class="card body-mass-progress-meter" id="body-mass-progress-meter" data-under-tiles>
                 <h3>Progress</h3>
                 <div class="body-mass-progress-meter-track-wrap">
                     <span class="body-mass-progress-meter-callout" id="body-mass-progress-meter-callout"></span>
@@ -358,7 +361,6 @@
                 </div>
 
                 <p id="body-mass-projection-eta" class="body-mass-eta"></p>
-            </div>
         </div>
 
         <div class="panel" data-route="chart">
@@ -597,23 +599,6 @@
                 <button id="add-nutrition-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an ingredient to the catalogue" aria-label="Add">➕</button>
             </div>
 
-            <!-- A copy of Health → Chart's Protein Source Rotation card, same data and window. -->
-            <div class="body-mass-projection-wrap card page-rotation-card">
-                <h3>Protein Source Rotation</h3>
-
-                <div class="protein-rotation-charts">
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="protein-rotation-chart-nutrition"></canvas>
-                    </div>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="protein-rotation-donut-nutrition"></canvas>
-                    </div>
-                </div>
-
-                <div class="donut-legend" id="protein-rotation-legend-nutrition"></div>
-                <div class="donut-legend" id="protein-rotation-ingredient-legend-nutrition"></div>
-            </div>
-
             <div class="panel-section card">
                 <h3>Ingredients</h3>
                 <div class="filters">
@@ -655,6 +640,23 @@
                 <button type="button" class="btn modal-close page-action-close" title="Clear selection" aria-label="Clear selection">❌</button>
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
+
+            <!-- A copy of Health → Chart's Protein Source Rotation card, same data and window. -->
+            <div class="body-mass-projection-wrap card page-rotation-card">
+                <h3>Protein Source Rotation</h3>
+
+                <div class="protein-rotation-charts">
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="protein-rotation-chart-nutrition"></canvas>
+                    </div>
+                    <div class="chart-box chart-box-flush">
+                        <canvas id="protein-rotation-donut-nutrition"></canvas>
+                    </div>
+                </div>
+
+                <div class="donut-legend" id="protein-rotation-legend-nutrition"></div>
+                <div class="donut-legend" id="protein-rotation-ingredient-legend-nutrition"></div>
+            </div>
         </div>
 
         <div class="panel" id="workout-plan-panel" data-route="activity">
@@ -971,26 +973,24 @@
                             <input type="text" id="formula-neck" inputmode="decimal">
                             <span class="formula-unit">cm</span>
                         </label>
-                        <label class="formula-row" title="Waist circumference: at the navel for men, at the narrowest point for women. Feeds BF%.">
+                        <label class="formula-row" title="Waist circumference: at the navel for men, at the narrowest point for women. Feeds BF%, WHtR, WHR and BRI. Goes red at 102 cm or more for men and 88 cm or more for women (the Lancet commission's thresholds for white adults; other populations' differ).">
                             <span class="formula-sym">C_waist</span>
                             <span class="formula-name">waist</span>
                             <input type="text" id="formula-waist" inputmode="decimal">
                             <span class="formula-unit">cm</span>
                         </label>
-                        <label class="formula-row" title="Hip circumference at the widest part of the buttocks. Feeds BF% for women only; the men's equation doesn't use it.">
+                        <label class="formula-row" title="Hip circumference at the widest part of the buttocks. Feeds BF% for women only (the men's equation doesn't use it), and WHR for both.">
                             <span class="formula-sym">C_hip</span>
                             <span class="formula-name">hip</span>
                             <input type="text" id="formula-hip" inputmode="decimal">
                             <span class="formula-unit">cm</span>
                         </label>
-                        <!-- The raw reading, and readonly because it's a measurement rather than a
-                             knob: it's here to be compared against the smoothed figure below, which is
-                             the one every identity on this sheet is evaluated at. Type your what-ifs
-                             into m̄. -->
-                        <label class="formula-row" title="Your most recent body-mass reading, exactly as logged. Shown for comparison only — the formulas below run on the smoothed mass, since a single reading carries a day's water and glycogen with it.">
+                        <!-- Opens on the latest reading; a typed figure is copied into m̄, which
+                             every identity is evaluated at. -->
+                        <label class="formula-row" title="Your most recent body-mass reading, exactly as logged. Editable: a typed figure is copied into m̄ below, so the whole plan runs at that mass.">
                             <span class="formula-sym">m</span>
                             <span class="formula-name">body mass</span>
-                            <input type="text" id="formula-body-mass" inputmode="decimal" readonly>
+                            <input type="text" id="formula-body-mass" inputmode="decimal">
                             <span class="formula-unit">kg</span>
                         </label>
                         <!-- L_p sits here, above m̄, because it is m̄'s window as well as the length
@@ -1025,7 +1025,26 @@
                             <input type="text" id="formula-healthy-bmi" inputmode="decimal">
                             <span class="formula-unit">kg/m²</span>
                         </label>
-                        <label class="formula-row" title="Body-fat %, U.S. Navy (Hodgdon & Beckett): for men, 495 / (1.0324 − 0.19077×log10(C_waist − C_neck) + 0.15456×log10(h)) − 450; for women, 495 / (1.29579 − 0.35004×log10(C_waist + C_hip − C_neck) + 0.22100×log10(h)) − 450. Not editable: derived from C_neck, C_waist, C_hip, h and σ.">
+                        <!-- Body-shape checks from the girths and h, beside BMI_des and BF%. -->
+                        <label class="formula-row" title="Waist-to-height ratio: C_waist / h. Keeping the waist under half the height (below 0.5) is the usual rule; at or above it the box goes red. Tracks belly fat, the kind most tied to heart and metabolic risk. Not editable: derived from C_waist and h.">
+                            <span class="formula-sym">WHtR</span>
+                            <span class="formula-name">waist-to-height ratio</span>
+                            <input type="text" id="formula-whtr" inputmode="decimal" readonly>
+                            <span class="formula-unit"></span>
+                        </label>
+                        <label class="formula-row" title="Waist-to-hip ratio: C_waist / C_hip. The WHO marks raised risk at 0.90 or more for men and 0.85 or more for women; there the box goes red. Not editable: derived from C_waist and C_hip.">
+                            <span class="formula-sym">WHR</span>
+                            <span class="formula-name">waist-to-hip ratio</span>
+                            <input type="text" id="formula-whr" inputmode="decimal" readonly>
+                            <span class="formula-unit"></span>
+                        </label>
+                        <label class="formula-row" title="Body Roundness Index (Thomas et al., 2013): 364.2 − 365.5 × √(1 − (C_waist/2π)² / (0.5 × h)²). Uses waist and height instead of weight; roughly 1–20, higher is rounder. No red band: its cut-offs aren't settled. Not editable: derived from C_waist and h.">
+                            <span class="formula-sym">BRI</span>
+                            <span class="formula-name">body roundness index</span>
+                            <input type="text" id="formula-bri" inputmode="decimal" readonly>
+                            <span class="formula-unit"></span>
+                        </label>
+                        <label class="formula-row" title="Body-fat %, U.S. Navy (Hodgdon & Beckett): for men, 495 / (1.0324 − 0.19077×log10(C_waist − C_neck) + 0.15456×log10(h)) − 450; for women, 495 / (1.29579 − 0.35004×log10(C_waist + C_hip − C_neck) + 0.22100×log10(h)) − 450. Goes red above 25% for men and 32% for women. Not editable: derived from C_neck, C_waist, C_hip, h and σ.">
                             <span class="formula-sym">BF%</span>
                             <span class="formula-name">body-fat % by U.S. Navy</span>
                             <input type="text" id="formula-bf-pct-navy" inputmode="decimal" readonly>
@@ -3145,6 +3164,13 @@
 
 <div id="activity-instruction-modal" class="modal" role="dialog" aria-modal="true" aria-label="Instructions on the Activities" hidden>
     <div class="modal-card">
+        <!-- One tile per Group (health-activity-catalogue.js's renderInstructionList), in one card
+             titled Workouts, as a hub's tiles are; a group's page lists its activities below. -->
+        <div class="card" id="instruction-groups-card">
+            <h3>Workouts</h3>
+            <div class="page-tiles instruction-groups" id="instruction-groups"></div>
+        </div>
+
         <!-- A copy of the Indicator panel's own Activity Rotation card (health-chart-activity-rotation.js),
              same chart and donut off the same data, just also visible here so the gym's own
              tiles page shows the rotation without leaving for Health → Indicator. Hidden
@@ -3165,13 +3191,6 @@
             </div>
 
             <div class="donut-legend" id="activity-rotation-legend-gym"></div>
-        </div>
-
-        <!-- One tile per Group (health-activity-catalogue.js's renderInstructionList), in one card
-             titled Workouts, as a hub's tiles are; a group's page lists its activities below. -->
-        <div class="card" id="instruction-groups-card">
-            <h3>Workouts</h3>
-            <div class="page-tiles instruction-groups" id="instruction-groups"></div>
         </div>
         <div class="instruction-body" id="instruction-body"></div>
 

@@ -276,7 +276,11 @@ const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water a
     m̄     =  (1/L_p) × Σ m(t−i),  i = 0…L_p−1
 The healthy body mass as a BMI — 18.5–24.9 healthy band
     BMI_des =  m_des / (h/100)²
-Body-fat % by U.S. Navy — Hodgdon & Beckett (1984), girths and height in cm
+Body shape from the girths — WHtR under 0.5; WHR under 0.90 (♂) / 0.85 (♀), WHO; C_waist under 102 (♂) / 88 (♀) cm
+    WHtR  =  C_waist / h
+    WHR   =  C_waist / C_hip
+    BRI   =  364.2  −  365.5 × √(1 − (C_waist/2π)² / (0.5×h)²)      Thomas et al. (2013)
+Body-fat % by U.S. Navy — red above 25% (♂) / 32% (♀) — Hodgdon & Beckett (1984), girths and height in cm
     BF%   =  495 / (1.0324  −  0.19077×log10(C_waist − C_neck)  +  0.15456×log10(h))  −  450           (♂)
     BF%   =  495 / (1.29579  −  0.35004×log10(C_waist + C_hip − C_neck)  +  0.22100×log10(h))  −  450   (♀)
 Lean body mass by U.S. Navy — body mass less its fat mass

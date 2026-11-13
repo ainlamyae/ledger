@@ -1875,7 +1875,7 @@ function findNutritionEntry(name) {
 // or an edited row (✏️ on a Calculate breakdown) ever supplies them, so most
 // callers still bank the same five-cell row as before and the sheet's grid
 // only needs widening (ensureNutritionColumns) when one of the three is set.
-async function addNutritionEntry({ name, amount, calories, protein, fiber, fat, carb }) {
-  if (fiber !== undefined || fat !== undefined || carb !== undefined) await ensureNutritionColumns();
-  await appendNutritionRow({ group: '', name, amount, calories, protein, fiber, fat, carb });
+async function addNutritionEntry({ name, amount, calories, protein, fiber, fat, carb, micronutrients }) {
+  if (fiber !== undefined || fat !== undefined || carb !== undefined || micronutrients) await ensureNutritionColumns();
+  await appendNutritionRow({ group: '', name, amount, calories, protein, fiber, fat, carb, micronutrients });
 }

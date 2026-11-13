@@ -15,7 +15,8 @@ let sheetsRequestCount = 0;
 
 async function sheetsRequest(path, options = {}, retrying = false, quotaAttempt = 0) {
   sheetsRequestCount++;
-  const token = getAccessToken();
+  // Expired while a form sat open: Save's click signs in first (never a background read).
+  const token = getAccessToken() || await ensureAccessToken();
   if (!token) throw new Error('Not signed in');
 
   const spreadsheetId = getActiveSpreadsheetId();

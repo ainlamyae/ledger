@@ -7,7 +7,7 @@ function loadFormulaInputsFromSettings() {
   // matches the one on the Caloric Intake line before anything is touched.
   //
   // Both mass boxes, from the two functions that define them: the raw one is the last
-  // body-mass reading, shown only for comparison, and m̄ is planBodyMassKg — the same rolling average
+  // body-mass reading (typing in it sets m̄), and m̄ is planBodyMassKg — the same rolling average
   // the tile and the chart's desired intake are computed at, so the modal opens agreeing with them.
   const healthEntries = physiqueAsHealthEntries();
   document.getElementById('formula-body-mass').value = latestBodyMassKg(healthEntries) ?? TUNE_PROFILE_DEFAULTS.bodyMassKg;
@@ -298,12 +298,17 @@ function initFormulaPlayground() {
   // Δm is left out here and wired with Δm% below: both have to record which of the pair
   // is the known BEFORE the render, and a plain render-only listener firing first would
   // let the previous known overwrite the box being typed into.
-  // formula-body-mass is NOT here: it's the raw body-mass reading, readonly and read by nothing —
-  // m̄ below it is the box every identity is evaluated at, so it's the one that re-renders.
+  // formula-body-mass is NOT here: nothing reads it, so a typed m is copied into m̄ below.
   //
   // m_g is left out for the same reason Δm is, and wired with BMI_g below: both have to
   // record which of their pair is the known BEFORE the render, and a plain render-only
   // listener firing first would let the previous known overwrite the box being typed into.
+  // A typed m becomes m̄, the mass every formula runs at.
+  document.getElementById('formula-body-mass').addEventListener('input', (event) => {
+    if (!event.target.value) return;
+    document.getElementById('formula-body-mass-smooth').value = event.target.value;
+    renderFormulaPreview();
+  });
   // m̄ is averaged over L_p, so a typed L_p re-smooths it before the render below reads it.
   // Registered ahead of the render listeners so it runs first.
   document.getElementById('formula-cal-period-days').addEventListener('input', () => {

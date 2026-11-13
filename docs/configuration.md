@@ -30,7 +30,7 @@
 
 | Key | Set by | Contents |
 |---|---|---|
-| `ledger_token` | `auth.js` | `{ token, expiresAt }` — enables silent refresh |
+| `ledger_token` | `auth.js` | `{ token, expiresAt }` — survives reloads and is shared by every open tab |
 | `ledger_consented` | `auth.js` | `'1'` once consent completes; controls `prompt` on next sign-in; cleared on sign-out |
 | `ledger_widget_detected_location` | `ledger-widgets.js` | `{lat, lon, label}` from the last "Use my location" |
 | `ledger_spreadsheet_id` | `drive.js` | The chosen spreadsheet's Drive file ID — every Sheets call goes to it |

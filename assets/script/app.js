@@ -1082,7 +1082,7 @@ const AUTH_GATE_EXEMPT_IDS = ['activity-instruction-btn'];
 function setupAuthGatedActions() {
   document.addEventListener('click', (event) => {
     const btn = event.target.closest(AUTH_GATED_SELECTOR);
-    if (!btn || AUTH_GATE_EXEMPT_IDS.includes(btn.id)) return;
+    if (!btn || AUTH_GATE_EXEMPT_IDS.includes(btn.id) || btn.dataset.noAuth === '1') return;
     // authChecked marks the re-dispatched click; authPending swallows the impatient
     // second click while the first one's token request is still open.
     if (btn.dataset.authChecked === '1' || btn.dataset.authPending === '1' || btn.disabled) return;

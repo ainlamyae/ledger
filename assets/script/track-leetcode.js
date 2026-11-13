@@ -428,9 +428,9 @@ function buildLeetcodeCategory(category, problems, solves) {
     // 🎥 the YouTube video, 📄 NeetCode's page and 🔗 the LeetCode problem, as buttons like ✏️/🗑️.
     const open = (href) => () => window.open(href, '_blank', 'noopener');
     actions.append(
-      makeRowActionButton({ emoji: '🎥', title: 'YouTube video', onClick: open(latest?.youtube || youtubeLink(p)) }),
-      makeRowActionButton({ emoji: '📄', title: 'NeetCode page', onClick: open(latest?.neetcode || neetcodePageLink(p)) }),
-      makeRowActionButton({ emoji: '🔗', title: 'LeetCode problem', onClick: open(latest?.link || leetcodeLink(p)) }),
+      makeRowActionButton({ emoji: '🎥', title: 'YouTube video', onClick: open(latest?.youtube || youtubeLink(p)), readOnly: true }),
+      makeRowActionButton({ emoji: '📄', title: 'NeetCode page', onClick: open(latest?.neetcode || neetcodePageLink(p)), readOnly: true }),
+      makeRowActionButton({ emoji: '🔗', title: 'LeetCode problem', onClick: open(latest?.link || leetcodeLink(p)), readOnly: true }),
     );
     if (latest) {
       actions.append(

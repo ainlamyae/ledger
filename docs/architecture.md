@@ -159,7 +159,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | # | Module | Responsibility |
 |---|---|---|
 | 1 | `config.js` | `CONFIG`: Client ID, template spreadsheet ID, Picker API key, sheet tab names |
-| 2 | `auth.js` | Google sign-in/out, token persistence, silent refresh, profile lookup |
+| 2 | `auth.js` | Google sign-in/out, token persistence, quiet expiry, profile lookup |
 | 3 | `drive.js` | Template copy link, Google Picker, active spreadsheet ID storage |
 | 4 | `sheets.js` | Sheets API v4 wrapper; `USER_ENTERED` by default, `RAW` for Settings writes |
 | 5 | `cache.js` | Numeric-expression evaluator; deletes the `ledger_cache_*` keys earlier versions stored |
@@ -231,15 +231,15 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 **Sign-in**
 
 1. `initAuth(handleAuthChange)`.
-2. Non-expired token in `localStorage` is used; else a silent `prompt: 'none'` attempt; else the consent button.
+2. Non-expired token in `localStorage` is used; else the signed-out view with the 🔑 icon. Nothing opens a Google window on load.
 3. On success, an already-selected spreadsheet loads the dashboard; otherwise the file gate shows.
-4. A timer renews the token ~5 min before it expires (`REFRESH_BUFFER_MS`), since the implicit GIS flow issues no refresh token and a tab left open would otherwise start 401ing.
+4. No background renewal: GIS's token client opens a popup for every request, `prompt: 'none'` included, so a timer renewing (and retrying every 2 min on failure) used to raise sign-in windows in an idle tab. At expiry `scheduleTokenExpiry` turns the app signed-out quietly; the next click signs in again. Signing in on one tab signs in the others (`storage` event, `adoptToken`).
 
 **Token freshness before a write** — GIS tokens last ~1hr and this is a tab people leave open, so the routine failure was filling in a long form and losing it to a Google auth error on Save.
 
-1. **Checked at the click, not at the save.** One capture-phase listener on `document` (`setupAuthGatedActions`) intercepts every button that opens a form or edits the sheet — `.panel-header-btn`, `.row-action-btn` (every ✏️/📋/🗑️, via `makeRowActionButton`), the bulk bars, Import CSV — stops the event before the button's own bubble-phase handler, awaits a token, then re-dispatches the identical click. A rebuilt table row inherits this for free; read-only actions (the Instruction modal) are exempt, since a sign-in popup to look something up is worse than the problem.
-2. `ensureAccessToken()` resolves three ways, cheapest first: a stored token with more than `TOKEN_MIN_REMAINING_MS` (2 min) left is returned with **no network call and no UI**; otherwise one silent renewal (invisible when it works); and only if that fails, the visible flow. Callers arriving while a request is open — including the scheduled hourly refresh — **join** it rather than racing a second one.
-3. **And a retry at the save anyway.** A 401 from `sheetsRequest` renews once in place and re-sends the identical request, so a form left open past the hour still saves instead of asking someone to re-type it. `retrying` bounds it to one extra attempt.
+1. **Checked at the click, not at the save.** One capture-phase listener on `document` (`setupAuthGatedActions`) intercepts every button that opens a form or edits the sheet — `.panel-header-btn`, `.row-action-btn` (every ✏️/📋/🗑️, via `makeRowActionButton`), the bulk bars, Import CSV — stops the event before the button's own bubble-phase handler, awaits a token, then re-dispatches the identical click. A rebuilt table row inherits this for free; read-only actions (the Instruction modal, and any row button made with `makeRowActionButton({ readOnly: true })`, e.g. LeetCode's 🎥📄🔗 links — `data-no-auth`) are exempt, since a sign-in popup to look something up is worse than the problem.
+2. `ensureAccessToken()`: a stored token with more than `TOKEN_MIN_REMAINING_MS` (2 min) left (this tab's or another's) is returned with **no network call and no UI**; otherwise one sign-in popup, but **only inside the user's click** (`navigator.userActivation`), else null. Callers arriving while a request is open **join** it rather than racing a second one.
+3. **And at the save anyway.** With no token (expired while a form sat open), `sheetsRequest` signs in from Save's click first; a 401 renews once in place and re-sends the identical request, so the form still saves instead of asking someone to re-type it. `retrying` bounds it to one extra attempt. A background read never opens a window.
 4. The `n` shortcut goes through the Transaction button rather than calling `openTransactionForm()` directly, so it passes the same gate a click does.
 5. A row button's long press (`onLongPress`, e.g. holding 📋 on a transaction) takes its release click on `window` before the gate, so its handler calls `ensureAccessToken()` itself.
 

@@ -19,7 +19,7 @@ ledger/
 │   ├── style/styles.css          # All styling
 │   └── script/
 │       ├── config.js             # Client ID, template ID, Picker key, sheet names
-│       ├── auth.js               # Sign-in/out, token storage, silent refresh
+│       ├── auth.js               # Sign-in/out, token storage, quiet expiry
 │       ├── drive.js              # Template copy link, Picker, active-file storage
 │       ├── sheets.js             # Sheets API wrapper
 │       ├── cache.js              # Numeric-expression evaluator; clears old cache keys

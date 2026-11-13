@@ -156,7 +156,7 @@ right axis  = left axis × (DEFICIT_VS_BMR_PCT_CEILING / WEEKLY_FAT_LOSS_PCT_CEI
 ```
 
 - Both read existing smoothing only: `bodyMassTrendSeries` (`bodyMassEmaSeries` + `emaSlopePerSpan`, the Body Mass chart's own trend line) and `emaSeries(·, L_p)`, the L_p-Day Average every other chart draws. Intake and BMR come from `energyBalanceDays`, the same figures Calorie Balance uses; the formula is `deficitVsBmrPct` (`health-math.js`), shared with Tune's D_bmr% box and the Health Plan prompt.
-- The axis ratio puts 1 % m/wk and 20 % of BMR on one line: green below it (safe), red above (too fast). Weight gain or a surplus reads below zero, still safe.
+- The axis ratio puts 1 % m/wk and 20 % of BMR on one line: green from 0 % up to it (safe), red above (too fast), amber below 0 % (gaining: weight gain or a surplus).
 
 ## Healthy BMI band (Body Mass chart)
 

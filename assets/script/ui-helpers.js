@@ -122,12 +122,14 @@ function standardUnit(unit) {
 // promise (every delete does; the edit/duplicate ones just open a form and
 // don't) gets the busy treatment automatically, so a row delete can't be
 // double-fired while the sheet write is in flight.
-function makeRowActionButton({ emoji, title, onClick, onLongPress }) {
+function makeRowActionButton({ emoji, title, onClick, onLongPress, readOnly = false }) {
   const btn = document.createElement('button');
   // row-action-btn is a hook, not a style: it's how setupAuthGatedActions (app.js)
   // recognises every ✏️/📋/🗑️ in the app as something that edits the sheet, without
   // each table renderer having to opt in.
   btn.className = 'btn row-action-btn';
+  // Never touches the sheet (e.g. an outside link), so the sign-in gate skips it.
+  if (readOnly) btn.dataset.noAuth = '1';
   btn.textContent = emoji;
   btn.title = title;
   btn.setAttribute('aria-label', title);

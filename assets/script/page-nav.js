@@ -42,12 +42,16 @@ const QUICK_ACTIONS = {
   health: [
     { label: 'Today', buttonId: 'today-physique-btn', href: () => `physique/${isoFromDate(new Date())}/` },
     { label: 'Workouts', buttonId: 'activity-instruction-btn', href: () => 'activity/workouts/' },
+    // `page` moves that page's own tile to this spot.
+    { page: 'insight' },
+    // `after` places it beside that page's tile instead of last.
+    { label: 'Micronutrients', buttonId: 'physique-micro-range-btn', href: () => 'physique/micronutrients/', kind: 'chart', after: 'activity' },
   ],
 };
 
 // What a tile opens, as its colour (styles.css's .page-tile[data-kind]): a form to
 // fill in, charts, or AI. Every other block is rows of a sheet tab and keeps the
-// plain gray. Quick actions (above) are all forms.
+// plain gray. Quick actions (above) are forms unless they set `kind`.
 const TILE_KINDS = {
   'health/chart': 'chart',
   'health/insight': 'ai',
@@ -73,10 +77,15 @@ function buildQuickActions(section) {
   if (!actions || !grid) return;
   // Last in the tile row, after the page tiles, styled as the one action among them.
   actions.forEach((action) => {
+    if (action.page) {
+      const pageTile = grid.querySelector(`.page-tile[data-route="${action.page}"]`);
+      if (pageTile) grid.appendChild(pageTile);
+      return;
+    }
     const source = document.getElementById(action.buttonId);
     const tile = document.createElement('a');
     tile.className = 'page-tile quick-tile';
-    tile.dataset.kind = 'form';
+    tile.dataset.kind = action.kind || 'form';
     if (source?.title) tile.title = source.title;
     tile.href = `${section.href}${action.href()}`;
     const title = document.createElement('span');
@@ -89,7 +98,9 @@ function buildQuickActions(section) {
       event.preventDefault();
       source.click();
     });
-    grid.appendChild(tile);
+    const anchor = action.after && grid.querySelector(`.page-tile[data-route="${action.after}"]`);
+    if (anchor) anchor.after(tile);
+    else grid.appendChild(tile);
   });
 }
 
@@ -124,6 +135,8 @@ function buildPageTiles(section) {
   heading.textContent = section.label;
   card.append(heading, grid);
   group.insertBefore(card, section.panels[0] || null);
+  // Cards marked data-under-tiles (Health's Progress) sit right under it.
+  [...group.querySelectorAll(':scope > [data-under-tiles]')].reverse().forEach((el) => card.after(el));
   renderPageBadges();
 }
 

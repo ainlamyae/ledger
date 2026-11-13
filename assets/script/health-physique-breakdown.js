@@ -250,9 +250,12 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
 
   const reused = [];
   const staleLines = [];
+  // An estimate whose food has since been saved to Nutrition is re-priced from it.
+  const nowInNutrition = (item) =>
+    !NUTRITION_TABLE_SOURCE_LABELS.includes(item.source) && findNutritionEntry(item.name);
   lines.forEach((line) => {
     const matches = pool.get(line);
-    if (matches && matches.length) reused.push(matches.shift());
+    if (matches && matches.length && !nowInNutrition(matches[0])) reused.push(matches.shift());
     else staleLines.push(line);
   });
 

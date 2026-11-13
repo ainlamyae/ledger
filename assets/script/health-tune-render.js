@@ -38,6 +38,12 @@ function renderFormulaSubstituted(rows, plan = null) {
   } catch (err) {
     console.error('U.S. Navy body fat failed to render', err);
   }
+  let bodyShapeRows = [];
+  try {
+    bodyShapeRows = renderBodyShapeFields();
+  } catch (err) {
+    console.error('Body-shape checks failed to render', err);
+  }
   let proteinRows = [];
   try {
     proteinRows = renderProteinFields();
@@ -95,7 +101,7 @@ function renderFormulaSubstituted(rows, plan = null) {
     console.error('Deficit vs. BMR failed to render', err);
   }
 
-  const allRows = [...navyRows, ...lbmRows, ...(rows ?? []), ...deficitBmrRows, ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows];
+  const allRows = [...bodyShapeRows, ...navyRows, ...lbmRows, ...(rows ?? []), ...deficitBmrRows, ...correctionRows, ...glycogenRows, ...proteinRows, ...fiberRows, ...fatRows, ...carbRows];
   sortRowsByTuneOrder(allRows).forEach(([label, value]) => {
     const p = document.createElement('p');
     const strong = document.createElement('strong');
@@ -333,6 +339,66 @@ function renderLbmField() {
   return [['LBM_boer', `${coefficients}  =  ${lbmKg} kg`]];
 }
 
+// Red lines for the body-shape checks. Waist: the Lancet commission's (2025) for white
+// adults. WHR: the WHO's. BF%: the common "obese" cut-offs. WHtR: waist under half height.
+const WAIST_CM_MAX_MALE = 102;
+const WAIST_CM_MAX_FEMALE = 88;
+const WHR_MAX_MALE = 0.90;
+const WHR_MAX_FEMALE = 0.85;
+const WHTR_MAX = 0.5;
+const BF_PCT_MAX_MALE = 25;
+const BF_PCT_MAX_FEMALE = 32;
+
+// Body Roundness Index (Thomas et al., 2013); waist and height in the same unit.
+function bodyRoundnessIndex(waistCm, heightCm) {
+  const ratio = (waistCm / (2 * Math.PI)) / (0.5 * heightCm);
+  return 364.2 - 365.5 * Math.sqrt(1 - ratio ** 2);
+}
+
+// The WHtR, WHR and BRI boxes and their rows, plus C_waist's red flag. A blank input dashes its box.
+function renderBodyShapeFields() {
+  const heightCm = formulaNumber('formula-height');
+  const waistCm = formulaNumber('formula-waist');
+  const hipCm = formulaNumber('formula-hip');
+  const male = document.getElementById('formula-sex').value === 'male';
+  const rows = [];
+  const show = (id, value, outside) => {
+    setComputedField(id, value === null ? '—' : String(value));
+    document.getElementById(id).classList.toggle('formula-out-of-band', outside);
+  };
+
+  const waistMax = male ? WAIST_CM_MAX_MALE : WAIST_CM_MAX_FEMALE;
+  document.getElementById('formula-waist').classList.toggle('formula-out-of-band', waistCm !== null && waistCm >= waistMax);
+
+  if (waistCm !== null && heightCm !== null && heightCm > 0) {
+    const whtr = Math.round((waistCm / heightCm) * 100) / 100;
+    show('formula-whtr', whtr, whtr >= WHTR_MAX);
+    rows.push(['WHtR', `${waistCm} / ${heightCm}  =  ${whtr} — ${whtr >= WHTR_MAX ? `at or over ${WHTR_MAX}` : `under ${WHTR_MAX}`}`]);
+    // Undefined once the waist's radius passes half the height.
+    const bri = bodyRoundnessIndex(waistCm, heightCm);
+    if (Number.isFinite(bri)) {
+      const briShown = Math.round(bri * 10) / 10;
+      show('formula-bri', briShown, false);
+      rows.push(['BRI', `364.2 − 365.5 × √(1 − (${waistCm}/2π)² / (0.5 × ${heightCm})²)  =  ${briShown}`]);
+    } else {
+      show('formula-bri', null, false);
+    }
+  } else {
+    show('formula-whtr', null, false);
+    show('formula-bri', null, false);
+  }
+
+  if (waistCm !== null && hipCm !== null && hipCm > 0) {
+    const whr = Math.round((waistCm / hipCm) * 100) / 100;
+    const whrMax = male ? WHR_MAX_MALE : WHR_MAX_FEMALE;
+    show('formula-whr', whr, whr >= whrMax);
+    rows.push(['WHR', `${waistCm} / ${hipCm}  =  ${whr} — ${whr >= whrMax ? `at or over ${whrMax}` : `under ${whrMax}`}`]);
+  } else {
+    show('formula-whr', null, false);
+  }
+  return rows;
+}
+
 // The BF% and LBM_navy boxes and their rows. BF% is rounded first so the trace multiplies out.
 function renderNavyFields() {
   const heightCm = formulaNumber('formula-height');
@@ -344,17 +410,23 @@ function renderNavyFields() {
   const raw = (heightCm === null || neckCm === null || waistCm === null || (!male && hipCm === null))
     ? null
     : navyBodyFatPct(sex, heightCm, neckCm, waistCm, hipCm);
+  const bfEl = document.getElementById('formula-bf-pct-navy');
   if (raw === null || !Number.isFinite(raw)) {
     setComputedField('formula-bf-pct-navy', '—');
     setComputedField('formula-lbm-navy', '—');
+    bfEl.classList.remove('formula-out-of-band');
     return [];
   }
 
   const bfPct = Math.round(raw * 10) / 10;
   setComputedField('formula-bf-pct-navy', String(bfPct));
+  const bfMax = male ? BF_PCT_MAX_MALE : BF_PCT_MAX_FEMALE;
+  const bfHigh = bfPct > bfMax;
+  bfEl.classList.toggle('formula-out-of-band', bfHigh);
+  const bfVerdict = bfHigh ? `above the ${bfMax}% line` : `at or under the ${bfMax}% line`;
   const bfRow = male
-    ? ['BF%', `495 / (1.0324 − 0.19077 × log10(${waistCm} − ${neckCm}) + 0.15456 × log10(${heightCm})) − 450  =  ${bfPct}%`]
-    : ['BF%', `495 / (1.29579 − 0.35004 × log10(${waistCm} + ${hipCm} − ${neckCm}) + 0.22100 × log10(${heightCm})) − 450  =  ${bfPct}%`];
+    ? ['BF%', `495 / (1.0324 − 0.19077 × log10(${waistCm} − ${neckCm}) + 0.15456 × log10(${heightCm})) − 450  =  ${bfPct}% — ${bfVerdict}`]
+    : ['BF%', `495 / (1.29579 − 0.35004 × log10(${waistCm} + ${hipCm} − ${neckCm}) + 0.22100 × log10(${heightCm})) − 450  =  ${bfPct}% — ${bfVerdict}`];
 
   const bodyMassKg = formulaBodyMassKg();
   if (bodyMassKg === null) {

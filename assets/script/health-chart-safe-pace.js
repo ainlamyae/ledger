@@ -9,7 +9,7 @@
 //                  Calorie Balance uses), smoothed by the same L_p-Day Average. Red past
 //                  DEFICIT_VS_BMR_PCT_CEILING.
 // The right axis is the left one × (D_bmr ceiling ÷ weekly ceiling), so both limits fall on
-// ONE line: everything under it is the green safe band, everything over it red.
+// ONE line: 0 up to it is the green safe band, over it red, below 0 (gaining) amber.
 
 let healthSafePaceChart = null;
 
@@ -19,6 +19,7 @@ const SAFE_PACE_WEEKLY_NAME = 'Weekly Loss';
 const SAFE_PACE_DBMR_NAME = 'Deficit vs BMR';
 const SAFE_PACE_SAFE_NAME = 'Safe';
 const SAFE_PACE_DANGER_NAME = 'Too Fast';
+const SAFE_PACE_GAIN_NAME = 'Gaining';
 
 function renderHealthSafePaceChart(entries) {
   const ctx = document.getElementById('health-safe-pace-chart');
@@ -85,9 +86,13 @@ function renderHealthSafePaceChart(entries) {
     data: {
       labels: dates,
       datasets: [
-        // Bands: bottom edge → limit (green, fills down to it) → top edge (red, fills down
-        // to the limit). The '-1' chain needs these three adjacent and in this order.
+        // Bands, each filling down to the edge before it: floor → 0 % (amber, gaining)
+        // → limit (green) → ceiling (red). The '-1' chain needs them adjacent, in order.
         bandEdge('Band floor', yMin),
+        bandEdge('Zero band', 0, {
+          fill: '-1',
+          backgroundColor: hidden.has(SAFE_PACE_GAIN_NAME) ? 'transparent' : chartColor('--chart-warn', 0.12),
+        }),
         bandEdge('Limit band', WEEKLY_FAT_LOSS_PCT_CEILING, {
           fill: '-1',
           backgroundColor: hidden.has(SAFE_PACE_SAFE_NAME) ? 'transparent' : chartColor('--chart-good', 0.12),
@@ -215,5 +220,6 @@ function renderHealthSafePaceChart(entries) {
     { name: SAFE_PACE_DBMR_NAME, color: chartColor('--chart-cyan') },
     { name: SAFE_PACE_SAFE_NAME, color: chartColor('--chart-good', 0.4) },
     { name: SAFE_PACE_DANGER_NAME, color: chartColor('--chart-bad', 0.4) },
+    { name: SAFE_PACE_GAIN_NAME, color: chartColor('--chart-warn', 0.4) },
   ], () => renderHealthSafePaceChart(entries));
 }

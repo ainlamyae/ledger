@@ -105,8 +105,9 @@ function usdaMacroPer100g(candidate, nutrientName) {
 
 function pickPlausibleMacros(candidates, kcalFallback, proteinFallback) {
   const best = pickPlausibleUsdaCandidate(candidates, kcalFallback);
-  if (!best) return { kcal: kcalFallback, protein: proteinFallback, fiber: null, fat: null, carb: null };
+  if (!best) return { kcal: kcalFallback, protein: proteinFallback, fiber: null, fat: null, carb: null, candidate: null };
   return {
+    candidate: best,
     kcal: best.kcalPer100g,
     protein: best.proteinPer100g !== null ? best.proteinPer100g : proteinFallback,
     fiber: usdaMacroPer100g(best, 'Fiber, total dietary'),
@@ -530,8 +531,10 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       let fiberPer100g;
       let fatPer100g;
       let carbPer100g;
-      ({ kcal, protein, fiber: fiberPer100g, fat: fatPer100g, carb: carbPer100g } =
+      let candidate;
+      ({ kcal, protein, fiber: fiberPer100g, fat: fatPer100g, carb: carbPer100g, candidate } =
         pickPlausibleMacros(candidates, item.kcalPer100gFallback, item.proteinPer100gFallback));
+      if (candidate) usdaCandidateByName.set(name.toLowerCase(), candidate);
       if (energyKcal !== null) usedGrams = gramsForEnergy(energyKcal, kcal, grams);
       else if (proteinG !== null) usedGrams = gramsForProtein(proteinG, protein, grams);
       itemCalories = (kcal * usedGrams) / 100;
@@ -672,7 +675,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 
   const dedupedNewRows = [...new Map(newNutritionRows.map((r) => [r.name.toLowerCase(), r])).values()];
   if (dedupedNewRows.length) {
-    await Promise.all(dedupedNewRows.map((r) => addNutritionEntry(r)));
+    await Promise.all(dedupedNewRows.map(async (r) => addNutritionEntry({ ...r, micronutrients: await usdaMicronutrientsForNewRow(r) })));
     await refreshNutrition(true);
   }
 
@@ -689,6 +692,31 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 // user reviews it here: either click 💾 to bank it as-is, or leave it
 // and fix/retype the ingredient in Notes then Calculate again if the name
 // was wrong (e.g. a typo not matching an existing row).
+// The USDA food Calculate priced each new ingredient from, by lowercase name.
+const usdaCandidateByName = new Map();
+
+// The full USDA panel for a new row, as its Micronutrients cell ('' if none).
+// After a reload the candidate is looked up again against the row's own kcal.
+async function usdaMicronutrientsForNewRow(newRow) {
+  let candidate = usdaCandidateByName.get(newRow.name.toLowerCase());
+  if (!candidate) {
+    try {
+      candidate = pickPlausibleUsdaCandidate(await usdaLookupKcalCandidates(newRow.name), newRow.calories);
+    } catch {
+      candidate = null;
+    }
+  }
+  const grams = parseGramsFromAmount(newRow.amount);
+  if (!candidate || !candidate.nutrients.length || !grams) return '';
+  const panel = nutrientPanelFromCandidate(candidate, grams);
+  const top = nutritionTopValues({
+    calories: newRow.calories, protein: newRow.protein,
+    fiber: newRow.fiber ?? null, fat: newRow.fat ?? null, carb: newRow.carb ?? null, tef: null,
+    micronutrients: JSON.stringify(panel),
+  });
+  return nutritionColumnL(top, panel, new Set());
+}
+
 function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, form) {
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -701,12 +729,16 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, f
     btn.disabled = true;
     btn.textContent = '⏳';
     try {
-      await addNutritionEntry(row.newRow);
+      await addNutritionEntry({ ...row.newRow, micronutrients: await usdaMicronutrientsForNewRow(row.newRow) });
       await refreshNutrition(true);
-      // Same food may appear more than once in one breakdown (e.g. split
-      // across two Notes lines) — clear all matching rows' newRow so a
-      // second click can't bank the same name twice in one go.
-      breakdown.forEach((r) => { if (r.newRow && r.newRow.name === row.newRow.name) r.newRow = null; });
+      // Clears every line of this food, so it can't be banked twice and reads ✅.
+      const savedName = row.newRow.name;
+      breakdown.forEach((r) => {
+        if (r.newRow && r.newRow.name === savedName) {
+          r.newRow = null;
+          r.source = NUTRITION_TABLE_SOURCE_LABEL;
+        }
+      });
       renderCalcBreakdown(breakdown, totalCalories, totalProtein, form);
     } catch (err) {
       btn.disabled = false;

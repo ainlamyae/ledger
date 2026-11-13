@@ -46,7 +46,7 @@ const CAR_SERVICE_RULES = [
 ];
 
 // A service due within this many days (or overdue) flags the heading and notifies.
-const CAR_REMINDER_DAYS = 30;
+const CAR_REMINDER_DAYS = 7;
 
 // Predictions further out than this stay in the table but off the chart.
 const CAR_CHART_HORIZON_DAYS = 730;

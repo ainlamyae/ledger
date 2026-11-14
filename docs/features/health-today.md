@@ -11,8 +11,9 @@
   4. D, **Δm′**, the change calculated from D (primed to tell it from measured Δm), and **ETA**, the days to the healthy mass.
   - A day not logged yet reads as 0 intake against each desired (`0 / 2100 kcal`), never `—`.
 - Intake Macros, Physical Activity and Sleep (Window, then Duration) stack beside Status, aligned top and bottom.
-- **Micronutrient Gaps** card, full width below Status and Sleep, two columns (one on a phone): every nutrient whose last-week average (`healthRangeDates('1w')`, supplements included) is a mild or severe gap against its Ideal / day, shown as `0.006 / 1.6 g` in the ideal's unit, worst shortfall first; masked in privacy mode (`renderTodayMicronutrientGaps`, `health-chart.js`).
-- **Progress** card, full width below: kg bar marked every 2 kg, days bar every 4 weeks (from the first reading), healthy mass as `→ 70 ± 1.9 kg`; the bubble over the bar reads today's weight then m̄ in brackets (`79.1 (80) kg`). Shows `—` from first paint; ends at its last bar unless it has a note (reached, no change, wrong direction, levelling off).
+- **Progress** card, full width below Status and Sleep: kg bar marked every 2 kg, days bar every 4 weeks (from the first reading), healthy mass as `→ 70 ± 1.9 kg`; the bubble over the bar reads today's weight then m̄ in brackets (`79.1 (80) kg`). Shows `—` from first paint; ends at its last bar unless it has a note (reached, no change, wrong direction, levelling off).
+- The section's page-tile grid (`buildPageTiles`, `page-nav.js`) sits right under this card, on the home page and the Health hub alike — the same DOM, so the two can't show it differently.
+- **Micronutrient Gaps** card, full width below the tile grid (`data-under-tiles`, placed by `buildPageTiles`), two columns (one on a phone): every nutrient whose last-week average (`healthRangeDates('1w')`, supplements included) is a mild or severe gap against its Ideal / day, shown as `0.006 / 1.6 g` in the ideal's unit, worst shortfall first; masked in privacy mode (`renderTodayMicronutrientGaps`, `health-chart.js`).
 
 ## Health — Today at a glance
 

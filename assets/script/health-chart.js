@@ -39,7 +39,6 @@ function renderHealthCharts(entries) {
   renderHealthBodyMassChart(entries);
   renderHealthSafePaceChart(entries);
   renderHealthIntakeChart(entries);
-  renderHealthCaloriesChart(entries);
   renderHealthProteinChart(entries);
   renderHealthFiberChart(entries);
   renderHealthFatChart(entries);
@@ -634,7 +633,7 @@ const MACRO_G_TICK_STEPS = [5, 10, 25, 50, 100, 200, 500, 1000];
 // share of the desired change it made (1 exactly the desired figure, 0 none of it, below
 // 0 the wrong way), on five steps instead of met or missed. The L_p-day average's own r
 // lifts a day to one step under the week's grade: one off day in a week on pace reads
-// as a dip, not a failure. Body Mass, Calorie Balance, Intake, Caloric Intake, Physical
+// as a dip, not a failure. Body Mass, Calorie Balance, Caloric Intake, Physical
 // Activity, Sleep and the heatmap all grade this way.
 const DESIRED_GRADES = [
   { name: 'Beat desired', min: 1.1, color: '--chart-good-high' },
@@ -690,6 +689,45 @@ function intakeDesiredR(kcal, dayDesired, balanceKcal) {
   if (!balanceKcal || (balanceKcal < 0) !== dayDesired.isMax) return dayDesired.isMax ? dayDesired.kcal / kcal : kcal / dayDesired.kcal;
   const maintenance = dayDesired.kcal - balanceKcal;
   return (kcal - maintenance) / balanceKcal;
+}
+
+// Caloric Intake's axis (health-chart-intake.js). Headroom above the plotted range, with
+// a floor — a window of near-identical days would otherwise be padded by almost nothing
+// and sit flush against the top.
+const CALORIE_AXIS_PAD_FRACTION = 0.15;
+const CALORIE_AXIS_MIN_PAD_KCAL = 120;
+
+// Rounding for the top, so the axis still lands on readable tick figures (1,650
+// rather than 1,663).
+const CALORIE_AXIS_STEP_KCAL = 50;
+
+// Coarser, for the one case where the desired figure still has to widen the axis. A coarse step
+// holds the frame still across several hundred kcal of desired movement.
+const CALORIE_AXIS_DESIRED_STEP_KCAL = 250;
+
+// From 0 kcal, so a bar's height is the day's intake. The top is framed on what was
+// LOGGED, padded out.
+//
+// The desired figure is deliberately NOT part of the frame. Padding around it made the ruler move
+// with the thing it measures: a 278 kcal change landed the caps 2 px from where they
+// started, with the bars changing height instead. What was eaten doesn't depend on the
+// desired figure, so framing on it holds still while that moves across it.
+//
+// The caps still can't fall off-plot, so the frame is WIDENED — never re-padded — to
+// reach one. That only arises when the desired figure sits beyond everything logged.
+function calorieAxisBounds(loggedValues, desiredValues) {
+  // Falls back to 0 when every entry is hidden.
+  const framing = loggedValues.length ? loggedValues : desiredValues.length ? desiredValues : [0];
+  const lo = Math.min(...framing);
+  const hi = Math.max(...framing);
+  const pad = Math.max(CALORIE_AXIS_MIN_PAD_KCAL, (hi - lo) * CALORIE_AXIS_PAD_FRACTION);
+
+  const roundUp = (v, step) => Math.ceil(v / step) * step;
+
+  return {
+    min: 0,
+    max: Math.max(roundUp(hi + pad, CALORIE_AXIS_STEP_KCAL), roundUp(Math.max(0, ...desiredValues), CALORIE_AXIS_DESIRED_STEP_KCAL)),
+  };
 }
 
 function lerpHex(hexA, hexB, t) {
@@ -748,12 +786,14 @@ function bodyMassKgFromBmi(bmi, heightCm) {
   return Math.round(bmi * heightM * heightM * 10) / 10;
 }
 
-// The WHO bands, for the one place a BMI is a GOAL rather than a reading: a healthy body mass
-// is a number you choose, and the whole reason to show its BMI is to say whether the choice
-// lands somewhere sensible. Both ends matter here, unlike the fat-loss band where only the
-// ceiling is a warning — an underweight choice is as much a problem as an obese one.
-const BMI_HEALTHY_MIN = 18.5;
-const BMI_HEALTHY_MAX = 24.9;
+// The healthy band, for the one place a BMI is a GOAL rather than a reading: a healthy body
+// mass is a number you choose, and the whole reason to show its BMI is to say whether the
+// choice lands somewhere sensible. Both ends matter here, unlike the fat-loss band where only
+// the ceiling is a warning — an underweight choice is as much a problem as an obese one. Same
+// 20–25 the Body Mass chart shades green (BMI_HEALTHY_BAND, health-chart-body-mass.js) — one
+// band, not two that happen to be close.
+const BMI_HEALTHY_MIN = 20;
+const BMI_HEALTHY_MAX = 25;
 
 function bmiVerdict(bmi) {
   if (bmi < 16) return { text: 'severely underweight', outside: true };

@@ -1,4 +1,27 @@
 
+// τ, s and f, seeded from the logged history whenever there's enough of it — the same
+// "recomputed every open, not frozen at whatever was last saved" idea m̄ already follows,
+// just anchored to the L_p days ending YESTERDAY rather than the latest reading (see
+// trailingToYesterday, health-math.js). Never blanks a box that already holds a value —
+// unlike m̄'s own re-smooth below, these three feed straight into whether Eᵢₙ can be
+// computed at all, so "no data yet" has to mean "leave it alone", not "clear it".
+function seedLoggedAverageFields(healthEntries, periodDays) {
+  const bodyMassKg = formulaBodyMassKg();
+
+  const avgSleep = trailingSleepHours(healthEntries, periodDays);
+  if (avgSleep !== null) document.getElementById('formula-plan-sleep-hours').value = Math.round(avgSleep * 10) / 10;
+
+  // bodyMassKg guards the inversion below: it's null on the rare L_p-retype where there's
+  // no body-mass reading at all yet (m̄ itself goes blank then, see the listener below) —
+  // without it, kcal / (met × null × κ) divides by zero instead of by a mass.
+  const avgActivityKcal = bodyMassKg ? trailingActivityKcal(healthEntries, bodyMassKg, periodDays) : null;
+  const avgActivityMin = avgActivityKcal !== null ? activityMinutesFromKcal(avgActivityKcal, bodyMassKg) : null;
+  if (avgActivityMin !== null) document.getElementById('formula-activity-min').value = Math.round(avgActivityMin);
+
+  const avgTefPct = trailingTefPercent(healthEntries, periodDays);
+  if (avgTefPct !== null) document.getElementById('formula-tef-pct').value = Math.round(avgTefPct * 10) / 10;
+}
+
 function loadFormulaInputsFromSettings() {
   [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS, ...CALIBRATION_FORMULA_FIELDS, ...NAVY_FORMULA_FIELDS].forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
@@ -12,10 +35,14 @@ function loadFormulaInputsFromSettings() {
   const healthEntries = physiqueAsHealthEntries();
   document.getElementById('formula-body-mass').value = latestBodyMassKg(healthEntries) ?? TUNE_PROFILE_DEFAULTS.bodyMassKg;
   // Over the L_p just loaded into its box above, so the two agree on open.
+  const periodDays = periodInputValue('formula-cal-period-days', bodyMassSmoothingDays());
   document.getElementById('formula-body-mass-smooth').value = smoothedBodyMassKg(
     healthEntries,
-    periodInputValue('formula-cal-period-days', bodyMassSmoothingDays()),
+    periodDays,
   ) ?? TUNE_PROFILE_DEFAULTS.smoothBodyMassKg;
+  // τ/s/f next, now that m̄ is in its box — they're seeded at this same L_p and read it
+  // back off that box (formulaBodyMassKg).
+  seedLoggedAverageFields(healthEntries, periodDays);
   document.getElementById('formula-height').value = getSetting('HEIGHT_CM', null) ?? TUNE_PROFILE_DEFAULTS.heightCm;
   document.getElementById('formula-age').value = ageFromBirthDate(getSettingString('BIRTH_DATE', null)) ?? TUNE_PROFILE_DEFAULTS.age;
   // Falls back to male only because the formula needs one of the two — an unset
@@ -313,8 +340,12 @@ function initFormulaPlayground() {
   // Registered ahead of the render listeners so it runs first.
   document.getElementById('formula-cal-period-days').addEventListener('input', () => {
     const days = periodInputValue('formula-cal-period-days', bodyMassSmoothingDays());
+    const healthEntries = physiqueAsHealthEntries();
     document.getElementById('formula-body-mass-smooth').value =
-      smoothedBodyMassKg(physiqueAsHealthEntries(), days) ?? '';
+      smoothedBodyMassKg(healthEntries, days) ?? '';
+    // τ/s/f re-seed at the new L_p too, same live re-derive m̄ just got above — but only
+    // where there's a fresh average to show (seedLoggedAverageFields never blanks them).
+    seedLoggedAverageFields(healthEntries, days);
   });
 
   [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss' && id !== 'formula-healthy'),

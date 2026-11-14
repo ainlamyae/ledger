@@ -29,9 +29,9 @@
 | Threshold | Value | Effect |
 |---|---|---|
 | Protein over-band | — | Above the top end is a darker green (`#166534`), not red or grey. Below the floor stays red |
-| `DESIRED_GRADES` (`health-chart.js`) | r ≥ 1.1 / 0.85 / 0.6 / 0.3 | **Beat desired** (dark green), **Desired met** (green), **Near desired** (lime), **Short of desired** (amber), **Missed desired** (red), by r, the share of the desired change a day made. Calorie Balance, Intake, Caloric Intake, Physical Activity, Sleep and the heatmap |
+| `DESIRED_GRADES` (`health-chart.js`) | r ≥ 1.1 / 0.85 / 0.6 / 0.3 | **Beat desired** (dark green), **Desired met** (green), **Near desired** (lime), **Short of desired** (amber), **Missed desired** (red), by r, the share of the desired change a day made. Calorie Balance, Caloric Intake, Physical Activity, Sleep and the heatmap |
 | Calorie Balance r | balance ÷ D | No D: toward (green) or away (red) by the sign |
-| Intake / Caloric Intake r | (intake − M) ÷ D, M = desired intake − D (`intakeDesiredR`) | The same share as Calorie Balance's, read off the intake. No D: cap ÷ intake (floor: intake ÷ floor) |
+| Caloric Intake r | (intake − M) ÷ D, M = desired intake − D (`intakeDesiredR`) | The same share as Calorie Balance's, read off the intake. No D: cap ÷ intake (floor: intake ÷ floor) |
 | Sleep r | hours slept ÷ `SLEEP_DESIRED_HOURS` | Lifted by the L_p-day average duration |
 | Physical Activity r | burn ÷ desired burn (`getActivityDesiredKcal`) | No body mass: violet, unscored |
 | L_p-Day lift | `desiredGrade(r, weekR)` | A day grades at least one step under its L_p-day average's (Physical Activity: the L_p-Day Average Burn), so one off day in a week on pace reads as a dip, not red |
@@ -160,7 +160,7 @@ right axis  = left axis × (DEFICIT_VS_BMR_PCT_CEILING / WEEKLY_FAT_LOSS_PCT_CEI
 
 ## Healthy BMI band (Body Mass chart)
 
-- Green fill between `BMI_HEALTHY_BAND` = 20 and 25 kg/m², drawn at `BMI × (HEIGHT_CM / 100)²` kg. Left out of the axis fit, so it only shows where the readings' range reaches it. A chart band only — `bmiVerdict` still grades against 18.5–24.9.
+- Green fill between `BMI_HEALTHY_BAND` = 20 and 25 kg/m², drawn at `BMI × (HEIGHT_CM / 100)²` kg. Left out of the axis fit, so it only shows where the readings' range reaches it. Same band `bmiVerdict` grades BMI_des against (`BMI_HEALTHY_MIN`/`MAX`, `health-chart.js`) — one healthy band, not two that happen to be close.
 
 ## 7-day trend line (all nine scored charts)
 

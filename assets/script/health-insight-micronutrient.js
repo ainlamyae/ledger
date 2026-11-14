@@ -36,11 +36,25 @@ const GENERIC_PUFA_AS = {
 };
 
 // A nutrient's name cell, its hover listing where the amount came from (one line per
-// source, "Ingredient (amount eaten): nutrient amount").
+// source, "Ingredient (amount eaten): nutrient amount") — a touch screen has no hover,
+// so a tap toggles the same list open as visible lines under the name instead
+// (nutrient-sources-open on the cell; see the matching CSS and renderToggleLegend's own
+// click-to-reveal for the same idea on charts).
 function nutrientNameCell(n) {
   const td = makeCell(n.displayName);
   if (n.sources && n.sources.length) {
-    td.title = n.sources.map((s) => `${s.from}: ${s.amount} ${n.unit}`).join('\n');
+    const lines = n.sources.map((s) => `${s.from}: ${s.amount} ${n.unit}`);
+    td.title = lines.join('\n');
+    td.classList.add('nutrient-name-cell');
+    const sources = document.createElement('div');
+    sources.className = 'nutrient-sources';
+    lines.forEach((line) => {
+      const row = document.createElement('div');
+      row.textContent = line;
+      sources.appendChild(row);
+    });
+    td.appendChild(sources);
+    td.addEventListener('click', () => td.classList.toggle('nutrient-sources-open'));
   }
   return td;
 }

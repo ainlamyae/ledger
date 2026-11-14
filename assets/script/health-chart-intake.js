@@ -1,5 +1,5 @@
-// Intake chart (Health Chart): Caloric Intake's dots, caps and average over a stack of
-// the day's macros in kcal. Shared helpers live in health-chart.js.
+// Caloric Intake chart (Health Chart): a TEI dot, caps and average over a stack of the
+// day's macros in kcal. Shared helpers live in health-chart.js.
 
 let healthIntakeChart = null;
 
@@ -55,8 +55,8 @@ function renderHealthIntakeChart(entries) {
   });
   const macroColors = INTAKE_MACROS.map(({ hue }) => seriesColor(hue, { lightness: '--chart-series-light' }));
 
-  // Only the BMR selected in Tune, coloured as on Caloric Intake; a day missing it
-  // falls back to the equation, as pickBmrForBasis does.
+  // Only the BMR selected in Tune, coloured as Calorie Balance's own BMR line is; a day
+  // missing it falls back to the equation, as pickBmrForBasis does.
   const BMR_COLORS = {
     BMR_mif: chartColor('--chart-blue'),
     BMR_kat: chartColor('--chart-orange'),
@@ -80,7 +80,7 @@ function renderHealthIntakeChart(entries) {
   const desiredByDay = calorieDesiredSeries(entries, dates);
   const dayDesired = (i) => ({ ...desired, kcal: desiredByDay[i].kcal });
 
-  // Dots graded as Caloric Intake's bars (intakeDesiredR), coloured along the blend.
+  // The TEI dot graded like Calorie Balance's bars (intakeDesiredR), coloured along the blend.
   const values = dates.map((d) => (byDate.has(d) ? byDate.get(d) : null));
   const weeklyAvg = emaSeries(values, bodyMassSmoothingDays());
   const balanceKcal = desiredBalanceKcal(planBodyMassKg(entries));

@@ -129,16 +129,55 @@ function healthAvgName(suffix = '') {
   return `${bodyMassSmoothingDays()}-Day Average${suffix}`;
 }
 
-function smoothedBodyMassKg(entries, windowDays = bodyMassSmoothingDays()) {
-  const readings = entries
-    .filter((e) => e.category === 'Body Mass' && e.amount !== null)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  if (readings.length === 0) return null;
+// One value per date — summed when a day can log more than one of something (sleep,
+// activity and food all accumulate across a day), averaged when it can't (two body-mass
+// readings the same morning aren't a heavier day, they're two looks at the same one).
+// `matches` picks the entries, `valueOf` what each is worth, `combine` which rule applies.
+function dailyValues(entries, matches, valueOf, combine) {
+  const raw = new Map();
+  entries.forEach((e) => {
+    if (!matches(e)) return;
+    if (!raw.has(e.date)) raw.set(e.date, []);
+    raw.get(e.date).push(valueOf(e));
+  });
+  const byDate = new Map();
+  raw.forEach((values, date) => byDate.set(date, combine(values)));
+  return byDate;
+}
 
-  const windowStartMs = parseIsoDateUTC(readings[readings.length - 1].date)
-    - (windowDays - 1) * 86400000;
-  const inWindow = readings.filter((e) => parseIsoDateUTC(e.date) >= windowStartMs);
-  return Math.round((inWindow.reduce((sum, e) => sum + e.amount, 0) / inWindow.length) * 10) / 10;
+const sumDailyValues = (values) => values.reduce((a, b) => a + b, 0);
+const meanDailyValues = (values) => sumDailyValues(values) / values.length;
+
+// `byDate` trimmed to the L_p days ending YESTERDAY — every one of these logs, m̄ included,
+// is still filling in while today itself is still happening, so today's entry — logged or
+// not — is always excluded here.
+function trailingToYesterday(byDate, windowDays) {
+  const yesterdayMs = parseIsoDateUTC(isoFromDate(new Date())) - 86400000;
+  const windowStartMs = yesterdayMs - (windowDays - 1) * 86400000;
+  const trimmed = new Map();
+  byDate.forEach((value, date) => {
+    const ms = parseIsoDateUTC(date);
+    if (ms >= windowStartMs && ms <= yesterdayMs) trimmed.set(date, value);
+  });
+  return trimmed;
+}
+
+// The one formula behind every "logged average over L_p days" seed on the Tune sheet — m̄,
+// s and τ's own AEE all reduce to trimming a day-value map to the window above and
+// averaging what's left. null with nothing in the window, rather than averaging zero days.
+function trailingAverage(byDate, windowDays) {
+  const trimmed = trailingToYesterday(byDate, windowDays);
+  return trimmed.size > 0 ? avg(trimmed) : null;
+}
+
+// m̄ — the L_p-day rolling average body mass, ending YESTERDAY (today's own reading, if
+// there is one, is excluded the same way a still-open sleep/activity/food log would be),
+// rounded to 0.1 kg. Same-day readings are averaged into one day first (meanDailyValues),
+// so a day weighed twice doesn't outweigh a day weighed once in the days-long average.
+function smoothedBodyMassKg(entries, windowDays = bodyMassSmoothingDays()) {
+  const byDate = dailyValues(entries, (e) => e.category === 'Body Mass' && e.amount !== null, (e) => e.amount, meanDailyValues);
+  const result = trailingAverage(byDate, windowDays);
+  return result !== null ? Math.round(result * 10) / 10 : null;
 }
 
 // The mass every PLAN-level figure is evaluated at — the desired intake, its direction, the
@@ -405,6 +444,25 @@ function tefDivisor(percent = tefPercent()) {
   return 1 - Math.min(Math.max(percent, 0), TEF_PERCENT_MAX) / 100;
 }
 
+// f, seeded from real digestion instead of a flat guess: each day's own measured TEF
+// (tefKcal — estimateTefBreakdown, health-insight-micronutrient.js) against that same
+// day's TEI, summed over the L_p days (ending yesterday) that actually have a measured
+// TEF, then divided once — a ratio of sums, not two independent averages divided, since
+// a day only has tefKcal when it also has the TEI it was measured against, so the two
+// are the same number either way and summing just reads clearer.
+function trailingTefPercent(entries, windowDays) {
+  const hasMeasuredTef = (e) => e.category === 'Calories; Protein'
+    && e.tefKcal !== null && e.tefKcal !== undefined && e.amount !== null;
+  const tefByDate = dailyValues(entries, hasMeasuredTef, (e) => e.tefKcal, sumDailyValues);
+  const teiByDate = dailyValues(entries, hasMeasuredTef, (e) => e.amount, sumDailyValues);
+
+  const tefTrimmed = trailingToYesterday(tefByDate, windowDays);
+  if (tefTrimmed.size === 0) return null;
+  const tefSum = sumDailyValues([...tefTrimmed.values()]);
+  const teiSum = sumDailyValues([...tefTrimmed.keys()].map((date) => teiByDate.get(date)));
+  return teiSum > 0 ? (tefSum / teiSum) * 100 : null;
+}
+
 // Metabolic adaptation: on a long cut, BMR falls by more than the lost mass accounts for —
 // less leptin and T3, quieter sympathetic tone, cheaper movement — and the gap widens with
 // time on the diet before levelling off. BMR_adapt(t) = BMR × (1 − λt), with λt plateauing
@@ -607,7 +665,14 @@ function getActivityDesiredMin(bodyMassKg) {
   if (pinnedKcal === null || bodyMassKg === null) {
     return getSetting('ACTIVITY_DESIRED_MIN', ACTIVITY_DESIRED_MIN_DEFAULT);
   }
-  return pinnedKcal / (activityMet() * bodyMassKg * kcalPerMetKgMin());
+  return activityMinutesFromKcal(pinnedKcal, bodyMassKg);
+}
+
+// Minutes of the Walk-MET activity that burn `kcal` at `bodyMassKg` — the inverse of
+// metKcal, shared by the pinned-burn case above and Tune's own logged-average seed (see
+// trailingActivityKcal) so neither keeps a second copy of the inversion.
+function activityMinutesFromKcal(kcal, bodyMassKg) {
+  return kcal / (activityMet() * bodyMassKg * kcalPerMetKgMin());
 }
 
 // The single rule every activity kcal figure goes through. A Calculate-derived amount2
@@ -616,6 +681,19 @@ function activityEntryKcal(entry, bodyMassKg) {
   if (entry.amount2 !== null) return entry.amount2;
   const mins = toActivityMinutes(entry.amount, entry.unit);
   return bodyMassKg != null ? metKcal(activityMet(), bodyMassKg, mins) : mins * GENERIC_KCAL_PER_ACTIVE_MIN;
+}
+
+// The L_p-day (ending yesterday) average of logged activity burn — the actual kcal/day,
+// not the desired one, so Tune's own τ box (see activityMinutesFromKcal) can be seeded
+// from what you really did instead of staying wherever it was last typed or saved.
+function trailingActivityKcal(entries, bodyMassKg, windowDays) {
+  const byDate = dailyValues(
+    entries,
+    (e) => (e.category === 'Activity' || e.category === 'Activity; Calories') && e.amount !== null,
+    (e) => activityEntryKcal(e, bodyMassKg),
+    sumDailyValues,
+  );
+  return trailingAverage(byDate, windowDays);
 }
 
 // Sleep Efficiency Factor: 1 − rate × hours below desired — the per-hour cost a short
@@ -634,6 +712,14 @@ function sleepEfficiencyFactor(sleepHours, sleepDesiredHours) {
   const hoursBelow = Math.max(0, sleepDesiredHours - sleepHours);
   const pctPerHour = getSetting(SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY, SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT);
   return Math.max(0, 1 - (pctPerHour / 100) * hoursBelow);
+}
+
+// The L_p-day (ending yesterday) average of logged sleep — what Tune's own s box
+// (PLAN_SLEEP_HOURS) is seeded from, the same "recomputed from real data, not frozen at
+// whatever was last saved" idea m̄ already follows for body mass.
+function trailingSleepHours(entries, windowDays) {
+  const byDate = dailyValues(entries, (e) => e.category === 'Sleep' && e.amount !== null, (e) => e.amount, sumDailyValues);
+  return trailingAverage(byDate, windowDays);
 }
 
 // kcal of ground given back to short sleep — (1 - factor) × how far the balance already

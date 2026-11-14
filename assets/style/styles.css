@@ -1475,6 +1475,40 @@ td:has(.btn) {
     color: var(--color-danger);
 }
 
+/* Hidden at every width — opened only below, on a small screen. A laptop keeps the plain
+   mouse hover (the name cell's title) and never shows this at all. */
+#insight-micro-table .nutrient-sources,
+#physique-micro-table .nutrient-sources,
+#physique-micro-range-table .nutrient-sources {
+    display: none;
+    margin-top: var(--space-xs);
+    font-size: var(--card-text-size);
+    color: var(--color-text-muted);
+}
+
+/* A touch screen has no hover to show the name cell's title (its ingredient sources), so
+   below the phone breakpoint a tap toggles the same list open as lines under the name
+   instead (nutrientNameCell, health-insight-micronutrient.js) — the dotted underline is
+   the only hint there's more here. A wider screen keeps the plain mouse hover and never
+   shows either the hint or the opened list, even though the tap listener is still
+   attached (it just has nothing visible to toggle there). */
+@media (max-width: 640px) {
+    #insight-micro-table td.nutrient-name-cell,
+    #physique-micro-table td.nutrient-name-cell,
+    #physique-micro-range-table td.nutrient-name-cell {
+        cursor: pointer;
+        text-decoration: underline dotted;
+        text-decoration-color: var(--color-text-muted);
+        text-underline-offset: 3px;
+    }
+
+    #insight-micro-table td.nutrient-sources-open .nutrient-sources,
+    #physique-micro-table td.nutrient-sources-open .nutrient-sources,
+    #physique-micro-range-table td.nutrient-sources-open .nutrient-sources {
+        display: block;
+    }
+}
+
 #transactions-table th:first-child,
 #transactions-table td:first-child,
 #transactions-table th:nth-child(2),
@@ -2506,10 +2540,11 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-m);
 }
 
-/* Micronutrient Gaps: full width under Status and the stack beside it, its rows
-   in two columns so a long list stays short (one column on narrow screens). */
-.today-glance-cards > .micro-gaps-card {
+/* Progress: full width under Status and the stack beside it, swapped into Micronutrient
+   Gaps' old slot (that card now sits under the tiles, in Progress's old one). */
+.today-glance-cards > .body-mass-progress-meter {
     grid-column: 1 / -1;
+    margin-top: 0;
 }
 
 .micro-gaps-rows {
@@ -2524,8 +2559,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     }
 }
 
-/* The meters' own card, full width under the two glance columns. */
-.panel-group > .body-mass-progress-meter {
+/* Micronutrient Gaps, full width under the two glance columns — Progress's old spot. */
+.panel-group > .micro-gaps-card {
     margin: 0;
 }
 
@@ -3385,7 +3420,7 @@ html.home-hub .page-tiles,
     margin-bottom: 0;
 }
 
-/* Δm% above the 1%/week ceiling; BMI_g outside the healthy 18.5–24.9 band; C_waist, WHtR, WHR
+/* Δm% above the 1%/week ceiling; BMI_g outside the healthy 20–25 band; C_waist, WHtR, WHR
    and BF% past their lines (renderBodyShapeFields, renderNavyFields). The colour is
    the whole warning — the unit column stays `%/week` or `kg/m²` like every other row's, and
    the words are in the substituted trace. Two names for one look because they mark different

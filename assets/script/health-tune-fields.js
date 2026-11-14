@@ -272,9 +272,9 @@ function applySolveForMode(mode) {
 // verbatim to the AI by formatPlanInsightPrompt (health-insight-plan.js), so both read the
 // one definition of the model. The four-space indent sets each formula off from its
 // heading.
-const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass
-    m̄     =  (1/L_p) × Σ m(t−i),  i = 0…L_p−1
-The healthy body mass as a BMI — 18.5–24.9 healthy band
+const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass. Ending yesterday: today's own reading, if any, is still excluded
+    m̄     =  (1/L_p) × Σ m(t−i),  i = 1…L_p
+The healthy body mass as a BMI — ${BMI_HEALTHY_MIN}–${BMI_HEALTHY_MAX} healthy band
     BMI_des =  m_des / (h/100)²
 Body shape from the girths — WHtR under 0.5; WHR under 0.90 (♂) / 0.85 (♀), WHO; C_waist under 102 (♂) / 88 (♀) cm
     WHtR  =  C_waist / h

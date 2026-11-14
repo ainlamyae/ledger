@@ -94,9 +94,10 @@ function bodyMassTrendSeries(byDate, dates) {
   return { trendDays, trendSeries: trendSeries.slice(offset), slopePerSpan: slopePerSpan.slice(offset) };
 }
 
-// The chart's healthy region, in BMI (kg/m²): shaded green behind the readings. The
-// user's chosen band — bmiVerdict's 18.5–24.9 grading is a separate, clinical one.
-const BMI_HEALTHY_BAND = [20, 25];
+// The chart's healthy region, in BMI (kg/m²): shaded green behind the readings — the same
+// band bmiVerdict grades BMI_des against (BMI_HEALTHY_MIN/MAX, health-chart.js), so the
+// chart's shading and Tune's red-flagged field can't disagree about what "healthy" means.
+const BMI_HEALTHY_BAND = [BMI_HEALTHY_MIN, BMI_HEALTHY_MAX];
 const BMI_HEALTHY_LEGEND_NAME = `Healthy BMI (${BMI_HEALTHY_BAND[0]}–${BMI_HEALTHY_BAND[1]})`;
 
 // One gray dot per reading, on the same dates Caloric Intake uses, so the two compare

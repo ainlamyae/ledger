@@ -316,14 +316,7 @@
                     <div class="widget-row"><span>Duration</span><span id="today-sleep-duration-value">—</span></div>
                 </div>
             </div>
-            <div class="card micro-gaps-card">
-                <h3>Micronutrient Gaps</h3>
-                <div id="today-micro-gaps" class="micro-gaps-rows"><div class="widget-row"><span>—</span></div></div>
-            </div>
-        </div>
-
-        <!-- Moved under the Health tile card by buildPageTiles (page-nav.js). -->
-        <div class="card body-mass-progress-meter" id="body-mass-progress-meter" data-under-tiles>
+            <div class="card body-mass-progress-meter" id="body-mass-progress-meter">
                 <h3>Progress</h3>
                 <div class="body-mass-progress-meter-track-wrap">
                     <span class="body-mass-progress-meter-callout" id="body-mass-progress-meter-callout"></span>
@@ -361,6 +354,13 @@
                 </div>
 
                 <p id="body-mass-projection-eta" class="body-mass-eta"></p>
+            </div>
+        </div>
+
+        <!-- Moved under the Health tile card by buildPageTiles (page-nav.js). -->
+        <div class="card micro-gaps-card" data-under-tiles>
+            <h3>Micronutrient Gaps</h3>
+            <div id="today-micro-gaps" class="micro-gaps-rows"><div class="widget-row"><span>—</span></div></div>
         </div>
 
         <div class="panel" data-route="chart">
@@ -443,19 +443,11 @@
 
             <div class="donut-grid health-metrics-grid">
                 <div class="card">
-                    <h3>Intake</h3>
+                    <h3>Caloric Intake</h3>
                     <div class="chart-box chart-box-flush">
                         <canvas id="health-intake-chart"></canvas>
                     </div>
                     <div class="donut-legend" id="health-intake-legend"></div>
-                </div>
-
-                <div class="card">
-                    <h3 id="health-calories-label">Caloric Intake</h3>
-                    <div class="chart-box chart-box-flush">
-                        <canvas id="health-calories-chart"></canvas>
-                    </div>
-                    <div class="donut-legend" id="health-calories-legend"></div>
                 </div>
 
                 <div class="card">
@@ -1019,7 +1011,7 @@
                              is rewritten from it. Directly under m_des because a goal in kilograms is a
                              number you pick and a goal in BMI is what tells you whether picking it was
                              sensible — the verdict rides on the trace line, never in the unit column. -->
-                        <label class="formula-row" title="The BMI your healthy body mass comes to at your height — BMI = m_des / (h/100)². Type a healthy mass and this follows it; type a BMI here and the healthy mass follows instead. The healthy band is 18.5–24.9, and outside it the box goes red. In Solve for → Healthy body mass both are answers, so neither is typed.">
+                        <label class="formula-row" title="The BMI your healthy body mass comes to at your height — BMI = m_des / (h/100)². Type a healthy mass and this follows it; type a BMI here and the healthy mass follows instead. The healthy band is 20–25, and outside it the box goes red. In Solve for → Healthy body mass both are answers, so neither is typed.">
                             <span class="formula-sym">BMI_des</span>
                             <span class="formula-name">healthy body mass index</span>
                             <input type="text" id="formula-healthy-bmi" inputmode="decimal">
@@ -3573,7 +3565,6 @@
 <script src="assets/script/health-math.js"></script>
 <script src="assets/script/health-chart.js"></script>
 <script src="assets/script/health-chart-body-mass.js"></script>
-<script src="assets/script/health-chart-calories.js"></script>
 <script src="assets/script/health-chart-intake.js"></script>
 <script src="assets/script/health-chart-protein.js"></script>
 <script src="assets/script/health-chart-fiber.js"></script>

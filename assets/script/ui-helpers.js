@@ -1,12 +1,6 @@
-// Shared DOM/CRUD helpers used by the entity modules (transactions, accounts,
-// work-time, wellness, contacts, travel, applications, settings-panel) — the
-// mechanical bits of the "table + modal form" pattern that are genuinely
-// identical across those files. Per-entity logic (validation, chart
-// rendering, bulk actions, etc.) stays in each module.
+// Shared table + form helpers for the entity modules; per-entity logic stays in each module.
 
-// Finds a sheet's ID by tab title in an already-fetched getSpreadsheetMetadata()
-// result, throwing a descriptive error (listing the available tabs) if the
-// tab doesn't exist — e.g. a renamed/deleted sheet tab, or a typo in config.js.
+// A sheet's ID by tab title; a missing tab throws, listing the tabs there are.
 function findSheetId(metadata, title) {
   const sheet = metadata.sheets.find((s) => s.properties.title === title);
   if (!sheet) {
@@ -16,10 +10,7 @@ function findSheetId(metadata, title) {
   return sheet.properties.sheetId;
 }
 
-// Wraps the confirm-gate + try/catch/alert shape every delete action shares.
-// `deleteFn` does the entity-specific work (batchUpdate, refresh, any extra
-// success side effect like an undo toast) — this just gates it on the confirm
-// dialog and reports a failure consistently.
+// The confirm gate and failure alert every delete shares; `deleteFn` does the work.
 async function confirmAndDelete(message, deleteFn, errorPrefix = 'Failed to delete') {
   if (!confirm(message)) return;
   try {
@@ -35,8 +26,7 @@ function showFieldError(elId, message) {
   showToast(message, !message.endsWith('…'));
 }
 
-// A save never closes its form: "Saved" shows in the toast, and any old
-// message in the form's status line goes.
+// A save never closes its form: "Saved" is a toast and the old status line goes.
 function showFormSaved(elId) {
   clearFieldError(elId);
   showToast('Saved');
@@ -46,21 +36,11 @@ function clearFieldError(elId) {
   document.getElementById(elId).hidden = true;
 }
 
-// Builds a small icon-only action button (Edit/Delete/Duplicate/prev-next,
-// etc.) with the title/aria-label pair every row action and pager control uses.
-// Marks a button busy for the length of an async action and disables it until
-// the action settles. A save to Sheets or an API round trip is slow enough to
-// look like nothing happened, so without this the natural response is to
-// click again. Restores the original state even when the action throws, and
-// tolerates a null button so callers needn't check.
-// An emoji icon button (.btn-icon/.row-action-btn) gets the grow/bounce
-// treatment above — no text to put an ellipsis next to. Any other (word-label)
-// button keeps the ellipsis-on-label treatment.
-// Marks busy with aria-busy rather than `disabled`: several of these buttons
-// (the bulk-action bar's especially) have their own disabled rule driven by the
-// selection, and an action that changes the selection would have it overwritten
-// on the way out. CSS takes the clicks away; the data-busy guard covers
-// keyboard activation and implicit form submits, which pointer-events can't.
+// Marks a button busy while an async action runs, so a slow save isn't clicked
+// twice; restores it even on a throw, and accepts a null button.
+// An emoji button (.btn-icon/.row-action-btn) grows and bounces; a word button gets "…".
+// aria-busy rather than `disabled`, which some buttons drive from the selection;
+// the data-busy guard covers keyboard and implicit submits that CSS can't block.
 async function withButtonBusy(btn, run) {
   if (!btn) return run();
   if (btn.dataset.busy) return undefined;
@@ -93,9 +73,7 @@ function onAsyncClick(buttonId, handler) {
   btn.addEventListener('click', () => withButtonBusy(btn, handler));
 }
 
-// Wires a form's submit to an async handler and marks the button that actually
-// submitted busy for its duration — `submitter` rather than a lookup, for a form
-// with more than one submit button.
+// Async submit handler; `submitter` marks the button actually pressed busy.
 function onFormSubmit(formId, handler) {
   const form = document.getElementById(formId);
   form.addEventListener('submit', (event) => {
@@ -117,18 +95,13 @@ function standardUnit(unit) {
   return STANDARD_UNITS[raw.toLowerCase()] || raw;
 }
 
-// Stays the default surface button whatever it does — these are all emoji, and
-// an emoji on a filled colour is hard to read. An onClick that returns a
-// promise (every delete does; the edit/duplicate ones just open a form and
-// don't) gets the busy treatment automatically, so a row delete can't be
-// double-fired while the sheet write is in flight.
+// An emoji row/pager button on the default surface (emoji read badly on colour).
+// A handler that returns a promise (every delete) gets the busy treatment.
 function makeRowActionButton({ emoji, title, onClick, onLongPress, readOnly = false }) {
   const btn = document.createElement('button');
-  // row-action-btn is a hook, not a style: it's how setupAuthGatedActions (app.js)
-  // recognises every ✏️/📋/🗑️ in the app as something that edits the sheet, without
-  // each table renderer having to opt in.
+  // row-action-btn is how setupAuthGatedActions (app.js) knows it edits the sheet.
   btn.className = 'btn row-action-btn';
-  // Never touches the sheet (e.g. an outside link), so the sign-in gate skips it.
+  // Never touches the sheet (e.g. an outside link): the sign-in gate skips it.
   if (readOnly) btn.dataset.noAuth = '1';
   btn.textContent = emoji;
   btn.title = title;
@@ -144,6 +117,7 @@ function makeRowActionButton({ emoji, title, onClick, onLongPress, readOnly = fa
 }
 
 const LONG_PRESS_MS = 600;
+const LONG_PRESS_VIBRATE_MS = 15;
 
 // Held LONG_PRESS_MS: the release runs onLongPress instead of the click, caught on
 // window ahead of the auth gate. Moving off the button cancels it.
@@ -168,7 +142,7 @@ function attachLongPress(btn, onLongPress) {
         onLongPress(e);
       };
       window.addEventListener('click', swallow, true);
-      navigator.vibrate?.(15);
+      navigator.vibrate?.(LONG_PRESS_VIBRATE_MS);
     }, LONG_PRESS_MS);
   });
   btn.addEventListener('pointerup', () => { clearTimeout(timer); timer = null; });
@@ -179,8 +153,7 @@ function attachLongPress(btn, onLongPress) {
   btn.addEventListener('contextmenu', (event) => event.preventDefault());
 }
 
-// A plain <td> with text (and an optional title/tooltip, e.g. for a
-// truncated value) — the row-cell shape repeated across every table renderer.
+// A <td> with text and an optional title (e.g. for a truncated value).
 function makeCell(text, title) {
   const td = document.createElement('td');
   td.textContent = text;
@@ -188,8 +161,7 @@ function makeCell(text, title) {
   return td;
 }
 
-// Refreshes the ▲/▼ indicator on every `th.sortable` in a table to match the
-// current sort state.
+// Sets the ▲/▼ on every `th.sortable` in a table to match the sort state.
 function updateSortIndicators(tableSelector, sortState) {
   document.querySelectorAll(`${tableSelector} th.sortable`).forEach((th) => {
     const indicator = th.querySelector('.sort-indicator');
@@ -198,11 +170,8 @@ function updateSortIndicators(tableSelector, sortState) {
   });
 }
 
-// Wires up click/keyboard-toggle sorting for every `th.sortable` in a table:
-// clicking a header sorts by its `data-sort` key, clicking the active header
-// again flips direction. `sortState` is a mutable { key, dir } object owned by
-// the caller; `onSortChange` re-renders (and does any extra reset the caller
-// needs, e.g. clearing the current page or a row-selection set).
+// Click/Enter/Space sorting on every `th.sortable` by its `data-sort` key; the
+// active header flips direction. Mutates the caller's { key, dir }, then calls onSortChange.
 function makeSortableHeaders(tableSelector, sortState, onSortChange) {
   document.querySelectorAll(`${tableSelector} th.sortable`).forEach((th) => {
     const label = document.createElement('span');
@@ -235,10 +204,7 @@ function makeSortableHeaders(tableSelector, sortState, onSortChange) {
   updateSortIndicators(tableSelector, sortState);
 }
 
-// Renders a prev/info/next pager into `containerId`, or clears it when
-// there's only one page. `onChange(newPage)` is responsible for updating the
-// caller's own page variable (plus any extra reset, e.g. clearing a
-// row-selection set) and re-rendering.
+// A prev/"n of m"/next pager, or nothing for one page; onChange(newPage) re-renders.
 function renderPager(containerId, { page, totalPages, onChange }) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';

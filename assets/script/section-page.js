@@ -1,16 +1,7 @@
-// Turns /health/, /finance/, /track/ and /other/ into pages of their own.
-//
-// Each of those directories holds an identical stub whose only job is to load
-// this file. The dashboard's markup lives in index.html and nowhere else: this
-// fetches that one file, rehydrates it into the stub, and then hides everything
-// outside the wrapper the address names. So a panel added to index.html — or
-// moved between wrappers — shows up on the right section page with nothing to
-// keep in sync, and the address survives a refresh because the page is really
-// served from that path rather than reached through a hash or a redirect.
-//
-// The section this page shows is read off index.html's own <nav>, matching the
-// last path segment against each link's href, so the list of sections has one
-// home: that markup.
+// Turns /health/, /finance/, /track/ and /other/ into pages of their own: each
+// stub loads this file, which fetches index.html (the only copy of the markup),
+// rebuilds it here and hides every wrapper but the one the address names. The
+// section is matched against index.html's <nav> hrefs, the one list of sections.
 
 (function () {
   // Pinned absolute, so the router's pushState can't shift relative URLs.
@@ -23,14 +14,11 @@
     .split('/')
     .filter(Boolean);
 
-  // index.html's scripts register their start-up step here instead of on
-  // window.load / DOMContentLoaded: they arrive long after this page's own
-  // load event, so those listeners would never fire. Called in registration
-  // order once every script — including the async Google ones, which window.load
-  // would also have waited for — has finished loading.
+  // Start-up steps, registered instead of window.load (long past by the time the
+  // scripts arrive). Boot steps run once every script, async Google ones included,
+  // has loaded; route steps run first, once the app's own have, so the page shows
+  // the right view straight away.
   const bootSteps = [];
-  // Run first, as soon as the app's own scripts have: the page's view from its address,
-  // so it never shows the whole section before the right page.
   const routeSteps = [];
 
   window.ledgerSectionPage = {
@@ -48,18 +36,14 @@
   // Content stays hidden until the route steps have run (styles.css).
   document.documentElement.dataset.routing = '';
 
-  // Resolved against the live document's <base>, never against the parsed
-  // document: DOMParser gives its document THIS page's URL as the base, so
-  // node.href / node.src on anything it parsed would point inside this section's
-  // own directory. Only raw attribute values are ever copied across.
+  // Raw attribute values only: the parsed document's base is this page's URL, so
+  // its resolved node.src would point inside this section's directory.
   function reviveScript(node) {
     const script = document.createElement('script');
     for (const { name, value } of node.attributes) script.setAttribute(name, value);
     script.textContent = node.textContent;
-    // A script element created here defaults to async, i.e. whenever-it-arrives.
-    // index.html's order is load-bearing (Chart.js before the chart scripts, config
-    // before everything), so opt every one that wasn't explicitly marked async
-    // back into ordered execution.
+    // A created script defaults to async; index.html's order is load-bearing, so
+    // only the ones marked async stay that way.
     if (!node.hasAttribute('async')) script.async = false;
     return script;
   }
@@ -69,9 +53,8 @@
     const script = reviveScript(node);
     if (script.src) {
       const loaded = new Promise((resolve) => {
-        // error resolves too: a script that 404s should leave the page half-built
-        // with a console error, exactly as it would on the home page, rather than
-        // hanging before the boot steps run.
+        // error resolves too: a 404 leaves the page half-built, as on the home page,
+        // rather than hanging before the boot steps.
         script.addEventListener('load', resolve, { once: true });
         script.addEventListener('error', resolve, { once: true });
       });
@@ -87,10 +70,7 @@
     );
 
     [...source.head.children].forEach((node) => {
-      // The stub's own <base> is what makes every relative URL in the markup
-      // below resolve, and its <title>/stylesheet are already here — the
-      // stylesheet deliberately so, to download alongside index.html instead
-      // of after it.
+      // The stub's own <base>, <title> and stylesheet (fetched alongside index.html) stay.
       if (node.tagName === 'BASE' || node.tagName === 'TITLE') return;
       if (node.tagName === 'LINK' && stylesheets.has(node.getAttribute('href'))) return;
       if (node.tagName === 'SCRIPT') {
@@ -103,9 +83,8 @@
     });
   }
 
-  // Everything but the scripts, which have to be recreated to run at all and are
-  // appended last — after the wrapper filter below, so no renderer ever sees the
-  // hidden sections as visible.
+  // Everything but the scripts, which must be recreated to run and go in last, after
+  // showOnly, so no renderer sees the other sections visible.
   function adoptBody(source) {
     const scripts = [];
     [...source.body.childNodes].forEach((node) => {
@@ -118,10 +97,7 @@
     return scripts;
   }
 
-  // Hidden rather than removed: the panels in the other wrappers are still
-  // rendered into by loadDashboard, and every renderer expects its elements to
-  // exist. Nothing enumerates the sections here — whatever isn't this page's is
-  // hidden — so a fourth wrapper needs no change to this file.
+  // Hidden, not removed: loadDashboard still renders into every wrapper.
   function showOnly(sectionId) {
     document.documentElement.dataset.section = sectionId;
     window.ledgerSectionPage.section = sectionId;
@@ -129,8 +105,7 @@
     document.querySelectorAll('#dashboard .panel-group').forEach((group) => {
       group.hidden = group.id !== sectionId;
     });
-    // The Time / Date / Azan / Weather row belongs to the dashboard as a whole,
-    // not to any one wrapper.
+    // The Time / Date / Azan / Weather row belongs to the home page alone.
     document.querySelectorAll('#dashboard .widget-cards').forEach((row) => {
       row.hidden = true;
     });
@@ -165,9 +140,7 @@
       .find((a) => a.getAttribute('href').replace(/\/+$/, '') === SLUG);
     if (!link) throw new Error(`"${SLUG}" isn't one of the dashboard's sections`);
 
-    // This head runs index.html's theme script (again — it's idempotent, and the
-    // stub already ran a copy of it to beat the first paint) and brings in
-    // anything else index.html has picked up since.
+    // Re-runs index.html's (idempotent) theme script and adds the rest of its head.
     const pending = [];
     adoptHead(source, pending);
 

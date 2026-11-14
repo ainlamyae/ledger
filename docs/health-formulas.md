@@ -22,7 +22,6 @@
 | `GLYCOGEN_G_PER_KG_MUSCLE_DEFAULT` | `14` g glycogen / kg muscle | `health-chart.js` |
 | `GLYCOGEN_LIVER_G_DEFAULT` | `100` g liver glycogen reserve | `health-chart.js` |
 | `GLYCOGEN_WATER_RATIO_DEFAULT` | `3` g H₂O bound per g glycogen | `health-chart.js` |
-| `GLYCOGEN_ZONE_SMOOTHING_ALPHA` | `1 / BODY_MASS_TREND_WINDOW_SIZE` (`0.2`) | `health-math.js` |
 
 ## Scoring thresholds
 
@@ -190,8 +189,8 @@ m_gly  = g_musc × m_musc + g_liver                  per-kg-muscle and liver con
 ```
 
 - `glycogenSwingKg` (`health-chart.js`) — the day-to-day swing glycogen and its bound water alone can account for, at this body. Same identity the Tune's glycogen block walks through (`readGlycogenSwingFormula`), evaluated at its default knobs rather than whatever's currently typed there, so a reader who never opens that modal still gets the figure it would report for their own body. `null` without `HEIGHT_CM`/`SEX` on file, which the zone and the swing-adjusted arrival below both fall back around.
-- **Trend zone** — a transparent band drawn at `trend(t) ± ΔM_gly`, centred not on the trend line itself but on an EMA of it (`computeGlycogenZoneAnchor`, `α = GLYCOGEN_ZONE_SMOOTHING_ALPHA`) — deliberately smoother/slower-moving than the trend, so the zone reads as the stable reference and the trend as what moves inside it.
-  - **State Trend & Forecast's own chart** (`healthProjectionChart`) draws this yellow band anchored to that day's gray Calorie-Implied Trajectory instead — `[anchor − ΔM_gly, anchor]`, unshifted at the top so the band's own upper edge draws exactly on the gray line — then shades the gap **red** wherever the green trend line drops below the band's floor: glycogen and water alone don't explain a drop that size, so past the floor reads as a real loss, not the zone's own normal noise. A second, near-invisible dataset (`Muscle Loss (below swing zone)`, `renderHealthProjectionChart`) sits flush on the floor whenever the trend is inside or above it, and only opens up — filling red down to the trend's own value — for the stretch it's genuinely below.
+- **Swing zone** — a transparent band `ΔM_gly` deep, anchored to the calorie-implied trajectory rather than to the noisy trend, so the zone is the stable reference and the trend is what moves inside it (Body Mass and State Trend & Forecast alike).
+  - **State Trend & Forecast's own chart** (`healthProjectionChart`) draws this yellow band anchored to that day's gray Calorie-Implied Trajectory — `[anchor − ΔM_gly, anchor]`, unshifted at the top so the band's own upper edge draws exactly on the gray line — then shades the gap **red** wherever the green trend line drops below the band's floor: glycogen and water alone don't explain a drop that size, so past the floor reads as a real loss, not the zone's own normal noise. A second, near-invisible dataset (`Muscle Loss (below swing zone)`, `renderHealthProjectionChart`) sits flush on the floor whenever the trend is inside or above it, and only opens up — filling red down to the trend's own value — for the stretch it's genuinely below.
 - **Arrival mass** — `arrivalHealthyKg(healthyKg, m̄, h, sex, isDownward) = healthyKg ∓ ΔM_gly`, past the raw healthy mass by the swing **in the direction travel is already headed** (cutting subtracts, bulking adds) — so a reading on a high-water day still can't land on the wrong side of the real healthy mass. This is what `healthyKg` means everywhere below; the progress meter's raw kg-to-go bar and the drawn healthy-mass line still use the unadjusted figure, shown alongside its `± ΔM_gly`.
 
 **Healthy-mass-based** — the primary path, whenever `HEIGHT_CM`, `BIRTH_DATE` and `SEX` are on file. It projects the plan being *followed*.

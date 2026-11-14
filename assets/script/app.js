@@ -5,11 +5,12 @@ const SETTINGS_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-// The Amounts, Widgets and Bulbs switches' last known values
-// (SHOW_AMOUNTS, SHOW_WIDGETS, SHOW_BULBS: 0 or 1), kept in this browser so the
-// switches show and work before sign-in. The Settings tab replaces them once
-// it loads (loadDashboard). index.html's head reads the same key before first
-// paint, so a hidden row or card row doesn't flash on a reload.
+// Wide enough for the sidebar to hold the settings switches.
+const SIDEBAR_MEDIA_QUERY = '(min-width: 1180px)';
+
+// The show/hide switches' last values (0 or 1), so they work before sign-in;
+// the Settings tab replaces them once it loads. index.html's head reads this
+// key before first paint, so a hidden row doesn't flash on reload.
 const SWITCHES_KEY = 'ledger_switches';
 
 function readCachedSwitches() {
@@ -22,17 +23,14 @@ function readCachedSwitches() {
 
 function cacheSwitches() {
   try {
-    localStorage.setItem(SWITCHES_KEY, JSON.stringify({
-      SHOW_AMOUNTS: privacyMode ? 0 : 1,
-      SHOW_WIDGETS: widgetsVisible ? 1 : 0,
-      SHOW_BULBS: bulbsVisible ? 1 : 0,
-    }));
+    localStorage.setItem(SWITCHES_KEY, JSON.stringify(
+      Object.fromEntries(VISIBILITY_SWITCHES.map((s) => [s.key, s.isOn() ? 1 : 0]))
+    ));
   } catch {}
 }
 
-// A switch's change saved to the Settings tab, when there's a sheet to save it
-// to; signed out it stays in this browser only (cacheSwitches) until Settings
-// loads. Best-effort: a missing Settings tab shouldn't block toggling.
+// Saved to the Settings tab when there's one; signed out it stays in this
+// browser. Best-effort: a missing Settings tab shouldn't block toggling.
 function saveSwitchSetting(values) {
   cacheSwitches();
   if (!isSignedIn() || !getActiveSpreadsheetId()) return;
@@ -41,26 +39,20 @@ function saveSwitchSetting(values) {
   });
 }
 
-// Amounts are shown unless SHOW_AMOUNTS is 0; the Amounts switch hides
-// them (for reading the dashboard somewhere it can be seen over your shoulder).
+// Amounts show unless SHOW_AMOUNTS is 0 (for reading over someone's shoulder).
 let privacyMode = readCachedSwitches().SHOW_AMOUNTS === 0;
 
-// The Time/Date/Azan/Weather "bulb" row (ledger-widgets.js), SHOW_WIDGETS, and the home
-// page's section glance cards, SHOW_BULBS: both start off until this browser or
-// the Settings tab says otherwise.
+// The widget row (SHOW_WIDGETS) and the home page's glance cards (SHOW_BULBS)
+// start off until this browser or the Settings tab says otherwise.
 let widgetsVisible = readCachedSwitches().SHOW_WIDGETS === 1;
 let bulbsVisible = readCachedSwitches().SHOW_BULBS === 1;
 
-// Replaces every digit with '*', so masked values keep their currency
-// symbol, sign, and separators (e.g. "$1,234.56" -> "$*,***.**").
+// Keeps the symbol, sign and separators: "$1,234.56" -> "$*,***.**".
 function maskDigits(str) {
   return String(str).replace(/[0-9]/g, '*');
 }
 
-// Same idea as maskDigits, but for arbitrary free text (e.g. a Physique
-// Consumption cell) rather than a formatted number — digits alone would leave every
-// word fully readable, so every non-whitespace character is replaced
-// instead, keeping only the word/line shape visible.
+// For free text, where masking digits alone would leave every word readable.
 function maskText(str) {
   return String(str).replace(/\S/g, '*');
 }
@@ -81,9 +73,7 @@ function formatMoney(value, currency = 'CAD', { mask = true } = {}) {
   return mask && privacyMode ? maskDigits(formatted) : formatted;
 }
 
-// Shared by the Transactions, Accounts, and Time Log tables for the "no
-// rows to show" case, so an empty sheet (or filter with no matches) doesn't
-// just render a blank table.
+// A table's "no rows to show" row, so an empty table isn't just blank.
 function renderEmptyRow(colspan, message) {
   const tr = document.createElement('tr');
   const td = document.createElement('td');
@@ -94,11 +84,16 @@ function renderEmptyRow(colspan, message) {
   return tr;
 }
 
+const UNDO_TOAST_MS = 6000;
+const TOAST_BASE_MS = 2000;
+const TOAST_MS_PER_CHAR = 50;
+const TOAST_MIN_MS = 3000;
+const ERROR_TOAST_MIN_MS = 6000;
+const TOAST_MAX_MS = 12000;
+
 let undoToastTimer = null;
 
-// Shared by single and bulk transaction delete. Re-showing the toast before
-// the previous one's timer fires (e.g. deleting twice in quick succession)
-// clears the old timer so it can't dismiss the new toast early.
+// A new toast clears the old timer so it can't dismiss the new one early.
 function showUndoToast(message, onUndo, error = false) {
   clearTimeout(undoToastTimer);
 
@@ -106,6 +101,7 @@ function showUndoToast(message, onUndo, error = false) {
   toast.classList.toggle('toast-error', error);
   document.getElementById('undo-toast-message').textContent = message;
 
+  // A fresh button drops the previous toast's Undo listener.
   const btn = document.getElementById('undo-toast-btn');
   const newBtn = btn.cloneNode(true);
   btn.replaceWith(newBtn);
@@ -118,7 +114,9 @@ function showUndoToast(message, onUndo, error = false) {
 
   toast.hidden = false;
   // Longer messages stay longer: 3s to 12s without Undo, errors 6s or more.
-  const ms = onUndo ? 6000 : Math.min(Math.max(2000 + message.length * 50, error ? 6000 : 3000), 12000);
+  const ms = onUndo
+    ? UNDO_TOAST_MS
+    : Math.min(Math.max(TOAST_BASE_MS + message.length * TOAST_MS_PER_CHAR, error ? ERROR_TOAST_MIN_MS : TOAST_MIN_MS), TOAST_MAX_MS);
   undoToastTimer = setTimeout(() => { toast.hidden = true; }, ms);
 }
 
@@ -134,9 +132,8 @@ function parseBalance(balanceRows) {
   return (balanceRows[0] && balanceRows[0][3]) || 0;
 }
 
-// 'Insight'!A2:F200 — Category, Type, Last Month, Last Quarter, Last Year,
-// Lifelong, pre-computed by spreadsheet formulas. Rows with a blank Type
-// hold the category's overall total (used as the "Untyped" remainder).
+// Breakdown!A2:F200: Category, Type, Last Month, Last Quarter, Last Year,
+// Lifelong. A blank-Type row holds the category's overall total.
 function parseTypeBreakdown(insightRows) {
   const breakdown = {};
 
@@ -154,9 +151,7 @@ function parseTypeBreakdown(insightRows) {
 
     if (!breakdown[category]) breakdown[category] = { types: [], total: null };
     if (type) {
-      // Skip types that have never had any spend (e.g. a retired type whose
-      // Insight row still exists with all-zero figures) so they don't clutter
-      // the legend/donuts.
+      // A type that never had any spend (e.g. a retired one) would only clutter the donuts.
       if (stats.lifelong) breakdown[category].types.push({ name: type, ...stats });
     } else {
       breakdown[category].total = stats;
@@ -183,13 +178,9 @@ function focusableElements(container) {
   )].filter((el) => el.offsetParent !== null);
 }
 
-// Each modal manages its own hidden flag from wherever it's opened/closed
-// (finance-transaction.js, finance-account.js, track-work-time.js, etc.) — rather than touching
-// every call site, watch the `hidden` attribute here to send focus back to
-// whatever triggered the modal once it closes. Focus is deliberately left
-// alone on open: auto-focusing any field (even a plain text one) pops the
-// keyboard on mobile and, for date/time/select fields, the native picker —
-// so the form should just appear with nothing selected.
+// Watches each modal's `hidden` so focus returns to whatever opened it on
+// close. Focus is left alone on open: focusing a field pops the mobile
+// keyboard or a native picker.
 function setupModalFocusManagement() {
   SHORTCUT_MODAL_IDS.forEach((id) => {
     const modal = document.getElementById(id);
@@ -211,11 +202,8 @@ function setupModalFocusManagement() {
   });
 }
 
-// Global shortcuts. Escape always works (even while focus is inside a
-// modal's own input, e.g. typing an amount then hitting Escape to cancel);
-// the single-letter shortcuts are skipped whenever focus is in a field that
-// actually consumes typed characters, so they can't fire while searching or
-// filling out a form.
+// Escape works even inside a field; the single-letter shortcuts don't fire
+// while focus is in something that takes typing.
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -224,8 +212,7 @@ function setupKeyboardShortcuts() {
       return;
     }
 
-    // Trap Tab/Shift+Tab inside whichever modal is open, so focus can't
-    // escape to the page behind the overlay.
+    // Keep Tab/Shift+Tab inside the open modal.
     if (e.key === 'Tab') {
       const openModal = getOpenModal();
       if (!openModal) return;
@@ -247,8 +234,8 @@ function setupKeyboardShortcuts() {
     const isTyping = focused && (['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName) || focused.isContentEditable);
     if (isTyping) return;
 
-    // Both work from any page: on Finance's own pages in place, elsewhere by going to
-    // the Transaction page or its Log form.
+    // Both work from any page: in place on Finance, elsewhere by going to the
+    // Transaction page or its Log form.
     const txPanel = document.querySelector('#finance > .panel[data-route="transaction"]');
     const onFinance = !window.ledgerSectionPage || window.ledgerSectionPage.section === 'finance';
     if (e.key === '/') {
@@ -260,8 +247,7 @@ function setupKeyboardShortcuts() {
         search.focus();
       } else location.href = routeUrl(txPanel);
     } else if (e.key === 'n') {
-      // Through the button rather than openTransactionForm() directly, so the
-      // shortcut passes the same auth gate a click does (setupAuthGatedActions).
+      // Via the button, so it passes the same auth gate a click does.
       if (onFinance) document.getElementById('add-transaction-btn').click();
       else location.href = routeUrl(txPanel, [{ slug: 'log' }]);
     } else if (e.key === '?') {
@@ -285,14 +271,12 @@ function setupNotificationsButton() {
   });
 }
 
-// Refresh data, Clear cache and the show/hide switches sit in the sidebar's bottom panel, above the account
-// row, on a wide screen with the sidebar open; in the account menu, under its
-// name and email, everywhere else (no sidebar, or the sidebar hidden).
-// page-nav.js's setSideNavOpen calls this too.
+// The settings switches sit in the sidebar on a wide screen with it open, and
+// in the account menu otherwise. page-nav.js's setSideNavOpen calls this too.
 function placeSettingsSwitches() {
   const switches = document.getElementById('settings-switches');
   if (!switches) return;
-  const inSidebar = window.matchMedia('(min-width: 1180px)').matches
+  const inSidebar = window.matchMedia(SIDEBAR_MEDIA_QUERY).matches
     && document.documentElement.dataset.sideNav !== 'closed';
   if (inSidebar) {
     document.querySelector('.header-actions').prepend(switches);
@@ -303,7 +287,7 @@ function placeSettingsSwitches() {
 
 function setupAccountMenu() {
   placeSettingsSwitches();
-  window.matchMedia('(min-width: 1180px)').addEventListener('change', placeSettingsSwitches);
+  window.matchMedia(SIDEBAR_MEDIA_QUERY).addEventListener('change', placeSettingsSwitches);
 
   const menu = document.getElementById('account-menu');
   const btn = document.getElementById('account-menu-btn');
@@ -312,6 +296,13 @@ function setupAccountMenu() {
   const closeMenu = () => {
     dropdown.hidden = true;
     btn.setAttribute('aria-expanded', 'false');
+  };
+  // A menu item closes the menu, then does its job.
+  const onMenuItem = (id, action) => {
+    document.getElementById(id).addEventListener('click', () => {
+      closeMenu();
+      action();
+    });
   };
 
   btn.addEventListener('click', (e) => {
@@ -329,36 +320,23 @@ function setupAccountMenu() {
     if (e.key === 'Escape') closeMenu();
   });
 
-  document.getElementById('signout-btn').addEventListener('click', closeMenu);
-
-  document.getElementById('refresh-btn').addEventListener('click', () => {
-    closeMenu();
-    loadDashboard(true);
-  });
-
-  document.getElementById('clear-cache-btn').addEventListener('click', () => {
-    closeMenu();
-    clearCacheAndReload();
-  });
-
-  document.getElementById('open-sheet-btn').addEventListener('click', () => {
-    closeMenu();
+  // Sign-out itself is bootDashboard's listener.
+  onMenuItem('signout-btn', () => {});
+  onMenuItem('refresh-btn', () => loadDashboard(true));
+  onMenuItem('clear-cache-btn', clearCacheAndReload);
+  onMenuItem('open-sheet-btn', () => {
     window.open(`https://docs.google.com/spreadsheets/d/${getActiveSpreadsheetId()}/edit`, '_blank');
   });
 
-  document.getElementById('switch-sheet-btn').addEventListener('click', async () => {
-    closeMenu();
+  onMenuItem('switch-sheet-btn', async () => {
     try {
-      await pickSpreadsheet();
-      setUIState('dashboard');
-      loadDashboard();
+      await pickAndLoadSpreadsheet();
     } catch (err) {
       if (err.message !== 'cancelled') alert(`Couldn't switch spreadsheet: ${err.message}`);
     }
   });
 
-  document.getElementById('rename-sheet-btn').addEventListener('click', async () => {
-    closeMenu();
+  onMenuItem('rename-sheet-btn', async () => {
     try {
       const currentName = await getActiveSpreadsheetName();
       const newName = prompt('Rename your Ledger spreadsheet', currentName);
@@ -379,59 +357,39 @@ async function loadReport() {
   const balanceRows = valueRanges[1].values || [];
   const insightRows = valueRanges[2].values || [];
 
-  // Breakdown!A2:F200 lists each category once per Type plus one blank-Type
-  // total row, so collapse column A to a unique, order-preserving list.
-  const categoryNames = [];
-  insightRows.forEach((row) => {
-    if (row[0] && !categoryNames.includes(row[0])) categoryNames.push(row[0]);
-  });
+  // Breakdown lists each category once per Type plus a total row: keep each name once, in order.
+  const categoryNames = [...new Set(insightRows.map((row) => row[0]).filter(Boolean))];
 
-  // The blank-Type row's Last Month/Last Quarter/Last Year/Lifelong columns
-  // are each category's overall spend — the same figures the old Benchmarks
-  // sheet duplicated, so they double as the per-category benchmarks too.
+  // The blank-Type totals double as each category's benchmarks.
   const typeBreakdown = parseTypeBreakdown(insightRows);
 
-  // Row 1 of Statement holds column headers (Income, Expenses, one
-  // column per spending category, Saved, Cumulative) — used below to find
-  // each category's column dynamically instead of a hardcoded index.
+  // Statement's row 1 names its columns (Income, Expenses, one per category,
+  // Saved, Cumulative), so categories are found by name, not index.
   const monthlyHeader = reportRows[0] || [];
   const monthlyRows = reportRows.slice(1);
 
   const monthlyCols = {};
   monthlyHeader.forEach((name, i) => { if (name) monthlyCols[name] = i; });
 
-  // "Saved" and "Cumulative" are always the last two columns of Monthly
-  // Summary, regardless of how many category columns precede them. The
-  // Sheets API trims each row to its own last non-empty cell, so the header
-  // row's length isn't a reliable column count — use the widest data row
-  // instead, so adding/removing a category column doesn't break these.
+  // Saved and Cumulative are always the last two columns. The API trims each
+  // row to its last non-empty cell, so the widest data row gives the width.
   const dataWidth = monthlyRows.reduce((max, row) => Math.max(max, row.length), 0);
   const savedIndex = dataWidth - 2;
   const cumulativeIndex = dataWidth - 1;
 
-  let activeIndex = monthlyRows.length - 1;
-  for (let i = monthlyRows.length - 1; i >= 0; i--) {
-    if (monthlyRows[i][1] || monthlyRows[i][2]) {
-      activeIndex = i;
-      break;
-    }
-  }
+  // The latest month with any income or expenses.
+  const lastActive = monthlyRows.findLastIndex((row) => row[1] || row[2]);
+  const activeIndex = lastActive === -1 ? monthlyRows.length - 1 : lastActive;
 
   const current = monthlyRows[activeIndex];
 
-  // Every category in Insight becomes a chart category as long as its name
-  // also appears as a column header in Statement — no hardcoded
-  // category list or column indices. Columns A-C (Month, Income, Expenses)
-  // are excluded since "Income" may also appear as an Insight category but
-  // isn't a spending category.
+  // A Breakdown category charts if Statement has a column for it past A-C
+  // (Month, Income, Expenses), so "Income" never counts as spending.
   const categoryColumns = categoryNames
     .filter((name) => monthlyCols[name] >= 3)
     .map((name) => ({ name, monthlyIndex: monthlyCols[name] }));
 
-  // Order categories by lifelong spend (highest first) so every
-  // category-based chart (trend, comparison, breakdown) ranks consistently
-  // by overall impact rather than Insight's row order, then assign each a
-  // distinct color spread evenly around the color wheel.
+  // Every category chart ranks by lifelong spend, each with its own hue spread around the wheel.
   const orderedCategoryColumns = [...categoryColumns]
     .sort((a, b) => {
       const lifelongA = Math.abs(typeBreakdown[a.name]?.total?.lifelong || 0);
@@ -440,83 +398,65 @@ async function loadReport() {
     })
     .map((c, i, arr) => ({ ...c, color: seriesColor(Math.round((i * 360) / arr.length)) }));
 
-  const savingsTrend = monthlyRows
-    .slice(0, activeIndex + 1)
-    .map((row) => ({ label: row[0], cumulative: row[cumulativeIndex] || 0 }));
+  const activeRows = monthlyRows.slice(0, activeIndex + 1);
 
-  // Income rides along with the per-category spend rather than in a series of its
-  // own: one chart draws both now (the stack, and the line across it), so it's one
-  // shape they're read off. Column B, the same figure the old Revenue vs.
-  // Expenditure chart used — that chart's other series was this stack's total.
-  const categoryTrend = monthlyRows
-    .slice(0, activeIndex + 1)
-    .map((row) => ({
-      label: row[0],
-      income: row[1] || 0,
-      categories: orderedCategoryColumns.map((c) => ({
-        name: c.name,
-        value: Math.abs(row[c.monthlyIndex] || 0),
-        color: c.color,
-      })),
-    }));
+  const savingsTrend = activeRows.map((row) => ({ label: row[0], cumulative: row[cumulativeIndex] || 0 }));
 
-  const categoryComparison = orderedCategoryColumns
-    .map((c) => {
-      const total = typeBreakdown[c.name]?.total || {};
-      const lastMonth = Math.abs(total.lastMonth || 0);
-      const quarterAvg = Math.abs(total.lastQuarter || 0);
-      const yearAvg = Math.abs(total.lastYear || 0);
-      const lifelongAvg = Math.abs(total.lifelong || 0);
-      return { name: c.name, color: c.color, lastMonth, quarterAvg, yearAvg, lifelongAvg };
-    });
+  // Income (column B) rides along with each month's category spend: one chart draws both.
+  const categoryTrend = activeRows.map((row) => ({
+    label: row[0],
+    income: row[1] || 0,
+    categories: orderedCategoryColumns.map((c) => ({
+      name: c.name,
+      value: Math.abs(row[c.monthlyIndex] || 0),
+      color: c.color,
+    })),
+  }));
+
+  const categoryComparison = orderedCategoryColumns.map((c) => {
+    const total = typeBreakdown[c.name]?.total || {};
+    return {
+      name: c.name,
+      color: c.color,
+      lastMonth: Math.abs(total.lastMonth || 0),
+      quarterAvg: Math.abs(total.lastQuarter || 0),
+      yearAvg: Math.abs(total.lastYear || 0),
+      lifelongAvg: Math.abs(total.lifelong || 0),
+    };
+  });
 
   const netWorth = parseBalance(balanceRows);
 
-  // Reconciliation gap: recorded account balances vs. what the transaction
-  // history alone adds up to. Non-zero means a balance is wrong or a
-  // transaction is missing — computed client-side from figures the app
-  // already reads, no dedicated sheet tab required.
+  // Account balances vs. what the transactions add up to: non-zero means a
+  // wrong balance or a missing transaction.
   const cumulativeSaved = Number(monthlyRows[monthlyRows.length - 1]?.[cumulativeIndex]) || 0;
   const missingAmount = netWorth - cumulativeSaved;
 
-  const report = {
+  return {
     income: current[1] || 0,
     expenses: current[2] || 0,
     saved: current[savedIndex] || 0,
-    quarterAverage: quarterAverages(monthlyRows, activeIndex, savedIndex),
+    quarterAverage: quarterAverages(monthlyRows, activeIndex),
     savingsTrend,
     categoryTrend,
     categoryComparison,
-    // Statement has one row per month from the first month of data
-    // through the current month, so its row count doubles as the number of
-    // months to divide the Lifelong total by for a monthly average.
+    // One Statement row per month through the active one: what Lifelong is averaged over.
     totalMonths: activeIndex + 1,
     typeBreakdown,
     netWorth,
     missingAmount,
   };
-
-  return report;
 }
 
 let currentSettings = {};
 
-// Last successfully parsed Settings tab, kept so a FAILED refresh can fall
-// back to it instead of wiping everything — see the catch below.
+// Last good Settings read, so a failed refresh doesn't wipe it.
 let lastLoadedSettings = null;
 
-// The Setting tab's A2:C is optional and user-managed — unlike every other tab, most
-// users won't have added it. A failure here is never a dashboard-load failure;
-// every reader falls back to its own default via getSetting() below.
-//
-// A read failure is NOT the same as "there are no settings", though, and
-// conflating the two was a real bug: returning {} here silently wiped every
-// setting in memory on one transient read error. Desired values reverted to their defaults and Health Insight
-// reported age and height as "not set" — all while the spreadsheet itself was
-// perfectly intact, which is exactly why it looked like a dozen unrelated bugs.
-// So: keep the
-// last known-good copy and log the cause, which used to be discarded entirely
-// by a bare `catch {}`.
+// The Setting tab is optional, so a failure never fails the dashboard: every
+// reader has its own default (getSetting). A failed read is not "no
+// settings", though: returning {} once wiped every setting in memory, so it
+// keeps the last good copy and logs why.
 async function loadSettings() {
   try {
     const resp = await getValues(SETTINGS_RANGE, VALUE_PARAMS);
@@ -529,17 +469,14 @@ async function loadSettings() {
   }
 }
 
-// Row-reduce idiom mirroring parseTypeBreakdown — column A is the key,
-// column B its value; column C (Notes) is intentionally never read.
+// Column A is the key, B its value; C (Notes) is never read. A later duplicate wins.
 function parseSettings(settingsRows) {
   const settings = {};
   settingsRows.forEach((row) => { if (row[0]) settings[row[0]] = row[1]; });
   return settings;
 }
 
-// Looks up a numeric parameter from the Settings tab, falling back to
-// `fallback` if the tab/row is missing, the cell is blank, or the value
-// isn't a usable number.
+// A numeric setting, or `fallback` if it's missing, blank or not a number.
 function getSetting(key, fallback) {
   const raw = currentSettings[key];
   const num = Number(raw);
@@ -552,9 +489,8 @@ function getSettingString(key, fallback) {
   return raw !== undefined && raw !== '' ? raw : fallback;
 }
 
-// First of `keys` that's actually set — for a setting that's been renamed:
-// the current name leads, older names follow, so a row written before the
-// rename keeps working until something writes the new name over it.
+// First of `keys` that's set: a renamed setting's current name, then its old
+// ones, so a row written before the rename keeps working.
 function getSettingStringAny(keys, fallback) {
   for (const key of keys) {
     const value = getSettingString(key, null);
@@ -563,14 +499,8 @@ function getSettingStringAny(keys, fallback) {
   return fallback;
 }
 
-// Monthly average of the three months BEFORE the active one — a baseline this
-// month is read against, so the current (usually part-way through) month isn't
-// averaged into its own benchmark. Taken from Statement rather than
-// Insight's Last Quarter column so it shares the current month's exact
-// definition of income and expenses. Falls back to however many prior months
-// exist, and to null in the first month, when there's nothing to compare to.
-//
-// Income and Expenses only — Monthly Cash Flow shows its own figure alone.
+// Monthly income and expenses over up to three months BEFORE the active one,
+// so a part-way month isn't its own benchmark; null in the first month.
 function quarterAverages(monthlyRows, activeIndex) {
   const prior = monthlyRows.slice(Math.max(0, activeIndex - 3), activeIndex);
   if (prior.length === 0) return null;
@@ -585,24 +515,18 @@ function renderSummaryCards(data) {
 
   document.getElementById('net-worth').textContent = formatCurrency(data.netWorth);
 
-  // The month's own figure alone. Income is lumpy in a way spending isn't — a
-  // quarter that caught a bonus or a contract makes every ordinary month look
-  // like a shortfall against its own baseline, which is a comparison that reads
-  // as a verdict without being one. The average is still on the card's tooltip
-  // and in Finance's Insight, where it comes with context.
-  document.getElementById('income-label').textContent = 'Monthly Income';
-  const incomeEl = document.getElementById('income-value');
-  incomeEl.textContent = formatCurrency(data.income);
-  incomeEl.title = avg
-    ? `This month. Average of the ${priorMonths}: ${formatCurrency(avg.income)}`
-    : 'This month — no earlier months to average yet';
-
-  document.getElementById('expenses-label').textContent = 'Monthly Expenditure';
-  const expensesEl = document.getElementById('expenses-value');
-  expensesEl.textContent = formatCurrency(data.expenses);
-  expensesEl.title = avg
-    ? `This month. Average of the ${priorMonths}: ${formatCurrency(avg.expenses)}`
-    : 'This month — no earlier months to average yet';
+  // The month's own figure; its average is only in the hover, since lumpy
+  // income makes an ordinary month read as a shortfall against it.
+  const renderMonthCard = (labelId, label, valueId, key) => {
+    document.getElementById(labelId).textContent = label;
+    const el = document.getElementById(valueId);
+    el.textContent = formatCurrency(data[key]);
+    el.title = avg
+      ? `This month. Average of the ${priorMonths}: ${formatCurrency(avg[key])}`
+      : 'This month — no earlier months to average yet';
+  };
+  renderMonthCard('income-label', 'Monthly Income', 'income-value', 'income');
+  renderMonthCard('expenses-label', 'Monthly Expenditure', 'expenses-value', 'expenses');
 
   document.getElementById('cashflow-label').textContent = 'Monthly Cash Flow';
   const savingsEl = document.getElementById('savings-value');
@@ -611,8 +535,11 @@ function renderSummaryCards(data) {
   savingsEl.classList.toggle('expense', data.saved < 0);
 }
 
+// Under half a cent counts as reconciled.
+const RECONCILED_EPSILON = 0.005;
+
 function renderReconciliationStatus(missingAmount) {
-  const isReconciled = Math.abs(missingAmount) < 0.005;
+  const isReconciled = Math.abs(missingAmount) < RECONCILED_EPSILON;
 
   // A>T: accounts above the transactions' total; A<T: below.
   setAccountBadgePart('reconcile', isReconciled ? null : {
@@ -667,71 +594,40 @@ async function loadDashboard(forceRefresh = false) {
   // When this load's data reading started, after the page and sign-in were ready.
   const dataStart = performance.now();
 
-  // Wrapped end to end rather than relying solely on the Promise.allSettled
-  // below: that only catches a rejection from one of the listed module
-  // promises. A throw in this function's own setup code (anything before the
-  // await, e.g. a stale cached script reaching for a DOM node a newer cached
-  // HTML removed) used to become an unhandled rejection instead — nothing
-  // calls loadDashboard() with a .catch(), so the dashboard just sat on its
-  // placeholder dashes forever with no visible error at all.
+  // Wrapped whole: nothing awaits loadDashboard with a .catch(), so a throw
+  // here would otherwise leave the placeholders up with no error shown.
   try {
-    // Never throws (see loadSettings). Settings fetches concurrently with
-    // every other module below instead of blocking them first — only
-    // initPhysique (desired-line charts) and initTravel (BIRTH_DATE credit)
-    // actually read currentSettings, so just those two wait on it.
-    const settingsPromise = loadSettings(forceRefresh).then((settings) => {
+    // Never throws (loadSettings). Runs alongside the rest; only what reads
+    // currentSettings waits on it.
+    const settingsPromise = loadSettings().then((settings) => {
       currentSettings = settings;
-      // 0 hides amounts, 1 (or unset) shows them — kept in the Settings tab so
-      // this survives a refresh instead of always starting shown.
-      privacyMode = getSetting('SHOW_AMOUNTS', 1) === 0;
-      updatePrivacyButtonUI();
-      // Same 0/1 convention as SHOW_AMOUNTS, just for the bulb row.
-      widgetsVisible = getSetting('SHOW_WIDGETS', 1) !== 0;
-      updateWidgetsButtonUI();
-      applyWidgetsVisibility();
-      bulbsVisible = getSetting('SHOW_BULBS', 1) !== 0;
-      updateBulbsButtonUI();
-      applyBulbsVisibility();
+      // Each switch is on unless its setting is 0.
+      VISIBILITY_SWITCHES.forEach((s) => {
+        s.set(getSetting(s.key, 1) !== 0);
+        syncSwitch(s);
+        s.apply?.();
+      });
       cacheSwitches();
       applySettingsToWidgets();
       renderInsightAgeBadges();
-      // Same 0/1 convention, but DEFAULT 0 (hidden) — the home page deliberately
-      // starts without its blocks, showing them only once asked.
     });
 
-    // The blocks themselves load only on a section page, which shows them. The
-    // home page is an overview — each section's glance cards and page tiles
-    // (page-nav.js) — so it reads just what those cards need.
+    // Blocks load only on a section page, which shows them; the home page
+    // reads just what its glance cards and tile badges need.
     const loadBlocks = Boolean(window.ledgerSectionPage);
-
-    // The core, always loaded whether the blocks are shown or not — it's what
-    // populates the always-visible summary tiles. Physique feeds Health's
-    // today-glance (and the Chart page's charts/plan); the report feeds
-    // Finance's Net Worth / Income / Expenditure / Cash-Flow cards.
-    //
-    // Activities has to land BEFORE Physique: the adapter splits each day's
-    // workout by the category that tab assigns, and it memoizes the result — a
-    // Physique load that won the race would cache every activity as 'Other'.
-    // allSettled, not all: a missing or unreadable Activities tab should cost the
-    // category split (everything lands under 'Other') and the plan tables, not
-    // every chart on the page. The rejection still surfaces via the list below.
-    // Which blocks this page shows, so only their data is read. A section page
-    // (/health/, /finance/, /track/, /other/) loads its own blocks alone; the home page
-    // loads the glance cards (Health status, Finance summary), plus every block
-    // when Show blocks is on. Car Service (Track) is drawn from Transactions, so
-    // Track loads those too. The home page also reads Transactions, Work Time and Accounts for
-    // its tiles' badges (Car Service's days left, Work Time's Log, Account's Pay).
     const section = window.ledgerSectionPage?.section ?? null;
     const home = section === null;
     const shows = (id) => loadBlocks && (home || section === id);
     const needsHealth = section === null || section === 'health';
     const needsReport = section === null || section === 'finance';
 
+    // Activities lands BEFORE Physique, which memoizes each workout's category
+    // from it. allSettled: a bad Activities tab costs that split, not Physique.
     const activitiesPromise = needsHealth ? initActivities(forceRefresh) : Promise.resolve();
     const physiquePromise = needsHealth
       ? Promise.allSettled([settingsPromise, activitiesPromise]).then(() => initPhysique(forceRefresh))
       : Promise.resolve();
-    const reportPromise = needsReport ? loadReport(forceRefresh).then((report) => {
+    const reportPromise = needsReport ? loadReport().then((report) => {
       currentReport = report;
       renderSummaryCards(report);
       renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
@@ -748,37 +644,32 @@ async function loadDashboard(forceRefresh = false) {
         nutritionPromise,
         // Once, if missing: the glycogen swing as a saved setting from now on.
         physiquePromise.then(() => seedGlycogenSwingSetting()).catch((err) => console.error('Saving GLYCOGEN_SWING_KG failed:', err)),
-        // Protein Source Rotation needs Physique (actual servings eaten),
-        // Nutrition (live per-serving calories/protein), and settings
-        // (desired protein) all loaded — refresh only once all three are in.
+        // Protein Rotation needs Physique (servings), Nutrition (per serving) and settings.
         Promise.all([physiquePromise, nutritionPromise]).then(() => {
           renderProteinRotationChart(healthDateRange());
           renderProteinRotationChart(healthDateRange(), 'nutrition', PROTEIN_ROTATION_NUTRITION_IDS);
           // Needs both tabs: the grams come from each food's Nutrition row.
           convertPhysiqueBreakdownAmountsToGrams().then(fillPhysiqueMissingTef);
         }),
-        // Activity Rotation needs Physique (logged Workout notes) and Activities
-        // (each exercise's Group and Weekly Desired) both loaded.
+        // Activity Rotation needs Physique (Workout notes) and Activities (Group, Weekly Desired).
         Promise.all([physiquePromise, activitiesPromise]).then(() => {
           renderActivityRotationChart(healthDateRange());
-          // The GYM modal's own copy (instruction-rotation-card, index.html) — its
-          // eager boot-time render (initActivityRotationPanel) ran before this data
-          // was in, so it needs the same post-load refresh the line above gives
-          // the Chart panel's copy.
+          // The GYM and Activity modals' copies rendered at boot, before this data.
           renderActivityRotationChart(healthDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);
           renderActivityRotationChart(healthDateRange(), 'activity', ACTIVITY_ROTATION_ACTIVITY_IDS);
           renderActivityPlanTables();
           renderInstructionList();
         }),
       ] : []),
+      // Car Service (Track) is drawn from Transactions; home reads it for its tile badge.
       ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
       ...(home && !shows('track') ? [initWorkTime(forceRefresh)] : []),
       // LeetCode for its tile's solves-owed badge.
       ...(home && !shows('track') ? [initLeetcode()] : []),
       // Accounts for the Account tile's Pay badge.
       ...(home && !shows('finance') ? [initAccountManager(forceRefresh)] : []),
-      // Watchlist alerts badge the Watch List and Market tiles, here and on home;
-      // the price check runs in the background once the keys (settings) are in.
+      // Watchlist alerts badge the Watch List and Market tiles; the price check
+      // runs in the background once the keys (settings) are in.
       ...((shows('finance') || home) ? [initWatchlist(forceRefresh).then(() => {
         settingsPromise.then(() => checkWatchlistAlerts()).catch(() => {});
         return initStockAnalysisLog();
@@ -809,8 +700,7 @@ async function loadDashboard(forceRefresh = false) {
 
     setLastUpdated();
     console.info(`[sheets] ${section || 'home'} load: ${sheetsRequestCount - requestsBefore} requests`);
-    // Where a load's time goes: page and sign-in (until data reading started), then the
-    // data itself — to tell a slow sign-in from slow Sheets reads.
+    // Splits a slow sign-in from slow Sheets reads.
     console.info(`[load] ${section || 'home'}: page + sign-in ${Math.round(dataStart)} ms, data ${Math.round(performance.now() - dataStart)} ms, total ${Math.round(performance.now())} ms`);
     const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason.message);
     if (errors.length) {
@@ -826,19 +716,8 @@ async function loadDashboard(forceRefresh = false) {
   routerDataLoaded();
 }
 
-// Each panel's <h2> toggles its own content.
-// The CSS collapse animation (max-height/opacity, styles.css) only hides
-// panel content VISUALLY — it never removes it from the accessibility tree
-// or from text selection/"find in page"/copy-paste, since neither property
-// implies aria-hidden or display:none. A collapsed table-heavy panel (Health
-// Log, Contacts, Settings) has plenty of literal DOM text an a11y-tree-based
-// tool can still read even while a sighted user sees nothing; a collapsed
-// chart-only panel (canvas has no text content at all) looks "empty" either
-// way, which is what made this asymmetry hard to spot visually. `inert`
-// (supported in all current major browsers) is the correct fix: it pulls
-// the whole subtree out of the accessibility tree, tab order, and text
-// selection in one attribute, so collapsed really means collapsed for every
-// consumer, not just sighted mouse users.
+// `inert`, not just the CSS collapse, so a folded panel's content also leaves
+// the accessibility tree, tab order and find-in-page.
 function setPanelCollapsed(panel, heading, collapsed) {
   panel.classList.toggle('collapsed', collapsed);
   heading.setAttribute('aria-expanded', String(!collapsed));
@@ -849,6 +728,7 @@ function setPanelCollapsed(panel, heading, collapsed) {
   });
 }
 
+// Each panel's <h2> toggles its own content.
 function setupPanelToggles() {
   const panels = [...document.querySelectorAll('#dashboard .panel')];
 
@@ -886,8 +766,7 @@ function setupPanelToggles() {
     };
 
     heading.addEventListener('click', () => {
-      // A click that ends a text-selection drag (e.g. the user selecting the
-      // heading's label) shouldn't also toggle the panel.
+      // A click ending a text selection on the heading isn't a toggle.
       if (window.getSelection().toString()) return;
       toggle();
     });
@@ -921,88 +800,53 @@ function setupThemeToggle() {
   });
 }
 
-// Reflects the current privacyMode on its switch. Standalone (not
-// nested in setupPrivacyToggle) so loadDashboard can call it too, once the
-// Settings tab's SHOW_AMOUNTS tells it what privacyMode actually is.
-function updatePrivacyButtonUI() {
-  document.getElementById('privacy-toggle').checked = !privacyMode;
+// Mirrors the head script's pre-paint guess on <html>, so a stale cache corrects itself at once.
+function setVisibilityPref(name, visible) {
+  if (visible) {
+    document.documentElement.removeAttribute(`data-${name}-pref`);
+  } else {
+    document.documentElement.setAttribute(`data-${name}-pref`, 'hidden');
+  }
 }
 
-// Masks every formatted amount on the page (cards, tables, chart ticks,
-// and chart tooltips) by re-rendering from cached data with formatCurrency
-// in masked mode.
-function setupPrivacyToggle() {
-  updatePrivacyButtonUI();
-
-  document.getElementById('privacy-toggle').addEventListener('change', (e) => {
-    privacyMode = !e.target.checked;
-    updatePrivacyButtonUI();
-    // Signed out there are no amounts on the page to mask yet.
-    if (isSignedIn() && !document.getElementById('dashboard').hidden) loadDashboard(false);
-    saveSwitchSetting({ SHOW_AMOUNTS: privacyMode ? 0 : 1 });
-  });
-}
-
-// Reflects the current widgetsVisible on its switch — same
-// standalone-from-setup shape as updatePrivacyButtonUI, so loadDashboard's
-// SHOW_WIDGETS read can call it too.
-function updateWidgetsButtonUI() {
-  document.getElementById('widgets-toggle').checked = widgetsVisible;
-}
-
-// Shows/hides the Time/Date/Azan/Weather row per widgetsVisible. Section pages
-// (/health/, /finance/, /track/, /other/) hide that row themselves — see
-// section-page.js's showOnly — and want it hidden regardless of this setting,
-// so this leaves it alone there rather than fighting that call.
+// The widget row. Section pages hide it themselves (section-page.js), whatever this says.
 function applyWidgetsVisibility() {
   if (window.ledgerSectionPage) return;
   document.querySelectorAll('#dashboard .widget-cards').forEach((row) => {
     row.hidden = !widgetsVisible;
   });
-  // Keeps index.html's own pre-paint guess (read from the localStorage cache
-  // before this ever runs) in sync with the real fetched setting — so a stale
-  // or missing cache's wrong guess self-corrects immediately rather than only
-  // on the next refresh, and a live toggle updates it too.
-  if (widgetsVisible) {
-    document.documentElement.removeAttribute('data-widgets-pref');
-  } else {
-    document.documentElement.setAttribute('data-widgets-pref', 'hidden');
-  }
-}
-
-function setupWidgetsToggle() {
-  updateWidgetsButtonUI();
-
-  document.getElementById('widgets-toggle').addEventListener('change', (e) => {
-    widgetsVisible = e.target.checked;
-    updateWidgetsButtonUI();
-    applyWidgetsVisibility();
-    saveSwitchSetting({ SHOW_WIDGETS: widgetsVisible ? 1 : 0 });
-  });
-}
-
-function updateBulbsButtonUI() {
-  document.getElementById('bulbs-toggle').checked = bulbsVisible;
+  setVisibilityPref('widgets', widgetsVisible);
 }
 
 // Home page only; section pages keep their cards.
 function applyBulbsVisibility() {
   if (window.ledgerSectionPage) return;
-  if (bulbsVisible) {
-    document.documentElement.removeAttribute('data-bulbs-pref');
-  } else {
-    document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
-  }
+  setVisibilityPref('bulbs', bulbsVisible);
 }
 
-function setupBulbsToggle() {
-  updateBulbsButtonUI();
+// The Amounts, Widgets and Bulbs switches, in this order everywhere (cache,
+// Settings load, setup). `apply` shows the change; Amounts re-renders instead.
+const VISIBILITY_SWITCHES = [
+  { id: 'privacy-toggle', key: 'SHOW_AMOUNTS', isOn: () => !privacyMode, set: (on) => { privacyMode = !on; }, remasks: true },
+  { id: 'widgets-toggle', key: 'SHOW_WIDGETS', isOn: () => widgetsVisible, set: (on) => { widgetsVisible = on; }, apply: applyWidgetsVisibility },
+  { id: 'bulbs-toggle', key: 'SHOW_BULBS', isOn: () => bulbsVisible, set: (on) => { bulbsVisible = on; }, apply: applyBulbsVisibility },
+];
 
-  document.getElementById('bulbs-toggle').addEventListener('change', (e) => {
-    bulbsVisible = e.target.checked;
-    updateBulbsButtonUI();
-    applyBulbsVisibility();
-    saveSwitchSetting({ SHOW_BULBS: bulbsVisible ? 1 : 0 });
+function syncSwitch(s) {
+  document.getElementById(s.id).checked = s.isOn();
+}
+
+function setupVisibilitySwitches() {
+  VISIBILITY_SWITCHES.forEach((s) => {
+    syncSwitch(s);
+    document.getElementById(s.id).addEventListener('change', (e) => {
+      s.set(e.target.checked);
+      syncSwitch(s);
+      s.apply?.();
+      // Re-render masked or not; signed out there are no amounts yet.
+      if (s.remasks && isSignedIn() && !document.getElementById('dashboard').hidden) loadDashboard(false);
+      saveSwitchSetting({ [s.key]: s.isOn() ? 1 : 0 });
+    });
   });
 }
 
@@ -1011,8 +855,7 @@ function setupScrollSpy() {
   // The Ledger tab is current on the home page, a section's tab on its pages.
   document.querySelector('#main-nav .nav-home')?.classList.toggle('active', !window.ledgerSectionPage);
 
-  // On a section page there's one wrapper and nothing to scroll between, so its
-  // nav entry is simply the active one for as long as the page is open.
+  // A section page has one section, so its tab simply stays active.
   const onlySection = document.documentElement.dataset.section;
   if (onlySection) {
     navLinks.forEach((link) => link.classList.toggle('active', link.dataset.section === onlySection));
@@ -1035,17 +878,15 @@ function setupScrollSpy() {
 
   sections.forEach((section) => observer.observe(section));
 
-  // The widget cards row above the first section can push its midpoint past
-  // the viewport's center line, so the observer never fires for it near the
-  // top of the page. Force the first nav link active once the user scrolls back up.
+  // The widget row can keep the first section's midpoint below the centre
+  // line near the top, so the observer never fires for it there.
   window.addEventListener('scroll', () => {
     if (window.scrollY < sections[0].offsetTop) setActive(navLinks[0].dataset.section);
   });
 }
 
-// Anything that opens a form or edits the sheet. Everything read-only is left out
-// on purpose — a token check that raises a sign-in popup to look something up
-// would be worse than the problem it solves.
+// Anything that opens a form or edits the sheet. Read-only actions are left
+// out: a sign-in popup just to look something up would be worse.
 const AUTH_GATED_SELECTOR = [
   '.panel-header-btn',            // every panel's Log / Add
   '.row-action-btn',              // ✏️ / 📋 / 🗑️ on every table row
@@ -1062,23 +903,16 @@ const AUTH_GATED_SELECTOR = [
   '#analysis-apply-alerts-btn',   // writes the AI's alerts to the Watchlist tab
 ].join(', ');
 
-// Reads the sheet but never writes it, so it has no business prompting: the
-// Instruction modal is the Activities tab already in memory.
+// Reads but never writes: the Instruction modal is the Activities tab already in memory.
 const AUTH_GATE_EXEMPT_IDS = ['activity-instruction-btn'];
 
-// Ensures a live access token BEFORE a form opens, rather than letting a stale
-// or missing one surface as a Google auth error on Save with the filled-in form
-// still on screen. Covers both endpoints of the same problem: a signed-out click
-// runs the full sign-in flow first (silent, then the visible popup if needed),
-// and a signed-in click with a token nearing its ~1hr expiry gets a silent
-// refresh — either way the button's own action runs only once a token is in
-// hand, so there's no separate "sign in, then try again" step for the user.
+// Gets a live token BEFORE a form opens, so an expired one can't fail the Save
+// with the form filled in: signed out it signs in first, near expiry it
+// refreshes silently, then the click goes through.
 //
-// One capture-phase listener on the document instead of a check inside fifteen
-// handlers: it sees the click before the button's own listener (all of which are
-// bubble-phase), stops it, awaits the token, then re-dispatches the same click.
-// A new table row gets this for free — the listener matches on the class, so
-// there's nothing to re-wire when a renderer rebuilds a table.
+// One capture-phase listener sees the click before the button's own (bubble)
+// handler, stops it, awaits the token and re-dispatches it. Matching on class
+// covers rows a renderer adds later.
 function setupAuthGatedActions() {
   document.addEventListener('click', (event) => {
     const btn = event.target.closest(AUTH_GATED_SELECTOR);
@@ -1090,21 +924,15 @@ function setupAuthGatedActions() {
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    // Deliberately NOT wrapped in withButtonBusy: the row-action buttons wrap their
-    // own handlers in it, and it no-ops while dataset.busy is set — the re-dispatched
-    // click would land inside that window and be dropped. The wait is invisible
-    // anyway on every path except the visible sign-in, which shows its own UI.
+    // Not withButtonBusy: row actions wrap their own handlers in it, and it
+    // would drop the re-dispatched click.
     btn.dataset.authPending = '1';
     ensureAccessToken().then((token) => {
       delete btn.dataset.authPending;
-      // No message needed on failure: every path that ends without a token has
-      // already sent handleAuthChange the sign-out (with its own error banner if
-      // there's a reason to show one) — a form opened over that would be the
-      // wrong outcome.
+      // No token: handleAuthChange has already shown the sign-out.
       if (!token) return;
 
-      // Same click, now with a live token. The flag is what lets it through the
-      // listener above, cleared straight after so the next real click is gated.
+      // The flag lets the same click through once; the next real click is gated again.
       btn.dataset.authChecked = '1';
       btn.click();
       delete btn.dataset.authChecked;
@@ -1122,9 +950,7 @@ function routeDashboard() {
 }
 
 function bootDashboard() {
-  // Belt-and-suspenders alongside the head script's history.scrollRestoration
-  // = 'manual' — guarantees every load starts at the top even if the browser
-  // still tried to restore a prior scroll position before this fired.
+  // With the head script's scrollRestoration = 'manual': every load starts at the top.
   window.scrollTo(0, 0);
 
   initGate();
@@ -1150,9 +976,7 @@ function bootDashboard() {
   // A section page has routed already (routeDashboard, before this boot step).
   if (!window.ledgerSectionPage) routeDashboard();
   setupThemeToggle();
-  setupPrivacyToggle();
-  setupWidgetsToggle();
-  setupBulbsToggle();
+  setupVisibilitySwitches();
   setupNotificationsButton();
   setupKeyboardShortcuts();
   applyChartTheme();
@@ -1163,15 +987,9 @@ function bootDashboard() {
   if (typeof APP_VERSION !== 'undefined') document.getElementById('footer-version').textContent = `v${APP_VERSION}`;
 }
 
-// A section page (/health/, /finance/, /track/, /other/) builds this markup from
-// index.html after its own load event has already fired, so a load listener
-// there would never run: it starts the page itself instead, once every script
-// index.html asks for has arrived.
-//
-// DOMContentLoaded rather than window.load: load also waits on every image and
-// the chart CDN scripts, which have nothing to do with the dashboard shell or
-// the sign-in check — that wait was the whole reason the sign-in banner used
-// to take seconds to appear after the (already-visible) shell.
+// A section page builds this markup after its own load event, so it starts
+// the page itself once every script has arrived. Elsewhere DOMContentLoaded,
+// not load, which would also wait on images and the chart CDN.
 if (window.ledgerSectionPage) {
   window.ledgerSectionPage.onRoute(routeDashboard);
   window.ledgerSectionPage.onBoot(bootDashboard);

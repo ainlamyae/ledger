@@ -1,7 +1,5 @@
-// Dashboard "bulb" widgets: live clock, multi-calendar date, Azan (prayer)
-// times, and weather. These are independent of the Google Sheet — they only
-// need the (possibly still-hidden) #dashboard markup to exist, so they're
-// started once on page load rather than tied to the sign-in/data-load flow.
+// Dashboard "bulb" widgets: clock, multi-calendar date, Azan times and weather.
+// They don't need the sheet, so they start once on page load, not on sign-in.
 
 const DEG2RAD = Math.PI / 180;
 const dsin = (deg) => Math.sin(deg * DEG2RAD);
@@ -40,10 +38,8 @@ function toJulianDay(year, month, day) {
   return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + B - 1524.5;
 }
 
-// Sun declination and equation of time (in hours) for a given Julian day.
-// Based on the low-precision solar position formulas widely used for
-// prayer-time calculation (e.g. praytimes.org's published method) — accurate
-// to well within a minute, which is all a dashboard widget needs.
+// Sun declination and equation of time (hours) for a Julian day: praytimes.org's
+// low-precision formulas, well within a minute.
 function sunPosition(jd) {
   const D = jd - 2451545.0;
   const g = fixAngle(357.529 + 0.98560028 * D);
@@ -80,9 +76,7 @@ function computePrayerTimes({ lat, lon, date, utcOffsetHours }) {
   const fajr = dhuhr - fajrOffset;
   const maghrib = dhuhr + maghribOffset;
 
-  // Standard method: the midpoint between Maghrib and the next day's Fajr.
-  // Fajr barely shifts night to night, so today's Fajr + 24h stands in for
-  // tomorrow's without needing a second sun-position calculation.
+  // Midway from Maghrib to the next Fajr; today's Fajr + 24h stands in for tomorrow's.
   const midnight = (maghrib + fajr + 24) / 2;
 
   return {
@@ -129,8 +123,7 @@ function mapWeatherCode(code) {
   return WEATHER_CODE_MAP[code] || { icon: '🌡️', label: '—' };
 }
 
-// "America/Toronto" -> "Toronto", used when geolocation/reverse-geocoding
-// isn't available so the clock still shows a plausible location name.
+// "America/Toronto" -> "Toronto": a location name without geolocation.
 function fallbackLocationLabel() {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -140,32 +133,38 @@ function fallbackLocationLabel() {
   }
 }
 
-// Shown when the browser won't share a location (denied/unsupported) and the
-// user hasn't set one manually, so the Azan/Weather widgets always have
-// somewhere to work with instead of just showing an error. Overridable from
-// the Google Sheet's Settings tab via the WIDGET_DEFAULT_CITY key (see
-// applySettingsToWidgets()).
+// Used when no location is shared or picked, so Azan/Weather always show
+// something; the Settings tab's WIDGET_DEFAULT_CITY overrides it.
 const DEFAULT_LOCATION = { lat: 43.4643, lon: -80.5204, label: 'Waterloo, ON' };
 let sheetDefaultLocation = null;
 let sheetDefaultCityQuery = null;
 
-// The second clock row's reference city. Overridable per-browser via the
-// picker (setupSecondClockPicker) or, as a shared default, from the
-// Settings tab via WIDGET_SECOND_CLOCK_CITY.
+// The second clock's city: the picker overrides it per browser, WIDGET_SECOND_CLOCK_CITY for all.
 const DEFAULT_SECOND_CLOCK = { label: 'Isfahan', timezone: 'Asia/Tehran' };
 let sheetSecondClockCity = null;
 let sheetSecondClockQuery = null;
 
 const MANUAL_LOCATION_KEY = 'ledger_widget_manual_location';
 const SECOND_CLOCK_MANUAL_KEY = 'ledger_widget_second_clock_location';
+// What "Use my location" last found, kept so later visits don't ask again.
+const DETECTED_LOCATION_KEY = 'ledger_widget_detected_location';
 
-function getManualLocation() {
+const GEOLOCATION_TIMEOUT_MS = 10000;
+const CLOCK_TICK_MS = 1000;
+const FORECAST_DAYS = 3;
+
+// null when unset, unreadable or not JSON.
+function readStoredJson(key) {
   try {
-    const raw = localStorage.getItem(MANUAL_LOCATION_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
+}
+
+function getManualLocation() {
+  return readStoredJson(MANUAL_LOCATION_KEY);
 }
 
 function setManualLocation(location) {
@@ -177,36 +176,22 @@ function clearManualLocation() {
 }
 
 function getSecondClockManual() {
-  try {
-    const raw = localStorage.getItem(SECOND_CLOCK_MANUAL_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readStoredJson(SECOND_CLOCK_MANUAL_KEY);
 }
 
 function setSecondClockManual(city) {
   localStorage.setItem(SECOND_CLOCK_MANUAL_KEY, JSON.stringify(city));
 }
 
-// The location "Use my location" last detected — remembered like the manual
-// one, so the widgets keep using it on later visits without asking again.
-const DETECTED_LOCATION_KEY = 'ledger_widget_detected_location';
-
 function getDetectedLocation() {
-  try {
-    const raw = localStorage.getItem(DETECTED_LOCATION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readStoredJson(DETECTED_LOCATION_KEY);
 }
 
 async function getUserLocation() {
   if (!('geolocation' in navigator)) return null;
 
   const position = await new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition((pos) => resolve(pos), () => resolve(null), { timeout: 10000 });
+    navigator.geolocation.getCurrentPosition((pos) => resolve(pos), () => resolve(null), { timeout: GEOLOCATION_TIMEOUT_MS });
   });
   if (!position) return null;
 
@@ -234,11 +219,8 @@ async function getUserLocation() {
   return location;
 }
 
-// Open-Meteo's free geocoding search — turns a typed city name into
-// coordinates for the manual "Set location" option. The API's default
-// top hit isn't necessarily a name match (e.g. searching "Waterloo" can
-// rank "Austin, Texas" first), so fetch several candidates, prefer ones
-// whose name actually matches the query, and break ties by population.
+// A typed city -> coordinates via Open-Meteo. Its top hit needn't match the name
+// ("Waterloo" can rank Austin first), so exact names win, then population.
 async function geocodeLocation(query) {
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=en&format=json`;
   const res = await fetch(url);
@@ -257,11 +239,8 @@ async function geocodeLocation(query) {
   return { lat: best.latitude, lon: best.longitude, label, timezone: best.timezone };
 }
 
-// Never calls navigator.geolocation itself — that's a real permission
-// prompt and should only ever happen from an explicit click on "Use my
-// location" (see setupLocationPicker), not silently on every page load.
-// Manual override beats a previously-detected location, which
-// beats the Settings-tab default city, which beats the hardcoded fallback.
+// Manual, then last detected, then the Settings city, then the default. Never
+// asks for geolocation: that prompt only follows a "Use my location" click.
 function resolveLocation() {
   const manual = getManualLocation();
   if (manual) return manual;
@@ -279,16 +258,13 @@ function applyLocation(location) {
   initWeatherWidget(location);
 }
 
-// Manual override beats the Settings-tab city, which beats the hardcoded
-// Isfahan default.
+// Manual, then the Settings city, then Isfahan.
 function resolveSecondClockCity() {
   return getSecondClockManual() || sheetSecondClockCity || DEFAULT_SECOND_CLOCK;
 }
 
-// Called once the Google Sheet's Settings tab has loaded (see app.js ->
-// loadDashboard) so WIDGET_DEFAULT_CITY / WIDGET_SECOND_CLOCK_CITY can
-// override the hardcoded defaults, without overriding a per-browser manual
-// pick made via the location pickers.
+// After Settings load: WIDGET_DEFAULT_CITY / WIDGET_SECOND_CLOCK_CITY replace
+// the defaults, but never a manual pick from the pickers.
 async function applySettingsToWidgets() {
   if (!widgetsOnPage()) return;
 
@@ -320,91 +296,16 @@ async function applySettingsToWidgets() {
   if (!getSecondClockManual()) renderClock();
 }
 
-function setupLocationPicker() {
-  const container = document.getElementById('location-picker');
-  const btn = document.getElementById('widget-clock-location-btn');
-  const dropdown = document.getElementById('location-picker-dropdown');
-  const autoBtn = document.getElementById('location-auto-btn');
-  const manualInput = document.getElementById('location-manual-input');
-  const manualBtn = document.getElementById('location-manual-btn');
-  const statusEl = document.getElementById('location-picker-status');
-
-  const closeDropdown = () => { dropdown.hidden = true; };
-  const showStatus = (message) => {
-    statusEl.hidden = false;
-    statusEl.textContent = message;
-  };
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    dropdown.hidden = !dropdown.hidden;
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!container.contains(e.target)) closeDropdown();
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeDropdown();
-  });
-
-  autoBtn.addEventListener('click', async () => {
-    showStatus('Detecting your location…');
-    clearManualLocation();
-
-    const detected = await getUserLocation();
-    if (detected) {
-      applyLocation(detected);
-      statusEl.hidden = true;
-      closeDropdown();
-    } else {
-      applyLocation(DEFAULT_LOCATION);
-      showStatus('Location access denied — using Waterloo, ON, Canada.');
-    }
-  });
-
-  const submitManual = async () => {
-    const query = manualInput.value.trim();
-    if (!query) return;
-
-    showStatus('Searching…');
-
-    try {
-      const location = await geocodeLocation(query);
-      if (!location) {
-        showStatus('Location not found.');
-        return;
-      }
-
-      setManualLocation(location);
-      applyLocation(location);
-      statusEl.hidden = true;
-      manualInput.value = '';
-      closeDropdown();
-    } catch {
-      showStatus('Search failed — try again.');
-    }
-  };
-
-  manualBtn.addEventListener('click', submitManual);
-  manualInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      submitManual();
-    }
-  });
-}
-
-// Same picker pattern as the main location picker, but for the second
-// clock row: no "use my location" option (it's a reference city, not
-// the user's own location), just a manual city search.
-function setupSecondClockPicker() {
-  const container = document.getElementById('second-clock-picker');
-  const btn = document.getElementById('second-clock-location-btn');
-  const dropdown = document.getElementById('second-clock-dropdown');
-  const manualInput = document.getElementById('second-clock-manual-input');
-  const manualBtn = document.getElementById('second-clock-manual-btn');
-  const statusEl = document.getElementById('second-clock-status');
+// A clock's city dropdown: its button toggles it, a click outside or Escape
+// closes it, and a typed city is looked up on its button or Enter.
+// `accept(result)` says whether a hit is usable; `apply(result, query)` uses it.
+function setupCityPicker(ids, { notFoundMessage, accept, apply }) {
+  const container = document.getElementById(ids.container);
+  const btn = document.getElementById(ids.button);
+  const dropdown = document.getElementById(ids.dropdown);
+  const manualInput = document.getElementById(ids.input);
+  const manualBtn = document.getElementById(ids.submit);
+  const statusEl = document.getElementById(ids.status);
 
   const closeDropdown = () => { dropdown.hidden = true; };
   const showStatus = (message) => {
@@ -433,14 +334,12 @@ function setupSecondClockPicker() {
 
     try {
       const result = await geocodeLocation(query);
-      if (!result || !result.timezone) {
-        showStatus('City not found.');
+      if (!accept(result)) {
+        showStatus(notFoundMessage);
         return;
       }
 
-      const city = { label: query, timezone: result.timezone };
-      setSecondClockManual(city);
-      renderClock();
+      apply(result, query);
       statusEl.hidden = true;
       manualInput.value = '';
       closeDropdown();
@@ -455,6 +354,60 @@ function setupSecondClockPicker() {
       e.preventDefault();
       submitManual();
     }
+  });
+
+  return { statusEl, showStatus, closeDropdown };
+}
+
+function setupLocationPicker() {
+  const { statusEl, showStatus, closeDropdown } = setupCityPicker({
+    container: 'location-picker',
+    button: 'widget-clock-location-btn',
+    dropdown: 'location-picker-dropdown',
+    input: 'location-manual-input',
+    submit: 'location-manual-btn',
+    status: 'location-picker-status',
+  }, {
+    notFoundMessage: 'Location not found.',
+    accept: (location) => Boolean(location),
+    apply: (location) => {
+      setManualLocation(location);
+      applyLocation(location);
+    },
+  });
+
+  document.getElementById('location-auto-btn').addEventListener('click', async () => {
+    showStatus('Detecting your location…');
+    clearManualLocation();
+
+    const detected = await getUserLocation();
+    if (detected) {
+      applyLocation(detected);
+      statusEl.hidden = true;
+      closeDropdown();
+    } else {
+      applyLocation(DEFAULT_LOCATION);
+      showStatus('Location access denied — using Waterloo, ON, Canada.');
+    }
+  });
+}
+
+// A reference city, not the user's own, so there's no "Use my location".
+function setupSecondClockPicker() {
+  setupCityPicker({
+    container: 'second-clock-picker',
+    button: 'second-clock-location-btn',
+    dropdown: 'second-clock-dropdown',
+    input: 'second-clock-manual-input',
+    submit: 'second-clock-manual-btn',
+    status: 'second-clock-status',
+  }, {
+    notFoundMessage: 'City not found.',
+    accept: (result) => Boolean(result && result.timezone),
+    apply: (result, query) => {
+      setSecondClockManual({ label: query, timezone: result.timezone });
+      renderClock();
+    },
   });
 }
 
@@ -516,31 +469,27 @@ function safeFormatCalendarDateParts(date, calendar) {
   }
 }
 
-// Renders each calendar's year/month/day into their own column so the three
-// rows (Gregorian/Shamsi/Ghamari) line up under each other.
+// A <span> with text, and a class when given.
+function makeWidgetSpan(className, text) {
+  const span = document.createElement('span');
+  if (className) span.className = className;
+  span.textContent = text;
+  return span;
+}
+
+// One column per part, so the Gregorian/Shamsi/Ghamari rows line up.
 function renderDateWidgetRow(elementId, icon, date, calendar) {
   const { day, month, year } = safeFormatCalendarDateParts(date, calendar);
   const el = document.getElementById(elementId);
   el.innerHTML = '';
 
-  const iconEl = document.createElement('span');
-  iconEl.className = 'widget-date-icon';
-  iconEl.textContent = icon;
-
-  const dayEl = document.createElement('span');
-  dayEl.className = 'widget-date-day';
-  dayEl.textContent = day;
-
-  const monthEl = document.createElement('span');
-  monthEl.className = 'widget-date-month';
-  monthEl.textContent = month;
-
-  const yearEl = document.createElement('span');
-  yearEl.className = 'widget-date-year';
-  yearEl.textContent = year;
-
   // Year, month, day: the app's date order.
-  el.append(iconEl, yearEl, monthEl, dayEl);
+  el.append(
+    makeWidgetSpan('widget-date-icon', icon),
+    makeWidgetSpan('widget-date-year', year),
+    makeWidgetSpan('widget-date-month', month),
+    makeWidgetSpan('widget-date-day', day),
+  );
 }
 
 function renderDateWidget(date = new Date()) {
@@ -561,14 +510,13 @@ function initPrayerWidget(location) {
   const utcOffsetHours = -new Date().getTimezoneOffset() / 60;
   const times = computePrayerTimes({ lat: location.lat, lon: location.lon, date: new Date(), utcOffsetHours });
 
-  document.getElementById('widget-prayer-fajr').textContent = times.fajr;
-  document.getElementById('widget-prayer-dhuhr').textContent = times.dhuhr;
-  document.getElementById('widget-prayer-maghrib').textContent = times.maghrib;
-  document.getElementById('widget-prayer-midnight').textContent = times.midnight;
+  ['fajr', 'dhuhr', 'maghrib', 'midnight'].forEach((name) => {
+    document.getElementById(`widget-prayer-${name}`).textContent = times[name];
+  });
 }
 
 async function fetchWeather(lat, lon) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=3`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto&forecast_days=${FORECAST_DAYS}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('Weather request failed');
 
@@ -593,8 +541,7 @@ function renderWeather(data) {
   const forecastEl = document.getElementById('widget-weather-forecast');
   forecastEl.innerHTML = '';
 
-  const FORECAST_DAYS_SHOWN = 3;
-  data.daily.time.slice(0, FORECAST_DAYS_SHOWN).forEach((isoDate, i) => {
+  data.daily.time.slice(0, FORECAST_DAYS).forEach((isoDate, i) => {
     const day = new Date(`${isoDate}T00:00:00`);
     const info = mapWeatherCode(data.daily.weather_code[i]);
     const high = Math.round(data.daily.temperature_2m_max[i]);
@@ -602,19 +549,11 @@ function renderWeather(data) {
 
     const item = document.createElement('div');
     item.className = 'widget-forecast-day';
-
-    const dayLabel = document.createElement('span');
-    dayLabel.textContent = day.toLocaleDateString(undefined, { weekday: 'short' });
-
-    const icon = document.createElement('span');
-    icon.className = 'widget-forecast-icon';
-    icon.textContent = info.icon;
-
-    const temps = document.createElement('span');
-    temps.className = 'widget-forecast-temps';
-    temps.textContent = `${high}°/${low}°`;
-
-    item.append(dayLabel, icon, temps);
+    item.append(
+      makeWidgetSpan(null, day.toLocaleDateString(undefined, { weekday: 'short' })),
+      makeWidgetSpan('widget-forecast-icon', info.icon),
+      makeWidgetSpan('widget-forecast-temps', `${high}°/${low}°`),
+    );
     forecastEl.appendChild(item);
   });
 }
@@ -637,12 +576,8 @@ async function initWeatherWidget(location) {
   }
 }
 
-// The section pages (/health/, /finance/, /track/, /other/) hide the bulbs row — it
-// belongs to the dashboard as a whole rather than to any one wrapper — and a
-// clock ticking every second behind a hidden row, with prayer-time and forecast
-// requests behind it, is work nobody can see. Checked at both entry points
-// (here and applySettingsToWidgets) rather than at the call sites, so no future
-// caller has to remember it.
+// Section pages hide the bulbs row, and a clock and fetches behind it are wasted
+// work; both entry points check this so no caller has to.
 function widgetsOnPage() {
   const row = document.querySelector('.widget-cards');
   return Boolean(row) && !row.hidden;
@@ -657,7 +592,7 @@ async function startWidgets() {
 
   widgetLocationLabel = fallbackLocationLabel();
   renderClock();
-  setInterval(renderClock, 1000);
+  setInterval(renderClock, CLOCK_TICK_MS);
   setupLocationPicker();
   setupSecondClockPicker();
 

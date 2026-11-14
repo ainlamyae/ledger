@@ -1,28 +1,10 @@
-﻿// The Health Insight panel's Activity mode: a plain-language workout-performance
-// snapshot (consistency, activity-type breakdown, total resistance volume, and a
-// per-muscle-group last-trained/volume breakdown). The muscle-group detail is
-// this mode's own contribution — the Wellness mode's activity section only
-// reports totals by description (NEAT/Cardio/Strength Training). Everything else
-// is borrowed: aggregateWindow/previousDateRange/formatActivityBreakdownLines/
-// formatProfileLines from health-insight-wellness.js,
-// parseWorkoutNoteLines from health-activity-estimator.js. health-insight.js drives it.
+// The Health Insight panel's Activity mode: consistency, the activity-type
+// breakdown, resistance volume, and each muscle group's last-trained gap and
+// exercises. Muscle groups and the exercise -> group mapping come from the
+// Activities sheet (health-activity-catalogue.js), in the sheet's order.
 
-// Muscle groups and the exercise -> group mapping now come from the Activities
-// sheet tab (health-activity-catalogue.js). The reported groups are whatever that sheet
-// actually names, in the order it names them, so filling in a blank cell with a
-// group that didn't exist before starts reporting without a code change.
-
-// Total resistance-training REPS logged in [fromIso, toIso], across every
-// exercise (mapped or not) — the simple whole-body volume-trend figure,
-// independent of the per-muscle breakdown below.
-//
-// Reps rather than sets because the workout note records total reps per exercise
-// ("30x Leg Press"): 30 could have been 3x10 or 5x6, so a set count is no longer
-// recoverable from the log. Reps are the finer figure of the two and the older
-// two-number lines convert into them exactly (3x10 = 30 reps, done by
-// parseWorkoutNoteLines), so volume stays comparable across entries logged either
-// side of that format change — which matters here, since this figure's whole job
-// is a current-vs-previous-period comparison.
+// Total resistance reps in [fromIso, toIso], mapped or not. Reps, not sets: the
+// note stores total reps ("30x Leg Press"), and older "3x10" lines convert exactly.
 function sumStrengthRepsInWindow(fromIso, toIso) {
   let total = 0;
   physiqueAsHealthEntries()
@@ -35,14 +17,9 @@ function sumStrengthRepsInWindow(fromIso, toIso) {
   return total;
 }
 
-// Per muscle group: reps performed (see sumStrengthRepsInWindow for why reps
-// rather than sets) and sessions (distinct dates trained) in
-// [fromIso, toIso], plus the last-trained date searched across the entry's
-// *full* history — so a long-neglected muscle still reads correctly even
-// when it falls outside the selected range, rather than showing as "never
-// logged" just because the picked window happens to be short. Sorted
-// most-neglected-first (never logged, then longest gap, then lowest volume)
-// so the muscle needing attention next always leads the list.
+// Per muscle group: reps and sessions in range, and the last-trained date over the
+// whole history (so a long-neglected group isn't "never logged" on a short range).
+// Most neglected first: never logged, then longest gap, then lowest volume.
 function computeMuscleGroupRows(fromIso, toIso) {
   const stats = new Map(activityMuscleGroups().map((m) => [m, {
     repsInRange: 0, sessionDatesInRange: new Set(), lastTrainedDate: null, exerciseReps: new Map(),
@@ -61,8 +38,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
           if (e.date >= fromIso && e.date <= toIso) {
             s.repsInRange += line.reps;
             s.sessionDatesInRange.add(e.date);
-            // Summed per exercise across the range, so a group trained twice reports
-            // one figure per movement rather than the same name twice.
+            // One figure per movement across the range.
             s.exerciseReps.set(line.name, (s.exerciseReps.get(line.name) || 0) + line.reps);
           }
         });
@@ -72,7 +48,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
   return [...stats.keys()].map((muscle) => {
     const s = stats.get(muscle);
     const daysSinceLastTrained = s.lastTrainedDate
-      ? Math.round((dateFromIso(todayIso) - dateFromIso(s.lastTrainedDate)) / 86400000)
+      ? Math.round((dateFromIso(todayIso) - dateFromIso(s.lastTrainedDate)) / INSIGHT_MS_PER_DAY)
       : null;
     return {
       muscle,
@@ -80,7 +56,7 @@ function computeMuscleGroupRows(fromIso, toIso) {
       sessionsInRange: s.sessionDatesInRange.size,
       lastTrainedDate: s.lastTrainedDate,
       daysSinceLastTrained,
-      // Heaviest movement first — the one carrying the group's volume leads.
+      // Heaviest movement first.
       exercises: [...s.exerciseReps.entries()]
         .map(([name, reps]) => ({ name, reps }))
         .sort((a, b) => b.reps - a.reps),
@@ -95,14 +71,14 @@ function computeMuscleGroupRows(fromIso, toIso) {
   });
 }
 
-// One row per logged activity entry. Only the non-resistance types survive into the
-// prompt (summariseRoutineActivity), but the resistance ones are still gathered here
-// so that filter can tell them apart by content.
+// One row per logged activity day, newest first. Resistance sessions are kept so
+// summariseRoutineActivity can tell them apart by content.
 function computeActivitySessionDays(fromIso, toIso) {
   const byDate = new Map();
-  const bodyMassKg = latestBodyMassKg(physiqueAsHealthEntries());
+  const entries = physiqueAsHealthEntries();
+  const bodyMassKg = latestBodyMassKg(entries);
 
-  physiqueAsHealthEntries()
+  entries
     .filter((e) => isActivityCategory(e.category) && e.amount !== null && e.date >= fromIso && e.date <= toIso)
     .forEach((e) => {
       if (!byDate.has(e.date)) byDate.set(e.date, { date: e.date, sessions: [], mins: 0, kcal: 0 });
@@ -113,8 +89,7 @@ function computeActivitySessionDays(fromIso, toIso) {
         description: e.description || 'Other',
         mins,
         kcal,
-        // The workout note's own lines, kept in their logged order so the prompt can
-        // list what was actually done rather than only its rep total.
+        // The note's lines in logged order.
         items: e.notes.trim() ? parseWorkoutNoteLines(e.notes) : [],
       });
       day.mins += mins;
@@ -124,24 +99,19 @@ function computeActivitySessionDays(fromIso, toIso) {
   return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
 }
 
-// Reuses health-insight-wellness.js's own aggregateWindow/previousDateRange — the exact same
-// current-vs-previous-period computation the Wellness mode already runs, just for
-// this mode's own selected range — plus the muscle-group/volume metrics above.
+// Wellness's current-vs-previous aggregation for this range, plus the
+// muscle-group and volume figures above.
 function gatherActivityInsightMetrics(fromIso, toIso) {
   const dates = datesInRange(fromIso, toIso);
   const lookbackDays = dates.length;
-  const current = aggregateWindow(dates);
-  const previous = aggregateWindow(previousDateRange(fromIso, toIso));
   const prevRange = previousDateRange(fromIso, toIso);
+  const current = aggregateWindow(dates);
+  const previous = aggregateWindow(prevRange);
 
   return {
     lookbackDays,
-    // Same age/sex/height/body-mass/BMI block the Wellness and Food modes send
-    // (health-insight-wellness.js) — training volume, rest needs and what counts as a heavy session
-    // all depend on the body doing the lifting, so the coach shouldn't be
-    // reasoning about this log without knowing whose it is.
     profile: gatherProfileSnapshot(),
-    bodyMassHealthyKg: getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT),
+    bodyMassHealthyKg: bodyMassHealthySettingKg(),
     activityDaysLogged: current.activityDaysLogged,
     prevActivityDaysLogged: previous.activityDaysLogged,
     avgActivityMins: current.avgActivityMins,
@@ -157,12 +127,8 @@ function gatherActivityInsightMetrics(fromIso, toIso) {
   };
 }
 
-// The non-resistance types — a walk, a swim — as one summary row each. Resistance
-// work is deliberately left out: it's reported exercise by exercise under the muscle
-// group it trained, so listing it here as well would name every movement twice.
-//
-// The test is rep-bearing content, not the description text, so a type is judged by
-// what it actually contains however it happens to be named.
+// One summary row per type with no resistance work (walk, swim). Resistance is
+// listed under its muscle groups instead. Judged by content, not by name.
 function summariseRoutineActivity(sessionDays) {
   const byDescription = new Map();
   sessionDays.forEach((day) => day.sessions.forEach((s) => {
@@ -204,13 +170,9 @@ function formatRoutineActivityLines(routine, lookbackDays) {
   ];
 }
 
-// The exercises hang off the muscle group they trained rather than off a session of
-// their own: a separate session log listed every movement a second time, and grouped
-// by date it answered "what did I do on Tuesday" when the question this mode is built
-// around is "what has each muscle actually had".
+// Exercises listed under the group they trained: the question is what each muscle has had.
 function formatMuscleGroupLines(rows) {
   return rows.map((r) => {
-    // No calendar date beside the gap — "5 days ago" already says it.
     const last = r.lastTrainedDate
       ? `last trained ${r.daysSinceLastTrained} day${r.daysSinceLastTrained === 1 ? '' : 's'} ago`
       : 'never logged';
@@ -222,7 +184,7 @@ function formatMuscleGroupLines(rows) {
 }
 
 function formatActivityInsightPrompt(m) {
-  const lines = [
+  return [
     ...formatProfileLines(m.profile, m.bodyMassHealthyKg),
     '',
     `Total resistance-training reps, all muscle groups: ${m.totalRepsInRange} — previous period: ${m.prevTotalRepsInRange}`,
@@ -232,9 +194,7 @@ function formatActivityInsightPrompt(m) {
     '',
     'Muscle group breakdown, most neglected first, with the exercises that built it:',
     ...formatMuscleGroupLines(m.muscleRows),
-  ];
-
-  return lines.join('\n');
+  ].join('\n');
 }
 
 const ACTIVITY_INSIGHT_SYSTEM_PROMPT = `You are a supportive strength-training coach reviewing someone's own self-tracked workout log. You are not a doctor — do not diagnose injuries or prescribe rehab; if something sounds like pain or an injury, tell them to see a professional instead of advising around it.

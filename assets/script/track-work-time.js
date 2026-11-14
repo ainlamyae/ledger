@@ -1,10 +1,20 @@
 const WORK_TIME_RANGE = `${CONFIG.SHEETS.WORK_TIME}!A2:H`;
 const TS_PAGE_SIZE = 28;
+const WORK_TIME_TASK_DISPLAY_MAX = 30;
+// The table's default date range around today.
+const WORK_TIME_DEFAULT_DAYS_BACK = 7;
+const WORK_TIME_DEFAULT_DAYS_AHEAD = 14;
+// The form fields a holiday blanks and disables (suffixes of work-time-*).
+const WORK_TIME_SHIFT_FIELDS = ['start', 'end', 'break-h', 'break-m'];
 
 let allTimeEntries = [];
 let workTimeListenersAttached = false;
-let tsSort = { dir: -1 };
+let tsSort = { key: 'date', dir: -1 };
 let tsCurrentPage = 1;
+
+function workTimeField(name) {
+  return document.getElementById(`work-time-${name}`);
+}
 
 function timeToMinutes(hhmm) {
   if (!hhmm) return null;
@@ -12,12 +22,8 @@ function timeToMinutes(hhmm) {
   return h * 60 + m;
 }
 
-// A pre-existing Start/End cell can carry Sheets' own default time number
-// format (e.g. "9:40:00 AM") — the first USER_ENTERED write of a bare "09:40"
-// got auto-detected as a time value and the cell reformatted around it, so
-// FORMATTED_STRING reads it back dressed in seconds and/or AM/PM instead of
-// what was actually typed. Strips both back down to a plain 24-hour "HH:mm",
-// same tolerance parseBreakMinutes already applies to Break.
+// A cell Sheets once auto-formatted as a time reads back as e.g. "9:40:00 AM";
+// strips it back to the 24-hour "HH:mm" that was typed.
 function normalizeTimeString(raw) {
   if (!raw) return '';
   const match = String(raw).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
@@ -29,11 +35,7 @@ function normalizeTimeString(raw) {
   return `${String(hour).padStart(2, '0')}:${match[2]}`;
 }
 
-// The Break cell is plain minutes once the app has written it, but a
-// pre-existing Excel-style duration-formatted cell (e.g. a Break column
-// carried over from before this app touched the sheet) comes back from
-// Sheets as a formatted "H:MM" or "H:MM:SS" string instead of a number —
-// parse both.
+// Plain minutes, or an older duration-formatted cell's "H:MM" / "H:MM:SS".
 function parseBreakMinutes(raw) {
   if (!raw) return 0;
   const asNumber = Number(raw);
@@ -51,16 +53,12 @@ function minutesToHm(mins) {
   return `${sign}${Math.floor(abs / 60)}h ${abs % 60}m`;
 }
 
-// Same as minutesToHm, but always shows a sign — a bare "6h" reads as neutral,
-// while the overtime summary needs +/- to be unambiguous at a glance.
+// Always signed, so the overtime summary's +/- is unambiguous.
 function signedMinutesToHm(mins) {
   return mins >= 0 ? `+${minutesToHm(mins)}` : minutesToHm(mins);
 }
 
-// The Break field itself is already an "HH:mm" time input, but its value
-// still needs normalizing (zero-padding, rounding) into the exact "H:MM"
-// string the sheet write needs (see submitWorkTimeForm's comment on why
-// that format is required).
+// The zero-padded "HH:MM" Break string the sheet write needs (see submitWorkTimeForm).
 function minutesToTimeInput(mins) {
   const abs = Math.max(0, Math.round(mins));
   return `${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
@@ -73,15 +71,12 @@ function computeDurationMinutes(start, end, breakMinutes) {
   return endMin - startMin - (breakMinutes || 0);
 }
 
-// Appending "T00:00:00" parses the date in the local timezone instead of
-// UTC, so the weekday/weekend check below can't land a day off.
+// Local midnight, not UTC, so the weekday can't land a day off.
 function dateFromIso(dateStr) {
   return new Date(`${dateStr}T00:00:00`);
 }
 
-// date.toISOString() converts through UTC, which can shift the calendar
-// date by one near midnight depending on the local timezone offset — this
-// reads the Date object's own local year/month/day instead.
+// The Date's local calendar date; toISOString() would go through UTC.
 function isoFromDate(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -105,11 +100,19 @@ function isWeekend(dateStr) {
   return day === 0 || day === 6;
 }
 
+// No clock-in but a Task note: a holiday or day off.
+function isHolidayEntry(entry) {
+  return !!entry && !entry.start && !entry.end && !!entry.task;
+}
+
 async function initWorkTime(forceRefresh = false) {
-  // Attached before the data fetch below — a failed/slow refresh must never
-  // leave the form controls permanently dead.
+  // Before the fetch, so a failed refresh never leaves the controls dead.
   if (!workTimeListenersAttached) {
     workTimeListenersAttached = true;
+    const rerenderFromFirstPage = () => {
+      tsCurrentPage = 1;
+      renderWorkTimeList();
+    };
 
     document.getElementById('log-today-btn').addEventListener('click', () => {
       openWorkTimeForm(isoFromDate(new Date()));
@@ -120,81 +123,37 @@ async function initWorkTime(forceRefresh = false) {
       openWorkTimeForm(slug);
       return slug;
     });
-    document.getElementById('work-time-cancel-btn').addEventListener('click', closeWorkTimeForm);
+    workTimeField('cancel-btn').addEventListener('click', closeWorkTimeForm);
     onFormSubmit('work-time-form', submitWorkTimeForm);
-    document.getElementById('work-time-holiday').addEventListener('change', () => {
+    workTimeField('holiday').addEventListener('change', () => {
       toggleWorkTimeHolidayFields();
       updateWorkTimeLiveDuration();
     });
-    ['work-time-start', 'work-time-end', 'work-time-break-h', 'work-time-break-m'].forEach((id) => {
-      document.getElementById(id).addEventListener('input', updateWorkTimeLiveDuration);
-    });
-    document.getElementById('work-time-date-from').addEventListener('input', () => {
-      tsCurrentPage = 1;
-      renderWorkTimeList();
-    });
-    document.getElementById('work-time-date-to').addEventListener('input', () => {
-      tsCurrentPage = 1;
-      renderWorkTimeList();
-    });
-    setupWorkTimeSorting();
+    WORK_TIME_SHIFT_FIELDS.forEach((name) => workTimeField(name).addEventListener('input', updateWorkTimeLiveDuration));
+    ['date-from', 'date-to'].forEach((name) => workTimeField(name).addEventListener('input', rerenderFromFirstPage));
+    makeSortableHeaders('#work-time-table', tsSort, rerenderFromFirstPage);
   }
 
   await refreshWorkTime(forceRefresh);
 }
 
-function setupWorkTimeSorting() {
-  const th = document.querySelector('#work-time-table th.sortable');
-  const label = document.createElement('span');
-  label.textContent = th.textContent;
-  const indicator = document.createElement('span');
-  indicator.className = 'sort-indicator';
-  th.textContent = '';
-  th.append(label, indicator);
-  th.setAttribute('tabindex', '0');
-
-  const updateIndicator = () => { indicator.textContent = tsSort.dir === 1 ? ' ▲' : ' ▼'; };
-  updateIndicator();
-
-  th.addEventListener('click', () => {
-    tsSort.dir *= -1;
-    updateIndicator();
-    tsCurrentPage = 1;
-    renderWorkTimeList();
-  });
-  th.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      th.click();
-    }
-  });
-}
-
-// Defaults the filter to 1 week back through 2 weeks out from today, but
-// only the first time — never stomps a date range the user already set
-// themselves. Anchored directly on today (not rounded to a weekday) so the
-// split is exactly 1 week back / 2 weeks out regardless of what day of the
-// week today happens to be.
+// Seeds the filter around today, once; never overrides a range the user set.
 function setDefaultWorkTimeDateRange() {
-  const fromInput = document.getElementById('work-time-date-from');
-  const toInput = document.getElementById('work-time-date-to');
+  const fromInput = workTimeField('date-from');
+  const toInput = workTimeField('date-to');
   if (fromInput.value || toInput.value) return;
 
   const today = new Date();
   const fromDate = new Date(today);
-  fromDate.setDate(today.getDate() - 7);
+  fromDate.setDate(today.getDate() - WORK_TIME_DEFAULT_DAYS_BACK);
   const toDate = new Date(today);
-  toDate.setDate(today.getDate() + 14);
+  toDate.setDate(today.getDate() + WORK_TIME_DEFAULT_DAYS_AHEAD);
   fromInput.value = isoFromDate(fromDate);
   toInput.value = isoFromDate(toDate);
 }
 
-// Company/Start/End/Break/Date are read and written as plain text/numbers
-// the app fully owns (e.g. "09:00", not an Excel time-of-day cell), the same
-// way Transactions' Date column is a plain ISO string. Day (C) and Duration
-// (G) are never read or written — Duration is always computed client-side
-// from Start/End/Break, and Day only matters when appending a brand-new row
-// that has no formula to backfill it.
+// Day (C) and Duration (G) are never read: Duration is computed here, and Day is
+// only written on a new row.
 async function refreshWorkTime(forceRefresh = false) {
   const resp = await getValues(WORK_TIME_RANGE, VALUE_PARAMS);
   const values = resp.values || [];
@@ -220,28 +179,21 @@ async function refreshWorkTime(forceRefresh = false) {
   checkWorkTimeReminder();
 }
 
-// The 8h/day overtime pace and the "log today" reminder should reflect only
-// your current employer — entries from a company you've since left would
-// otherwise skew both. "Last company" is whichever company appears on the
-// most recently dated entry, on or before today, that has one; if no entry
-// has a company yet (e.g. existing data written before this column existed),
-// nothing is filtered out. Future-dated rows are excluded even if they carry
-// a company — a day that hasn't happened yet (e.g. a pre-filled placeholder
-// row for the rest of the year) hasn't actually been "logged" and shouldn't
-// be able to define your current employer.
+// The company on the latest entry dated on or before today. Future rows (e.g.
+// pre-filled placeholders) haven't been worked, so they can't name it.
 function getLastCompany(entries) {
   const today = isoFromDate(new Date());
   const withCompany = entries.filter((e) => e.company && e.date <= today).sort((a, b) => b.date.localeCompare(a.date));
   return withCompany.length ? withCompany[0].company : null;
 }
 
+// Only the current employer's entries; all of them if none has a company yet.
 function entriesForLastCompany(entries) {
   const lastCompany = getLastCompany(entries);
   return lastCompany ? entries.filter((e) => e.company === lastCompany) : entries;
 }
 
-// Fills the Company datalist with previously used values, most frequent
-// first, the same convention as Transactions' Payee/Description datalists.
+// Previously used companies, most frequent first.
 function populateWorkTimeCompanyOptions() {
   const counts = new Map();
   allTimeEntries.forEach(({ company }) => {
@@ -251,7 +203,7 @@ function populateWorkTimeCompanyOptions() {
 
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value]) => value);
 
-  const datalist = document.getElementById('work-time-company-options');
+  const datalist = workTimeField('company-options');
   datalist.innerHTML = '';
   sorted.forEach((value) => {
     const option = document.createElement('option');
@@ -260,9 +212,8 @@ function populateWorkTimeCompanyOptions() {
   });
 }
 
-// A weekday with nothing logged for today: a red "<days>d" badge (days since the
-// last logged day, like the other badges) opening today's day, and (once allowed
-// in the account menu) one Chrome notification a day. A logged holiday counts.
+// A weekday with nothing logged today: a red "<days>d" badge (days since the last
+// logged day) opening today, and once allowed one notification a day. A holiday counts.
 function checkWorkTimeReminder() {
   const today = isoFromDate(new Date());
   const entries = entriesForLastCompany(allTimeEntries).filter((e) => e.date <= today);
@@ -271,7 +222,7 @@ function checkWorkTimeReminder() {
     return;
   }
   const last = entries.reduce((max, e) => (e.date > max ? e.date : max), '');
-  const days = Math.round((dateFromIso(today) - dateFromIso(last)) / 86400000);
+  const days = Math.round((dateFromIso(today) - dateFromIso(last)) / MS_PER_DAY);
   setPageBadge('track', 'work-time', { text: `${days}d`, title: `Today's hours aren't logged; last logged ${days} days ago (${last})`, record: today });
   if ('Notification' in window && Notification.permission === 'granted'
     && localStorage.getItem('ledger_last_reminder_notified') !== today) {
@@ -281,8 +232,8 @@ function checkWorkTimeReminder() {
 }
 
 function getFilteredTimeEntries() {
-  const dateFrom = document.getElementById('work-time-date-from').value;
-  const dateTo = document.getElementById('work-time-date-to').value;
+  const dateFrom = workTimeField('date-from').value;
+  const dateTo = workTimeField('date-to').value;
 
   return allTimeEntries
     .filter((e) => (!dateFrom || e.date >= dateFrom) && (!dateTo || e.date <= dateTo))
@@ -290,7 +241,7 @@ function getFilteredTimeEntries() {
 }
 
 function renderWorkTimeList() {
-  const tbody = document.getElementById('work-time-body');
+  const tbody = workTimeField('body');
   tbody.innerHTML = '';
 
   const entries = getFilteredTimeEntries();
@@ -307,45 +258,22 @@ function renderWorkTimeList() {
     tbody.appendChild(renderEmptyRow(9, message));
   }
 
-  // Same tint the Activity Plan uses for a row already logged today, and the
-  // Physique table for today's day row. Read per render, so a tab left open across
-  // midnight moves the mark on its next redraw.
+  // Read per render, so a tab left open past midnight moves the mark.
   const todayIso = isoFromDate(new Date());
 
   pageEntries.forEach((e) => {
     const tr = document.createElement('tr');
     const weekend = isWeekend(e.date);
-
-    const companyCell = document.createElement('td');
-    const firstSpace = e.company.indexOf(' ');
-    companyCell.textContent = firstSpace === -1 ? e.company : `${e.company.slice(0, firstSpace)}…`;
-    companyCell.title = e.company;
-
-    const dateCell = document.createElement('td');
-    dateCell.textContent = e.date;
-
-    const dayCell = document.createElement('td');
-    dayCell.textContent = dayNameFromDate(e.date);
-
-    const startCell = document.createElement('td');
-    const endCell = document.createElement('td');
-    const breakCell = document.createElement('td');
-    const durationCell = document.createElement('td');
-    const taskCell = document.createElement('td');
-
-    // A weekday with no clock-in but a Task note is a holiday/day off (the
-    // same free-text convention Transactions uses for Type); blank Task on
-    // a weekday instead flags an entry nobody filled in yet.
+    // A weekday without times is a holiday, or (no Task either) not filled in yet.
     const noTimes = !e.start && !e.end;
-    const isHoliday = !weekend && noTimes && e.task;
+    const isHoliday = !weekend && isHolidayEntry(e);
     const isNoEntry = !weekend && noTimes && !e.task;
 
-    startCell.textContent = noTimes ? '—' : e.start.slice(0, 5);
-    endCell.textContent = noTimes ? '—' : e.end.slice(0, 5);
-    breakCell.textContent = noTimes ? '—' : (e.breakMinutes ? `${e.breakMinutes}m` : '—');
-    taskCell.textContent = e.task.length > 30 ? `${e.task.slice(0, 30)}…` : e.task;
-    taskCell.title = e.task;
+    const firstSpace = e.company.indexOf(' ');
+    const company = firstSpace === -1 ? e.company : `${e.company.slice(0, firstSpace)}…`;
+    const task = e.task.length > WORK_TIME_TASK_DISPLAY_MAX ? `${e.task.slice(0, WORK_TIME_TASK_DISPLAY_MAX)}…` : e.task;
 
+    const durationCell = document.createElement('td');
     if (isHoliday) {
       durationCell.textContent = '🏖 Holiday';
       durationCell.classList.add('work-time-holiday-badge');
@@ -363,21 +291,25 @@ function renderWorkTimeList() {
       openWorkTimeForm(e.date);
     } }));
 
-    tr.append(companyCell, dateCell, dayCell, startCell, endCell, breakCell, durationCell, taskCell, actionsCell);
-    // A weekend and a holiday are the same thing to this table: a day off.
+    tr.append(
+      makeCell(company, e.company),
+      makeCell(e.date),
+      makeCell(dayNameFromDate(e.date)),
+      makeCell(noTimes ? '—' : e.start.slice(0, 5)),
+      makeCell(noTimes ? '—' : e.end.slice(0, 5)),
+      makeCell(noTimes || !e.breakMinutes ? '—' : `${e.breakMinutes}m`),
+      durationCell,
+      makeCell(task, e.task),
+      actionsCell,
+    );
+    // A weekend and a holiday are both a day off here.
     if (weekend || isHoliday) tr.classList.add('work-time-off');
     else if (isNoEntry) tr.classList.add('work-time-no-entry');
-    // Not part of that chain: today can also be a day off, and both marks are worth
-    // keeping. The green lands on the cells (.today-row > td) while a day off tints
-    // the row itself, so today's tint paints over it while its muted text survives.
+    // Separate: today's tint lands on the cells, so it shows over a day off's row tint.
     if (e.date === todayIso) tr.classList.add('today-row');
     tbody.appendChild(tr);
   });
 
-  renderTsPagination(totalPages);
-}
-
-function renderTsPagination(totalPages) {
   renderPager('ts-pagination', {
     page: tsCurrentPage,
     totalPages,
@@ -389,63 +321,57 @@ function renderTsPagination(totalPages) {
 }
 
 function toggleWorkTimeHolidayFields() {
-  const holiday = document.getElementById('work-time-holiday').checked;
-  ['work-time-start', 'work-time-end', 'work-time-break-h', 'work-time-break-m'].forEach((id) => {
-    const el = document.getElementById(id);
+  const holiday = workTimeField('holiday').checked;
+  WORK_TIME_SHIFT_FIELDS.forEach((name) => {
+    const el = workTimeField(name);
     el.disabled = holiday;
-    if (holiday) el.value = id.startsWith('work-time-break') ? '0' : '';
+    if (holiday) el.value = name.startsWith('break') ? '0' : '';
   });
 }
 
 function workTimeBreakMinutesFromInputs() {
-  const h = Number(document.getElementById('work-time-break-h').value) || 0;
-  const m = Number(document.getElementById('work-time-break-m').value) || 0;
+  const h = Number(workTimeField('break-h').value) || 0;
+  const m = Number(workTimeField('break-m').value) || 0;
   return h * 60 + m;
 }
 
 function updateWorkTimeLiveDuration() {
-  const liveDuration = document.getElementById('work-time-live-duration');
-  if (document.getElementById('work-time-holiday').checked) {
+  const liveDuration = workTimeField('live-duration');
+  if (workTimeField('holiday').checked) {
     liveDuration.textContent = '🏖 Holiday';
     return;
   }
 
-  const start = document.getElementById('work-time-start').value;
-  const end = document.getElementById('work-time-end').value;
-  const breakMinutes = workTimeBreakMinutesFromInputs();
-  const durationMin = computeDurationMinutes(start, end, breakMinutes);
+  const durationMin = computeDurationMinutes(workTimeField('start').value, workTimeField('end').value, workTimeBreakMinutesFromInputs());
   liveDuration.textContent = durationMin !== null ? minutesToHm(durationMin) : '—';
 }
 
 function openWorkTimeForm(dateStr) {
   const existing = allTimeEntries.find((e) => e.date === dateStr);
 
-  document.getElementById('work-time-company').value = existing?.company || getLastCompany(allTimeEntries) || '';
-  document.getElementById('work-time-date').value = dateStr;
-  document.getElementById('work-time-start').value = existing?.start || '';
-  document.getElementById('work-time-end').value = existing?.end || '';
+  workTimeField('company').value = existing?.company || getLastCompany(allTimeEntries) || '';
+  workTimeField('date').value = dateStr;
+  workTimeField('start').value = existing?.start || '';
+  workTimeField('end').value = existing?.end || '';
   const breakMinutes = Math.max(0, Math.round(existing?.breakMinutes || 0));
-  document.getElementById('work-time-break-h').value = Math.floor(breakMinutes / 60);
-  document.getElementById('work-time-break-m').value = breakMinutes % 60;
-  document.getElementById('work-time-task').value = existing?.task || '';
+  workTimeField('break-h').value = Math.floor(breakMinutes / 60);
+  workTimeField('break-m').value = breakMinutes % 60;
+  workTimeField('task').value = existing?.task || '';
 
-  const isHoliday = !!(existing && !existing.start && !existing.end && existing.task);
-  document.getElementById('work-time-holiday').checked = isHoliday;
+  workTimeField('holiday').checked = isHolidayEntry(existing);
   toggleWorkTimeHolidayFields();
   updateWorkTimeLiveDuration();
 
   clearFieldError('work-time-form-error');
-  document.getElementById('work-time-modal').hidden = false;
+  workTimeField('modal').hidden = false;
 }
 
 function closeWorkTimeForm() {
-  document.getElementById('work-time-modal').hidden = true;
+  workTimeField('modal').hidden = true;
 }
 
-// Keeps the sheet's "one row per calendar day" shape intact: if logging a
-// new date leaves a gap since the last entry already in the sheet (e.g. a
-// skipped weekend, or any other unlogged stretch), fill every missing day
-// in between with a blank row before appending the new one.
+// Keeps one row per calendar day: blank rows for every missing day between the
+// last earlier entry and the new date.
 async function backfillMissingDates(untilDate) {
   const existingDates = new Set(allTimeEntries.map((e) => e.date));
   const priorDates = [...existingDates].filter((d) => d < untilDate).sort();
@@ -469,19 +395,15 @@ async function backfillMissingDates(untilDate) {
 async function submitWorkTimeForm(event) {
   event.preventDefault();
 
-  const company = document.getElementById('work-time-company').value.trim();
-  const date = document.getElementById('work-time-date').value;
-  const holiday = document.getElementById('work-time-holiday').checked;
-  const start = holiday ? '' : document.getElementById('work-time-start').value;
-  const end = holiday ? '' : document.getElementById('work-time-end').value;
-  // The Break field is two hours/minutes number inputs in the UI, but is
-  // written to the sheet as an "H:MM" time string, not a raw minutes count:
-  // some Break cells carry pre-existing Excel-style duration formatting, and
-  // Sheets reinterprets a plain integer written into those as a count of
-  // days (e.g. 15 minutes becomes a 15-day duration). A time-string literal
-  // parses correctly under that formatting either way.
+  const company = workTimeField('company').value.trim();
+  const date = workTimeField('date').value;
+  const holiday = workTimeField('holiday').checked;
+  const start = holiday ? '' : workTimeField('start').value;
+  const end = holiday ? '' : workTimeField('end').value;
+  // Written as "HH:MM", not minutes: a duration-formatted Break cell would read
+  // a bare 15 as 15 days.
   const breakValue = minutesToTimeInput(holiday ? 0 : workTimeBreakMinutesFromInputs());
-  const task = document.getElementById('work-time-task').value;
+  const task = workTimeField('task').value;
 
   if (!holiday && start && end && timeToMinutes(end) <= timeToMinutes(start)) {
     showFieldError('work-time-form-error', 'End time must be after Start time.');
@@ -492,16 +414,13 @@ async function submitWorkTimeForm(event) {
     const existing = allTimeEntries.find((e) => e.date === date);
 
     if (existing) {
-      // Three calls so Day (C) and Duration (G), which this app never
-      // writes, are never touched.
-      await updateValues(`${CONFIG.SHEETS.WORK_TIME}!A${existing.row}`, [[company]]);
-      // RAW, not the default USER_ENTERED: a bare "09:40" written USER_ENTERED
-      // gets auto-detected as a time value and the cell reformatted around it
-      // (seconds, AM/PM), so the next read back returns that reformatted
-      // string instead of what was typed — the same class of bug documented
-      // on the Settings tab's writes (see other-settings.js).
-      await updateValues(`${CONFIG.SHEETS.WORK_TIME}!D${existing.row}:F${existing.row}`, [[start, end, breakValue]], 'RAW');
-      await updateValues(`${CONFIG.SHEETS.WORK_TIME}!H${existing.row}`, [[task]]);
+      const sheet = CONFIG.SHEETS.WORK_TIME;
+      const row = existing.row;
+      // Three writes, so Day (C) and Duration (G) are never touched.
+      await updateValues(`${sheet}!A${row}`, [[company]]);
+      // RAW: USER_ENTERED would turn "09:40" into a time cell that reads back reformatted.
+      await updateValues(`${sheet}!D${row}:F${row}`, [[start, end, breakValue]], 'RAW');
+      await updateValues(`${sheet}!H${row}`, [[task]]);
     } else {
       await backfillMissingDates(date);
       await appendValues(WORK_TIME_RANGE, [[company, date, dayNameFromDate(date), start, end, breakValue, '', task]], 'RAW');

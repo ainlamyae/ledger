@@ -1,8 +1,11 @@
 // Market indicators and signals. Pure functions; bars are { d, o, h, l, c, v } ascending, c adjusted.
 const MM_TRADING_DAYS = 252;
+const MM_RATIO_MIN_CLOSES = 64; // a quarter of returns for Sharpe/Sortino
+const MM_MOMENTUM_MIN_BARS = MM_TRADING_DAYS + 1;
+const MM_MONTH_BARS = 21;
 
 function mmResult(value, needs, have) {
-  return { value: value, needs: needs, have: have };
+  return { value, needs, have };
 }
 
 function mmMean(xs) {
@@ -75,7 +78,7 @@ function macdSeries(closes, fast = 12, slow = 26, sig = 9) {
     for (let i = 0; i < s.length; i++) signal[start + i] = s[i];
   }
   const hist = macd.map((m, i) => (m === null || signal[i] === null ? null : m - signal[i]));
-  return { macd: macd, signal: signal, hist: hist };
+  return { macd, signal, hist };
 }
 
 function atrSeries(bars, n = 14) {
@@ -121,7 +124,7 @@ function bollingerSeries(closes, n = 20, k = 2) {
     upper[i] = mid[i] + k * sd;
     lower[i] = mid[i] - k * sd;
   }
-  return { mid: mid, upper: upper, lower: lower };
+  return { mid, upper, lower };
 }
 
 function logReturns(closes) {
@@ -153,22 +156,23 @@ function maxDrawdown(closes) {
   return mmResult(mdd, 2, closes.length);
 }
 
-function sharpeRatio(closes, rfAnnualPct = 0) {
-  if (closes.length < 64) return mmResult(null, 64, closes.length);
+// Annualized excess daily return per unit of deviation(returns, dailyRf).
+function mmAnnualizedRatio(closes, rfAnnualPct, deviation) {
+  if (closes.length < MM_RATIO_MIN_CLOSES) return mmResult(null, MM_RATIO_MIN_CLOSES, closes.length);
   const r = simpleReturns(closes);
-  const sd = mmSampleSd(r);
-  const v = sd ? ((mmMean(r) - rfAnnualPct / 100 / MM_TRADING_DAYS) / sd) * Math.sqrt(MM_TRADING_DAYS) : null;
-  return mmResult(v, 64, closes.length);
+  const rf = rfAnnualPct / 100 / MM_TRADING_DAYS;
+  const d = deviation(r, rf);
+  const v = d ? ((mmMean(r) - rf) / d) * Math.sqrt(MM_TRADING_DAYS) : null;
+  return mmResult(v, MM_RATIO_MIN_CLOSES, closes.length);
+}
+
+function sharpeRatio(closes, rfAnnualPct = 0) {
+  return mmAnnualizedRatio(closes, rfAnnualPct, (r) => mmSampleSd(r));
 }
 
 // Downside deviation averages over all N returns, not just the negative ones.
 function sortinoRatio(closes, rfAnnualPct = 0) {
-  if (closes.length < 64) return mmResult(null, 64, closes.length);
-  const r = simpleReturns(closes);
-  const rf = rfAnnualPct / 100 / MM_TRADING_DAYS;
-  const dd = Math.sqrt(mmMean(r.map((x) => Math.min(0, x - rf) ** 2)));
-  const v = dd ? ((mmMean(r) - rf) / dd) * Math.sqrt(MM_TRADING_DAYS) : null;
-  return mmResult(v, 64, closes.length);
+  return mmAnnualizedRatio(closes, rfAnnualPct, (r, rf) => Math.sqrt(mmMean(r.map((x) => Math.min(0, x - rf) ** 2))));
 }
 
 function betaVs(stockBars, marketBars, minAligned = 126) {
@@ -190,9 +194,9 @@ function betaVs(stockBars, marketBars, minAligned = 126) {
 }
 
 function momentum12_1(bars) {
-  if (bars.length < 253) return mmResult(null, 253, bars.length);
+  if (bars.length < MM_MOMENTUM_MIN_BARS) return mmResult(null, MM_MOMENTUM_MIN_BARS, bars.length);
   const t = bars.length - 1;
-  return mmResult(bars[t - 21].c / bars[t - 252].c - 1, 253, bars.length);
+  return mmResult(bars[t - MM_MONTH_BARS].c / bars[t - MM_TRADING_DAYS].c - 1, MM_MOMENTUM_MIN_BARS, bars.length);
 }
 
 // Accepts numbers or { d, c } month-end rows.
@@ -213,10 +217,10 @@ function monthEndCloses(bars) {
 }
 
 function fiftyTwoWeekRatio(bars) {
-  if (bars.length < 252) return mmResult(null, 252, bars.length);
+  if (bars.length < MM_TRADING_DAYS) return mmResult(null, MM_TRADING_DAYS, bars.length);
   let hi = -Infinity;
-  for (let i = bars.length - 252; i < bars.length; i++) hi = Math.max(hi, bars[i].h);
-  return mmResult(bars[bars.length - 1].c / hi, 252, bars.length);
+  for (let i = bars.length - MM_TRADING_DAYS; i < bars.length; i++) hi = Math.max(hi, bars[i].h);
+  return mmResult(bars[bars.length - 1].c / hi, MM_TRADING_DAYS, bars.length);
 }
 
 // SMA200 when there's enough daily history, else Faber's 10-month SMA (from monthlyBars if given).
@@ -225,15 +229,15 @@ function trendFilter(bars, monthlyBars = null) {
   if (have >= 200) {
     const close = bars[have - 1].c;
     const sma = mmMean(bars.slice(-200).map((b) => b.c));
-    return { value: close > sma, close: close, sma: sma, needs: 200, have: have, basis: 'SMA200' };
+    return { value: close > sma, close, sma, needs: 200, have, basis: 'SMA200' };
   }
   const me = monthEndCloses(monthlyBars && monthlyBars.length ? monthlyBars : bars);
   if (me.length >= 10) {
     const close = me[me.length - 1].c;
     const sma = mmMean(me.slice(-10).map((x) => x.c));
-    return { value: close > sma, close: close, sma: sma, needs: 10, have: me.length, basis: '10-month SMA' };
+    return { value: close > sma, close, sma, needs: 10, have: me.length, basis: '10-month SMA' };
   }
-  return { value: null, close: have ? bars[have - 1].c : null, sma: null, needs: 200, have: have, basis: 'SMA200' };
+  return { value: null, close: have ? bars[have - 1].c : null, sma: null, needs: 200, have, basis: 'SMA200' };
 }
 
 // Sigma from the 63 log returns before the 5-day move, so the spike doesn't inflate its own yardstick.
@@ -258,17 +262,18 @@ function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atr
   const trend = trendFilter(bars, monthlyBars);
   const momentum = mmMomentum(bars, monthlyBars);
   const bench = benchmarkBars && benchmarkBars.length ? mmMomentum(benchmarkBars, null) : null;
-  const relative = momentum.value === null || !bench || bench.value === null
-    ? { value: null, needs: momentum.value === null ? momentum.needs : bench ? bench.needs : 253, have: momentum.value === null ? momentum.have : bench ? bench.have : 0 }
-    : { value: momentum.value - bench.value, needs: momentum.needs, have: momentum.have };
+  // Short of history: the stock's shortfall first, then the benchmark's.
+  let relative;
+  if (momentum.value === null) relative = { value: null, needs: momentum.needs, have: momentum.have };
+  else if (!bench) relative = { value: null, needs: MM_MOMENTUM_MIN_BARS, have: 0 };
+  else if (bench.value === null) relative = { value: null, needs: bench.needs, have: bench.have };
+  else relative = { value: momentum.value - bench.value, needs: momentum.needs, have: momentum.have };
   const high52 = fiftyTwoWeekRatio(bars);
   const vol63 = annualVolatility(closes, 63);
-  const vol252 = annualVolatility(closes, 252);
-  const atrs = atrSeries(bars, 14);
-  const atr = atrs.length ? atrs[atrs.length - 1] : null;
-  const close = closes.length ? closes[closes.length - 1] : null;
-  const stops = trailingStopSeries(bars, atrMult);
-  const stop = stops.length ? stops[stops.length - 1] : null;
+  const vol252 = annualVolatility(closes, MM_TRADING_DAYS);
+  const atr = atrSeries(bars, 14).at(-1) ?? null;
+  const close = closes.length ? closes.at(-1) : null;
+  const stop = trailingStopSeries(bars, atrMult).at(-1) ?? null;
   // Trailing stop: for a holder. Entry stop: where a buy made today would exit; sizes it.
   const risk = close !== null && atr !== null ? atrMult * atr : null;
   const entryStop = risk !== null ? close - risk : null;
@@ -281,25 +286,25 @@ function computeSignals({ bars, benchmarkBars, monthlyBars, riskFreePct = 0, atr
   };
   const spike = fiveDaySpike(closes);
   return {
-    trend: trend,
-    momentum: momentum,
-    relative: relative,
-    high52: high52,
-    vol63: vol63,
-    vol252: vol252,
-    atr: atr,
-    mdd1y: maxDrawdown(closes.slice(-252)),
-    sharpe: sharpeRatio(closes.slice(-253), riskFreePct),
-    sortino: sortinoRatio(closes.slice(-253), riskFreePct),
+    trend,
+    momentum,
+    relative,
+    high52,
+    vol63,
+    vol252,
+    atr,
+    mdd1y: maxDrawdown(closes.slice(-MM_TRADING_DAYS)),
+    sharpe: sharpeRatio(closes.slice(-MM_MOMENTUM_MIN_BARS), riskFreePct),
+    sortino: sortinoRatio(closes.slice(-MM_MOMENTUM_MIN_BARS), riskFreePct),
     beta: betaVs(bars, benchmarkBars || []),
-    spike: spike,
-    close: close,
-    stop: stop,
-    entryStop: entryStop,
-    shares: shares,
+    spike,
+    close,
+    stop,
+    entryStop,
+    shares,
     riskAmount: shares !== null ? shares * risk : null,
-    checks: checks,
-    verdict: verdictFromChecks(checks, { vol63: vol63.value, vol252: vol252.value, spike: spike }),
+    checks,
+    verdict: verdictFromChecks(checks, { vol63: vol63.value, vol252: vol252.value, spike }),
   };
 }
 
@@ -322,8 +327,7 @@ function checkAlerts(rules, bars, monthlyBars = null, atrMult = MARKET_ATR_MULT_
     if (rules.aboveAvg) add('aboveAvg', '>avg', sma, sma === null ? null : close > sma, trend.basis);
   }
   if (rules.belowStop) {
-    const stops = trailingStopSeries(bars, atrMult);
-    const stop = stops[stops.length - 1];
+    const stop = trailingStopSeries(bars, atrMult).at(-1);
     add('belowStop', '<stop', stop, stop === null ? null : close < stop);
   }
   return out;
@@ -362,5 +366,5 @@ function verdictFromChecks(checks, { vol63, vol252, spike } = {}) {
   const notes = [];
   if (vol63 != null && vol252 != null && vol63 > 1.25 * vol252) notes.push('high-volatility regime, size down');
   if (spike === true) notes.push("don't chase last week's spike");
-  return { label: label, passed: passed, available: available, notes: notes };
+  return { label, passed, available, notes };
 }

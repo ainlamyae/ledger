@@ -1,70 +1,46 @@
-// The Activity Plan panel's tables (Leg/Push/Pull strength days, plus the
-// NEAT table below them) each tick off what was actually done, then hand a
-// computed duration + workout lines straight to the Physique "Log a Physique"
-// modal (health-physique.js) — this module never writes to the sheet itself, it
-// only pre-fills that modal's fields and lets the user review/edit before
-// saving, same as any other manual entry.
+// The Activity Plan: tick what was done, then hand the note lines and a duration
+// to the Physique form (health-physique.js) for review, or save them straight to
+// today's row (Workouts' 📝). Durations come from activeSecondsForNoteLine
+// (health-activity-estimator.js).
 
-// Duration comes from the note lines this module writes, priced by
-// activeSecondsForNoteLine (health-activity-estimator.js) — including the per-rep
-// tempo, which is a Settings value (WORKOUT_REP_SEC) rather than a constant here.
+// A plan row's exercise name, the key the sheet and the note lines share.
+function planRowName(tr) {
+  return tr.querySelector('.workout-name-cell').textContent.trim();
+}
 
-// Every plan row, keyed by its exercise name — the same key the Activities
-// sheet and the standardized note lines use. Lets a note already on the sheet
-// be traced back to its rows without any DOM tick state, which is what makes
-// both the logged-today marks and the merge below work after a page reload.
+// Every plan row by name, so today's note can be traced back to its rows after a reload.
 function planRowsByName() {
   const map = new Map();
   document.querySelectorAll('.workout-day table tbody tr').forEach((tr) => {
     const box = tr.querySelector('.workout-check');
-    if (box) map.set(tr.querySelector('.workout-name-cell').textContent.trim(), { box, tr });
+    if (box) map.set(planRowName(tr), { box, tr });
   });
   return map;
 }
 
-// The separator in a "Sets x Reps" cell and in the note's own rep unit. A plain
-// ASCII `x`, which is what the plan tables display and what the note is written
-// with — but `×` is accepted everywhere it's READ, since the tables used to show
-// it and notes already on the sheet still carry it.
+// The x in "Sets x Reps" and in the note's rep unit. `×` is still read, since
+// older notes carry it.
 const REPS_SEPARATOR_PATTERN = /\s*[x×]\s*/;
 
-// A "Sets x Reps" cell as one total-rep figure: "3 x 10" -> 30. Returns null if
-// the cell isn't two numbers around an x, which leaves the caller writing the
-// cell's own text rather than a figure derived from a cell it didn't understand —
-// health-activity-estimator.js still parses that older two-number form, so an
-// unrecognized cell degrades to the previous behavior instead of a wrong number.
+// "3 x 10" -> 30, or null if the cell isn't two numbers around an x.
 function totalRepsFromSetsCell(text) {
   const parts = text.trim().split(REPS_SEPARATOR_PATTERN).map(Number);
   if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n))) return null;
   return parts[0] * parts[1];
 }
 
-// A ticked row's quantity as the note writes it: a hold row's TOTAL held
-// seconds, a strength row's TOTAL REPS ("30x"), a step count, or flat minutes.
-// Never the "3 x 10" the cell displays — health-activity-estimator.js parses these
-// lines back on Recalculate against a `<number><unit>` pattern, so a space
-// before the unit would silently drop the exercise from the recalculated total,
-// and the product saves the reader multiplying to compare one line to another.
-//
-// The reps figure is read off the DISPLAYED "Sets x Reps" cell. Both that cell
-// and the checkbox's own attributes are now built from one Activities-sheet
-// cell (health-activity-catalogue.js), so they can't disagree the way they did while the plan
-// was hand-written markup — 24 of 34 rows had, and since the duration math
-// reads the ATTRIBUTES while this reads the TEXT, Log Workout and a later
-// Recalculate differed by up to ~15% on the same exercise.
+// A ticked row's note quantity: total held seconds, total reps ("30x"), steps
+// or minutes. No space before the unit, or the estimator won't parse it back.
+// Reps come from the displayed cell, which shares its sheet cell with the box's data.
 function workoutNoteQuantityForBox(box) {
   if (box.dataset.steps !== undefined) return `${box.dataset.steps}step`;
   if (box.dataset.minutes !== undefined) return `${box.dataset.minutes}min`;
-  // An isometric HOLD row (Plank) is held rather than repped, so its total is
-  // sets × seconds held and the per-rep tempo doesn't apply.
+  // A hold is held, not repped, so the per-rep tempo doesn't apply.
   if (box.dataset.hold !== undefined) return `${Number(box.dataset.sets) * Number(box.dataset.hold)}sec`;
-  // By class, not a fixed index — the column's position among Muscle
-  // Group/Weight/Rest shifts with that table's own columnVisibility
-  // (health-activity-catalogue.js), so an index would drift as those come and go.
+  // By class: the column's position moves with the table's optional columns.
   const cell = box.closest('tr').querySelector('.workout-quantity-cell').textContent;
   const totalReps = totalRepsFromSetsCell(cell);
-  // An unrecognized cell writes its own text with the separator normalized to a
-  // bare x — still a format health-activity-estimator.js reads back.
+  // An unrecognized cell is written as typed, with a bare x.
   return totalReps !== null ? `${totalReps}x` : cell.trim().replace(REPS_SEPARATOR_PATTERN, 'x');
 }
 
@@ -76,74 +52,64 @@ function workoutNoteQuantityForLine(line) {
   return `${line.reps}x`;
 }
 
-// Today's Workout text, if any of it parses as plan lines — what the ticks are
-// read from. A hand-typed workout the plan can't recognize reads as nothing
-// logged, rather than being mistaken for banked work.
+// Today's Workout text if any of it parses as plan lines; free text reads as nothing logged.
 function todaysLoggedWorkoutText() {
   const day = todaysPhysiqueDay();
   return day && parseWorkoutNoteLines(day.workout).length > 0 ? day.workout : '';
 }
 
-// One combined button below every table (rather than one per table) since a real
-// session often mixes strength exercises across Leg/Push/Pull days with a
-// NEAT/Cardio activity.
-//
-// Rows already in today's log are ticked by renderWorkoutPlanProgress and skipped
-// here — ticking is how the plan shows what's banked, so only the boxes ticked
-// since the last save are new work. That's what lets a gym session be logged
-// gradually: tick what's done, save, tick more, save again into the same row.
-// Shared by logWorkout (every ticked plan row) and the Add Activity modal's
-// own Log button (health-activity-catalogue.js, one row at a time — there's no tick to read
-// there) — appends note lines to today's Workout text, opens the Physique
-// form in edit mode, and pre-runs Calculate so the form shows a real
-// duration/burn pair instead of making the user click it themselves.
-function applyWorkoutLines(lines) {
-  // Today's Workout text is carried over verbatim and the new lines appended,
-  // so any free text on the row survives being extended.
-  const today = todaysPhysiqueDay();
-  const workout = [today?.workout ?? '', ...lines].filter((part) => part.trim()).join('\n');
+// The day's Workout text with `lines` appended, blank parts dropped.
+function appendWorkoutLines(workout, lines) {
+  return [workout ?? '', ...lines].filter((part) => part.trim()).join('\n');
+}
 
-  // Passing today's row puts the form in edit mode, so Save updates that day
-  // rather than appending a second one — which the duplicate-date guard would
-  // refuse anyway. Everything already logged for the day (meals, body mass) is
-  // left exactly as it is; only the workout side changes. Opens as today's page.
+// Combines and prices `workoutText` onto `day`, highest burn first, the way
+// bulk Calculate does.
+function repriceWorkoutDay(day, workoutText, bodyMassKg) {
+  const { text } = combineWorkoutText(workoutText);
+  const { minutes, calories, perLine } = estimateWorkoutActivity(text, bodyMassKg);
+  day.workout = [...perLine].sort((a, b) => b.calories - a.calories)
+    .map((line) => `${line.quantity} ${line.name}`).join('\n');
+  day.duration = minutes;
+  day.caloriesOut = calories;
+}
+
+// Appends note lines to today's Workout and opens the Physique form on today
+// (edit mode, so Save updates the day), pre-running Calculate. Shared by
+// logWorkout and the Activity form's own Log button.
+function applyWorkoutLines(lines) {
+  const today = todaysPhysiqueDay();
+  const workout = appendWorkoutLines(today?.workout, lines);
+
   routeRecordEdit('physique', todayPhysiqueRouteStep());
   openPhysiqueForm(today);
   if (today) setPhysiqueFormHint("Add to Today's Workout");
   physiqueField('workout').value = workout;
   physiqueField('activity-duration').value = String(workoutNoteMinutes(workout));
 
-  // If it can't run (no body mass yet) the plain-minutes prefill above stays
-  // and the reason is surfaced.
+  // If Calculate can't run (no body mass yet), the plain-minutes prefill stays.
   const messages = runPhysiqueWorkoutCalc();
   if (messages.length) showToast(messages.join(' '));
 }
 
-// The fast path (Workouts' 📝): the same appended lines, priced the way the
-// form's Calculate prices them, saved straight to today's row with no form to
-// review. Undo writes the day back as it was (or clears a row this created).
+// Workouts' 📝: the same appended lines, priced and saved straight to today's
+// row. Undo writes the day back (or empties a row this created).
 async function quickLogWorkoutLines(lines) {
   const today = todaysPhysiqueDay();
   const day = today
     ? physiqueDayCopy(today)
     : { cells: [], ...Object.fromEntries(PHYSIQUE_FIELDS.map(({ key, numeric }) => [key, numeric ? null : ''])),
       date: isoFromDate(new Date()) };
-  const workout = [day.workout ?? '', ...lines].filter((part) => part.trim()).join('\n');
+  const workout = appendWorkoutLines(day.workout, lines);
 
   const bodyMassKg = day.bodyMass ?? physiqueBodyMassKgFromLog();
   if (bodyMassKg === null) throw new Error('Log a body mass first: the burn is priced from it.');
-  const { text } = combineWorkoutText(workout);
-  const { minutes, calories, perLine } = estimateWorkoutActivity(text, bodyMassKg);
-  day.workout = [...perLine].sort((a, b) => b.calories - a.calories)
-    .map((line) => `${line.quantity} ${line.name}`).join('\n');
-  day.duration = minutes;
-  day.caloriesOut = calories;
+  repriceWorkoutDay(day, workout, bodyMassKg);
 
   if (today) await writePhysiqueRow(today.row, day);
   else await appendPhysiqueRow(day);
   await refreshPhysique(true);
 
-  // A row this created is undone to an empty workout rather than deleted.
   const before = today ?? { ...day, workout: '', duration: null, caloriesOut: null };
   const row = today?.row ?? todaysPhysiqueDay()?.row;
   const what = lines.length === 1 ? lines[0].replace(/^\S+\s+/, '') : `${lines.length} activities`;
@@ -152,10 +118,12 @@ async function quickLogWorkoutLines(lines) {
   });
 }
 
+// One button for every table. Rows already logged today are skipped, so a
+// session can be logged gradually into the same row.
 function logWorkout() {
   const logged = loggedWorkoutQuantities();
   const added = [...document.querySelectorAll('.workout-check:checked')]
-    .map((box) => ({ name: box.closest('tr').querySelector('.workout-name-cell').textContent.trim(), box }))
+    .map((box) => ({ name: planRowName(box.closest('tr')), box }))
     .filter(({ name }) => !logged.has(name))
     .map(({ name, box }) => `${workoutNoteQuantityForBox(box)} ${name}`);
 
@@ -169,8 +137,7 @@ function logWorkout() {
   applyWorkoutLines(added);
 }
 
-// Exercise name -> the quantity already logged for it today ("30x", "6000step"),
-// read straight off today's Physique row so it survives a page reload.
+// Exercise name -> today's logged quantity ("30x", "6000step"), read off today's row.
 function loggedWorkoutQuantities() {
   const byName = new Map();
   parseWorkoutNoteLines(todaysLoggedWorkoutText())
@@ -178,24 +145,18 @@ function loggedWorkoutQuantities() {
   return byName;
 }
 
-// Tints every plan row that's already in today's log — the visible answer to
-// "did I do this today?", the same green a logged Nutrition row gets, and like
-// it with no tick or hover note (today's log itself is on the Physique page): the tick box is only for picking
-// what to log next (logWorkout skips anything already logged). Called after
-// every Physique refresh (health-physique.js), so a save re-marks the rows it just
-// wrote and the marks clear by themselves at the date rollover.
+// Tints every plan row already in today's log. Runs after every Physique
+// refresh, so the marks clear by themselves at the date rollover.
 function renderWorkoutPlanProgress() {
   const logged = loggedWorkoutQuantities();
 
   planRowsByName().forEach(({ box, tr }, name) => {
     const quantity = logged.get(name);
     tr.classList.toggle('workout-row-logged', quantity !== undefined);
-    // A logged row's tick is cleared (it was the pick that just got saved);
-    // anything ticked but not saved yet survives a background refresh.
+    // A logged row's tick clears; an unsaved tick survives a background refresh.
     if (quantity !== undefined) box.checked = false;
   });
 
-  // Always 📝; the hover says whether it adds to today's workout or starts it.
   const logBtn = document.getElementById('log-workout-btn');
   logBtn.textContent = '📝';
   logBtn.title = logged.size
@@ -206,12 +167,10 @@ function renderWorkoutPlanProgress() {
 function initWorkoutPlan() {
   document.getElementById('log-workout-btn').addEventListener('click', logWorkout);
 
-  // A sibling of the <h2>, not a child of it — the h2 is the collapse toggle, so
-  // a button inside it would close the panel on the way to opening the modal.
+  // The button sits beside the <h2>, not in it: the h2 toggles the panel.
   const instructionModal = document.getElementById('activity-instruction-modal');
   document.getElementById('activity-instruction-btn').addEventListener('click', () => {
-    // Opens on its group tiles, or straight onto a group when its address was loaded
-    // (…/workouts/push-day/); a group is a page of its own under Workouts' address.
+    // Opens on the tiles, or on a group when its address was loaded (…/workouts/push-day/).
     const sub = takeInitialFormSub('workouts');
     guideGroupSlug = sub && guideGroupName(sub) !== null ? sub : null;
     renderInstructionList();
@@ -219,8 +178,7 @@ function initWorkoutPlan() {
   });
   registerFormSubView('workouts', showGuideGroup, guideGroupName);
   document.getElementById('guide-log-btn').addEventListener('click', logGuideTicks);
-  // ❌ goes back one level: from a group's page to Workouts' tiles, from the tiles
-  // out of Workouts.
+  // ❌ goes back one level: a group's page to the tiles, the tiles out of Workouts.
   document.getElementById('activity-instruction-close-btn').addEventListener('click', () => {
     if (guideGroupSlug !== null) showGuideGroup(null);
     else instructionModal.hidden = true;

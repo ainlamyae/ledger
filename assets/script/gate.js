@@ -1,18 +1,11 @@
-// Owns the page shown before the dashboard is reachable: the
-// "connect your spreadsheet" file-gate, and the auth-state-driven
-// switch between them and the dashboard itself. Kept out of app.js (the
-// dashboard proper) so the pre-login flow can be read and changed on its
-// own, without wading through unrelated dashboard code.
+// The pre-dashboard flow: the "connect your spreadsheet" file-gate and the
+// auth-driven switch between it and the dashboard.
 
-// 'signedOut' -> dashboard shell visible (every block, all placeholders), no
-//   data loaded — just the header's sign-in icon, no banner nagging about it.
-//   Clicking any gated action (setupAuthGatedActions in app.js) signs the
-//   user in first and then carries out whatever was clicked.
-// 'needsFile' -> signed in, but no spreadsheet selected yet (new user, or
-//   returning user who cleared storage / switched browsers): the one state
-//   that still takes over the whole page, since there's no spreadsheet to
-//   eventually populate the blocks from.
-// 'dashboard' -> signed in with a spreadsheet selected; the normal app.
+// 'signedOut' -> the dashboard shell with placeholders and the header's sign-in
+//   icon; a gated action (setupAuthGatedActions, app.js) signs in first, then runs.
+// 'needsFile' -> signed in with no spreadsheet chosen: the only state that takes
+//   over the whole page, since there's nothing to fill the blocks from.
+// 'dashboard' -> signed in with a spreadsheet; the normal app.
 function setUIState(state) {
   document.getElementById('file-gate').hidden = state !== 'needsFile';
   document.getElementById('dashboard').hidden = state === 'needsFile';
@@ -43,8 +36,7 @@ function handleAuthChange(token, error) {
   }
 }
 
-// Shows the signed-in account's picture (or initials, if it has none/fails
-// to load) and name/email in the header dropdown.
+// The account's picture (or its initial) and name/email in the header dropdown.
 async function populateAccountMenu() {
   const info = await fetchUserInfo();
   if (!info) return;
@@ -74,14 +66,19 @@ function showFileGateStatus(message) {
   status.textContent = message;
 }
 
+// Shared by the file-gate and the account menu's Switch spreadsheet; rejects with 'cancelled' on a closed picker.
+async function pickAndLoadSpreadsheet() {
+  await pickSpreadsheet();
+  setUIState('dashboard');
+  loadDashboard();
+}
+
 function setupFileGate() {
   document.getElementById('get-template-btn').addEventListener('click', openTemplateCopyLink);
 
   document.getElementById('select-sheet-btn').addEventListener('click', async () => {
     try {
-      await pickSpreadsheet();
-      setUIState('dashboard');
-      loadDashboard();
+      await pickAndLoadSpreadsheet();
     } catch (err) {
       if (err.message !== 'cancelled') showFileGateStatus(`Couldn't select that file: ${err.message}`);
     }

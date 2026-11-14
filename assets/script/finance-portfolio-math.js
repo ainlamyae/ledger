@@ -1,6 +1,10 @@
 // Pure portfolio math: ACB holdings, realized/unrealized gains, value series. No DOM.
 
-const PORTFOLIO_EPS = 1e-9;
+const PORTFOLIO_EPS = 1e-9; // fewer shares than this count as none
+
+function barDate(bar) {
+  return String(bar.d).slice(0, 10);
+}
 
 function sortTrades(trades) {
   return trades.slice().sort((a, b) =>
@@ -64,6 +68,7 @@ function applyTrade(h, t, fxFallback) {
   }
 }
 
+// Holdings by "account|symbol", or by symbol when pooled (registered accounts left out).
 function computeHoldings(trades, { pooled = false, registeredAccounts = new Set(), fxFallback = 1 } = {}) {
   const out = new Map();
   for (const t of sortTrades(trades)) {
@@ -98,7 +103,7 @@ function priceOn(bars, date) {
   let lo = 0, hi = bars.length - 1, hit = -1;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
-    if (String(bars[mid].d).slice(0, 10) <= date) { hit = mid; lo = mid + 1; }
+    if (barDate(bars[mid]) <= date) { hit = mid; lo = mid + 1; }
     else hi = mid - 1;
   }
   return hit < 0 ? null : bars[hit].c;
@@ -110,6 +115,7 @@ function fxOn(series, date) {
   return priceOn(series, date);
 }
 
+// Daily CAD totals from the first trade (or `from`); a day with no bar uses the last trade price (estimated).
 function buildPortfolioSeries(trades, barsBySymbol, fxSeries, { from = null } = {}) {
   const sorted = sortTrades(trades);
   const res = { dates: [], marketValueCad: [], costBasisCad: [], unrealizedCad: [], realizedCumCad: [], totalGainCad: [], estimated: [] };
@@ -120,7 +126,7 @@ function buildPortfolioSeries(trades, barsBySymbol, fxSeries, { from = null } = 
   if (from && from > start) start = from;
   const dateSet = new Set();
   for (const s of new Set(sorted.map((t) => t.symbol))) {
-    for (const b of getBars(s) || []) dateSet.add(String(b.d).slice(0, 10));
+    for (const b of getBars(s) || []) dateSet.add(barDate(b));
   }
   // No bars at all: fall back to trade dates.
   if (!dateSet.size) for (const t of sorted) dateSet.add(t.date);

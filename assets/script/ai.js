@@ -21,6 +21,8 @@ const AI_PROVIDERS = {
   },
 };
 const AI_SEED = 42;
+// How much of an unparseable reply an error message quotes.
+const AI_SNIPPET_LENGTH = 300;
 
 function aiProvider() {
   const id = getSettingString('AI_PROVIDER', 'groq').trim().toLowerCase();
@@ -72,25 +74,59 @@ async function aiChat(role, body) {
   return { content, provider };
 }
 
+function aiTextMessages(systemPrompt, userMessage) {
+  return [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage },
+  ];
+}
+
+// One user turn holding an image and its instructions.
+function aiImageMessages(base64Image, mimeType, text) {
+  return [{
+    role: 'user',
+    content: [
+      { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+      { type: 'text', text },
+    ],
+  }];
+}
+
+function aiUnexpectedResponse(provider, content, reason) {
+  const snippet = content.length > AI_SNIPPET_LENGTH ? `${content.slice(0, AI_SNIPPET_LENGTH)}…` : content;
+  return new Error(`${provider.name} returned an unexpected response${reason ? ` (${reason})` : ''}: ${snippet}`);
+}
+
+// The outermost {...} of a reply, ignoring any words around it; null if none.
+// Parsed here rather than via response_format: json_object, whose server-side
+// validator hard-rejects output with a stray word around the object.
+function aiJsonObjectText(content) {
+  const start = content.indexOf('{');
+  const end = content.lastIndexOf('}');
+  return start === -1 || end <= start ? null : content.slice(start, end + 1);
+}
+
+// The reply's JSON object, or a quoted error. `prepare` may repair its text first.
+function aiParseJsonReply(provider, content, prepare = (text) => text) {
+  const text = aiJsonObjectText(content);
+  if (text === null) throw aiUnexpectedResponse(provider, content, 'no JSON object found');
+  const prepared = prepare(text);
+  try {
+    return JSON.parse(prepared);
+  } catch (e) {
+    throw aiUnexpectedResponse(provider, content, `invalid JSON — ${e.message}`);
+  }
+}
+
 // The free-text chat call every Insight mode makes. Returns the raw text.
 async function aiChatText(systemPrompt, userMessage, temperature = 0.4) {
-  const { content } = await aiChat('text', {
-    temperature,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage },
-    ],
-  });
+  const { content } = await aiChat('text', { temperature, messages: aiTextMessages(systemPrompt, userMessage) });
   return content;
 }
 
-// Deliberately does NOT ask the model to rewrite/standardize the user's
-// ingredient text (an earlier version had a "notes" field for that) — it
-// would silently change names (e.g. "egg" -> "egg, whole") which then got
-// written back over what the user actually typed. The Notes field is never
-// touched by this response now; "query" below is used purely as an internal
-// USDA search term (health-physique-estimator.js prefers the user's own text for the
-// Nutrition table match/lookup whenever the split lines up 1:1).
+// Never asks the model to rewrite the user's text: renamed items ("egg" -> "egg,
+// whole") used to be written back over what they typed. "query" is only a USDA
+// search term; health-physique-estimator.js prefers the user's own text.
 const AI_EXTRACT_SYSTEM_PROMPT = `You are a nutrition estimator for a personal health log. The user gives you a freeform
 description of food ingredients and amounts (e.g. "2 eggs, 1 slice toast, 1 tbsp butter").
 
@@ -110,62 +146,37 @@ Do not calculate the total calories or protein yourself — that happens outside
 Respond with ONLY a JSON object, no other text, in exactly this shape:
 {"items": [{"query": "<generic food name>", "grams": <number>, "count": <number or null>, "kcalPer100gFallback": <number>, "proteinPer100gFallback": <number>}, ...]}`;
 
+// The model sometimes writes its unit arithmetic as a field value ("grams": 2.5 * 0.3):
+// invalid JSON, so it's evaluated here (exactly) instead of rejected.
+function aiEvaluateArithmeticFields(jsonText) {
+  return jsonText.replace(/("(?:grams|count|kcalPer100gFallback|proteinPer100gFallback)"\s*:\s*)([^,}]+)/g, (match, prefix, rawValue) => {
+    const trimmed = rawValue.trim();
+    if (trimmed === 'null') return match;
+    if (!Number.isNaN(Number(trimmed))) return match;
+    if (!/^[\d.\s*+\-/()]+$/.test(trimmed)) return match;
+    try {
+      const value = Function(`"use strict"; return (${trimmed});`)();
+      return Number.isFinite(value) ? `${prefix}${value}` : match;
+    } catch {
+      return match;
+    }
+  });
+}
+
 async function aiExtractIngredients(notesText) {
   const { content, provider } = await aiChat('text', {
     temperature: 0,
     seed: AI_SEED,
-    messages: [
-      { role: 'system', content: AI_EXTRACT_SYSTEM_PROMPT },
-      { role: 'user', content: notesText },
-    ],
+    messages: aiTextMessages(AI_EXTRACT_SYSTEM_PROMPT, notesText),
   });
   console.debug('[ai] raw response content:', content);
 
-  const fail = (reason) => {
-    const snippet = content.length > 300 ? `${content.slice(0, 300)}…` : content;
-    throw new Error(`${provider.name} returned an unexpected response (${reason}): ${snippet}`);
-  };
-
-  // Not using response_format: json_object — a server-side JSON-mode
-  // validator can hard-reject valid-enough output (e.g. if the model adds a
-  // stray word around the object) with a generic "Failed to generate JSON"
-  // error before we ever see the content. Parsing it ourselves is more
-  // forgiving: pull out the outermost {...} and ignore anything around it.
-  const jsonStart = content.indexOf('{');
-  const jsonEnd = content.lastIndexOf('}');
-  if (jsonStart === -1 || jsonEnd <= jsonStart) fail('no JSON object found');
-
-  // The model sometimes writes out its unit-conversion arithmetic directly as
-  // the field value (e.g. "grams": 2.5 * 0.3) instead of a final number —
-  // invalid JSON, but the arithmetic itself is fine. Evaluate it ourselves
-  // (exact, unlike asking the model to do it) rather than rejecting it.
-  const jsonSlice = content.slice(jsonStart, jsonEnd + 1)
-    .replace(/("(?:grams|count|kcalPer100gFallback|proteinPer100gFallback)"\s*:\s*)([^,}]+)/g, (match, prefix, rawValue) => {
-      const trimmed = rawValue.trim();
-      if (trimmed === 'null') return match;
-      if (!Number.isNaN(Number(trimmed))) return match;
-      if (!/^[\d.\s*+\-/()]+$/.test(trimmed)) return match;
-      try {
-        const value = Function(`"use strict"; return (${trimmed});`)();
-        return Number.isFinite(value) ? `${prefix}${value}` : match;
-      } catch {
-        return match;
-      }
-    });
-
-  let parsed;
-  try {
-    parsed = JSON.parse(jsonSlice);
-  } catch (e) {
-    fail(`invalid JSON — ${e.message}`);
-  }
-
+  const parsed = aiParseJsonReply(provider, content, aiEvaluateArithmeticFields);
+  const fail = (reason) => { throw aiUnexpectedResponse(provider, content, reason); };
   if (!Array.isArray(parsed.items) || parsed.items.length === 0) fail('missing "items" array');
 
-  // Coerce rather than strictly type-check — models sometimes emit numeric
-  // fields as strings (e.g. "50" or "50g"). "count" is nullable (not every
-  // food is naturally counted in whole units), so it's left as null rather
-  // than coerced to a number when absent/null.
+  // Coerced, not type-checked: numbers sometimes arrive as strings ("50g").
+  // "count" stays null for foods not counted in whole units.
   const items = parsed.items.map((item) => ({
     query: item.query,
     grams: parseFloat(item.grams),
@@ -183,14 +194,11 @@ async function aiExtractIngredients(notesText) {
   return { items };
 }
 
-// The Workout counterpart to aiExtractIngredients: fills in a catalogue row for
-// each exercise name the Activity sheet doesn't list yet, so the day is priced at
-// a real MET rather than the flat default, and 💾 on its row (health-physique-breakdown.js)
-// can save it as a new activity. `lines` is [{ name, unit }], unit being the
-// note line's own (x, sec, min, step); `catalogue` is the sheet's existing
-// { categories, groups, muscleGroups }, which the model is asked to reuse so a
-// saved row lands in a table that already exists. Returns
-// [{ name, met, category, group, muscleGroup, amount, rest }], one per name.
+// The Workout counterpart to aiExtractIngredients: a catalogue row for each exercise
+// the Activity sheet lacks, so the day is priced at a real MET and 💾 can save it.
+// `lines` is [{ name, unit }] (x, sec, min, step); `catalogue` is the sheet's
+// { categories, groups, muscleGroups }, offered for reuse. Returns
+// [{ name, met, category, group, muscleGroup, amount, rest }].
 async function aiEstimateActivities(lines, catalogue) {
   const list = (values) => (values.length ? values.map((v) => `"${v}"`).join(', ') : '(none yet)');
   const systemPrompt = `You fill in exercise catalogue rows for a personal workout log. For each exercise name given, provide:
@@ -208,27 +216,11 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
   const { content, provider } = await aiChat('text', {
     temperature: 0,
     seed: AI_SEED,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: lines.map((l) => `${l.name} (unit: ${l.unit})`).join('\n') },
-    ],
+    messages: aiTextMessages(systemPrompt, lines.map((l) => `${l.name} (unit: ${l.unit})`).join('\n')),
   });
 
-  const fail = (reason) => {
-    const snippet = content.length > 300 ? `${content.slice(0, 300)}…` : content;
-    throw new Error(`${provider.name} returned an unexpected response (${reason}): ${snippet}`);
-  };
-  // Same forgiving parse as aiExtractIngredients: the outermost {...} only.
-  const jsonStart = content.indexOf('{');
-  const jsonEnd = content.lastIndexOf('}');
-  if (jsonStart === -1 || jsonEnd <= jsonStart) fail('no JSON object found');
-  let parsed;
-  try {
-    parsed = JSON.parse(content.slice(jsonStart, jsonEnd + 1));
-  } catch (e) {
-    fail(`invalid JSON — ${e.message}`);
-  }
-  if (!Array.isArray(parsed.activities)) fail('missing "activities" array');
+  const parsed = aiParseJsonReply(provider, content);
+  if (!Array.isArray(parsed.activities)) throw aiUnexpectedResponse(provider, content, 'missing "activities" array');
 
   return parsed.activities
     .map((a) => ({
@@ -250,13 +242,7 @@ async function aiReadNutritionLabel(base64Image, mimeType, nutrients) {
   const names = nutrients.map((n) => `- ${n.name}`).join('\n');
   const { content, provider } = await aiChat('vision', {
     temperature: 0,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-        {
-          type: 'text',
-          text: `This is a food product's Nutrition Facts label (it may be bilingual English/French, e.g. Canadian).
+    messages: aiImageMessages(base64Image, mimeType, `This is a food product's Nutrition Facts label (it may be bilingual English/French, e.g. Canadian).
 Read only what is printed; never guess a nutrient that isn't on the label.
 
 For every nutrient line, give its printed amount and unit for one serving, and its printed % Daily Value.
@@ -265,45 +251,29 @@ ${names}
 Skip any printed line that matches none of them.
 
 Respond with ONLY a JSON object, no other text, in exactly this shape:
-{"name": "<product name if visible, else null>", "serving": "<serving size as printed, e.g. 1 cup (250 mL) or 2 biscuits (30 g)>", "servingGrams": <grams in one serving if printed, else null>, "calories": <number or null>, "nutrients": [{"name": "<one of the names above>", "amount": <number or null>, "unit": "<g, mg or µg, or null>", "percentDV": <number or null>}]}`,
-        },
-      ],
-    }],
+{"name": "<product name if visible, else null>", "serving": "<serving size as printed, e.g. 1 cup (250 mL) or 2 biscuits (30 g)>", "servingGrams": <grams in one serving if printed, else null>, "calories": <number or null>, "nutrients": [{"name": "<one of the names above>", "amount": <number or null>, "unit": "<g, mg or µg, or null>", "percentDV": <number or null>}]}`),
   });
 
-  const start = content.indexOf('{');
-  const end = content.lastIndexOf('}');
+  // Any unreadable reply gets the same reason-less error.
+  const text = aiJsonObjectText(content);
   let parsed = null;
-  try { parsed = start === -1 ? null : JSON.parse(content.slice(start, end + 1)); } catch { parsed = null; }
-  if (!parsed || !Array.isArray(parsed.nutrients)) {
-    const snippet = content.length > 300 ? `${content.slice(0, 300)}…` : content;
-    throw new Error(`${provider.name} returned an unexpected response: ${snippet}`);
-  }
+  try { parsed = text === null ? null : JSON.parse(text); } catch { parsed = null; }
+  if (!parsed || !Array.isArray(parsed.nutrients)) throw aiUnexpectedResponse(provider, content);
   return parsed;
 }
 
-// Sends a food photo to the vision model and returns a plain ingredient
-// list in the same format the Consumption textarea expects (one item per line,
-// e.g. "250g chicken breast" or "2 eggs"), ready to be appended directly.
+// A food photo as an ingredient list in the Consumption textarea's format (one item
+// per line, e.g. "250g chicken breast"), ready to append.
 async function aiAnalyzeFoodImage(base64Image, mimeType) {
   const { content } = await aiChat('vision', {
     temperature: 0,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-        {
-          type: 'text',
-          text: `You are a nutrition assistant. Identify every food item visible in this image and estimate realistic portion sizes.
+    messages: aiImageMessages(base64Image, mimeType, `You are a nutrition assistant. Identify every food item visible in this image and estimate realistic portion sizes.
 
 Return ONLY a plain list, one item per line:
 - Weighed items: "<grams>g <food name>"  →  e.g. "250g chicken breast"
 - Countable items: "<count> <food name>"  →  e.g. "2 eggs"
 
-No headings, no explanations, no bullet points — just the list.`,
-        },
-      ],
-    }],
+No headings, no explanations, no bullet points — just the list.`),
   });
 
   return content.trim();

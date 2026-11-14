@@ -1,17 +1,17 @@
 // Sleep chart (Health Chart). Shared math/helpers live in health-chart.js.
 
 let wellnessSleepChart = null;
-// Clock minutes onto a noon-anchored axis, so a bed/wake pair crossing midnight renders
-// as one contiguous span instead of splitting at 0:00. Noon, not an assumed bedtime: a
-// fixed 18:00 anchor baked in "everyone sleeps at night" and broke on a night shift,
-// while noon falls mid-waking-period for virtually any schedule.
+
+// Clock minutes onto a noon-anchored axis, so a night crossing midnight is one span.
+// Noon rather than an assumed bedtime, so night shifts plot too.
 const SLEEP_AXIS_ANCHOR_MIN = 12 * 60;
+const SLEEP_AXIS_TICK_HOURS = 3;
+
 function sleepAxisValue(clockMin) {
   return (((clockMin - SLEEP_AXIS_ANCHOR_MIN) + 24 * 60) % (24 * 60)) / 60;
 }
 
-// Inverse of sleepAxisValue, shared by the ticks and the weekly-average tooltip. Both
-// the anchor and the 3h step are whole hours, so no label lookup table is needed.
+// Inverse of sleepAxisValue, for the ticks and the average's tooltip.
 function sleepAxisClockMin(v) {
   return Math.round((SLEEP_AXIS_ANCHOR_MIN + v * 60) % (24 * 60));
 }
@@ -20,59 +20,46 @@ function sleepAxisTickLabel(v) {
   return formatClockTime24(sleepAxisClockMin(v));
 }
 
-// The real bed-to-wake span rounded out to a 3-hour tick, rather than a fixed 18-hour
-// window that wastes space on hours nobody sleeps through. 0-18 only with no data.
-//
-// The tick AT OR BELOW the earliest bedtime, not a whole tick below it. Flooring a 23:00
-// bedtime already lands on 21:00; subtracting a further 3h put the axis floor at 18:00
-// and left three empty hours under every bar — six with the top end padded the same way.
-// A pad is added only when an extreme falls exactly ON a tick, which is the one case
-// where the bar would otherwise sit flush against the axis edge with nothing to read it
-// against (a midnight bedtime lands on 00:00, so the axis opens at 21:00).
+// The bed-to-wake span rounded out to the tick at or beyond each extreme; padded one
+// more tick only when an extreme sits exactly on one, so no bar is flush with the edge.
 function computeSleepAxisRange(shiftedPairs) {
   if (shiftedPairs.length === 0) return { axisMin: 0, axisMax: 18 };
+  const step = SLEEP_AXIS_TICK_HOURS;
   const min = Math.min(...shiftedPairs.map((p) => p.start));
   const max = Math.max(...shiftedPairs.map((p) => p.end));
-  const floorTick = Math.floor(min / 3) * 3;
-  const ceilTick = Math.ceil(max / 3) * 3;
+  const floorTick = Math.floor(min / step) * step;
+  const ceilTick = Math.ceil(max / step) * step;
   return {
-    axisMin: Math.max(0, min === floorTick ? floorTick - 3 : floorTick),
-    axisMax: Math.min(24, max === ceilTick ? ceilTick + 3 : ceilTick),
+    axisMin: Math.max(0, min === floorTick ? floorTick - step : floorTick),
+    axisMax: Math.min(24, max === ceilTick ? ceilTick + step : ceilTick),
   };
 }
 
-// Green at 0 kcal, sliding to red as the Deprivation Effect itself grows — driven by the
-// same kcal figure the dot's position and the glance tile's number already show, not a
-// separate hours-based reading, so the colour can't tell a different story than the
-// value beside it. Full red at 60 kcal/day: roughly what one night a couple of hours
-// short costs a typical few-hundred-kcal desired deficit — an hours-based ratio against
-// the full desired sleep left ordinary night-to-night variation reading as the same
-// solid green. Shared by the Sleep chart's dot and the Deprivation Effect glance tile.
+// The Deprivation Effect dot goes fully red at this many kcal/day, roughly a night a
+// couple of hours short against a typical desired deficit.
 const SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL = 60;
 
+// Green at 0 kcal, along the desired grades' blend to Missed at the full-red figure.
 function sleepDeprivationDotColor(deprivationEffectKcal) {
   if (deprivationEffectKcal === null || deprivationEffectKcal === undefined) return chartColor('--chart-good');
-  // Along the desired grades' blend: 0 kcal at Desired met's green, the full-red kcal at Missed.
   const ratio = Math.min(1, Math.max(0, deprivationEffectKcal / SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL));
   return desiredGradeBlend(DESIRED_GRADES[1].min * (1 - ratio));
 }
 
 function renderHealthSleepChart(entries) {
   const ctx = document.getElementById('health-sleep-chart');
+  const smoothingDays = bodyMassSmoothingDays();
+  const bedWakeAvgName = healthAvgName(' Bed & Wake');
 
   const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
   const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
-  // Shared with every other chart in the panel (healthCalorieChartDates), not this
-  // metric's own earliest log — a Sleep chart clipped to its own first entry could pick
-  // a different-length date list than Body Mass/Calorie Balance/etc, and
-  // wellnessTickIndices (charts-base.js) would then choose DIFFERENT dates for its
-  // ticks even though every chart runs the identical selection algorithm. One shared list is the
-  // only way every chart's gridlines are guaranteed to land on the same dates.
+  // The panel's shared dates, not this metric's own first log, so every chart picks the
+  // same gridline dates.
   const dates = healthCalorieChartDates(entries);
 
-  // Only the longest bed/wake-bearing entry per date, so a nap logged separately
-  // doesn't compete with the night. A date with only a duration is left as a gap.
+  // Only the longest entry with bed and wake times per date, so a separate nap doesn't
+  // compete with the night. A date with only a duration is left as a gap.
   const bestByDate = new Map();
   sleepEntries.forEach((e) => {
     if (e.sleepBedMin === null || e.sleepWakeMin === null) return;
@@ -80,8 +67,7 @@ function renderHealthSleepChart(entries) {
     if (!current || e.amount > current.amount) bestByDate.set(e.date, e);
   });
 
-  // Shifted once up front, feeding both the axis range and the chart data, so the shift
-  // and the validity check (wake must land after bed) live in one place.
+  // Shifted once, for both the axis range and the bars; wake must land after bed.
   const shiftedByDate = new Map();
   dates.forEach((d) => {
     const e = bestByDate.get(d);
@@ -91,62 +77,48 @@ function renderHealthSleepChart(entries) {
     if (end <= start) return;
     shiftedByDate.set(d, { start, end, e });
   });
-
-  const rangeByDate = new Map(); // date -> { bedMin, wakeMin, durationHr }
   const sleepData = dates.map((d) => {
     const shifted = shiftedByDate.get(d);
-    if (!shifted) return null;
-    const { start, end, e } = shifted;
-    rangeByDate.set(d, { bedMin: e.sleepBedMin, wakeMin: e.sleepWakeMin, durationHr: e.amount });
-    return [start, end];
+    return shifted ? [shifted.start, shifted.end] : null;
   });
 
-  // Each night graded by hours slept ÷ desired sleep (desiredGradeBlended), lifted to one step
-  // under its L_p-day average duration's grade, as every other Health chart.
-  const durations = dates.map((d) => rangeByDate.get(d)?.durationHr ?? null);
-  const durationAvg = emaSeries(durations, bodyMassSmoothingDays());
+  // Each night graded by hours slept ÷ desired sleep, lifted by its average's grade.
+  const durations = dates.map((d) => shiftedByDate.get(d)?.e.amount ?? null);
+  const durationAvg = emaSeries(durations, smoothingDays);
   const nightGrades = durations.map((hr, i) => (hr === null ? null
     : desiredGradeBlended(hr / sleepDesired, durationAvg[i] === null ? null : durationAvg[i] / sleepDesired)));
   const barColors = nightGrades.map((g) => g?.color ?? null);
 
-  // Fit in AXIS units, not clock minutes: the shift has already unwrapped midnight, so
-  // a plain fit works where clock times would average 23:30 and 00:30 into midday.
-  const bedAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null), bodyMassSmoothingDays());
-  const wakeAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null), bodyMassSmoothingDays());
+  // Averaged in axis units, where midnight is already unwrapped.
+  const bedAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.start ?? null), smoothingDays);
+  const wakeAvg = emaSeries(dates.map((d) => shiftedByDate.get(d)?.end ?? null), smoothingDays);
 
-  // Deprivation Effect = Desired Deficit × (1 - Sleep Efficiency Factor) — the kcal of
-  // the plan's own deficit (desiredBalanceKcal, not the day's actual eaten-vs-burned
-  // balance — that adjustment lives in Calorie Balance instead) that a short night cost,
-  // dotted on each night's bar. Zero — green — at a full night; red and rising the
-  // further that night fell short of desired sleep. This is the impact, not what survived
-  // it, so a good night reads as "nothing lost" rather than a number worth reading.
+  // Deprivation Effect = Desired Deficit × (1 - Sleep Efficiency Factor): the kcal of the
+  // plan's deficit a short night cost. Calorie Balance applies it to the day's actual balance.
   const desiredDeficitKcal = desiredBalanceKcal(planBodyMassKg(entries));
-  const sleepHoursByDate = new Map();
-  sleepEntries.forEach((e) => {
-    sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount);
-  });
-  const dotColors = [];
+  const sleepHoursByDate = dailyValues(sleepEntries, () => true, (e) => e.amount, sumDailyValues);
   const deprivationEffectData = dates.map((d) => {
     const sleepHrs = sleepHoursByDate.get(d);
-    if (sleepHrs === undefined || desiredDeficitKcal === null) { dotColors.push(null); return null; }
+    if (sleepHrs === undefined || desiredDeficitKcal === null) return null;
     const factor = sleepEfficiencyFactor(sleepHrs, sleepDesired);
-    const kcal = Math.round(Math.abs(desiredDeficitKcal) * (1 - factor));
-    dotColors.push(sleepDeprivationDotColor(kcal));
-    return kcal;
+    return Math.round(Math.abs(desiredDeficitKcal) * (1 - factor));
   });
+  const dotColors = deprivationEffectData.map((kcal) => (kcal === null ? null : sleepDeprivationDotColor(kcal)));
 
-  // Legend entries switched off (renderToggleLegend below) leave the axis too; nights by
-  // their grade's name.
+  // Hidden legend entries leave the axis range too; nights by their grade's name.
   const hidden = legendHiddenNames('health-sleep-legend');
+  const avgHidden = hidden.has(bedWakeAvgName);
   const nightClasses = nightGrades.map((g) => g?.name ?? null);
   const shownPairs = dates.map((d, i) => (hidden.has(nightClasses[i]) ? null : shiftedByDate.get(d)))
     .filter(Boolean);
-  if (!hidden.has(healthAvgName(' Bed & Wake'))) {
+  if (!avgHidden) {
     dates.forEach((d, i) => {
       if (bedAvg[i] !== null && wakeAvg[i] !== null) shownPairs.push({ start: bedAvg[i], end: wakeAvg[i] });
     });
   }
   const { axisMin, axisMax } = computeSleepAxisRange(shownPairs);
+
+  const hasDot = (c) => deprivationEffectData[c.dataIndex] !== null;
 
   wellnessSleepChart = upsertChart(wellnessSleepChart, ctx, {
     data: {
@@ -160,22 +132,22 @@ function renderHealthSleepChart(entries) {
           yAxisID: 'y1',
           order: 2,
         },
-        trendLineDataset(`${bodyMassSmoothingDays()}-Day Avg Bed`, bedAvg, { yAxisID: 'y1', hidden: hidden.has(healthAvgName(' Bed & Wake')) }),
-        trendLineDataset(`${bodyMassSmoothingDays()}-Day Avg Wake`, wakeAvg, { yAxisID: 'y1', hidden: hidden.has(healthAvgName(' Bed & Wake')) }),
+        trendLineDataset(`${smoothingDays}-Day Avg Bed`, bedAvg, { yAxisID: 'y1', hidden: avgHidden }),
+        trendLineDataset(`${smoothingDays}-Day Avg Wake`, wakeAvg, { yAxisID: 'y1', hidden: avgHidden }),
         {
           type: 'line',
           label: 'Deprivation Effect',
           data: deprivationEffectData,
           showLine: false,
           spanGaps: false,
-          pointRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? fitPointRadius(4)(c) : 0),
-          pointHoverRadius: (c) => (deprivationEffectData[c.dataIndex] !== null ? fitPointRadius(5)(c) : 0),
+          pointRadius: (c) => (hasDot(c) ? fitPointRadius(4)(c) : 0),
+          pointHoverRadius: (c) => (hasDot(c) ? fitPointRadius(5)(c) : 0),
           pointBorderWidth: fitPointBorderWidth(4, 1),
           pointBackgroundColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           pointBorderColor: (c) => dotColors[c.dataIndex] ?? 'transparent',
           yAxisID: 'y',
           hidden: hidden.has('Sleep Deprivation Effect'),
-          // Paints on top of the bar it sits on, same convention as the desired caps.
+          // Paints on top of its bar.
           order: 0,
         },
       ],
@@ -183,7 +155,7 @@ function renderHealthSleepChart(entries) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      // Without it the cursor lands on whichever average line is nearest, not the bar.
+      // Index mode, or the cursor snaps to the nearest average line instead of the bar.
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
@@ -197,16 +169,15 @@ function renderHealthSleepChart(entries) {
                 const text = `SD (Sleep Deprivation Effect): ${item.raw} kcal`;
                 return privacyMode ? maskDigits(text) : text;
               }
-              const r = rangeByDate.get(item.label);
-              if (!r) return '';
+              const e = shiftedByDate.get(item.label)?.e;
+              if (!e) return '';
               const lines = [
-                `Bed: ${formatClockTime24(r.bedMin)}`,
-                `Wake: ${formatClockTime24(r.wakeMin)}`,
-                `Duration: ${r.durationHr} hr`,
+                `Bed: ${formatClockTime24(e.sleepBedMin)}`,
+                `Wake: ${formatClockTime24(e.sleepWakeMin)}`,
+                `Duration: ${e.amount} hr`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // Flush left and last, like every reference figure in the section.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined || bedAvg[i] === null) return '';
@@ -232,17 +203,16 @@ function renderHealthSleepChart(entries) {
           max: axisMax,
           afterFit: fixDatedYAxisWidth,
           grid: { drawOnChartArea: false },
-          ticks: { stepSize: 3, callback: sleepAxisTickLabel },
+          ticks: { stepSize: SLEEP_AXIS_TICK_HOURS, callback: sleepAxisTickLabel },
         },
       },
     },
   });
 
-  // Swatches under the chart; both L_p-Day lines share one colour, so one entry.
-  renderToggleLegend('health-sleep-legend', rangeByDate.size === 0 ? [] : [
+  // Both average lines share one colour, so one legend entry.
+  renderToggleLegend('health-sleep-legend', shiftedByDate.size === 0 ? [] : [
     ...desiredGradeLegend(),
-    { name: healthAvgName(' Bed & Wake'), color: desiredMarkColor() },
+    { name: bedWakeAvgName, color: desiredMarkColor() },
     ...(desiredDeficitKcal !== null ? [{ name: 'Sleep Deprivation Effect', color: sleepDeprivationDotColor(SLEEP_DEPRIVATION_DOT_FULL_RED_KCAL / 2) }] : []),
   ], () => renderHealthSleepChart(entries));
 }
-

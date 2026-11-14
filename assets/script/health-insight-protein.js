@@ -1,12 +1,9 @@
-// The Health Insight panel's Protein mode: how well actual eating
-// matched the per-ingredient protein-source rotation plan (health-chart-protein-rotation.js)
-// — each tracked ingredient's own desired share of the desired protein vs. the
-// share actually eaten in the selected window. Reuses computeProteinRotationRows
-// exactly, so this mode's numbers can't disagree with the Protein Source
-// Rotation chart. health-insight.js drives it.
+// The Health Insight panel's Protein mode: each tracked ingredient's desired share
+// of the desired protein vs. the share eaten, from the Protein Source Rotation
+// chart's own rows (computeProteinRotationRows).
 
 function formatProteinRotationInsightPrompt(rows) {
-  const lines = [...formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)), ''];
+  const lines = [...currentProfileLines(), ''];
 
   if (rows.length === 0) {
     lines.push('No ingredients are tracked for protein-source rotation yet — nothing has a Protein % set in Nutrition.');

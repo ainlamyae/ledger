@@ -2,8 +2,12 @@
 // cost (finance-portfolio-math.js) and gain/loss in CAD. Prices load when the page opens.
 
 const TRADE_HEADERS = ['Date', 'Account', 'Symbol', 'Action', 'Quantity', 'Price', 'Fees', 'Currency', 'Notes', 'FX to CAD'];
-const TRADES_RANGE = () => `'${CONFIG.SHEETS.TRADES}'!A2:J`;
+const tradeSheetRange = (cells) => `'${CONFIG.SHEETS.TRADES}'!${cells}`;
+const TRADES_RANGE = () => tradeSheetRange('A2:J');
 const TRADE_PAGE_SIZE = 50;
+const TRADE_TABLE_COLUMNS = 9; // the holdings and trades tables alike
+const NO_TRADES_TEXT = 'No trades yet — click 📝 to log a buy.';
+const FX_DECIMALS_SCALE = 10000; // a looked-up FX rate keeps 4 decimals
 const PORTFOLIO_RANGES = MARKET_RANGES.filter((r) => !r.intraday);
 
 let allTrades = [];
@@ -19,6 +23,20 @@ let portfolioValueChart = null;
 const portfolioBars = new Map(); // symbol -> daily bars
 let portfolioFx = null;          // USD/CAD daily bars
 const portfolioHiddenSeries = new Set();
+let portfolioAccountHoldings = new Map(); // account -> holdings (CAD), for writeHoldingsToMarketValue
+
+function tradeField(name) {
+  return document.getElementById(`trade-${name}`);
+}
+
+async function ensureTradesTab() {
+  tradesSheetId = await ensureSheetTab(CONFIG.SHEETS.TRADES, TRADE_HEADERS);
+}
+
+// Columns A–J of one trade.
+function tradeRowValues(t) {
+  return [t.date, t.account, t.symbol, t.action, t.quantity, t.action === 'Split' ? '' : t.price, t.fees, t.currency, t.notes, t.fx ?? ''];
+}
 
 async function initTrades(forceRefresh = false) {
   portfolioRangeSlug = readMarketPref('ledger_portfolio_range', 'all');
@@ -28,11 +46,11 @@ async function initTrades(forceRefresh = false) {
   tradeListenersAttached = true;
   document.getElementById('add-trade-btn').addEventListener('click', () => openTradeForm());
   editTrade = routedRowEdit('portfolio', () => allTrades, (t) => `${t.date} ${t.action} ${t.symbol}`, openTradeForm);
-  document.getElementById('trade-cancel-btn').addEventListener('click', closeTradeForm);
-  document.getElementById('trade-action').addEventListener('change', syncTradeActionFields);
-  document.getElementById('trade-symbol').addEventListener('change', () => {
-    const symbol = normalizeSymbol(document.getElementById('trade-symbol').value);
-    if (symbol) document.getElementById('trade-currency').value = isCanadianSymbol(symbol) ? 'CAD' : (allWatchlist.find((w) => w.symbol === symbol)?.currency || 'USD');
+  tradeField('cancel-btn').addEventListener('click', closeTradeForm);
+  tradeField('action').addEventListener('change', syncTradeActionFields);
+  tradeField('symbol').addEventListener('change', () => {
+    const symbol = normalizeSymbol(tradeField('symbol').value);
+    if (symbol) tradeField('currency').value = isCanadianSymbol(symbol) ? 'CAD' : (allWatchlist.find((w) => w.symbol === symbol)?.currency || 'USD');
   });
   onFormSubmit('trade-form', submitTradeForm);
   makeSortableHeaders('#trades-table', tradeSort, () => { tradePage = 1; renderTrades(); });
@@ -141,7 +159,8 @@ function renderPortfolio() {
   setCard('portfolio-cost', cost);
   setCard('portfolio-unrealized', unrealized, true);
   setCard('portfolio-realized', realized, true);
-  if (missing) document.getElementById('portfolio-value').title = 'Some holdings have no price yet and are left out';
+  // Cleared once every holding has a price, so a resolved warning doesn't linger.
+  document.getElementById('portfolio-value').title = missing ? 'Some holdings have no price yet and are left out' : '';
 
   renderHoldingsTable(rows);
   renderPortfolioAccounts(rows, fxNow);
@@ -169,7 +188,7 @@ function renderHoldingsTable(rows) {
   tbody.innerHTML = '';
   const open = rows.filter(({ h }) => h.shares > 0);
   if (!open.length) {
-    tbody.appendChild(renderEmptyRow(9, allTrades.length ? 'No open positions.' : 'No trades yet — click 📝 to log a buy.'));
+    tbody.appendChild(renderEmptyRow(TRADE_TABLE_COLUMNS, allTrades.length ? 'No open positions.' : NO_TRADES_TEXT));
     return;
   }
   open.sort((a, b) => (b.v.marketValueCad ?? 0) - (a.v.marketValueCad ?? 0)).forEach(({ h, close, v }) => {
@@ -193,11 +212,16 @@ function renderHoldingsTable(rows) {
   });
 }
 
+// An account's Market Value, else its Balance.
+function accountValue(a) {
+  return Number.isFinite(a.currentValue) ? a.currentValue : a.balance;
+}
+
 // Investment accounts' Market Value (or Balance), the equity Market's position size uses.
 function investmentEquityCad() {
   return allAccounts
     .filter((a) => /^investment/i.test(a.type))
-    .reduce((sum, a) => sum + (Number.isFinite(a.currentValue) ? a.currentValue : a.balance || 0), 0);
+    .reduce((sum, a) => sum + (accountValue(a) || 0), 0);
 }
 
 function renderPortfolioAccounts(rows, fxNow) {
@@ -213,7 +237,7 @@ function renderPortfolioAccounts(rows, fxNow) {
   }
   byAccount.forEach((holdingsCad, name) => {
     const account = allAccounts.find((a) => a.name === name);
-    const mv = account ? (Number.isFinite(account.currentValue) ? account.currentValue : account.balance) : null;
+    const mv = account ? accountValue(account) : null;
     const tr = document.createElement('tr');
     tr.append(makeCell(name), moneyCell(holdingsCad, 'CAD'), moneyCell(mv, 'CAD'), moneyCell(mv === null ? null : mv - holdingsCad, 'CAD', true));
     tbody.appendChild(tr);
@@ -222,13 +246,12 @@ function renderPortfolioAccounts(rows, fxNow) {
   portfolioAccountHoldings = byAccount;
 }
 
-let portfolioAccountHoldings = new Map();
-
 // Opt-in: writes each account's Holdings into Account column E, skipping formulas.
 async function writeHoldingsToMarketValue() {
   if (!portfolioAccountHoldings.size) return;
   if (!confirm("Write each account's Holdings (CAD) into its Market Value? Cells holding a formula are left alone.")) return;
-  const resp = await getValues(`'${CONFIG.SHEETS.ACCOUNTS}'!A3:E100`, { valueRenderOption: 'FORMULA' });
+  const accountCell = (cells) => `'${CONFIG.SHEETS.ACCOUNTS}'!${cells}`;
+  const resp = await getValues(accountCell('A3:E100'), { valueRenderOption: 'FORMULA' });
   const data = [];
   const skipped = [];
   (resp.values || []).forEach((row, i) => {
@@ -239,7 +262,7 @@ async function writeHoldingsToMarketValue() {
       skipped.push(`${name} (E${i + 3} is a formula)`);
       return;
     }
-    data.push({ range: `'${CONFIG.SHEETS.ACCOUNTS}'!E${i + 3}`, values: [[Math.round(portfolioAccountHoldings.get(name) * 100) / 100]] });
+    data.push({ range: accountCell(`E${i + 3}`), values: [[Math.round(portfolioAccountHoldings.get(name) * 100) / 100]] });
   });
   if (data.length) await batchUpdateValues(data, 'RAW');
   await refreshAccountsList(true);
@@ -286,7 +309,7 @@ function renderTrades() {
   const tbody = document.getElementById('trades-body');
   tbody.innerHTML = '';
   if (!allTrades.length) {
-    tbody.appendChild(renderEmptyRow(9, 'No trades yet — click 📝 to log a buy.'));
+    tbody.appendChild(renderEmptyRow(TRADE_TABLE_COLUMNS, NO_TRADES_TEXT));
     renderPager('trades-pagination', { page: 1, totalPages: 1, onChange: () => {} });
     return;
   }
@@ -301,11 +324,12 @@ function renderTrades() {
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editTrade(t) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteTrade(t) }),
     );
+    const split = t.action === 'Split';
     tr.append(
       makeCell(t.date), makeCell(t.account, t.notes || t.account), makeCell(t.symbol), makeCell(t.action),
       numberCell(t.quantity),
-      t.action === 'Split' ? makeCell('') : moneyCell(t.price, t.currency),
-      t.action === 'Split' ? makeCell('') : moneyCell(t.fees, t.currency),
+      split ? makeCell('') : moneyCell(t.price, t.currency),
+      split ? makeCell('') : moneyCell(t.fees, t.currency),
       numberCell(t.fx ?? NaN),
       actions,
     );
@@ -322,41 +346,42 @@ function tradeAccountOptions() {
 }
 
 function syncTradeActionFields() {
-  const split = document.getElementById('trade-action').value === 'Split';
-  document.getElementById('trade-quantity-label').textContent = split ? 'Split ratio (new ÷ old)' : 'Quantity';
-  ['trade-price', 'trade-fees', 'trade-fx'].forEach((id) => { document.getElementById(id).disabled = split; });
+  const split = tradeField('action').value === 'Split';
+  tradeField('quantity-label').textContent = split ? 'Split ratio (new ÷ old)' : 'Quantity';
+  ['price', 'fees', 'fx'].forEach((name) => { tradeField(name).disabled = split; });
 }
 
 function openTradeForm(trade = null) {
   editingTradeRow = trade?.row ?? null;
   const last = allTrades.at(-1);
-  populateSelect(document.getElementById('trade-account'), tradeAccountOptions(), trade?.account || last?.account || '');
-  const symbols = document.getElementById('trade-symbol-options');
+  populateSelect(tradeField('account'), tradeAccountOptions(), trade?.account || last?.account || '');
+  const symbols = tradeField('symbol-options');
   symbols.innerHTML = '';
   [...new Set([...allWatchlist.map((w) => w.symbol), ...heldSymbols()])].forEach((s) => {
     const option = document.createElement('option');
     option.value = s;
     symbols.appendChild(option);
   });
-  document.getElementById('trade-date').value = trade?.date || isoFromDate(new Date());
-  document.getElementById('trade-action').value = trade?.action || 'Buy';
-  document.getElementById('trade-symbol').value = trade?.symbol || '';
-  document.getElementById('trade-quantity').value = trade ? trade.quantity : '';
-  document.getElementById('trade-price').value = trade && trade.action !== 'Split' ? trade.price : '';
-  document.getElementById('trade-fees').value = trade && trade.fees ? trade.fees : '';
-  document.getElementById('trade-currency').value = trade?.currency || 'USD';
-  document.getElementById('trade-fx').value = trade && trade.currency !== 'CAD' && trade.fx ? trade.fx : '';
-  document.getElementById('trade-notes').value = trade?.notes || '';
+  tradeField('date').value = trade?.date || isoFromDate(new Date());
+  tradeField('action').value = trade?.action || 'Buy';
+  tradeField('symbol').value = trade?.symbol || '';
+  tradeField('quantity').value = trade ? trade.quantity : '';
+  tradeField('price').value = trade && trade.action !== 'Split' ? trade.price : '';
+  tradeField('fees').value = trade && trade.fees ? trade.fees : '';
+  tradeField('currency').value = trade?.currency || 'USD';
+  tradeField('fx').value = trade && trade.currency !== 'CAD' && trade.fx ? trade.fx : '';
+  tradeField('notes').value = trade?.notes || '';
   syncTradeActionFields();
   clearFieldError('trade-form-error');
-  document.getElementById('trade-modal').hidden = false;
+  tradeField('modal').hidden = false;
 }
 
 function closeTradeForm() {
-  document.getElementById('trade-modal').hidden = true;
+  tradeField('modal').hidden = true;
   editingTradeRow = null;
 }
 
+// Blank -> null, unparseable -> NaN.
 function tradeNumber(id) {
   const raw = document.getElementById(id).value.trim();
   if (!raw) return null;
@@ -366,40 +391,42 @@ function tradeNumber(id) {
 }
 
 async function submitTradeForm() {
-  const date = document.getElementById('trade-date').value;
-  const action = document.getElementById('trade-action').value;
-  const account = document.getElementById('trade-account').value;
-  const symbol = normalizeSymbol(document.getElementById('trade-symbol').value);
+  const fail = (message) => showFieldError('trade-form-error', message);
+  const date = tradeField('date').value;
+  const action = tradeField('action').value;
+  const account = tradeField('account').value;
+  const symbol = normalizeSymbol(tradeField('symbol').value);
+  const split = action === 'Split';
   const quantity = tradeNumber('trade-quantity');
-  const price = action === 'Split' ? null : tradeNumber('trade-price');
-  const fees = action === 'Split' ? 0 : (tradeNumber('trade-fees') ?? 0);
-  const currency = isCanadianSymbol(symbol) ? 'CAD' : document.getElementById('trade-currency').value;
-  let fx = currency === 'CAD' || action === 'Split' ? 1 : tradeNumber('trade-fx');
+  const price = split ? null : tradeNumber('trade-price');
+  const fees = split ? 0 : (tradeNumber('trade-fees') ?? 0);
+  const currency = isCanadianSymbol(symbol) ? 'CAD' : tradeField('currency').value;
+  let fx = currency === 'CAD' || split ? 1 : tradeNumber('trade-fx');
 
-  if (!date) return showFieldError('trade-form-error', 'Pick the trade date.');
-  if (!account) return showFieldError('trade-form-error', 'Pick the account (add one on the Account page first).');
-  if (!symbol) return showFieldError('trade-form-error', 'Enter the symbol, e.g. AAPL or SHOP.TO.');
-  if (!(quantity > 0)) return showFieldError('trade-form-error', action === 'Split' ? 'Enter the split ratio, e.g. 4 for a 4-for-1.' : 'Enter how many shares.');
-  if (action !== 'Split' && !(price > 0)) return showFieldError('trade-form-error', 'Enter the price per share.');
-  if (!Number.isFinite(fees) || fees < 0) return showFieldError('trade-form-error', 'Fees must be 0 or more.');
+  if (!date) return fail('Pick the trade date.');
+  if (!account) return fail('Pick the account (add one on the Account page first).');
+  if (!symbol) return fail('Enter the symbol, e.g. AAPL or SHOP.TO.');
+  if (!(quantity > 0)) return fail(split ? 'Enter the split ratio, e.g. 4 for a 4-for-1.' : 'Enter how many shares.');
+  if (!split && !(price > 0)) return fail('Enter the price per share.');
+  if (!Number.isFinite(fees) || fees < 0) return fail('Fees must be 0 or more.');
 
   try {
     if (fx === null) {
       try {
         fx = fxOn(await getUsdCadSeries(), date);
       } catch (err) {
-        return showFieldError('trade-form-error', `Couldn't look up USD/CAD for ${date} (${marketErrorText(err)}); type the rate in FX to CAD.`);
+        return fail(`Couldn't look up USD/CAD for ${date} (${marketErrorText(err)}); type the rate in FX to CAD.`);
       }
-      if (!fx) return showFieldError('trade-form-error', `No USD/CAD rate on or before ${date}; type it in FX to CAD.`);
-      fx = Math.round(fx * 10000) / 10000;
+      if (!fx) return fail(`No USD/CAD rate on or before ${date}; type it in FX to CAD.`);
+      fx = Math.round(fx * FX_DECIMALS_SCALE) / FX_DECIMALS_SCALE;
     }
-    if (!(fx > 0)) return showFieldError('trade-form-error', 'FX to CAD must be a positive number.');
+    if (!(fx > 0)) return fail('FX to CAD must be a positive number.');
 
-    const values = [date, account, symbol, action, quantity, price ?? '', fees, currency, document.getElementById('trade-notes').value.trim(), fx];
-    tradesSheetId = await ensureSheetTab(CONFIG.SHEETS.TRADES, TRADE_HEADERS);
+    const values = tradeRowValues({ date, account, symbol, action, quantity, price, fees, currency, notes: tradeField('notes').value.trim(), fx });
+    await ensureTradesTab();
     const editingRow = editingTradeRow;
     let savedRow = editingRow;
-    if (editingRow) await updateValues(`'${CONFIG.SHEETS.TRADES}'!A${editingRow}:J${editingRow}`, [values], 'RAW');
+    if (editingRow) await updateValues(tradeSheetRange(`A${editingRow}:J${editingRow}`), [values], 'RAW');
     else savedRow = appendedRow(await appendValues(TRADES_RANGE(), [values], 'RAW'));
     await refreshTrades();
     const saved = allTrades.find((t) => t.row === savedRow);
@@ -410,20 +437,17 @@ async function submitTradeForm() {
     showFormSaved('trade-form-error');
     if (!portfolioBars.has(symbol)) loadPortfolioPrices();
   } catch (err) {
-    showFieldError('trade-form-error', err.message);
+    fail(err.message);
   }
 }
 
 async function deleteTrade(trade) {
   await confirmAndDelete(`Delete the ${trade.action} of ${trade.symbol} on ${trade.date}?`, async () => {
-    if (tradesSheetId === null) tradesSheetId = await ensureSheetTab(CONFIG.SHEETS.TRADES, TRADE_HEADERS);
-    await batchUpdate([{
-      deleteDimension: { range: { sheetId: tradesSheetId, dimension: 'ROWS', startIndex: trade.row - 1, endIndex: trade.row } },
-    }]);
+    if (tradesSheetId === null) await ensureTradesTab();
+    await deleteSheetRow(tradesSheetId, trade.row);
     await refreshTrades();
     showUndoToast(`${trade.action} of ${trade.symbol} deleted.`, async () => {
-      await appendValues(TRADES_RANGE(), [[trade.date, trade.account, trade.symbol, trade.action, trade.quantity,
-        trade.action === 'Split' ? '' : trade.price, trade.fees, trade.currency, trade.notes, trade.fx ?? '']], 'RAW');
+      await appendValues(TRADES_RANGE(), [tradeRowValues(trade)], 'RAW');
       await refreshTrades();
     });
   }, "Couldn't delete the trade");

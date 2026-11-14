@@ -1,4 +1,6 @@
 ﻿const SETTINGS_PANEL_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
+// Notes | Key | Value | actions.
+const SETTING_COLUMN_COUNT = 4;
 
 let allSettingRows = [];
 let settingsSheetId = null;
@@ -6,26 +8,28 @@ let settingsSheetMissing = false;
 let editingSettingRow = null;
 let settingPanelListenersAttached = false;
 
+function settingRange(cells) {
+  return `${CONFIG.SHEETS.SETTINGS}!${cells}`;
+}
+
+function missingSettingsTabMessage(purpose) {
+  return `No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to ${purpose}.`;
+}
+
 async function initSettingsPanel(forceRefresh = false) {
   const spreadsheet = await getSpreadsheetMetadata();
   const sheet = spreadsheet.sheets.find((s) => s.properties.title === CONFIG.SHEETS.SETTINGS);
-  const meta = { settingsSheetId: sheet ? sheet.properties.sheetId : null };
-
-  settingsSheetId = meta.settingsSheetId;
+  settingsSheetId = sheet ? sheet.properties.sheetId : null;
   settingsSheetMissing = settingsSheetId === null;
   // Before the first render, so a /settings/<tab>/ load draws that tab at once.
   initSettingTabs();
 
-  SETTING_TABLES.forEach(({ addButtonId }) => {
-    document.getElementById(addButtonId).disabled = settingsSheetMissing;
-  });
+  document.getElementById('add-setting-btn').disabled = settingsSheetMissing;
 
   if (settingsSheetMissing) {
-    SETTING_TABLES.forEach(({ bodyId }) => {
-      const tbody = document.getElementById(bodyId);
-      tbody.innerHTML = '';
-      tbody.appendChild(renderEmptyRow(4, `No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to use this panel.`));
-    });
+    const tbody = document.getElementById('settings-body');
+    tbody.innerHTML = '';
+    tbody.appendChild(renderEmptyRow(SETTING_COLUMN_COUNT, missingSettingsTabMessage('use this panel')));
   } else {
     await refreshSettingsList(forceRefresh);
     await removeRetiredSettings();
@@ -34,13 +38,10 @@ async function initSettingsPanel(forceRefresh = false) {
 
   if (!settingPanelListenersAttached) {
     settingPanelListenersAttached = true;
-    SETTING_TABLES.forEach(({ addButtonId }) => {
-      document.getElementById(addButtonId).addEventListener('click', () => openSettingForm());
-    });
+    document.getElementById('add-setting-btn').addEventListener('click', () => openSettingForm());
     document.getElementById('setting-cancel-btn').addEventListener('click', closeSettingForm);
     onFormSubmit('setting-form', submitSettingForm);
-    // <section>/settings/<key in lowercase>/ opens that setting's Edit (both blocks
-    // share the slug "settings", in different sections).
+    // <section>/settings/<key in lowercase>/ opens that setting's Edit.
     registerRecordRoute('settings', (slug, sub) => {
       const setting = allSettingRows.find((s) => settingRouteSlug(s) === slug);
       if (!setting || sub) return null;
@@ -49,11 +50,6 @@ async function initSettingsPanel(forceRefresh = false) {
     });
   }
 }
-
-// The Setting tab's one table, under Other, filtered by the active tab below.
-const SETTING_TABLES = [
-  { bodyId: 'settings-body', addButtonId: 'add-setting-btn', includes: (key) => settingTabIncludes(activeSettingTab, key) },
-];
 
 // Slugs match the #settings-tabs buttons. Health takes every key no other tab
 // claims, so a new key always lands somewhere.
@@ -89,8 +85,7 @@ function showSettingTab(slug) {
   renderSettingsList();
 }
 
-// The router (data-route-view) puts each tab at /other/settings/<tab>/; the
-// bare address is the first tab.
+// Each tab is at /other/settings/<tab>/; the bare address is the first tab.
 function initSettingTabs() {
   if (settingTabsAttached) return;
   settingTabsAttached = true;
@@ -103,8 +98,7 @@ function initSettingTabs() {
   registerViewReset(panel, () => showSettingTab(SETTING_TABS[0].slug));
 }
 
-// A setting's address segment: its key in lowercase, underscores kept
-// (BODY_MASS_HEALTHY_KG -> body_mass_healthy_kg).
+// The key in lowercase, underscores kept (BODY_MASS_HEALTHY_KG -> body_mass_healthy_kg).
 function settingRouteSlug(setting) {
   return setting.key.trim().toLowerCase();
 }
@@ -123,10 +117,8 @@ async function refreshSettingsList(forceRefresh = false) {
   renderSettingsList();
 }
 
-// A Value cell holds anything from `82` to a whole saved AI report, and a
-// multi-hundred-character cell stretched the row far past every other one.
-// Truncated for display only — the full text is in the title attribute and in
-// the edit form, and nothing here is ever written back from the table.
+// A Value cell can hold a whole saved AI report; the table shows a stub, the full
+// text is in the title and the edit form.
 const SETTING_VALUE_DISPLAY_MAX = 32;
 
 function truncateSettingValue(value) {
@@ -135,24 +127,18 @@ function truncateSettingValue(value) {
     : value;
 }
 
-// Keys holding a bearer credential (GROQ_API_KEY, OPENROUTER_API_KEY, USDA_FDC_API_KEY)
-// rather than a plain preference. Masked by default independent of the
-// privacy toggle below: that toggle is for hiding amounts from someone
-// glancing at the screen, not for keeping a credential off it during
-// ordinary use, where privacy mode is normally off.
+// Credential keys, masked even with privacy mode off (that toggle hides amounts,
+// it isn't meant to guard credentials).
 const SECRET_SETTING_KEY_PATTERN = /(API_KEY|_TOKEN|_SECRET)$/i;
 
 function isSecretSettingKey(key) {
   return SECRET_SETTING_KEY_PATTERN.test(key);
 }
 
-// Which secret keys the user has explicitly revealed this session. In
-// memory only — resets on refresh/reload, same as a password manager's
-// reveal-until-you-look-away.
+// Secret keys revealed this session; in memory only.
 const revealedSettingKeys = new Set();
 
-// Not makeRowActionButton: reveal/hide never touches the sheet, so it has no
-// business behind setupAuthGatedActions' sign-in gate the way Edit/Delete do.
+// Not makeRowActionButton: reveal never writes the sheet, so it skips the sign-in gate.
 function makeSecretRevealButton(key, revealed) {
   const btn = document.createElement('button');
   btn.className = 'btn';
@@ -168,19 +154,15 @@ function makeSecretRevealButton(key, revealed) {
 
 function renderSettingsList() {
   renderSettingTabs();
-  SETTING_TABLES.forEach((table) => renderSettingsTable(table));
-}
-
-function renderSettingsTable({ bodyId, includes }) {
-  const tbody = document.getElementById(bodyId);
+  const tbody = document.getElementById('settings-body');
   tbody.innerHTML = '';
 
   // Alphabetical by key, not the sheet's row order, so a key is found where you'd look.
   const rows = allSettingRows
-    .filter((setting) => includes(setting.key))
+    .filter((setting) => settingTabIncludes(activeSettingTab, setting.key))
     .sort((a, b) => a.key.localeCompare(b.key));
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(4, allSettingRows.length ? 'No settings in this tab.' : 'No settings yet — add your first one above.'));
+    tbody.appendChild(renderEmptyRow(SETTING_COLUMN_COUNT, allSettingRows.length ? 'No settings in this tab.' : 'No settings yet — add your first one above.'));
   }
 
   rows.forEach((setting) => {
@@ -199,12 +181,8 @@ function renderSettingsTable({ bodyId, includes }) {
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteSetting(setting.row) }),
     );
 
-    // Full-masked (not just digits) since values include API keys and city
-    // names — letters carry just as much sensitive content as digits do
-    // here, unlike a plain number. The Key column (e.g. BODY_MASS_HEALTHY_KG)
-    // isn't sensitive on its own and stays visible.
-    // No hover-reveal of a masked value — that would defeat the privacy toggle
-    // (or, for a secret, the reveal click).
+    // Values are fully masked (they include keys and city names); the Key column
+    // stays visible. No hover-reveal of a masked value.
     const shouldMask = privacyMode || (isSecret && !revealed);
     const shown = truncateSettingValue(shouldMask ? maskText(setting.value) : setting.value);
     const fullTitle = (!shouldMask && shown !== setting.value) ? setting.value : undefined;
@@ -242,33 +220,24 @@ async function submitSettingForm(event) {
 
   const values = [[
     key,
-    // Trimmed: the box is multi-line, and a stray trailing Enter would otherwise be
-    // saved into the value ("male\n" no longer reads as male).
+    // Trimmed: a stray trailing Enter in the multi-line box would be saved ("male\n").
     document.getElementById('setting-value').value.trim(),
     // A blank note takes the key's default one.
     document.getElementById('setting-notes').value.trim() || settingDefaultNote(key),
   ]];
 
   try {
-    // RAW here for the same reason saveSettingValues uses it (see there): this
-    // tab is a key/value store, and nothing in it benefits from Sheets
-    // reinterpreting the typed text. A BIRTH_DATE of "1990-05-12" is meant to
-    // be read back as exactly that string, and a HEIGHT_CM of 178 must never
-    // end up in a date-formatted cell — where it would read back as a date and
-    // register as "not set" everywhere.
+    // RAW, as in saveSettingValues.
     if (editingSettingRow) {
-      await updateValues(`${CONFIG.SHEETS.SETTINGS}!A${editingSettingRow}:C${editingSettingRow}`, values, 'RAW');
+      await updateValues(settingRange(`A${editingSettingRow}:C${editingSettingRow}`), values, 'RAW');
     } else {
       await appendValues(SETTINGS_PANEL_RANGE, values, 'RAW');
     }
-    await refreshSettingsList(true);
-    // Repairs this row's format if a previous USER_ENTERED write date-stamped
-    // it, so editing a broken setting is enough to fix it.
-    const saved = allSettingRows.find((r) => r.key === key);
-    if (saved) await clearSettingValueFormats([saved.row]);
-
-    await refreshSettingsList(true);
-    currentSettings = await loadSettings(true);
+    // Re-saving a setting is enough to repair a date-stamped cell.
+    await reloadSettingsAfterWrite(() => {
+      const saved = allSettingRows.find((r) => r.key === key);
+      return saved ? [saved.row] : [];
+    });
     applySettingsToWidgets();
     await recomputeStoredPhysiqueBmr([key]);
     const savedSetting = allSettingRows.find((r) => r.key === key);
@@ -282,11 +251,8 @@ async function submitSettingForm(event) {
   }
 }
 
-// A cell's number format is a separate property from its value, so writing the
-// right number into a cell that some earlier write turned into a date-formatted
-// one leaves it still reading back as a date string. Clearing the format on
-// every row written repairs those in place — an already-broken setting is fixed
-// by re-saving it, rather than needing its row deleted by hand.
+// A cell's number format outlives its value, so a once date-formatted Value cell
+// keeps reading back as a date. Resetting the format repairs it in place.
 async function clearSettingValueFormats(rowNumbers) {
   if (rowNumbers.length === 0 || settingsSheetId === null) return;
 
@@ -299,33 +265,23 @@ async function clearSettingValueFormats(rowNumbers) {
         startColumnIndex: 1, // column B, the Value cell
         endColumnIndex: 2,
       },
-      // Field named in `fields` but omitted from `cell` — the API's documented
-      // way to DELETE a field, resetting the cell to Automatic formatting.
+      // Named in `fields` but absent from `cell`: the API's way to delete it.
       cell: { userEnteredFormat: {} },
       fields: 'userEnteredFormat.numberFormat',
     },
   })));
 }
 
-// Writes key/value pairs to the Settings tab — updating rows that already
-// exist in place, appending new ones for keys seen for the first time — then
-// refreshes both the settings-panel list and currentSettings so callers see
-// their own write immediately. Shared by every feature that persists an
-// AI/computed result there (health-insight-wellness.js, health-insight-food.js).
-//
-// RAW, not USER_ENTERED: every value routed through here is already a finished
-// computed value that has to survive the round trip byte-for-byte, and
-// USER_ENTERED reinterprets it the way typing into the cell would. That caused
-// a genuinely destructive bug — a written "2026-07-30" was parsed into a real
-// date, which turned its cell into a DATE-formatted one, and rows appended
-// beside it inherited that format. A value like 0.00031534 is a perfectly valid
-// date serial, so it then displayed as "1899-12-30 0:00" and (via VALUE_PARAMS'
-// FORMATTED_STRING dateTimeRenderOption) read back as that STRING rather than a
-// number. getSetting() saw NaN and reported the setting as absent, so a
-// correctly-written value silently vanished — as did any other numeric setting
-// whose cell caught the same format.
-// The Notes a save writes into a key's Notes cell when it's blank (a typed note is kept),
-// so no key the app writes lands without one.
+// After a write: re-reads the tab, repairs the given rows' formats, then re-reads
+// again so the list and currentSettings get the repaired values.
+async function reloadSettingsAfterWrite(rowsToRepair) {
+  await refreshSettingsList(true);
+  await clearSettingValueFormats(rowsToRepair());
+  await refreshSettingsList(true);
+  currentSettings = await loadSettings(true);
+}
+
+// The note a save writes into a blank Notes cell (a typed note is kept).
 const SETTING_DEFAULT_NOTES = {
   ACTIVITY_DESIRED_FIXED_KCAL: 'Pins the desired daily activity burn (kcal); blank = worked out from ACTIVITY_DESIRED_MIN of walking at your body mass',
   ACTIVITY_DESIRED_MIN: 'Desired daily activity (minutes) line on the Physical Activity chart',
@@ -399,24 +355,29 @@ function settingDefaultNote(key) {
   return '';
 }
 
+// Writes key/value pairs to the Setting tab (existing keys in place, new ones
+// appended), then refreshes the list and currentSettings so callers see their write.
+//
+// RAW, not USER_ENTERED: Sheets parsed a written "2026-07-30" into a date, which
+// date-formatted the cell and the rows appended beside it, so numbers there read
+// back as date strings and getSetting() reported them as absent.
 async function saveSettingValues(values) {
   await initSettingsPanel(true);
   if (settingsSheetMissing) {
-    throw new Error(`No "${CONFIG.SHEETS.SETTINGS}" tab found — add one with columns Key | Value | Notes to save this.`);
+    throw new Error(missingSettingsTabMessage('save this'));
   }
 
   const existingByKey = new Map(allSettingRows.map((r) => [r.key, r]));
-  const changedKeys = Object.entries(values)
-    .filter(([key, value]) => String(existingByKey.get(key)?.value ?? '') !== String(value ?? ''))
-    .map(([key]) => key);
+  const changedKeys = [];
   const updates = [];
   const newRows = [];
 
   Object.entries(values).forEach(([key, value]) => {
     const existing = existingByKey.get(key);
+    if (String(existing?.value ?? '') !== String(value ?? '')) changedKeys.push(key);
     const defaultNote = settingDefaultNote(key);
     if (existing) {
-      updates.push(updateValues(`${CONFIG.SHEETS.SETTINGS}!A${existing.row}:C${existing.row}`, [[key, value, existing.notes || defaultNote]], 'RAW'));
+      updates.push(updateValues(settingRange(`A${existing.row}:C${existing.row}`), [[key, value, existing.notes || defaultNote]], 'RAW'));
     } else {
       newRows.push([key, value, defaultNote]);
     }
@@ -425,23 +386,15 @@ async function saveSettingValues(values) {
   await Promise.all(updates);
   if (newRows.length > 0) await appendValues(SETTINGS_PANEL_RANGE, newRows, 'RAW');
 
-  // Formats are cleared BEFORE the read-back below, so currentSettings gets the
-  // repaired numeric values rather than the date strings the old format would
-  // still have produced this one last time.
-  await refreshSettingsList(true);
   const writtenKeys = new Set(Object.keys(values));
-  await clearSettingValueFormats(allSettingRows.filter((r) => writtenKeys.has(r.key)).map((r) => r.row));
-
-  await refreshSettingsList(true);
-  currentSettings = await loadSettings(true);
+  await reloadSettingsAfterWrite(() => allSettingRows.filter((r) => writtenKeys.has(r.key)).map((r) => r.row));
   // Stored per-day BMR/Deprivation follow a changed profile or BMR setting.
   return recomputeStoredPhysiqueBmr(changedKeys);
 }
 
-// Keys the app no longer reads: the walking MET is the Activity sheet's Walk row,
-// BMR_cal is each Physique day's stored Derived cell, and SHOW_BLOCKS went with the home
-// page's Show blocks (it shows page tiles instead). A copy left in the Setting tab would only be a stale duplicate, so any row
-// still holding one is deleted on load (once; nothing writes them any more).
+// Keys the app no longer reads (the walking MET is the Activity sheet's Walk row,
+// BMR_cal each Physique day's Derived cell, SHOW_BLOCKS went with Show blocks).
+// Any row still holding one is deleted on load.
 const RETIRED_SETTING_KEYS = ['ACTIVITY_MET', 'ACTIVITY_MET_DEFAULT', 'BMR_CALIBRATED_KCAL', 'BMR_CALIBRATED_OFFSET_KCAL', 'SHOW_BLOCKS'];
 
 // A row with a blank Notes cell gets its key's default note, once, on load.
@@ -450,7 +403,7 @@ async function fillBlankSettingNotes() {
     .map((setting) => ({ setting, note: settingDefaultNote(setting.key.trim()) }))
     .filter(({ setting, note }) => note && !String(setting.notes || '').trim());
   if (!blanks.length) return;
-  await Promise.all(blanks.map(({ setting, note }) => updateValues(`${CONFIG.SHEETS.SETTINGS}!C${setting.row}`, [[note]], 'RAW')));
+  await Promise.all(blanks.map(({ setting, note }) => updateValues(settingRange(`C${setting.row}`), [[note]], 'RAW')));
   console.info(`[settings] filled blank notes: ${blanks.map(({ setting }) => setting.key).join(', ')}`);
   await refreshSettingsList(true);
 }
@@ -462,22 +415,14 @@ async function removeRetiredSettings() {
     // Bottom-up, so each deletion leaves the rows still to delete where they were.
     .sort((a, b) => b - a);
   if (!rows.length || settingsSheetId === null) return;
-  await batchUpdate(rows.map((row) => ({
-    deleteDimension: {
-      range: { sheetId: settingsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
-    },
-  })));
+  await batchUpdate(rows.map((row) => sheetRowDeleteRequest(settingsSheetId, row)));
   console.info(`[settings] removed retired keys: ${RETIRED_SETTING_KEYS.join(', ')}`);
   await refreshSettingsList(true);
 }
 
 async function deleteSetting(row) {
   await confirmAndDelete('Delete this setting?', async () => {
-    await batchUpdate([{
-      deleteDimension: {
-        range: { sheetId: settingsSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row },
-      },
-    }]);
+    await batchUpdate([sheetRowDeleteRequest(settingsSheetId, row)]);
     await refreshSettingsList(true);
     currentSettings = await loadSettings(true);
     applySettingsToWidgets();

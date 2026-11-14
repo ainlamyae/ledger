@@ -1,5 +1,9 @@
 const TRAVEL_RANGE = `'${CONFIG.SHEETS.TRAVEL}'!A2:H`;
 const TRAVEL_PAGE_SIZE = 25;
+// Sheet columns A–H, in order; each has a travel-<kebab-case> form field.
+const TRAVEL_FIELD_KEYS = ['countryCity', 'port', 'type', 'via', 'date', 'time', 'reason', 'detail'];
+const TRAVEL_TABLE_KEYS = ['date', 'type', 'countryCity', 'port', 'via', 'reason', 'detail'];
+const TRAVEL_SEARCH_KEYS = ['countryCity', 'port', 'type', 'via', 'reason', 'detail'];
 
 let allTravel = [];
 let editTravel = null;
@@ -9,36 +13,28 @@ let travelCurrentPage = 1;
 let travelSheetId = null;
 let editingTravelRow = null;
 
-async function fetchTravelSheetId() {
-  const metadata = await getSpreadsheetMetadata();
-  return findSheetId(metadata, CONFIG.SHEETS.TRAVEL);
+// "countryCity" -> the travel-country-city input.
+function travelFieldId(key) {
+  return `travel-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
 }
 
 async function initTravel(forceRefresh = false) {
   if (!travelListenersAttached) {
     travelListenersAttached = true;
+    const rerenderFromFirstPage = () => {
+      travelCurrentPage = 1;
+      renderTravelList();
+    };
 
     document.getElementById('add-travel-btn').addEventListener('click', () => openTravelForm(null));
     editTravel = routedRowEdit('travel', () => allTravel, (t) => `${t.date} ${t.countryCity}`, openTravelForm);
     document.getElementById('travel-cancel-btn').addEventListener('click', closeTravelForm);
     onFormSubmit('travel-form', submitTravelForm);
-
-    document.getElementById('travel-search').addEventListener('input', () => {
-      travelCurrentPage = 1;
-      renderTravelList();
-    });
-
-    setupTravelSorting();
+    document.getElementById('travel-search').addEventListener('input', rerenderFromFirstPage);
+    makeSortableHeaders('#travel-table', travelSort, rerenderFromFirstPage);
   }
 
   await refreshTravel(forceRefresh);
-}
-
-function setupTravelSorting() {
-  makeSortableHeaders('#travel-table', travelSort, () => {
-    travelCurrentPage = 1;
-    renderTravelList();
-  });
 }
 
 async function refreshTravel(forceRefresh = false) {
@@ -46,17 +42,7 @@ async function refreshTravel(forceRefresh = false) {
   const values = resp.values || [];
 
   allTravel = values
-    .map((row, i) => ({
-      row: i + 2,
-      countryCity: row[0] || '',
-      port: row[1] || '',
-      type: row[2] || '',
-      via: row[3] || '',
-      date: row[4] || '',
-      time: row[5] || '',
-      reason: row[6] || '',
-      detail: row[7] || '',
-    }))
+    .map((row, i) => ({ row: i + 2, ...Object.fromEntries(TRAVEL_FIELD_KEYS.map((key, col) => [key, row[col] || ''])) }))
     .filter((t) => t.countryCity || t.port);
 
   renderTravelList();
@@ -64,14 +50,12 @@ async function refreshTravel(forceRefresh = false) {
   renderWorldMapChart(getVisitedCountries(allTravel));
 }
 
+// Newest (last sheet row) first until a column is sorted.
 function getFilteredTravel() {
   const search = document.getElementById('travel-search').value.trim().toLowerCase();
 
-  const filtered = allTravel.filter((t) => {
-    if (!search) return true;
-    return [t.countryCity, t.port, t.type, t.via, t.reason, t.detail]
-      .some((field) => field.toLowerCase().includes(search));
-  });
+  const filtered = allTravel.filter((t) => !search
+    || TRAVEL_SEARCH_KEYS.some((key) => t[key].toLowerCase().includes(search)));
 
   if (!travelSort.key) return [...filtered].reverse();
 
@@ -99,16 +83,7 @@ function renderTravelList() {
 
   pageItems.forEach((t) => {
     const tr = document.createElement('tr');
-
-    tr.append(
-      makeCell(t.date),
-      makeCell(t.type),
-      makeCell(t.countryCity),
-      makeCell(t.port),
-      makeCell(t.via),
-      makeCell(t.reason),
-      makeCell(t.detail),
-    );
+    tr.append(...TRAVEL_TABLE_KEYS.map((key) => makeCell(t[key])));
 
     const actionsCell = document.createElement('td');
     actionsCell.append(
@@ -119,10 +94,6 @@ function renderTravelList() {
     tbody.appendChild(tr);
   });
 
-  renderTravelPagination(totalPages);
-}
-
-function renderTravelPagination(totalPages) {
   renderPager('travel-pagination', {
     page: travelCurrentPage,
     totalPages,
@@ -133,18 +104,10 @@ function renderTravelPagination(totalPages) {
   });
 }
 
-const TRAVEL_FIELD_IDS = ['country-city', 'port', 'type', 'via', 'date', 'time', 'reason', 'detail'];
-
 function openTravelForm(travel) {
   editingTravelRow = travel ? travel.row : null;
-
-
-  const values = travel
-    ? [travel.countryCity, travel.port, travel.type, travel.via, travel.date, travel.time, travel.reason, travel.detail]
-    : ['', '', '', '', '', '', '', ''];
-
-  TRAVEL_FIELD_IDS.forEach((id, i) => {
-    document.getElementById(`travel-${id}`).value = values[i];
+  TRAVEL_FIELD_KEYS.forEach((key) => {
+    document.getElementById(travelFieldId(key)).value = travel ? travel[key] : '';
   });
 
   clearFieldError('travel-form-error');
@@ -158,7 +121,7 @@ function closeTravelForm() {
 async function submitTravelForm(event) {
   event.preventDefault();
 
-  const rowData = TRAVEL_FIELD_IDS.map((id) => document.getElementById(`travel-${id}`).value.trim());
+  const rowData = TRAVEL_FIELD_KEYS.map((key) => document.getElementById(travelFieldId(key)).value.trim());
 
   try {
     let row = editingTravelRow;
@@ -181,17 +144,8 @@ async function submitTravelForm(event) {
 
 async function deleteTravelEntry(travel) {
   await confirmAndDelete(`Delete this travel entry (${travel.countryCity || travel.port})?`, async () => {
-    if (!travelSheetId) travelSheetId = await fetchTravelSheetId();
-    await batchUpdate([{
-      deleteDimension: {
-        range: {
-          sheetId: travelSheetId,
-          dimension: 'ROWS',
-          startIndex: travel.row - 1,
-          endIndex: travel.row,
-        },
-      },
-    }]);
+    if (!travelSheetId) travelSheetId = findSheetId(await getSpreadsheetMetadata(), CONFIG.SHEETS.TRAVEL);
+    await batchUpdate([sheetRowDeleteRequest(travelSheetId, travel.row)]);
     await refreshTravel(true);
   }, "Couldn't delete travel entry");
 }

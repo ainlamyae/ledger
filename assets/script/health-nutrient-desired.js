@@ -1,15 +1,10 @@
-// Ideal/day desired amounts for the Health Insight Micronutrients table
-// (health-insight-micronutrient.js). Defaults are the FDA's 2016 Daily Values (21
-// CFR 101.9(c)), plus ALA's NASEM Adequate Intake since omega-3 isn't on the
-// FDA label at all. Not personalized — sex/age/body mass aren't factored in.
-// Only nutrients with an official reference are listed; the rest of what FDC
-// reports (fatty-acid isomers, amino acids, individual sugars...) has none.
+// Desired amounts per day for the Micronutrients Insight table, keyed by exact FDC
+// nutrient name: the FDA's 2016 Daily Values (21 CFR 101.9(c)) plus the NASEM
+// figures noted below. Not personalized. A nutrient with no published reference
+// (fatty-acid isomers, individual sugars...) is left out.
+// A MICRONUTRIENT_DAILY_DESIRED_JSON Setting of the same shape replaces the whole list.
 //
-// Override via a MICRONUTRIENT_DAILY_DESIRED_JSON Setting, same shape as
-// below — only the names it sets are replaced. Keyed by exact FDC nutrient name.
-//
-// `kind`: 'floor' = get enough of (gap = too low), 'ceiling' = limit (gap =
-// too high, e.g. sodium/saturated fat), 'reference' = shown, not flagged.
+// `kind`: 'floor' = get enough of, 'ceiling' = limit (e.g. sodium), 'reference' = shown, not flagged.
 const NUTRIENT_DAILY_DESIRED_DEFAULT = {
   'Total lipid (fat)': { unit: 'g', amount: 78, kind: 'reference' },
   'Fatty acids, total saturated': { unit: 'g', amount: 20, kind: 'ceiling' },
@@ -45,30 +40,19 @@ const NUTRIENT_DAILY_DESIRED_DEFAULT = {
   'Chromium, Cr': { unit: 'µg', amount: 35, kind: 'floor' },
   'Molybdenum, Mo': { unit: 'µg', amount: 45, kind: 'floor' },
   'Choline, total': { unit: 'mg', amount: 550, kind: 'floor' },
-  // EPA/DHA get no desired amount: the only cited figure (DGA, ~250mg/day) is for the
-  // two combined, and FDC reports them as separate rows.
+  // No EPA/DHA: the only cited figure (~250mg/day) is for the two combined, and FDC
+  // reports them separately.
   'PUFA 18:3 n-3 c,c,c (ALA)': { unit: 'g', amount: 1.6, kind: 'floor' },
-  // NASEM 2004 Adequate Intake, total water from food AND beverages — men's
-  // figure (3.7L), the higher of the two sexes, kept as one fixed number like
-  // everything else here. Only accurate if drinks are logged as Consumption
-  // lines too: FDC's "Water" is the water content of whatever was actually
-  // priced, not a separate hydration tracker, and NASEM says ~80% of total
-  // water normally comes from drinking water/beverages, not food.
+  // NASEM 2004 Adequate Intake for total water, food and drinks (men's 3.7L, the
+  // higher). Only meaningful if drinks are logged too: FDC's Water is what the
+  // logged food holds, and ~80% normally comes from drinks.
   'Water': { unit: 'g', amount: 3700, kind: 'floor' },
-  // FDA consumer guidance (not a formal DRI): up to ~400mg/day is not
-  // associated with adverse effects in most healthy adults.
+  // FDA consumer guidance, not a DRI: up to ~400mg/day is safe for most adults.
   'Caffeine': { unit: 'mg', amount: 400, kind: 'ceiling' },
-  // No desired alcohol: even a "moderate" ceiling reads as an allowance, and zero has
-  // no downside.
-  // NASEM 2005 indispensable-amino-acid RDA (mg/kg body mass/day),
-  // multiplied by a 70kg reference adult — an actual computation, not a
-  // published fixed figure like everything else above, since amino acid
-  // needs scale with body size more directly than a vitamin's. Approximate
-  // for anyone far from 70kg. Methionine, Cysteine, Phenylalanine and
-  // Tyrosine are deliberately excluded: NASEM only publishes COMBINED
-  // Methionine+Cysteine and Phenylalanine+Tyrosine requirements, and FDC
-  // reports each amino acid as its own row — splitting a combined figure
-  // between two rows would be a guess, the same reason EPA/DHA have none.
+  // No alcohol: even a "moderate" ceiling reads as an allowance.
+  // NASEM 2005 indispensable-amino-acid RDA (mg/kg/day) times a 70kg reference adult,
+  // so approximate far from 70kg. Methionine, Cysteine, Phenylalanine and Tyrosine
+  // are left out: NASEM only gives them in pairs, which FDC reports as separate rows.
   'Histidine': { unit: 'g', amount: 0.98, kind: 'floor' },
   'Isoleucine': { unit: 'g', amount: 1.33, kind: 'floor' },
   'Leucine': { unit: 'g', amount: 2.94, kind: 'floor' },
@@ -82,34 +66,25 @@ function nutrientDailyDesired() {
   const raw = getSettingString('MICRONUTRIENT_DAILY_DESIRED_JSON', null);
   if (!raw) return NUTRIENT_DAILY_DESIRED_DEFAULT;
   try {
-    // The setting is the whole list, not overrides on top of the defaults: a nutrient
-    // deleted from it has no desired amount. The defaults above only stand in until the key
-    // exists (and seed it, patchMicronutrientDailyDesiredAmounts below).
+    // The whole list, not overrides: a nutrient deleted from it has no desired amount.
     const desired = JSON.parse(raw);
-    Object.values(desired).forEach((t) => { if (t && t.unit) t.unit = standardUnit(t.unit); });
+    Object.values(desired).forEach((entry) => { if (entry && entry.unit) entry.unit = standardUnit(entry.unit); });
     return desired;
   } catch {
     return NUTRIENT_DAILY_DESIRED_DEFAULT;
   }
 }
 
-// Patches one or more nutrients' `amount` inside the MICRONUTRIENT_DAILY_DESIRED_JSON
-// override, preserving each one's unit/kind (and every other nutrient) untouched — the
-// Tune's Save calls this so this table's own Protein/Fiber rows track the
-// band it just computed instead of sitting on the shipped FDA Daily Value forever. An
-// entry gains an override even if the setting was never customized before, since the
-// starting point is the shipped default for whichever name isn't already overridden.
+// The MICRONUTRIENT_DAILY_DESIRED_JSON value with each patched name's `amount` set,
+// unit/kind and every other nutrient kept. Tune's Save uses it so Protein/Fiber track
+// its band. With no valid setting yet, it starts from the whole default list.
 function patchMicronutrientDailyDesiredAmounts(patch) {
   const raw = getSettingString('MICRONUTRIENT_DAILY_DESIRED_JSON', null);
-  // The setting is the whole list (nutrientDailyDesired), so a first write starts
-  // from every default rather than just the patched names.
-  let overrides = { ...NUTRIENT_DAILY_DESIRED_DEFAULT };
-  if (raw) {
-    try {
-      overrides = JSON.parse(raw);
-    } catch {
-      overrides = { ...NUTRIENT_DAILY_DESIRED_DEFAULT };
-    }
+  let overrides;
+  try {
+    overrides = raw ? JSON.parse(raw) : { ...NUTRIENT_DAILY_DESIRED_DEFAULT };
+  } catch {
+    overrides = { ...NUTRIENT_DAILY_DESIRED_DEFAULT };
   }
   Object.entries(patch).forEach(([name, amount]) => {
     const base = overrides[name] || NUTRIENT_DAILY_DESIRED_DEFAULT[name] || { unit: 'g', kind: 'floor' };
@@ -121,10 +96,8 @@ function patchMicronutrientDailyDesiredAmounts(patch) {
 const NUTRIENT_GAP_SEVERE_FLOOR_RATIO = 0.5;
 const NUTRIENT_GAP_MILD_FLOOR_RATIO = 0.8;
 
-// Only flags a genuine shortfall on a get-enough-of nutrient — running OVER an
-// ideal (a ceiling nutrient like sodium/alcohol, or a floor nutrient eaten well
-// past its desired amount) is never colored, even though it may be worth noting in the
-// AI report; the row coloring is reserved for "a lot less than the ideal/day".
+// Flags only a shortfall on a floor nutrient; running over any desired amount is
+// never colored.
 function nutrientGapSeverity(kind, avgPerDay, desiredAmount) {
   if (kind !== 'floor') return null;
   if (!desiredAmount || avgPerDay === null) return null;

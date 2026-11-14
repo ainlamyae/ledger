@@ -7,6 +7,9 @@ const ANALYSIS_RANGE = () => `'${CONFIG.SHEETS.STOCK_ANALYSIS}'!A2:G`;
 const ANALYSIS_LABELS = ['Overview', 'Signals', 'News', 'Risk', 'Levels', 'Verdict', 'Answer', 'Alerts'];
 const ANALYSIS_DISCLAIMER = 'Not financial advice. A rules-based summary of past prices and recent headlines; no signal here is anywhere near 95% reliable.';
 const ANALYSIS_STALE_DAYS = 30;
+const ANALYSIS_PRICE_TOLERANCE = 0.005; // within ±0.5% counts as a supplied price
+const ANALYSIS_NEWS_SHOWN = 12;
+const ANALYSIS_NEWS_SENT = 15;
 
 let allStockAnalyses = [];
 let analysisSymbol = null;
@@ -76,7 +79,7 @@ function updateAnalysisAgeBadge() {
   allWatchlist.forEach((w) => {
     const last = latestAnalysis(w.symbol);
     if (!last) return;
-    const days = Math.round((today - dateFromIso(last.date.slice(0, 10))) / 86400000);
+    const days = Math.round((today - dateFromIso(last.date.slice(0, 10))) / MS_PER_DAY);
     if (oldest === null || days > oldest.days) oldest = { days, symbol: w.symbol, date: last.date };
   });
   const stale = oldest && oldest.days > ANALYSIS_STALE_DAYS ? `${oldest.symbol} last analyzed ${oldest.days} days ago (${oldest.date})` : null;
@@ -137,8 +140,9 @@ function analysisBenchmark(symbol) {
 async function loadStockAnalysis() {
   const symbol = analysisSymbol;
   const token = ++analysisLoadToken;
+  const btn = document.getElementById('analysis-generate-btn');
   document.getElementById('analysis-symbol').value = symbol;
-  document.getElementById('analysis-generate-btn').disabled = true;
+  btn.disabled = true;
   setMarketStatus('analysis-status', `Loading ${symbol}…`);
   const onWait = (s, name) => setMarketStatus('analysis-status', `Waiting for ${name}'s per-minute limit (${s} s)…`);
   const problems = [];
@@ -170,8 +174,8 @@ async function loadStockAnalysis() {
       benchmarkBars: benchmark,
       monthlyBars: monthly,
       riskFreePct: getSetting('MARKET_RISK_FREE_PCT', 0),
-      atrMult: getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT),
-      riskPct: getSetting('MARKET_RISK_PCT', 1),
+      atrMult: analysisAtrMult(),
+      riskPct: analysisRiskPct(),
       equity,
     });
     if (token !== analysisLoadToken) return;
@@ -184,8 +188,8 @@ async function loadStockAnalysis() {
     drawAnalysisChart();
     renderAnalysisPrompt();
     renderSavedAnalysis();
-    document.getElementById('analysis-generate-btn').disabled = false;
-    document.getElementById('analysis-generate-btn').title = `Send ${symbol}'s signals and headlines to AI`;
+    btn.disabled = false;
+    btn.title = `Send ${symbol}'s signals and headlines to AI`;
   } catch (err) {
     if (token !== analysisLoadToken) return;
     analysisLoaded = null;
@@ -195,12 +199,29 @@ async function loadStockAnalysis() {
 
 // --- Rendering --------------------------------------------------------------
 
+function analysisAtrMult() {
+  return getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT);
+}
+
+function analysisRiskPct() {
+  return getSetting('MARKET_RISK_PCT', 1);
+}
+
+// A holder's exit signal: the close at or below the trailing stop.
+function analysisStopBroken({ stop, close }) {
+  return stop !== null && close <= stop;
+}
+
+function analysisSharesText(shares) {
+  return privacyMode ? maskDigits(String(shares)) : String(shares);
+}
+
 function fmtPct(v, digits = 1) {
-  return v === null || !Number.isFinite(v) ? null : `${(v * 100).toFixed(digits)}%`;
+  return Number.isFinite(v) ? `${(v * 100).toFixed(digits)}%` : null;
 }
 
 function fmtNum(v, digits = 2) {
-  return v === null || !Number.isFinite(v) ? null : v.toFixed(digits);
+  return Number.isFinite(v) ? v.toFixed(digits) : null;
 }
 
 function needsText(result) {
@@ -211,30 +232,34 @@ const VERDICT_CLASS = { Favourable: 'income', Mixed: 'neutral', Unfavourable: 'e
 
 function renderAnalysisCards() {
   const { signals, currency } = analysisLoaded;
+  const money = (v) => formatMoney(v, currency, { mask: false });
   const verdict = document.getElementById('analysis-verdict');
   verdict.className = `value ${VERDICT_CLASS[signals.verdict.label] || 'neutral'}`;
   verdict.textContent = `${signals.verdict.label} ${signals.verdict.passed}/${signals.verdict.available}`;
   verdict.title = signals.verdict.notes.join('; ');
-  document.getElementById('analysis-close').textContent = signals.close !== null ? formatMoney(signals.close, currency, { mask: false }) : '—';
-  document.getElementById('analysis-stop').textContent = signals.stop !== null ? formatMoney(signals.stop, currency, { mask: false }) : '—';
-  const shares = document.getElementById('analysis-shares');
-  shares.textContent = signals.shares !== null ? (privacyMode ? maskDigits(String(signals.shares)) : String(signals.shares)) : '—';
-  shares.title = signals.riskAmount !== null ? `If you buy today: risking ${formatMoney(signals.riskAmount, currency)} at the entry stop ${formatMoney(signals.entryStop, currency, { mask: false })}`
-    : 'Needs investment accounts with a Market Value';
+  document.getElementById('analysis-close').textContent = signals.close !== null ? money(signals.close) : '—';
   const stopCard = document.getElementById('analysis-stop');
-  stopCard.title = signals.stop !== null && signals.close <= signals.stop
-    ? `Trailing stop, already broken: close is below it (exit signal for a holder). Entry stop if buying today: ${signals.entryStop !== null ? formatMoney(signals.entryStop, currency, { mask: false }) : 'n/a'}`
-    : `Trailing stop for a holder. Entry stop if buying today: ${signals.entryStop !== null ? formatMoney(signals.entryStop, currency, { mask: false }) : 'n/a'}`;
+  stopCard.textContent = signals.stop !== null ? money(signals.stop) : '—';
+  const shares = document.getElementById('analysis-shares');
+  shares.textContent = signals.shares !== null ? analysisSharesText(signals.shares) : '—';
+  shares.title = signals.riskAmount !== null ? `If you buy today: risking ${formatMoney(signals.riskAmount, currency)} at the entry stop ${money(signals.entryStop)}`
+    : 'Needs investment accounts with a Market Value';
+  const entry = `Entry stop if buying today: ${signals.entryStop !== null ? money(signals.entryStop) : 'n/a'}`;
+  stopCard.title = analysisStopBroken(signals)
+    ? `Trailing stop, already broken: close is below it (exit signal for a holder). ${entry}`
+    : `Trailing stop for a holder. ${entry}`;
 }
+
+// A signal's read cell by pass (true/false/null); anything else is a blank neutral cell.
+const ANALYSIS_SIGNAL_READS = new Map([[true, ['Pass', 'income']], [false, ['Fail', 'expense']], [null, ['n/a', 'neutral']]]);
 
 // One table row: [name (definition), value, rule, read].
 function signalRow(tbody, name, title, value, rule, pass, groupEnd = false) {
   const tr = document.createElement('tr');
   tr.title = title;
-  const read = makeCell(pass === true ? 'Pass' : pass === false ? 'Fail' : pass === null ? 'n/a' : '');
-  if (pass === true) read.classList.add('income');
-  else if (pass === false) read.classList.add('expense');
-  else read.classList.add('neutral');
+  const [readText, readClass] = ANALYSIS_SIGNAL_READS.get(pass) || ['', 'neutral'];
+  const read = makeCell(readText);
+  read.classList.add(readClass);
   const valueCell = makeCell(value ?? '—');
   valueCell.classList.add('num');
   tr.append(makeCell(name), valueCell, makeCell(rule), read);
@@ -246,31 +271,34 @@ function renderSignalTable() {
   const { signals: s, currency, symbol } = analysisLoaded;
   const tbody = document.getElementById('market-signal-body');
   tbody.innerHTML = '';
-  const money = (v) => (v === null || !Number.isFinite(v) ? null : formatMoney(v, currency, { mask: false }));
+  const money = (v) => (Number.isFinite(v) ? formatMoney(v, currency, { mask: false }) : null);
   const or = (result, text) => (result.value === null ? needsText(result) : text);
+  const bench = analysisBenchmark(symbol);
 
   signalRow(tbody, `Trend (${s.trend.basis})`, 'Close above its long average — mainly cuts drawdowns (Faber 2007; Brock-Lakonishok-LeBaron 1992)',
     s.trend.value === null ? needsText(s.trend) : `${money(s.trend.close)} vs ${money(s.trend.sma)}`, 'Close above the average', s.checks.trend);
   signalRow(tbody, 'Momentum 12-1', 'Return from 12 months ago to 1 month ago (Jegadeesh-Titman 1993; Asness-Moskowitz-Pedersen 2013)',
     or(s.momentum, fmtPct(s.momentum.value)), 'Above 0%', s.checks.momentum);
-  signalRow(tbody, `Relative momentum vs ${analysisBenchmark(symbol)}`, "12-1 momentum minus the market's",
+  signalRow(tbody, `Relative momentum vs ${bench}`, "12-1 momentum minus the market's",
     s.relative.value === null ? `— (needs ${s.relative.needs} days)` : fmtPct(s.relative.value), 'Above the market', s.checks.relative);
   signalRow(tbody, '52-week high', 'Close ÷ highest high of the last 252 days (George-Hwang 2004)',
     or(s.high52, fmtPct(s.high52.value)), 'At least 90%', s.checks.high52, true);
 
-  signalRow(tbody, 'Volatility 3m', 'Annualized standard deviation of daily log returns, last 63 days', or(s.vol63, fmtPct(s.vol63.value)), 'Risk', undefined);
-  signalRow(tbody, 'Volatility 1y', 'Same, last 252 days', or(s.vol252, fmtPct(s.vol252.value)), '3m above 1.25× 1y: size down', undefined);
-  signalRow(tbody, 'ATR14', "Wilder's average true range, 14 days", money(s.atr), 'Sets the stop distance', undefined);
-  signalRow(tbody, 'Max drawdown 1y', 'Largest fall from a peak in the last year', or(s.mdd1y, fmtPct(s.mdd1y.value)), 'Risk', undefined);
-  signalRow(tbody, 'Sharpe 1y', 'Excess return per unit of volatility, annualized', or(s.sharpe, fmtNum(s.sharpe.value)), 'Risk', undefined);
-  signalRow(tbody, 'Sortino 1y', 'Excess return per unit of downside volatility, annualized', or(s.sortino, fmtNum(s.sortino.value)), 'Risk', undefined);
-  signalRow(tbody, `Beta vs ${analysisBenchmark(symbol)}`, 'How much the stock moves per 1% market move', or(s.beta, fmtNum(s.beta.value)), 'Risk', undefined, true);
+  signalRow(tbody, 'Volatility 3m', 'Annualized standard deviation of daily log returns, last 63 days', or(s.vol63, fmtPct(s.vol63.value)), 'Risk');
+  signalRow(tbody, 'Volatility 1y', 'Same, last 252 days', or(s.vol252, fmtPct(s.vol252.value)), '3m above 1.25× 1y: size down');
+  signalRow(tbody, 'ATR14', "Wilder's average true range, 14 days", money(s.atr), 'Sets the stop distance');
+  signalRow(tbody, 'Max drawdown 1y', 'Largest fall from a peak in the last year', or(s.mdd1y, fmtPct(s.mdd1y.value)), 'Risk');
+  signalRow(tbody, 'Sharpe 1y', 'Excess return per unit of volatility, annualized', or(s.sharpe, fmtNum(s.sharpe.value)), 'Risk');
+  signalRow(tbody, 'Sortino 1y', 'Excess return per unit of downside volatility, annualized', or(s.sortino, fmtNum(s.sortino.value)), 'Risk');
+  signalRow(tbody, `Beta vs ${bench}`, 'How much the stock moves per 1% market move', or(s.beta, fmtNum(s.beta.value)), 'Risk', undefined, true);
 
-  const k = getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT);
-  signalRow(tbody, 'Trailing stop', `Highest close of the last 22 days − ${k} × ATR14 (chandelier exit). A risk-control habit for long holds, not a proven edge`, money(s.stop), s.stop !== null && s.close <= s.stop ? 'Close is at or below it: exit signal' : 'Exit if the close falls below', s.stop === null ? undefined : s.close > s.stop ? undefined : false);
-  signalRow(tbody, 'Entry stop', `Close − ${k} × ATR14: where a buy made today would exit; Position size uses it`, money(s.entryStop), 'If you buy today', undefined);
-  signalRow(tbody, 'Position size', `Shares so a stop-out at the entry stop loses ${getSetting('MARKET_RISK_PCT', 1)}% of your investment accounts`,
-    s.shares === null ? null : (privacyMode ? maskDigits(String(s.shares)) : String(s.shares)), s.riskAmount === null ? '' : `Risk ${formatMoney(s.riskAmount, currency)}`, undefined, true);
+  const k = analysisAtrMult();
+  // A NaN close reads Fail with the "exit if" rule, so this isn't analysisStopBroken().
+  const stopPass = s.stop === null ? undefined : s.close > s.stop ? undefined : false;
+  signalRow(tbody, 'Trailing stop', `Highest close of the last 22 days − ${k} × ATR14 (chandelier exit). A risk-control habit for long holds, not a proven edge`, money(s.stop), analysisStopBroken(s) ? 'Close is at or below it: exit signal' : 'Exit if the close falls below', stopPass);
+  signalRow(tbody, 'Entry stop', `Close − ${k} × ATR14: where a buy made today would exit; Position size uses it`, money(s.entryStop), 'If you buy today');
+  signalRow(tbody, 'Position size', `Shares so a stop-out at the entry stop loses ${analysisRiskPct()}% of your investment accounts`,
+    s.shares === null ? null : analysisSharesText(s.shares), s.riskAmount === null ? '' : `Risk ${formatMoney(s.riskAmount, currency)}`, undefined, true);
 
   signalRow(tbody, '5-day move', 'Last 5 days against 2σ of normal 5-day moves (short-term reversal: Jegadeesh 1990)',
     s.spike === null ? '—' : s.spike ? 'Spike' : 'Normal', "Don't chase a spike", s.spike === null ? null : !s.spike);
@@ -288,13 +316,14 @@ function renderDescriptiveTable() {
   const upper = last(bb.upper);
   const lower = last(bb.lower);
   const pctB = upper !== null && lower !== null && upper !== lower ? (closes.at(-1) - lower) / (upper - lower) : null;
+  const sma50 = last(smaSeries(closes, 50));
   const rows = [
     ['RSI14', "Wilder's relative strength index, 0–100", fmtNum(rsi, 1)],
     ['MACD 12/26/9', 'EMA12 − EMA26; signal = EMA9 of MACD', last(macd.macd) === null ? null : `${fmtNum(last(macd.macd))} / ${fmtNum(last(macd.signal))}`],
     ['Bollinger %B', 'Where the close sits between the 20-day ± 2σ bands', fmtNum(pctB)],
-    ['SMA50', '50-day average close', last(smaSeries(closes, 50)) === null ? null : formatMoney(last(smaSeries(closes, 50)), currency, { mask: false })],
+    ['SMA50', '50-day average close', sma50 === null ? null : formatMoney(sma50, currency, { mask: false })],
   ];
-  rows.forEach(([name, title, value]) => signalRow(tbody, name, title, value, 'Descriptive only', undefined));
+  rows.forEach(([name, title, value]) => signalRow(tbody, name, title, value, 'Descriptive only'));
 }
 
 function renderNews() {
@@ -309,7 +338,7 @@ function renderNews() {
     box.appendChild(p);
     return;
   }
-  news.slice(0, 12).forEach((n) => {
+  news.slice(0, ANALYSIS_NEWS_SHOWN).forEach((n) => {
     const p = document.createElement('p');
     const a = document.createElement('a');
     a.href = n.url;
@@ -330,6 +359,26 @@ function renderAnalysisRange() {
   }, canadian ? new Set(['1d']) : new Set());
 }
 
+// The stock's own line, drawn first.
+function analysisCloseSeries(symbol, bars) {
+  return { label: `${symbol} (close)`, data: bars.map((b) => b.c), color: chartColor('--chart-blue'), order: 1 };
+}
+
+// date -> close, for lining a benchmark up with the stock.
+function analysisCloseByDate(bars) {
+  return new Map((bars || []).map((b) => [b.d, b.c]));
+}
+
+// Draws the chart and its legend; a legend toggle redraws with that series hidden.
+function drawAnalysisSeries(labels, series, options) {
+  const draw = () => {
+    analysisChart = marketLineChart(analysisChart, 'analysis-chart', labels,
+      series.map((s) => ({ ...s, hidden: analysisHiddenSeries.has(s.label) })), options);
+    renderSeriesLegend('analysis-legend', series, analysisHiddenSeries, draw);
+  };
+  draw();
+}
+
 // 1d/1w: Twelve Data intraday, close only (the other lines are daily).
 async function drawIntradayAnalysisChart(range) {
   const { currency, symbol } = analysisLoaded;
@@ -342,15 +391,7 @@ async function drawIntradayAnalysisChart(range) {
       bars = bars.filter((b) => b.d.startsWith(lastDay));
     }
     if (token !== analysisChartToken) return;
-    const series = [
-      { label: `${symbol} (close)`, data: bars.map((b) => b.c), color: chartColor('--chart-blue'), order: 1 },
-    ];
-    const draw = () => {
-      analysisChart = marketLineChart(analysisChart, 'analysis-chart', bars.map((b) => b.d),
-        series.map((s) => ({ ...s, hidden: analysisHiddenSeries.has(s.label) })), { money: result.currency || currency, intraday: true });
-      renderSeriesLegend('analysis-legend', series, analysisHiddenSeries, draw);
-    };
-    draw();
+    drawAnalysisSeries(bars.map((b) => b.d), [analysisCloseSeries(symbol, bars)], { money: result.currency || currency, intraday: true });
   } catch (err) {
     if (token === analysisChartToken) setMarketStatus('analysis-status', marketErrorText(err));
   }
@@ -372,28 +413,24 @@ function drawAnalysisChart() {
   ++analysisChartToken;
   const shown = barsForRange(bars, monthly, range);
   const closes = bars.map((b) => b.c);
+  const k = analysisAtrMult();
   const byDate = (series) => new Map(bars.map((b, i) => [b.d, series[i]]));
   const sma200 = byDate(smaSeries(closes, 200));
-  const stops = byDate(trailingStopSeries(bars, getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)));
-  const high52 = byDate(bars.map((_, i) => (i >= 251 ? Math.max(...bars.slice(i - 251, i + 1).map((b) => b.h)) : null)));
+  const stops = byDate(trailingStopSeries(bars, k));
+  const yearBack = MM_TRADING_DAYS - 1;
+  const high52 = byDate(bars.map((_, i) => (i >= yearBack ? Math.max(...bars.slice(i - yearBack, i + 1).map((b) => b.h)) : null)));
   const pick = (map) => shown.map((b) => map.get(b.d) ?? null);
-  const benchByDate = new Map((benchmark || []).map((b) => [b.d, b.c]));
+  const benchByDate = analysisCloseByDate(benchmark);
   const firstBench = shown.map((b) => benchByDate.get(b.d)).find((v) => Number.isFinite(v));
   const rebased = shown.map((b) => (firstBench && benchByDate.has(b.d) ? (benchByDate.get(b.d) / firstBench) * shown[0].c : null));
 
-  const series = [
-    { label: `${symbol} (close)`, data: shown.map((b) => b.c), color: chartColor('--chart-blue'), order: 1 },
+  drawAnalysisSeries(shown.map((b) => b.d), [
+    analysisCloseSeries(symbol, shown),
     { label: 'SMA200 (200-day average close)', data: pick(sma200), color: desiredMarkColor() },
     { label: '52-week high (highest high, 252 days)', data: pick(high52), color: chartColor('--chart-good'), dash: true },
-    { label: `Trailing stop (highest close of 22 days − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14)`, data: pick(stops), color: chartColor('--chart-bad'), dash: true },
+    { label: `Trailing stop (highest close of 22 days − ${k} × ATR14)`, data: pick(stops), color: chartColor('--chart-bad'), dash: true },
     { label: `${analysisBenchmark(symbol)} (market, rebased to the first close)`, data: rebased, color: chartColor('--chart-purple') },
-  ];
-  const draw = () => {
-    analysisChart = marketLineChart(analysisChart, 'analysis-chart', shown.map((b) => b.d),
-      series.map((s) => ({ ...s, hidden: analysisHiddenSeries.has(s.label) })), { money: currency });
-    renderSeriesLegend('analysis-legend', series, analysisHiddenSeries, draw);
-  };
-  draw();
+  ], { money: currency });
 }
 
 // --- AI ---------------------------------------------------------------------
@@ -401,7 +438,7 @@ function drawAnalysisChart() {
 // The chart's lines as text, so the AI reads what the chart shows.
 function analysisChartHistory() {
   const { symbol, bars, benchmark } = analysisLoaded;
-  const k = getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT);
+  const k = analysisAtrMult();
   const closes = bars.map((b) => b.c);
   const sma = smaSeries(closes, 200);
   const stops = trailingStopSeries(bars, k);
@@ -427,21 +464,20 @@ function analysisChartHistory() {
   if (stops[t] !== null) {
     lines.push(`Close vs trailing stop: ${pct(closes[t] / stops[t] - 1)}`);
     const hits = [];
-    for (let i = Math.max(1, t - 251); i <= t; i++) {
+    for (let i = Math.max(1, t - (MM_TRADING_DAYS - 1)); i <= t; i++) {
       if (stops[i] !== null && stops[i - 1] !== null && closes[i] < stops[i] && closes[i - 1] >= stops[i - 1]) hits.push(bars[i].d.slice(0, 10));
     }
     lines.push(`Closes below the trailing stop in the last year: ${hits.length ? `${hits.length} (latest ${hits.at(-1)})` : 'none'}`);
   }
 
-  const benchByDate = new Map((benchmark || []).map((b) => [b.d, b.c]));
-  const back = (days) => (t >= days ? bars[t - days] : null);
-  const perf = [63, 126, 252].map((days) => {
-    const then = back(days);
-    if (!then) return null;
+  const benchByDate = analysisCloseByDate(benchmark);
+  const perf = [[63, '3m'], [126, '6m'], [MM_TRADING_DAYS, '12m']].map(([days, label]) => {
+    if (t < days) return null;
+    const then = bars[t - days];
     const stock = closes[t] / then.c - 1;
     const b0 = benchByDate.get(then.d);
     const b1 = benchByDate.get(bars[t].d);
-    return `${days === 63 ? '3m' : days === 126 ? '6m' : '12m'} ${pct(stock)} vs ${benchName} ${b0 && b1 ? pct(b1 / b0 - 1) : 'n/a'}`;
+    return `${label} ${pct(stock)} vs ${benchName} ${b0 && b1 ? pct(b1 / b0 - 1) : 'n/a'}`;
   }).filter(Boolean);
   if (perf.length) lines.push(`Return: ${perf.join('; ')}`);
 
@@ -459,31 +495,33 @@ function analysisChartHistory() {
 
 function analysisUserMessage() {
   const { symbol, signals: s, currency, bars, news } = analysisLoaded;
-  const money = (v) => (v === null || !Number.isFinite(v) ? 'n/a' : `${v.toFixed(2)} ${currency}`);
+  const money = (v) => (Number.isFinite(v) ? `${v.toFixed(2)} ${currency}` : 'n/a');
   const read = (pass) => (pass === true ? 'pass' : pass === false ? 'fail' : 'n/a');
   const val = (result, text) => (result.value === null ? `n/a (needs ${result.needs}, have ${result.have})` : text);
   // The close's distance from a level, so the AI needn't work it out.
-  const gap = (level) => (level === null || !Number.isFinite(level) ? '' : ` (close is ${Math.abs(s.close - level).toFixed(2)} ${s.close >= level ? 'above' : 'below'} it)`);
+  const gap = (level) => (Number.isFinite(level) ? ` (close is ${Math.abs(s.close - level).toFixed(2)} ${s.close >= level ? 'above' : 'below'} it)` : '');
+  const bench = analysisBenchmark(symbol);
+  const k = analysisAtrMult();
   const lines = [
     `Stock: ${symbol} (${currency}), as of ${bars.at(-1)?.d.slice(0, 10)}`,
     '',
     'Evidence-backed checks:',
     `Trend (${s.trend.basis}): close ${money(s.trend.close)} vs average ${money(s.trend.sma)} (rule: close above) -> ${read(s.checks.trend)}`,
     `Momentum 12-1: ${val(s.momentum, fmtPct(s.momentum.value))} (rule: above 0%) -> ${read(s.checks.momentum)}`,
-    `Relative momentum vs ${analysisBenchmark(symbol)}: ${s.relative.value === null ? 'n/a' : fmtPct(s.relative.value)} (rule: above 0) -> ${read(s.checks.relative)}`,
+    `Relative momentum vs ${bench}: ${s.relative.value === null ? 'n/a' : fmtPct(s.relative.value)} (rule: above 0) -> ${read(s.checks.relative)}`,
     `52-week high ratio: ${val(s.high52, fmtPct(s.high52.value))} (rule: at least 90%) -> ${read(s.checks.high52)}`,
     `Verdict: ${s.verdict.label} (${s.verdict.passed} of ${s.verdict.available} checks pass)${s.verdict.notes.length ? `; ${s.verdict.notes.join('; ')}` : ''}`,
     '',
     'Risk:',
     `Volatility 3m: ${val(s.vol63, fmtPct(s.vol63.value))}; 1y: ${val(s.vol252, fmtPct(s.vol252.value))}`,
     `ATR14: ${money(s.atr)}; max drawdown 1y: ${val(s.mdd1y, fmtPct(s.mdd1y.value))}`,
-    `Sharpe 1y: ${val(s.sharpe, fmtNum(s.sharpe.value))}; Sortino 1y: ${val(s.sortino, fmtNum(s.sortino.value))}; beta vs ${analysisBenchmark(symbol)}: ${val(s.beta, fmtNum(s.beta.value))}`,
+    `Sharpe 1y: ${val(s.sharpe, fmtNum(s.sharpe.value))}; Sortino 1y: ${val(s.sortino, fmtNum(s.sortino.value))}; beta vs ${bench}: ${val(s.beta, fmtNum(s.beta.value))}`,
     `5-day move: ${s.spike === null ? 'n/a' : s.spike ? 'spike (above 2 sigma)' : 'normal'}`,
     '',
     'Levels:',
     `Close: ${money(s.close)}`,
-    `Trailing stop, for a holder (highest close of 22 days − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14): ${money(s.stop)}${gap(s.stop)}${s.stop !== null && s.close <= s.stop ? ' — already broken: exit signal for a holder' : ''}`,
-    `Entry stop, if buying today (close − ${getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)} × ATR14): ${money(s.entryStop)}${gap(s.entryStop)}`,
+    `Trailing stop, for a holder (highest close of 22 days − ${k} × ATR14): ${money(s.stop)}${gap(s.stop)}${analysisStopBroken(s) ? ' — already broken: exit signal for a holder' : ''}`,
+    `Entry stop, if buying today (close − ${k} × ATR14): ${money(s.entryStop)}${gap(s.entryStop)}`,
     `${s.trend.basis} (long-term average): ${money(s.trend.sma)}${gap(s.trend.sma)}`,
     `52-week high: ${s.high52.value === null ? 'n/a' : `${money(s.close / s.high52.value)}${gap(s.close / s.high52.value)}`}`,
     `Last 5 closes: ${bars.slice(-5).map((b) => `${b.d.slice(0, 10)} ${b.c.toFixed(2)}`).join(', ')}`,
@@ -497,7 +535,7 @@ function analysisUserMessage() {
       : ['none']));
   }
   lines.push('', `Headlines (last 30 days, newest first):`, ...(news.length
-    ? news.slice(0, 15).map((n) => `${n.date} | ${n.source} | ${n.headline}`)
+    ? news.slice(0, ANALYSIS_NEWS_SENT).map((n) => `${n.date} | ${n.source} | ${n.headline}`)
     : ['none supplied']));
   const question = document.getElementById('analysis-question').value.trim();
   if (question) lines.push('', `Question: ${question}`);
@@ -526,6 +564,15 @@ function renderAnalysisReport(text, stamp) {
 
 let suggestedAlerts = null; // { symbol, alerts } from the shown report
 
+// Every 2-decimal figure in a text, e.g. the prices sent to the AI.
+function analysisPricesIn(text) {
+  return (text.match(/\d+\.\d{2}/g) || []).map(Number);
+}
+
+function isAnalysisKnownPrice(price, known) {
+  return known.some((k) => Math.abs(price - k) <= k * ANALYSIS_PRICE_TOLERANCE);
+}
+
 // The report's Alerts line; a price not in the data sent is dropped, never applied.
 function renderSuggestedAlerts(text) {
   const hint = document.getElementById('analysis-alerts-hint');
@@ -536,10 +583,10 @@ function renderSuggestedAlerts(text) {
   const parsed = text ? parseAlertLine(text) : null;
   if (!parsed || !analysisLoaded) return;
   const { symbol } = analysisLoaded;
-  const known = (analysisUserMessage().match(/\d+\.\d{2}/g) || []).map(Number);
+  const known = analysisPricesIn(analysisUserMessage());
   const { close, stop, trend } = analysisLoaded.signals;
   const notes = [];
-  const dropped = ['below', 'above'].filter((k) => parsed[k] !== null && !known.some((v) => Math.abs(parsed[k] - v) <= v * 0.005));
+  const dropped = ['below', 'above'].filter((k) => parsed[k] !== null && !isAnalysisKnownPrice(parsed[k], known));
   if (dropped.length) notes.push(`Left out ${dropped.join(' and ')}: not a price in the data sent.`);
   dropped.forEach((k) => { parsed[k] = null; });
   // A rule already met would fire at once, so it isn't a warning.
@@ -552,18 +599,16 @@ function renderSuggestedAlerts(text) {
     notes.push(`Left out above ${money(parsed.above)}: it's not over today's close ${money(close)}.`);
     parsed.above = null;
   }
-  if (parsed.belowStop && stop !== null && close <= stop) {
-    notes.push('Left out below the trailing stop: the close is already under it.');
-    parsed.belowStop = false;
-  }
-  if (parsed.belowAvg && trend.sma !== null && close <= trend.sma) {
-    notes.push('Left out below the average: the close is already under it.');
-    parsed.belowAvg = false;
-  }
-  if (parsed.aboveAvg && trend.sma !== null && close >= trend.sma) {
-    notes.push('Left out above the average: the close is already over it.');
-    parsed.aboveAvg = false;
-  }
+  [
+    ['belowStop', stop, (level) => close <= level, 'Left out below the trailing stop: the close is already under it.'],
+    ['belowAvg', trend.sma, (level) => close <= level, 'Left out below the average: the close is already under it.'],
+    ['aboveAvg', trend.sma, (level) => close >= level, 'Left out above the average: the close is already over it.'],
+  ].forEach(([rule, level, met, note]) => {
+    if (parsed[rule] && level !== null && met(level)) {
+      notes.push(note);
+      parsed[rule] = false;
+    }
+  });
   const labels = alertLabels(parseAlerts(parsed)).map((l) => l.label);
   const entry = allWatchlist.find((w) => w.symbol === symbol);
   if (labels.length && entry) {
@@ -606,10 +651,9 @@ function renderSavedAnalysis() {
 
 // A price in Levels that isn't one of the supplied figures (±0.5%) gets flagged.
 function auditAnalysisLevels(text, message) {
-  const known = (message.match(/\d+\.\d{2}/g) || []).map(Number);
+  const known = analysisPricesIn(message);
   const levels = text.split('\n').find((l) => l.trim().startsWith('Levels:')) || '';
-  const odd = (levels.match(/\d+\.\d{2}/g) || []).map(Number).filter((v) => !known.some((k) => Math.abs(v - k) <= k * 0.005));
-  return odd;
+  return analysisPricesIn(levels).filter((v) => !isAnalysisKnownPrice(v, known));
 }
 
 async function runStockAnalysis() {

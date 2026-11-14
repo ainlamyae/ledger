@@ -1,6 +1,6 @@
-// Insight's Pattern mode: the BMR_cal Periods table, widened with
-// each period's macro and activity-type averages, sent to AI to spot which habits line up
-// with more fat lost (ΔM) and a higher real BMR (Offset). health-insight.js drives it.
+// Insight's Pattern mode: Tune's BMR_cal Periods table, widened with each period's
+// macro and activity-type averages, for the AI to find which habits line up with
+// more fat lost (ΔM) and a higher real BMR (Offset).
 
 // Column label, then how to read it off a period row. Shared by the table and the prompt.
 const FAT_LOSS_PATTERN_COLUMNS = [
@@ -38,8 +38,8 @@ function meanOfPresent(values) {
   return present.length ? present.reduce((s, v) => s + v, 0) / present.length : null;
 }
 
-// computeBmrCalibration's own periods (so m/Δm/ΔM/D/Offset match Tune's Periods
-// exactly), plus period averages of the columns that form doesn't show.
+// computeBmrCalibration's own periods (so m/Δm/ΔM/D/Offset match Tune's), plus
+// period averages of the columns Tune doesn't show.
 function gatherFatLossPattern(fromIso, toIso, chunkDays) {
   const result = computeBmrCalibration(fromIso, chunkDays, toIso);
   const byDate = new Map(allPhysiqueEntries.filter((p) => p.date).map((p) => [p.date, p]));
@@ -82,7 +82,7 @@ function gatherFatLossPattern(fromIso, toIso, chunkDays) {
     periods,
     reason: result.ok ? null : result.reason,
     chunkDays,
-    bodyMassHealthyKg: getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT),
+    bodyMassHealthyKg: bodyMassHealthySettingKg(),
   };
 }
 
@@ -97,11 +97,7 @@ function renderFatLossPatternPreview(data) {
   }
   data.periods.forEach((r) => {
     const tr = document.createElement('tr');
-    FAT_LOSS_PATTERN_COLUMNS.forEach(([, read]) => {
-      const td = document.createElement('td');
-      td.textContent = read(r);
-      tr.appendChild(td);
-    });
+    tr.append(...FAT_LOSS_PATTERN_COLUMNS.map(([, read]) => makeCell(read(r))));
     tbody.appendChild(tr);
   });
 }
@@ -130,8 +126,7 @@ function formatFatLossPatternPrompt(data) {
   ].join('\n');
 }
 
-// A function of chunkDays, not a fixed string — the period length is user-editable
-// (Pattern's days box), so the prompt has to name whatever length is actually in the table.
+// Takes chunkDays: the period length is editable, and the prompt names it.
 function formatFatLossPatternSystemPrompt(chunkDays) {
   return `You are a data-minded personal health coach. You are not a doctor — do not give medical diagnoses or prescribe treatment.
 

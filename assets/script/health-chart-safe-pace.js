@@ -20,6 +20,8 @@ const SAFE_PACE_DBMR_NAME = 'Deficit vs BMR';
 const SAFE_PACE_SAFE_NAME = 'Safe';
 const SAFE_PACE_DANGER_NAME = 'Too Fast';
 const SAFE_PACE_GAIN_NAME = 'Gaining';
+// Headroom past the furthest point (or the limit) at both ends.
+const SAFE_PACE_AXIS_HEADROOM = 1.15;
 
 function renderHealthSafePaceChart(entries) {
   const ctx = document.getElementById('health-safe-pace-chart');
@@ -59,18 +61,17 @@ function renderHealthSafePaceChart(entries) {
   const hasData = shown.length > 0;
 
   // The limit always on-plot with headroom above it; a gain or surplus dips below zero.
-  const hiRaw = Math.max(WEEKLY_FAT_LOSS_PCT_CEILING, ...shown) * 1.15;
-  const loRaw = Math.min(0, ...shown) * 1.15;
+  const hiRaw = Math.max(WEEKLY_FAT_LOSS_PCT_CEILING, ...shown) * SAFE_PACE_AXIS_HEADROOM;
+  const loRaw = Math.min(0, ...shown) * SAFE_PACE_AXIS_HEADROOM;
   const step = SAFE_PACE_TICK_STEPS_PCT.find((s) => (hiRaw - loRaw) / s <= SAFE_PACE_MAX_GRIDLINES)
     ?? SAFE_PACE_TICK_STEPS_PCT[SAFE_PACE_TICK_STEPS_PCT.length - 1];
   const yMin = Math.floor(loRaw / step) * step;
   const yMax = Math.ceil(hiRaw / step) * step;
 
-  const flat = (v) => new Array(dates.length).fill(v);
   const bandEdge = (label, value, extra = {}) => ({
     type: 'line',
     label,
-    data: flat(value),
+    data: new Array(dates.length).fill(value),
     borderWidth: 0,
     pointRadius: 0,
     pointHitRadius: 0,
@@ -81,6 +82,11 @@ function renderHealthSafePaceChart(entries) {
     ...extra,
   });
   const decimals = step < 1 ? 2 : 0;
+  const bands = [
+    { edge: 'Zero band', value: 0, name: SAFE_PACE_GAIN_NAME, color: '--chart-warn' },
+    { edge: 'Limit band', value: WEEKLY_FAT_LOSS_PCT_CEILING, name: SAFE_PACE_SAFE_NAME, color: '--chart-good' },
+    { edge: 'Band ceiling', value: yMax, name: SAFE_PACE_DANGER_NAME, color: '--chart-bad' },
+  ];
 
   healthSafePaceChart = upsertChart(healthSafePaceChart, ctx, {
     data: {
@@ -89,19 +95,11 @@ function renderHealthSafePaceChart(entries) {
         // Bands, each filling down to the edge before it: floor → 0 % (amber, gaining)
         // → limit (green) → ceiling (red). The '-1' chain needs them adjacent, in order.
         bandEdge('Band floor', yMin),
-        bandEdge('Zero band', 0, {
+        ...bands.map((b) => bandEdge(b.edge, b.value, {
           fill: '-1',
-          backgroundColor: hidden.has(SAFE_PACE_GAIN_NAME) ? 'transparent' : chartColor('--chart-warn', 0.12),
-        }),
-        bandEdge('Limit band', WEEKLY_FAT_LOSS_PCT_CEILING, {
-          fill: '-1',
-          backgroundColor: hidden.has(SAFE_PACE_SAFE_NAME) ? 'transparent' : chartColor('--chart-good', 0.12),
-        }),
-        bandEdge('Band ceiling', yMax, {
-          fill: '-1',
-          backgroundColor: hidden.has(SAFE_PACE_DANGER_NAME) ? 'transparent' : chartColor('--chart-bad', 0.12),
-        }),
-        // The shared limit itself: 1 %/wk on the left, 20 % of BMR on the right.
+          backgroundColor: hidden.has(b.name) ? 'transparent' : chartColor(b.color, 0.12),
+        })),
+        // The shared limit itself, the same line on both axes.
         bandEdge('Limit', WEEKLY_FAT_LOSS_PCT_CEILING, {
           borderWidth: 1.5,
           borderColor: chartColor('--chart-bad'),
@@ -138,23 +136,11 @@ function renderHealthSafePaceChart(entries) {
           hidden: hidden.has(SAFE_PACE_DBMR_NAME),
           order: 2,
         },
-        {
-          type: 'line',
-          label: SAFE_PACE_DBMR_NAME,
-          data: dbmrAvg,
+        trendLineDataset(SAFE_PACE_DBMR_NAME, dbmrAvg, {
           yAxisID: 'y1',
           borderColor: chartColor('--chart-cyan'),
-          borderWidth: 2,
-          tension: 0.3,
-          cubicInterpolationMode: 'monotone',
-          spanGaps: false,
-          pointRadius: 0,
-          pointHitRadius: 0,
-          fill: false,
-          isWeeklyAverage: true,
           hidden: hidden.has(SAFE_PACE_DBMR_NAME),
-          order: 1,
-        },
+        }),
       ],
     },
     options: {
@@ -202,7 +188,7 @@ function renderHealthSafePaceChart(entries) {
           grid: { color: (c) => (c.tick.value === 0 ? Chart.defaults.color : Chart.defaults.borderColor) },
           ticks: { stepSize: step, autoSkip: false, callback: maskedUnitTick('%', decimals) },
         },
-        // A fixed linear rescale of y, so the 20 % mark sits exactly on the 1 % line.
+        // A fixed linear rescale of y, so both ceilings share one line.
         y1: {
           min: yMin * axisRatio,
           max: yMax * axisRatio,

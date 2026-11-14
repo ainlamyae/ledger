@@ -1,18 +1,18 @@
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const VALUE_PARAMS = { valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING' };
 
-// Sheets allows 60 reads per minute per user, and a full dashboard load fires
-// ~18 at once with nothing cached, so a few Refresh clicks inside a minute
-// can run out. A 429 only ever means "wait and resend", so back off and retry
-// (2s, 4s, 8s, 16s, 32s with jitter, ~62s total, past the per-minute window)
-// before reporting it.
+// Sheets allows 60 reads a minute per user and a cold dashboard load fires ~18, so
+// a few Refreshes can run out. A 429 only means "wait and resend": back off
+// 2s, 4s, 8s, 16s, 32s plus jitter (~62s, past the window) before reporting it.
 const QUOTA_RETRY_LIMIT = 5;
+const QUOTA_BASE_DELAY_MS = 2000;
+const QUOTA_JITTER_MS = 1000;
 
-// `retrying` is set only by the 401 path below — the recursive call renews the
-// token first and gets exactly one more attempt, so a dead token can't loop.
 // Every request sent, retries included — loadDashboard logs how many a load cost.
 let sheetsRequestCount = 0;
 
+// `retrying` is set only by the 401 path: one more attempt on a renewed token,
+// so a dead token can't loop.
 async function sheetsRequest(path, options = {}, retrying = false, quotaAttempt = 0) {
   sheetsRequestCount++;
   // Expired while a form sat open: Save's click signs in first (never a background read).
@@ -31,12 +31,8 @@ async function sheetsRequest(path, options = {}, retrying = false, quotaAttempt 
     },
   });
 
-  // The one error worth handling here rather than reporting. A token that expired
-  // or was revoked between opening a form and saving it used to surface as a
-  // Google auth message on the filled-in form — the click gate in app.js makes
-  // that rare, but a form left open past the hour can still hit it, and there's
-  // no reason to make someone re-type a save that only needed a new token.
-  // Renew once, in place, and re-send the identical request.
+  // A token that died while a form sat open past the hour: renew once and
+  // re-send, rather than make someone re-type a save.
   if (res.status === 401 && !retrying) {
     const fresh = await ensureAccessToken();
     if (fresh) return sheetsRequest(path, options, true, quotaAttempt);
@@ -46,7 +42,7 @@ async function sheetsRequest(path, options = {}, retrying = false, quotaAttempt 
     const retryAfter = Number(res.headers.get('Retry-After'));
     const delayMs = retryAfter > 0
       ? retryAfter * 1000
-      : 2000 * 2 ** quotaAttempt + Math.random() * 1000;
+      : QUOTA_BASE_DELAY_MS * 2 ** quotaAttempt + Math.random() * QUOTA_JITTER_MS;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     return sheetsRequest(path, options, retrying, quotaAttempt + 1);
   }
@@ -59,18 +55,24 @@ async function sheetsRequest(path, options = {}, retrying = false, quotaAttempt 
   return res.json();
 }
 
+// A write whose payload goes as the JSON body.
+function sheetsWrite(path, method, payload) {
+  return sheetsRequest(path, { method, body: JSON.stringify(payload) });
+}
+
+function valuesPath(range) {
+  return `/values/${encodeURIComponent(range)}`;
+}
+
 // --- Read coalescing ---------------------------------------------------------
 //
-// Sheets counts quota per REQUEST (60 reads/min/user), not per range, and a full
-// load used to send ~28: every module fetched the tab list for itself, then read
-// its own range. Both are shared here, with no change to the callers:
-//
-// - The tab list (sheet ids/titles) is fetched once and reused until something
-//   could have changed it: a Refresh (resetSheetReads), a batchUpdate (which can
-//   add, delete or rename tabs), or a different spreadsheet.
-// - getValues calls made within READ_BATCH_WINDOW_MS of each other, with the same
-//   params, go out as ONE values:batchGet. If that request fails, each range is
-//   retried on its own, so one missing tab fails only the module that reads it.
+// Sheets counts quota per request, not per range, so reads are shared here with
+// no change to the callers:
+// - The tab list is fetched once and reused until a Refresh (resetSheetReads),
+//   a batchUpdate (which can add, delete or rename tabs) or a spreadsheet switch.
+// - getValues calls within READ_BATCH_WINDOW_MS of each other, with the same
+//   params, go out as ONE values:batchGet. If it fails, each range is retried on
+//   its own, so one missing tab fails only the module that reads it.
 
 const READ_BATCH_WINDOW_MS = 20;
 
@@ -99,7 +101,7 @@ function resetSheetReads() {
 function getValuesNow(range, params = {}) {
   const query = new URLSearchParams(params).toString();
   const suffix = query ? `?${query}` : '';
-  return sheetsRequest(`/values/${encodeURIComponent(range)}${suffix}`);
+  return sheetsRequest(`${valuesPath(range)}${suffix}`);
 }
 
 // Same result as a single values.get ({ range, values }), but batched with the
@@ -137,15 +139,14 @@ function batchGetValues(ranges, params = {}) {
   return sheetsRequest(`/values:batchGet?${query.toString()}`);
 }
 
-// valueInputOption defaults to USER_ENTERED — what the entity forms
-// (transactions, work-time, ...) want, since a typed date or formula should be
-// parsed the way typing it into the cell would be. Pass 'RAW' for values that
-// must round-trip byte-for-byte instead of being reinterpreted; see
-// other-settings.js's saveSettingValues for why that matters.
+// USER_ENTERED (the default) parses a typed date or formula as the cell would.
+// Pass 'RAW' for values that must round-trip byte-for-byte (see
+// other-settings.js's saveSettingValues).
 function appendValues(range, values, valueInputOption = 'USER_ENTERED') {
-  return sheetsRequest(
-    `/values/${encodeURIComponent(range)}:append?valueInputOption=${valueInputOption}&insertDataOption=INSERT_ROWS`,
-    { method: 'POST', body: JSON.stringify({ values }) }
+  return sheetsWrite(
+    `${valuesPath(range)}:append?valueInputOption=${valueInputOption}&insertDataOption=INSERT_ROWS`,
+    'POST',
+    { values }
   );
 }
 
@@ -156,18 +157,12 @@ function appendedRow(response) {
 }
 
 function updateValues(range, values, valueInputOption = 'USER_ENTERED') {
-  return sheetsRequest(
-    `/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`,
-    { method: 'PUT', body: JSON.stringify({ values }) }
-  );
+  return sheetsWrite(`${valuesPath(range)}?valueInputOption=${valueInputOption}`, 'PUT', { values });
 }
 
 // Several ranges in one request — `data` is [{ range, values }].
 function batchUpdateValues(data, valueInputOption = 'USER_ENTERED') {
-  return sheetsRequest('/values:batchUpdate', {
-    method: 'POST',
-    body: JSON.stringify({ valueInputOption, data }),
-  });
+  return sheetsWrite('/values:batchUpdate', 'POST', { valueInputOption, data });
 }
 
 // A tab the app adds on its first save (Watchlist, Trade, Analysis), with a
@@ -190,8 +185,5 @@ async function sheetTabExists(title) {
 function batchUpdate(requests) {
   // Can add, delete or rename tabs, so the shared tab list may be out of date.
   resetSheetReads();
-  return sheetsRequest(':batchUpdate', {
-    method: 'POST',
-    body: JSON.stringify({ requests }),
-  });
+  return sheetsWrite(':batchUpdate', 'POST', { requests });
 }

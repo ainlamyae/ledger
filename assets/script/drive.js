@@ -1,4 +1,5 @@
 const ACTIVE_SHEET_STORAGE_KEY = 'ledger_spreadsheet_id';
+const DRIVE_FILES_API = 'https://www.googleapis.com/drive/v3/files';
 
 let gapiReadyPromise = null;
 
@@ -14,16 +15,13 @@ function clearActiveSpreadsheetId() {
   localStorage.removeItem(ACTIVE_SHEET_STORAGE_KEY);
 }
 
-// Opens Google Sheets' own "make a copy" flow in a new tab. This needs no
-// Drive scope at all — Sheets clones the template directly into the
-// signed-in user's Drive via Google's UI, outside our app entirely. The
-// user then picks that new file via pickSpreadsheet() below.
+// Google Sheets' own "make a copy" flow in a new tab: needs no Drive scope, as
+// Sheets clones the template itself. The user then picks the copy via pickSpreadsheet().
 function openTemplateCopyLink() {
   window.open(`https://docs.google.com/spreadsheets/d/${CONFIG.TEMPLATE_SPREADSHEET_ID}/copy`, '_blank');
 }
 
-// Loads gapi's 'picker' module (for the file picker UI), cached so repeated
-// picker opens don't reload the script.
+// gapi's 'picker' module, loaded once.
 function loadGapiPicker() {
   if (gapiReadyPromise) return gapiReadyPromise;
 
@@ -34,10 +32,8 @@ function loadGapiPicker() {
   return gapiReadyPromise;
 }
 
-// Shows a Picker scoped to Sheets files. Selecting a file here is what
-// grants our drive.file-scoped token access to that specific file, whether
-// the user just created it (via openTemplateCopyLink) or it's an existing
-// personal ledger copy from a previous session/browser.
+// A Picker of Sheets files. Picking a file is what grants the drive.file token
+// access to it, whether a fresh template copy or an existing ledger.
 async function pickSpreadsheet() {
   await loadGapiPicker();
 
@@ -49,6 +45,7 @@ async function pickSpreadsheet() {
     const picker = new google.picker.PickerBuilder()
       .setOAuthToken(getAccessToken())
       .setDeveloperKey(CONFIG.PICKER_API_KEY)
+      // The client id's leading number is the Cloud project number.
       .setAppId(CONFIG.CLIENT_ID.split('-')[0])
       .addView(view)
       .setCallback((data) => {
@@ -66,27 +63,27 @@ async function pickSpreadsheet() {
   });
 }
 
-// Reads/renames the active spreadsheet's Drive filename — distinct from any
-// sheet *tab* name. drive.file scope already covers metadata writes on a
-// file the app was granted access to via pickSpreadsheet(), so no extra
-// scope is needed.
-async function getActiveSpreadsheetName() {
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${getActiveSpreadsheetId()}?fields=name`,
-    { headers: { Authorization: `Bearer ${getAccessToken()}` } }
-  );
+// A Drive API call on the active spreadsheet's file; throws on a non-2xx.
+async function driveFileRequest(suffix, init = {}) {
+  const res = await fetch(`${DRIVE_FILES_API}/${getActiveSpreadsheetId()}${suffix}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${getAccessToken()}`, ...init.headers },
+  });
   if (!res.ok) throw new Error(`Drive API error ${res.status}`);
+  return res;
+}
+
+// The spreadsheet's Drive filename, not a tab name. drive.file already covers
+// metadata writes on a picked file.
+async function getActiveSpreadsheetName() {
+  const res = await driveFileRequest('?fields=name');
   return (await res.json()).name;
 }
 
 async function renameActiveSpreadsheet(name) {
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${getActiveSpreadsheetId()}`, {
+  await driveFileRequest('', {
     method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${getAccessToken()}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
-  if (!res.ok) throw new Error(`Drive API error ${res.status}`);
 }

@@ -1,9 +1,7 @@
 const TOKEN_STORAGE_KEY = 'ledger_token';
 const CONSENTED_STORAGE_KEY = 'ledger_consented';
-// File-scoped Drive access: the app only ever sees files it created or the
-// user explicitly granted via Picker — not every spreadsheet in their Drive.
-// userinfo.email/profile (non-sensitive, no Google verification needed) are
-// only used to show the signed-in account's name/avatar in the header.
+// drive.file sees only files the app created or the user picked, not the whole
+// Drive. userinfo.email/profile only show the account's name/avatar in the header.
 const SHEETS_SCOPE = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/userinfo.email',
@@ -15,22 +13,23 @@ let accessToken = null;
 let authChangeHandler = () => {};
 // Set for the mobile return-to-tab retry, so its failure stays quiet.
 let pendingSilent = false;
-// Tokens last ~1hr with no refresh token. GIS's token client opens a popup for
-// every request, prompt:'none' included, so nothing renews in the background:
-// at expiry the app just turns signed-out, and the next click signs in again.
+// Tokens last ~1hr with no refresh token, and GIS opens a popup for every request,
+// so nothing renews in the background: at expiry the app just turns signed-out.
 let expiryTimer = null;
 // Less life than this left and ensureAccessToken() asks for a new token, so a
 // form isn't opened on one that dies before Save.
 const TOKEN_MIN_REMAINING_MS = 2 * 60 * 1000;
+// Used when GIS's response leaves out expires_in.
+const DEFAULT_TOKEN_LIFETIME_S = 3600;
+const MOBILE_UA_PATTERN = /Mobi|Android|iPhone|iPad|IEMobile/i;
+// Silent retries the mobile sign-in makes on returning to the tab.
+const MOBILE_SILENT_RETRY_LIMIT = 3;
 
 // Callers parked on an in-flight requestAccessToken. GIS reports through one
-// shared callback rather than per-request promises, so every waiter is resolved
-// together by whichever request lands — including the scheduled silent refresh.
+// shared callback, so every waiter is resolved by whichever request lands.
 let authWaiters = [];
-// Whether any request is outstanding. Every requestAccessToken call in this file
-// goes through requestToken() so this stays true: two overlapping requests both
-// resolve the same waiter list, and the loser resolving second used to hand a
-// caller `null` from a request it never made.
+// Whether a requestToken() call is outstanding, so overlapping callers join it
+// instead of starting a second request whose result they'd be handed.
 let tokenRequestInFlight = false;
 
 function requestToken(params) {
@@ -57,7 +56,7 @@ function loadStoredToken() {
 }
 
 function storeToken(token, expiresInSeconds) {
-  const expiresAt = Date.now() + (expiresInSeconds || 3600) * 1000;
+  const expiresAt = Date.now() + (expiresInSeconds || DEFAULT_TOKEN_LIFETIME_S) * 1000;
   localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
   localStorage.setItem(CONSENTED_STORAGE_KEY, '1');
   scheduleTokenExpiry(expiresAt);
@@ -98,14 +97,26 @@ function hasUserActivation() {
   return navigator.userActivation ? navigator.userActivation.isActive : true;
 }
 
-// index.html loads gsi/client with `async`, so it can still be in flight when
-// this file runs (bootDashboard no longer waits on window.load, which used to
-// guarantee it had arrived) — wait for the script's own load event rather than
-// assuming `google` exists yet. Resolves immediately if it's already there.
+// gsi/client loads `async`, so it may not have arrived yet: wait for its load event.
 function waitForGoogleIdentity() {
   if (window.google?.accounts?.oauth2) return Promise.resolve();
   const script = document.querySelector('script[src^="https://accounts.google.com/gsi/client"]');
   return new Promise((resolve) => script.addEventListener('load', resolve, { once: true }));
+}
+
+// Ends the outstanding request; returns whether it was the quiet mobile retry.
+function finishTokenRequest() {
+  const wasSilent = pendingSilent;
+  pendingSilent = false;
+  tokenRequestInFlight = false;
+  return wasSilent;
+}
+
+// A failure leaves whatever token is still held; its expiry timer signs out.
+function reportTokenFailure(message, detail, wasSilent) {
+  console.error(message, detail);
+  resolveAuthWaiters(null);
+  if (!accessToken) authChangeHandler(null, { ...detail, silent: wasSilent });
 }
 
 async function initAuth(onAuthChange) {
@@ -119,15 +130,9 @@ async function initAuth(onAuthChange) {
     client_id: CONFIG.CLIENT_ID,
     scope: SHEETS_SCOPE,
     callback: (response) => {
-      const wasSilent = pendingSilent;
-      pendingSilent = false;
-      tokenRequestInFlight = false;
-
-      // A failure leaves whatever token is still held; its expiry timer signs out.
+      const wasSilent = finishTokenRequest();
       if (response.error) {
-        console.error('OAuth error:', response);
-        resolveAuthWaiters(null);
-        if (!accessToken) authChangeHandler(null, { ...response, silent: wasSilent });
+        reportTokenFailure('OAuth error:', response, wasSilent);
         return;
       }
       const wasSignedIn = accessToken !== null;
@@ -138,14 +143,7 @@ async function initAuth(onAuthChange) {
       if (!wasSignedIn) authChangeHandler(accessToken);
     },
     // Popup closed or blocked.
-    error_callback: (err) => {
-      const wasSilent = pendingSilent;
-      pendingSilent = false;
-      tokenRequestInFlight = false;
-      console.error('OAuth flow error:', err);
-      resolveAuthWaiters(null);
-      if (!accessToken) authChangeHandler(null, { ...err, silent: wasSilent });
-    },
+    error_callback: (err) => reportTokenFailure('OAuth flow error:', err, finishTokenRequest()),
   });
 
   if (accessToken) {
@@ -159,24 +157,19 @@ async function initAuth(onAuthChange) {
 }
 
 function signIn() {
-  // First-time users (no prior consent stored) need 'consent' to grant OAuth
-  // permissions. Returning users already have Google-side consent, so '' lets
-  // GIS use the browser's active Google session — Chrome can often satisfy
-  // this without any visible UI or with a single account-picker click.
+  // First-timers need 'consent'; a returning user's '' lets GIS reuse the
+  // browser's Google session, often with no UI or one account-picker click.
   const hasConsented = localStorage.getItem(CONSENTED_STORAGE_KEY);
   requestToken({ prompt: hasConsented ? '' : 'consent' });
 
-  // On mobile, GIS opens the OAuth flow as a new browser tab rather than a
-  // true popup. window.opener is often null in that context, so the token
-  // can't be posted back — the app tab stays at the sign-in gate even after
-  // the user authenticates. When the user switches back here, a silent
-  // requestAccessToken succeeds because the browser now has a Google session
-  // cookie from the completed sign-in.
-  if (/Mobi|Android|iPhone|iPad|IEMobile/i.test(navigator.userAgent)) {
+  // On mobile GIS opens a new tab with no window.opener, so the token never posts
+  // back. Back on this tab the browser has a Google session, so a silent request
+  // succeeds. Deliberately not via requestToken(): it never parks waiters.
+  if (MOBILE_UA_PATTERN.test(navigator.userAgent)) {
     let attempts = 0;
     const retryOnReturn = () => {
       if (document.hidden || isSignedIn()) return;
-      if (++attempts > 3) {
+      if (++attempts > MOBILE_SILENT_RETRY_LIMIT) {
         document.removeEventListener('visibilitychange', retryOnReturn);
         return;
       }
@@ -194,18 +187,15 @@ function signOut() {
   }
   accessToken = null;
   localStorage.removeItem(TOKEN_STORAGE_KEY);
-  // Clear the consent flag too: a different person may sign in next on this
-  // browser and needs to go through their own consent flow.
+  // A different person may sign in next on this browser: they need their own
+  // consent, and mustn't inherit this user's spreadsheet.
   localStorage.removeItem(CONSENTED_STORAGE_KEY);
-  // A different person may sign in next on this browser — don't hand them
-  // the previous user's spreadsheet selection.
   clearActiveSpreadsheetId();
   clearMarketCache();
   authChangeHandler(null);
 }
 
-// Used only to show the signed-in account's name/avatar in the header —
-// the app's own data access stays entirely on the drive.file scope.
+// Only for the header's name/avatar; data access stays on drive.file.
 async function fetchUserInfo() {
   const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -214,13 +204,10 @@ async function fetchUserInfo() {
   return res.json();
 }
 
-// A token good for the next couple of minutes, or null. Awaited before a form
-// opens, so a long form isn't lost to a 401 on Save.
-//
-// A stored token with life left comes straight back (possibly another tab's).
-// Otherwise sign-in runs, but only inside the user's click: called from anywhere
-// else (a background read's 401) it returns null instead of opening a window.
-// `interactive: false` never opens one.
+// A token good for the next couple of minutes, or null; awaited before a form
+// opens so Save doesn't hit a 401. A stored token with life left (maybe another
+// tab's) comes straight back. Otherwise sign-in runs, but only inside the user's
+// click; `interactive: false` never opens a window.
 function ensureAccessToken({ interactive = true } = {}) {
   if (!tokenClient) return Promise.resolve(null);
 
@@ -231,17 +218,12 @@ function ensureAccessToken({ interactive = true } = {}) {
   }
 
   if (!interactive || !hasUserActivation()) return Promise.resolve(null);
-  // One popup, opened synchronously in the click; prompt '' lets a returning user
-  // through on their Google session without a picker.
+  // One popup, opened synchronously in the click.
   return requestTokenAndWait(signIn);
 }
 
-// Parks the caller on the shared GIS callback, kicking `start` only when nothing
-// is already outstanding — a second click while the iframe is open, or a click
-// that lands on top of the scheduled hourly refresh, joins that request rather
-// than racing another one against it. Racing them meant two resolutions of the
-// same waiter list, and whichever landed second could hand a caller the result of
-// a request it never made.
+// Parks the caller on the shared GIS callback, calling `start` only when no
+// request is outstanding: a second click joins the open one rather than racing it.
 function requestTokenAndWait(start) {
   return new Promise((resolve) => {
     authWaiters.push(resolve);

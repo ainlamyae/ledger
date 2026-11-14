@@ -1,11 +1,44 @@
 
+// "Name: $1,234.00 (12.3%)" of `total`; the percentage masks with the amounts.
+function financeShareLabel(name, value, total) {
+  const pct = total ? (value / total * 100).toFixed(1) : '0.0';
+  return `${name}: ${formatCurrency(value)} (${privacyMode ? maskDigits(pct) : pct}%)`;
+}
+
+// Legend-less doughnut options whose hover reads each slice as a share of `total`.
+function financeDonutOptions(total, nameOf = (item) => item.label) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: () => '',
+          label: (item) => financeShareLabel(nameOf(item), item.raw, total),
+        },
+      },
+    },
+  };
+}
+
+// The filled blue running-total line the glance and Savings charts share.
+function cumulativeLineDataset(label, months) {
+  return {
+    label,
+    data: months.map((m) => m.cumulative),
+    borderColor: chartColor('--chart-blue'),
+    backgroundColor: chartColor('--chart-blue', 0.1),
+    fill: true,
+    tension: 0.4,
+    pointRadius: 0,
+  };
+}
+
 let expenseBreakdownTrendChart = null;
 
-// Stacked spend per month, with that month's INCOME over the top of it as a single
-// line — the two questions ("where did it go" and "was it more than came in") read
-// off one chart instead of two, which is what let the separate Revenue vs.
-// Expenditure area chart go: its expense series was this chart's stack total, and
-// its income series is the line below.
+// Stacked spend per month with that month's income as a line across it, so
+// "where did it go" and "was it more than came in" read off one chart.
 function renderExpenseBreakdownTrendChart(months) {
   const ctx = document.getElementById('expense-breakdown-trend-chart');
   if (months.length === 0) {
@@ -15,9 +48,7 @@ function renderExpenseBreakdownTrendChart(months) {
 
   const categories = months[0].categories;
 
-  // Income leads the legend: it's the line every bar is read against, not another
-  // slice of the stack. Same order as `datasets` below, which is what lets the
-  // legend index BE the dataset index.
+  // Same order as `datasets`, so a legend index is its dataset index.
   const legendItems = [{ name: 'Income', color: desiredMarkColor() }, ...categories];
 
   // No y max: Chart.js fits the tallest month, and re-fits when a series is hidden.
@@ -35,14 +66,10 @@ function renderExpenseBreakdownTrendChart(months) {
           pointRadius: 0,
           pointHoverRadius: 4,
           fill: false,
-          // A month's income is one flat figure for that whole month, not a slope
-          // from last month's to this one's — sloping it invented a value for every
-          // point in between and turned a pay rise into a peak. 'middle' steps
-          // halfway between months, so each flat run sits centred over its own
-          // bar and the jump lands on the boundary between them.
+          // A month's income is one flat figure: step halfway between months so
+          // each run sits over its own bar and a change lands on the boundary.
           stepped: 'middle',
-          // Its own stack, so a stacked y axis reads it as a line ACROSS the bars
-          // rather than another storey on top of them.
+          // Its own stack, so it reads as a line across the bars, not a storey on them.
           stack: 'income',
           // Drawn last, so it stays legible over the tallest stack.
           order: 0,
@@ -61,15 +88,13 @@ function renderExpenseBreakdownTrendChart(months) {
       plugins: { legend: { display: false } },
       scales: {
         x: { stacked: true },
-        y: { stacked: true, beginAtZero: true, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } },
+        y: { stacked: true, beginAtZero: true, afterFit: fixTrendYAxisWidth, ticks: { callback: formatCurrency } },
       },
     },
   });
 
-  // After the chart, not before: the legend reads its dataset visibility, so it
-  // needs the chart to exist. Chart.js' own dataset hiding is enough here (unlike
-  // the by-category charts, which re-render) — the x axis is months, so a hidden
-  // series leaves the axis and every other series exactly where they were.
+  // Drawn after the chart, whose visibility it reads. Chart.js' own hiding is
+  // enough here: the x axis is months, so a hidden series moves nothing else.
   const drawLegend = () => renderCategoryLegend('expense-breakdown-trend-legend', legendItems, {
     isHidden: (_, i) => !expenseBreakdownTrendChart.isDatasetVisible(i),
     onToggle: (_, i) => {
@@ -83,8 +108,8 @@ function renderExpenseBreakdownTrendChart(months) {
 
 let spendingTrendChart = null;
 
-// Divisors turning each period's total into a monthly average. Lifelong has none —
-// renderSpendingTrendChart passes the real month count instead.
+// Divisors turning each period's total into a monthly average; Lifelong uses the
+// real month count (see spendingMonthlyAverage).
 const SPENDING_TREND_PERIODS = [
   { key: 'lastMonth', label: 'Last Month', alpha: 1, months: 1 },
   { key: 'quarterAvg', label: 'Last Quarter', alpha: 0.7, months: 3 },
@@ -92,28 +117,23 @@ const SPENDING_TREND_PERIODS = [
   { key: 'lifelongAvg', label: 'Lifelong', alpha: 0.25, months: null },
 ];
 
-// Categories switched off from this chart's legend, by name. Module-level, so the
-// choice survives the re-render each click triggers — and a plain refresh of the
-// dashboard, which is the same call again.
-const hiddenSpendingCategories = new Set();
+// Category `c`'s period total as a monthly average. Insight reads it too.
+function spendingMonthlyAverage(c, period, totalMonths) {
+  return c[period.key] / (period.months || totalMonths || 1);
+}
+
+// Kept for the page's life, so a choice survives each re-render and refresh.
+const hiddenSpendingCategories = legendHiddenNames('spending-trend-legend');
 
 function renderSpendingTrendChart(categories, totalMonths) {
   const ctx = document.getElementById('spending-trend-chart');
   if (spendingTrendChart) spendingTrendChart.destroy();
 
-  // The legend lists every category and is drawn before the early return below, so
-  // switching the last one off still leaves something to switch back on.
-  renderCategoryLegend('spending-trend-legend', categories, {
-    isHidden: (c) => hiddenSpendingCategories.has(c.name),
-    onToggle: (c) => {
-      if (!hiddenSpendingCategories.delete(c.name)) hiddenSpendingCategories.add(c.name);
-      renderSpendingTrendChart(categories, totalMonths);
-    },
-  });
+  // Drawn before the early return, so the last category switched off can come back.
+  renderToggleLegend('spending-trend-legend', categories, () => renderSpendingTrendChart(categories, totalMonths));
 
-  // Filtered out of the data rather than hidden inside it: a category is this
-  // chart's x axis, so Chart.js' own per-index hiding would leave a labelled gap
-  // where the bars were.
+  // Filtered out rather than hidden: categories are the x axis, so Chart.js'
+  // per-index hiding would leave a labelled gap.
   const shown = categories.filter((c) => !hiddenSpendingCategories.has(c.name));
   if (shown.length === 0) return;
 
@@ -123,7 +143,7 @@ function renderSpendingTrendChart(categories, totalMonths) {
       labels: shown.map((c) => c.name),
       datasets: SPENDING_TREND_PERIODS.map((p) => ({
         label: p.label,
-        data: shown.map((c) => c[p.key] / (p.months || totalMonths || 1)),
+        data: shown.map((c) => spendingMonthlyAverage(c, p, totalMonths)),
         backgroundColor: shown.map((c) => hslWithAlpha(c.color, p.alpha)),
       })),
     },
@@ -141,7 +161,7 @@ function renderSpendingTrendChart(categories, totalMonths) {
       },
       scales: {
         x: { ticks: { display: false }, border: { width: 3 } },
-        y: { beginAtZero: true, ticks: { callback: (value) => formatCurrency(value) } },
+        y: { beginAtZero: true, ticks: { callback: formatCurrency } },
       },
     },
   });
@@ -173,22 +193,7 @@ function renderSpendingBreakdownCharts(categories) {
         labels: categories.map((c) => c.name),
         datasets: [{ data, backgroundColor: categories.map((c) => c.color) }],
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: () => '',
-              label: (item) => {
-                const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
-                return `${item.label}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
-              },
-            },
-          },
-        },
-      },
+      options: financeDonutOptions(total),
     });
   });
 }
@@ -202,11 +207,12 @@ const TYPE_BREAKDOWN_PERIODS = [
 
 const typeBreakdownCharts = {};
 
-// One card: heading + 4 period donuts + legend, built from scratch so the panels follow whatever
-// categories Insight defines rather than a hardcoded list.
-function buildTypeBreakdownSection(category) {
-  const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const typeBreakdownSlug = (category) => category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const typeBreakdownCanvasId = (slug, suffix) => `type-breakdown-${slug}-${suffix}-chart`;
 
+// One card: heading, four period donuts and a legend, built per category so the
+// panels follow whatever categories Insight defines.
+function buildTypeBreakdownSection(category, slug) {
   const section = document.createElement('div');
   section.className = 'panel-section card type-breakdown-category';
   section.id = `type-breakdown-${slug}-section`;
@@ -229,7 +235,7 @@ function buildTypeBreakdownSection(category) {
     chartBox.className = 'chart-box chart-box-donut';
 
     const canvas = document.createElement('canvas');
-    canvas.id = `type-breakdown-${slug}-${suffix}-chart`;
+    canvas.id = typeBreakdownCanvasId(slug, suffix);
 
     chartBox.appendChild(canvas);
     item.append(h4, chartBox);
@@ -246,18 +252,14 @@ function buildTypeBreakdownSection(category) {
   return section;
 }
 
-// One donut per category per period: that category's Types as a share of its total.
-// Only categories with a named Type get a panel. The gap between the category total and
-// the sum of its named Types becomes an "Untyped" slice.
+// One donut per category per period: its named Types as shares of its total, plus
+// an "Untyped" slice for the rest. Only categories with a named Type get a panel.
 function renderTypeBreakdownCharts(typeBreakdown) {
   // By absolute lifelong spend, so the biggest movers surface first whatever their sign.
+  const lifelongAbs = (category) => Math.abs(typeBreakdown[category].total?.lifelong || 0);
   const orderedCategories = Object.keys(typeBreakdown)
     .filter((category) => typeBreakdown[category].types.length > 0)
-    .sort((a, b) => {
-      const lifelongA = Math.abs((typeBreakdown[a]?.total?.lifelong) || 0);
-      const lifelongB = Math.abs((typeBreakdown[b]?.total?.lifelong) || 0);
-      return lifelongB - lifelongA;
-    });
+    .sort((a, b) => lifelongAbs(b) - lifelongAbs(a));
 
   const container = document.getElementById('type-breakdown-container');
   container.innerHTML = '';
@@ -265,14 +267,13 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
   orderedCategories.forEach((category) => {
     const data = typeBreakdown[category];
+    const slug = typeBreakdownSlug(category);
 
-    container.appendChild(buildTypeBreakdownSection(category));
+    container.appendChild(buildTypeBreakdownSection(category, slug));
 
     // Sorted once, so the legend and all four donuts share slice order and colours.
     const types = [...data.types].sort((a, b) => Math.abs(b.lifelong) - Math.abs(a.lifelong));
     const colors = types.map((_, i) => seriesColor(Math.round((i * 360) / types.length)));
-
-    const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     renderCategoryLegend(`type-breakdown-${slug}-legend`, [
       ...types.map((t, i) => ({ name: t.name, color: colors[i] })),
@@ -280,11 +281,11 @@ function renderTypeBreakdownCharts(typeBreakdown) {
     ]);
 
     TYPE_BREAKDOWN_PERIODS.forEach(({ key, suffix }) => {
-      const canvasId = `type-breakdown-${slug}-${suffix}-chart`;
+      const canvasId = typeBreakdownCanvasId(slug, suffix);
       const ctx = document.getElementById(canvasId);
 
       const typedTotal = types.reduce((sum, t) => sum + t[key], 0);
-      const total = (data.total && data.total[key]) || typedTotal;
+      const total = data.total?.[key] || typedTotal;
       const untyped = Math.max(0, total - typedTotal);
 
       const labels = [...types.map((t) => t.name), 'Untyped'];
@@ -294,22 +295,7 @@ function renderTypeBreakdownCharts(typeBreakdown) {
       typeBreakdownCharts[canvasId] = upsertChart(typeBreakdownCharts[canvasId], ctx, {
         type: 'doughnut',
         data: { labels, datasets: [{ data: values, backgroundColor: sliceColors }] },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                title: () => '',
-                label: (item) => {
-                  const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
-                  return `${item.label}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
-                },
-              },
-            },
-          },
-        },
+        options: financeDonutOptions(total),
       });
     });
   });
@@ -317,14 +303,16 @@ function renderTypeBreakdownCharts(typeBreakdown) {
 
 let accountCompositionChart = null;
 
-// Nested doughnut: account type (inner), institution (middle, one fixed colour each),
-// individual account (outer, shaded by institution). Slices size on the ABSOLUTE
-// balance, so a debt account renders normally instead of breaking the chart.
-// Types and institutions switched off from the two legends, by name. Module-level,
-// so a choice survives the re-render each click triggers and the next dashboard load.
-const hiddenAccountTypes = new Set();
-const hiddenInstitutions = new Set();
+// Kept for the page's life, so a choice survives each re-render and the next load.
+const hiddenAccountTypes = legendHiddenNames('account-composition-legend');
+const hiddenInstitutions = legendHiddenNames('account-composition-institution-legend');
 
+// Outer-ring account shades: the largest account in an institution is most opaque.
+const ACCOUNT_SLICE_ALPHA = { first: 0.85, step: 0.15, min: 0.4 };
+
+// Nested doughnut: account type (inner), institution (middle, one colour each) and
+// account (outer, shaded by institution). Slices size on the ABSOLUTE balance, so a
+// debt account renders normally instead of breaking the chart.
 function renderAccountCompositionChart(accounts) {
   const ctx = document.getElementById('account-composition-chart');
   if (accounts.length === 0) {
@@ -332,8 +320,18 @@ function renderAccountCompositionChart(accounts) {
     return;
   }
 
-  // Largest absolute balance first, so a big debt still ranks near the top. Anything
-  // netting to zero is dropped rather than left as an empty legend entry.
+  const absTotal = (list) => list.reduce((sum, a) => sum + Math.abs(a.balance), 0);
+  const groupBy = (list, keyOf) => {
+    const groups = new Map();
+    list.forEach((a) => {
+      const key = keyOf(a);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(a);
+    });
+    return groups;
+  };
+
+  // Largest absolute balance first; anything netting to zero is dropped.
   const rankedByAbs = (list, keyOf) => {
     const totals = new Map();
     list.forEach((a) => {
@@ -348,161 +346,92 @@ function renderAccountCompositionChart(accounts) {
   const typeOf = (a) => a.type || 'Other';
   const institutionOf = (a) => a.institution || 'Other';
 
-  // Evenly-spaced hues, so no count repeats a colour the way a fixed palette would.
-  //
-  // `band` is what keeps the two rings apart. Both used to walk the same wheel from
-  // the same starting hue, so with a similar number of types and institutions the two
-  // palettes came out IDENTICAL — the second-largest institution painted in exactly the
-  // second-largest type's colour. That's what makes a TFSA (an Investment) read as
-  // "the Saving colour": the slice matches a legend entry it has nothing to do with.
-  // The half-step offset pulls the hues off each other; the deeper, less saturated
-  // band is what still tells the rings apart when the two counts differ enough for the
-  // hues to realign anyway.
+  // Evenly spaced hues. The institution ring's half-step offset and deeper band keep
+  // its colours from matching the type ring's when the two counts are similar.
   const TYPE_BAND = { offset: 0 };
   const INSTITUTION_BAND = { offset: 0.5, saturation: '--chart-ring-saturation', lightness: '--chart-ring-lightness' };
   const distinctColors = (count, band) => Array.from({ length: count }, (_, i) =>
     seriesColor(Math.round(((i + band.offset) * 360) / count) % 360, band));
 
-  // Both palettes and both legends are built from EVERY account, not from what's
-  // currently shown: the hues are spaced by count, so recomputing them over a
-  // filtered list would recolour the survivors on every click — and a name dropped
-  // from its legend is a name with no way back on.
+  // Palettes and legends come from EVERY account, so hiding one neither recolours
+  // the rest nor drops a name that's needed to switch it back on.
   const allTypes = rankedByAbs(accounts, typeOf);
   const allInstitutions = rankedByAbs(accounts, institutionOf);
 
   const typeColors = {};
   distinctColors(allTypes.length, TYPE_BAND).forEach((color, i) => { typeColors[allTypes[i]] = color; });
 
-  // One fixed colour per institution, whatever types its accounts span.
   const institutionColorMap = {};
   distinctColors(allInstitutions.length, INSTITUTION_BAND).forEach((color, i) => { institutionColorMap[allInstitutions[i]] = color; });
 
-  // Drawn before the early return below, so switching everything off still leaves
-  // both legends to switch something back on with. Hiding a type takes its
-  // institutions and accounts out of the two outer rings with it — the rings are
-  // built from the accounts that survive both filters, so the hierarchy holds.
+  // Drawn before the early return, so something is always left to switch back on.
   const redraw = () => renderAccountCompositionChart(accounts);
-  renderCategoryLegend('account-composition-legend', allTypes.map((t) => ({ name: t, color: typeColors[t] })), {
-    isHidden: (t) => hiddenAccountTypes.has(t.name),
-    onToggle: (t) => {
-      if (!hiddenAccountTypes.delete(t.name)) hiddenAccountTypes.add(t.name);
-      redraw();
-    },
-  });
-  renderCategoryLegend('account-composition-institution-legend', allInstitutions.map((name) => ({ name, color: institutionColorMap[name] })), {
-    isHidden: (n) => hiddenInstitutions.has(n.name),
-    onToggle: (n) => {
-      if (!hiddenInstitutions.delete(n.name)) hiddenInstitutions.add(n.name);
-      redraw();
-    },
-  });
+  renderToggleLegend('account-composition-legend', allTypes.map((t) => ({ name: t, color: typeColors[t] })), redraw);
+  renderToggleLegend('account-composition-institution-legend', allInstitutions.map((name) => ({ name, color: institutionColorMap[name] })), redraw);
 
+  // Rings are built only from accounts surviving both filters, so the hierarchy holds.
   const shown = accounts.filter((a) => !hiddenAccountTypes.has(typeOf(a)) && !hiddenInstitutions.has(institutionOf(a)));
   if (shown.length === 0) return;
 
-  const byType = new Map();
-  shown.forEach((a) => {
-    const type = typeOf(a);
-    if (!byType.has(type)) byType.set(type, []);
-    byType.get(type).push(a);
-  });
-
+  const byType = groupBy(shown, typeOf);
   const typeAbsTotals = new Map();
-  byType.forEach((group, type) => {
-    typeAbsTotals.set(type, group.reduce((sum, acc) => sum + Math.abs(acc.balance), 0));
-  });
+  byType.forEach((group, type) => typeAbsTotals.set(type, absTotal(group)));
 
   const types = allTypes.filter((type) => (typeAbsTotals.get(type) || 0) > 0);
 
-  const accountLabels = [];
-  const accountValues = [];
-  const accountColors = [];
-  const institutionLabels = [];
-  const institutionValues = [];
-  const institutionColors = [];
-  const typeLabels = [];
-  const typeValues = [];
-  const typeColorList = [];
+  // Outer to inner, the datasets' order.
+  const rings = [0, 1, 2].map(() => ({ labels: [], values: [], colors: [] }));
+  const [accountRing, institutionRing, typeRing] = rings;
+  const addSlice = (ring, label, value, color) => {
+    ring.labels.push(label);
+    ring.values.push(value);
+    ring.colors.push(color);
+  };
 
   types.forEach((type) => {
     const group = byType.get(type);
-    typeLabels.push(type);
-    typeValues.push(typeAbsTotals.get(type));
-    typeColorList.push(typeColors[type]);
+    addSlice(typeRing, type, typeAbsTotals.get(type), typeColors[type]);
 
     // Largest institution first, so the middle ring lines up with the outer one.
-    const byInstitution = new Map();
-    group.forEach((a) => {
-      const institution = a.institution || 'Other';
-      if (!byInstitution.has(institution)) byInstitution.set(institution, []);
-      byInstitution.get(institution).push(a);
-    });
-
-    const institutions = [...byInstitution.entries()]
-      .map(([name, accts]) => ({ name, accts, abs: accts.reduce((sum, a) => sum + Math.abs(a.balance), 0) }))
+    const institutions = [...groupBy(group, institutionOf).entries()]
+      .map(([name, accts]) => ({ name, accts, abs: absTotal(accts) }))
       .filter((institution) => institution.abs > 0)
       .sort((a, b) => b.abs - a.abs);
 
     institutions.forEach((institution) => {
-      institutionLabels.push(institution.name);
-      institutionValues.push(institution.abs);
-      institutionColors.push(institutionColorMap[institution.name]);
+      const color = institutionColorMap[institution.name];
+      addSlice(institutionRing, institution.name, institution.abs, color);
 
       [...institution.accts]
         .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))
         .forEach((a, j) => {
-          accountLabels.push(a.name);
-          accountValues.push(Math.abs(a.balance));
-          accountColors.push(hslWithAlpha(institutionColorMap[institution.name], Math.max(0.4, 0.85 - j * 0.15)));
+          const alpha = Math.max(ACCOUNT_SLICE_ALPHA.min, ACCOUNT_SLICE_ALPHA.first - j * ACCOUNT_SLICE_ALPHA.step);
+          addSlice(accountRing, a.name, Math.abs(a.balance), hslWithAlpha(color, alpha));
         });
     });
   });
 
-  const total = typeValues.reduce((sum, v) => sum + v, 0);
-
-  // By datasetIndex (outer to inner), so the tooltip names whichever ring is hovered.
-  const ringLabels = [accountLabels, institutionLabels, typeLabels];
+  const total = typeRing.values.reduce((sum, v) => sum + v, 0);
 
   accountCompositionChart = upsertChart(accountCompositionChart, ctx, {
     type: 'doughnut',
     data: {
-      labels: accountLabels,
-      datasets: [
-        { data: accountValues, backgroundColor: accountColors, weight: 1 },
-        { data: institutionValues, backgroundColor: institutionColors, weight: 1 },
-        { data: typeValues, backgroundColor: typeColorList, weight: 1 },
-      ],
+      labels: accountRing.labels,
+      datasets: rings.map((ring) => ({ data: ring.values, backgroundColor: ring.colors, weight: 1 })),
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      // Otherwise one hover matches the same dataIndex in all three rings and
-      // produces three tooltip lines.
+      // Named from the hovered ring, not the account-ring labels.
+      ...financeDonutOptions(total, (item) => rings[item.datasetIndex].labels[item.dataIndex]),
+      // Otherwise one hover matches that dataIndex in all three rings.
       interaction: { mode: 'point' },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            // The default title looks up account-ring names by dataIndex, which is
-            // meaningless for the inner two rings.
-            title: () => '',
-            label: (item) => {
-              const name = ringLabels[item.datasetIndex][item.dataIndex];
-              const pct = total ? (item.raw / total * 100).toFixed(1) : '0.0';
-              return `${name}: ${formatCurrency(item.raw)} (${privacyMode ? maskDigits(pct) : pct}%)`;
-            },
-          },
-        },
-      },
     },
   });
 }
 
 let savingsTrendChart = null;
 
-// The Finance glance's own card: the same Cumulative Net Worth line as the Chart
-// chart below, with nothing but the line — no axis labels, no amounts, no grid. The
-// hover still names the month and amount.
+// The Finance glance's Cumulative Net Worth: the line alone, with no axes or grid.
+// The hover still names the month and amount.
 let financeGlanceNetWorthChart = null;
 
 function renderFinanceGlanceNetWorthChart(months) {
@@ -511,15 +440,7 @@ function renderFinanceGlanceNetWorthChart(months) {
     type: 'line',
     data: {
       labels: months.map((m) => m.label),
-      datasets: [{
-        label: 'Cumulative Net Worth',
-        data: months.map((m) => m.cumulative),
-        borderColor: chartColor('--chart-blue'),
-        backgroundColor: chartColor('--chart-blue', 0.1),
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-      }],
+      datasets: [cumulativeLineDataset('Cumulative Net Worth', months)],
     },
     options: {
       responsive: true,
@@ -568,21 +489,13 @@ function renderSavingsTrendChart(months) {
     type: 'line',
     data: {
       labels: months.map((m) => m.label),
-      datasets: [{
-        label: 'Cumulative Savings',
-        data: months.map((m) => m.cumulative),
-        borderColor: chartColor('--chart-blue'),
-        backgroundColor: chartColor('--chart-blue', 0.1),
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-      }],
+      datasets: [cumulativeLineDataset('Cumulative Savings', months)],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: false, afterFit: fixTrendYAxisWidth, ticks: { callback: (value) => formatCurrency(value) } } },
+      scales: { y: { beginAtZero: false, afterFit: fixTrendYAxisWidth, ticks: { callback: formatCurrency } } },
     },
   });
 }

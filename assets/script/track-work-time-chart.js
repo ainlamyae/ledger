@@ -1,4 +1,3 @@
-
 function mean(values) {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
@@ -13,9 +12,8 @@ function minutesToClock(mins) {
   return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
 }
 
-// Chart.js has no distribution plot, so: equal-width bins across the values' own range,
-// plus a normal curve at the same mean/stdev scaled to the tallest bar. The curve is a
-// shape overlay, not a second count axis.
+// Equal-width bins across the values' range, plus a normal curve at the same
+// mean/stdev scaled to the tallest bar: a shape overlay, not a second count axis.
 function buildDistribution(values, binCount, formatLabel) {
   if (values.length === 0) return null;
 
@@ -24,6 +22,7 @@ function buildDistribution(values, binCount, formatLabel) {
   const avg = mean(values);
   const sd = stdDev(values, avg);
   const binWidth = (max - min) / binCount;
+  const binCentre = (i) => min + binWidth * (i + 0.5);
 
   const counts = new Array(binCount).fill(0);
   values.forEach((v) => {
@@ -31,28 +30,23 @@ function buildDistribution(values, binCount, formatLabel) {
     counts[idx]++;
   });
 
-  const labels = counts.map((_, i) => formatLabel(min + binWidth * (i + 0.5)));
+  const labels = counts.map((_, i) => formatLabel(binCentre(i)));
 
-  // Bars are a % of all days, not raw counts, so the curve scales to the same peak.
+  // Bars are a % of all days, so the curve scales to the same peak.
   const percentages = counts.map((c) => (c / values.length) * 100);
 
   const peakPercentage = Math.max(...percentages);
   const normalPdf = (x) => (sd ? (1 / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-((x - avg) ** 2) / (2 * sd ** 2)) : 0);
   const peakPdf = normalPdf(avg) || 1;
-  const curve = counts.map((_, i) => (normalPdf(min + binWidth * (i + 0.5)) / peakPdf) * peakPercentage);
+  const curve = counts.map((_, i) => (normalPdf(binCentre(i)) / peakPdf) * peakPercentage);
 
   return { labels, counts, percentages, curve };
 }
 
-// Shared across all 4 Work Pattern Analysis bar charts so bars look the same
-// thickness regardless of how many bars/bins each one happens to have (the
-// 3 histograms have 10 bins, the Average Hours per Day chart has 5).
+const WORK_PATTERN_BIN_COUNT = 10;
+// Shared by the 4 Work Pattern bar charts so bars match whatever their bin count.
 const WORK_PATTERN_BAR_THICKNESS = 18;
-
-// Fixed height for the x-axis label row on the same 4 charts, so their plot
-// areas line up even though Average Hours per Day's labels ("Last Quarter",
-// "Last Year"...) are longer than the histograms' clock-time/hour labels and
-// would otherwise wrap or reserve more vertical space, shrinking its bars.
+// A fixed x-label height lines up the 4 plot areas despite the longer period labels.
 const WORK_PATTERN_X_AXIS_HEIGHT = 80;
 
 function fixWorkPatternXAxisHeight(scale) {
@@ -96,29 +90,30 @@ function renderDistributionChart(canvasId, dist) {
 
 const STANDARD_WORKDAY_MINUTES = 8 * 60;
 
-// Signed tally of (shift − 8h) over qualifying entries: a real Start/End, not today's
-// possibly-unfinished shift, not a weekend, and a non-negative duration. A missed
-// weekday is excluded rather than counted as −8h — no data isn't leaving early — and a
-// weekend shift doesn't count either way, since no 8h baseline was expected there.
-// `days` is a trailing window (lifelong if falsy), matching averageDailyHours.
+// Local midnight `days - 1` days before today: the first day of a trailing window.
+function trailingWindowStart(days) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (days - 1));
+  return start;
+}
+
+// Signed sum of (shift − 8h) over full weekday shifts, excluding today's possibly
+// unfinished one and negative (mis-keyed) durations. A missed weekday isn't −8h: no
+// data isn't leaving early. `days` is a trailing window, lifelong if falsy.
 function computeOvertimeMinutes(entries, days) {
   const todayIso = isoFromDate(new Date());
-  const windowStartIso = days
-    ? isoFromDate(new Date(new Date().setDate(new Date().getDate() - (days - 1))))
-    : null;
+  const windowStartIso = days ? isoFromDate(trailingWindowStart(days)) : null;
 
-  const qualifying = entries.filter((e) =>
-    e.start && e.end && e.date !== todayIso && !isWeekend(e.date)
-    && (!windowStartIso || e.date >= windowStartIso)
-    && computeDurationMinutes(e.start, e.end, e.breakMinutes) >= 0
-  );
+  const durations = entries
+    .filter((e) => e.start && e.end && e.date !== todayIso && !isWeekend(e.date)
+      && (!windowStartIso || e.date >= windowStartIso))
+    .map((e) => computeDurationMinutes(e.start, e.end, e.breakMinutes))
+    .filter((d) => d >= 0);
 
-  const minutes = qualifying.reduce(
-    (sum, e) => sum + (computeDurationMinutes(e.start, e.end, e.breakMinutes) - STANDARD_WORKDAY_MINUTES),
-    0
-  );
+  const minutes = durations.reduce((sum, d) => sum + (d - STANDARD_WORKDAY_MINUTES), 0);
 
-  return { minutes, count: qualifying.length };
+  return { minutes, count: durations.length };
 }
 
 function renderWorkTimeOvertimeSummary(entries) {
@@ -127,7 +122,7 @@ function renderWorkTimeOvertimeSummary(entries) {
   el.classList.remove('warning');
 
   const total = computeOvertimeMinutes(entries, null);
-  if (total.count === 0) return; // not enough logged full days yet — stay blank, same convention as .body-mass-eta
+  if (total.count === 0) return; // no full days yet: blank, like .body-mass-eta
 
   const year = computeOvertimeMinutes(entries, 365);
   const month = computeOvertimeMinutes(entries, 30);
@@ -146,34 +141,26 @@ function renderWorkTimeDistributionCharts(entries) {
   const today = isoFromDate(new Date());
   const worked = entries.filter((e) => e.start && e.end && e.date !== today);
 
-  renderDistributionChart('work-time-start-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.start)), 10, minutesToClock));
-  renderDistributionChart('work-time-end-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.end)), 10, minutesToClock));
+  renderDistributionChart('work-time-start-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.start)), WORK_PATTERN_BIN_COUNT, minutesToClock));
+  renderDistributionChart('work-time-end-distribution-chart', buildDistribution(worked.map((e) => timeToMinutes(e.end)), WORK_PATTERN_BIN_COUNT, minutesToClock));
 
-  // Weekends aren't representative shifts, and a negative duration (end before start,
-  // or a break longer than the shift) is mis-keyed. Both would skew the bins.
+  // Weekend shifts aren't representative, and a negative duration is mis-keyed.
   const durations = worked
     .filter((e) => !isWeekend(e.date))
     .map((e) => computeDurationMinutes(e.start, e.end, e.breakMinutes) / 60)
     .filter((h) => h >= 0);
-  renderDistributionChart('work-time-duration-distribution-chart', buildDistribution(durations, 10, (h) => `${h.toFixed(1)}h`));
+  renderDistributionChart('work-time-duration-distribution-chart', buildDistribution(durations, WORK_PATTERN_BIN_COUNT, (h) => `${h.toFixed(1)}h`));
 }
 
-function isHolidayEntry(entry) {
-  return !!entry && !entry.start && !entry.end && !!entry.task;
-}
-
-// Hours in the trailing window (or since the first entry) over the working days elapsed
-// in it. Weekends and marked holidays leave both numerator and denominator, so they
-// can't pull the average down; a weekday with no entry still counts as 0 hours, since
-// that's a missed log rather than time off.
+// Hours over working days elapsed in the trailing window (or since the first entry).
+// Weekends and holidays leave both sides; an unlogged weekday counts as 0 hours.
 function averageDailyHours(entries, days) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   let windowStart;
   if (days) {
-    windowStart = new Date(today);
-    windowStart.setDate(windowStart.getDate() - (days - 1));
+    windowStart = trailingWindowStart(days);
   } else {
     if (entries.length === 0) return 0;
     windowStart = entries.reduce((min, e) => (dateFromIso(e.date) < min ? dateFromIso(e.date) : min), dateFromIso(entries[0].date));
@@ -199,6 +186,14 @@ function averageDailyHours(entries, days) {
   return workingDays ? totalMinutes / 60 / workingDays : 0;
 }
 
+const WORK_TIME_AVERAGE_PERIODS = [
+  { label: 'Last Week', days: 7 },
+  { label: 'Last Month', days: 30 },
+  { label: 'Last Quarter', days: 90 },
+  { label: 'Last Year', days: 365 },
+  { label: 'Lifelong', days: null },
+];
+
 let workTimeDailyAverageChart = null;
 
 function renderWorkTimeDailyAverageChart(entries) {
@@ -208,19 +203,11 @@ function renderWorkTimeDailyAverageChart(entries) {
     return;
   }
 
-  const periods = [
-    { label: 'Last Week', days: 7 },
-    { label: 'Last Month', days: 30 },
-    { label: 'Last Quarter', days: 90 },
-    { label: 'Last Year', days: 365 },
-    { label: 'Lifelong', days: null },
-  ];
-
   workTimeDailyAverageChart = upsertChart(workTimeDailyAverageChart, ctx, {
     type: 'bar',
     data: {
-      labels: periods.map((p) => p.label),
-      datasets: [{ label: 'Avg Hours/Day', data: periods.map((p) => averageDailyHours(entries, p.days)), backgroundColor: chartColor('--chart-blue'), maxBarThickness: WORK_PATTERN_BAR_THICKNESS }],
+      labels: WORK_TIME_AVERAGE_PERIODS.map((p) => p.label),
+      datasets: [{ label: 'Avg Hours/Day', data: WORK_TIME_AVERAGE_PERIODS.map((p) => averageDailyHours(entries, p.days)), backgroundColor: chartColor('--chart-blue'), maxBarThickness: WORK_PATTERN_BAR_THICKNESS }],
     },
     options: {
       responsive: true,

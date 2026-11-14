@@ -38,8 +38,8 @@
 
 All of it lives in `motion.js` (`window.Motion`): its CSS, keyframes and view transitions too, so no other file or stylesheet animates. Web Animations ride over every `.modal`'s and the toast's `hidden`, so every write stays synchronous. Only cards and fields move; the background never does.
 
-- **Timing:** every page and form move (`down`, `up`, `sideways`) on one even curve, `SWIPE` (1.5s, `cubic-bezier(.45, 0, .2, 1)`); only the toast keeps a spring (`spring`, `POP`).
-- **Two motions only, named `down`, `up` and `sideways`** (`motion.js`), all slides, never a fade, on one even 1.5s curve (`SWIPE`):
+- **Timing:** every page and form move (`down`, `up`, `sideways`) the leaving screen out fast on `SWIPE_OUT` (0.35s, `cubic-bezier(.4, 0, 1, 1)`, accelerating) while the arriving one comes in on `SWIPE_IN` (0.55s, `cubic-bezier(.2, .8, .2, 1)`, settling), so the old content is gone before the new lands; a sideways move crosses the width, so on a wide screen both take up to 30% longer (√(width/height), never shorter) to look as fast as down and up; only the toast keeps a spring (`spring`, `POP`).
+- **Two motions only, named `down`, `up` and `sideways`** (`motion.js`), all slides, never a fade, out in 0.35s, in over 0.55s (`SWIPE_OUT`, `SWIPE_IN`):
   - **Down / up, by the breadcrumb:** a level down (Ledger → section → page → view → form → a form opened from a form, Workouts → a group) the old screen goes off the top while the new one rises from the bottom; a level up the reverse: the old one goes off the bottom while its parent comes down from the top.
   - **Sideways, on the same level:** sections in menu order (Health, Finance, Track, then Other), a section's pages in their tile order (Transaction → Account), a page's views in their button order (Settings' tabs). Going on in the order, the new one comes in from the right as the old one goes out the left; going back, the mirror.
   - Browser Back and Forward follow the same rules (the move is worked out from where you are and where you land, not from which button you pressed).

@@ -1,24 +1,10 @@
-// The Health Insight panel's Micronutrients mode: unlike Food mode (which asks
-// the model to guess at vitamin/mineral content from general food knowledge),
-// this one is built on REAL numbers — it takes the same per-ingredient totals
-// health-insight-food.js's aggregateFoodIntake already computes for the picked range,
-// looks each ingredient up in the Nutrition table (health-nutrition.js), and scales
-// whatever USDA-sourced panel Complete banked in its Micronutrients
-// column (JSON, per that row's own reference Amount) to how much was actually
-// eaten — the same scaling math health-physique-estimator.js already applies to
-// Calories/Protein. The AI is asked to judge sufficiency against standard
-// dietary reference intakes, not to estimate the amounts themselves.
-//
-// Coverage is necessarily partial: only ingredients that have BOTH a Nutrition
-// row AND an already-pulled Micronutrients cell contribute. That's tracked
-// explicitly (not silently dropped) so the prompt — and the report it
-// produces — can say what's measured vs. what's simply not priced yet, rather
-// than reading a genuinely unpriced nutrient as a confirmed zero.
+// The Health Insight panel's Micronutrient mode: Food mode's per-ingredient
+// totals (aggregateFoodIntake) scaled against each ingredient's banked USDA
+// panel in Nutrition, so the model judges real amounts rather than guessing them.
+// Only ingredients with a Nutrition row and a pulled panel contribute; the rest
+// are listed as missing so an unpriced nutrient never reads as zero.
 
-// FDC's names for these are pure chemistry (fatty-acid carbon count/bond
-// notation) — "Omega-3" doesn't appear anywhere in them, so it's added for
-// display only. Keyed by the exact FDC name; matching/lookup elsewhere still
-// uses that raw name, only the rendered label changes.
+// FDC's fatty-acid names don't say "Omega-3"; display labels only, keyed by FDC name.
 const NUTRIENT_DISPLAY_NAME = {
   'PUFA 18:3 n-3 c,c,c (ALA)': 'Omega-3, ALA',
   'PUFA 18:4': 'Omega-3, SDA',
@@ -28,18 +14,15 @@ const NUTRIENT_DISPLAY_NAME = {
   'PUFA 22:6 n-3 (DHA)': 'Omega-3, DHA',
 };
 
-// USDA's undifferentiated fatty-acid names (SR Legacy foods such as flaxseed) and the
-// specific one each is counted as when a panel has no specific figure of its own.
+// USDA's undifferentiated fatty acids (SR Legacy) and the specific one each counts
+// as when a panel has no specific figure.
 const GENERIC_PUFA_AS = {
   'PUFA 18:3': 'PUFA 18:3 n-3 c,c,c (ALA)',
   'PUFA 18:2': 'PUFA 18:2 n-6 c,c',
 };
 
-// A nutrient's name cell, its hover listing where the amount came from (one line per
-// source, "Ingredient (amount eaten): nutrient amount") — a touch screen has no hover,
-// so a tap toggles the same list open as visible lines under the name instead
-// (nutrient-sources-open on the cell; see the matching CSS and renderToggleLegend's own
-// click-to-reveal for the same idea on charts).
+// A nutrient's name cell; its hover lists each source ("Ingredient (amount eaten):
+// nutrient amount"), and a tap toggles the same list open for touch screens.
 function nutrientNameCell(n) {
   const td = makeCell(n.displayName);
   if (n.sources && n.sources.length) {
@@ -59,40 +42,31 @@ function nutrientNameCell(n) {
   return td;
 }
 
-// Grouping for the reference-only rows (no desired amount, no supplement): the
-// "Vitamin …" rows 0, the omega-3 family 1 (the names NUTRIENT_DISPLAY_NAME marks
-// Omega-3, or any n-3), everything else 2.
+// Sort group for reference-only rows: vitamins 0, the omega-3 family 1, the rest 2.
 function nutrientFamilyRank(name) {
   if (/^Vitamin\b/.test(name)) return 0;
   if (/Omega-3/.test(NUTRIENT_DISPLAY_NAME[name] || '') || /\bn-3\b/.test(name)) return 1;
   return 2;
 }
 
-// True on the last Nutrition Facts line when other nutrients follow it: that row
-// carries the rule separating the label's lines from the rest (both micronutrient
-// tables, here and Physique's 🧬 view).
+// The last Nutrition Facts line, when other nutrients follow it (both tables draw a rule there).
 function endsNutritionFactsLines(nutrients, i) {
   return nutrients[i].factsLine && i + 1 < nutrients.length && !nutrients[i + 1].factsLine;
 }
 
-// True on the row just above the first nutrient past the Nutrition Facts lines with
-// no desired daily amount, when a judged one sits above it: the rule between the
-// nutrients judged against a goal and the reference-only ones.
+// The last nutrient with a desired amount, when a reference-only one follows it.
 function endsDesiredNutrients(nutrients, i) {
   const next = nutrients[i + 1];
   return !!next && !next.factsLine && next.ideal === null && !nutrients[i].factsLine && nutrients[i].ideal !== null;
 }
 
-// One table row's class for either rule; both draw the same line.
+// One row's class for either rule; both draw the same line.
 function nutrientSectionEnd(nutrients, i) {
   return endsNutritionFactsLines(nutrients, i) || endsDesiredNutrients(nutrients, i);
 }
 
-// Every date in [from, to] that actually has a Calculate-derived breakdown —
-// the denominator for each nutrient's per-day average. Deliberately the same
-// "was Calculate actually run that day" bar aggregateFoodIntake's own source
-// rows require, not just the fixed length of the picked range, so a sparsely
-// logged window doesn't understate the daily average.
+// Days in [from, to] with a Calculate breakdown: the per-day divisor, so a
+// sparsely logged range doesn't understate the average.
 function countMicronutrientLoggedDays(from, to) {
   const dates = new Set();
   physiqueAsHealthEntries()
@@ -101,14 +75,9 @@ function countMicronutrientLoggedDays(from, to) {
   return dates.size;
 }
 
-// One ingredient's contribution to the running nutrient totals: how many
-// times over its own Nutrition-row reference Amount was actually eaten in the
-// window, by weight and/or by count (an ingredient logged inconsistently
-// across days can carry both). Same precedence health-physique-estimator.js's
-// tableCount uses — an explicit leading count in Amount, or (only when Amount
-// has no gram figure at all) an implicit reference count of 1 — so a
-// gram-only row never double-counts against a stray count total. Returns 0
-// when neither applies (e.g. the row's Amount can't be scaled at all).
+// How many times its Nutrition row's reference Amount was eaten, by weight and/or
+// count. The reference count is Amount's leading count, else 1 only when Amount
+// has no grams (the estimator's own rule); 0 when neither scales.
 function micronutrientScaleFactor(entry, row) {
   const referenceGrams = parseGramsFromAmount(entry.amount);
   const explicitCount = parseCountFromAmount(entry.amount);
@@ -120,12 +89,9 @@ function micronutrientScaleFactor(entry, row) {
   return scale;
 }
 
-// Constant daily intake that isn't logged day by day — supplements, water, tea and
-// other calorie-free drinks — as one DAILY_SUPPLEMENTS Setting: a JSON object keyed by
-// exact FDC nutrient name, each { unit, amount } per day (the same shape as
-// MICRONUTRIENT_DAILY_DESIRED_JSON, without `kind`). Added once for every logged day
-// (aggregateMicronutrientIntake below), so it never touches Calories In or the
-// Physique rows themselves. Missing or unparseable setting = nothing added.
+// Constant daily intake not logged day by day (supplements, water, tea): a JSON
+// object keyed by FDC name, each { unit, amount } per day. Added once per logged
+// day; never touches Calories In. Missing or unparseable = nothing added.
 const DAILY_SUPPLEMENTS_KEY = 'DAILY_SUPPLEMENTS';
 const DAILY_SUPPLEMENTS_LABEL = 'Daily supplements & drinks';
 
@@ -145,9 +111,8 @@ function dailySupplements() {
   }
 }
 
-// A nutrient amount in another unit: g/mg/µg through massUnit/MASS_UNIT_GRAMS
-// (health-nutrition.js), plus vitamin D's IU (40 IU = 1 µg; IU is defined per vitamin,
-// so only vitamin D's converts). Null when the units can't be converted.
+// A nutrient amount in another unit: g/mg/µg, plus vitamin D's IU (IU is per
+// vitamin, so only D converts). Null when the units can't convert.
 const VITAMIN_D_IU_PER_UG = 40;
 function convertNutrientAmount(name, amount, fromUnit, toUnit) {
   if (standardUnit(fromUnit) === standardUnit(toUnit)) return amount;
@@ -164,11 +129,10 @@ function convertNutrientAmount(name, amount, fromUnit, toUnit) {
   return to ? from.value * MASS_UNIT_GRAMS[from.unit] / MASS_UNIT_GRAMS[to] : null;
 }
 
-// Sums every nutrient across every ingredient logged in [from, to] that has
-// both a Nutrition row and an already-pulled Micronutrients panel, scaled to
-// how much of that ingredient was actually eaten. `contributing`/`missing`
-// name which ingredients did and didn't make it in, so the caller can be
-// upfront about coverage instead of presenting a silently partial total.
+const roundThousandth = (value) => Math.round(value * 1000) / 1000;
+
+// Every nutrient eaten in [from, to], scaled per ingredient, plus the daily
+// supplements; `contributing`/`missing` say which ingredients made it in.
 // `breakdowns`: as aggregateFoodIntake's, each counted as one day.
 function aggregateMicronutrientIntake(from, to, breakdowns = null) {
   const rows = aggregateFoodIntake(from, to, breakdowns);
@@ -183,44 +147,33 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
   rows.forEach((row) => {
     const entry = findNutritionEntry(row.name);
     const parsed = entry ? parseMicronutrients(entry.micronutrients) : null;
-    if (!parsed) {
-      missing.add(row.name);
-      return;
-    }
-
-    const scale = micronutrientScaleFactor(entry, row);
+    const scale = parsed ? micronutrientScaleFactor(entry, row) : 0;
     if (scale <= 0) {
       missing.add(row.name);
       return;
     }
 
     contributing.add(row.name);
-    const from = row.amountLabel ? `${row.name} (${row.amountLabel})` : row.name;
+    const source = row.amountLabel ? `${row.name} (${row.amountLabel})` : row.name;
     Object.entries(parsed).forEach(([rawName, v]) => {
-      // An older (SR Legacy) panel carries only the undifferentiated 18:3/18:2: counted
-      // as ALA/LA, as in food it nearly all is. A panel with the specific one keeps it.
+      // A panel with only the generic 18:3/18:2 counts it as ALA/LA, as in food it nearly all is.
       const specific = GENERIC_PUFA_AS[rawName];
       const name = specific && !(specific in parsed) ? specific : rawName;
       if (!totals.has(name)) totals.set(name, { unit: v.unit, total: 0, sources: [] });
       const amount = v.amount * scale;
       totals.get(name).total += amount;
-      if (amount > 0) totals.get(name).sources.push({ from, amount });
+      if (amount > 0) totals.get(name).sources.push({ from: source, amount });
     });
   });
 
-  // Read once per aggregation, not once per nutrient — nutrientDailyDesired()
-  // (health-nutrient-desired.js) re-parses a Setting value on every call, and this
-  // loop runs over the whole nutrient list.
+  // Read once: nutrientDailyDesired() re-parses a Setting on every call.
   const dailyDesired = nutrientDailyDesired();
 
-  // DAILY_SUPPLEMENTS: the same amount on every logged day, so it adds amount × days.
-  // Converted to the unit food already uses for that nutrient, else its desired unit,
-  // so it adds up and compares like for like; a unit that can't convert is skipped.
-  const supplements = dailySupplements();
-  // Each nutrient's daily supplement share, in its row's unit, for the tables' own column.
+  // Supplements add amount × days, in the unit food already uses for that
+  // nutrient (else its desired unit); a unit that can't convert is skipped.
   const supplementPerDay = new Map();
   if (daysLogged > 0) {
-    Object.entries(supplements).forEach(([name, s]) => {
+    Object.entries(dailySupplements()).forEach(([name, s]) => {
       const unit = totals.get(name)?.unit || dailyDesired[name]?.unit || s.unit;
       const perDay = convertNutrientAmount(name, s.amount, s.unit, unit);
       if (perDay === null) return;
@@ -231,32 +184,28 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
     });
   }
   if (supplementPerDay.size) contributing.add(DAILY_SUPPLEMENTS_LABEL);
-  // The Nutrition Facts lines lead, in label order and under the label's names
-  // (Saturated, Omega-3, Sodium, …), as in the ingredient form (NUTRITION_FACTS_ORDER, health-nutrition.js).
+  // The Nutrition Facts lines lead, in label order and under the label's names.
   const factsRanks = nutritionFactsRanks([...totals.keys()]);
-  // EPA and DHA aren't Nutrition Facts lines, but they're read beside ALA, so in these
-  // tables they follow the Omega-3, ALA line (ranks are whole numbers; the fractions
-  // slot them in before the next line) and count as part of that block.
+  // EPA and DHA follow the Omega-3, ALA line (fractional ranks) and join that block.
   const alaRank = NUTRITION_FACTS_ORDER.findIndex((l) => l.label === 'Omega-3, ALA');
   ['PUFA 20:5 n-3 (EPA)', 'PUFA 22:6 n-3 (DHA)'].forEach((name, i) => {
     if (alaRank >= 0 && totals.has(name)) factsRanks.set(name, { rank: alaRank + (i + 1) / 10, label: NUTRIENT_DISPLAY_NAME[name] });
   });
   const nutrients = [...totals.entries()]
     .map(([name, v]) => {
-      const perDay = daysLogged > 0 ? Math.round((v.total / daysLogged) * 1000) / 1000 : null;
+      const perDay = daysLogged > 0 ? roundThousandth(v.total / daysLogged) : null;
       const desired = dailyDesired[name] || null;
       return {
         name,
         displayName: factsRanks.get(name)?.label || NUTRIENT_DISPLAY_NAME[name] || name,
         factsLine: factsRanks.has(name),
         unit: v.unit,
-        total: Math.round(v.total * 1000) / 1000,
+        total: roundThousandth(v.total),
         perDay,
-        supplementPerDay: supplementPerDay.has(name) ? Math.round(supplementPerDay.get(name) * 1000) / 1000 : null,
-        // Where the total came from: each ingredient (with how much of it was eaten) and
-        // the daily supplements, largest share first — the tables' name-cell hover.
+        supplementPerDay: supplementPerDay.has(name) ? roundThousandth(supplementPerDay.get(name)) : null,
+        // The name cell's hover, largest share first.
         sources: v.sources
-          .map((s) => ({ from: s.from, amount: Math.round(s.amount * 1000) / 1000 }))
+          .map((s) => ({ from: s.from, amount: roundThousandth(s.amount) }))
           .sort((a, b) => b.amount - a.amount),
         ideal: desired ? desired.amount : null,
         idealUnit: desired ? desired.unit : null,
@@ -264,12 +213,10 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
         severity: desired ? nutrientGapSeverity(desired.kind, perDay, desired.amount) : null,
       };
     })
-    // Zero eaten with no desired amount (or a zero one) says nothing; a zero against a real one is a gap.
+    // Zero with no (or a zero) desired amount says nothing; zero against a real one is a gap.
     .filter((n) => n.total !== 0 || (n.ideal !== null && n.ideal !== 0))
-    // The Nutrition Facts lines first, in label order. Then nutrients with a known
-    // desired amount (alphabetical), then everything without one (alphabetical) — so the
-    // rows worth judging against a goal aren't scattered through dozens of
-    // reference-only ones.
+    // Facts lines in label order; then those with a desired amount; then the rest:
+    // supplemented first, then by family. Alphabetical within each.
     .sort((a, b) => {
       const aRank = factsRanks.get(a.name)?.rank ?? Infinity;
       const bRank = factsRanks.get(b.name)?.rank ?? Infinity;
@@ -277,8 +224,6 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
       const aHasIdeal = a.ideal !== null;
       const bHasIdeal = b.ideal !== null;
       if (aHasIdeal !== bHasIdeal) return aHasIdeal ? -1 : 1;
-      // Among those without a desired amount: the ones a daily supplement adds to first,
-      // then the remaining vitamin forms, then the omega-3 family, then everything else.
       if (!aHasIdeal) {
         const aHasSupp = a.supplementPerDay !== null;
         const bHasSupp = b.supplementPerDay !== null;
@@ -299,11 +244,7 @@ function aggregateMicronutrientIntake(from, to, breakdowns = null) {
   };
 }
 
-// Estimated Thermic Effect of Food share of each macro's OWN calories —
-// Settings so they can be retuned without a code change, same idiom
-// TEF_PERCENT_KEY (health-math.js) already uses for the flat whole-intake figure.
-// Defaults are the commonly-cited per-macro TEF shares: Protein 25%,
-// Carbohydrate 7.5%, Fat 2%.
+// Per-macro TEF shares of that macro's own calories, as Settings (percent).
 const TEF_PROTEIN_SHARE_KEY = 'TEF_PROTEIN_PERCENT';
 const TEF_CARB_SHARE_KEY = 'TEF_CARB_PERCENT';
 const TEF_FAT_SHARE_KEY = 'TEF_FAT_PERCENT';
@@ -311,12 +252,8 @@ const TEF_PROTEIN_SHARE_DEFAULT = 25;
 const TEF_CARB_SHARE_DEFAULT = 7.5;
 const TEF_FAT_SHARE_DEFAULT = 2;
 
-// Standard Atwater energy factors (kcal/g), keyed by the exact FDC nutrient
-// name so this reads straight off the same panel health-nutrient-desired.js's Daily
-// Value table already keys by, no separate lookup needed. tefShare is read
-// fresh from Settings on every call rather than baked in here, so a value
-// edited in the Settings panel takes effect on the next Calculate/estimate
-// without a reload.
+// Atwater factors (kcal/g) and TEF shares, keyed by FDC name. Read on every call
+// so an edited Setting applies without a reload.
 function tefMacroRate() {
   return {
     Protein: { label: 'Protein', kcalPerGram: 4, tefShare: getSetting(TEF_PROTEIN_SHARE_KEY, TEF_PROTEIN_SHARE_DEFAULT) / 100 },
@@ -328,48 +265,57 @@ function tefMacroRate() {
 // TEF in kcal (unrounded) of these grams; missing Carb/Fat count as 0.
 function tefFromMacros(protein, carb, fat) {
   const rate = tefMacroRate();
+  const carbRate = rate['Carbohydrate, by difference'];
+  const fatRate = rate['Total lipid (fat)'];
   return protein * rate.Protein.kcalPerGram * rate.Protein.tefShare
-    + (carb || 0) * rate['Carbohydrate, by difference'].kcalPerGram * rate['Carbohydrate, by difference'].tefShare
-    + (fat || 0) * rate['Total lipid (fat)'].kcalPerGram * rate['Total lipid (fat)'].tefShare;
+    + (carb || 0) * carbRate.kcalPerGram * carbRate.tefShare
+    + (fat || 0) * fatRate.kcalPerGram * fatRate.tefShare;
 }
 
-// A row priced outside Nutrition (USDA/AI): TEF from its own Protein/Carb/Fat,
-// keys put in the Nutrition table's order. Null without a Protein figure.
+// A breakdown item rebuilt in the Nutrition table's key order (Amount, Calories,
+// Protein, Fiber, Fat, Carb, TEF, Source, then anything else), with these macros.
+function orderedBreakdownItem(item, macros) {
+  const { name, amount, calories, protein, fiber, fat, carbohydrate, tef, source, ...rest } = item;
+  const rebuilt = { name, amount, calories, protein };
+  FOOD_MACROS.forEach((macro) => {
+    if (macros[macro] !== undefined) rebuilt[macro] = macros[macro];
+  });
+  rebuilt.source = source;
+  return Object.assign(rebuilt, rest);
+}
+
+// A row priced outside Nutrition (USDA/AI): TEF from its own Protein/Carb/Fat.
+// Null without a Protein figure.
 function withOwnMacroTef(item) {
   if (typeof item.protein !== 'number') return null;
   const tefRaw = tefFromMacros(item.protein, item.carbohydrate, item.fat);
-  const { name, amount, calories, protein, fiber, fat, carbohydrate, tef, source, ...rest } = item;
-  const rebuilt = { name, amount, calories, protein };
-  if (fiber !== undefined) rebuilt.fiber = fiber;
-  if (fat !== undefined) rebuilt.fat = fat;
-  if (carbohydrate !== undefined) rebuilt.carbohydrate = carbohydrate;
-  rebuilt.tef = Math.round(tefRaw);
-  rebuilt.source = source;
-  return { row: Object.assign(rebuilt, rest), tefRaw };
+  const macros = { fiber: item.fiber, fat: item.fat, carbohydrate: item.carbohydrate, tef: Math.round(tefRaw) };
+  return { row: orderedBreakdownItem(item, macros), tefRaw };
 }
 
-// Estimated Fiber/Fat/Carbohydrate/Thermic Effect of Food for one day's own
-// Consumption breakdown — each ingredient's own typed Fiber/Fat/Carb/TEF
-// (Nutrition columns I-L) when it has one, otherwise the same 🧬
-// Micronutrients-derived/Atwater-formula estimate the Nutrition table itself
-// falls back to (resolvedNutritionMacros, health-nutrition.js), scaled to how much
-// of it was actually logged (same per-ingredient scaling
-// aggregateMicronutrientIntake uses above, just over one day's breakdown
-// array directly instead of aggregateFoodIntake's range total, so this also
-// works on a day still open in the form and not yet saved). Atwater, not
-// each ingredient's own listed Calories: TEF is defined against the macro
-// split, and the two can disagree by a few percent per ingredient.
-//
-// Rebuilds each matched row (mutating `breakdown` in place by index) with
-// its keys in the same Amount/Calories/Protein/Fiber/Fat/Carb/TEF/Source
-// order the Nutrition table itself uses — that's what lets the Physique
-// breakdown table AND its saved JSON read the same way the sheet does,
-// instead of just carrying the same values in whatever order they were
-// first computed. A row with nothing usable in Nutrition (USDA/AI-priced)
-// gets its TEF from its own Protein/Carb/Fat; one without Protein is left
-// untouched. Returns the day's total TEF in kcal, or null when nothing in the
-// breakdown is measurable at all — callers fall back to the flat
-// TEF_PERCENT_OF_INTAKE estimate (tefDivisor, health-math.js) in that case.
+function nutritionEntryHasMacroData(entry) {
+  return !!(parseMicronutrients(entry.micronutrients)
+    || entry.fiber !== null || entry.fat !== null || entry.carb !== null || entry.tef !== null);
+}
+
+// A Nutrition row's typed-over-estimated macros (resolvedNutritionMacros) scaled
+// to the amount eaten; a field neither source has stays absent, not zero.
+function scaledNutritionMacros(entry, scale) {
+  const resolved = resolvedNutritionMacros(entry);
+  const macros = {};
+  if (resolved.fiber !== null) macros.fiber = Math.round(resolved.fiber * scale * 100) / 100;
+  if (resolved.fat !== null) macros.fat = Math.round(resolved.fat * scale * 100) / 100;
+  if (resolved.carb !== null) macros.carbohydrate = Math.round(resolved.carb * scale * 100) / 100;
+  const tefRaw = resolved.tef !== null ? resolved.tef * scale : null;
+  if (tefRaw !== null) macros.tef = Math.round(tefRaw);
+  return { macros, tefRaw };
+}
+
+// Fiber/Fat/Carbohydrate/TEF for one day's breakdown, written back onto each item
+// (in place, in the Nutrition table's key order). Each item uses its Nutrition
+// row when it has usable data, else its own USDA/AI macros; an item with
+// neither is left alone. Returns { tefKcal }, or null when nothing was measurable
+// (callers then use the flat TEF_PERCENT_OF_INTAKE estimate).
 function estimateTefBreakdown(breakdown) {
   let totalTefRaw = 0;
   let matched = false;
@@ -378,10 +324,8 @@ function estimateTefBreakdown(breakdown) {
     const entry = findNutritionEntry(item.name);
     const { grams, count } = parseBreakdownAmount(item.amount);
     const scale = entry ? micronutrientScaleFactor(entry, { grams: grams || 0, count: count || 0 }) : 0;
-    const hasData = entry && (parseMicronutrients(entry.micronutrients)
-      || entry.fiber !== null || entry.fat !== null || entry.carb !== null || entry.tef !== null);
+    const hasData = entry && nutritionEntryHasMacroData(entry);
 
-    // Nothing usable in Nutrition: the row's own USDA/AI macros.
     if (scale <= 0 || !hasData) {
       const own = withOwnMacroTef(item);
       if (!own) return;
@@ -391,44 +335,19 @@ function estimateTefBreakdown(breakdown) {
       return;
     }
 
-    const resolved = resolvedNutritionMacros(entry);
-    const { name, amount, calories, protein, source, fiber, fat, carbohydrate, tef, ...rest } = item;
-    const rebuilt = { name, amount, calories, protein };
-
-    if (resolved.fiber !== null) rebuilt.fiber = Math.round(resolved.fiber * scale * 100) / 100;
-    if (resolved.fat !== null) rebuilt.fat = Math.round(resolved.fat * scale * 100) / 100;
-    if (resolved.carb !== null) rebuilt.carbohydrate = Math.round(resolved.carb * scale * 100) / 100;
-    if (resolved.tef !== null) {
-      const itemTefRaw = resolved.tef * scale;
-      rebuilt.tef = Math.round(itemTefRaw);
-      totalTefRaw += itemTefRaw;
-    }
-
-    rebuilt.source = source;
-    Object.assign(rebuilt, rest);
-
-    breakdown[i] = rebuilt;
+    const { macros, tefRaw } = scaledNutritionMacros(entry, scale);
+    if (tefRaw !== null) totalTefRaw += tefRaw;
+    breakdown[i] = orderedBreakdownItem(item, macros);
     matched = true;
   });
 
   return matched ? { tefKcal: Math.round(totalTefRaw) } : null;
 }
 
-// Same estimate as estimateTefBreakdown above, but for one aggregateFoodIntake
-// row (health-insight-food.js's Food mode ingredient table) — that row already
-// carries its own {name, grams, count} totalled over the whole picked range,
-// so this reuses micronutrientScaleFactor directly instead of re-parsing an
-// amount string. Null when neither its Nutrition row nor its logged Breakdown has
-// any of these, same "not measured" rather than a confident zero. Returns {fiber,
-// carbohydrate, fat, tef}
-// rather than writing onto the row (unlike estimateTefBreakdown's per-Physique-
-// day rows): a Food mode row is a fresh aggregate rebuilt on every render, so
-// there's nothing to persist it onto.
+// {fiber, fat, carbohydrate, tef} for one aggregateFoodIntake row: each from its
+// Nutrition row when it has one, else the logged Breakdown's own figures. Null
+// when neither has any.
 function estimateMacrosForFoodRow(row) {
-  // Each macro from the ingredient's Nutrition row when it has one (scaled to the
-  // amount eaten, typed-over-estimated as below), otherwise from the logged
-  // Breakdown's own figures (aggregateFoodIntake's breakdownMacros) — so a food with
-  // no Nutrition row, or a row missing one macro, still shows what Calculate saved.
   const fromBreakdown = {};
   Object.entries(row.breakdownMacros || {}).forEach(([macro, value]) => {
     fromBreakdown[macro] = macro === 'tef' ? Math.round(value) : Math.round(value * 100) / 100;
@@ -443,47 +362,29 @@ function estimateMacrosFromNutritionRow(row) {
   if (!entry) return null;
 
   const scale = micronutrientScaleFactor(entry, row);
-  if (scale <= 0) return null;
+  if (scale <= 0 || !nutritionEntryHasMacroData(entry)) return null;
 
-  const parsed = parseMicronutrients(entry.micronutrients);
-  const hasData = parsed || entry.fiber !== null || entry.fat !== null || entry.carb !== null || entry.tef !== null;
-  if (!hasData) return null;
-
-  // Same typed-over-estimated resolution the Nutrition table and Physique
-  // breakdown use (resolvedNutritionMacros, health-nutrition.js): your own typed
-  // Fiber/Fat/Carbohydrate/TEF when the row has one, otherwise its pulled 🧬
-  // Micronutrients panel (Fiber/Fat/Carbohydrate) or the Atwater/TEF-share
-  // formula (TEF). A field stays absent from the result (not a confident
-  // zero) when neither source has it.
-  const resolved = resolvedNutritionMacros(entry);
-  const result = {};
-  if (resolved.fiber !== null) result.fiber = Math.round(resolved.fiber * scale * 100) / 100;
-  if (resolved.fat !== null) result.fat = Math.round(resolved.fat * scale * 100) / 100;
-  if (resolved.carb !== null) result.carbohydrate = Math.round(resolved.carb * scale * 100) / 100;
-  if (resolved.tef !== null) result.tef = Math.round(resolved.tef * scale);
-
-  return Object.keys(result).length ? result : null;
+  const { macros } = scaledNutritionMacros(entry, scale);
+  return Object.keys(macros).length ? macros : null;
 }
 
-// Thin TEF-only wrapper — formatFoodInsightPrompt only needs the one figure,
-// not the full macro breakdown estimateMacrosForFoodRow computes it from.
 function estimateTefForFoodRow(row) {
   const macros = estimateMacrosForFoodRow(row);
   return (macros && macros.tef !== undefined) ? macros.tef : null;
 }
 
-// The one line every render of this mode leads with — what the totals below
-// actually cover, since "18 nutrients, none of them showing iron" means
-// something very different depending on whether any iron-rich ingredient was
-// even priced this round.
+// What the totals cover, leading every render of this mode.
 function formatMicronutrientCoverageLine(data) {
   if (data.nutrients.length === 0) return 'No Calculate-derived ingredients logged in this window.';
   return `Based on ${data.contributing.length} ingredient${data.contributing.length === 1 ? '' : 's'} with pulled micronutrient data, over ${data.daysLogged} day${data.daysLogged === 1 ? '' : 's'} logged.`;
 }
 
+const MICRONUTRIENT_TABLE_COLUMN_COUNT = 5;
+const amountWithUnit = (value, unit) => (value !== null ? `${value} ${unit}` : '—');
+
 function renderMicronutrientInsightPreview(data) {
   renderInsightLines(document.getElementById('insight-micro-profile'), [
-    ...formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)),
+    ...currentProfileLines(),
     formatMicronutrientCoverageLine(data),
   ]);
 
@@ -491,7 +392,7 @@ function renderMicronutrientInsightPreview(data) {
   tbody.innerHTML = '';
 
   if (data.nutrients.length === 0) {
-    tbody.appendChild(renderEmptyRow(5, 'Nothing to show — see the coverage note above.'));
+    tbody.appendChild(renderEmptyRow(MICRONUTRIENT_TABLE_COLUMN_COUNT, 'Nothing to show — see the coverage note above.'));
     return;
   }
 
@@ -501,22 +402,20 @@ function renderMicronutrientInsightPreview(data) {
     if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
     tr.append(
       nutrientNameCell(n),
-      makeCell(`${n.total} ${n.unit}`),
-      makeCell(n.perDay !== null ? `${n.perDay} ${n.unit}` : '—'),
-      makeCell(n.supplementPerDay !== null ? `${n.supplementPerDay} ${n.unit}` : '—'),
-      makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
+      makeCell(amountWithUnit(n.total, n.unit)),
+      makeCell(amountWithUnit(n.perDay, n.unit)),
+      makeCell(amountWithUnit(n.supplementPerDay, n.unit)),
+      makeCell(amountWithUnit(n.ideal, n.idealUnit)),
     );
     tbody.appendChild(tr);
   });
 }
 
-// Asked when the question box is left blank — mirrors Food mode's own
-// default-question pattern, since this is the same "is this enough, what's
-// short, what should I eat" shape of question the user actually wants.
+// Asked when the question box is left blank, as in Food mode.
 const MICRONUTRIENT_INSIGHT_DEFAULT_QUESTION = 'Is this amount enough? What is missing, and what should I eat to fix it?';
 
 function formatMicronutrientInsightPrompt(data, { from, to, question }) {
-  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)).join('\n');
+  const profile = currentProfileLines().join('\n');
   const coverage = formatMicronutrientCoverageLine(data);
   const header = `Real, measured nutrient totals (from USDA FoodData Central, via each ingredient's own Nutrition-table entry) for the ingredients logged from ${from} to ${to} that have been priced for micronutrients — name: total over the period (average per day), ideal/day (a fixed FDA Daily Value, not personalized to this user), and whether the app's own math already flags a gap:`;
   const body = data.nutrients.length
@@ -529,8 +428,7 @@ function formatMicronutrientInsightPrompt(data, { from, to, question }) {
       return `  - ${n.displayName}: ${n.total} ${n.unit} total (${avgPart})${idealPart}${gapPart}`;
     }).join('\n')
     : '(none — see the coverage note above)';
-  const q = (question && question.trim()) ? question.trim() : MICRONUTRIENT_INSIGHT_DEFAULT_QUESTION;
-  return `${profile}\n\n${coverage}\n\n${header}\n${body}\n\nQuestion: ${q}`;
+  return `${profile}\n\n${coverage}\n\n${header}\n${body}\n\nQuestion: ${insightQuestionOrDefault(question, MICRONUTRIENT_INSIGHT_DEFAULT_QUESTION)}`;
 }
 
 const MICRONUTRIENT_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewing REAL, measured micronutrient totals — vitamins, minerals, and other nutrients — someone actually ate over a recent period. Unlike a rough estimate, these figures come from USDA FoodData Central, matched to the exact ingredients and amounts the user logged, so treat the numbers themselves as trustworthy for whatever they cover. A nutrient that's low or missing from the list may genuinely be low, or may simply not have been priced yet — never treat a nutrient missing from the list as confirmed zero intake.

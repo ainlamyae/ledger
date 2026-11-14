@@ -1,13 +1,11 @@
 
-// The country listed on each Travel row is where that border-crossing event
-// happened ("Country, City") — only the part before the comma matters here.
+// "Country, City" -> "Country".
 function travelCountryName(countryCity) {
   return (countryCity || '').split(',')[0].trim();
 }
 
-// Date + Time as one instant, so a same-day round trip nets a real sub-day duration
-// instead of rounding to 0 just because both events share a date. Midnight if Time is
-// blank. timeToMinutes lives in track-work-time.js — fine, since this only runs post-load.
+// Date + Time as one instant, so a same-day round trip nets its real sub-day length.
+// Midnight if Time is blank.
 function travelInstant(t) {
   const date = new Date(t.date);
   if (Number.isNaN(date.getTime())) return null;
@@ -15,18 +13,18 @@ function travelInstant(t) {
   return date.getTime() + minutes * 60000;
 }
 
-// Travel is a log of Arrival/Departure events, not pre-computed stays. An Arrival opens
-// a stay; the next Departure closes it — whatever country IT names, since a departure is
-// always from wherever the stay was — and the difference is credited to the opening
-// country. A trailing Arrival is an ongoing stay, credited up to today.
-//
-// The log starts at the first trip ever taken, so the years lived at home before it
-// would be dropped. Given a birthDate, a leading Departure is treated as though an
-// Arrival had opened a stay in that same country at birth.
+// Arrival/Departure events to days per country: an Arrival opens a stay, the next
+// Departure (whatever country it names) closes it, and a trailing Arrival runs to now.
+// Given a birthDate, a leading Departure counts as a stay there since birth, so the
+// years before the first trip aren't dropped.
 function computeCountryDays(travelEntries, birthDate) {
   const totals = new Map();
   let openCountry = null;
   let openSince = null;
+  const closeStay = (until) => {
+    const days = Math.max(0, (until - openSince) / MS_PER_DAY);
+    totals.set(openCountry, (totals.get(openCountry) || 0) + days);
+  };
 
   const sorted = [...travelEntries].sort((a, b) => a.row - b.row);
 
@@ -43,24 +41,17 @@ function computeCountryDays(travelEntries, birthDate) {
     if (instant === null) return;
 
     if (t.type.toLowerCase() === 'departure') {
-      if (openCountry) {
-        const days = Math.max(0, (instant - openSince) / 86400000);
-        totals.set(openCountry, (totals.get(openCountry) || 0) + days);
-      }
+      if (openCountry) closeStay(instant);
       openCountry = null;
       openSince = null;
     } else {
-      // Anything not "Departure" is treated as an Arrival (covers the
-      // sheet's "Arival" spelling and any future correction of it).
+      // Anything else is an Arrival (including the sheet's "Arival" spelling).
       openCountry = travelCountryName(t.countryCity);
       openSince = instant;
     }
   });
 
-  if (openCountry) {
-    const days = Math.max(0, (Date.now() - openSince) / 86400000);
-    totals.set(openCountry, (totals.get(openCountry) || 0) + days);
-  }
+  if (openCountry) closeStay(Date.now());
 
   return [...totals.entries()]
     .map(([country, days]) => ({ country, days }))
@@ -78,10 +69,8 @@ function formatDuration(days) {
   return `${Math.round(days * 24)} hr`;
 }
 
-// Common English country names -> ISO 3166-1 alpha-2, used to build flag
-// emoji. Not exhaustive of every territory (e.g. Hong Kong has no flag emoji
-// of its own in most fonts) — countryFlagEmoji() below falls back to a globe
-// for anything not listed here.
+// English country names -> ISO 3166-1 alpha-2, for flag emoji; anything missing
+// gets a globe (countryFlagEmoji).
 const COUNTRY_ISO2 = {
   Afghanistan: 'AF', Albania: 'AL', Algeria: 'DZ', Argentina: 'AR', Armenia: 'AM',
   Australia: 'AU', Austria: 'AT', Azerbaijan: 'AZ', Bahrain: 'BH', Bangladesh: 'BD',
@@ -106,10 +95,13 @@ const COUNTRY_ISO2 = {
   Venezuela: 'VE', Vietnam: 'VN', Yemen: 'YE',
 };
 
-// Regional Chart Symbol pair for an ISO2 code (e.g. "CA" -> 🇨🇦).
+// U+1F1E6, the Regional Indicator Symbol for "A".
+const REGIONAL_INDICATOR_A = 0x1f1e6;
+
+// Regional Indicator Symbol pair for an ISO2 code (e.g. "CA" -> 🇨🇦).
 function flagFromIso2(iso2) {
   return [...iso2.toUpperCase()]
-    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .map((c) => String.fromCodePoint(REGIONAL_INDICATOR_A + c.charCodeAt(0) - 'A'.charCodeAt(0)))
     .join('');
 }
 
@@ -131,19 +123,20 @@ function renderCountryDaysList(countryTotals) {
   }
 
   countryTotals.forEach((c) => {
+    const duration = formatDuration(c.days);
     const item = document.createElement('li');
     item.className = 'country-tile';
-    item.title = `${c.country} — ${formatDuration(c.days)}`;
+    item.title = `${c.country} — ${duration}`;
 
     const flag = document.createElement('span');
     flag.className = 'country-tile-flag';
     flag.textContent = countryFlagEmoji(c.country);
 
-    const duration = document.createElement('span');
-    duration.className = 'country-tile-duration';
-    duration.textContent = formatDuration(c.days);
+    const durationSpan = document.createElement('span');
+    durationSpan.className = 'country-tile-duration';
+    durationSpan.textContent = duration;
 
-    item.append(flag, duration);
+    item.append(flag, durationSpan);
     list.appendChild(item);
   });
 }
@@ -151,12 +144,12 @@ function renderCountryDaysList(countryTotals) {
 let worldMapChart = null;
 let worldTopologyPromise = null;
 
-// Loaded once per page session and reused on every dashboard refresh —
-// world-atlas's country borders don't change between refreshes, only which
-// countries are "visited" does.
+const WORLD_TOPOLOGY_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+
+// Fetched once per page session; only which countries are visited changes.
 function loadWorldTopology() {
   if (!worldTopologyPromise) {
-    worldTopologyPromise = fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+    worldTopologyPromise = fetch(WORLD_TOPOLOGY_URL)
       .then((res) => res.json());
   }
   return worldTopologyPromise;
@@ -165,11 +158,6 @@ function loadWorldTopology() {
 async function renderWorldMapChart(visitedCountries) {
   const canvas = document.getElementById('travel-world-map-chart');
   const topology = await loadWorldTopology();
-
-  // A forceRefresh (or a second, near-simultaneous call) could have already
-  // torn down/rebuilt this chart while the fetch above was in flight — bail
-  // rather than destroy a chart instance created after this call started.
-  if (canvas.dataset.rendering === 'stale') return;
 
   const countries = ChartGeo.topojson.feature(topology, topology.objects.countries).features;
   const visited = new Set(visitedCountries.map((c) => c.toLowerCase()));

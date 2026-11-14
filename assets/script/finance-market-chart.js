@@ -14,6 +14,7 @@ const MARKET_RANGES = [
 ];
 const MARKET_CHART_MAX_POINTS = 600;
 
+// Unknown slugs fall back to 1y.
 function marketRange(slug) {
   return MARKET_RANGES.find((r) => r.slug === slug) || MARKET_RANGES[5];
 }
@@ -145,8 +146,7 @@ function marketErrorText(err) {
 }
 
 function setMarketStatus(id, text) {
-  const el = document.getElementById(id);
-  el.textContent = text || '';
+  document.getElementById(id).textContent = text || '';
 }
 
 // Change from `back` bars ago, as a fraction; null if too short.

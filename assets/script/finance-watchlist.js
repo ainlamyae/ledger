@@ -3,8 +3,12 @@
 // Alerts (column F, JSON) are checked on every Finance load for alerted stocks only.
 
 const WATCHLIST_HEADERS = ['Symbol', 'Name', 'Exchange', 'Currency', 'Notes', 'Alerts'];
-const WATCHLIST_RANGE = () => `'${CONFIG.SHEETS.WATCHLIST}'!A2:F`;
+const watchlistSheetRange = (cells) => `'${CONFIG.SHEETS.WATCHLIST}'!${cells}`;
+const WATCHLIST_RANGE = () => watchlistSheetRange('A2:F');
 const ALERT_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+const ALERT_SMA_DAYS = 200; // fewer daily bars than this: the average needs monthly bars
+const SYMBOL_SEARCH_DELAY_MS = 500;
+const SYMBOL_SEARCH_MIN_CHARS = 2;
 const alertResults = new Map(); // symbol -> checkAlerts() results
 let alertCheckToken = 0;
 
@@ -24,6 +28,21 @@ function writeMarketPref(key, value) {
   try { localStorage.setItem(key, value); } catch { /* storage blocked */ }
 }
 
+function watchlistField(name) {
+  return document.getElementById(`watchlist-${name}`);
+}
+
+// Deletes one sheet row (Watchlist and Trade tabs).
+function deleteSheetRow(sheetId, row) {
+  return batchUpdate([{
+    deleteDimension: { range: { sheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row } },
+  }]);
+}
+
+async function ensureWatchlistTab() {
+  watchlistSheetId = await ensureSheetTab(CONFIG.SHEETS.WATCHLIST, WATCHLIST_HEADERS);
+}
+
 async function initWatchlist(forceRefresh = false) {
   await refreshWatchlist();
 
@@ -34,8 +53,8 @@ async function initWatchlist(forceRefresh = false) {
   document.getElementById('watchlist-cancel-btn').addEventListener('click', closeWatchlistForm);
   onFormSubmit('watchlist-form', submitWatchlistForm);
   makeSortableHeaders('#watchlist-table', watchlistSort, renderWatchlist);
-  document.getElementById('watchlist-symbol').addEventListener('input', debounceSymbolSearch);
-  document.getElementById('watchlist-symbol').addEventListener('change', fillWatchlistFromSearch);
+  watchlistField('symbol').addEventListener('input', debounceSymbolSearch);
+  watchlistField('symbol').addEventListener('change', fillWatchlistFromSearch);
   registerPageShow('watchlist', loadWatchlistPrices);
 }
 
@@ -59,6 +78,11 @@ async function refreshWatchlist() {
   syncAnalysisSymbolOptions();
 }
 
+// Columns A–F of one entry.
+function watchlistRowValues(w) {
+  return [w.symbol, w.name, w.exchange, w.currency, w.notes, alertsCell(w.alerts)];
+}
+
 function sortedWatchlist() {
   if (!watchlistSort.key) return allWatchlist;
   const { key, dir } = watchlistSort;
@@ -78,12 +102,12 @@ function renderWatchlist() {
     const bars = marketBars.get(w.symbol)?.bars || [];
     const close = makeCell(bars.length ? formatMoney(bars.at(-1).c, w.currency, { mask: false }) : '—');
     close.classList.add('num');
-    const day = document.createElement('td');
-    const month = document.createElement('td');
-    const year = document.createElement('td');
-    setPercentCell(day, barChange(bars, 1));
-    setPercentCell(month, barChange(bars, 21));
-    setPercentCell(year, barChange(bars, 252));
+    // 1d, ~1m (21 trading days), ~1y (252).
+    const changes = [1, 21, 252].map((back) => {
+      const td = document.createElement('td');
+      setPercentCell(td, barChange(bars, back));
+      return td;
+    });
     const actions = document.createElement('td');
     actions.className = 'workout-actions-cell';
     if (activeAlerts(w).length) {
@@ -94,7 +118,7 @@ function renderWatchlist() {
       makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editWatchlist(w) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteWatchlistEntry(w) }),
     );
-    tr.append(makeCell(w.symbol), makeCell(w.name, w.notes || w.name), close, day, month, year, alertCell(w), actions);
+    tr.append(makeCell(w.symbol), makeCell(w.name, w.notes || w.name), close, ...changes, alertCell(w), actions);
     tbody.appendChild(tr);
   });
 }
@@ -177,7 +201,8 @@ function alertLabels(alerts) {
 
 function alertText(w, r) {
   const money = (v) => formatMoney(v, w.currency, { mask: false });
-  const name = { below: '', above: '', belowAvg: `the ${r.basis || 'long-term average'} `, aboveAvg: `the ${r.basis || 'long-term average'} `, belowStop: 'the trailing stop ' }[r.rule];
+  const average = `the ${r.basis || 'long-term average'} `;
+  const name = { below: '', above: '', belowAvg: average, aboveAvg: average, belowStop: 'the trailing stop ' }[r.rule];
   const side = r.rule.startsWith('above') ? 'above' : 'below';
   if (r.met === null) return `${w.symbol}: close ${side} ${name.trim() || 'the level'} — needs more price history`;
   return `${w.symbol}: close ${money(r.close)} ${r.met ? 'is' : 'is not'} ${side} ${name}${money(r.level)} (${r.date})`;
@@ -205,6 +230,15 @@ function alertCell(w) {
   return td;
 }
 
+// Short (TSX) daily history: the long average needs month-end bars.
+function needsMonthlyBars(daily) {
+  return daily.partial && daily.bars.length < ALERT_SMA_DAYS;
+}
+
+function alertAtrMult() {
+  return getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT);
+}
+
 // Alerted stocks only: saved prices up to 4 h old, then each rule on the latest close.
 async function checkWatchlistAlerts() {
   const token = ++alertCheckToken;
@@ -214,9 +248,9 @@ async function checkWatchlistAlerts() {
       const daily = await getDailyBars(w.symbol, { maxAgeMs: ALERT_MAX_AGE_MS });
       if (token !== alertCheckToken) return;
       marketBars.set(w.symbol, daily);
-      const needsMonthly = (w.alerts.belowAvg || w.alerts.aboveAvg) && daily.bars.length < 200 && daily.partial;
+      const needsMonthly = (w.alerts.belowAvg || w.alerts.aboveAvg) && needsMonthlyBars(daily);
       const monthly = needsMonthly ? await getMonthlyBars(w.symbol).catch(() => null) : null;
-      alertResults.set(w.symbol, checkAlerts(w.alerts, daily.bars, monthly, getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT)));
+      alertResults.set(w.symbol, checkAlerts(w.alerts, daily.bars, monthly, alertAtrMult()));
     } catch (err) {
       console.warn(`[alerts] ${w.symbol}: ${err.message}`);
     }
@@ -239,7 +273,16 @@ async function clearStaleDismissals(alerted) {
 }
 
 function writeWatchlistAlerts(w) {
-  return updateValues(`'${CONFIG.SHEETS.WATCHLIST}'!F${w.row}`, [[alertsCell(w.alerts)]], 'RAW');
+  return updateValues(watchlistSheetRange(`F${w.row}`), [[alertsCell(w.alerts)]], 'RAW');
+}
+
+// Column F's header goes in with the first stock that has rules.
+function isFirstAlerted(alerts) {
+  return hasAlertRules(alerts) && !allWatchlist.some((w) => w.alerts);
+}
+
+function writeAlertsHeader() {
+  return updateValues(watchlistSheetRange('F1'), [['Alerts']], 'RAW');
 }
 
 async function dismissWatchlistAlerts(w) {
@@ -271,12 +314,10 @@ function updateWatchlistAlertBadges() {
   updateAnalysisAgeBadge();
 }
 
-// Rules from outside the form (the AI's suggestion); writes F1's header the first time.
+// Rules from outside the form (the AI's suggestion).
 async function saveWatchlistAlerts(w, alerts) {
   const next = parseAlerts(alerts);
-  if (next && !allWatchlist.some((x) => x.alerts)) {
-    await updateValues(`'${CONFIG.SHEETS.WATCHLIST}'!F1`, [['Alerts']], 'RAW');
-  }
+  if (isFirstAlerted(next)) await writeAlertsHeader();
   w.alerts = next;
   await writeWatchlistAlerts(w);
   alertResults.delete(w.symbol);
@@ -285,15 +326,15 @@ async function saveWatchlistAlerts(w, alerts) {
 
 // The form's hint: the stock's current levels, from saved prices.
 async function showWatchlistAlertLevels(symbol) {
-  const hint = document.getElementById('watchlist-alert-levels');
+  const hint = watchlistField('alert-levels');
   const base = "Alerts: a red badge on Watch List and Market when a rule is met on a day's close.";
   hint.textContent = base;
   if (!symbol) return;
   try {
     const daily = marketBars.get(symbol) || await getDailyBars(symbol, { maxAgeMs: Infinity });
-    const monthly = daily.partial && daily.bars.length < 200 ? await getMonthlyBars(symbol).catch(() => null) : null;
-    const r = checkAlerts({ belowAvg: true, belowStop: true }, daily.bars, monthly, getSetting('MARKET_ATR_MULT', MARKET_ATR_MULT_DEFAULT));
-    if (r.length < 2 || normalizeSymbol(document.getElementById('watchlist-symbol').value) !== symbol) return;
+    const monthly = needsMonthlyBars(daily) ? await getMonthlyBars(symbol).catch(() => null) : null;
+    const r = checkAlerts({ belowAvg: true, belowStop: true }, daily.bars, monthly, alertAtrMult());
+    if (r.length < 2 || normalizeSymbol(watchlistField('symbol').value) !== symbol) return;
     const cur = daily.currency || symbolCurrency(symbol);
     const money = (v) => (v === null ? 'n/a' : formatMoney(v, cur, { mask: false }));
     const [avg, stop] = r;
@@ -308,12 +349,12 @@ let lastSymbolResults = [];
 
 function debounceSymbolSearch() {
   clearTimeout(symbolSearchTimer);
-  const query = document.getElementById('watchlist-symbol').value.trim();
-  if (query.length < 2) return;
+  const query = watchlistField('symbol').value.trim();
+  if (query.length < SYMBOL_SEARCH_MIN_CHARS) return;
   symbolSearchTimer = setTimeout(async () => {
     try {
       lastSymbolResults = await searchSymbols(query);
-      const list = document.getElementById('watchlist-symbol-options');
+      const list = watchlistField('symbol-options');
       list.innerHTML = '';
       lastSymbolResults.forEach((r) => {
         const option = document.createElement('option');
@@ -324,98 +365,85 @@ function debounceSymbolSearch() {
     } catch (err) {
       if (err.kind === 'missing-key') showFieldError('watchlist-form-error', marketErrorText(err));
     }
-  }, 500);
+  }, SYMBOL_SEARCH_DELAY_MS);
 }
 
 function fillWatchlistFromSearch() {
-  const symbol = normalizeSymbol(document.getElementById('watchlist-symbol').value);
+  const symbol = normalizeSymbol(watchlistField('symbol').value);
   const hit = lastSymbolResults.find((r) => r.symbol === symbol);
-  document.getElementById('watchlist-currency').value = hit?.currency === 'CAD' || isCanadianSymbol(symbol) ? 'CAD' : 'USD';
+  watchlistField('currency').value = hit?.currency === 'CAD' || isCanadianSymbol(symbol) ? 'CAD' : 'USD';
   if (!hit) return;
-  const name = document.getElementById('watchlist-name');
+  const name = watchlistField('name');
   if (!name.value) name.value = hit.name;
-  document.getElementById('watchlist-exchange').value = hit.exchange;
+  watchlistField('exchange').value = hit.exchange;
 }
 
 function openWatchlistForm(entry = null) {
   editingWatchlistRow = entry?.row ?? null;
-  document.getElementById('watchlist-symbol').value = entry?.symbol || '';
-  document.getElementById('watchlist-name').value = entry?.name || '';
-  document.getElementById('watchlist-exchange').value = entry?.exchange || '';
-  document.getElementById('watchlist-currency').value = entry?.currency || 'USD';
-  document.getElementById('watchlist-notes').value = entry?.notes || '';
+  ['symbol', 'name', 'exchange'].forEach((key) => { watchlistField(key).value = entry?.[key] || ''; });
+  watchlistField('currency').value = entry?.currency || 'USD';
+  watchlistField('notes').value = entry?.notes || '';
   const a = entry?.alerts;
-  document.getElementById('watchlist-alert-below').value = a?.below ?? '';
-  document.getElementById('watchlist-alert-above').value = a?.above ?? '';
-  document.getElementById('watchlist-alert-below-avg').checked = !!a?.belowAvg;
-  document.getElementById('watchlist-alert-above-avg').checked = !!a?.aboveAvg;
-  document.getElementById('watchlist-alert-below-stop').checked = !!a?.belowStop;
+  watchlistField('alert-below').value = a?.below ?? '';
+  watchlistField('alert-above').value = a?.above ?? '';
+  watchlistField('alert-below-avg').checked = !!a?.belowAvg;
+  watchlistField('alert-above-avg').checked = !!a?.aboveAvg;
+  watchlistField('alert-below-stop').checked = !!a?.belowStop;
   showWatchlistAlertLevels(entry?.symbol || null);
   clearFieldError('watchlist-form-error');
-  document.getElementById('watchlist-modal').hidden = false;
+  watchlistField('modal').hidden = false;
 }
 
 function closeWatchlistForm() {
-  document.getElementById('watchlist-modal').hidden = true;
+  watchlistField('modal').hidden = true;
   editingWatchlistRow = null;
 }
 
 async function submitWatchlistForm() {
-  const symbol = normalizeSymbol(document.getElementById('watchlist-symbol').value);
-  if (!/^[A-Z0-9.\-^=/]{1,15}$/.test(symbol)) {
-    showFieldError('watchlist-form-error', 'Enter a symbol, e.g. AAPL, SHOP.TO or TSE: AC.');
-    return;
-  }
+  const fail = (message) => showFieldError('watchlist-form-error', message);
+  const symbol = normalizeSymbol(watchlistField('symbol').value);
+  if (!/^[A-Z0-9.\-^=/]{1,15}$/.test(symbol)) return fail('Enter a symbol, e.g. AAPL, SHOP.TO or TSE: AC.');
   if (allWatchlist.some((w) => w.symbol === symbol && w.row !== editingWatchlistRow)) {
-    showFieldError('watchlist-form-error', `${symbol} is already on the watchlist.`);
-    return;
+    return fail(`${symbol} is already on the watchlist.`);
   }
   const price = (id) => {
-    const v = document.getElementById(id).value.trim();
+    const v = watchlistField(id).value.trim();
     return v === '' ? null : Number(v);
   };
-  const below = price('watchlist-alert-below');
-  const above = price('watchlist-alert-above');
-  if ([below, above].some((v) => v !== null && !(v > 0))) {
-    showFieldError('watchlist-form-error', 'Alert prices must be above 0.');
-    return;
-  }
+  const below = price('alert-below');
+  const above = price('alert-above');
+  if ([below, above].some((v) => v !== null && !(v > 0))) return fail('Alert prices must be above 0.');
   // A new price already met on the latest close would show at once, so it can't warn of anything.
   const lastClose = marketBars.get(symbol)?.bars?.at(-1)?.c;
-  const before = allWatchlist.find((w) => w.row === editingWatchlistRow)?.alerts;
-  if (Number.isFinite(lastClose) && below !== null && below !== before?.below && below >= lastClose) {
-    showFieldError('watchlist-form-error', `"Close below" must be under the latest close (${lastClose.toFixed(2)}).`);
-    return;
-  }
-  if (Number.isFinite(lastClose) && above !== null && above !== before?.above && above <= lastClose) {
-    showFieldError('watchlist-form-error', `"Close above" must be over the latest close (${lastClose.toFixed(2)}).`);
-    return;
-  }
   const previous = allWatchlist.find((w) => w.row === editingWatchlistRow)?.alerts;
+  if (Number.isFinite(lastClose) && below !== null && below !== previous?.below && below >= lastClose) {
+    return fail(`"Close below" must be under the latest close (${lastClose.toFixed(2)}).`);
+  }
+  if (Number.isFinite(lastClose) && above !== null && above !== previous?.above && above <= lastClose) {
+    return fail(`"Close above" must be over the latest close (${lastClose.toFixed(2)}).`);
+  }
   const alerts = {
     below,
     above,
-    belowAvg: document.getElementById('watchlist-alert-below-avg').checked,
-    aboveAvg: document.getElementById('watchlist-alert-above-avg').checked,
-    belowStop: document.getElementById('watchlist-alert-below-stop').checked,
+    belowAvg: watchlistField('alert-below-avg').checked,
+    aboveAvg: watchlistField('alert-above-avg').checked,
+    belowStop: watchlistField('alert-below-stop').checked,
   };
   // A dismissal survives a save only for a rule left unchanged.
   alerts.dismissed = previous ? previous.dismissed.filter((r) => previous[r] === alerts[r]) : [];
-  const values = [
+  const values = watchlistRowValues({
     symbol,
-    document.getElementById('watchlist-name').value.trim(),
-    document.getElementById('watchlist-exchange').value.trim(),
-    isCanadianSymbol(symbol) ? 'CAD' : document.getElementById('watchlist-currency').value,
-    document.getElementById('watchlist-notes').value.trim(),
-    alertsCell(alerts),
-  ];
+    name: watchlistField('name').value.trim(),
+    exchange: watchlistField('exchange').value.trim(),
+    currency: isCanadianSymbol(symbol) ? 'CAD' : watchlistField('currency').value,
+    notes: watchlistField('notes').value.trim(),
+    alerts,
+  });
   try {
-    watchlistSheetId = await ensureSheetTab(CONFIG.SHEETS.WATCHLIST, WATCHLIST_HEADERS);
-    if (hasAlertRules(alerts) && !allWatchlist.some((w) => w.alerts)) {
-      await updateValues(`'${CONFIG.SHEETS.WATCHLIST}'!F1`, [['Alerts']], 'RAW');
-    }
+    await ensureWatchlistTab();
+    if (isFirstAlerted(alerts)) await writeAlertsHeader();
     const editingRow = editingWatchlistRow;
-    if (editingRow) await updateValues(`'${CONFIG.SHEETS.WATCHLIST}'!A${editingRow}:F${editingRow}`, [values], 'RAW');
+    if (editingRow) await updateValues(watchlistSheetRange(`A${editingRow}:F${editingRow}`), [values], 'RAW');
     else await appendValues(WATCHLIST_RANGE(), [values], 'RAW');
     alertResults.delete(symbol);
     await refreshWatchlist();
@@ -433,14 +461,12 @@ async function submitWatchlistForm() {
 
 async function deleteWatchlistEntry(entry) {
   await confirmAndDelete(`Remove ${entry.symbol} from the watchlist? Its trades in Portfolio stay.`, async () => {
-    if (watchlistSheetId === null) watchlistSheetId = await ensureSheetTab(CONFIG.SHEETS.WATCHLIST, WATCHLIST_HEADERS);
-    await batchUpdate([{
-      deleteDimension: { range: { sheetId: watchlistSheetId, dimension: 'ROWS', startIndex: entry.row - 1, endIndex: entry.row } },
-    }]);
+    if (watchlistSheetId === null) await ensureWatchlistTab();
+    await deleteSheetRow(watchlistSheetId, entry.row);
     await refreshWatchlist();
     updateWatchlistAlertBadges();
     showUndoToast(`${entry.symbol} removed.`, async () => {
-      await appendValues(WATCHLIST_RANGE(), [[entry.symbol, entry.name, entry.exchange, entry.currency, entry.notes, alertsCell(entry.alerts)]], 'RAW');
+      await appendValues(WATCHLIST_RANGE(), [watchlistRowValues(entry)], 'RAW');
       await refreshWatchlist();
       checkWatchlistAlerts();
     });

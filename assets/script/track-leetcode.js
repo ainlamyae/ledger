@@ -1,8 +1,7 @@
 // LeetCode: the NeetCode 250 roadmap (track-leetcode-roadmap.js) by category, ticked
 // off from the LeetCode tab, one row per solve.
 
-// Sheet columns, found by header name (as Physique's), so a moved or added
-// column can't shift values into the wrong cell.
+// Sheet columns, found by header name so a moved column can't shift values.
 const LEETCODE_COLUMNS = [
   ['date', 'Date'], ['name', 'Problem'], ['category', 'Category'], ['difficulty', 'Difficulty'],
   ['link', 'LeetCode'], ['neetcode', 'NeetCode Page'], ['youtube', 'YouTube Video'], ['minutes', 'Duration'],
@@ -15,10 +14,25 @@ const LEETCODE_HEADERS = LEETCODE_COLUMNS.map(([, header]) => header);
 const LEETCODE_RANGE = () => `'${CONFIG.SHEETS.LEETCODE}'!A1:Z`;
 let leetcodeColumnIndex = {}; // key -> 0-based column, from the header row
 const NEETCODE_BY_SLUG = new Map(NEETCODE_250.map((p) => [p.slug, p]));
+// Category -> its problems, in NeetCode's order.
+const NEETCODE_BY_CATEGORY = NEETCODE_250.reduce((map, p) => map.set(p.category, [...(map.get(p.category) || []), p]), new Map());
 
 const leetcodeLink = (p) => `https://leetcode.com/problems/${p.slug}/`;
 const neetcodePageLink = (p) => `https://neetcode.io/solutions/${p.slug}`;
 const youtubeLink = (p) => `https://www.youtube.com/watch?v=${p.youtube}`;
+// A problem's outside links: its row buttons and form fields. `generated` spots a
+// link the form filled itself, so a pasted one is kept.
+const LEETCODE_LINKS = [
+  { key: 'youtube', emoji: '🎥', title: 'YouTube video', href: youtubeLink, generated: /youtube\.com\/watch\?v=/ },
+  { key: 'neetcode', emoji: '📄', title: 'NeetCode page', href: neetcodePageLink, generated: /neetcode\.io\/solutions\// },
+  { key: 'link', emoji: '🔗', title: 'LeetCode problem', href: leetcodeLink },
+];
+
+const LEETCODE_PACE_DAYS = 7; // the badge's and ETA's look-back
+// Meter marks: every 25 problems, 10 hours of video and 4 weeks.
+const LEETCODE_MARK_EVERY = { problems: 25, minutes: 600, days: 28 };
+// One Letter page less @page's 0.25in margins, in px with a little slack; fonts in pt.
+const LEETCODE_PRINT = { maxHeight: 10.5 * 96 - 8, minFont: 5, maxFont: 12, steps: 10 };
 
 let allLeetcodeLogs = [];
 let leetcodeSheetId = null;
@@ -26,6 +40,21 @@ let editingLeetcodeRow = null;
 let leetcodeListenersAttached = false;
 let editLeetcodeLog = null;
 let openLeetcodeCategory = null; // one at a time; all closed on load
+
+const leetcodeField = (key) => document.getElementById(`leetcode-${key}`);
+
+function leetcodeToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+// Enter or Space on a role="button" acts as its click.
+function onLeetcodeActivate(el, activate) {
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+  });
+}
 
 async function initLeetcode() {
   if (!leetcodeListenersAttached) {
@@ -35,9 +64,9 @@ async function initLeetcode() {
     editLeetcodeLog = routedRowEdit('leetcode', () => allLeetcodeLogs, (l) => `${l.date} ${l.name}`, openLeetcodeForm);
     document.getElementById('leetcode-cancel-btn').addEventListener('click', closeLeetcodeForm);
     onFormSubmit('leetcode-form', submitLeetcodeForm);
-    document.getElementById('leetcode-problem').addEventListener('change', () => fillLeetcodeLinks());
-    populateSelect(document.getElementById('leetcode-category'), Object.keys(NEETCODE_ROADMAP), '');
-    const options = document.getElementById('leetcode-problem-options');
+    leetcodeField('problem').addEventListener('change', () => fillLeetcodeLinks());
+    populateSelect(leetcodeField('category'), Object.keys(NEETCODE_ROADMAP), '');
+    const options = leetcodeField('problem-options');
     NEETCODE_250.forEach((p) => {
       const option = document.createElement('option');
       option.value = p.name;
@@ -48,23 +77,28 @@ async function initLeetcode() {
   await refreshLeetcode();
 }
 
+// Maps each key to its header's column, noting keys still under an old header.
+function readLeetcodeHeader(header) {
+  const names = header.map((h) => String(h ?? '').trim().toLowerCase());
+  leetcodeColumnIndex = {};
+  leetcodeOldHeaders = [];
+  LEETCODE_COLUMNS.forEach(([key, h]) => {
+    let i = names.indexOf(h.toLowerCase());
+    if (i === -1 && LEETCODE_OLD_HEADERS[key]) {
+      i = names.indexOf(LEETCODE_OLD_HEADERS[key]);
+      if (i !== -1) leetcodeOldHeaders.push(key);
+    }
+    if (i !== -1) leetcodeColumnIndex[key] = i;
+  });
+}
+
 async function refreshLeetcode() {
   if (!(await sheetTabExists(CONFIG.SHEETS.LEETCODE))) {
     allLeetcodeLogs = [];
     leetcodeSheetId = null;
   } else {
     const [header = [], ...rows] = (await getValues(LEETCODE_RANGE(), VALUE_PARAMS)).values || [];
-    const names = header.map((h) => String(h ?? '').trim().toLowerCase());
-    leetcodeColumnIndex = {};
-    leetcodeOldHeaders = [];
-    LEETCODE_COLUMNS.forEach(([key, h]) => {
-      let i = names.indexOf(h.toLowerCase());
-      if (i === -1 && LEETCODE_OLD_HEADERS[key]) {
-        i = names.indexOf(LEETCODE_OLD_HEADERS[key]);
-        if (i !== -1) leetcodeOldHeaders.push(key);
-      }
-      if (i !== -1) leetcodeColumnIndex[key] = i;
-    });
+    readLeetcodeHeader(header);
     const cell = (row, key) => String(row[leetcodeColumnIndex[key]] ?? '').trim();
     allLeetcodeLogs = rows.map((row, i) => {
       const slug = findNeetcodeProblem(cell(row, 'link'))?.slug || findNeetcodeProblem(cell(row, 'name'))?.slug || '';
@@ -108,16 +142,16 @@ function renderLeetcodeCheatsheet() {
   });
 }
 
-// Prints only the Cheat Sheet (html.print-cheatsheet in styles.css), its font
-// the largest that fits one Letter page inside @page cheatsheet's 0.25in margins.
+// Prints only the Cheat Sheet (html.print-cheatsheet in styles.css), its font the
+// largest that fits one page, by bisection.
 function printLeetcodeCheatsheet() {
   const root = document.documentElement;
   const card = document.getElementById('leetcode-cheatsheet-card');
-  const maxHeight = 10.5 * 96 - 8; // px, with a little slack
+  const { maxHeight, minFont, maxFont, steps } = LEETCODE_PRINT;
   root.classList.add('print-cheatsheet');
   card.style.setProperty('--cheatsheet-width', '8in');
-  let lo = 5, hi = 12;
-  for (let i = 0; i < 10; i++) {
+  let lo = minFont, hi = maxFont;
+  for (let i = 0; i < steps; i++) {
     const mid = (lo + hi) / 2;
     card.style.setProperty('--cheatsheet-font', `${mid}pt`);
     if (card.offsetHeight <= maxHeight) lo = mid; else hi = mid;
@@ -135,7 +169,8 @@ function printLeetcodeCheatsheet() {
 function leetcodeSolves() {
   const solves = new Map();
   [...allLeetcodeLogs].sort((a, b) => a.date.localeCompare(b.date)).forEach((l) => {
-    solves.set(l.slug, [...(solves.get(l.slug) || []), l]);
+    if (!solves.has(l.slug)) solves.set(l.slug, []);
+    solves.get(l.slug).push(l);
   });
   return solves;
 }
@@ -156,9 +191,7 @@ function renderLeetcode() {
 
   const container = document.getElementById('leetcode-list');
   container.innerHTML = '';
-  const categories = [...new Set(NEETCODE_250.map((p) => p.category))];
-  categories.forEach((category) => {
-    const problems = NEETCODE_250.filter((p) => p.category === category);
+  NEETCODE_BY_CATEGORY.forEach((problems, category) => {
     container.appendChild(buildLeetcodeCategory(category, problems, solves));
   });
 }
@@ -166,45 +199,42 @@ function renderLeetcode() {
 // A red badge of the solves today still owes: the last 7 days' average (rounded up)
 // less today's solves.
 function checkLeetcodeBadge() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = leetcodeToday();
   const todayIso = isoFromDate(today);
   const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  weekAgo.setDate(weekAgo.getDate() - LEETCODE_PACE_DAYS);
   const weekAgoIso = isoFromDate(weekAgo);
   const weekSolves = allLeetcodeLogs.filter((l) => l.date >= weekAgoIso && l.date < todayIso).length;
   const todaySolves = allLeetcodeLogs.filter((l) => l.date === todayIso).length;
-  const owed = Math.ceil(weekSolves / 7) - todaySolves;
+  const owed = Math.ceil(weekSolves / LEETCODE_PACE_DAYS) - todaySolves;
   setPageBadge('track', 'leetcode', owed > 0 ? {
     text: String(owed),
-    title: `${owed} more to match the last 7 days' average of ${(weekSolves / 7).toFixed(1)} solves a day (${todaySolves} today)`,
+    title: `${owed} more to match the last 7 days' average of ${(weekSolves / LEETCODE_PACE_DAYS).toFixed(1)} solves a day (${todaySolves} today)`,
   } : null);
 }
 
-// Health's Progress meter over the NeetCode 250, a mark every 25, then the time
-// meter: days since the first solve against days to go at last week's pace.
+// Fills a Progress meter to `pct`; with `markStep`, its track gets a mark every that many percent.
+function setLeetcodeMeter(meter, pct, markStep) {
+  meter.style.setProperty('--meter-pct', `${pct}`);
+  meter.style.setProperty('--fill-pct', `${Math.round(pct)}`);
+  if (markStep !== undefined) meter.querySelector('.body-mass-progress-meter-track').style.setProperty('--mark-step', `${markStep}`);
+}
+
+// Health's Progress meter over the NeetCode 250, then video minutes, then time:
+// days since the first solve against days to go at last week's pace.
 function renderLeetcodeProgress(solves) {
   const total = NEETCODE_250.length;
   const done = NEETCODE_250.filter((p) => solves.has(p.slug)).length;
-  const pct = (done / total) * 100;
-  const meter = document.getElementById('leetcode-progress-meter');
-  meter.style.setProperty('--meter-pct', `${pct}`);
-  meter.style.setProperty('--fill-pct', `${Math.round(pct)}`);
-  meter.querySelector('.body-mass-progress-meter-track').style.setProperty('--mark-step', `${(25 / total) * 100}`);
+  setLeetcodeMeter(document.getElementById('leetcode-progress-meter'), (done / total) * 100, (LEETCODE_MARK_EVERY.problems / total) * 100);
   document.getElementById('leetcode-progress-meter-callout').textContent = `${done}/${total}`;
   document.getElementById('leetcode-progress-meter-done').textContent = String(done);
   document.getElementById('leetcode-progress-meter-remaining').textContent = String(total - done);
 
-  // Video minutes: a solve's logged minutes, else its video's.
+  // A solve's logged minutes, else its video's.
   const minutesOf = (p) => solves.get(p.slug)?.at(-1).minutes || p.minutes;
   const allMinutes = NEETCODE_250.reduce((sum, p) => sum + minutesOf(p), 0);
   const doneMinutes = NEETCODE_250.filter((p) => solves.has(p.slug)).reduce((sum, p) => sum + minutesOf(p), 0);
-  const minutesPct = allMinutes ? (doneMinutes / allMinutes) * 100 : 0;
-  const minutesMeter = document.getElementById('leetcode-minutes-meter');
-  minutesMeter.style.setProperty('--meter-pct', `${minutesPct}`);
-  minutesMeter.style.setProperty('--fill-pct', `${Math.round(minutesPct)}`);
-  // A mark every 10 hours.
-  minutesMeter.querySelector('.body-mass-progress-meter-track').style.setProperty('--mark-step', `${(600 / allMinutes) * 100}`);
+  setLeetcodeMeter(document.getElementById('leetcode-minutes-meter'), allMinutes ? (doneMinutes / allMinutes) * 100 : 0, (LEETCODE_MARK_EVERY.minutes / allMinutes) * 100);
   const hours = (m) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`;
   document.getElementById('leetcode-minutes-meter-done').textContent = hours(doneMinutes);
   document.getElementById('leetcode-minutes-meter-remaining').textContent = hours(allMinutes - doneMinutes);
@@ -215,33 +245,34 @@ function renderLeetcodeProgress(solves) {
   const etaEl = document.getElementById('leetcode-time-meter-eta');
   time.style.setProperty('--meter-pct', '0');
   time.style.removeProperty('--fill-pct');
-  const timeTrack = time.querySelector('.body-mass-progress-meter-track');
-  timeTrack.style.removeProperty('--mark-step');
+  time.querySelector('.body-mass-progress-meter-track').style.removeProperty('--mark-step');
   elapsedEl.textContent = '—';
   remainingEl.textContent = '—';
   etaEl.textContent = '';
   const firstDates = [...solves.values()].map((s) => s[0].date).filter(Boolean).sort();
   if (!firstDates.length) return;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = leetcodeToday();
   const todayMs = parseIsoDateUTC(isoFromDate(today));
   const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 6);
-  // New problems a day over the last 7 days, today included.
-  const rate = firstDates.filter((d) => d >= isoFromDate(weekAgo)).length / 7;
-  const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(firstDates[0])) / 86400000));
+  weekAgo.setDate(weekAgo.getDate() - LEETCODE_PACE_DAYS);
+  // New problems a day: the faster of the last 7 days with today and the 7 before it,
+  // so an unfinished today can't drag the ETA out but today's solves still count.
+  const weekAgoIso = isoFromDate(weekAgo);
+  const todayIso = isoFromDate(today);
+  const newSince = (fromIso, beforeIso) => firstDates.filter((d) => d >= fromIso && (!beforeIso || d < beforeIso)).length;
+  const sixDaysAgo = new Date(today);
+  sixDaysAgo.setDate(sixDaysAgo.getDate() - (LEETCODE_PACE_DAYS - 1));
+  const rate = Math.max(newSince(isoFromDate(sixDaysAgo)), newSince(weekAgoIso, todayIso)) / LEETCODE_PACE_DAYS;
+  const daysElapsed = Math.max(0, Math.round((todayMs - parseIsoDateUTC(firstDates[0])) / MS_PER_DAY));
   const days = (n) => `${n} ${n === 1 ? 'day' : 'days'}`;
   elapsedEl.textContent = days(daysElapsed);
   if (done < total && !rate) return;
 
   const daysToGo = Math.ceil((total - done) / (rate || 1));
   const totalDays = daysElapsed + daysToGo;
-  const timePct = totalDays ? (daysElapsed / totalDays) * 100 : 100;
-  time.style.setProperty('--meter-pct', `${timePct}`);
-  time.style.setProperty('--fill-pct', `${Math.round(timePct)}`);
-  // A mark every 4 weeks from the first solve.
-  if (totalDays) timeTrack.style.setProperty('--mark-step', `${(28 / totalDays) * 100}`);
+  setLeetcodeMeter(time, totalDays ? (daysElapsed / totalDays) * 100 : 100,
+    totalDays ? (LEETCODE_MARK_EVERY.days / totalDays) * 100 : undefined);
   remainingEl.textContent = days(daysToGo);
   const eta = new Date(today);
   eta.setDate(eta.getDate() + daysToGo);
@@ -249,15 +280,14 @@ function renderLeetcodeProgress(solves) {
 }
 
 // Solves per day from the first solve's Monday to today, as Health Chart's All:
-// columns are weeks, the last one holding today. Each day shows its solve count,
-// shaded by its video minutes from empty (0) to dark green (the longest day).
+// a column per week. Each day shows its count, shaded by its video minutes up
+// to the longest day's.
 function renderLeetcodeHeatmap() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = leetcodeToday();
   const first = allLeetcodeLogs.map((l) => l.date).filter(Boolean).sort()[0];
   const start = first ? dateFromIso(first) : new Date(today);
   start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const weeks = Math.max(1, Math.ceil((Math.round((today - start) / 86400000) + 1) / 7));
+  const weeks = Math.max(1, Math.ceil((Math.round((today - start) / MS_PER_DAY) + 1) / 7));
 
   const perDay = new Map(); // date -> {count, minutes}
   allLeetcodeLogs.forEach((l) => {
@@ -302,6 +332,8 @@ function renderLeetcodeHeatmap() {
 // NeetCode's roadmap at its own positions (y squeezed to fit), a node per
 // category with its count and progress bar; a click opens its card below.
 const ROADMAP_NODE = { w: 210, wLong: 254, h: 66, ySquash: 0.55 };
+// The viewBox padding, node corner radius and progress bar's inset, offset and height.
+const ROADMAP_LAYOUT = { pad: 10, rx: 12, barInset: 32, barY: 21, barH: 5 };
 const roadmapNodeWidth = (name) => (name.length > 21 ? ROADMAP_NODE.wLong : ROADMAP_NODE.w);
 
 function renderLeetcodeRoadmap(solves) {
@@ -314,9 +346,9 @@ function renderLeetcodeRoadmap(solves) {
     return el;
   };
   const { wLong, h, ySquash } = ROADMAP_NODE;
+  const { pad, rx, barInset, barY, barH } = ROADMAP_LAYOUT;
   const at = (name) => ({ x: NEETCODE_ROADMAP[name][0], y: NEETCODE_ROADMAP[name][1] * ySquash });
   const points = Object.keys(NEETCODE_ROADMAP).map(at);
-  const pad = 10;
   const minX = Math.min(...points.map((p) => p.x)) - wLong / 2 - pad;
   const minY = Math.min(...points.map((p) => p.y)) - h / 2 - pad;
   const width = Math.max(...points.map((p) => p.x)) + wLong / 2 + pad - minX;
@@ -337,28 +369,28 @@ function renderLeetcodeRoadmap(solves) {
   Object.keys(NEETCODE_ROADMAP).forEach((name) => {
     const { x, y } = at(name);
     const w = roadmapNodeWidth(name);
-    const problems = NEETCODE_250.filter((p) => p.category === name);
+    const problems = NEETCODE_BY_CATEGORY.get(name);
     const done = problems.filter((p) => solves.has(p.slug)).length;
+    const label = `${name}: ${done}/${problems.length} solved`;
     const node = make('g', {
-      tabindex: '0', role: 'button', 'aria-label': `${name}: ${done}/${problems.length} solved`,
+      tabindex: '0', role: 'button', 'aria-label': label,
       class: [done === problems.length ? 'done' : '', openLeetcodeCategory === name ? 'open' : ''].join(' ').trim(),
     }, svg);
-    make('title', {}, node).textContent = `${name}: ${done}/${problems.length} solved`;
-    make('rect', { class: 'roadmap-box', x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 12 }, node);
+    make('title', {}, node).textContent = label;
+    make('rect', { class: 'roadmap-box', x: x - w / 2, y: y - h / 2, width: w, height: h, rx }, node);
     make('text', { x, y: y - 6 }, node).textContent = name;
     make('text', { class: 'roadmap-count', x, y: y + 14 }, node).textContent = `${done}/${problems.length}`;
-    const barW = w - 32;
-    make('rect', { class: 'roadmap-track', x: x - barW / 2, y: y + 21, width: barW, height: 5, rx: 2.5 }, node);
-    if (done) make('rect', { class: 'roadmap-fill', x: x - barW / 2, y: y + 21, width: (barW * done) / problems.length, height: 5, rx: 2.5 }, node);
+    const barW = w - barInset;
+    const bar = { x: x - barW / 2, y: y + barY, height: barH, rx: barH / 2 };
+    make('rect', { class: 'roadmap-track', x: bar.x, y: bar.y, width: barW, height: bar.height, rx: bar.rx }, node);
+    if (done) make('rect', { class: 'roadmap-fill', x: bar.x, y: bar.y, width: (barW * done) / problems.length, height: bar.height, rx: bar.rx }, node);
     const open = () => {
       openLeetcodeCategory = name;
       renderLeetcode();
       document.querySelector(`#leetcode-list .app-card[data-category="${CSS.escape(name)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     node.addEventListener('click', open);
-    node.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-    });
+    onLeetcodeActivate(node, open);
   });
 }
 
@@ -403,9 +435,7 @@ function buildLeetcodeCategory(category, problems, solves) {
     if (window.getSelection().toString()) return;
     toggle();
   });
-  header.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
-  });
+  onLeetcodeActivate(header, toggle);
 
   const body = document.createElement('div');
   body.className = 'app-card-body';
@@ -425,13 +455,11 @@ function buildLeetcodeCategory(category, problems, solves) {
     const solvedText = logs.length ? `${logs[0].date}${logs.length > 1 ? ` ×${logs.length}` : ''}` : '';
     const actions = document.createElement('td');
     actions.className = 'workout-actions-cell';
-    // 🎥 the YouTube video, 📄 NeetCode's page and 🔗 the LeetCode problem, as buttons like ✏️/🗑️.
+    // The outside links, as buttons like ✏️/🗑️.
     const open = (href) => () => window.open(href, '_blank', 'noopener');
-    actions.append(
-      makeRowActionButton({ emoji: '🎥', title: 'YouTube video', onClick: open(latest?.youtube || youtubeLink(p)), readOnly: true }),
-      makeRowActionButton({ emoji: '📄', title: 'NeetCode page', onClick: open(latest?.neetcode || neetcodePageLink(p)), readOnly: true }),
-      makeRowActionButton({ emoji: '🔗', title: 'LeetCode problem', onClick: open(latest?.link || leetcodeLink(p)), readOnly: true }),
-    );
+    actions.append(...LEETCODE_LINKS.map(({ key, emoji, title: linkTitle, href }) => makeRowActionButton({
+      emoji, title: linkTitle, onClick: open(latest?.[key] || href(p)), readOnly: true,
+    })));
     if (latest) {
       actions.append(
         makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => editLeetcodeLog(latest) }),
@@ -439,7 +467,7 @@ function buildLeetcodeCategory(category, problems, solves) {
       );
     } else {
       actions.append(makeRowActionButton({ emoji: '📝', title: 'Log', onClick: () => {
-        // Opens as the header's Log does: its own page at …/leetcode/log/.
+        // Routes as the header's Log does: …/leetcode/log/.
         routeRecordEdit('leetcode', { slug: 'log', label: 'Log' });
         openLeetcodeForm(null, p);
       } }));
@@ -462,16 +490,13 @@ function buildLeetcodeCategory(category, problems, solves) {
 
 function openLeetcodeForm(log = null, problem = null) {
   editingLeetcodeRow = log?.row ?? null;
-  document.getElementById('leetcode-date').value = log?.date || isoFromDate(new Date());
-  document.getElementById('leetcode-problem').value = log?.name || problem?.name || '';
-  document.getElementById('leetcode-category').value = log?.category || problem?.category || '';
-  document.getElementById('leetcode-difficulty').value = log?.difficulty || problem?.difficulty || '';
-  document.getElementById('leetcode-link').value = log?.link || '';
-  document.getElementById('leetcode-neetcode').value = log?.neetcode || '';
-  document.getElementById('leetcode-youtube').value = log?.youtube || '';
-  document.getElementById('leetcode-minutes').value = log?.minutes || '';
+  leetcodeField('date').value = log?.date || isoFromDate(new Date());
+  leetcodeField('problem').value = log?.name || problem?.name || '';
+  leetcodeField('category').value = log?.category || problem?.category || '';
+  leetcodeField('difficulty').value = log?.difficulty || problem?.difficulty || '';
+  ['link', 'neetcode', 'youtube', 'minutes'].forEach((key) => { leetcodeField(key).value = log?.[key] || ''; });
   fillLeetcodeLinks(Boolean(log));
-  document.getElementById('leetcode-notes').value = log?.notes || '';
+  leetcodeField('notes').value = log?.notes || '';
   clearFieldError('leetcode-form-error');
   document.getElementById('leetcode-modal').hidden = false;
 }
@@ -483,19 +508,18 @@ function closeLeetcodeForm() {
 
 // Category, difficulty and links follow the problem picked; saved ones or a pasted link are kept.
 function fillLeetcodeLinks(keepDifficulty = false) {
-  const problem = findNeetcodeProblem(document.getElementById('leetcode-problem').value);
+  const problem = findNeetcodeProblem(leetcodeField('problem').value);
   if (!problem) return;
   if (!keepDifficulty) {
-    document.getElementById('leetcode-category').value = problem.category;
-    document.getElementById('leetcode-difficulty').value = problem.difficulty;
+    leetcodeField('category').value = problem.category;
+    leetcodeField('difficulty').value = problem.difficulty;
   }
-  const link = document.getElementById('leetcode-link');
-  const page = document.getElementById('leetcode-neetcode');
-  const youtube = document.getElementById('leetcode-youtube');
-  if (findNeetcodeProblem(link.value) !== problem) link.value = leetcodeLink(problem);
-  if (!page.value || /neetcode\.io\/solutions\//.test(page.value)) page.value = neetcodePageLink(problem);
-  if (!youtube.value || /youtube\.com\/watch\?v=/.test(youtube.value)) youtube.value = youtubeLink(problem);
-  const minutes = document.getElementById('leetcode-minutes');
+  LEETCODE_LINKS.forEach(({ key, href, generated }) => {
+    const field = leetcodeField(key);
+    const keep = generated ? field.value && !generated.test(field.value) : findNeetcodeProblem(field.value) === problem;
+    if (!keep) field.value = href(problem);
+  });
+  const minutes = leetcodeField('minutes');
   if (!keepDifficulty || !minutes.value) minutes.value = problem.minutes;
 }
 
@@ -507,22 +531,23 @@ function findNeetcodeProblem(text) {
 }
 
 async function submitLeetcodeForm() {
-  const problem = findNeetcodeProblem(document.getElementById('leetcode-problem').value);
-  const date = document.getElementById('leetcode-date').value;
+  const problem = findNeetcodeProblem(leetcodeField('problem').value);
+  const date = leetcodeField('date').value;
   if (!problem) return showFieldError('leetcode-form-error', 'Pick a problem from the NeetCode 250 list.');
   if (!date) return showFieldError('leetcode-form-error', 'Pick the date you solved it.');
 
   try {
+    const link = (key, href) => leetcodeField(key).value.trim() || href(problem);
     const log = {
       date,
       name: problem.name,
-      category: document.getElementById('leetcode-category').value || problem.category,
-      difficulty: document.getElementById('leetcode-difficulty').value || problem.difficulty,
-      link: document.getElementById('leetcode-link').value.trim() || leetcodeLink(problem),
-      neetcode: document.getElementById('leetcode-neetcode').value.trim() || neetcodePageLink(problem),
-      youtube: document.getElementById('leetcode-youtube').value.trim() || youtubeLink(problem),
-      minutes: Number(document.getElementById('leetcode-minutes').value) || problem.minutes,
-      notes: document.getElementById('leetcode-notes').value.trim(),
+      category: leetcodeField('category').value || problem.category,
+      difficulty: leetcodeField('difficulty').value || problem.difficulty,
+      link: link('link', leetcodeLink),
+      neetcode: link('neetcode', neetcodePageLink),
+      youtube: link('youtube', youtubeLink),
+      minutes: Number(leetcodeField('minutes').value) || problem.minutes,
+      notes: leetcodeField('notes').value.trim(),
     };
     const savedRow = await writeLeetcodeLog(log, editingLeetcodeRow);
     openLeetcodeCategory = problem.category;
@@ -539,16 +564,17 @@ async function submitLeetcodeForm() {
 }
 
 // Writes a solve cell by cell under its headers (a missing header is added at
-// the end); `row` null appends. Returns the sheet row.
+// the end, an old one renamed); `row` null appends. Returns the sheet row.
 async function writeLeetcodeLog(log, row = null) {
   const tab = CONFIG.SHEETS.LEETCODE;
+  const cellRange = (key, r) => `'${tab}'!${physiqueColumnLetter(leetcodeColumnIndex[key])}${r}`;
   leetcodeSheetId = await ensureSheetTab(tab, LEETCODE_HEADERS);
   if (!Object.keys(leetcodeColumnIndex).length) await refreshLeetcode();
   const header = [];
   LEETCODE_COLUMNS.forEach(([key, h]) => {
     if (leetcodeColumnIndex[key] !== undefined && !leetcodeOldHeaders.includes(key)) return;
     if (leetcodeColumnIndex[key] === undefined) leetcodeColumnIndex[key] = Math.max(-1, ...Object.values(leetcodeColumnIndex)) + 1;
-    header.push({ range: `'${tab}'!${physiqueColumnLetter(leetcodeColumnIndex[key])}1`, values: [[h]] });
+    header.push({ range: cellRange(key, 1), values: [[h]] });
   });
   if (header.length) await batchUpdateValues(header, 'RAW');
   leetcodeOldHeaders = [];
@@ -558,9 +584,7 @@ async function writeLeetcodeLog(log, row = null) {
     LEETCODE_COLUMNS.forEach(([key]) => { values[leetcodeColumnIndex[key]] = log[key] ?? ''; });
     return appendedRow(await appendValues(`'${tab}'!A2:${physiqueColumnLetter(width - 1)}`, [values], 'RAW'));
   }
-  await batchUpdateValues(LEETCODE_COLUMNS.map(([key]) => ({
-    range: `'${tab}'!${physiqueColumnLetter(leetcodeColumnIndex[key])}${row}`, values: [[log[key] ?? '']],
-  })), 'RAW');
+  await batchUpdateValues(LEETCODE_COLUMNS.map(([key]) => ({ range: cellRange(key, row), values: [[log[key] ?? '']] })), 'RAW');
   return row;
 }
 

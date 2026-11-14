@@ -2,46 +2,21 @@
 
 let healthBodyMassChart = null;
 
-// The tolerance getCalorieDesiredKind and calcProjection also treat as "there" — no scale
+// The tolerance getCalorieDesiredKind and calcProjection also treat as "there": no scale
 // reading lands on a healthy mass to the gram.
 const BODY_MASS_AT_HEALTHY_TOLERANCE_KG = 0.1;
 
-// Deurenberg et al. 1991 (Br J Nutr): body fat % from BMI alone. The app has no direct
-// measurement anywhere, so this is a population estimate at the same trust level as the
-// USDA/AI calorie lookups.
-function estimateBodyFatPercent(bodyMassKg, heightCm, age, sex) {
-  const bmi = bodyMassKg / (heightCm / 100) ** 2;
-  const sexTerm = sex === 'male' ? 1 : 0;
-  return 1.20 * bmi + 0.23 * age - 10.8 * sexTerm - 5.4;
-}
-
-// Held to a plausible range, so a nonsense BMI can't produce a nonsense figure. Every
-// fat-related value on this chart goes through it, so none of them can disagree.
-function clampedBodyFatPercent(bodyMassKg, heightCm, age, sex) {
-  return Math.max(3, Math.min(60, estimateBodyFatPercent(bodyMassKg, heightCm, age, sex)));
-}
-
-// Estimated fat mass (kg) at `bodyMassKg` — that clamped share of it.
-function estimatedFatMassKg(bodyMassKg, heightCm, age, sex) {
-  return bodyMassKg * (clampedBodyFatPercent(bodyMassKg, heightCm, age, sex) / 100);
-}
-
-// Energy stored in that fat mass, costed at fat's ~7,700 kcal/kg.
-function fatEnergyKcal(bodyMassKg, heightCm, age, sex) {
-  return estimatedFatMassKg(bodyMassKg, heightCm, age, sex) * GENERIC_KCAL_PER_KG_FAT;
-}
-
-// Headroom around the plotted range. The floor keeps a window of nearly identical
-// readings off the top and bottom edges.
+// Headroom around the plotted range; the floor keeps near-identical readings off the edges.
 const BODY_MASS_AXIS_PAD_FRACTION = 0.15;
 const BODY_MASS_AXIS_MIN_PAD_KG = 0.5;
 
-// Smallest first; the first step keeping the count under BODY_MASS_MAX_GRIDLINES wins, so
-// every line lands on a round kg.
+// The first step keeping the count under BODY_MASS_MAX_GRIDLINES wins, so lines land on round kg.
 const BODY_MASS_TICK_STEPS_KG = [0.5, 1, 2, 5, 10];
 const BODY_MASS_MAX_GRIDLINES = 8;
+// The BMI twin axis snaps to the first of these at or above kg step ÷ height².
+const BODY_MASS_BMI_TICK_STEPS = [0.1, 0.2, 0.5, 1, 2, 5];
 
-// Cyan, so the healthy-mass mark can't pass for the L_p-Day Trend's text colour.
+// Cyan, so the healthy-mass mark can't pass for the L_p-Day Trend's colour.
 const BODY_MASS_HEALTHY_COLOR = () => chartColor('--chart-cyan');
 
 // A gap longer than this between readings ends a run; the trend lines restart after it.
@@ -75,11 +50,8 @@ function bodyMassEmaSeries(values, span) {
   return series;
 }
 
-// The L_p-Day Trend for the plotted `dates` and its change per L_p days — the one rolling
-// average Body Mass draws and Safe Pace reads its weekly loss from, so the two can't
-// disagree. Run over the FULL history from the first reading, then cropped to the window,
-// so the window's first days carry their real smoothed value and slope instead of
-// restarting cold (no slope at all until L_p days into the range).
+// The L_p-Day Trend for `dates` and its change per L_p days, shared with Safe Pace. Run
+// over the full history, then cropped, so the window's first days aren't cold-started.
 function bodyMassTrendSeries(byDate, dates) {
   const trendDays = bodyMassSmoothingDays();
   if (!dates.length) return { trendDays, trendSeries: [], slopePerSpan: [] };
@@ -94,125 +66,112 @@ function bodyMassTrendSeries(byDate, dates) {
   return { trendDays, trendSeries: trendSeries.slice(offset), slopePerSpan: slopePerSpan.slice(offset) };
 }
 
-// The chart's healthy region, in BMI (kg/m²): shaded green behind the readings — the same
-// band bmiVerdict grades BMI_des against (BMI_HEALTHY_MIN/MAX, health-chart.js), so the
-// chart's shading and Tune's red-flagged field can't disagree about what "healthy" means.
+// The body mass logged calories alone imply: from startKg, each day adds its sleep-adjusted
+// balance (Calorie Balance's arithmetic) as fat. kgByDate is each day's value at its START;
+// balanceGPerDay is that day's own change, so a hover never reads the previous day's.
+function calorieImpliedTrajectory(entries, bodyMassByDate, walkDates, startKg) {
+  const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDate, walkDates);
+  const intakeByDate = new Map();
+  const tefByDate = new Map();
+  const activityKcalByDate = new Map();
+  const sleepHoursByDate = new Map();
+  const add = (map, date, value) => map.set(date, (map.get(date) || 0) + value);
+  entries.forEach((e) => {
+    if (e.amount === null) return;
+    if (e.category === 'Calories' || e.category === 'Calories; Protein') {
+      add(intakeByDate, e.date, e.amount);
+      // Measured TEF wins over the estimate, as on Calorie Balance.
+      if (e.tefKcal !== null && e.tefKcal !== undefined) add(tefByDate, e.date, e.tefKcal);
+    } else if (e.category === 'Activity' || e.category === 'Activity; Calories') {
+      add(activityKcalByDate, e.date, activityEntryKcal(e, bodyMassForDate.get(e.date) ?? null));
+    } else if (e.category === 'Sleep') {
+      add(sleepHoursByDate, e.date, e.amount);
+    }
+  });
+  const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
+
+  const kgByDate = new Map();
+  const balanceGPerDay = new Map();
+  let running = startKg;
+  walkDates.forEach((d) => {
+    kgByDate.set(d, running);
+    if (!intakeByDate.has(d)) return;
+    const intake = intakeByDate.get(d);
+    const maintenance = storedBmrForDate(d);
+    if (maintenance === null) return;
+    const activity = activityKcalByDate.get(d) || 0;
+    const tef = tefByDate.has(d) ? tefByDate.get(d) : intake * (1 - tefDivisor());
+    const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, sleepHoursByDate.get(d), sleepDesired);
+    balanceGPerDay.set(d, Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000));
+    running += balance / GENERIC_KCAL_PER_KG_FAT;
+  });
+  return { kgByDate, balanceGPerDay };
+}
+
+// Where the trend fell below the swing zone's floor: a real loss, not glycogen and water.
+function muscleLossKg(anchorKg, trendKg, swingKg) {
+  if (anchorKg === undefined || trendKg === null || trendKg === undefined) return null;
+  return Math.min(trendKg, anchorKg - swingKg);
+}
+
+// The BMI twin axis: tick density matched to the kg axis, snapped to a clean BMI step.
+function bodyMassBmiAxis(yMin, yMax, kgStep, heightCm) {
+  const rawBmiStep = kgStep / Math.pow(heightCm / 100, 2);
+  const bmiStep = BODY_MASS_BMI_TICK_STEPS.find((s) => s >= rawBmiStep)
+    ?? BODY_MASS_BMI_TICK_STEPS[BODY_MASS_BMI_TICK_STEPS.length - 1];
+  return {
+    min: computeBmi(yMin, heightCm),
+    max: computeBmi(yMax, heightCm),
+    position: 'right',
+    afterFit: fixDatedYAxisWidth,
+    grid: { drawOnChartArea: false },
+    ticks: { stepSize: bmiStep, includeBounds: false, callback: maskedUnitTick('kg/m²', bmiStep < 1 ? 1 : 0) },
+  };
+}
+
+// Shaded green behind the readings: the same band bmiVerdict grades BMI_des against.
 const BMI_HEALTHY_BAND = [BMI_HEALTHY_MIN, BMI_HEALTHY_MAX];
 const BMI_HEALTHY_LEGEND_NAME = `Healthy BMI (${BMI_HEALTHY_BAND[0]}–${BMI_HEALTHY_BAND[1]})`;
 
-// One gray dot per reading, on the same dates Caloric Intake uses, so the two compare
-// bar for bar. m_des (BODY_MASS_HEALTHY_KG, Tune's healthy body
-// mass) is marked across it with the section's desired-value cap.
-//
-// The twin axis restates each bar as the energy stored in the fat mass it implies.
-// Body fat % moves with BMI, so that mapping is quadratic while a Chart.js twin axis
-// can only be linear — anchoring at the ends of the kg range costs under 0.5% of the
-// span on a typical window, 2.8% across an unusually wide 13 kg one.
+// One gray dot per reading, on Caloric Intake's dates so the two compare bar for bar,
+// with m_des marked across it and a BMI twin axis on the right.
 function renderHealthBodyMassChart(entries) {
   const ctx = document.getElementById('health-body-mass-chart');
 
   const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
   const byDate = bodyMassByDateMap(bodyMassEntries);
   const dates = healthCalorieChartDates(entries);
+  const lastDate = dates[dates.length - 1];
 
-  // Changed against the previous reading, seeded from the last one before the window.
-  let previousKg = null;
-  let previousDate = null;
-  [...byDate.keys()].sort().forEach((d) => {
-    if (d >= dates[0]) return;
-    const kg = Math.round(byDate.get(d) * 100) / 100;
-    previousKg = kg;
-    previousDate = d;
-  });
-
-  // Read before the loop, so each day's fat energy can be worked out as it goes.
   const heightCm = getSetting('HEIGHT_CM', null);
   const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
   const sex = getSettingString('SEX', null);
   const haveProfile = heightCm !== null && age !== null && (sex === 'male' || sex === 'female');
 
-  // The same smoothed line and glycogen/water swing zone State Trend & Forecast draws
-  // (computeBodyMassTrend/computeGlycogenZoneAnchor in health-math.js, glycogenSwingKg here), built off
-  // the FULL history in `byDate` rather than just this window — smoothing needs the
-  // context past the window's edges to agree with the other chart there — then read back
-  // only for the dates this chart actually plots.
+  // Smoothed trend and swing zone built off the full history, then read for these dates.
   const trendMap = computeBodyMassTrend(byDate);
-  const trendDates = [...trendMap.keys()].sort();
-  const lastTrendDate = trendDates[trendDates.length - 1];
-  // Its slope at each point, read back below alongside the raw day-to-day delta, so a
-  // single noisy body-mass reading doesn't read as the real trend.
+  const lastTrendDate = [...trendMap.keys()].sort().pop();
   const trendSlopeByDate = computeBodyMassTrendSlopeGramsPerDay(trendMap);
   const storedMassByDay = storedMassByDate();
   const swingKg = lastTrendDate !== undefined ? glycogenSwingKg(byDate.get(lastTrendDate), heightCm, sex) : null;
 
-  // Calorie-implied trajectory: same walk the (now-hidden) State Trend & Forecast chart
-  // built — start at the mean of the run's first L_p days of body mass and advance by each day's calorie balance. Used
-  // here for the indigo reference line, the yellow zone, and the Muscle Loss red zone.
-  // Requires a full profile (height/age/sex) for BMR; omitted otherwise.
-  const calorieTrendMap = new Map();
-  // Each day's OWN balance-implied change, in grams — the exact figure the Status card's
-  // Δm computes for today, kept per-date here so the hover's Calorie Trend Slope can read
-  // it directly instead of diffing two calorieTrendMap points (see the comment where this
-  // is filled in below for why that diff is off by a day).
-  const calorieDayBalanceGPerDay = new Map();
-  if (haveProfile) {
-    const sortedWeighInDates = [...byDate.keys()].sort();
-    if (sortedWeighInDates.length >= 1) {
-      // Through the chart's own last plotted date, not just the last actual body-mass reading —
-      // otherwise a day (or several) without a fresh body-mass reading leaves this line flat short
-      // of today, disagreeing with the Status card's own Δm for a day it never reaches.
-      // carryForwardBodyMassByDate below fills the gap with the last known reading.
-      const runStartDate = bodyMassRunStartDate(sortedWeighInDates);
-      const calorieTrendDates = datesInRange(runStartDate, dates[dates.length - 1]);
-      const calorieBodyMassForDate = carryForwardBodyMassByDate(byDate, calorieTrendDates);
-      const cIntakeByDate = new Map();
-      const cTefByDate = new Map();
-      const cActivityKcalByDate = new Map();
-      const cSleepHoursByDate = new Map();
-      entries.forEach((e) => {
-        if (e.amount === null) return;
-        if (e.category === 'Calories' || e.category === 'Calories; Protein') {
-          cIntakeByDate.set(e.date, (cIntakeByDate.get(e.date) || 0) + e.amount);
-          if (e.tefKcal !== null && e.tefKcal !== undefined) {
-            cTefByDate.set(e.date, (cTefByDate.get(e.date) || 0) + e.tefKcal);
-          }
-        } else if (e.category === 'Activity' || e.category === 'Activity; Calories') {
-          const kcal = activityEntryKcal(e, calorieBodyMassForDate.get(e.date) ?? null);
-          cActivityKcalByDate.set(e.date, (cActivityKcalByDate.get(e.date) || 0) + kcal);
-        } else if (e.category === 'Sleep') {
-          cSleepHoursByDate.set(e.date, (cSleepHoursByDate.get(e.date) || 0) + e.amount);
-        }
-      });
-      const cSleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
-      // Starts at the run's first L_p days' mean, so a bloated first day can't skew it.
-      const startWindowEnd = datesInRange(runStartDate, dates[dates.length - 1])[bodyMassSmoothingDays() - 1] ?? dates[dates.length - 1];
-      let running = smoothedBodyMassKg(bodyMassEntries.filter((e) => e.date >= runStartDate && e.date <= startWindowEnd));
-      calorieTrendDates.forEach((d) => {
-        // Plotted BEFORE this day's own balance is folded in — calorieTrendMap.get(d) is
-        // the trajectory as of the START of d (last night's number), and d's own balance
-        // only shows up in TOMORROW's point. Reading two consecutive points back out of
-        // calorieTrendMap to get "today's slope" would therefore actually read YESTERDAY's
-        // balance instead — calorieDayBalanceGPerDay below is captured right here, the one
-        // place that balance actually exists per day, so the hover's slope line can't get
-        // the date shifted by one the way a naive point-to-point diff did.
-        calorieTrendMap.set(d, running);
-        if (!cIntakeByDate.has(d)) return;
-        const intake = cIntakeByDate.get(d);
-        const maintenance = storedBmrForDate(d);
-        if (maintenance === null) return;
-        const activity = cActivityKcalByDate.get(d) || 0;
-        const tef = cTefByDate.has(d) ? cTefByDate.get(d) : intake * (1 - tefDivisor());
-        const { balance } = dailyEnergyBalanceKcal(intake, maintenance, activity, tef, cSleepHoursByDate.get(d), cSleepDesired);
-        calorieDayBalanceGPerDay.set(d, Math.round((balance / GENERIC_KCAL_PER_KG_FAT) * 1000));
-        running += balance / GENERIC_KCAL_PER_KG_FAT;
-      });
-    }
+  // Needs a full profile for BMR. Walked to the last plotted date, not the last reading,
+  // so it agrees with the Status card's Δm on days without a fresh reading.
+  let calorieTrendMap = new Map();
+  let calorieDayBalanceGPerDay = new Map();
+  if (haveProfile && byDate.size >= 1) {
+    const runStartDate = bodyMassRunStartDate([...byDate.keys()].sort());
+    const calorieTrendDates = datesInRange(runStartDate, lastDate);
+    // Starts at the run's first L_p days' mean, so a bloated first day can't skew it.
+    const startWindowEnd = calorieTrendDates[bodyMassSmoothingDays() - 1] ?? lastDate;
+    const startKg = smoothedBodyMassKg(bodyMassEntries.filter((e) => e.date >= runStartDate && e.date <= startWindowEnd));
+    ({ kgByDate: calorieTrendMap, balanceGPerDay: calorieDayBalanceGPerDay } = calorieImpliedTrajectory(entries, byDate, calorieTrendDates, startKg));
   }
+  const haveZones = calorieTrendMap.size > 0 && swingKg !== null;
   const calorieTrendSeries = dates.map((d) => calorieTrendMap.get(d) ?? null);
 
-  // Yellow zone anchored to the calorie-implied trajectory, matching State Trend &
-  // Forecast exactly: upper edge = indigo line, lower edge = indigo line − full swingKg.
-  const zoneUpperSeries = dates.map((d) => calorieTrendMap.get(d) ?? null);
+  // Yellow zone: from the calorie-implied line down by the full swing.
+  const zoneUpperSeries = calorieTrendSeries.slice();
   const zoneLowerSeries = dates.map((d) => {
     const c = calorieTrendMap.get(d);
     return c !== undefined && swingKg !== null ? c - swingKg : null;
@@ -220,46 +179,27 @@ function renderHealthBodyMassChart(entries) {
 
   const values = [];
   const detailByDate = new Map();
-
   dates.forEach((d) => {
+    // An empty slot, not a zero: 0 kg is impossible and would drag the axis to it.
     if (!byDate.has(d)) {
-      // An empty slot, not a zero: 0 kg is impossible and would drag the axis to it.
       values.push(null);
       return;
     }
-
     const kg = Math.round(byDate.get(d) * 100) / 100;
-    // No change across a long gap: the old reading says nothing about this one.
-    const afterGap = previousDate !== null
-      && (parseIsoDateUTC(d) - parseIsoDateUTC(previousDate)) / 86400000 > BODY_MASS_RUN_MAX_GAP_DAYS;
-    const delta = previousKg === null || afterGap ? null : Math.round((kg - previousKg) * 100) / 100;
-
-    const fatKcal = haveProfile ? fatEnergyKcal(kg, heightCm, age, sex) : null;
-    // BMI needs only height, so it survives a profile missing birth date or sex.
-    // BMI and Δm (Changed Mass) as stored in the day's Derived cell (health-physique.js), read
-    // rather than worked out; a day without one falls back to the calculation.
+    // BMI and Δm from the day's stored Derived cell, else calculated.
     const storedMass = storedMassByDay.get(d);
     const bmi = storedMass?.BMI ?? (heightCm !== null ? computeBmi(kg, heightCm) : null);
     const smoothedChangeGPerDay = massChangeGPerDay(storedMass) ?? trendSlopeByDate.get(d) ?? null;
-    detailByDate.set(d, { delta, fatKcal, bmi, smoothedChangeGPerDay });
-
+    detailByDate.set(d, { bmi, smoothedChangeGPerDay });
     values.push(kg);
-    previousKg = kg;
-    previousDate = d;
   });
 
-  // Smoothed, not flat: a bar here is an absolute level, so a flat week's mean says
-  // little and its direction says everything. An EMA rather than a per-week fit, so the
-  // line has no seam at a bucket boundary — today's own body-mass reading blends straight in,
-  // same as any other day.
   const { trendDays, trendSeries, slopePerSpan } = bodyMassTrendSeries(byDate, dates);
   const trendName = `${trendDays}-Day Trend`;
 
-  // Explicit bounds, not `grace`: the twin axis derives from them and Chart.js resolves
-  // `grace` too late to read here. The trend folds in too — a fit extended to the week's
-  // edges can reach past every reading in it, and would otherwise clip.
+  // Explicit bounds, not `grace`: the twin axis derives from them. Series switched off in
+  // the legend leave the fit too.
   const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
-  // Legend entries switched off (renderToggleLegend below) leave the axis too; dots by their colour's name.
   const hidden = legendHiddenNames('health-body-mass-legend');
   const dotClasses = values.map(() => 'Measured Body Mass');
   const shownValues = maskHiddenClasses(values, dotClasses, hidden);
@@ -277,12 +217,24 @@ function renderHealthBodyMassChart(entries) {
   const kgHi = logged.length ? Math.max(...logged) : 0;
   const kgPad = Math.max((kgHi - kgLo) * BODY_MASS_AXIS_PAD_FRACTION, BODY_MASS_AXIS_MIN_PAD_KG);
 
-  // kg owns the gridlines, so both bounds round out to a whole step of it — otherwise
-  // the lines land wherever the padding left them. The step grows with the range.
+  // Bounds round out to a whole kg step so gridlines land on it; the step grows with the range.
   const kgStep = BODY_MASS_TICK_STEPS_KG.find((s) => (kgHi - kgLo + 2 * kgPad) / s <= BODY_MASS_MAX_GRIDLINES)
     ?? BODY_MASS_TICK_STEPS_KG[BODY_MASS_TICK_STEPS_KG.length - 1];
   const yMin = Math.max(0, Math.floor((kgLo - kgPad) / kgStep) * kgStep);
   const yMax = Math.ceil((kgHi + kgPad) / kgStep) * kgStep;
+
+  // Stroke-less line behind the dots, for bands and overlays.
+  const overlayLine = (label, data, extra) => ({
+    type: 'line',
+    label,
+    data,
+    borderWidth: 0,
+    pointRadius: 0,
+    pointHitRadius: 0,
+    tension: 0,
+    isStateTrendOverlay: true,
+    ...extra,
+  });
 
   healthBodyMassChart = upsertChart(healthBodyMassChart, ctx, {
     data: {
@@ -306,104 +258,52 @@ function renderHealthBodyMassChart(entries) {
           order: 2,
         },
         trendLineDataset(trendName, trendSeries, { hidden: hidden.has(trendName) }),
-        // Healthy BMI band: two stroke-less edges at constant kg, the upper filling down
-        // to the lower ('-1', so the pair stays adjacent and in this order). Left out of
-        // the axis fit — Chart.js clips the fill to whatever range the readings set.
-        ...(heightCm !== null && dates.length ? BMI_HEALTHY_BAND.map((bmi, k) => ({
-          type: 'line',
-          label: `BMI ${bmi} edge`,
-          data: new Array(dates.length).fill(bmi * (heightCm / 100) ** 2),
-          borderWidth: 0,
-          pointRadius: 0,
-          pointHitRadius: 0,
-          tension: 0,
-          fill: k === 0 ? false : '-1',
-          backgroundColor: chartColor('--chart-good', 0.12),
-          isStateTrendOverlay: true,
-          hidden: hidden.has(BMI_HEALTHY_LEGEND_NAME),
-          order: 4,
-        })) : []),
+        // Healthy BMI band: the upper edge fills down to the lower ('-1', so keep them adjacent).
+        ...(heightCm !== null && dates.length ? BMI_HEALTHY_BAND.map((bmi, k) => overlayLine(
+          `BMI ${bmi} edge`,
+          new Array(dates.length).fill(bmi * (heightCm / 100) ** 2),
+          {
+            fill: k === 0 ? false : '-1',
+            backgroundColor: chartColor('--chart-good', 0.12),
+            hidden: hidden.has(BMI_HEALTHY_LEGEND_NAME),
+            order: 4,
+          },
+        )) : []),
         ...(healthyKg !== null && dates.length
           ? [desiredCapDataset('Healthy Body Mass', new Array(dates.length).fill(healthyKg), desiredCapHalf(yMax - yMin), { isDesiredLine: true, backgroundColor: BODY_MASS_HEALTHY_COLOR(), hidden: hidden.has('Healthy Body Mass') })]
           : []),
-        // Yellow zone, Muscle Loss red zone, and indigo Calorie-Implied Trajectory line —
-        // all anchored to the calorie-implied trajectory and omitted together whenever the
-        // profile is incomplete (no BMR → no trajectory). fill: '-1' chain runs upper →
-        // lower (yellow fill) → Muscle Loss (red fill), matching State Trend & Forecast.
-        // Band order (3) sits behind the dots (2); lines use lower orders to read on top.
-        ...(calorieTrendMap.size > 0 && swingKg !== null ? [
-          {
-            type: 'line',
-            label: 'Glycogen + Water Swing (upper)',
-            data: zoneUpperSeries,
-            borderWidth: 0,
-            pointRadius: 0,
-            pointHitRadius: 0,
-            tension: 0,
-            fill: false,
-            spanGaps: false,
-            isStateTrendOverlay: true,
-            order: 3,
-          },
-          {
-            type: 'line',
-            label: 'Glycogen + Water Swing',
-            data: zoneLowerSeries,
+        // Swing zone, Muscle Loss and the indigo trajectory, all off the calorie walk.
+        // The '-1' chain runs upper → lower (yellow) → Muscle Loss (red); bands (3) sit behind the dots (2).
+        ...(haveZones ? [
+          overlayLine('Glycogen + Water Swing (upper)', zoneUpperSeries, { fill: false, spanGaps: false, order: 3 }),
+          overlayLine('Glycogen + Water Swing', zoneLowerSeries, {
             // Hidden by its fill alone: Muscle Loss fills down from this edge.
             backgroundColor: hidden.has('Glycogen + Water Swing') ? 'transparent' : chartColor('--chart-warn', 0.15),
-            borderWidth: 0,
-            pointRadius: 0,
-            pointHitRadius: 0,
-            tension: 0,
             fill: '-1',
             spanGaps: false,
-            isStateTrendOverlay: true,
             order: 3,
-          },
-          {
-            type: 'line',
-            label: 'Muscle Loss (below swing zone)',
-            data: dates.map((d) => {
-              const c = calorieTrendMap.get(d);
-              const trend = trendMap.get(d);
-              if (c === undefined || trend === null || trend === undefined) return null;
-              return Math.min(trend, c - swingKg);
-            }),
-            backgroundColor: chartColor('--chart-bad', 0.45),
-            borderWidth: 0,
-            pointRadius: 0,
-            pointHitRadius: 0,
-            tension: 0,
-            fill: '-1',
-            spanGaps: false,
-            isStateTrendOverlay: true,
-            hidden: hidden.has('Muscle Loss'),
-            order: 3,
-          },
-          {
-            type: 'line',
-            label: 'Calorie-Implied Trajectory',
-            data: calorieTrendSeries,
-            // Indigo, like the forecast's Projected line, so it can't pass for the gray dot line.
+          }),
+          overlayLine(
+            'Muscle Loss (below swing zone)',
+            dates.map((d) => muscleLossKg(calorieTrendMap.get(d), trendMap.get(d), swingKg)),
+            { backgroundColor: chartColor('--chart-bad', 0.45), fill: '-1', spanGaps: false, hidden: hidden.has('Muscle Loss'), order: 3 },
+          ),
+          overlayLine('Calorie-Implied Trajectory', calorieTrendSeries, {
+            // Indigo, so it can't pass for the gray dot line.
             borderColor: chartColor('--chart-indigo'),
             borderWidth: 2,
             fill: false,
-            tension: 0,
-            pointRadius: 0,
-            pointHitRadius: 0,
             spanGaps: false,
-            isStateTrendOverlay: true,
             hidden: hidden.has('Calorie Trend'),
             order: 1.5,
-          },
+          }),
         ] : []),
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      // Matching the other charts in the section — without it the cursor lands on the
-      // trend line instead of the day's bar, and that row is filtered out.
+      // Otherwise the cursor lands on the trend line instead of the day's dot.
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
@@ -415,69 +315,36 @@ function renderHealthBodyMassChart(entries) {
           padding: { top: 40 },
         },
         tooltip: {
-          // Days with no body-mass reading plot as a gap; index mode would otherwise hand them
-          // over as an empty row.
+          // Gap days and overlay lines don't get rows of their own.
           filter: (item) => item.raw !== null && !item.dataset.isWeeklyAverage && !item.dataset.isStateTrendOverlay && !item.dataset.isDesiredLine,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
             label: (item) => {
               const d = detailByDate.get(item.label) ?? {};
               const lines = [`m (Body Mass): ${item.parsed.y} kg`];
-              // The smoothed trend's own slope, not the raw day-to-day delta a single
-              // water/glycogen-heavy body-mass reading would swing — this is the one shown.
+              // The smoothed trend's slope, not the raw day-to-day delta.
               if (d.smoothedChangeGPerDay !== null && d.smoothedChangeGPerDay !== undefined) {
                 lines.push(`Δm (Changed Mass): ${withExplicitSign(d.smoothedChangeGPerDay)} g/day`);
               }
-              // BMI leads the derived rows because the rest are computed from it.
-              // Unitless by definition, so no unit.
               if (d.bmi !== null && d.bmi !== undefined) lines.push(`BMI (Body Mass Index): ${d.bmi} kg/m²`);
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // Flush left and last, like every reference figure in the section. One fact
-            // per line, same rule every other row in this tooltip already follows (the
-            // label callback's own Body Mass/Changed Mass/BMI rows never combine two
-            // figures on one line either) — value and slope are two separate lines, not
-            // one line with the slope parenthesized after the value.
-            //
-            // The indigo line (renamed "Calorie Trend" for the hover — "Calorie-Implied
-            // Trajectory" is the chart's own internal/legend name) is filtered out of the
-            // item rows above (isStateTrendOverlay), same as every other overlay line, so
-            // its own value/slope never showed anywhere in the hover — added here instead,
-            // right above the L_p-Day Trend so the two rates read together. calorieTrendMap
-            // already holds its value per date.
-            //
-            // Slope is that day's OWN balance-implied change (calorieDayBalanceGPerDay,
-            // captured while the trajectory is built above), not a diff between two
-            // calorieTrendMap points — calorieTrendMap.get(d) is the trajectory as of the
-            // START of d, so a naive point-to-point diff actually reads the PRIOR day's
-            // balance (the one that moved d-1's point to d's), landing one day off from
-            // what the number was labeled as. Reading the captured balance directly is
-            // also exactly the Status card's own Δm arithmetic for today, so the two can't
-            // disagree the way a diffed or averaged figure could.
+            // The overlay lines' figures, one per line, all rates in g/day so they compare.
+            // The slope is the day's own balance, the Status card's Δm arithmetic.
             afterBody: (items) => {
               const i = items[0]?.dataIndex;
               if (i === undefined) return [];
               const d = items[0].label;
               const lines = [];
-
               const trajectoryKg = calorieTrendMap.get(d);
               if (trajectoryKg !== undefined) {
                 lines.push(`Calorie Trend: ${Math.round(trajectoryKg * 100) / 100} kg`);
                 const slopeGPerDay = calorieDayBalanceGPerDay.get(d);
-                if (slopeGPerDay !== undefined) {
-                  // g/day, not kg/week — same unit Δm (Changed Mass) above uses, so the
-                  // two rates read on the same scale instead of forcing a unit conversion
-                  // to compare them.
-                  lines.push(`Calorie Trend Slope: ${withExplicitSign(slopeGPerDay)} g/day`);
-                }
+                if (slopeGPerDay !== undefined) lines.push(`Calorie Trend Slope: ${withExplicitSign(slopeGPerDay)} g/day`);
               }
-
-              // g/day like Δm and Calorie Trend Slope above, so all three rates compare
-              // directly (the slope itself is kg per L_p days).
               if (slopePerSpan[i] !== null) {
                 lines.push(`${trendName}: ${withExplicitSign(Math.round((slopePerSpan[i] * 1000) / trendDays))} g/day`);
               }
-
               return privacyMode ? lines.map(maskDigits) : lines;
             },
           },
@@ -486,8 +353,7 @@ function renderHealthBodyMassChart(entries) {
       scales: {
         x: wellnessCategoryXScale(dates),
         y: {
-          // Must NOT begin at zero — a 0 kg baseline puts every bar within a pixel of
-          // the same height and hides the movement the chart exists for.
+          // Not from zero: a 0 kg baseline flattens the movement the chart exists for.
           beginAtZero: false,
           position: 'left',
           min: yMin,
@@ -496,33 +362,12 @@ function renderHealthBodyMassChart(entries) {
           // autoSkip off so the step is honoured exactly.
           ticks: { stepSize: kgStep, autoSkip: false, callback: maskedUnitTick('kg', kgStep < 1 ? 1 : 0) },
         },
-        // BMI (kg/m²) right axis — a fixed linear rescale of kg so it stays a true
-        // pixel-for-pixel twin of y. Step derived from kgStep / height² so the tick
-        // density matches the left axis, then snapped to the nearest clean BMI step.
-        y1: heightCm !== null
-          ? (() => {
-            const BMI_TICK_STEPS = [0.1, 0.2, 0.5, 1, 2, 5];
-            const rawBmiStep = kgStep / Math.pow(heightCm / 100, 2);
-            const bmiStep = BMI_TICK_STEPS.find((s) => s >= rawBmiStep) ?? BMI_TICK_STEPS[BMI_TICK_STEPS.length - 1];
-            return {
-              min: computeBmi(yMin, heightCm),
-              max: computeBmi(yMax, heightCm),
-              position: 'right',
-              afterFit: fixDatedYAxisWidth,
-              grid: { drawOnChartArea: false },
-              ticks: {
-                stepSize: bmiStep,
-                includeBounds: false,
-                callback: maskedUnitTick('kg/m²', bmiStep < 1 ? 1 : 0),
-              },
-            };
-          })()
-          : ghostRightAxis(),
+        // A fixed linear rescale of kg, so it stays a pixel-for-pixel twin of y.
+        y1: heightCm !== null ? bodyMassBmiAxis(yMin, yMax, kgStep, heightCm) : ghostRightAxis(),
       },
     },
   });
   // Swatches under the chart, named as in the hover.
-  const haveZones = calorieTrendMap.size > 0 && swingKg !== null;
   renderToggleLegend('health-body-mass-legend', [
     { name: 'Measured Body Mass', color: chartColor('--chart-neutral') },
     { name: trendName, color: desiredMarkColor() },
@@ -535,4 +380,3 @@ function renderHealthBodyMassChart(entries) {
     ] : []),
   ], () => renderHealthBodyMassChart(entries));
 }
-

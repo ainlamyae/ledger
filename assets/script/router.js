@@ -1,19 +1,11 @@
-// Hierarchical addresses: <wrapper>/<block>/<button>/, e.g. health/physique/log/.
-// Each one is a real page (a stub written by scripts/build_routes.py), so a
-// reload or a shared link lands on the same block or form. The slugs are the
-// data-route attributes in index.html.
+// Addresses <wrapper>/<block>/<button>/ (health/physique/log/), from index.html's
+// data-route slugs; each is a real stub page (scripts/build_routes.py), so a reload
+// lands on the same block or form. A block or view (data-route-view) rewrites the
+// address; a form adds a history step, so Back closes it.
 //
-// Expanding/collapsing a block only rewrites the address; opening a form adds
-// one history step, so Back closes it. A view button (data-route-view, e.g.
-// Insight's modes) rewrites the address like a block does.
-//
-// A row's Edit gets its own address too, <wrapper>/<block>/<record>/ (e.g.
-// health/physique/2026-10-04/), and a row's view one more level down
-// (…/2026-10-04/micronutrients/). No stub exists for these: 404.html loads the
-// section page, and the block's registerRecordRoute opens the row.
-//
-// Forms can stack (a view opened from inside a form); each one is a history
-// step, and history.state.depth says how many are open at that step.
+// A row's Edit is <wrapper>/<block>/<record>/[<view>/]: no stub, so 404.html loads
+// the section page and the block's registerRecordRoute opens the row.
+// Forms can stack; history.state.depth counts the ones open at each step.
 
 const routerRoot = new URL('.', document.baseURI).href;
 let pendingFormRoute = null; // { panel, steps } from a routed click, claimed by the modal it opens
@@ -22,10 +14,25 @@ let initialFormRoute = null; // { panel, button } or { panel, record, sub } wait
 const recordRoutes = new Map(); // block slug -> [open(recordSlug, subSlug)]: the row's label, or null if none
 let formHandoff = false;     // a form closed to hand its history entry to the next one
 
-// A step below the block: { slug, label }, from a routed button or a row.
-// An emoji button (➕) is named by its aria-label.
+// Fills a direct load's breadcrumb until the sheet supplies the real name.
+const PENDING_LABEL = '…';
+const ISO_DATE_SLUG = /^\d{4}-\d{2}-\d{2}$/;
+
+// A step below the block: { slug, label }. An emoji button (➕) is named by its aria-label.
 function buttonStep(button) {
   return { slug: button.dataset.route, label: button.getAttribute('aria-label') || button.textContent.trim() };
+}
+
+// A view button (data-route-view) rewrites the address instead of opening a form.
+function isRouteView(button) {
+  return 'routeView' in button.dataset;
+}
+
+// A row's steps: the row, then its view (…/<row>/duplicate/) when `sub` is given.
+function recordSteps(slug, label, sub = null) {
+  const steps = [{ slug, label }];
+  if (sub) steps.push({ slug: sub, label: subStepLabel(sub) });
+  return steps;
 }
 
 // Lowercase words joined by hyphens: "Chicken Breast" -> "chicken-breast".
@@ -39,9 +46,8 @@ function registerRecordRoute(blockSlug, open) {
   recordRoutes.set(blockSlug, [...(recordRoutes.get(blockSlug) || []), open]);
 }
 
-// Routes a block's row Edits: <block>/<row label>/, a repeated label getting -2,
-// -3… in sheet order, and `subs` one level down (…/<row>/duplicate/). `rows()` is
-// read fresh; returns the click handler, (row, subSlug = null).
+// Routes a block's row Edits as <block>/<row label>/ (repeats get -2, -3… in sheet
+// order), `subs` one level down. Returns the click handler (row, subSlug = null).
 function routedRowEdit(blockSlug, rows, label, open, subs = {}) {
   let cache = { list: null, slugs: null };
   const slugs = () => {
@@ -66,9 +72,7 @@ function routedRowEdit(blockSlug, rows, label, open, subs = {}) {
     return label(row);
   });
   const edit = (row, sub = null) => {
-    const steps = [{ slug: slugs().get(row), label: label(row) }];
-    if (sub) steps.push({ slug: sub, label: subStepLabel(sub) });
-    routeRecordEdit(blockSlug, ...steps);
+    routeRecordEdit(blockSlug, ...recordSteps(slugs().get(row), label(row), sub));
     (sub ? subs[sub] : open)(row);
   };
   edit.step = (row) => ({ slug: slugs().get(row), label: label(row) });
@@ -89,7 +93,7 @@ function resetRouteViews() {
 // The view button the address names, or null.
 function currentRouteView(panel) {
   const { panel: at, button } = routeFromLocation();
-  return at === panel && button && 'routeView' in button.dataset ? button : null;
+  return at === panel && button && isRouteView(button) ? button : null;
 }
 
 // "bulk-edit" -> "Bulk Edit".
@@ -97,8 +101,8 @@ function subStepLabel(slug) {
   return slug.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-// A form staying open after its save, now on the saved row: its address, title and
-// breadcrumb move there in place (an Add becomes that row's Edit), no history step.
+// A form left open after its save moves to the saved row in place (an Add becomes
+// that row's Edit), with no history step.
 function stayOnSavedForm(modalId, step) {
   const form = routedForms.find((f) => f.modal.id === modalId);
   if (!form || !step?.slug) return;
@@ -119,12 +123,10 @@ function routeRecordEdit(blockSlug, ...steps) {
 async function openRecordRoute(panel, slug, sub = null) {
   const opens = recordRoutes.get(panel.dataset.route);
   if (!opens || !(await ensureAccessToken())) return;
-  const steps = [{ slug, label: slug }];
-  if (sub) steps.push({ slug: sub, label: subStepLabel(sub) });
+  const steps = recordSteps(slug, slug, sub);
   pendingFormRoute = { panel, steps };
-  // The modal observer runs after this, so the step can still be filled in. `open`
-  // returns the row's label, or a { slug, label } step when the row's own address
-  // differs from the one asked for (an alias such as physique's "today").
+  // The modal observer runs later, so the step can still be filled in: `open` gives
+  // the row's label, or a { slug, label } for an alias (physique's "today").
   let opened = null;
   for (const open of opens) {
     opened = open(slug, sub);
@@ -164,12 +166,23 @@ function routeTitle(panel = null, steps = []) {
     .join(' — ');
 }
 
+// push: a new form entry; handoff: the closing form's entry becomes this form's.
 function setRoute(panel = null, steps = [], { push = false, handoff = false } = {}) {
   document.title = routeTitle(panel, steps);
   const url = routeUrl(panel, steps);
-  if (push) history.pushState({ ledgerForm: true, depth: routedForms.length + 1 }, '', url);
-  else if (handoff) history.replaceState({ ledgerForm: true, depth: routedForms.length + 1 }, '', url);
+  const formState = { ledgerForm: true, depth: routedForms.length + 1 };
+  if (push) history.pushState(formState, '', url);
+  else if (handoff) history.replaceState(formState, '', url);
   else if (url !== location.href) history.replaceState(null, '', url);
+}
+
+// A page (block or view) entry: Back returns to the page before it.
+function pushPageEntry(url) {
+  history.pushState({ ledgerPage: true }, '', url);
+}
+
+function routedSection() {
+  return document.getElementById(routedSectionId(null));
 }
 
 function routedPanel(slug) {
@@ -191,15 +204,12 @@ function routeHit(element) {
 }
 
 // --- Hub and pages (section pages only; see page-nav.js) ----------------------
-//
-// <html data-page="hub"> shows the section's glance cards and page tiles;
-// data-page="block" shows one block alone, opened, under its breadcrumb. Which
-// one is current always follows the address, so a reload, Back or a shared link
-// lands on the same view.
-// view: the view page being shown, when known before its button runs (Back/Forward).
+// <html data-page="hub"> shows the glance cards and tiles, "block" one block alone;
+// which follows the address. `view`: the view being shown, when known before its
+// button runs (Back/Forward).
 function showSectionPage(panel, view) {
   if (!window.ledgerSectionPage) return;
-  const section = document.getElementById(routedSectionId(null));
+  const section = routedSection();
   const motion = Motion.capturePage(panel, section, view);
   document.documentElement.dataset.page = panel ? 'block' : 'hub';
   document.querySelectorAll(`#${routedSectionId(null)} > .panel[data-route]`).forEach((p) => {
@@ -213,8 +223,7 @@ function showSectionPage(panel, view) {
   runPageShow(panel);
 }
 
-// A block's on-open work (Market's price fetch): runs when its page is shown, never
-// on the section's own load.
+// A block's on-open work (Market's price fetch), run when its page shows, not on load.
 const pageShows = new Map(); // block slug -> fn(panel)
 
 function registerPageShow(blockSlug, show) {
@@ -227,18 +236,17 @@ function runPageShow(panel) {
 
 // A tile, sidebar link or breadcrumb: one history step, no reload.
 function navigateSectionPage(panel) {
-  history.pushState({ ledgerPage: true }, '', routeUrl(panel));
-  Motion.prepareNavigation(panel, document.getElementById(routedSectionId(null)));
+  pushPageEntry(routeUrl(panel));
+  Motion.prepareNavigation(panel, routedSection());
   resetRouteViews();
   showSectionPage(panel);
   document.title = routeTitle(panel);
   window.scrollTo(0, 0);
 }
 
-// A routed form (Log, Add, a row's Edit or view) on a section page is a page too:
-// html[data-form-page] puts the innermost one in the page's place under a
-// breadcrumb (page-nav.js's updateFormCrumb) instead of over it. Other dialogs
-// (shortcuts, confirms) stay overlays. Leaving it returns to where the page was.
+// A routed form is a page too: html[data-form-page] puts the innermost one in the
+// page's place under its breadcrumb (updateFormCrumb). Other dialogs stay overlays;
+// leaving returns to the page's scroll.
 let formPageReturnScroll = 0;
 
 function updateFormPage() {
@@ -247,8 +255,7 @@ function updateFormPage() {
   const top = routedForms.at(-1);
   const current = document.querySelector('.modal.form-page');
   if (current && current !== top?.modal) current.classList.remove('form-page');
-  // Stacked forms (a 🧬 view opened from a day's Edit): only the top one is the
-  // page; the ones under it are hidden until it closes, never left as overlays.
+  // Stacked forms: only the top one is the page; the ones under it stay hidden.
   document.querySelectorAll('.modal.form-page-under').forEach((m) => m.classList.remove('form-page-under'));
   routedForms.slice(0, -1).forEach((form) => form.modal.classList.add('form-page-under'));
   if (!top) {
@@ -273,11 +280,9 @@ function updateFormPage() {
   updateActionBar();
 }
 
-// A form address loaded directly (a reload of …/2026-10-05/ or …/log/) opens as
-// that form page at once — its breadcrumb over a "Loading…" card in the form's
-// place — while the data it needs loads, instead of showing the block's page
-// first. The real form takes its place when it opens (updateFormPage); if it
-// can't (signed out, an unknown row), the block's page is shown instead.
+// A directly loaded form address shows this placeholder page while the data loads,
+// never the block's page first. The real form replaces it (updateFormPage); if it
+// can't open, the block's page shows instead.
 function pendingFormPage() {
   let page = document.getElementById('form-pending');
   if (!page) {
@@ -290,11 +295,8 @@ function pendingFormPage() {
   return page;
 }
 
-// Holds the form's place while its data loads, so the block's page never shows first.
-// It shows nothing of its own — no placeholder text — and its breadcrumb only when
-// every level's real name is already known from the address (a date, Log); a name
-// that comes from the sheet (an ingredient, a Workouts group) isn't guessed, so the
-// breadcrumb is drawn once, final, when the form opens.
+// Empty; its breadcrumb shows only when every name is known from the address (a
+// date, Log), never a guessed sheet name.
 function showPendingFormPage(panel, steps) {
   if (!window.ledgerSectionPage) return;
   const page = pendingFormPage();
@@ -304,7 +306,7 @@ function showPendingFormPage(panel, steps) {
   const crumb = document.getElementById('form-crumb');
   if (!crumb) return;
   page.insertBefore(crumb, page.firstChild);
-  const known = steps.every((step) => step.label !== '…');
+  const known = steps.every((step) => step.label !== PENDING_LABEL);
   page.style.visibility = known ? '' : 'hidden';
   if (known) updateFormCrumb(panel, steps);
 }
@@ -327,19 +329,18 @@ function abandonPendingFormPage() {
   if ((history.state?.depth || 0) > 0) history.back();
 }
 
-// Signed out: the address stays this page's own, its breadcrumb named from the
-// address; the sign-in's data load opens the form (routerDataLoaded).
+// Signed out: the address keeps this page, named from the address, until the
+// sign-in's data load opens the form (routerDataLoaded).
 function holdPendingFormPage() {
   if (!initialFormRoute) return;
   const { panel, button, record, sub } = initialFormRoute;
-  const steps = record ? [{ slug: record, label: record }] : [buttonStep(button)];
-  if (sub) steps.push({ slug: sub, label: record ? subStepLabel(sub) : sub });
+  const steps = record ? recordSteps(record, record, sub) : [buttonStep(button)];
+  if (sub && !record) steps.push({ slug: sub, label: sub });
   showPendingFormPage(panel, steps);
 }
 
-// A breadcrumb link to a level between the block and the current form (a row's
-// date over its 🧬 view). When that row's form is open underneath, closing the
-// top one returns to it; otherwise every form closes and the row's own opens.
+// A breadcrumb level between the block and the form (a row's date over its 🧬 view):
+// back to that row's form if open underneath, else close all and open it.
 function openFormStep(panel, step) {
   if (routedForms.length > 1) {
     routedForms.at(-1).modal.hidden = true;
@@ -348,8 +349,7 @@ function openFormStep(panel, step) {
   closeFormPages(panel, () => openRecordRoute(panel, step.slug));
 }
 
-// The breadcrumb's way out: closes every open form page in one history step back,
-// then shows `panel`'s page, or the hub for null.
+// Closes every form page in one history step back, then shows `panel`'s page (hub for null).
 function closeFormPages(panel, then = null) {
   const forms = routedForms.splice(0);
   const steps = Math.min(forms.length, history.state?.depth || 0);
@@ -381,8 +381,7 @@ function routerModalChanged(modal) {
     if (!pendingFormRoute || routedForms.some((f) => f.modal === modal)) return;
     const { panel, steps } = pendingFormRoute;
     pendingFormRoute = null;
-    // A form that closed to open this one (seen here first or already let go)
-    // hands over its history entry.
+    // A form that closed to open this one hands over its history entry.
     const closing = routedForms.filter((f) => f.modal.hidden);
     const handoff = formHandoff || closing.length > 0;
     formHandoff = false;
@@ -431,12 +430,10 @@ function routeFromLocation() {
   return { panel, button, record, sub };
 }
 
-// A form's own pages under its address (Workouts' groups: …/activity/workouts/push-day/).
-// `show(slug)` shows that page, or the form's top level for null; switching rewrites
-// the address in place, like a view, with no history step of its own.
+// A form's own pages (…/activity/workouts/push-day/): `show(slug)` shows one, or the
+// top level for null, rewriting the address in place like a view.
 const formSubViews = new Map(); // button slug -> { show(subSlug | null), label(subSlug) }
-// The sub page a direct load of a form's address asked for, taken by the form as it
-// opens so it opens straight onto that page (takeInitialFormSub).
+// The sub page a direct load asked for, taken by the form as it opens (takeInitialFormSub).
 let initialFormSub = null;
 
 function registerFormSubView(buttonSlug, show, label) {
@@ -508,14 +505,14 @@ function initRouter() {
       location.href = routeUrl(hit.panel, hit.button ? [buttonStep(hit.button)] : []);
       return;
     }
-    if (hit?.button && 'routeView' in hit.button.dataset) {
+    if (hit?.button && isRouteView(hit.button)) {
       pendingFormRoute = null;
-      // A page of its own over the block's: Back returns to the block.
+      // Its own page over the block's: Back returns to the block.
       const steps = [buttonStep(hit.button)];
-      if (location.href !== routeUrl(hit.panel, steps)) history.pushState({ ledgerPage: true }, '', routeUrl(hit.panel, steps));
+      if (location.href !== routeUrl(hit.panel, steps)) pushPageEntry(routeUrl(hit.panel, steps));
       // The view's page grows out of its tile once its click has drawn it.
       Motion.arm();
-      const section = document.getElementById(routedSectionId(null));
+      const section = routedSection();
       Motion.playPage(hit.panel, section, Motion.capturePage(hit.panel, section, hit.button));
       document.title = routeTitle(hit.panel, steps);
       updatePageNav(hit.panel);
@@ -565,10 +562,11 @@ function initRouter() {
       return;
     }
     const { panel, button } = routeFromLocation();
-    showSectionPage(panel, button && 'routeView' in button.dataset ? button : null);
+    const view = button && isRouteView(button) ? button : null;
+    showSectionPage(panel, view);
     document.title = routeTitle(panel);
     // A view's page reopens its view (the click retitles); the block's resets it.
-    if (button && 'routeView' in button.dataset) button.click();
+    if (view) view.click();
     else resetRouteViews();
   });
 
@@ -582,29 +580,23 @@ function initRouter() {
   setRoute(panel);
   if (button) {
     // A view or a form gets a history step over the block's.
-    if ('routeView' in button.dataset) {
+    initialFormRoute = { panel, button, sub };
+    if (isRouteView(button)) {
       // The view's page now, not the block's tiles until the data loads.
       panel.dataset.insightMode = button.dataset.route;
-      history.pushState({ ledgerPage: true }, '', routeUrl(panel, [buttonStep(button)]));
-      document.title = routeTitle(panel, [buttonStep(button)]);
+      const steps = [buttonStep(button)];
+      pushPageEntry(routeUrl(panel, steps));
+      document.title = routeTitle(panel, steps);
     } else {
-      // The address stays on a form's own page (…/workouts/push-day/) while it loads; its
-      // name shows as "…" until the data does.
-      setRoute(panel, sub ? formSubSteps(button, sub, '…') : [buttonStep(button)], { push: true });
-    }
-    initialFormRoute = { panel, button, sub };
-    if (!('routeView' in button.dataset)) {
-      showPendingFormPage(panel, sub ? formSubSteps(button, sub, '…') : [buttonStep(button)]);
+      // The address stays on a form's own page (…/workouts/push-day/) while it loads.
+      const steps = sub ? formSubSteps(button, sub, PENDING_LABEL) : [buttonStep(button)];
+      setRoute(panel, steps, { push: true });
+      showPendingFormPage(panel, steps);
     }
   } else if (record) {
-    // The form's own entry over the block's, now, so the address stays on the
-    // row while its data loads; the form claims this entry when it opens.
-    // The address only has the row's lowercase slug ("broccoli"), not its name
-    // ("Broccoli"), until the rows load: "…" holds its place in the breadcrumb, so
-    // the name isn't shown wrong and then corrected. A date reads the same either way.
-    const label = /^\d{4}-\d{2}-\d{2}$/.test(record) ? record : '…';
-    const steps = [{ slug: record, label }];
-    if (sub) steps.push({ slug: sub, label: subStepLabel(sub) });
+    // The form's entry now, claimed when it opens. Until the rows load the address
+    // has only the slug ("broccoli"), so the name waits as "…"; a date reads the same.
+    const steps = recordSteps(record, ISO_DATE_SLUG.test(record) ? record : PENDING_LABEL, sub);
     setRoute(panel, steps, { push: true });
     initialFormRoute = { panel, record, sub };
     showPendingFormPage(panel, steps);

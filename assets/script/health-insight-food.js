@@ -1,22 +1,14 @@
-// The Health Insight panel's Food mode: aggregates every ingredient logged (via
-// Physique's 🧮 Calculate breakdown) over the picked range into one
-// per-ingredient total, and phrases it for a nutrient-gap read. This mode leans
-// entirely on the model's own food-composition knowledge for vitamins/minerals
-// — the same trust level item.kcalPer100gFallback already extends it in
-// health-physique-estimator.js — rather than the Nutrition table's own (partial,
-// opt-in-per-ingredient) Micronutrients column; health-insight-micronutrient.js's
-// mode is the one built on real, measured totals from that column instead.
-// health-insight.js drives it; the shared profile block and the report
-// renderer come from health-insight-wellness.js.
+// The Health Insight panel's Food mode: every ingredient logged (Physique's
+// 🧮 Calculate breakdown) over the range, totalled per ingredient, for the model
+// to infer nutrient gaps from its own food knowledge. The Micronutrient mode
+// (health-insight-micronutrient.js) is the one built on measured totals.
 
-// Sums each Calculate-derived breakdown item across every Calories; Protein
-// entry in the window, grouped by lowercase-trimmed ingredient name. Exact
-// match (not the trailing-s fold health-nutrition.js's findNutritionEntry uses) —
-// that fold exists to prevent duplicate *catalog* rows; here "egg"/"eggs"
-// showing as two summary lines is a harmless cosmetic difference, not a
-// data-quality problem, so the simpler/more predictable exact match wins.
-// Entries with no breakdown (entry.breakdown === []) are silently skipped.
-// `breakdowns`: sum these instead of the window (a dateless Pattern's own).
+// The Breakdown's own per-item macros, summed where present.
+const FOOD_MACROS = ['fiber', 'fat', 'carbohydrate', 'tef'];
+
+// Sums each breakdown item across the window's Calories; Protein entries, keyed
+// by lowercase-trimmed name. Exact match on purpose: "egg"/"eggs" as two lines is
+// harmless here. `breakdowns`: sum these instead of the window (a dateless Pattern's own).
 function aggregateFoodIntake(from, to, breakdowns = null) {
   const byName = new Map();
 
@@ -32,10 +24,8 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
         const agg = byName.get(key);
         agg.calories += item.calories || 0;
         agg.protein += item.protein || 0;
-        // The Breakdown's own Fiber/Fat/Carbohydrate/TEF (Calculate's USDA figures), summed
-        // where an item carries them: the stand-in for a food with no Nutrition row, or a
-        // macro its row lacks (estimateMacrosForFoodRow, health-insight-micronutrient.js).
-        ['fiber', 'fat', 'carbohydrate', 'tef'].forEach((macro) => {
+        // The stand-in for a food with no Nutrition row, or a macro its row lacks.
+        FOOD_MACROS.forEach((macro) => {
           const value = Number(item[macro]);
           if (item[macro] !== undefined && item[macro] !== null && Number.isFinite(value)) {
             agg.breakdownMacros[macro] = (agg.breakdownMacros[macro] || 0) + value;
@@ -47,8 +37,7 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
       });
     });
 
-  // Highest-calorie ingredient first — matches health-physique-estimator.js's own
-  // breakdown table ordering (sortedMacros).
+  // Highest-calorie ingredient first, like the Physique breakdown table.
   return [...byName.values()]
     .map((agg) => {
       let grams = agg.grams;
@@ -62,17 +51,12 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
       }
       return {
         name: agg.name,
-        // Column A of the Nutrition row this ingredient matches. Blank
-        // when the ingredient isn't in the table yet, or is but hasn't been
-        // classified — both land in the Unclassified bucket below.
+        // The matching Nutrition row's Group; blank lands in Unclassified.
         group: findNutritionEntry(agg.name)?.group || '',
         calories: Math.round(agg.calories),
         protein: Math.round(agg.protein * 10) / 10,
         amountLabel: formatAggregatedAmount(grams, count),
-        // Raw totals (post count->grams conversion above), not just the
-        // display string — health-insight-micronutrient.js scales each ingredient's
-        // Nutrition-table micronutrient panel by these against its own
-        // reference Amount, which needs the numbers, not "350g, ×2" text.
+        // Raw totals too: the Micronutrient mode scales by them.
         grams,
         count,
         breakdownMacros: agg.breakdownMacros,
@@ -83,10 +67,8 @@ function aggregateFoodIntake(from, to, breakdowns = null) {
 
 const FOOD_UNCLASSIFIED_LABEL = 'Unclassified';
 
-// The same ingredients bucketed by group, each bucket carrying its own
-// totals — "which food groups is this diet actually built on" is a different
-// question from "which single ingredients dominate", and only the grouped view
-// can answer it. Ingredients keep their calorie ordering inside each bucket.
+// The rows bucketed by Group with per-group totals, biggest first and
+// Unclassified last; ingredients keep their calorie order inside each.
 function groupFoodIntakeByGroup(rows) {
   const byClass = new Map();
   rows.forEach((r) => {
@@ -100,8 +82,6 @@ function groupFoodIntakeByGroup(rows) {
 
   return [...byClass.values()]
     .map((g) => ({ ...g, protein: Math.round(g.protein * 10) / 10 }))
-    // Biggest calorie contributor first, but the unclassified bucket always
-    // sinks to the bottom — it's a gap in the catalog, not a food group.
     .sort((a, b) => {
       const aUnknown = a.group === FOOD_UNCLASSIFIED_LABEL;
       const bUnknown = b.group === FOOD_UNCLASSIFIED_LABEL;
@@ -115,15 +95,8 @@ function formatFoodGroupSummary(group) {
   return `${group.group} — ${n} ingredient${n === 1 ? '' : 's'}, ${group.calories} kcal, ${group.protein} g protein`;
 }
 
-// Converts a unit count (e.g. 23 eggs) to grams using the Nutrition
-// table's own per-unit weight for that ingredient (e.g. "58g (1x)" -> 58g
-// each), so the summary reads in one consistent unit instead of a bare,
-// hard-to-picture count — the count-branch Amount format ("×N") never
-// carries a real weight itself (see health-physique-estimator.js), only the
-// Nutrition row does. Returns null (leaving the count as-is for
-// display) if there's no matching row or its Amount has no gram figure —
-// e.g. an ingredient banked via a fresh USDA/AI miss that hasn't been
-// reviewed/saved yet (see the Calculate breakdown's 💾 button).
+// A count (e.g. 23 eggs) in grams, from the Nutrition row's per-unit weight
+// ("58g (1x)"); null without a row or a gram figure, leaving the count as is.
 function convertCountToGrams(name, count) {
   const tableEntry = findNutritionEntry(name);
   if (!tableEntry) return null;
@@ -133,14 +106,8 @@ function convertCountToGrams(name, count) {
   return (tableGrams / tableCount) * count;
 }
 
-// A Calculate breakdown item's amount is always exactly "×N" (a count-branch
-// match, e.g. "×2") or "Ng" (a grams-branch match/USDA estimate, e.g.
-// "40.5g") — see health-physique-estimator.js's amount assignments. NOT the same
-// shape as the freeform Nutrition table Amount field (e.g.
-// "1scoop (31g)") that health-nutrition.js's parseGramsFromAmount/
-// parseCountFromAmount are built for — reusing those here would silently
-// fail on every "×N" count string (no leading digit for parseCountFromAmount
-// to match), so this parses the breakdown's own exact format instead.
+// A breakdown amount is exactly "×N" or "Ng" (health-physique-estimator.js), not
+// the freeform Nutrition Amount that parseGramsFromAmount/parseCountFromAmount read.
 function parseBreakdownAmount(amount) {
   const str = String(amount || '').trim();
   const countMatch = str.match(/^×(\d+(?:\.\d+)?)$/);
@@ -150,10 +117,7 @@ function parseBreakdownAmount(amount) {
   return { grams: null, count: null };
 }
 
-// A given amount string is grams-only or count-only, never both — but
-// nothing stops the same ingredient NAME from being logged once by weight
-// and once by count across different entries, so show both totals rather
-// than silently dropping one.
+// One name can be logged by weight on one day and by count on another: show both.
 function formatAggregatedAmount(grams, count) {
   const parts = [];
   if (grams > 0) parts.push(`${Math.round(grams)}g`);
@@ -161,158 +125,122 @@ function formatAggregatedAmount(grams, count) {
   return parts.length ? parts.join(', ') : '—';
 }
 
-// Renders the (locally computed, not AI) ingredient table, plus the profile
-// line that rides along with it in the prompt — the panel shows everything it
-// sends, the same rule the other two modes' previews follow, so the profile
-// can't be silently attached to the request. Takes the rows the panel already
-// gathered rather than re-aggregating them.
+const FOOD_TABLE_COLUMN_COUNT = 8;
+
+// TEF in whole kcal, the rest in grams to 0.1; absent reads "—", not a zero.
+function formatFoodMacro(macro, value) {
+  if (value === undefined || value === null) return '—';
+  return macro === 'tef' ? String(Math.round(value)) : value.toFixed(1);
+}
+
+function foodMacroCells(values) {
+  return FOOD_MACROS.map((macro) => makeCell(formatFoodMacro(macro, values[macro])));
+}
+
+function foodTableRow(className, cells) {
+  const tr = document.createElement('tr');
+  if (className) tr.className = className;
+  tr.append(...cells);
+  return tr;
+}
+
+// The ingredient table (grouped as the prompt groups them) and the profile
+// lines sent with it. Unmasked: it shows the request to its own owner.
 function renderFoodInsightPreview(rows, from, to) {
-  // Unmasked, like the other modes' previews: this is the request being shown
-  // to the person whose data it is, not a dashboard figure the privacy toggle
-  // hides from someone glancing over at the charts. Rendered one line per fact
-  // by the panel's shared renderer, so the profile block reads the same here as
-  // it does inside the Wellness/Activity prompt previews.
-  renderInsightLines(document.getElementById('insight-food-profile'), formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)));
+  renderInsightLines(document.getElementById('insight-food-profile'), currentProfileLines());
 
   const tbody = document.getElementById('insight-food-body');
   tbody.innerHTML = '';
 
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(8, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
+    tbody.appendChild(renderEmptyRow(FOOD_TABLE_COLUMN_COUNT, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
     return;
   }
 
-  // Grouped exactly as the prompt groups them, so the preview stays a literal
-  // view of what gets sent rather than a differently-shaped summary of it.
   let totalCalories = 0;
   let totalProtein = 0;
-  let totalFiber;
-  let totalFat;
-  let totalCarbohydrate;
-  let totalTef;
+  // A macro stays absent (not zero) when no ingredient has it.
+  const totals = {};
 
   groupFoodIntakeByGroup(rows).forEach((g) => {
-    const groupRow = document.createElement('tr');
-    groupRow.className = 'insight-food-group-row';
-    const groupCell = document.createElement('td');
-    groupCell.colSpan = 8;
-    groupCell.textContent = formatFoodGroupSummary(g);
-    groupRow.appendChild(groupCell);
-    tbody.appendChild(groupRow);
+    const groupCell = makeCell(formatFoodGroupSummary(g));
+    groupCell.colSpan = FOOD_TABLE_COLUMN_COUNT;
+    tbody.appendChild(foodTableRow('insight-food-group-row', [groupCell]));
 
     g.items.forEach((r) => {
-      const tr = document.createElement('tr');
-      // A field absent (neither typed on the Nutrition row nor pulled via 🧬
-      // Micronutrients) reads as a blank dash, not a claimed zero — same
-      // convention the Physique TEF column and its own breakdown table use.
       const macros = estimateMacrosForFoodRow(r) || {};
-      tr.append(
+      tbody.appendChild(foodTableRow('', [
         makeCell(r.name),
         makeCell(r.amountLabel),
         makeCell(String(r.calories)),
         makeCell(String(r.protein)),
-        makeCell(macros.fiber !== undefined ? macros.fiber.toFixed(1) : '—'),
-        makeCell(macros.fat !== undefined ? macros.fat.toFixed(1) : '—'),
-        makeCell(macros.carbohydrate !== undefined ? macros.carbohydrate.toFixed(1) : '—'),
-        makeCell(macros.tef !== undefined ? String(macros.tef) : '—'),
-      );
-      tbody.appendChild(tr);
+        ...foodMacroCells(macros),
+      ]));
 
       totalCalories += r.calories;
       totalProtein += r.protein;
-      // Undefined stays undefined (not a confident zero) when NO ingredient
-      // in the whole table has that macro — same "—" convention as the
-      // per-row cells above, just summed instead of read off one row.
-      if (macros.fiber !== undefined) totalFiber = (totalFiber || 0) + macros.fiber;
-      if (macros.fat !== undefined) totalFat = (totalFat || 0) + macros.fat;
-      if (macros.carbohydrate !== undefined) totalCarbohydrate = (totalCarbohydrate || 0) + macros.carbohydrate;
-      if (macros.tef !== undefined) totalTef = (totalTef || 0) + macros.tef;
+      FOOD_MACROS.forEach((macro) => {
+        if (macros[macro] !== undefined) totals[macro] = (totals[macro] || 0) + macros[macro];
+      });
     });
   });
 
-  // Same "how many days actually have Calculate-derived data" divisor the
-  // Micronutrients mode's own per-day figures use (countMicronutrientLoggedDays,
-  // health-insight-micronutrient.js) — the picked range's calendar span would understate
-  // the daily average on a partially-logged window.
+  // Averaged over days with Calculate data, not the range's calendar length.
   const daysLogged = countMicronutrientLoggedDays(from, to);
-  const perDay = (total) => (total !== undefined && daysLogged > 0) ? total / daysLogged : null;
+  const perDay = {};
+  FOOD_MACROS.forEach((macro) => {
+    perDay[macro] = (totals[macro] !== undefined && daysLogged > 0) ? totals[macro] / daysLogged : null;
+  });
 
-  const totalRow = document.createElement('tr');
-  totalRow.className = 'insight-food-total-row';
-  totalRow.append(
+  tbody.appendChild(foodTableRow('insight-food-total-row', [
     makeCell('Total'),
     makeCell(''),
     makeCell(String(Math.round(totalCalories))),
     makeCell((Math.round(totalProtein * 10) / 10).toFixed(1)),
-    makeCell(totalFiber !== undefined ? totalFiber.toFixed(1) : '—'),
-    makeCell(totalFat !== undefined ? totalFat.toFixed(1) : '—'),
-    makeCell(totalCarbohydrate !== undefined ? totalCarbohydrate.toFixed(1) : '—'),
-    makeCell(totalTef !== undefined ? String(Math.round(totalTef)) : '—'),
-  );
-  tbody.appendChild(totalRow);
+    ...foodMacroCells(totals),
+  ]));
 
-  const avgRow = document.createElement('tr');
-  avgRow.className = 'insight-food-average-row';
-  avgRow.append(
+  tbody.appendChild(foodTableRow('insight-food-average-row', [
     makeCell('Avg/day', `Averaged over ${daysLogged} day${daysLogged === 1 ? '' : 's'} logged in this range, not the range's calendar length`),
     makeCell(''),
     makeCell(daysLogged > 0 ? String(Math.round(totalCalories / daysLogged)) : '—'),
     makeCell(daysLogged > 0 ? (totalProtein / daysLogged).toFixed(1) : '—'),
-    makeCell(perDay(totalFiber) !== null ? perDay(totalFiber).toFixed(1) : '—'),
-    makeCell(perDay(totalFat) !== null ? perDay(totalFat).toFixed(1) : '—'),
-    makeCell(perDay(totalCarbohydrate) !== null ? perDay(totalCarbohydrate).toFixed(1) : '—'),
-    makeCell(perDay(totalTef) !== null ? String(Math.round(perDay(totalTef))) : '—'),
-  );
-  tbody.appendChild(avgRow);
+    ...foodMacroCells(perDay),
+  ]));
 
-  // What this same body would be aiming for, so the Avg/day row directly above has
-  // something to compare itself against without leaving the table. Calories and Protein
-  // reuse the exact desired figures the tiles/charts already compute (getCalorieDesiredKcal,
-  // getProteinDesiredBandG/getFiberDesiredBandG) — the Formula Tune's own figures,
-  // not a second copy of the arithmetic. Fat/Carbohydrate have no personalized formula
-  // in the app yet, so they fall back to the FDA Daily Value reference the Micronutrients
-  // mode already uses for the same two nutrients. TEF has no desired figure at all — it's a
-  // measured byproduct of what you ate, not something to aim for.
+  // What this body aims for: Tune's calorie and protein/fiber figures, and the
+  // FDA Daily Value for fat/carbohydrate. TEF has no desired figure.
   const healthEntries = physiqueAsHealthEntries();
   const calorieDesired = getCalorieDesired(healthEntries);
   const proteinBand = getProteinDesiredBandG(healthEntries);
   const fiberBand = getFiberDesiredBandG(healthEntries);
   const dailyDesired = nutrientDailyDesired();
 
-  const idealRow = document.createElement('tr');
-  idealRow.className = 'insight-food-ideal-row';
-  idealRow.append(
+  tbody.appendChild(foodTableRow('insight-food-ideal-row', [
     makeCell('Ideal/day', `${calorieDesired.full} desired calories, current protein/fiber bands and Fat/Carbohydrate FDA Daily Values — from Tune and Settings, not this range's data`),
     makeCell(''),
     makeCell(String(Math.round(calorieDesired.kcal))),
     makeCell(formatProteinDesiredBand(proteinBand)),
     makeCell(formatProteinDesiredBand(fiberBand)),
-    makeCell(String(dailyDesired['Total lipid (fat)']?.amount ?? '—')),
-    makeCell(String(dailyDesired['Carbohydrate, by difference']?.amount ?? '—')),
+    makeCell(String(dailyDesired[WELLNESS_FAT_NUTRIENT]?.amount ?? '—')),
+    makeCell(String(dailyDesired[WELLNESS_CARB_NUTRIENT]?.amount ?? '—')),
     makeCell('—'),
-  );
-  tbody.appendChild(idealRow);
+  ]));
 }
 
-// Asked when the question box is left blank — this mode is the only one that
-// inlines the question in its prompt, so it needs something to inline.
+// Asked when the question box is left blank (this mode inlines its question).
 const FOOD_INSIGHT_DEFAULT_QUESTION = 'What vitamins or minerals might be missing from this diet?';
 
-// Who's eating it (the shared profile block from health-insight-wellness.js) + the plain-text
-// ingredient list + the user's question (or the default). Still no day-by-day
-// breakdown — that's what the Wellness mode is for. The profile leads, because
-// nutrient adequacy is a per-body judgement: iron and calcium needs differ by
-// sex and age, and "is this enough food" can't be read off an ingredient list
-// without knowing the body it's feeding.
+// Profile, then the grouped ingredient list, then the question. The profile
+// leads: nutrient needs differ by sex, age and body.
 function formatFoodInsightPrompt(rows, from, to, question) {
-  const profile = formatProfileLines(gatherProfileSnapshot(), getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT)).join('\n');
+  const profile = currentProfileLines().join('\n');
   const header = `Aggregated ingredients logged from ${from} to ${to}, grouped by the Group each ingredient is filed under in the user's own ingredient catalog. Each group line gives that group's ingredient count and totals, followed by its ingredients (name (total amount): total calories, total protein, estimated TEF where measured):`;
   const groups = groupFoodIntakeByGroup(rows);
   const body = groups.length
     ? groups.map((g) => [
       formatFoodGroupSummary(g),
-      // TEF only when this ingredient has 🧬 Micronutrients pulled — omitted
-      // rather than printed as 0, matching the preview table's own blank dash.
+      // TEF only where measured, like the table's "—".
       ...g.items.map((r) => {
         const tef = estimateTefForFoodRow(r);
         const tefPart = tef !== null ? `, ~${tef} kcal TEF (thermic effect of food)` : '';
@@ -320,8 +248,7 @@ function formatFoodInsightPrompt(rows, from, to, question) {
       }),
     ].join('\n')).join('\n\n')
     : '(no Calculate-derived ingredient breakdown logged in this window)';
-  const q = (question && question.trim()) ? question.trim() : FOOD_INSIGHT_DEFAULT_QUESTION;
-  return `${profile}\n\n${header}\n${body}\n\nQuestion: ${q}`;
+  return `${profile}\n\n${header}\n${body}\n\nQuestion: ${insightQuestionOrDefault(question, FOOD_INSIGHT_DEFAULT_QUESTION)}`;
 }
 
 const FOOD_INSIGHT_SYSTEM_PROMPT = `You are a nutrition-savvy assistant reviewing a plain list of foods someone logged over a recent period — each ingredient's total amount eaten and the total calories/protein it contributed. No vitamin or mineral data is provided; none was measured. Use your general knowledge of typical food composition to infer which vitamins/minerals this pattern of eating is likely rich in or short on, and answer the user's specific question.

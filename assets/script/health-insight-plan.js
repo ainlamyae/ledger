@@ -1,23 +1,15 @@
-// "Plan" mode of the Health Insight panel: sends Tune's
-// whole plan — the published identities, the inputs behind them, and the figures
-// they produce — and asks whether the plan is actually feasible.
-//
-// The other four modes report what HAPPENED. This one reports what the settings
-// INTEND, and pairs it with the same recent averages Wellness reads so the model
-// can judge the plan against the logging rather than in the abstract: a 1,228 kcal
-// desired intake is a different proposition for someone averaging 1,300 than for someone
-// averaging 2,100.
-//
-// Computed from `Settings` plus the latest body-mass reading, NOT from the Tune's
-// input boxes — the modal may never have been opened this session, and the saved
-// values are what the app actually runs on. Every figure goes through the same
-// functions the Tune and the charts use (calorieDesiredDetail,
-// maintenanceAffineCoefficients, projectHealthyDays, boerLeanBodyMassKg), so all
-// three can't disagree about the same plan.
+// The Health Insight panel's Plan mode: Tune's whole plan (formulas, inputs and
+// the figures they produce) beside Wellness's recent averages, asking whether it
+// is feasible. Built from the saved Settings, not Tune's boxes, through the same
+// functions Tune and the charts use, so the three can't disagree.
 
-// Both ends of the protein band, in the LBM-scaled form the Tune writes.
-// Falls back to the app-wide default pair when the sheet has no rule yet, so the
-// prompt still shows what the band WOULD be rather than dropping the section.
+// Glycogen knobs: Tune's hard-coded box defaults, so m_musc/m_gly/ΔM_gly match it.
+const PLAN_GLYCOGEN_SKELETAL_PCT = 45;
+const PLAN_GLYCOGEN_G_PER_KG_MUSCLE = 14;
+const PLAN_GLYCOGEN_LIVER_G = 100;
+const PLAN_GLYCOGEN_WATER_RATIO = 3;
+
+// Both ends of the protein band (g/kg LBM), else the app defaults.
 function planProteinPerKgBand() {
   return {
     low: getSetting('PROTEIN_G_PER_KG_LBM_MIN', PROTEIN_G_PER_KG_LBM_MIN_DEFAULT),
@@ -25,14 +17,11 @@ function planProteinPerKgBand() {
   };
 }
 
-// The plan as the app currently holds it, or null when the profile it's built from
-// is incomplete — the same all-or-nothing rule calorieDesiredDetail applies, since
-// a plan missing height or sex has no BMR and therefore no desired intake at all.
+// The plan as saved, or null when the profile is incomplete (no BMR, so no desired
+// intake), the same rule as calorieDesiredDetail.
 function gatherPlanSnapshot() {
   const entries = physiqueAsHealthEntries();
-  // The smoothed mass, exactly as the Tune and the calorie tile use it — a plan
-  // described here at one mass and computed there at another would have the model judging
-  // arithmetic the app isn't running.
+  // The smoothed mass, as Tune and the calorie tile use it.
   const bodyMassKg = planBodyMassKg(entries);
   const rawBodyMassKg = latestBodyMassKg(entries);
   const heightCm = getSetting('HEIGHT_CM', null);
@@ -45,26 +34,24 @@ function gatherPlanSnapshot() {
   const met = activityMet();
   const tau = getSetting('ACTIVITY_DESIRED_MIN', ACTIVITY_DESIRED_MIN_DEFAULT);
   const kappa = getSetting('KCAL_PER_MET_KG_MIN', MET_ML_O2_PER_KG_MIN_DEFAULT);
-  const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
+  const healthyKg = bodyMassHealthySettingKg();
 
   const coefficients = maintenanceAffineCoefficients({ heightCm, age, sex, met, tau, kappa, bodyMassKg });
   const { a, b } = coefficients;
-  // healthyJourneyProjection, not projectHealthyDays: with the percentage pinned the plan walks
-  // the proportional journey, and the prompt has to be judging the same arrival date the Body
-  // Mass chart is showing.
+  // The same arrival date the Body Mass chart shows, on either journey.
   const projection = healthyJourneyProjection({
     intakeKcal: detail.kcal, bodyMassKg, heightCm, age, sex, met, tau, kappa, healthyKg,
   });
 
-  // Rounded to 0.1 kg before the grams come off it, exactly as the Tune does
-  // — so the two report the same band rather than differing by a gram.
+  // Rounded to 0.1 kg before the grams come off it, as Tune does.
   const lbmKg = Math.round(leanBodyMassKg(bodyMassKg, heightCm, sex) * 10) / 10;
   const lbmCoefficients = leanBodyMassCoefficients(sex, heightCm);
   const perKg = planProteinPerKgBand();
+  const proteinPerKgMin = Math.min(perKg.low, perKg.high);
+  const proteinPerKgMax = Math.max(perKg.low, perKg.high);
 
-  // λt by the arrival date, and where the plateau really lands once BMR has sagged that far
-  // — the caveat the constant-BMR m_inf can't carry on its own. Null on the proportional
-  // journey, which has no plateau to overshoot.
+  // Adaptation by the arrival date, and the plateau once BMR has sagged that far;
+  // null on the proportional journey, which has no plateau.
   const adaptFraction = adaptationFraction(
     projection.status === 'ok' ? projection.days : Infinity,
     getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT),
@@ -74,23 +61,17 @@ function gatherPlanSnapshot() {
     ? null
     : Math.round(adaptedPlateauKg(detail.kcal, coefficients, adaptFraction) * 10) / 10;
 
-  // The rest of Tune's figure set, computed the same way its own render
-  // functions do (same inputs, same rounding) so the Health Plan and Health Tune can't
-  // quote different numbers for the same plan.
-  //
-  // Both BMR equations side by side like the Tune's field table, not just the one in
-  // force. Mifflin reads age, so it's null on a Katch plan with no birth date.
+  // The rest of Tune's figures, with its inputs and rounding. Both BMR equations,
+  // as in Tune's table; Mifflin is null without a birth date.
   const mifflinBmr = age === null ? null : Math.round(mifflinStJeorBmr(bodyMassKg, heightCm, age, sex));
   const katchBmr = Math.round(katchMcArdleBmr(lbmKg));
-  // The stored calibration (health-tune-calibration.js), shown as-is like the Status card — null
-  // until one has been saved, in which case the line is simply dropped.
+  // The saved calibration, or null (its line is then dropped).
   const calibratedBmr = calibratedBmrKcal();
   const bmiDes = heightCm ? Math.round((healthyKg / ((heightCm / 100) ** 2)) * 10) / 10 : null;
   const maintenanceKcal = Math.round(detail.bmr + detail.activityKcal);
   const deficitVsBmr = deficitVsBmrPct(detail.bmr, detail.kcal);
 
-  // Macro bands — floor/ceiling pairs, exactly as renderFiber/Fat/CarbFields compute them
-  // off the same rounded intake (health-tune-render.js).
+  // Macro bands, as Tune's renderFiber/Fat/CarbFields compute them.
   const fiberPerKcalMin = getSetting('FIBER_G_PER_1000_KCAL_MIN', FIBER_G_PER_1000_KCAL_MIN_DEFAULT);
   const fiberPerKgMax = getSetting('FIBER_G_PER_KG_MAX', FIBER_G_PER_KG_MAX_DEFAULT);
   const fatPctMin = getSetting('FAT_PCT_OF_KCAL_MIN', FAT_PCT_OF_KCAL_MIN_DEFAULT);
@@ -98,16 +79,9 @@ function gatherPlanSnapshot() {
   const carbPctMin = getSetting('CARB_PCT_OF_KCAL_MIN', CARB_PCT_OF_KCAL_MIN_DEFAULT);
   const carbPctMax = getSetting('CARB_PCT_OF_KCAL_MAX', CARB_PCT_OF_KCAL_MAX_DEFAULT);
 
-  // Skeletal-muscle / glycogen knobs: Tune's own defaults (hard-coded in
-  // its boxes, not Settings-backed), repeated here as the same constants so m_musc/m_gly/
-  // ΔM_gly match what Tune shows. Kept together so they read as one block, like its rows.
-  const glySkeletalPct = 45;
-  const glyPerKgMuscle = 14;
-  const glyLiverG = 100;
-  const glyWaterRatio = 3;
-  const muscleKg = Math.round((lbmKg * (glySkeletalPct / 100)) * 10) / 10;
-  const glycogenG = Math.round(glyPerKgMuscle * muscleKg + glyLiverG);
-  const glycogenSwingKg = Math.round((glycogenG * (1 + glyWaterRatio)) / 100) / 10;
+  const muscleKg = Math.round((lbmKg * (PLAN_GLYCOGEN_SKELETAL_PCT / 100)) * 10) / 10;
+  const glycogenG = Math.round(PLAN_GLYCOGEN_G_PER_KG_MUSCLE * muscleKg + PLAN_GLYCOGEN_LIVER_G);
+  const glycogenSwingKg = Math.round((glycogenG * (1 + PLAN_GLYCOGEN_WATER_RATIO)) / 100) / 10;
 
   return {
     bodyMassKg, rawBodyMassKg, heightCm, age, sex, healthyKg, met, tau, kappa,
@@ -121,18 +95,20 @@ function gatherPlanSnapshot() {
     carbMinG: Math.round((carbPctMin / 100) * detail.kcal / KCAL_PER_G_CARB),
     carbMaxG: Math.round((carbPctMax / 100) * detail.kcal / KCAL_PER_G_CARB),
     muscle: {
-      skeletalPct: glySkeletalPct, perKgMuscle: glyPerKgMuscle, liverG: glyLiverG,
-      waterRatio: glyWaterRatio, muscleKg, glycogenG, swingKg: glycogenSwingKg,
+      skeletalPct: PLAN_GLYCOGEN_SKELETAL_PCT,
+      perKgMuscle: PLAN_GLYCOGEN_G_PER_KG_MUSCLE,
+      liverG: PLAN_GLYCOGEN_LIVER_G,
+      waterRatio: PLAN_GLYCOGEN_WATER_RATIO,
+      muscleKg,
+      glycogenG,
+      swingKg: glycogenSwingKg,
     },
     tefPercent: Math.round((1 - coefficients.tefDivisor) * 1000) / 10,
     tefKcal: Math.round(detail.tefKcal),
     adaptPct: Math.round(adaptFraction * 1000) / 10,
     adaptedBmr: Math.round(detail.bmr * (1 - adaptFraction)),
     adaptedPlateau,
-    // The REALIZED deficit the intake was actually built from, not the raw dm × 7700 / 7
-    // rate — the two differ whenever PLAN_SLEEP_HOURS is short of the desired sleep (see
-    // sleepAdjustedDeficitKcal), and Ein below has to be traceable back to whichever one
-    // actually produced it.
+    // The sleep-adjusted deficit Ein was built from, and the raw dm × 7700 / 7 rate.
     deficitKcal: Math.round(detail.deficit),
     rawDeficitKcal: Math.round(detail.rawDeficit),
     sleepDeprivationEffectKcal: detail.sleepDeprivationEffectKcal,
@@ -142,9 +118,7 @@ function gatherPlanSnapshot() {
     bmr: Math.round(detail.bmr),
     activityKcal: Math.round(detail.activityKcal),
     intakeKcal: detail.kcal,
-    // Whether that intake is a pinned figure, a pinned percentage of body mass, or
-    // recalculated from a fixed kilogram rate is the plan's own design decision, and it
-    // changes what "following the plan" means — so the model is told which is in force.
+    // Which figure is pinned changes what "following the plan" means.
     intakeIsPinned: pinnedCalorieDesiredKcal() !== null,
     pinnedPct: pinnedWeeklyFatLossPct(),
     weeklyFatLossPct: weeklyFatLossPct(detail.weeklyFatLossKg, bodyMassKg),
@@ -156,36 +130,28 @@ function gatherPlanSnapshot() {
     lbmKg,
     lbmNavyBfPct: lbmCoefficients.formula === 'navy' ? lbmCoefficients.bfPct : null,
     leanPercent: Math.round((lbmKg / bodyMassKg) * 1000) / 10,
-    proteinPerKgMin: Math.min(perKg.low, perKg.high),
-    proteinPerKgMax: Math.max(perKg.low, perKg.high),
-    proteinMinG: Math.round(lbmKg * Math.min(perKg.low, perKg.high)),
-    proteinMaxG: Math.round(lbmKg * Math.max(perKg.low, perKg.high)),
+    proteinPerKgMin,
+    proteinPerKgMax,
+    proteinMinG: Math.round(lbmKg * proteinPerKgMin),
+    proteinMaxG: Math.round(lbmKg * proteinPerKgMax),
   };
 }
 
-// The plan plus the reality it has to survive. gatherInsightMetrics is Wellness'
-// own aggregation, reused as-is: feasibility is a question about the gap between
-// the two, and computing the actuals a second way here would let the two modes
-// quote different averages for the same week.
+// The plan plus Wellness's own actuals, so the two modes quote the same averages.
 function gatherPlanInsight(fromIso, toIso) {
   return { plan: gatherPlanSnapshot(), actuals: gatherInsightMetrics(fromIso, toIso) };
 }
 
-// The arithmetic, substituted — the same trace the Tune prints under its
-// inputs. Sent rather than just the results so the model can see WHERE a number
-// comes from and name the input to change, instead of only that it's aggressive.
+// The substituted arithmetic, as Tune prints it, so the model can name the input to change.
 function planSubstitutedLines(p) {
   const sigma = p.sex === 'male' ? '+ 5' : '− 161';
   const katch = p.formula === 'katch';
-  // Only when it changes something: at f = 0 there is no divisor to explain, and printing
-  // "/ 1" invites the model to reason about a term the plan doesn't use.
+  // No "/ 1" divisor at f = 0.
   const byF = p.tefPercent > 0 ? `, all / (1 − ${p.tefPercent}/100)` : '';
   const hM = Math.round((p.heightCm / 100) * 100) / 100;
   const proportional = p.projection.journey === 'pct';
 
-  // Ordered to match Tune's own substituted trace, top to bottom,
-  // so the two read the same way. Every figure is computed in gatherPlanSnapshot by the same
-  // wellness-math functions the Tune uses, off the same rounded intake.
+  // In Tune's order.
   const lines = [];
 
   const lbmTerms = p.lbmNavyBfPct !== null
@@ -193,8 +159,7 @@ function planSubstitutedLines(p) {
     : `${p.sex === 'male' ? `0.407 × ${p.bodyMassKg} + 0.267 × ${p.heightCm} − 19.2` : `0.252 × ${p.bodyMassKg} + 0.473 × ${p.heightCm} − 48.3`}, Boer`;
   lines.push(`LBM: ${lbmTerms} = ${p.lbmKg} kg (${p.leanPercent}% of body mass)`);
 
-  // Both BMR equations side by side, plus the calibrated figure when one's been saved — the
-  // plan runs on whichever PLAN INPUTS names (its value is what D, Ein, A and B below use).
+  // The plan runs on whichever BMR PLAN INPUTS names.
   if (p.mifflinBmr !== null) lines.push(`BMR_mif (Mifflin-St Jeor): 10 × ${p.bodyMassKg} + 6.25 × ${p.heightCm} − 5 × ${p.age} ${sigma} = ${p.mifflinBmr} kcal/day`);
   lines.push(`BMR_kat (Katch-McArdle, from lean mass): 370 + 21.6 × ${p.lbmKg} = ${p.katchBmr} kcal/day`);
   if (p.calibratedBmr !== null) lines.push(`BMR_cal (calibrated — back-solved from logged intake/activity/body-mass change): ${p.calibratedBmr} kcal/day`);
@@ -219,8 +184,7 @@ function planSubstitutedLines(p) {
     ? `B: 21.6 × (lean-mass kg term) + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`
     : `B: 10 + ${p.met} × ${p.tau} × ${p.kappa} / 200${byF} = ${p.b} kcal/day per kg`);
 
-  // m_inf only exists on the constant-intake journey: with the percentage pinned nothing
-  // holds Ein still, so there is no intake plateau to level off at.
+  // m_inf only exists on the constant-intake journey.
   if (!proportional) lines.push(`m_inf: (${p.intakeKcal} − ${p.a}) / ${p.b} = ${p.equilibriumKg} kg`);
 
   if (p.projection.status === 'ok' && proportional) {
@@ -239,9 +203,7 @@ function planSubstitutedLines(p) {
   lines.push(`dm%: 100 × ${p.weeklyFatLossKg} / ${p.bodyMassKg} = ${p.weeklyFatLossPct} %/week`);
   if (p.deficitVsBmrPct !== null) lines.push(`D_bmr%: (${p.bmr} − ${p.intakeKcal}) / ${p.bmr} × 100 = ${p.deficitVsBmrPct} %`);
 
-  // The adaptation caveat — reported, not planned with: nothing above used it, which is why
-  // the model has to be told m_inf is the optimistic figure and this is where mass tends to
-  // actually stall.
+  // Adaptation: reported, not planned with; m_inf is the optimistic figure.
   if (p.adaptPct > 0) {
     const whenNote = p.projection.status === 'ok' ? ' by the arrival date' : ' at the adaptation ceiling';
     lines.push(`BMR_adp: ${p.bmr} × (1 − ${p.adaptPct}/100) = ${p.adaptedBmr} kcal/day${whenNote}`);
@@ -266,10 +228,7 @@ function planSubstitutedLines(p) {
   return lines;
 }
 
-// Which of the three rate plans is in force, in words — the pins are mutually exclusive, so
-// exactly one of these describes the sheet. It matters to the judgement, not just the
-// arithmetic: the same desired intake is a different promise depending on whether it will be
-// recut at the next body-mass reading, and how.
+// Which of the three (mutually exclusive) rate pins is in force, in words.
 function planRatePinDescription(p) {
   if (p.intakeIsPinned) return 'the daily intake is pinned, so the deficit shrinks as body mass drops';
   if (p.pinnedPct !== null) {
@@ -314,14 +273,12 @@ function formatPlanInsightPrompt(data) {
   }
 
   return [
-    // PLAN INPUTS first — the person's own numbers lead, then the model they feed, then the
-    // figures that come out of it (in the same order the Health Tune panel lists them).
+    // Inputs, then the model, then its figures (Tune's order).
     'PLAN INPUTS:',
     ...planInputLines(plan),
     '',
     'THE PLAN — the formulas this app derives the desired figures from:',
-    // The Tune's own text, not a paraphrase: one definition of the model,
-    // shown on screen and sent to the model.
+    // Tune's own text, verbatim.
     FORMULA_EXPRESSION,
     '',
     'WHAT THOSE INPUTS PRODUCE (each line is the substituted arithmetic, in the same order as the Tune panel):',

@@ -2,9 +2,8 @@
 function applyChartTheme() {
   Chart.defaults.color = chartColor('--color-text-muted');
   Chart.defaults.borderColor = chartColor('--color-border');
-  // Every chart's text at .9rem, the app's own size for that band, in the px Chart.js takes.
   Chart.defaults.font.size = chartFontSize();
-  // The page's own font family, not Chart.js's Helvetica/Arial.
+  // The page's own font, not Chart.js's Helvetica/Arial.
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 
   // Every tooltip drawn over the page (htmlTooltip), so a tall one isn't cut at the canvas.
@@ -23,41 +22,32 @@ function chartFontSize() {
   return 0.8 * parseFloat(getComputedStyle(document.documentElement).fontSize);
 }
 
-// Every reference mark in Health Chart — the per-column caps, State Trend's healthy
-// line. Deliberately not red: red is this app's "missed" score, so a limit drawn in it
-// read as a failure rather than as the thing being measured against.
+// Every reference mark in Health Chart (caps, State Trend's healthy line). Not red: red
+// means "missed", so a limit drawn in it read as a failure.
 function desiredMarkColor() {
   return chartColor('--color-text');
 }
 
-// Fixed y-axis label width, so plot areas line up down the section however many
-// digits each chart's values run to. Wide enough for an 18-character Rotation name
-// ("Protein Supplement") at the chart font, so none is cut by the card's left edge.
+// Fixed y-axis widths, so plot areas line up down a section. The left fits an
+// 18-character Rotation name ("Protein Supplement"); right axes carry only short units.
 const TREND_Y_AXIS_LABEL_CHARS = 18;
 const TREND_Y_AXIS_WIDTH = 120;
 const TREND_Y_AXIS_RIGHT_WIDTH = 84;
 
-// A Rotation name cut to TREND_Y_AXIS_LABEL_CHARS, so a longer one can't spill off the
-// edge either; the hover still names it in full.
+// A Rotation name cut to TREND_Y_AXIS_LABEL_CHARS; the hover still names it in full.
 function trendYAxisCategoryTick(value) {
   const name = String(this.getLabelForValue(value) ?? '');
   return name.length > TREND_Y_AXIS_LABEL_CHARS ? `${name.slice(0, TREND_Y_AXIS_LABEL_CHARS - 1)}…` : name;
 }
 
-// Force EVERY axis to the exact same width (not just a minimum): a plain minimum
-// let any chart whose labels ran wider than it — the kcal/g/kg·m² unit ticks do —
-// keep a wider axis, which pushed its plot area in and slid that chart's vertical
-// gridlines out of line with the rest of the section. Pinned equal, every chart's
-// plot area starts and ends at the same x, so the date gridlines line up straight
-// down the column at every range.
+// An exact width, not a minimum: wider unit ticks would otherwise push one chart's plot
+// area in and its gridlines out of line with the rest.
 function fixTrendYAxisWidth(scale) {
-  // Right axes only carry short unit ticks, so they keep the old 84px.
   scale.width = scale.position === 'right' ? TREND_Y_AXIS_RIGHT_WIDTH : TREND_Y_AXIS_WIDTH;
 }
 
 // The dated Health charts' y axes, both sides one width: just wide enough for their
-// widest label ("-1500 kcal"), so the labels sit on the card's edges; the same width
-// on every chart keeps their gridlines lined up.
+// widest label, so every chart's gridlines line up.
 const DATED_Y_AXIS_WIDEST_LABEL = '-1500 kcal';
 function fixDatedYAxisWidth(scale) {
   const { ctx, options } = scale;
@@ -69,8 +59,9 @@ function fixDatedYAxisWidth(scale) {
   scale.width = Math.ceil(labelWidth + options.ticks.padding + options.grid.tickLength);
 }
 
-// Chart.js's own tooltip, drawn as a page overlay instead of on the canvas, so a hover
-// taller than its chart isn't cut off. Every chart's default (applyChartTheme).
+// Chart.js's tooltip as a page overlay, so a hover taller than its chart isn't cut off.
+const TOOLTIP_GAP_PX = 10;
+
 function htmlTooltip({ chart, tooltip }) {
   let el = document.querySelector('.chart-tooltip');
   if (!el) {
@@ -116,7 +107,7 @@ function htmlTooltip({ chart, tooltip }) {
 
   // Beside the caret, flipped and clamped so it stays on screen.
   const rect = chart.canvas.getBoundingClientRect();
-  const gap = 10;
+  const gap = TOOLTIP_GAP_PX;
   const { width, height } = el.getBoundingClientRect();
   let left = rect.left + tooltip.caretX + gap;
   if (left + width > window.innerWidth - gap) left = rect.left + tooltip.caretX - gap - width;
@@ -125,9 +116,8 @@ function htmlTooltip({ chart, tooltip }) {
   el.style.top = `${Math.max(gap, Math.min(top, window.innerHeight - height - gap))}px`;
 }
 
-// Invisible spacer reserving the same width as a real right axis, so a chart without
-// one doesn't stretch further right and misalign the section's date labels. A factory,
-// since afterFit mutates the scale it's handed.
+// Invisible spacer the width of a real right axis, so a chart without one keeps its
+// date labels aligned. A factory, since afterFit mutates the scale it's handed.
 function ghostRightAxis() {
   return {
     position: 'right',
@@ -138,9 +128,8 @@ function ghostRightAxis() {
   };
 }
 
-// The section's one mark for "the figure that applies here": a hairline floating bar
-// (`[from, to]`, `grouped: false`) overlaying its own column. Shared so the mark means
-// the same thing everywhere. One `values` entry per column; null leaves it unmarked.
+// The section's one "figure that applies here" mark: a hairline floating bar over its
+// own column. One `values` entry per column; null leaves it unmarked.
 function desiredCapDataset(label, values, capHalf, extra = {}) {
   return {
     type: 'bar',
@@ -154,27 +143,15 @@ function desiredCapDataset(label, values, capHalf, extra = {}) {
   };
 }
 
-// A fraction of the axis span, not a fixed amount in the data's units, so the cap
-// stays a hairline at any range.
+// A fraction of the axis span, so the cap stays a hairline at any range.
+const DESIRED_CAP_HALF_FRACTION = 0.006;
+
 function desiredCapHalf(axisSpan) {
-  return Math.abs(axisSpan) * 0.006;
+  return Math.abs(axisSpan) * DESIRED_CAP_HALF_FRACTION;
 }
 
-// Violet, the app's existing "not a score" colour. Grey was tried first and vanished:
-// a mid-tone in both themes, and it already means "unscored bar" on the same chart.
-
-// Teal, for BMR_cal beside BMR_adp's violet — a third reference line on the same chart needs
-// its own hue, not a tint of either existing one, so all three bases stay visually distinct
-// in both themes.
-
-// Amber, for BMR_kat beside BMR_mif's default mark, so the two equations read apart.
-
-// A continuous exponential moving average, not a fixed weekly bucket: each day blends
-// today's own reading into yesterday's already-smoothed value, rather than every column
-// in a calendar week sharing one fit that resets at the boundary — the reset is what
-// made the old per-week trend jump at every seventh column even when the data barely
-// changed. alpha = 2/(span+1) gives it roughly a `span`-day memory. An unlogged day
-// carries the last smoothed value forward rather than breaking the line.
+// Exponential moving average with roughly a `span`-day memory (alpha = 2/(span+1)), so
+// the trend doesn't jump at week boundaries. An unlogged day carries the last value.
 function emaSeries(values, span = 7) {
   const alpha = 2 / (span + 1);
   let prev = null;
@@ -185,19 +162,15 @@ function emaSeries(values, span = 7) {
   });
 }
 
-// The smoothed series' own rate of change over the trailing `span` days — comparable to
-// the old per-week slope, but read off two points on one continuous curve instead of a
-// fit that jumps at a bucket boundary. Null until there's a full span of smoothed values
-// behind it.
+// The smoothed series' change over the trailing `span` days; null until a full span exists.
 function emaSlopePerSpan(series, span = 7) {
   return series.map((_, i) => (i >= span && series[i] !== null && series[i - span] !== null
     ? series[i] - series[i - span]
     : null));
 }
 
-// The trend line: a solid curve in the dark/light neutral every other reference
-// mark on these charts uses. `monotone` interpolation keeps the curve from overshooting
-// past a local high/low into a bump the data never had.
+// The trend line, in the reference-mark neutral. `monotone` keeps it from overshooting
+// into bumps the data never had.
 function trendLineDataset(label, series, extra = {}) {
   return {
     type: 'line',
@@ -217,17 +190,8 @@ function trendLineDataset(label, series, extra = {}) {
   };
 }
 
-// Rounds up to 1/2/5 x a power of ten (4327 -> 5000), so an explicit axis cap still
-// gets clean gridlines.
-function niceAxisMax(value) {
-  if (value <= 0) return 0;
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  const residual = value / magnitude;
-  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
-  return niceResidual * magnitude;
-}
-
-// Finer ladder, where niceAxisMax's 1/2/5/10 would waste most of the plot area.
+// Rounds an axis cap up to this ladder × a power of ten, for clean gridlines without
+// wasting the plot area.
 const NICE_AXIS_STEPS = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 
 function niceAxisBound(value) {
@@ -237,35 +201,22 @@ function niceAxisBound(value) {
   return (NICE_AXIS_STEPS.find((step) => residual <= step) ?? 10) * magnitude;
 }
 
-// Destroy-then-construct — except the construct half is lazy: rather than an
-// immediate `new Chart()`, every chart goes through an IntersectionObserver and only
-// builds once its .chart-box actually intersects, so scrolling past a long page of
-// collapsed panels doesn't pay for every chart's layout/paint up front.
+// Destroy-then-construct, lazily: each chart builds only once its .chart-box nears the
+// viewport, so collapsed panels don't pay for layout up front. A panel collapsing at boot
+// is mid its 0.35s transition and can read as visible, so its charts wait that out first.
 //
-// A freshly-collapsed panel (setupPanelToggles, app.js) is mid CSS transition right
-// after boot — its collapsing wrapper (styles.css's ".panel.collapsed > *", a 0.35s
-// max-height transition) can still be tall for the first ~350ms, so an observer
-// started the instant a chart renders can catch that in-between state and report a
-// false "visible" for a chart that's actually about to be hidden. Charts inside an
-// already-collapsed panel wait out that transition before their observer's first
-// check, so it sees the real, settled geometry; anything not inside a collapsed
-// panel (i.e. genuinely on screen already) observes immediately, no added delay.
-//
-// The returned value stands in for the real Chart instance everywhere a caller
-// stores it back as `existingChart` next time — but one chart (Category Expenditure
-// Trend, finance-chart.js) also keeps calling real Chart.js instance methods
-// (isDatasetVisible/setDatasetVisibility/update) and touching `.options` on it
-// directly, from its own legend, so a plain {destroy()} stand-in isn't enough. This
-// returns a Proxy instead: once the real chart exists, every property/method
-// transparently forwards to it (including nested writes like
-// `chart.options.scales.y.max = …`, since the returned value is the real object,
-// not a copy); before that, dataset-visibility reads default to "visible" and
-// mutators/redraw calls no-op, so a legend built before its chart has ever been on
-// screen doesn't throw.
-//
-// Only for the unconditional case; a render that skips construction on empty data
-// keeps its own manual destroy.
+// Returns a Proxy for the Chart: it forwards to the real one once built (finance-chart.js's
+// legend calls its methods and edits `.options`); before that, visibility reads "visible"
+// and mutators no-op.
 const PANEL_COLLAPSE_TRANSITION_MS = 400;
+const CHART_BUILD_ROOT_MARGIN = '400px';
+
+const CHART_PRE_BUILD_DEFAULTS = {
+  isDatasetVisible: () => true,
+  setDatasetVisibility: () => {},
+  update: () => {},
+  resize: () => {},
+};
 
 // Charts not yet scrolled near, by canvas; buildPendingCharts draws them now.
 const pendingChartBuilds = new Map();
@@ -288,9 +239,12 @@ function upsertChart(existingChart, ctx, config) {
     pendingChartBuilds.delete(forceBuild);
     state.chart = new Chart(ctx, config);
   };
-  const forceBuild = () => {
+  const stopWaiting = () => {
     state.observer?.disconnect();
     clearTimeout(state.timer);
+  };
+  const forceBuild = () => {
+    stopWaiting();
     config.options = { ...config.options, animation: false };
     build();
   };
@@ -302,7 +256,7 @@ function upsertChart(existingChart, ctx, config) {
         build();
         state.observer.disconnect();
       }
-    }, { rootMargin: '400px' });
+    }, { rootMargin: CHART_BUILD_ROOT_MARGIN });
     state.observer.observe(box);
   };
 
@@ -312,38 +266,35 @@ function upsertChart(existingChart, ctx, config) {
     startObserving();
   }
 
-  const PRE_BUILD_DEFAULTS = {
-    isDatasetVisible: () => true,
-    setDatasetVisibility: () => {},
-    update: () => {},
-    resize: () => {},
-  };
-
   return new Proxy({}, {
     get(_, prop) {
       if (prop === 'destroy') {
         return () => {
           pendingChartBuilds.delete(forceBuild);
           state.chart?.destroy();
-          state.observer?.disconnect();
-          clearTimeout(state.timer);
+          stopWaiting();
         };
       }
       if (state.chart) {
         const value = state.chart[prop];
         return typeof value === 'function' ? value.bind(state.chart) : value;
       }
-      return PRE_BUILD_DEFAULTS[prop];
+      return CHART_PRE_BUILD_DEFAULTS[prop];
     },
   });
 }
 
-// Every chart colour comes from styles.css's :root (--chart-*, --color-*), read when
-// the chart is drawn, so a change there restyles the charts too. `alpha` gives rgba.
+// [r, g, b], 0-255, of a #rrggbb colour.
+function hexToRgb(hex) {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+}
+
+// A styles.css :root colour (--chart-*, --color-*), read at draw time so a CSS change
+// restyles the charts. `alpha` gives rgba.
 function chartColor(name, alpha = null) {
   const hex = getComputedStyle(document.documentElement).getPropertyValue(name).trim().toLowerCase();
   if (alpha === null || !/^#[0-9a-f]{6}$/.test(hex)) return hex;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const [r, g, b] = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
@@ -356,7 +307,7 @@ function seriesColor(hue, { saturation = '--chart-series-saturation', lightness 
 
 // A #rrggbb colour's hue, 0-360.
 function colorHue(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
   const max = Math.max(r, g, b);
   const d = max - Math.min(r, g, b);
   if (!d) return 0;
@@ -370,17 +321,9 @@ function hslWithAlpha(hsl, alpha) {
   return hsl.replace('hsl(', 'hsla(').replace(')', `, ${alpha})`);
 }
 
-// Category-colour swatch legend, shared by several panels.
-//
-// Pass `toggle` and every entry becomes a button that switches its series off and
-// on: `isHidden(entry, i)` decides how the entry is drawn, `onToggle(entry, i)`
-// does the hiding and redraws. What "hiding" means differs per chart — a dataset
-// on the trend chart, a category filtered out of a whole re-render on the ones
-// whose colours or ring proportions depend on what's showing — so that decision
-// stays with the chart and the legend only reports the click.
-//
-// A hidden entry stays in the legend, dimmed and struck through: it's the only way
-// back, and a legend that lost its entry on click would be a one-way door.
+// Category-colour swatch legend, shared by several panels. With `toggle`, each entry is
+// a button: `isHidden(entry, i)` styles it, `onToggle(entry, i)` hides and redraws (what
+// hiding means is the chart's call). A hidden entry stays, dimmed, as the way back.
 function renderCategoryLegend(containerId, categories, toggle) {
   const legend = document.getElementById(containerId);
   legend.innerHTML = '';
@@ -434,33 +377,10 @@ function maskHiddenClasses(values, classes, hidden) {
   return values.map((v, i) => (hidden.has(classes[i]) ? null : v));
 }
 
-// The shared From/To picker: one implementation instead of each panel re-deriving its
-// own defaulting and wiring. Seeds both inputs to the last defaultDays when empty,
-// fires onChange on every edit, and returns a getter for the current {from, to}.
-function initDateRangeControl(fromId, toId, defaultDays, onChange) {
-  const fromEl = document.getElementById(fromId);
-  const toEl = document.getElementById(toId);
-
-  if (!fromEl.value || !toEl.value) {
-    const defaultDates = lastNDates(defaultDays);
-    fromEl.value = defaultDates[0];
-    toEl.value = defaultDates[defaultDates.length - 1];
-  }
-
-  fromEl.addEventListener('change', onChange);
-  toEl.addEventListener('change', onChange);
-
-  return () => ({ from: fromEl.value, to: toEl.value });
-}
-
-// Health units never pass through formatCurrency's masking, but they're still personal
-// data the privacy toggle should hide — and a tooltip would leak the exact figure even
-// with masked ticks. `decimals: null` strips float noise without forcing trailing zeros;
-// pass a number (2 for BMI) to fix the places instead.
+// A unit tick the privacy toggle masks. `decimals: null` rounds off Chart.js's float
+// drift (32.400000000000006) without forcing trailing zeros; a number fixes the places.
 function maskedUnitTick(unit, decimals = null) {
   return (v) => {
-    // Chart.js builds ticks by repeated addition, which drifts into float noise
-    // (32.400000000000006) on a fractional step. Round before it reaches the label.
     const rounded = decimals !== null ? v.toFixed(decimals) : Math.round(v * 100) / 100;
     const label = `${rounded} ${unit}`;
     return privacyMode ? maskDigits(label) : label;
@@ -496,15 +416,13 @@ function wellnessTickIndices(dates) {
   return evenlySpacedIndices(dates.length, HEALTH_X_GRIDLINES);
 }
 
-// The x scale for every category-axis wellness chart (labels: dates), on the same ticks
-// as State Trend & Forecast's linear axis (renderHealthProjectionChart).
+// The x scale for every dated category-axis Health chart, on State Trend & Forecast's ticks.
 function wellnessCategoryXScale(dates) {
   return {
     afterBuildTicks: (axis) => {
       axis.ticks = wellnessTickIndices(dates).map((i) => ({ value: i }));
     },
-    // No margin: the first and last dates sit on the plot's edges at every range.
-    // Gridlines through each tick's date, not between bars.
+    // First and last dates on the plot's edges; gridlines through each date.
     offset: false,
     grid: { offset: false },
     // autoSkip off, or it would thin the ticks set above.

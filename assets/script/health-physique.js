@@ -1,22 +1,19 @@
-﻿﻿// One row per day: sleep window, body mass, what was eaten and what was
-// burned. The tab every chart, today-tile, Insight mode and Activity Plan tick
-// reads, via the physiqueAsHealthEntries() adapter below.
+﻿﻿// One row per day: sleep, body mass, what was eaten and burned. Charts, tiles,
+// Insight and the Activity Plan read it through physiqueAsHealthEntries().
 
-// Read with its header row: columns are found by name (PHYSIQUE_COLUMNS), so
-// reordering them on the sheet can't make the app write into the wrong cell.
+// Read with its header row, so columns are found by name, not position.
 const PHYSIQUE_RANGE = `'${CONFIG.SHEETS.PHYSIQUE}'!A1:Z`;
 
-// Sheet columns by header. The first name is the current one, the rest older
-// names still recognised. This order is the fallback when there's no header row.
+// Sheet columns by header: current name first, then older ones. This order is
+// the fallback when there's no header row.
 const PHYSIQUE_COLUMNS = [
   { key: 'date', headers: ['Date'] },
   { key: 'bodyMass', headers: ['Body Mass'] },
-  // JSON of the day's four BMR figures (see "Stored BMR" below) and its body-mass
-  // figures (see "Stored body mass").
+  // JSON of the day's BMR figures and body-mass figures (see "Stored BMR" / "Stored body mass").
   { key: 'bmr', headers: ['Derived', 'BMR'] },
   { key: 'bedtime', headers: ['Bed', 'Bedtime'] },
   { key: 'wakeTime', headers: ['Wake', 'Wake-up Time'] },
-  // Stored rather than recomputed per render: written on every save (physiqueRowCells).
+  // Written on every save (physiqueRowCells), not recomputed per render.
   { key: 'sleep', headers: ['Sleep'] },
   { key: 'deprivation', headers: ['Deprivation'] },
   { key: 'consumption', headers: ['Consumption'] },
@@ -34,16 +31,21 @@ const PHYSIQUE_COLUMNS = [
 const PHYSIQUE_DEFAULT_COLUMNS = Object.fromEntries(PHYSIQUE_COLUMNS.map(({ key }, i) => [key, i]));
 // key -> 0-based column, from the header row (refreshPhysique).
 let physiqueColumnIndex = PHYSIQUE_DEFAULT_COLUMNS;
-// 4 weeks of dated days per page. Pattern rows (no date) are date-agnostic
-// templates rather than a day, so they're excluded from this count and shown
-// on every page in full instead of being paginated away — see
-// getPhysiquePageEntries.
+
+function hasPhysiqueColumn(key) {
+  return physiqueColumnIndex[key] !== undefined;
+}
+
+// 4 weeks of dated days per page; patterns show on every page (getPhysiquePageEntries).
 const P_PAGE_SIZE = 28;
+// The list table's column count, for its empty-state row.
+const PHYSIQUE_TABLE_COLUMNS = 14;
+const PHYSIQUE_DAY_MS = 86400000;
+const MINUTES_PER_DAY = 1440;
+const GRAMS_PER_KG = 1000;
 
 let allPhysiqueEntries = [];
-// Flips true once refreshPhysique has run at least once — lets a click racing
-// the initial fetch tell "still loading" apart from "genuinely nothing
-// logged", same job the other modules' own loaded flags do.
+// True once refreshPhysique has run, so "still loading" differs from "nothing logged".
 let physiqueDataLoaded = false;
 // Memoized physiqueAsHealthEntries() result, dropped on every refresh.
 let physiqueEntriesCache = null;
@@ -59,10 +61,8 @@ async function fetchPhysiqueSheetId() {
   return findSheetId(metadata, CONFIG.SHEETS.PHYSIQUE);
 }
 
-// Time cells come back as FORMATTED_STRING, so what arrives depends on the
-// column's own number format — "23:30", "23:30:00" or "11:30:00 PM" are all
-// possible. Normalize to the HH:MM an <input type="time"> wants, and leave
-// anything unrecognized alone rather than mangling it.
+// Time cells arrive in the column's own format ("23:30", "23:30:00", "11:30:00 PM").
+// Normalized to the HH:MM an <input type="time"> wants; anything else is left alone.
 function normalizeTimeCell(value) {
   const str = String(value || '').trim();
   const m = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i.exec(str);
@@ -75,12 +75,12 @@ function normalizeTimeCell(value) {
   return `${String(hour).padStart(2, '0')}:${m[2]}`;
 }
 
-function numberCell(value) {
+// A sheet cell as a number, or null. Not "numberCell": finance-portfolio.js owns that name.
+function physiqueNumber(value) {
   return (value !== undefined && value !== '' && !Number.isNaN(Number(value))) ? Number(value) : null;
 }
 
-// Parses "HH:MM" (1 or 2-digit hour) into minutes since midnight, or null if
-// malformed.
+// "HH:MM" (1 or 2-digit hour) -> minutes since midnight, or null if malformed.
 function parseClockTime(str) {
   const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(str).trim());
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
@@ -90,119 +90,93 @@ function formatClockTime24(mins) {
   return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 }
 
-// Hours between a bed time and a wake time, wrapping past midnight (wake <= bed
-// means the wake happened the next calendar day).
+// Hours from bed to wake; wake <= bed means it was the next calendar day.
 function sleepDurationHours(bedMin, wakeMin) {
-  const diff = wakeMin <= bedMin ? wakeMin + 1440 - bedMin : wakeMin - bedMin;
+  const diff = wakeMin <= bedMin ? wakeMin + MINUTES_PER_DAY - bedMin : wakeMin - bedMin;
   return Math.round((diff / 60) * 10) / 10;
 }
 
-// Mirrors updateWorkTimeLiveDuration's live read-out, just off Bedtime/Wake-up
-// Time instead of Start/End — same wraparound sleepDurationHours already gives
-// the Sleep chart, read back live as the two clock fields are typed.
+// Live read-out as Bed/Wake are typed (like updateWorkTimeLiveDuration).
 function updatePhysiqueSleepDuration() {
-  const bed = parseClockTime(physiqueField('bedtime').value);
-  const wake = parseClockTime(physiqueField('wake-time').value);
-  const sleepHours = (bed !== null && wake !== null) ? sleepDurationHours(bed, wake) : null;
-  return updatePhysiqueSleepDeprivation(sleepHours);
+  return updatePhysiqueSleepDeprivation(physiqueSleepHours({
+    bedtime: physiqueField('bedtime').value,
+    wakeTime: physiqueField('wake-time').value,
+  }));
 }
 
-// Same dailyEnergyBalanceKcal the Status card's own energy-balance tile runs
-// (health-chart.js setStatusEnergyTile), just off the form's own typed
-// fields rather than a saved entry — so what's about to be saved already
-// shows what a short night is costing (or adding to) this day's balance.
-// Left blank whenever a piece it needs (profile, body mass, calories
-// in) isn't there yet. Returns D and its desire, for the save's warning.
+// The form's live energy table: the Status card's figures (setStatusEnergyTile)
+// off the typed fields, so a short night's cost shows before Save. Blank where an
+// input is missing. Returns D and its desire, for the save's warning.
 function updatePhysiqueSleepDeprivation(sleepHours) {
   const el = document.getElementById('physique-sleep-deprivation');
   if (!el) return null;
 
-  // The same derivation Save stores (physiqueDerivedFigures), off the typed fields.
+  // The derivation Save stores (physiqueDerivedFigures), off the typed fields.
   const read = (id) => evaluateNumberExpression(physiqueField(id).value.trim());
   const intake = read('calories-in');
   const day = {
-    date: physiqueField('date').value || isoFromDate(new Date()),
+    date: physiqueField('date').value || localIso(),
     bodyMass: read('body-mass') || null,
     caloriesIn: intake ? Math.round(intake) : null,
     caloriesOut: read('calories-out') || 0,
     tef: read('tef') || null,
   };
+  const isPattern = document.getElementById('physique-is-pattern').checked;
   // A pattern has no date, so no BMR.
-  const bmr = document.getElementById('physique-is-pattern').checked ? {} : physiqueBmrForSave(day.date, day.bodyMass);
+  const bmr = isPattern ? {} : physiqueBmrForSave(day.date, day.bodyMass);
   // No Bed/Wake yet: SD = 0, so D and Δm′ still show.
   const energy = physiqueEnergyBalance(day, sleepHours, bmr, { sleepOptional: true });
   el.textContent = energy ? `${energy.deprivationKcal}` : sleepHours === null ? '0' : '';
 
-  // TEI, TEF and AEE as typed/estimated for this day, the same three
-  // dailyEnergyBalanceKcal weighs against maintenance and SD to land on D —
-  // TEF and AEE shown as the expenditures they are (negative), like the
-  // Status card's own Digestion/Activity rows. Units are the table's own
-  // Unit column, not repeated in each cell's own text.
-  const teiText = day.caloriesIn !== null ? `${day.caloriesIn}` : '';
-  document.getElementById('physique-tei').textContent = privacyMode ? maskDigits(teiText) : teiText;
+  // Blank for null/undefined; digits masked in privacy mode.
+  const show = (id, value) => setMaskedText(id, value !== null && value !== undefined ? `${value}` : '');
+
+  // TEF and AEE are expenditures, so shown negative like the Status card's rows.
+  show('physique-tei', day.caloriesIn);
   // Needs only intake, not the sleep times D does.
   const tefKcal = energy ? energy.tef : day.tef ?? (day.caloriesIn !== null ? Math.round(day.caloriesIn * (1 - tefDivisor())) : null);
-  const tefText = tefKcal !== null ? `${-tefKcal}` : '';
-  document.getElementById('physique-tef-derived').textContent = privacyMode ? maskDigits(tefText) : tefText;
-  const aeeText = `${day.caloriesOut > 0 ? '-' : ''}${day.caloriesOut}`;
-  document.getElementById('physique-aee').textContent = privacyMode ? maskDigits(aeeText) : aeeText;
+  show('physique-tef-derived', tefKcal !== null ? -tefKcal : null);
+  show('physique-aee', `${day.caloriesOut > 0 ? '-' : ''}${day.caloriesOut}`);
 
-  // D (Balance) and Δm′, the mass change it implies (Balance ÷ ~7700 kcal/kg,
-  // GENERIC_KCAL_PER_KG_FAT) — same pair the Status card's own D/Δm′ rows show.
-  const dText = energy ? `${energy.balance}` : '';
-  document.getElementById('physique-balance').textContent = privacyMode ? maskDigits(dText) : dText;
-  const dmPrimeText = energy ? `${Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000)}` : '';
-  document.getElementById('physique-mass-delta-prime').textContent = privacyMode ? maskDigits(dmPrimeText) : dmPrimeText;
+  // D (Balance) and Δm′, the mass change it implies in g/day.
+  const deltaMassPrimeG = energy ? Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * GRAMS_PER_KG) : null;
+  show('physique-balance', energy ? energy.balance : null);
+  show('physique-mass-delta-prime', deltaMassPrimeG);
 
   // The Mass figures Save will store (the saved ones while Body Mass is unchanged).
-  // m, m̄ (m_avg), Δm (m_d) and BMI as stored, each its own row — the Unit column
-  // carries the unit.
-  const mass = document.getElementById('physique-is-pattern').checked ? {} : physiqueMassForSave(day.date, day.bodyMass);
+  const mass = isPattern ? {} : physiqueMassForSave(day.date, day.bodyMass);
+  const showsMassDelta = mass.m_d !== undefined && !massChangeStoredInGrams(mass);
   [
     ['mass-reading', day.bodyMass ?? undefined],
     ['mass-mean', mass.m_avg],
-    ['mass-delta', mass.m_d !== undefined && !massChangeStoredInGrams(mass) ? mass.m_d : undefined],
+    ['mass-delta', showsMassDelta ? mass.m_d : undefined],
     ['mass-bmi', mass.BMI],
-  ].forEach(([id, value]) => {
-    const text = value !== undefined ? `${value}` : '';
-    document.getElementById(`physique-${id}`).textContent = privacyMode ? maskDigits(text) : text;
-  });
+  ].forEach(([id, value]) => setMaskedText(`physique-${id}`, value !== undefined ? `${value}` : ''));
 
-  // Only the BMR picked in the Tune; shown negative, as the Status card's: an expenditure.
+  // Only the Tune's picked BMR row shows; negative, as an expenditure.
   const shownBmrKey = selectedBmrKey(bmr);
-  [['mif', 'BMR_mif'], ['kat', 'BMR_kat'], ['cal', 'BMR_cal'], ['adp', 'BMR_adp'], ['avg', 'BMR_avg']].forEach(([id, key]) => {
-    const text = bmr[key] !== undefined ? `${-bmr[key]}` : '';
-    const cell = document.getElementById(`physique-bmr-${id}`);
-    cell.textContent = privacyMode ? maskDigits(text) : text;
-    cell.parentElement.hidden = key !== shownBmrKey;
+  BMR_JSON_ORDER.forEach((key) => {
+    const id = `physique-bmr-${key.replace('BMR_', '')}`;
+    setMaskedText(id, bmr[key] !== undefined ? `${-bmr[key]}` : '');
+    document.getElementById(id).parentElement.hidden = key !== shownBmrKey;
   });
 
-  // M — BMR + AEE, signed as expenditure; its Desire is set with the others below.
+  // M = BMR + AEE, signed as expenditure.
   const bmrShown = bmr[shownBmrKey];
-  const mText = bmrShown !== undefined ? `${-Math.round(bmrShown + day.caloriesOut)}` : '';
-  document.getElementById('physique-maintenance').textContent = privacyMode ? maskDigits(mText) : mText;
+  const maintenanceKcal = bmrShown !== undefined ? -Math.round(bmrShown + day.caloriesOut) : null;
+  show('physique-maintenance', maintenanceKcal);
 
-  // The day's macros off its Consumption breakdown, floored as the Intake Macros card does.
+  // The day's macros off its breakdown, floored as the Intake Macros card does.
   const breakdown = parsePhysiqueBreakdown(document.getElementById('physique-breakdown').value);
   const macroG = {};
   [['protein', 'protein'], ['fiber', 'fiber'], ['fat', 'fat'], ['carb', 'carbohydrate']].forEach(([id, key]) => {
     const rows = breakdown.filter((r) => Number.isFinite(r[key]));
     if (rows.length) macroG[id] = Math.floor(rows.reduce((sum, r) => sum + r[key], 0));
-    const text = rows.length ? `${macroG[id]}` : '';
-    document.getElementById(`physique-macro-${id}`).textContent = privacyMode ? maskDigits(text) : text;
+    show(`physique-macro-${id}`, rows.length ? macroG[id] : null);
   });
 
-  // Desire — the plan-level figure each one is read against, the same ones the
-  // Status card's own rows pair with (health-chart.js setStatusEnergyTile): the
-  // healthy body mass, its BMI, the weekly fat-loss rate as a daily mass/calorie
-  // figure, the desired calories, and the desired Activity/Deprivation/Balance that
-  // follow from it. A plan figure, not a per-day one — it doesn't move as
-  // Calories In/Out are typed, only Body Mass (the desired Activity's own input).
-  const setDesire = (id, value) => {
-    const cell = document.getElementById(id);
-    const text = value !== null && value !== undefined ? `${value}` : '';
-    cell.textContent = privacyMode ? maskDigits(text) : text;
-  };
+  // Desire: the plan figure each row is read against (as setStatusEnergyTile pairs
+  // them). Moves with Body Mass only, not with Calories In/Out.
   const heightCm = getSetting('HEIGHT_CM', null);
   const healthyMassKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
   const healthEntries = physiqueAsHealthEntries();
@@ -214,39 +188,39 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const actDesiredKcal = actMassKg !== null ? Math.round(getActivityDesiredKcal(actMassKg)) : null;
   const weeklyFatLossKg = weeklyFatLossKgAt(planMassKg);
   const desiredKgPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) / 1000 : null;
-  const desiredGPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) : null;
+  const desiredGPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * GRAMS_PER_KG) : null;
+  const bmiDesired = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
 
   // The healthy mass ± glycogen swing, as the Progress meter shows it.
   const swingKg = glycogenSwingKg(day.bodyMass, heightCm, getSettingString('SEX', null));
-  setDesire('physique-mass-reading-desire', swingKg === null ? healthyMassKg : `${healthyMassKg} ± ${Math.round(swingKg * 10) / 10}`);
-  setDesire('physique-mass-mean-desire', healthyMassKg);
-  setDesire('physique-mass-delta-desire', desiredKgPerDay);
-  setDesire('physique-mass-bmi-desire', heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null);
+  show('physique-mass-reading-desire', swingKg === null ? healthyMassKg : `${healthyMassKg} ± ${Math.round(swingKg * 10) / 10}`);
+  show('physique-mass-mean-desire', healthyMassKg);
+  show('physique-mass-delta-desire', desiredKgPerDay);
+  show('physique-mass-bmi-desire', bmiDesired);
   const bands = {
     protein: getProteinDesiredBandG(healthEntries),
     fiber: getFiberDesiredBandG(healthEntries),
     fat: getFatDesiredBandG(healthEntries),
     carb: getCarbDesiredBandG(healthEntries),
   };
-  Object.entries(bands).forEach(([id, band]) => setDesire(`physique-macro-${id}-desire`, formatProteinDesiredBand(band)));
-  setDesire('physique-tei-desire', calDesired.kcal);
-  setDesire('physique-tef-desire', -digDesired);
-  setDesire('physique-aee-desire', actDesiredKcal !== null ? -actDesiredKcal : null);
-  setDesire('physique-sleep-deprivation-desire', 0);
+  Object.entries(bands).forEach(([id, band]) => show(`physique-macro-${id}-desire`, formatProteinDesiredBand(band)));
+  show('physique-tei-desire', calDesired.kcal);
+  show('physique-tef-desire', -digDesired);
+  show('physique-aee-desire', actDesiredKcal !== null ? -actDesiredKcal : null);
+  show('physique-sleep-deprivation-desire', 0);
   const mDesired = bmrShown !== undefined && actDesiredKcal !== null ? -Math.round(bmrShown + actDesiredKcal) : null;
-  setDesire('physique-maintenance-desire', mDesired);
+  show('physique-maintenance-desire', mDesired);
   const balanceDesired = desiredBalanceKcal(planMassKg);
-  setDesire('physique-balance-desire', balanceDesired);
-  setDesire('physique-mass-delta-prime-desire', desiredGPerDay);
+  show('physique-balance-desire', balanceDesired);
+  show('physique-mass-delta-prime-desire', desiredGPerDay);
 
-  // Remain — Desire − Amount, a band's floor for the macros; blank once Amount is past Desire.
+  // Remain = Desire − Amount (a band's floor for macros); blank once Amount is past Desire.
   // `dir` is the way Amount moves toward Desire (+1 up, −1 down; kcal out are negative).
   const downward = bodyMassHealthyIsDownward(healthEntries);
   const massDir = downward ? -1 : 1;
   const rateDir = (desire) => Math.sign(desire || 0) || massDir;
-  const bmiDesired = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
-  const showsMassDelta = mass.m_d !== undefined && !massChangeStoredInGrams(mass);
   const sdKcal = energy ? energy.deprivationKcal : sleepHours === null ? 0 : null;
+  const known = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
   [
     ['mass-reading', day.bodyMass, healthyMassKg, 1, massDir],
     ['mass-mean', mass.m_avg, healthyMassKg, 1, massDir],
@@ -257,17 +231,16 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     ['tef-derived', tefKcal !== null ? -tefKcal : null, -digDesired, 0, massDir],
     ['aee', -day.caloriesOut, actDesiredKcal !== null ? -actDesiredKcal : null, 0, -1],
     ['sleep-deprivation', sdKcal, 0, 0, -1],
-    ['maintenance', bmrShown !== undefined ? -Math.round(bmrShown + day.caloriesOut) : null, mDesired, 0, -1],
+    ['maintenance', maintenanceKcal, mDesired, 0, -1],
     ['balance', energy ? energy.balance : null, balanceDesired, 0, rateDir(balanceDesired)],
-    ['mass-delta-prime', energy ? Math.round((energy.balance / GENERIC_KCAL_PER_KG_FAT) * 1000) : null, desiredGPerDay, 0, rateDir(desiredGPerDay)],
+    ['mass-delta-prime', deltaMassPrimeG, desiredGPerDay, 0, rateDir(desiredGPerDay)],
   ].forEach(([id, amount, desire, digits, dir]) => {
-    const known = (v) => v !== null && v !== undefined && Number.isFinite(Number(v));
     const scale = 10 ** digits;
     const passed = known(amount) && known(desire) && dir * (amount - desire) > 0;
-    setDesire(`physique-${id}-remain`, known(amount) && known(desire) && !passed ? Math.round((desire - amount) * scale) / scale : null);
+    show(`physique-${id}-remain`, known(amount) && known(desire) && !passed ? Math.round((desire - amount) * scale) / scale : null);
   });
 
-  // Amount green/red by the Status and Intake Macros cards' own rules (health-chart.js).
+  // Amount green/red by the Status and Intake Macros cards' rules (health-chart.js).
   const towardHealthy = (v, healthy) => (downward ? v <= healthy : v >= healthy);
   const bandTone = (g, band, within) => (within(g, band) || g > band.max ? 'income' : 'expense');
   const isCut = getCalorieDesiredKind(healthEntries) === 'max';
@@ -292,7 +265,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     ['tef-derived', tefKcal !== null ? (downward ? tefKcal >= digDesired : tefKcal <= digDesired) : null],
     ['aee', actDesiredKcal !== null ? day.caloriesOut >= actDesiredKcal : null],
     ['sleep-deprivation', sdKcal !== null ? sdKcal <= 0 : null],
-    ...['mif', 'kat', 'cal', 'adp', 'avg'].map((id) => [`bmr-${id}`, bmrGood]),
+    ...BMR_JSON_ORDER.map((key) => [`bmr-${key.replace('BMR_', '')}`, bmrGood]),
     ['maintenance', bmrShown !== undefined && actDesiredKcal !== null ? day.caloriesOut >= actDesiredKcal : null],
     ['balance', balanceGood],
     // Δm′ is D in grams, so it reads as D does.
@@ -308,10 +281,16 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   return { balance: energy ? energy.balance : null, balanceDesired };
 }
 
-// The two activity categories physiqueAsHealthEntries emits and every
-// activity consumer (health-chart.js, health-insight-activity.js) filters on.
+// The activity categories physiqueAsHealthEntries emits, which every activity consumer filters on.
 function isActivityCategory(category) {
   return category === 'Activity' || category === 'Activity; Calories';
+}
+
+// Back to `page` with nothing selected.
+function showPhysiquePage(page) {
+  pCurrentPage = page;
+  selectedPhysiqueRows.clear();
+  renderPhysiqueList();
 }
 
 async function initPhysique(forceRefresh = false) {
@@ -319,16 +298,14 @@ async function initPhysique(forceRefresh = false) {
     physiqueListenersAttached = true;
 
     document.getElementById('add-physique-btn').addEventListener('click', () => openPhysiqueForm(null));
-    // Today's address is its date, the same one the row's own Edit uses, whether or
-    // not today is logged yet.
+    // Today's address is its date, logged yet or not.
     document.getElementById('today-physique-btn').addEventListener('click', () => {
       routeRecordEdit('physique', todayPhysiqueRouteStep());
       openPhysiqueForm(todaysPhysiqueDay());
     });
-    // health/physique/<date or pattern-N>/ opens that row's Edit; …/micronutrients/ its
-    // 🧬 view, …/duplicate/ its 📋.
-    // Today's date opens a new Log while today isn't logged, and the old …/today/
-    // address lands on today's date.
+    // health/physique/<date or pattern-N>/ opens that row's Edit, with …/micronutrients/
+    // and …/duplicate/ below it. Today's date (or the old …/today/) opens a new Log
+    // while today isn't logged.
     registerRecordRoute('physique', (slug, sub) => {
       const today = todayPhysiqueRouteStep();
       if (!sub && (slug === 'today' || (slug === today.slug && !todaysPhysiqueDay()))) {
@@ -342,13 +319,12 @@ async function initPhysique(forceRefresh = false) {
       return physiqueRouteStep(p).label;
     });
     document.getElementById('physique-cancel-btn').addEventListener('click', closePhysiqueForm);
-    document.getElementById('physique-micro-close-btn').addEventListener('click', () => {
-      document.getElementById('physique-micro-modal').hidden = true;
+    const closeOnClick = (btnId, modalId) => document.getElementById(btnId).addEventListener('click', () => {
+      document.getElementById(modalId).hidden = true;
     });
+    closeOnClick('physique-micro-close-btn', 'physique-micro-modal');
     document.getElementById('physique-micro-range-btn').addEventListener('click', openPhysiqueMicronutrientsRange);
-    document.getElementById('physique-micro-range-close-btn').addEventListener('click', () => {
-      document.getElementById('physique-micro-range-modal').hidden = true;
-    });
+    closeOnClick('physique-micro-range-close-btn', 'physique-micro-range-modal');
     document.getElementById('physique-calc-btn').addEventListener('click', calculatePhysiqueDay);
     document.getElementById('physique-scan-btn').addEventListener('click', () => document.getElementById('physique-scan-input').click());
     document.getElementById('physique-scan-input').addEventListener('change', handlePhysiqueScanInput);
@@ -361,19 +337,8 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('physique-is-pattern').addEventListener('change', updatePhysiqueSleepDuration);
     onFormSubmit('physique-form', submitPhysiqueForm);
 
-    ['physique-search'].forEach((id) => {
-      document.getElementById(id).addEventListener('input', () => {
-        pCurrentPage = 1;
-        selectedPhysiqueRows.clear();
-        renderPhysiqueList();
-      });
-    });
-
-    makeSortableHeaders('#physique-table', pSort, () => {
-      pCurrentPage = 1;
-      selectedPhysiqueRows.clear();
-      renderPhysiqueList();
-    });
+    document.getElementById('physique-search').addEventListener('input', () => showPhysiquePage(1));
+    makeSortableHeaders('#physique-table', pSort, () => showPhysiquePage(1));
 
     document.getElementById('physique-select-all').addEventListener('change', (e) => {
       const { pageEntries } = getPhysiquePageEntries();
@@ -386,42 +351,47 @@ async function initPhysique(forceRefresh = false) {
   await refreshPhysique(forceRefresh);
 }
 
+const physiqueTextCell = (value) => String(value || '');
+
+// Entry key -> cell parser, in the entry's own key order.
+const PHYSIQUE_CELL_PARSERS = {
+  date: (value) => physiqueTextCell(value).trim(),
+  bedtime: normalizeTimeCell,
+  wakeTime: normalizeTimeCell,
+  bodyMass: physiqueNumber,
+  sleep: physiqueNumber,
+  deprivation: physiqueNumber,
+  bmr: parsePhysiqueBmr,
+  consumption: physiqueTextCell,
+  breakdown: physiqueTextCell,
+  caloriesIn: physiqueNumber,
+  proteinIn: physiqueNumber,
+  fiber: physiqueNumber,
+  fat: physiqueNumber,
+  carbohydrate: physiqueNumber,
+  tef: physiqueNumber,
+  workout: physiqueTextCell,
+  duration: physiqueNumber,
+  caloriesOut: physiqueNumber,
+};
+
 async function refreshPhysique(forceRefresh = false) {
-  // A new key: the cached copy now includes the header row.
   const resp = await getValues(PHYSIQUE_RANGE, VALUE_PARAMS);
   const values = resp.values || [];
 
-  // Row 1 is always the header, as before.
+  // Row 1 is always the header.
   physiqueColumnIndex = physiqueColumnsFromHeader(values[0] || []);
-  const cell = (row, key) => (physiqueColumnIndex[key] === undefined ? undefined : row[physiqueColumnIndex[key]]);
+  const cell = (row, key) => (hasPhysiqueColumn(key) ? row[physiqueColumnIndex[key]] : undefined);
+  const parsers = Object.entries(PHYSIQUE_CELL_PARSERS);
 
   allPhysiqueEntries = values.slice(1)
     .map((row, i) => ({
       row: i + 2,
       // Every cell as read, so a write keeps columns this app doesn't know about.
       cells: row,
-      date: String(cell(row, 'date') || '').trim(),
-      bedtime: normalizeTimeCell(cell(row, 'bedtime')),
-      wakeTime: normalizeTimeCell(cell(row, 'wakeTime')),
-      bodyMass: numberCell(cell(row, 'bodyMass')),
-      sleep: numberCell(cell(row, 'sleep')),
-      deprivation: numberCell(cell(row, 'deprivation')),
-      bmr: parsePhysiqueBmr(cell(row, 'bmr')),
-      consumption: String(cell(row, 'consumption') || ''),
-      breakdown: String(cell(row, 'breakdown') || ''),
-      caloriesIn: numberCell(cell(row, 'caloriesIn')),
-      proteinIn: numberCell(cell(row, 'proteinIn')),
-      fiber: numberCell(cell(row, 'fiber')),
-      fat: numberCell(cell(row, 'fat')),
-      carbohydrate: numberCell(cell(row, 'carbohydrate')),
-      tef: numberCell(cell(row, 'tef')),
-      workout: String(cell(row, 'workout') || ''),
-      duration: numberCell(cell(row, 'duration')),
-      caloriesOut: numberCell(cell(row, 'caloriesOut')),
+      ...Object.fromEntries(parsers.map(([key, parse]) => [key, parse(cell(row, key))])),
     }))
-    // A row with nothing in it at all isn't a logged day — but a dateless row
-    // that carries anything is a pattern, so every column counts here, not
-    // just the date.
+    // An empty row isn't a day, but a dateless row with anything in it is a pattern.
     .filter((p) => PHYSIQUE_FIELDS.some(({ key }) => p[key] !== null && String(p[key]).trim() !== ''))
     // The body-mass figures ride in the same Derived cell.
     .map((p) => ({ ...p, mass: massFiguresOf(p.bmr) }));
@@ -433,22 +403,12 @@ async function refreshPhysique(forceRefresh = false) {
 
   renderPhysiqueList();
   renderHealthCharts(physiqueAsHealthEntries());
-  // Ticks the Activity Plan rows already in today's Workout cell
-  // (health-activity.js) — here rather than in the plan's own init so a save
-  // re-marks the row it just wrote.
+  // Here rather than in their own inits, so a save re-marks what it just wrote:
+  // the Activity Plan's ticks and Nutrition's logged-today tint.
   renderWorkoutPlanProgress();
-  // Same reason, for Nutrition's own tint/label pair (health-nutrition.js):
-  // .nutrition-row-logged on any row already in today's Consumption
-  // breakdown, and the Log buttons' hover. A full re-render rather than just
-  // the label, since the tint itself reads todaysPhysiqueDay() too — but
-  // only once Nutrition has data of its own to draw; before that,
-  // initNutrition's own first render already picks up whatever Physique
-  // state landed by then (see nutritionDataLoaded's own load-order comment,
-  // health-nutrition.js), and re-rendering an empty table here would show the
-  // "no ingredients yet" empty state rather than just doing nothing.
+  // Only once Nutrition has its own data; before that its first render picks this up.
   if (nutritionDataLoaded) {
-    // Today's logged days just changed, so the memoized Uses counts are stale —
-    // drop them so renderNutritionList recounts against current Physique.
+    // Today's days changed, so the memoized Uses counts are stale.
     nutritionUsageCounts = null;
     renderNutritionList();
   } else updateNutritionLogButtonLabel();
@@ -479,21 +439,19 @@ function physiqueColumnLetter(i) {
 
 // --- Stored body mass --------------------------------------------------------
 //
-// Each day's Derived cell also holds {"m","BMI","m_avg","m_d"}: the body-mass reading as of that day
-// (its own, else the latest earlier one), BMI at m_avg, the L_p-day rolling average,
-// and the smoothed trend's slope in g/day — all as of that day, worked out once on
-// save (and for days saved before the column existed, on load) and then only read:
-// by the Status card, the Body Mass chart and the day form. A changed body-mass reading
-// rewrites the days after it; a changed L_p or height rewrites every day.
+// Each day's Derived cell also holds {"m","BMI","m_avg","m_d"} as of that day: the
+// reading (its own, else the latest earlier), BMI at m_avg, the L_p-day rolling average
+// and the smoothed trend's slope in kg/day. Worked out on save (or on load for older
+// days), then only read. A changed reading rewrites the days after it; a changed L_p
+// or height rewrites every day.
 const MASS_JSON_ORDER = ['m', 'BMI', 'm_avg', 'm_d'];
 
 // m_d as g/day for display, from its stored kg/day.
 function massChangeGPerDay(mass) {
-  return mass?.m_d === undefined || mass?.m_d === null ? null : Math.round(mass.m_d * 1000);
+  return mass?.m_d === undefined || mass?.m_d === null ? null : Math.round(mass.m_d * GRAMS_PER_KG);
 }
 
-// A cell written while m_d was stored in g/day: no body changes by a kilogram a day,
-// so a magnitude that large can only be grams.
+// A cell written while m_d was in g/day: no body changes by 1 kg a day, so that's grams.
 function massChangeStoredInGrams(mass) {
   return mass?.m_d !== undefined && Math.abs(mass.m_d) >= 1;
 }
@@ -507,7 +465,7 @@ function massFiguresOf(bmr) {
 function computePhysiqueMassFigures(date, bodyMassKg = undefined) {
   if (!date) return {};
   const readings = physiqueDatedAscending()
-    .filter((p) => p.date <= date && p.date !== date && p.bodyMass !== null)
+    .filter((p) => p.date < date && p.bodyMass !== null)
     .map((p) => ({ category: 'Body Mass', date: p.date, amount: p.bodyMass }));
   const own = bodyMassKg !== undefined
     ? bodyMassKg
@@ -524,14 +482,19 @@ function computePhysiqueMassFigures(date, bodyMassKg = undefined) {
   const trendDates = [...trend.keys()].sort();
   const slope = trendDates.length ? computeBodyMassTrendSlopeGramsPerDay(trend).get(trendDates.at(-1)) : null;
   // Stored in kg/day like every other body-mass figure (the slope comes in g/day).
-  if (slope !== null && slope !== undefined) figures.m_d = Math.round(slope) / 1000;
+  if (slope !== null && slope !== undefined) figures.m_d = Math.round(slope) / GRAMS_PER_KG;
   return figures;
+}
+
+// The dated row already saved for `date`, if any.
+function savedPhysiqueDay(date) {
+  return allPhysiqueEntries.find((p) => p.date && p.date === date);
 }
 
 // What a save stores for `date`: the saved figures while its Body Mass is unchanged.
 function physiqueMassForSave(date, bodyMassKg) {
   if (!date) return {};
-  const saved = allPhysiqueEntries.find((p) => p.date && p.date === date);
+  const saved = savedPhysiqueDay(date);
   if (saved?.mass && !massChangeStoredInGrams(saved.mass) && (saved.bodyMass ?? null) === (bodyMassKg ?? null)) {
     return { ...saved.mass };
   }
@@ -551,10 +514,9 @@ function storedMassByDate() {
   return new Map(physiqueDatedAscending().filter((p) => p.mass).map((p) => [p.date, p.mass]));
 }
 
-// Rewrites the Derived cells of the days after `fromDate` that a changed body-mass reading moved
-// (their rolling average and trend read it); only cells whose figures differ.
+// After a changed reading, rewrites the later days whose average or trend it moved.
 async function recomputeStoredMassAfter(fromDate) {
-  if (physiqueBatchRunning || physiqueColumnIndex.bmr === undefined) return;
+  if (physiqueBatchRunning || !hasPhysiqueColumn('bmr')) return;
   const data = [];
   physiqueDatedAscending().filter((p) => p.date > fromDate).forEach((p) => {
     const figures = computePhysiqueMassFigures(p.date);
@@ -568,8 +530,8 @@ async function recomputeStoredMassAfter(fromDate) {
 // --- Stored BMR ------------------------------------------------------------
 //
 // Each day's Derived cell holds {"BMR_mif","BMR_kat","BMR_cal","BMR_adp","BMR_avg"} (kcal),
-// computed once on save and read by every per-day display. A key is left out
-// when its inputs are missing.
+// computed on save and read by every per-day display. A key is left out when its
+// inputs are missing.
 
 const BMR_EQUATION_KEYS = { mifflin: 'BMR_mif', katch: 'BMR_kat' };
 const BMR_DEFINITIONS = {
@@ -580,10 +542,21 @@ const BMR_DEFINITIONS = {
   BMR_avg: 'Average BMR',
 };
 
-// "BMR_kat (Katch-McArdle BMR)" — the label (definition) form every hover uses.
+// "BMR_kat (Katch-McArdle BMR)": the label (definition) form every hover uses.
 function bmrHoverLabel(key) {
   return `${key} (${BMR_DEFINITIONS[key]})`;
 }
+
+// The active equation's figure (BMR_mif or BMR_kat).
+function plainBmrOf(figures) {
+  return figures[BMR_EQUATION_KEYS[bmrFormula()]];
+}
+
+// Whole days from one ISO date to another.
+function physiqueDaysBetween(fromIso, toIso) {
+  return Math.round((parseIsoDateUTC(toIso) - parseIsoDateUTC(fromIso)) / PHYSIQUE_DAY_MS);
+}
+
 // Set while every day is being recomputed, so lookups ignore stale stored values.
 let ignoreStoredBmr = false;
 // date -> figures, and dated rows oldest first; both dropped on every refresh.
@@ -642,10 +615,10 @@ function physiqueBaseBmrFigures(date, bodyMassKg) {
   if (age !== null) figures.BMR_mif = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex, 'mifflin'));
   figures.BMR_kat = Math.round(bmrKcal(bodyMassKg, heightCm, age, sex, 'katch'));
 
-  const plain = figures[BMR_EQUATION_KEYS[bmrFormula()]];
+  const plain = plainBmrOf(figures);
   const firstWeighIn = physiqueFirstWeighInDate();
   if (plain !== undefined && firstWeighIn) {
-    const daysOnDiet = Math.max(0, Math.round((parseIsoDateUTC(date) - parseIsoDateUTC(firstWeighIn)) / 86400000));
+    const daysOnDiet = Math.max(0, physiqueDaysBetween(firstWeighIn, date));
     const fraction = adaptationFraction(daysOnDiet,
       getSetting(ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_PER_WEEK_DEFAULT),
       getSetting(ADAPT_PCT_CAP_KEY, ADAPT_PCT_CAP_DEFAULT));
@@ -654,33 +627,22 @@ function physiqueBaseBmrFigures(date, bodyMassKg) {
   return figures;
 }
 
-// Whichever of BMR_mif, BMR_kat and BMR_adp this day actually has — the plain
-// equations BMR_cal is measured against (as an offset) or, with nothing yet to
-// measure an offset from, averaged into a placeholder for (see
-// physiqueCalibratedBmr's 1st-week fallback below).
+// Whichever of BMR_mif, BMR_kat and BMR_adp the day has: what BMR_cal is clamped to,
+// and averaged before there's an offset to measure (physiqueCalibratedBmr).
 function physiqueBmrEquationValues(figures) {
   return [figures.BMR_mif, figures.BMR_kat, figures.BMR_adp].filter((v) => v !== undefined);
 }
 
-// The active equation's BMR plus the offset Calibrate measures over however many
-// full L_p-day periods are available so far, up to n_p. Ramps up rather than
-// waiting for the full n_p × L_p days to pile up: the 2nd period has only 1
-// period behind it to measure from, the 3rd has 2, and so on, capping at n_p
-// from period n_p + 1 onward — so BMR_cal starts appearing a period earlier
-// than it used to, every period, instead of staying blank until n_p periods
-// have fully elapsed.
-//
-// 1st period (no full L_p days logged yet, so no period to measure an offset
-// from at all): the plain average of whichever equations this day has, rather
-// than leaving BMR_cal undefined — so BMR_cal always has a value, from the very
-// first day, and the 1st period just happens to equal the average of the other
-// three until there's a measured offset to apply instead.
+// The active equation's BMR plus Calibrate's offset over the full L_p-day periods
+// so far, up to n_p, so BMR_cal ramps up from the 2nd period instead of waiting for
+// all n_p. In the 1st period (nothing to measure yet) it's the plain average of the
+// day's equations, so BMR_cal always has a value.
 function physiqueCalibratedBmr(date, plainBmr, figures) {
   if (plainBmr === undefined) return undefined;
   const periodCount = getSetting(BMR_CALIBRATION_PERIOD_COUNT_KEY, BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);
   const periodDays = getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
   const firstDate = physiqueDatedAscending()[0]?.date;
-  const daysOfData = firstDate ? Math.round((parseIsoDateUTC(date) - parseIsoDateUTC(firstDate)) / 86400000) : 0;
+  const daysOfData = firstDate ? physiqueDaysBetween(firstDate, date) : 0;
   const availablePeriods = firstDate ? Math.min(Math.floor(daysOfData / periodDays), periodCount) : 0;
   if (availablePeriods < 1) {
     const equations = physiqueBmrEquationValues(figures);
@@ -690,11 +652,8 @@ function physiqueCalibratedBmr(date, plainBmr, figures) {
   return result.ok ? Math.round(plainBmr + result.offsetKcal) : undefined;
 }
 
-// BMR_cal is measured from real data (computeBmrCalibration's offset) rather than
-// any equation, so a thin or noisy calibration window can swing it far from what
-// every equation agrees is plausible. Clamped to within 10% of whichever of
-// BMR_mif, BMR_kat and BMR_adp are available for this day (min − 10% to max +
-// 10%), so it can't calibrate to an implausibly high or low number.
+// BMR_cal comes from measured data, so a thin or noisy window can swing it far.
+// Clamped to the day's equations, min − 10% to max + 10%.
 const BMR_CAL_CLAMP_PCT = 0.10;
 function clampBmrCal(bmrCal, figures) {
   const equations = physiqueBmrEquationValues(figures);
@@ -704,11 +663,11 @@ function clampBmrCal(bmrCal, figures) {
   return Math.min(upper, Math.max(lower, bmrCal));
 }
 
-// All four figures for a day, computed fresh. `bodyMassKg` overrides the
-// carried-forward mass (a day being saved with its own new body-mass reading).
+// All of a day's BMR figures, computed fresh. `bodyMassKg` overrides the
+// carried-forward mass (a day saved with its own new reading).
 function computePhysiqueBmrFigures(date, bodyMassKg = physiqueBodyMassAsOf(date)) {
   const figures = physiqueBaseBmrFigures(date, bodyMassKg);
-  const calibrated = physiqueCalibratedBmr(date, figures[BMR_EQUATION_KEYS[bmrFormula()]], figures);
+  const calibrated = physiqueCalibratedBmr(date, plainBmrOf(figures), figures);
   if (calibrated !== undefined) figures.BMR_cal = clampBmrCal(calibrated, figures);
   const avg = bmrAverageOf(figures);
   if (avg !== null) figures.BMR_avg = avg;
@@ -732,7 +691,7 @@ function bmrFiguresForDate(date) {
 
 // Today's figures at m̄, computed as the Tune does; cached per mass and settings.
 function todayBmrFigures() {
-  const date = isoFromDate(new Date());
+  const date = localIso();
   const mass = planBodyMassKg(physiqueAsHealthEntries());
   const key = `today:${date}:${mass}:${JSON.stringify(currentSettings)}`;
   if (!bmrFiguresCache.has(key)) bmrFiguresCache.set(key, computePhysiqueBmrFigures(date, mass ?? undefined));
@@ -740,9 +699,9 @@ function todayBmrFigures() {
 }
 
 // One figure from a day's set for `basis` ('bmr', 'bmr_cal', 'bmr_adp', 'bmr_avg'). Plain
-// BMR stands in for a missing one, as before. Null without a profile.
+// BMR stands in for a missing one. Null without a profile.
 function pickBmrForBasis(figures, basis = bmrBasis()) {
-  const plain = figures[BMR_EQUATION_KEYS[bmrFormula()]];
+  const plain = plainBmrOf(figures);
   if (plain === undefined) return null;
   if (basis === 'bmr_adp') return figures.BMR_adp ?? plain;
   if (basis === 'bmr_cal') return figures.BMR_cal ?? plain;
@@ -761,9 +720,9 @@ function storedBmrForDate(date, basis = bmrBasis()) {
   return pickBmrForBasis(bmrFiguresForDate(date), basis);
 }
 
-// A day's energy balance off its own TEI, AEE, TEF and stored BMR — the same
-// dailyEnergyBalanceKcal the Status card uses. Null without a BMR, TEI or sleep.
-// sleepOptional: no Bed/Wake counts as SD = 0 (the form's live table) instead of no result.
+// A day's energy balance off its TEI, AEE, TEF and stored BMR (the Status card's
+// dailyEnergyBalanceKcal). Null without a BMR, TEI or sleep; with sleepOptional,
+// no Bed/Wake counts as SD = 0 (the form's live table).
 function physiqueEnergyBalance(day, sleepHours, bmrFigures, { sleepOptional = false } = {}) {
   const maintenance = pickBmrForBasis(bmrFigures);
   if (maintenance === null || day.caloriesIn === null || (sleepHours === null && !sleepOptional)) return null;
@@ -785,15 +744,15 @@ function physiqueDeprivationKcal(day, sleepHours, bmrFigures) {
   return physiqueEnergyBalance(day, sleepHours, bmrFigures)?.deprivationKcal ?? null;
 }
 
-// The BMR figures a save stores for `date`: its own body-mass reading, else the latest earlier one.
-// Only a changed Body Mass recomputes a stored day; otherwise its cell is kept as is.
+// The BMR figures a save stores for `date`, at its own reading else the latest earlier one.
+// Only a changed Body Mass recomputes a stored day.
 function physiqueBmrForSave(date, bodyMassKg) {
   if (!date) return {};
-  const saved = allPhysiqueEntries.find((p) => p.date && p.date === date);
+  const saved = savedPhysiqueDay(date);
   const bmr = saved?.bmr && (saved.bodyMass ?? null) === (bodyMassKg ?? null)
     ? { ...saved.bmr }
     : computePhysiqueBmrFigures(date, bodyMassKg ?? physiqueBodyMassAsOf(isoDatePlusDays(date, -1)));
-  // A BMR_cal already stored for this date is kept as is (only a settings change rewrites it).
+  // A stored BMR_cal is kept (only a settings change rewrites it).
   if (saved?.bmr?.BMR_cal !== undefined) bmr.BMR_cal = saved.bmr.BMR_cal;
   // BMR_avg from the figures actually kept, BMR_cal included.
   const avg = bmrAverageOf(bmr);
@@ -801,7 +760,7 @@ function physiqueBmrForSave(date, bodyMassKg) {
   return bmr;
 }
 
-// Sleep, BMR, Deprivation and Mass as stored — computed here, once per save.
+// Sleep, BMR, Deprivation and Mass as stored, computed once per save.
 function physiqueDerivedFigures(day) {
   const sleep = physiqueSleepHours(day);
   const bmr = physiqueBmrForSave(day.date, day.bodyMass);
@@ -810,16 +769,22 @@ function physiqueDerivedFigures(day) {
 }
 
 const BMR_JSON_ORDER = ['BMR_mif', 'BMR_kat', 'BMR_cal', 'BMR_adp', 'BMR_avg'];
+// Key order of a written Derived cell.
+const DERIVED_JSON_ORDER = [...BMR_JSON_ORDER, ...MASS_JSON_ORDER];
+
+// A day's stored Sleep, else from its clock times.
+function physiqueStoredSleepHours(p) {
+  return p.sleep ?? physiqueSleepHours(p);
+}
 
 function physiqueCellValue(key, value) {
   if (key !== 'bmr') return value ?? '';
-  const order = [...BMR_JSON_ORDER, ...MASS_JSON_ORDER];
-  const present = order.filter((k) => value?.[k] !== undefined);
+  const present = DERIVED_JSON_ORDER.filter((k) => value?.[k] !== undefined);
   return present.length ? JSON.stringify(Object.fromEntries(present.map((k) => [k, value[k]]))) : '';
 }
 
-// A day's cells in the sheet's own column order. Unknown columns keep what
-// was read; Sleep/BMR/Deprivation are recomputed from the day's other fields.
+// A day's cells in sheet order. Unknown columns keep what was read; Sleep, BMR,
+// Deprivation and Mass are recomputed from the day's other fields.
 function physiqueRowCells(day) {
   const values = { ...day, ...physiqueDerivedFigures(day) };
   const cells = [...(day.cells || [])];
@@ -842,13 +807,16 @@ async function appendPhysiqueRow(day) {
   await appendValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A:${physiqueColumnLetter(cells.length - 1)}`, [cells]);
 }
 
-// "row:key" cells the backfill has written this session, so a second load racing
-// the first write can't send the same cells again.
+// Cell ranges the one-off fills have written this session, so a second load racing
+// the first write can't send them again.
 const physiqueBackfilledCells = new Set();
 
+function physiqueCellRange(key, row) {
+  return `'${CONFIG.SHEETS.PHYSIQUE}'!${physiqueColumnLetter(physiqueColumnIndex[key])}${row}`;
+}
+
 function physiqueCellUpdate(key, row, value) {
-  const ref = `${physiqueColumnLetter(physiqueColumnIndex[key])}${row}`;
-  return { range: `'${CONFIG.SHEETS.PHYSIQUE}'!${ref}`, values: [[physiqueCellValue(key, value)]] };
+  return { range: physiqueCellRange(key, row), values: [[physiqueCellValue(key, value)]] };
 }
 
 // Writes `data` in one request and reloads; one run at a time. False on failure.
@@ -858,8 +826,7 @@ async function runPhysiqueBatch(data, label) {
   physiqueBatchRunning = true;
   try {
     await batchUpdateValues(data);
-    // A write here re-reads the whole Physique tab after it, so a load that writes is
-    // slower; it should only happen while something is missing or changed.
+    // A write re-reads the whole tab, so it should only happen while something is missing or changed.
     console.info(`[physique] ${label}: ${data.length} cells (this load writes and re-reads Physique)`);
     await refreshPhysique(true);
     return true;
@@ -871,14 +838,21 @@ async function runPhysiqueBatch(data, label) {
   }
 }
 
-// One-off fill for days saved before Sleep/BMR/Deprivation were stored: blank
-// cells only, oldest day first, in one request. Nothing to do once all are filled.
+// A one-off fill's cells not yet sent this session, in one batch.
+async function runPhysiqueBackfill(data, label) {
+  const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
+  fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
+  await runPhysiqueBatch(fresh, label);
+}
+
+// One-off fill for days saved before Sleep/BMR/Deprivation/Mass were stored: blank
+// cells only, oldest day first. Nothing to do once all are filled.
 async function backfillPhysiqueDerivedFigures() {
   if (physiqueBatchRunning) return;
-  const has = (key) => physiqueColumnIndex[key] !== undefined;
+  const has = hasPhysiqueColumn;
   const data = [];
   physiqueDatedAscending().forEach((p) => {
-    const sleep = p.sleep ?? physiqueSleepHours(p);
+    const sleep = physiqueStoredSleepHours(p);
     if (has('sleep') && p.sleep === null && sleep !== null) data.push(physiqueCellUpdate('sleep', p.row, sleep));
 
     let figures = p.bmr;
@@ -887,7 +861,7 @@ async function backfillPhysiqueDerivedFigures() {
       if (Object.keys(figures).length) data.push(physiqueCellUpdate('bmr', p.row, figures));
     } else if (has('bmr') && figures.BMR_cal === undefined) {
       // A day that now has enough history gets its BMR_cal once, then keeps it.
-      const calibrated = physiqueCalibratedBmr(p.date, figures[BMR_EQUATION_KEYS[bmrFormula()]]);
+      const calibrated = physiqueCalibratedBmr(p.date, plainBmrOf(figures), figures);
       if (calibrated !== undefined) {
         figures = { ...figures, BMR_cal: calibrated };
         data.push(physiqueCellUpdate('bmr', p.row, figures));
@@ -898,30 +872,26 @@ async function backfillPhysiqueDerivedFigures() {
       if (deprivation !== null) data.push(physiqueCellUpdate('deprivation', p.row, deprivation));
     }
   });
-  // Days whose Derived cell has no body-mass figures yet get them added to it, once.
-  if (physiqueColumnIndex.bmr !== undefined) {
+  // Body-mass figures for Derived cells without them (or with m_d still in g/day).
+  if (has('bmr')) {
     physiqueDatedAscending().forEach((p) => {
-      // Rewritten once if its m_d was saved in g/day, before it was stored in kg.
       if (p.mass && !massChangeStoredInGrams(p.mass)) return;
       const figures = computePhysiqueMassFigures(p.date);
       if (!Object.keys(figures).length) return;
-      const range = physiqueCellUpdate('bmr', p.row, {}).range;
+      const range = physiqueCellRange('bmr', p.row);
       const pending = data.find((d) => d.range === range);
-      // Merged into this day's BMR write above, if there is one; else its own write.
+      // Merged into this day's BMR write above, if any.
       if (pending) pending.values = [[physiqueCellValue('bmr', { ...JSON.parse(pending.values[0][0] || '{}'), ...figures })]];
       else data.push(physiqueCellUpdate('bmr', p.row, { ...(p.bmr || {}), ...figures }));
     });
   }
-  const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
-  fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
-  await runPhysiqueBatch(fresh, 'stored missing Sleep/BMR/Deprivation/body mass');
+  await runPhysiqueBackfill(data, 'stored missing Sleep/BMR/Deprivation/body mass');
 }
 
-// One-off rewrite of saved Breakdown amounts still in units ("×1") into grams, from
-// each food's Nutrition row (breakdownAmountInGrams). Needs Nutrition loaded, so
-// app.js runs it once both tabs are in. Foods whose row gives no weight keep "×N".
+// One-off rewrite of Breakdown amounts still in units ("×1") into grams, from each
+// food's Nutrition row; app.js runs it once both tabs are in. No weight keeps "×N".
 async function convertPhysiqueBreakdownAmountsToGrams() {
-  if (physiqueBatchRunning || physiqueColumnIndex.breakdown === undefined) return;
+  if (physiqueBatchRunning || !hasPhysiqueColumn('breakdown')) return;
   const data = [];
   allPhysiqueEntries.forEach((p) => {
     let changed = false;
@@ -933,16 +903,14 @@ async function convertPhysiqueBreakdownAmountsToGrams() {
     });
     if (changed) data.push(physiqueCellUpdate('breakdown', p.row, breakdownToJson(items)));
   });
-  const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
-  fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
-  await runPhysiqueBatch(fresh, 'converted Breakdown amounts to grams');
+  await runPhysiqueBackfill(data, 'converted Breakdown amounts to grams');
 }
 
 // One-off fill for days saved while USDA/AI rows got no TEF: those rows' TEF,
 // the day's TEF and its Deprivation. Needs Nutrition loaded, like the above.
 async function fillPhysiqueMissingTef() {
-  if (physiqueBatchRunning || physiqueColumnIndex.breakdown === undefined) return;
-  const has = (key) => physiqueColumnIndex[key] !== undefined;
+  if (physiqueBatchRunning || !hasPhysiqueColumn('breakdown')) return;
+  const has = hasPhysiqueColumn;
   const data = [];
   allPhysiqueEntries.forEach((p) => {
     const items = parsePhysiqueBreakdown(p.breakdown);
@@ -953,13 +921,11 @@ async function fillPhysiqueMissingTef() {
     if (has('tef')) data.push(physiqueCellUpdate('tef', p.row, result.tefKcal));
     if (has('deprivation') && p.date) {
       const day = { ...p, tef: result.tefKcal };
-      const deprivation = physiqueDeprivationKcal(day, p.sleep ?? physiqueSleepHours(p), bmrFiguresForDate(p.date));
+      const deprivation = physiqueDeprivationKcal(day, physiqueStoredSleepHours(p), bmrFiguresForDate(p.date));
       if (deprivation !== null) data.push(physiqueCellUpdate('deprivation', p.row, deprivation));
     }
   });
-  const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
-  fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
-  await runPhysiqueBatch(fresh, 'filled TEF for USDA/AI-priced rows');
+  await runPhysiqueBackfill(data, 'filled TEF for USDA/AI-priced rows');
 }
 
 // Settings that change a stored BMR or Deprivation.
@@ -967,21 +933,19 @@ const PHYSIQUE_BMR_SETTING_KEYS = ['HEIGHT_CM', 'BIRTH_DATE', 'SEX', BMR_FORMULA
   ADAPT_PCT_PER_WEEK_KEY, ADAPT_PCT_CAP_KEY, BMR_CALIBRATION_PERIOD_COUNT_KEY,
   BMR_CALIBRATION_PERIOD_DAYS_KEY, 'SLEEP_DESIRED_HOURS', TEF_PERCENT_KEY];
 
-// Rewrites every day's BMR and Deprivation, in one request, when a saved setting
-// they depend on changed (saveSettingValues / submitSettingForm, other-settings.js).
-// `force` skips the changed-keys check (Calibrate's Update). Resolves to the
+// Rewrites every day's BMR, Mass and Deprivation in one request when a setting they
+// depend on changed. `force` skips that check (Calibrate's Update). Resolves to the
 // number of days rewritten, or null when the write failed.
 async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
   if (physiqueBatchRunning) return 0;
   if (!force && !changedKeys.some((key) => PHYSIQUE_BMR_SETTING_KEYS.includes(key))) return 0;
-  // A page that doesn't show Physique (e.g. Other's Settings) never loaded it, but a
-  // changed height/sex/BMR setting still has to rewrite every day's stored BMR.
+  // A page without Physique (e.g. Other's Settings) never loaded it, but must still rewrite it.
   if (!physiqueDataLoaded) {
     await initActivities();
     await initPhysique();
   }
   if (!physiqueDataLoaded || physiqueBatchRunning) return 0;
-  if (physiqueColumnIndex.bmr === undefined && physiqueColumnIndex.deprivation === undefined) return 0;
+  if (!hasPhysiqueColumn('bmr') && !hasPhysiqueColumn('deprivation')) return 0;
 
   ignoreStoredBmr = true;
   bmrFiguresCache = new Map();
@@ -990,12 +954,11 @@ async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
     physiqueDatedAscending().forEach((p) => {
       const figures = computePhysiqueBmrFigures(p.date);
       // L_p (m_avg, m_d) and height (BMI) are among these settings too.
-      if (physiqueColumnIndex.bmr !== undefined) {
+      if (hasPhysiqueColumn('bmr')) {
         data.push(physiqueCellUpdate('bmr', p.row, { ...figures, ...computePhysiqueMassFigures(p.date) }));
       }
-      if (physiqueColumnIndex.deprivation !== undefined) {
-        data.push(physiqueCellUpdate('deprivation', p.row,
-          physiqueDeprivationKcal(p, p.sleep ?? physiqueSleepHours(p), figures)));
+      if (hasPhysiqueColumn('deprivation')) {
+        data.push(physiqueCellUpdate('deprivation', p.row, physiqueDeprivationKcal(p, physiqueStoredSleepHours(p), figures)));
       }
     });
   } finally {
@@ -1006,37 +969,27 @@ async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
   return ok ? physiqueDatedAscending().length : null;
 }
 
-// Unlike the work-time reminder (weekdays only, scoped to one employer),
-// there's no day this doesn't apply to — everyone eats every day — so this
-// is just "does today have a Physique row yet".
+// Every day needs a row (unlike the weekday-only work-time reminder).
 function checkHealthReminder() {
-  const today = isoFromDate(new Date());
+  const today = localIso();
   const logged = allPhysiqueEntries.some((p) => p.date === today);
   setPageBadge('health', 'physique', logged ? null : { text: 'Log', title: "Today isn't logged", record: today });
 }
 
 // --- Physique as chart input --------------------------------------------
 //
-// health-chart.js, health-insight-wellness.js and health-chart-protein-rotation.js all consume a per-EVENT row
-// shape ({date, category, amount, amount2, unit, notes, breakdown,
-// sleepBedMin/WakeMin, tefKcal}). Rather than rewrite six charts plus the
-// projection and energy-balance math, each Physique day is expanded back into
-// up to four such rows — so every consumer works unchanged off a per-day tab.
-//
-// Memoized because aggregateWindow (health-insight-wellness.js) reads it repeatedly per run.
+// The charts and Insight read per-event rows ({date, category, amount, amount2, unit,
+// notes, breakdown, sleepBedMin/WakeMin, tefKcal}), so each day expands into up to
+// four of them. Memoized: aggregateWindow reads it repeatedly per run.
 
-// A day's activity split across the categories its Workout lines belong to
-// (Strength / Cardio / NEAT, per the Activities sheet), so the Physical
-// Activity chart stacks real composition instead of labelling a mixed day with
-// whichever category happened to win.
-//
-// The day's own stored Duration and Calories Out are apportioned by each
-// category's share of active seconds, rather than recomputed — that keeps a
-// hand-edited total exact, and the largest category absorbs the rounding
-// remainder so the parts still sum to the whole.
+// A day's activity split by its Workout lines' categories (per the Activities sheet),
+// so the chart stacks the real mix. The stored Duration and Calories Out are shared
+// by active seconds, keeping a hand-edited total exact; the largest category takes
+// the rounding remainder.
 function physiqueActivityByCategory(p) {
+  const unsplit = [{ category: 'Other', minutes: p.duration, calories: p.caloriesOut }];
   const lines = parseWorkoutNoteLines(p.workout);
-  if (!lines.length) return [{ category: 'Other', minutes: p.duration, calories: p.caloriesOut }];
+  if (!lines.length) return unsplit;
 
   const secondsByCategory = new Map();
   lines.forEach((line) => {
@@ -1045,7 +998,7 @@ function physiqueActivityByCategory(p) {
   });
 
   const totalSeconds = [...secondsByCategory.values()].reduce((sum, s) => sum + s, 0);
-  if (totalSeconds <= 0) return [{ category: 'Other', minutes: p.duration, calories: p.caloriesOut }];
+  if (totalSeconds <= 0) return unsplit;
 
   const shares = [...secondsByCategory.entries()].map(([category, seconds]) => ({
     category,
@@ -1077,8 +1030,7 @@ function physiqueAsHealthEntries() {
 
     const bed = parseClockTime(p.bedtime);
     const wake = parseClockTime(p.wakeTime);
-    // Both clock times or nothing — a day missing either has no duration to
-    // derive, and Physique has no duration-only form to fall back on.
+    // Both clock times or no sleep entry.
     if (bed !== null && wake !== null) {
       entries.push({
         ...base, category: 'Sleep', description: 'Sleep Duration', unit: 'hr',
@@ -1095,27 +1047,17 @@ function physiqueAsHealthEntries() {
         ...base, category: 'Calories; Protein', description: 'Consumption',
         amount: p.caloriesIn, amount2: p.proteinIn, unit: 'kcal', unit2: 'g',
         notes: p.consumption, breakdown: parsePhysiqueBreakdown(p.breakdown),
-        // This day's own measured TEF (column L), or null when it hasn't been
-        // calculated — health-math.js falls back to the flat TEF_PERCENT_OF_INTAKE
-        // estimate on null rather than treating it as a measured zero.
+        // Null when not calculated: health-math.js then estimates it, not a measured zero.
         tefKcal: p.tef,
-        // This day's own persisted Fiber (column I) — hand-typed or last
-        // backfilled from the breakdown, same as tefKcal above. Read by the
-        // Health tiles' Fiber card.
+        // The day's stored macros, as typed or last calculated.
         fiberG: p.fiber,
-        // Same shape, one column over (J) — read by the Wellness Fat Intake chart.
         fatG: p.fat,
-        // Same shape, one column over again (K) — read by the Wellness Carb Intake chart.
         carbG: p.carbohydrate,
       });
     }
 
-    // One entry per activity category, so a day of lifting plus a swim reads as
-    // two stacked segments rather than one merged label.
-    //
-    // The Workout text rides on the FIRST of them only: it describes the whole
-    // day, and health-insight-activity.js re-parses it for rep volume and muscle
-    // groups — repeating it per category would count every rep twice.
+    // One entry per activity category. The Workout text rides on the first only:
+    // health-insight-activity.js re-parses it, and repeating it would count reps twice.
     if (p.workout.trim() || p.duration !== null || p.caloriesOut !== null) {
       physiqueActivityByCategory(p).forEach(({ category, minutes, calories }, i) => {
         entries.push({
@@ -1131,11 +1073,9 @@ function physiqueAsHealthEntries() {
   return entries;
 }
 
-// Today's day row, whatever state it's in — what Log a Workout extends rather
-// than appending a second row for the same date (which the duplicate-date
-// guard would refuse to save anyway).
+// Today's row, which Log a Workout extends rather than adding a second one.
 function todaysPhysiqueDay() {
-  const today = isoFromDate(new Date());
+  const today = localIso();
   return allPhysiqueEntries.find((p) => p.date === today) ?? null;
 }
 
@@ -1148,7 +1088,7 @@ function warnBalanceShortOfDesire(derived) {
 
 // Confetti when today's saved body mass is closer to the healthy mass than the last earlier reading.
 function celebrateBodyMassProgress(date, bodyMass) {
-  const today = isoFromDate(new Date());
+  const today = localIso();
   if (date !== today || !bodyMass) return;
   const previous = physiqueDatedAscending().filter((p) => p.date < today && p.bodyMass !== null).at(-1)?.bodyMass;
   if (previous == null) return;
@@ -1156,8 +1096,7 @@ function celebrateBodyMassProgress(date, bodyMass) {
   if (Math.abs(bodyMass - healthyKg) < Math.abs(previous - healthyKg)) Motion.confetti();
 }
 
-// Which days came across incomplete. console only — a chart gap is otherwise
-// indistinguishable from a day genuinely not logged.
+// Which days came across incomplete (console only), since a chart gap looks like an unlogged day.
 function logPhysiqueDataGaps() {
   const days = allPhysiqueEntries.filter((p) => p.date);
   if (!days.length) return;
@@ -1165,19 +1104,16 @@ function logPhysiqueDataGaps() {
   const count = (predicate) => days.filter(predicate).length;
   console.debug('[physique] gaps:', {
     days: days.length,
-    noSleepTimes: count((p) => parseClockTime(p.bedtime) === null || parseClockTime(p.wakeTime) === null),
+    noSleepTimes: count((p) => physiqueSleepHours(p) === null),
     noBodyMass: count((p) => p.bodyMass === null),
     noCaloriesIn: count((p) => p.caloriesIn === null),
     noProteinIn: count((p) => p.proteinIn === null),
     noBreakdown: count((p) => p.caloriesIn !== null && !parsePhysiqueBreakdown(p.breakdown).length),
     noActivityDuration: count((p) => p.workout.trim() && p.duration === null),
     noCaloriesOut: count((p) => p.workout.trim() && p.caloriesOut === null),
-    // Nothing the Activity Plan can recognize, so it contributes no rep
-    // volume, no muscle group and no derived activity label.
+    // Nothing the Activity Plan recognizes: no reps, muscle group or label.
     unparseableWorkout: count((p) => p.workout.trim() && parseWorkoutNoteLines(p.workout).length === 0),
-    // Parsed fine but isn't on the Activities tab — priced at the fallback
-    // MET, no muscle group, and stacked under 'Other' on the chart. Almost
-    // always a spelling drift between a logged line and the sheet's Name.
+    // Not on the Activities tab (usually a spelling drift): fallback MET, 'Other'.
     unmatchedExerciseNames: [...new Set(
       days.flatMap((p) => parseWorkoutNoteLines(p.workout).map((line) => line.name))
         .filter((name) => !activityByName(name)),
@@ -1206,25 +1142,19 @@ function getFilteredPhysiqueEntries() {
   });
 }
 
-// Day-level Fiber/Fat/Carbohydrate totals from an already-parsed breakdown
-// array — the same fiber/fat/carbohydrate estimateTefBreakdown annotates each
-// item with (health-insight-micronutrient.js). Used by Calculate/bulk-recalculate to
-// fill columns I/J/K alongside TEF (column L); unlike TEF's own persisted
-// figure this is never read back off the sheet — it's always recomputed from
-// the freshest breakdown at hand. Each field stays null when nothing in the
-// breakdown carries that macro (no 🧬 Micronutrients pulled and nothing typed
-// on any matched Nutrition row) — reads as "not measured" rather than a
-// confident zero, same rule the per-ingredient tables follow.
+// The day macros Calculate fills from a breakdown estimateTefBreakdown has annotated.
+const BREAKDOWN_MACRO_KEYS = ['fiber', 'fat', 'carbohydrate'];
+
+// Day totals of those macros, to 0.1 g. A macro no item carries stays null
+// ("not measured"), not a confident zero.
 function sumBreakdownMacros(items) {
-  let fiber = null;
-  let fat = null;
-  let carbohydrate = null;
+  const totals = Object.fromEntries(BREAKDOWN_MACRO_KEYS.map((key) => [key, null]));
   (items || []).forEach((item) => {
-    if (item.fiber !== undefined) fiber = Math.round(((fiber || 0) + item.fiber) * 10) / 10;
-    if (item.fat !== undefined) fat = Math.round(((fat || 0) + item.fat) * 10) / 10;
-    if (item.carbohydrate !== undefined) carbohydrate = Math.round(((carbohydrate || 0) + item.carbohydrate) * 10) / 10;
+    BREAKDOWN_MACRO_KEYS.forEach((key) => {
+      if (item[key] !== undefined) totals[key] = Math.round(((totals[key] || 0) + item[key]) * 10) / 10;
+    });
   });
-  return { fiber, fat, carbohydrate };
+  return totals;
 }
 
 // A day's sleep length from its two clock times.
@@ -1235,11 +1165,9 @@ function physiqueSleepHours(p) {
   return sleepDurationHours(bed, wake);
 }
 
-// Patterns always sort to the top of getFilteredPhysiqueEntries() and never
-// count against a page's P_PAGE_SIZE dated days — a template isn't a day, and
-// there's usually only a handful of them, so hiding one behind pagination
-// would bury a row meant to always be at hand. Shared by the render and the
-// header select-all checkbox so both agree on exactly what's on the page.
+// Patterns head every page and don't count against P_PAGE_SIZE, so a template is
+// never paged away. Shared by the render and select-all so both agree on the page.
+
 function getPhysiquePageEntries() {
   const entries = getFilteredPhysiqueEntries();
   const patterns = entries.filter((p) => !p.date);
@@ -1262,62 +1190,34 @@ function renderPhysiqueList() {
     const message = allPhysiqueEntries.length === 0
       ? 'No days logged yet — click "Log" in the panel heading to get started.'
       : 'No days match this filter.';
-    tbody.appendChild(renderEmptyRow(14, message));
+    tbody.appendChild(renderEmptyRow(PHYSIQUE_TABLE_COLUMNS, message));
   }
 
-  // Same tint the Activity Plan uses for a row already logged today (.today-row and
-  // .workout-row-logged share one declaration): in both places it marks the row the
-  // day's logging lands on. Recomputed per render rather than cached, so a tab left
-  // open across midnight moves the mark on its next redraw.
-  const todayIso = isoFromDate(new Date());
+  // The Activity Plan's logged-today tint. Read per render, so it moves at midnight.
+  const todayIso = localIso();
+  const masked = (text) => (privacyMode ? maskDigits(text) : text);
+  const num = (value) => (value === null ? '—' : masked(String(value)));
+  // Whole grams, floored as the day's breakdown Total shows them.
+  const int = (value) => (value === null ? '—' : masked(String(Math.floor(value))));
 
   pageEntries.forEach((p, i) => {
     const tr = document.createElement('tr');
-    // Pattern rows carry no date, so they never match.
     if (p.date === todayIso) tr.classList.add('today-row');
-    // One line per week, same idea as Work Time's weekend tint but a border
-    // instead. Newest-first, a Mon-Sun week reads top to bottom as Sun, Sat,
-    // ... Mon — so the line has to land on the SUNDAY row (top of the older
-    // week), not Monday: that's what puts it between this week's Monday
-    // (the row just above, oldest day of the more recent week) and the older
-    // week's Sunday, instead of slicing a week in half. T00:00:00 keeps the
-    // parse in the local timezone, same reasoning as track-work-time.js's
-    // dateFromIso.
+    // A line on each Sunday (newest first, that's between two Mon–Sun weeks) and on
+    // the first day after the patterns. T00:00:00 keeps the parse local.
     const isWeekBoundary = p.date && new Date(`${p.date}T00:00:00`).getDay() === 0;
-    // Same line, on the first actual day after the pattern rows: patterns
-    // always sort to the top regardless of column/direction (see the
-    // comparator above), so this is just "has a date, the row before it
-    // didn't" — no separate pass over the list needed.
     const afterPatterns = p.date && i > 0 && !pageEntries[i - 1].date;
     if (isWeekBoundary || afterPatterns) tr.classList.add('physique-week-start');
 
-    const num = (value) => {
-      if (value === null) return '—';
-      return privacyMode ? maskDigits(String(value)) : String(value);
-    };
-    // Whole grams, floored as the day's breakdown Total shows them.
-    const int = (value) => {
-      if (value === null) return '—';
-      const s = String(Math.floor(value));
-      return privacyMode ? maskDigits(s) : s;
-    };
     // The stored figures; computed here only for a day not yet saved with them.
-    const sleepHours = p.sleep ?? physiqueSleepHours(p);
-    // Wake minus bed, not the two clock times — those still open on Edit
-    // (the form's own Bedtime/Wake-up Time fields), same as every other
-    // computed table figure that keeps its raw inputs one click away rather
-    // than in the table itself.
+    const sleepHours = physiqueStoredSleepHours(p);
     const sleepTitle = sleepHours !== null
       ? `${sleepHours} hr of sleep (${p.bedtime} → ${p.wakeTime}) — open Edit to change the clock times`
       : '';
-    const maskedSleepTitle = privacyMode ? maskDigits(sleepTitle) : sleepTitle;
-
     const deprivationKcal = p.deprivation ?? physiqueDeprivationKcal(p, sleepHours, p.date ? bmrFiguresForDate(p.date) : {});
-    const deprivationText = deprivationKcal !== null ? String(deprivationKcal) : '—';
     const deprivationTitle = deprivationKcal !== null
       ? `Sleep Deprivation Effect: ${deprivationKcal} kcal`
       : 'Not calculable — needs a profile (Settings), this day\'s Body Mass and Calories In';
-    const maskedDeprivationTitle = privacyMode ? maskDigits(deprivationTitle) : deprivationTitle;
 
     const checkboxCell = document.createElement('td');
     const checkbox = document.createElement('input');
@@ -1336,8 +1236,8 @@ function renderPhysiqueList() {
       checkboxCell,
       makeCell(p.date || '🔁 Pattern'),
       makeCell(num(p.bodyMass)),
-      makeCell(num(sleepHours), maskedSleepTitle),
-      makeCell(privacyMode ? maskDigits(deprivationText) : deprivationText, maskedDeprivationTitle),
+      makeCell(num(sleepHours), masked(sleepTitle)),
+      makeCell(num(deprivationKcal), masked(deprivationTitle)),
       makeCell(num(p.caloriesIn)),
       makeCell(int(p.proteinIn)),
       makeCell(int(p.fiber)),
@@ -1356,8 +1256,7 @@ function renderPhysiqueList() {
         routeRecordEdit('physique', physiqueRouteStep(p));
         openPhysiqueForm(p);
       } }),
-      // How a pattern becomes a real day: duplicate it, and the copy opens
-      // dated today with the template's contents intact.
+      // How a pattern becomes a day: the copy opens dated today.
       makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => {
         routeRecordEdit('physique', physiqueRouteStep(p), { slug: 'duplicate', label: 'Duplicate' });
         openPhysiqueForm(p, true);
@@ -1372,15 +1271,7 @@ function renderPhysiqueList() {
   updatePhysiqueSelectAllCheckbox(pageEntries);
   updatePhysiqueBulkActionsUI();
 
-  renderPager('physique-pagination', {
-    page: pCurrentPage,
-    totalPages,
-    onChange: (page) => {
-      pCurrentPage = page;
-      selectedPhysiqueRows.clear();
-      renderPhysiqueList();
-    },
-  });
+  renderPager('physique-pagination', { page: pCurrentPage, totalPages, onChange: showPhysiquePage });
 }
 
 function updatePhysiqueSelectAllCheckbox(pageEntries) {
@@ -1403,13 +1294,25 @@ function updatePhysiqueBulkActionsUI() {
   document.getElementById('physique-bulk-calc-btn').disabled = !selected.some(eligibleForBulkCalc);
 }
 
-// The 🧬 row action: this day's own real, measured nutrient totals — the same
-// USDA-sourced numbers and FDA Daily Value comparison the Health Insight
-// panel's Micronutrients mode computes for a picked range (health-insight-micronutrient.js),
-// just narrowed to this one day by aggregating over [p.date, p.date]. Total and
-// per-day average always end up equal for a single day, so the table collapses
-// Health Insight's four columns down to three: Nutrient, Amount, Ideal / day.
-// `routed`: give it the day's address (…/<date>/micronutrients/) as it opens.
+// One nutrient's table row; `withPerDay` adds the per-day average column.
+function physiqueNutrientRow(nutrients, i, withPerDay) {
+  const n = nutrients[i];
+  const amount = (value, unit) => (value !== null ? `${value} ${unit}` : '—');
+  const tr = document.createElement('tr');
+  if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
+  if (nutrientSectionEnd(nutrients, i)) tr.classList.add('nutrient-facts-end');
+  tr.append(
+    nutrientNameCell(n),
+    makeCell(`${n.total} ${n.unit}`),
+    ...(withPerDay ? [makeCell(amount(n.perDay, n.unit))] : []),
+    makeCell(amount(n.supplementPerDay, n.unit)),
+    makeCell(amount(n.ideal, n.idealUnit)),
+  );
+  return tr;
+}
+
+// The 🧬 row action: Health Insight's Micronutrients table for this one day (no
+// per-day column, as it equals the total). `routed`: open at …/<date>/micronutrients/.
 function openPhysiqueMicronutrients(p, routed = false) {
   if (routed) routeRecordEdit('physique', physiqueRouteStep(p), { slug: 'micronutrients', label: 'Micronutrients' });
 
@@ -1424,27 +1327,16 @@ function openPhysiqueMicronutrients(p, routed = false) {
   if (data.nutrients.length === 0) {
     tbody.appendChild(renderEmptyRow(4, 'Nothing to show — see the coverage note above.'));
   } else {
-    data.nutrients.forEach((n, i) => {
-      const tr = document.createElement('tr');
-      if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
-      if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
-      tr.append(
-        nutrientNameCell(n),
-        makeCell(`${n.total} ${n.unit}`),
-        makeCell(n.supplementPerDay !== null ? `${n.supplementPerDay} ${n.unit}` : '—'),
-        makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
-      );
-      tbody.appendChild(tr);
-    });
+    data.nutrients.forEach((n, i) => tbody.appendChild(physiqueNutrientRow(data.nutrients, i, false)));
   }
 
   document.getElementById('physique-micro-modal').hidden = false;
 }
 
 // 🧬 in the header (…/physique/micronutrients/): the same table over a picked
-// range (Health Chart's buttons), with a per-day average beside each total.
+// range, with a per-day average beside each total.
 let physiqueMicroRangeSlug = '1w';
-// Health Chart's ranges with 1d (today alone) in front, for this page only.
+// Health Chart's ranges with 1d (today alone) in front.
 const PHYSIQUE_MICRO_RANGES = [{ slug: '1d', label: '1d' }, ...HEALTH_RANGES];
 
 function openPhysiqueMicronutrientsRange() {
@@ -1467,23 +1359,10 @@ function renderPhysiqueMicronutrientsRange() {
     tbody.appendChild(renderEmptyRow(5, 'No day in this range has 🧬 Micronutrients pulled.'));
     return;
   }
-  data.nutrients.forEach((n, i) => {
-    const tr = document.createElement('tr');
-    if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
-    if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
-    tr.append(
-      nutrientNameCell(n),
-      makeCell(`${n.total} ${n.unit}`),
-      makeCell(n.perDay !== null ? `${n.perDay} ${n.unit}` : '—'),
-      makeCell(n.supplementPerDay !== null ? `${n.supplementPerDay} ${n.unit}` : '—'),
-      makeCell(n.ideal !== null ? `${n.ideal} ${n.idealUnit}` : '—'),
-    );
-    tbody.appendChild(tr);
-  });
+  data.nutrients.forEach((n, i) => tbody.appendChild(physiqueNutrientRow(data.nutrients, i, true)));
 }
 
-// Form field id suffix → entry property. Where each lands on the sheet is
-// PHYSIQUE_COLUMNS' job, not this list's order.
+// Form field id suffix → entry property (sheet placement is PHYSIQUE_COLUMNS' job).
 const PHYSIQUE_FIELDS = [
   { id: 'date', key: 'date' },
   { id: 'bedtime', key: 'bedtime' },
@@ -1506,10 +1385,8 @@ function physiqueField(id) {
   return document.getElementById(`physique-${id}`);
 }
 
-// Pattern rows carry no date, body mass or sleep, so Date/Body Mass and
-// Bed/Wake (and Workout, Derived) are hidden whenever "Pattern" is checked, and the date input is
-// disabled (its required attribute dropped). submitPhysiqueForm blanks all four
-// on a pattern; unticking Pattern brings back whatever was typed.
+// A pattern has no date, body mass, sleep or workout, so those sections hide and the
+// date is disabled. Save blanks them; unticking Pattern brings back what was typed.
 function syncPhysiquePatternMode() {
   const isPattern = document.getElementById('physique-is-pattern').checked;
   document.getElementById('physique-day-details').hidden = isPattern;
@@ -1521,7 +1398,7 @@ function syncPhysiquePatternMode() {
   dateInput.disabled = isPattern;
   dateInput.required = !isPattern;
   if (isPattern) dateInput.value = '';
-  else if (!dateInput.value) dateInput.value = isoFromDate(new Date());
+  else if (!dateInput.value) dateInput.value = localIso();
 }
 
 // What Save will do ("Add to Today's Workout"), on Save's hover. openPhysiqueForm clears it.
@@ -1531,37 +1408,29 @@ function setPhysiqueFormHint(text) {
 
 function openPhysiqueForm(entry, duplicate = false) {
   editingPhysiqueRow = (entry && !duplicate) ? entry.row : null;
-  document.querySelector('#physique-form button[type="submit"]').title = '';
+  setPhysiqueFormHint('');
 
   PHYSIQUE_FIELDS.forEach(({ id, key }) => {
     const value = entry ? entry[key] : '';
     physiqueField(id).value = (value === null || value === undefined) ? '' : String(value);
   });
 
-  // A duplicate is always a real day — that's the point of duplicating a
-  // pattern — so the copy starts dated today rather than inheriting the
-  // template's blank date.
+  // A duplicate is always a real day, dated today.
   document.getElementById('physique-is-pattern').checked = entry ? (!entry.date && !duplicate) : false;
-  if (duplicate) physiqueField('date').value = isoFromDate(new Date());
+  if (duplicate) physiqueField('date').value = localIso();
   syncPhysiquePatternMode();
 
   // Day, Consumption and Workout start collapsed on any day but today; a Pattern opens Consumption too.
-  const isToday = physiqueField('date').value === isoFromDate(new Date());
+  const isToday = physiqueField('date').value === localIso();
   const isPattern = document.getElementById('physique-is-pattern').checked;
   document.getElementById('physique-day-details').open = isToday;
   document.getElementById('physique-consumption-details').open = isToday || isPattern;
   document.getElementById('physique-workout-details').open = isToday;
 
-  // A saved breakdown is shown as its table straight away on Edit, so an
-  // existing day can be checked without re-running Calculate. The activity
-  // table has no saved form, so it's recomputed from the Workout text instead —
-  // which also reprices Activity Duration and Calories Out at current settings,
-  // so Save persists the figures on screen rather than the older ones behind
-  // them. Body Mass is filled in by the loop above, which is what prices it.
+  // The saved breakdown shows as its table straight away, its macros and TEF freshened
+  // from Nutrition. The activity table is recomputed from the Workout text, repricing
+  // Duration and Calories Out at the Body Mass filled in above.
   const openedBreakdown = entry ? parsePhysiqueBreakdown(entry.breakdown) : [];
-  // Freshens fiber/fat/carbohydrate/tef against whatever's typed on the
-  // Nutrition row (or its pulled 🧬 Micronutrients) right now, same as the
-  // old standalone TEF table did on open.
   estimateTefBreakdown(openedBreakdown);
   renderPhysiqueBreakdown(openedBreakdown, entry ? entry.caloriesIn : 0, entry ? entry.proteinIn : 0);
   refreshPhysiqueActivityBreakdown();
@@ -1579,12 +1448,10 @@ function closePhysiqueForm() {
   hideWorkoutSuggestions();
 }
 
-// A whole day, not one meal, so a per-meal ceiling would fire
-// on every normal day here.
+// A whole day's ceiling; a per-meal one would fire on every normal day.
 const PHYSIQUE_DAY_CALORIE_CEILING = 6000;
 
-// Body mass for the burn formula: this day's own field first, else the most
-// recent day that recorded one.
+// Body mass for the burn formula: the typed one, else the latest logged.
 function physiqueBodyMassKg() {
   const typed = evaluateNumberExpression(physiqueField('body-mass').value.trim());
   return typed || physiqueBodyMassKgFromLog();
@@ -1599,70 +1466,45 @@ function physiqueBodyMassKgFromLog() {
   return lastLogged ? lastLogged.bodyMass : null;
 }
 
-// A copy of a day to change fields on and pass to writePhysiqueRow — also what
-// an undo writes straight back.
+// A copy of a day to change and pass to writePhysiqueRow; also what an undo writes back.
 function physiqueDayCopy(p) {
   return { ...p };
 }
 
-// Folds a day already on the sheet into the open form, so what was typed is
-// added to that day rather than refused for clashing with it.
-//
-// How each field merges follows from what the field IS. Consumption, Workout and
-// Breakdown are lists, so they concatenate — the saved lines first, then what was
-// just typed, verbatim: a food genuinely eaten twice in a day is two lines, and
-// Combine & Sort is there for when it isn't. Calories In / Protein In, TEF and
-// Duration / Calories Out are totals OVER those lists, so they add up. Bedtime,
-// Wake-up Time and Body Mass are single facts about the day rather than running
-// tallies, so a value typed here wins and the saved one only fills a blank.
-//
-// Nothing is written to the sheet: the merged day sits in the form, and the
-// second Save is what commits it.
+// Folds a day already on the sheet into the open form instead of refusing the clash.
+// Lists (Consumption, Workout, Breakdown) concatenate, saved lines first; totals over
+// them add up; single facts (Bed, Wake, Body Mass) keep what was typed, the saved
+// value only filling a blank. Nothing is written until the second Save.
 function mergePhysiqueEntryIntoForm(saved) {
-  // Body mass first — refreshPhysiqueActivityBreakdown below prices the merged
-  // workout against whatever this field ends up holding.
+  // Body mass first: the activity table below prices the merged workout at it.
   fillPhysiqueFieldIfBlank('bedtime', saved.bedtime);
   fillPhysiqueFieldIfBlank('wake-time', saved.wakeTime);
   fillPhysiqueFieldIfBlank('body-mass', saved.bodyMass);
 
-  addToPhysiqueTotal('calories-in', saved.caloriesIn);
-  addToPhysiqueTotal('protein-in', saved.proteinIn);
-  // Provisional — a linear sum of the two days' own Fiber/Fat/Carbohydrate/TEF,
-  // same as the other totals here. Replaced below by the exact figures if the
-  // merged breakdown's own macros can be re-estimated straight away.
-  addToPhysiqueTotal('fiber', saved.fiber);
-  addToPhysiqueTotal('fat', saved.fat);
-  addToPhysiqueTotal('carbohydrate', saved.carbohydrate);
-  addToPhysiqueTotal('tef', saved.tef);
-  addToPhysiqueTotal('activity-duration', saved.duration);
-  addToPhysiqueTotal('calories-out', saved.caloriesOut);
+  // Every numeric field but Body Mass is a total. Macros and TEF are provisional
+  // here, replaced below by the merged breakdown's exact figures where it has them.
+  PHYSIQUE_FIELDS.filter(({ id, numeric }) => numeric && id !== 'body-mass')
+    .forEach(({ id, key }) => addToPhysiqueTotal(id, saved[key]));
 
   appendToPhysiqueLines('consumption', saved.consumption);
   appendToPhysiqueLines('workout', saved.workout);
 
-  // Both breakdowns end up in one table, which is also what rewrites the
-  // Breakdown field's JSON — so a later Calculate can still match a saved line
-  // by noteLine and reuse its numbers instead of paying for it again.
+  // One table for both, which also rewrites the Breakdown JSON, so a later
+  // Calculate can still reuse saved lines by noteLine.
   const mergedBreakdown = [...parsePhysiqueBreakdown(saved.breakdown), ...parsePhysiqueBreakdown(physiqueField('breakdown').value)];
-  // Fiber/Fat/Carbohydrate/TEF are linear in each macro's own grams, so
-  // re-running them on the combined breakdown gives the same numbers the sums
-  // above already estimated — but exactly, off the actual merged ingredient
-  // list, rather than trusting rounded figures added together. Run before
-  // rendering so DF/Fat/Carb/TEF are on the rows the table is about to draw.
+  // Annotated before rendering, so the table draws the macro and TEF columns.
   const tef = estimateTefBreakdown(mergedBreakdown);
   const dayMacros = sumBreakdownMacros(mergedBreakdown);
-  if (dayMacros.fiber !== null) physiqueField('fiber').value = dayMacros.fiber;
-  if (dayMacros.fat !== null) physiqueField('fat').value = dayMacros.fat;
-  if (dayMacros.carbohydrate !== null) physiqueField('carbohydrate').value = dayMacros.carbohydrate;
+  BREAKDOWN_MACRO_KEYS.forEach((key) => {
+    if (dayMacros[key] !== null) physiqueField(key).value = dayMacros[key];
+  });
   if (tef) physiqueField('tef').value = tef.tefKcal;
   renderPhysiqueBreakdown(
     mergedBreakdown,
     evaluateNumberExpression(physiqueField('calories-in').value.trim()),
     evaluateNumberExpression(physiqueField('protein-in').value.trim()),
   );
-  // Reprices Duration and Calories Out off the merged Workout text, replacing
-  // the summed figures above with a single estimate of the combined session.
-  // Where it can't run (no body mass on file) the sums stand.
+  // Reprices Duration and Calories Out off the merged Workout; without a body mass the sums stand.
   refreshPhysiqueActivityBreakdown();
   updatePhysiqueSleepDuration();
 
@@ -1678,11 +1520,8 @@ function fillPhysiqueFieldIfBlank(id, savedValue) {
   }
 }
 
-// One decimal, the precision the calorie estimator itself rounds protein to.
-// Blank stays blank rather than becoming 0, so an untouched field doesn't start
-// claiming a zero the day didn't record. Protein always shows that decimal
-// (22.0, not 22) since it's the one field summed from already-rounded,
-// one-decimal per-ingredient figures; the others stay whole-number display.
+// Adds to a field at one decimal. A zero total stays blank, not a recorded 0;
+// Protein always shows its decimal (22.0), being summed from one-decimal figures.
 function addToPhysiqueTotal(id, savedNumber) {
   const field = physiqueField(id);
   const total = (savedNumber ?? 0) + (evaluateNumberExpression(field.value.trim()) ?? 0);
@@ -1699,21 +1538,19 @@ function appendToPhysiqueLines(id, savedText) {
   field.value = [String(savedText ?? '').trim(), field.value.trim()].filter(Boolean).join('\n');
 }
 
+// Fields a pattern hides, so saves blank (the date explicitly, not trusting a disabled input).
+const PHYSIQUE_PATTERN_BLANK_FIELDS = new Set(['date', 'body-mass', 'bedtime', 'wake-time', 'workout', 'activity-duration', 'calories-out']);
+
 async function submitPhysiqueForm(event) {
   event.preventDefault();
 
-  // Read explicitly rather than trusting that a disabled input reports no
-  // value, so a pattern's date stays blank even if field and checkbox ever
-  // fall out of sync. Body Mass, Bed/Wake and Workout are hidden on a pattern, so
-  // they're saved blank too.
   const isPattern = document.getElementById('physique-is-pattern').checked;
-  const patternBlankFields = new Set(['date', 'body-mass', 'bedtime', 'wake-time', 'workout', 'activity-duration', 'calories-out']);
 
   // An edit keeps the row's other cells (columns this app doesn't know about).
   const editing = allPhysiqueEntries.find((p) => p.row === editingPhysiqueRow);
   const day = { cells: editing ? editing.cells : [] };
   for (const { id, key, numeric } of PHYSIQUE_FIELDS) {
-    const raw = (isPattern && patternBlankFields.has(id)) ? '' : physiqueField(id).value.trim();
+    const raw = (isPattern && PHYSIQUE_PATTERN_BLANK_FIELDS.has(id)) ? '' : physiqueField(id).value.trim();
     if (!numeric) {
       day[key] = raw;
       continue;
@@ -1727,15 +1564,9 @@ async function submitPhysiqueForm(event) {
     day[key] = evaluated;
   }
 
-  // One row per day is the whole point of this tab, so a date already logged
-  // isn't a second sample — it's more of the same day. The first Save on a
-  // collision therefore writes nothing: it folds the row already on the sheet
-  // into the form, switches to editing that row, and leaves the combined day on
-  // screen to check. Saving again writes it, because editingPhysiqueRow now
-  // excludes that row from this very lookup.
-  //
-  // Patterns are exempt: they're dateless templates, and you can keep as many
-  // as you like.
+  // One row per day: a date already logged is more of that day. The first Save
+  // merges it into the form and edits that row; the second Save writes it.
+  // Patterns are exempt.
   const { date } = day;
   const clash = !isPattern && allPhysiqueEntries.find((p) => p.date === date && p.row !== editingPhysiqueRow);
   if (clash) {
@@ -1745,7 +1576,8 @@ async function submitPhysiqueForm(event) {
 
   try {
     const editingRow = editingPhysiqueRow;
-    const before = allPhysiqueEntries.find((p) => p.date && p.date === date);
+    const before = savedPhysiqueDay(date);
+    const massChanged = (before?.bodyMass ?? null) !== (day.bodyMass ?? null);
     if (editingRow !== null) {
       await writePhysiqueRow(editingRow, day);
     } else {
@@ -1753,7 +1585,7 @@ async function submitPhysiqueForm(event) {
     }
     await refreshPhysique(true);
     // A changed body-mass reading moves the stored Mass figures of the days after it.
-    if (date && (before?.bodyMass ?? null) !== (day.bodyMass ?? null)) await recomputeStoredMassAfter(date);
+    if (date && massChanged) await recomputeStoredMassAfter(date);
     // The saved day: the edited row, else the new date's (a new Pattern, the last one).
     const saved = allPhysiqueEntries.find((p) => p.row === editingRow)
       || (isPattern ? allPhysiqueEntries.filter((p) => !p.date).at(-1) : allPhysiqueEntries.find((p) => p.date === date));
@@ -1764,7 +1596,8 @@ async function submitPhysiqueForm(event) {
     showFormSaved('physique-form-error');
     if (!isPattern) warnBalanceShortOfDesire(updatePhysiqueSleepDuration());
     // Only a new or changed reading celebrates, so re-saving the same day doesn't.
-    if ((before?.bodyMass ?? null) !== (day.bodyMass ?? null)) celebrateBodyMassProgress(date, day.bodyMass);
+    if (massChanged) celebrateBodyMassProgress(date, day.bodyMass);
+
   } catch (err) {
     showFieldError('physique-form-error', err.message);
   }
@@ -1772,11 +1605,8 @@ async function submitPhysiqueForm(event) {
 
 // --- Bulk Calculate ------------------------------------------------------
 //
-// The form's 🧮 run one day at a time, over as many selected days as you like.
-// Each day goes through the same two estimators and the same incremental
-// reuse: a line whose noteLine already matches that day's saved breakdown
-// keeps its numbers, so re-running a stretch of days costs a lookup only for
-// what actually changed.
+// The form's 🧮 over every selected day. A line whose noteLine matches the day's
+// saved breakdown keeps its numbers, so only what changed costs a lookup.
 
 // A day with its derived fields recalculated.
 async function recalculatePhysiqueDay(p, bodyMassKg) {
@@ -1785,19 +1615,15 @@ async function recalculatePhysiqueDay(p, bodyMassKg) {
   if (p.consumption.trim()) {
     const { calories, protein, breakdown } =
       await estimateConsumptionIncrementally(p.consumption, p.breakdown);
-    // Annotates each matched row with fiber/fat/carbohydrate/tef before the
-    // JSON is stringified, so Breakdown carries them too, not just their own columns.
-    // Only overwritten when measurable — leaves an unpriced day's existing
-    // cells (blank, or a manual/earlier figure) alone rather than blanking them.
+    // Annotated before the JSON is written, so Breakdown carries the macros and TEF
+    // too. Each is only overwritten when measurable, never blanked.
     const tef = estimateTefBreakdown(breakdown);
     const dayMacros = sumBreakdownMacros(breakdown);
-    if (dayMacros.fiber !== null) day.fiber = dayMacros.fiber;
-    if (dayMacros.fat !== null) day.fat = dayMacros.fat;
-    if (dayMacros.carbohydrate !== null) day.carbohydrate = dayMacros.carbohydrate;
+    BREAKDOWN_MACRO_KEYS.forEach((key) => {
+      if (dayMacros[key] !== null) day[key] = dayMacros[key];
+    });
     if (tef) day.tef = tef.tefKcal;
-    // Tidied as the form's Calculate does: duplicates combined, sorted by the
-    // breakdown's real calories (so the box matches the Breakdown table even for
-    // USDA/AI-priced items), names capitalized.
+    // Tidied as the form's Calculate does: combined, sorted by real calories, capitalized.
     day.consumption = combineAndSortConsumptionText(
       breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n'),
       breakdownCaloriesLookup(breakdown),
@@ -1808,11 +1634,7 @@ async function recalculatePhysiqueDay(p, bodyMassKg) {
   }
 
   if (p.workout.trim() && bodyMassKg !== null) {
-    // Same combine + highest-burn-first sort the form's own Calculate button
-    // runs (runPhysiqueWorkoutCalc/combineWorkoutText) — bulk Calculate
-    // rewrites Workout too, not just the Duration/AEE it already
-    // wrote, so a repeated exercise logged across several lines collapses
-    // here the same way it would through the form.
+    // Combined and sorted highest burn first, as the form's Calculate does.
     const { text: combinedWorkout } = combineWorkoutText(p.workout);
     const { minutes, calories, perLine } = estimateWorkoutActivity(combinedWorkout, bodyMassKg);
     const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
@@ -1834,9 +1656,7 @@ async function bulkCalculatePhysique() {
     return;
   }
 
-  // One lookup for the whole run rather than per row: it's the same "right
-  // now" body mass either way, and a day of its own is preferred where it has
-  // one (below) so a historical row still uses what it actually recorded.
+  // Looked up once; a day's own reading still wins below.
   const latestBodyMassKg = physiqueBodyMassKgFromLog();
   const summaryEl = document.getElementById('physique-bulk-summary');
 
@@ -1866,8 +1686,7 @@ async function bulkCalculatePhysique() {
   showUndoToast(`${parts.join(', ')}.`, () => restorePhysiqueSnapshots(succeeded));
 }
 
-// Each row still exists, so undo is one write per row rather than a
-// re-insert. `values` is the day as it was (physiqueDayCopy).
+// Undo: one write per row (each still exists). `values` is the day as it was.
 async function restorePhysiqueSnapshots(snapshots) {
   try {
     await Promise.all(snapshots.map((s) => writePhysiqueRow(s.row, s.values)));
@@ -1877,23 +1696,26 @@ async function restorePhysiqueSnapshots(snapshots) {
   }
 }
 
-// A row's address step: its date, or pattern-<n> by sheet order for a Pattern.
 function todayPhysiqueRouteStep() {
-  const today = isoFromDate(new Date());
+  const today = localIso();
   return { slug: today, label: today };
 }
 
+// A row's address step: its date, or pattern-<n> by sheet order for a Pattern.
 function physiqueRouteStep(entry) {
   if (entry.date) return { slug: entry.date, label: entry.date };
   const n = allPhysiqueEntries.filter((e) => !e.date).indexOf(entry) + 1;
   return { slug: `pattern-${n}`, label: `Pattern ${n}` };
 }
 
+const PATTERN_SNIPPET_CHARS = 45;
+
 function physiquePatternLabel(entry) {
   const snippet = (text) => {
     const first = text.split('\n')[0].trim();
-    return first.length > 45 ? first.slice(0, 45) + '…' : first;
+    return first.length > PATTERN_SNIPPET_CHARS ? first.slice(0, PATTERN_SNIPPET_CHARS) + '…' : first;
   };
+
   const parts = [];
   if (entry.consumption) parts.push(`Consumption: "${snippet(entry.consumption)}"`);
   if (entry.workout)     parts.push(`Workout: "${snippet(entry.workout)}"`);

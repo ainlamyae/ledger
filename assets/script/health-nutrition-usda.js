@@ -1,18 +1,11 @@
 const USDA_FDC_SEARCH_API = 'https://api.nal.usda.gov/fdc/v1/foods/search';
+// A candidate further than this factor from the reference kcal/100g is the wrong food.
+const USDA_KCAL_PLAUSIBLE_RATIO = 2.5;
 
-// Returns the top few candidates rather than trusting foods[0] blindly — USDA's
-// relevance ranking can surface a wildly different product for a plain query
-// (e.g. "soybeans" ranks "Oil, soybean" above the actual bean). The caller
-// picks among these using its own plausibility check.
-//
-// `nutrients` carries every OTHER figure the search response returned for
-// this food (vitamins, minerals, amino acids...), unused by Calculate's own
-// kcal/protein-only path but read by health-nutrition.js's Complete. A
-// Foundation/SR Legacy result already comes back with dozens of these in
-// this same response — a separate per-food /food/{fdcId} request was tried
-// first and dropped: it 404s unreliably even against USDA's own documented
-// example, and is redundant anyway since this search response already has
-// the full panel.
+// The top few candidates, not foods[0]: USDA's ranking can put a different food first
+// ("soybeans" ranks "Oil, soybean" above the bean), so the caller picks among them.
+// `nutrients` is every other figure in the search response, for Complete's full
+// panel; the per-food /food/{fdcId} endpoint 404s unreliably and adds nothing.
 // The form's picker passes a wider search (pageSize 10, branded foods too).
 async function usdaLookupKcalCandidates(query, { pageSize = 5, dataType = 'Foundation,SR Legacy' } = {}) {
   const apiKey = getSettingString('USDA_FDC_API_KEY', null);
@@ -49,20 +42,14 @@ async function usdaLookupKcalCandidates(query, { pageSize = 5, dataType = 'Found
     .filter(Boolean);
 }
 
-// Picks whichever candidate's energy is closest (on a log scale, so 2x over
-// and 2x under count equally far) to a known reference kcal/100g, but only if
-// it's within a 2.5x band either way — otherwise USDA's relevance ranking has
-// probably surfaced the wrong food entirely (see usdaLookupKcalCandidates),
-// and returning it would be worse than returning nothing. Shared by
-// health-physique-estimator.js's Calculate fallback (compares against the AI's own
-// estimate) and health-nutrition.js's Complete (compares against the
-// row's own logged Calories) — same trust question, two different reference
-// numbers.
+// The candidate closest in energy (on a log scale, so 2x over and under are equally
+// far) to a reference kcal/100g, or null when even that one is outside the plausible
+// band. Physique passes the AI's estimate, or the Calories of a row being banked.
 function pickPlausibleUsdaCandidate(candidates, kcalPer100gReference) {
   if (!candidates.length) return null;
   const best = candidates.reduce((a, b) =>
     Math.abs(Math.log(a.kcalPer100g / kcalPer100gReference)) < Math.abs(Math.log(b.kcalPer100g / kcalPer100gReference)) ? a : b
   );
   const ratio = best.kcalPer100g / kcalPer100gReference;
-  return (ratio <= 2.5 && ratio >= 1 / 2.5) ? best : null;
+  return (ratio <= USDA_KCAL_PLAUSIBLE_RATIO && ratio >= 1 / USDA_KCAL_PLAUSIBLE_RATIO) ? best : null;
 }

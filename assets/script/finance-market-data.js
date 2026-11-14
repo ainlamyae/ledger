@@ -9,8 +9,19 @@ const MARKET_PROVIDERS = {
 };
 const MARKET_DB_NAME = 'ledger-market';
 const MARKET_QUOTA_KEY = 'ledger_market_quota';
-const MARKET_RECHECK_MS = 30 * 60 * 1000;
-const MARKET_INTRADAY_TTL_MS = { '5min': 5 * 60 * 1000, '30min': 15 * 60 * 1000 };
+const MARKET_MINUTE_MS = 60 * 1000;
+const MARKET_RECHECK_MS = 30 * MARKET_MINUTE_MS;
+const MARKET_MONTHLY_TTL_MS = 24 * 60 * MARKET_MINUTE_MS;
+const MARKET_NEWS_TTL_MS = 60 * MARKET_MINUTE_MS;
+// Per interval: how long saved bars stay fresh, and how many to fetch.
+const MARKET_INTRADAY = {
+  '5min': { ttlMs: 5 * MARKET_MINUTE_MS, size: 160 },
+  '30min': { ttlMs: 15 * MARKET_MINUTE_MS, size: 140 },
+};
+const MARKET_DAILY_FULL_SIZE = 5000; // first fetch: the whole history
+const MARKET_DAILY_TOPUP_SIZE = 300; // later fetches start at the last saved bar
+const MARKET_CLOSE_MINUTES = 16 * 60 + 30; // 16:30 local, after the close settles
+const MARKET_SLOT_MARGIN_MS = 250;
 
 class MarketDataError extends Error {
   // kind: missing-key | rate-minute | rate-day | unsupported | not-found | network
@@ -118,11 +129,12 @@ function utcDay() {
 }
 
 function readQuota() {
+  const fresh = () => ({ day: utcDay(), counts: {}, exhausted: {} });
   try {
     const q = JSON.parse(localStorage.getItem(MARKET_QUOTA_KEY) || '{}');
-    return q.day === utcDay() ? q : { day: utcDay(), counts: {}, exhausted: {} };
+    return q.day === utcDay() ? q : fresh();
   } catch {
-    return { day: utcDay(), counts: {}, exhausted: {} };
+    return fresh();
   }
 }
 
@@ -145,7 +157,7 @@ async function takeMarketSlot(provider, onWait) {
   }
   for (;;) {
     const now = Date.now();
-    const stamps = marketMinuteStamps[provider].filter((t) => now - t < 60000);
+    const stamps = marketMinuteStamps[provider].filter((t) => now - t < MARKET_MINUTE_MS);
     marketMinuteStamps[provider] = stamps;
     const gapMs = limits.minGapMs && stamps.length ? limits.minGapMs - (now - stamps.at(-1)) : 0;
     if (stamps.length < limits.perMinute && gapMs <= 0) break;
@@ -153,7 +165,7 @@ async function takeMarketSlot(provider, onWait) {
       await new Promise((resolve) => setTimeout(resolve, gapMs));
       continue;
     }
-    const waitMs = 60000 - (now - stamps[0]) + 250;
+    const waitMs = MARKET_MINUTE_MS - (now - stamps[0]) + MARKET_SLOT_MARGIN_MS;
     onWait?.(Math.ceil(waitMs / 1000), limits.name);
     await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 1000)));
   }
@@ -165,16 +177,17 @@ async function takeMarketSlot(provider, onWait) {
 // One GET per URL at a time; a second caller shares the first's answer.
 async function marketFetch(provider, url, onWait) {
   if (marketInFlight.has(url)) return marketInFlight.get(url);
+  const { name } = MARKET_PROVIDERS[provider];
   const run = (async () => {
     await takeMarketSlot(provider, onWait);
     let res;
     try {
       res = await fetch(url);
     } catch {
-      throw new MarketDataError('network', provider, `Couldn't reach ${MARKET_PROVIDERS[provider].name}.`);
+      throw new MarketDataError('network', provider, `Couldn't reach ${name}.`);
     }
     const body = await res.json().catch(() => null);
-    if (!res.ok && !body) throw new MarketDataError('network', provider, `${MARKET_PROVIDERS[provider].name} error ${res.status}.`);
+    if (!res.ok && !body) throw new MarketDataError('network', provider, `${name} error ${res.status}.`);
     return body;
   })();
   marketInFlight.set(url, run);
@@ -217,7 +230,7 @@ function twelveDataBars(body) {
   })).sort((a, b) => a.d.localeCompare(b.d));
 }
 
-async function fetchTwelveData(symbol, interval, { startDate = null, outputsize = 5000, onWait } = {}) {
+async function fetchTwelveData(symbol, interval, { startDate = null, outputsize = MARKET_DAILY_FULL_SIZE, onWait } = {}) {
   const params = new URLSearchParams({ symbol, interval, outputsize: String(outputsize), order: 'ASC', apikey: marketKey('td') });
   if (startDate) params.set('start_date', startDate);
   const body = checkTwelveData(await marketFetch('td', `https://api.twelvedata.com/time_series?${params}`, onWait), symbol);
@@ -255,6 +268,12 @@ async function fetchAlphaVantage(symbol, fn, onWait) {
   return checkAlphaVantage(await marketFetch('av', `https://www.alphavantage.co/query?${params}`, onWait), symbol);
 }
 
+// Daily bars after the cached record's last one, or the full history without one.
+function fetchTwelveDataDaily(symbol, cached, onWait) {
+  const start = cached?.lastBarDate || null;
+  return fetchTwelveData(symbol, '1day', { startDate: start, outputsize: start ? MARKET_DAILY_TOPUP_SIZE : MARKET_DAILY_FULL_SIZE, onWait });
+}
+
 // --- Public API -------------------------------------------------------------
 
 function mergeBars(older, newer) {
@@ -271,11 +290,16 @@ function localIso(date = new Date()) {
 // last weekday before today (holidays just cost one recheck per 30 min).
 function expectedLatestSession(now = new Date()) {
   const d = new Date(now);
-  const afterClose = now.getHours() * 60 + now.getMinutes() >= 16 * 60 + 30;
+  const afterClose = now.getHours() * 60 + now.getMinutes() >= MARKET_CLOSE_MINUTES;
   if (!(afterClose && d.getDay() >= 1 && d.getDay() <= 5)) {
     do d.setDate(d.getDate() - 1); while (d.getDay() === 0 || d.getDay() === 6);
   }
   return localIso(d);
+}
+
+// A saved daily record holds the expected session, or was checked within maxAgeMs.
+function dailyCacheFresh(cached, maxAgeMs) {
+  return cached.lastBarDate >= expectedLatestSession() || Date.now() - cached.checkedAt < maxAgeMs;
 }
 
 // { bars, currency, provider, partial, stale, fetchedAt, error }.
@@ -285,14 +309,12 @@ async function getDailyBars(symbol, { onWait, maxAgeMs = MARKET_RECHECK_MS } = {
   const provider = marketProviderFor(symbol);
   const key = `${provider}:${symbol}:1day`;
   const cached = await readSeries(key);
-  const fresh = cached && (cached.lastBarDate >= expectedLatestSession() || Date.now() - cached.checkedAt < maxAgeMs);
-  if (fresh) return { ...cached, provider, stale: false };
+  if (cached && dailyCacheFresh(cached, maxAgeMs)) return { ...cached, provider, stale: false };
 
   try {
     let fetched;
     if (provider === 'td') {
-      const start = cached?.lastBarDate || null;
-      fetched = await fetchTwelveData(symbol, '1day', { startDate: start, outputsize: start ? 300 : 5000, onWait });
+      fetched = await fetchTwelveDataDaily(symbol, cached, onWait);
     } else {
       const body = await fetchAlphaVantage(symbol, 'TIME_SERIES_DAILY', onWait);
       fetched = { bars: alphaVantageBars(body['Time Series (Daily)'], '4. close'), currency: 'CAD' };
@@ -311,8 +333,8 @@ async function getDailyBars(symbol, { onWait, maxAgeMs = MARKET_RECHECK_MS } = {
     await writeSeries(record);
     return { ...record, provider, stale: false };
   } catch (err) {
-    // Saved bars beat an error; the caller shows why they're old.
-    if (cached && err instanceof MarketDataError) return { ...cached, provider, stale: true, error: err };
+    // Saved bars beat any error, as in the monthly and USD/CAD fetches; the caller shows why they're old.
+    if (cached) return { ...cached, provider, stale: true, error: err };
     throw err;
   }
 }
@@ -324,7 +346,7 @@ async function getMonthlyBars(symbol, { onWait } = {}) {
   if (marketProviderFor(symbol) !== 'av') return null;
   const key = `av:${symbol}:1month`;
   const cached = await readSeries(key);
-  if (cached && Date.now() - cached.checkedAt < 24 * 60 * 60 * 1000) return cached.bars;
+  if (cached && Date.now() - cached.checkedAt < MARKET_MONTHLY_TTL_MS) return cached.bars;
   try {
     const body = await fetchAlphaVantage(symbol, 'TIME_SERIES_MONTHLY_ADJUSTED', onWait);
     const bars = alphaVantageBars(body['Monthly Adjusted Time Series'], '5. adjusted close');
@@ -344,14 +366,15 @@ async function getIntradayBars(symbol, interval, { onWait } = {}) {
   }
   const key = `td:${symbol}:${interval}`;
   const cached = await readSeries(key);
-  if (cached && Date.now() - cached.fetchedAt < MARKET_INTRADAY_TTL_MS[interval]) return cached;
+  const { ttlMs, size } = MARKET_INTRADAY[interval];
+  if (cached && Date.now() - cached.fetchedAt < ttlMs) return cached;
   try {
-    const fetched = await fetchTwelveData(symbol, interval, { outputsize: interval === '5min' ? 160 : 140, onWait });
+    const fetched = await fetchTwelveData(symbol, interval, { outputsize: size, onWait });
     const record = { key, bars: fetched.bars, currency: fetched.currency, fetchedAt: Date.now(), checkedAt: Date.now() };
     await writeSeries(record);
     return record;
   } catch (err) {
-    if (cached && err instanceof MarketDataError) return { ...cached, stale: true, error: err };
+    if (cached) return { ...cached, stale: true, error: err };
     throw err;
   }
 }
@@ -360,10 +383,9 @@ async function getIntradayBars(symbol, interval, { onWait } = {}) {
 async function getUsdCadSeries({ onWait } = {}) {
   const key = 'td:USD/CAD:1day';
   const cached = await readSeries(key);
-  if (cached && (cached.lastBarDate >= expectedLatestSession() || Date.now() - cached.checkedAt < MARKET_RECHECK_MS)) return cached.bars;
+  if (cached && dailyCacheFresh(cached, MARKET_RECHECK_MS)) return cached.bars;
   try {
-    const start = cached?.lastBarDate || null;
-    const fetched = await fetchTwelveData('USD/CAD', '1day', { startDate: start, outputsize: start ? 300 : 5000, onWait });
+    const fetched = await fetchTwelveDataDaily('USD/CAD', cached, onWait);
     const bars = mergeBars(cached?.bars || [], fetched.bars);
     await writeSeries({ key, bars, lastBarDate: bars.at(-1)?.d || null, fetchedAt: Date.now(), checkedAt: Date.now() });
     return bars;
@@ -400,9 +422,9 @@ async function getCompanyNews(symbol, days = 30, { onWait } = {}) {
   if (isCanadianSymbol(symbol)) throw new MarketDataError('unsupported', 'fh', "Finnhub's free plan has no news for TSX stocks.");
   const cacheKey = `${symbol}:${days}`;
   const hit = marketNewsCache.get(cacheKey);
-  if (hit && Date.now() - hit.at < 60 * 60 * 1000) return hit.items;
+  if (hit && Date.now() - hit.at < MARKET_NEWS_TTL_MS) return hit.items;
   const to = localIso();
-  const from = localIso(new Date(Date.now() - days * 86400000));
+  const from = localIso(new Date(Date.now() - days * MS_PER_DAY));
   const params = new URLSearchParams({ symbol, from, to, token: marketKey('fh') });
   const body = await marketFetch('fh', `https://finnhub.io/api/v1/company-news?${params}`, onWait);
   if (!Array.isArray(body)) throw new MarketDataError('unsupported', 'fh', body?.error ? `Finnhub: ${body.error}` : `No Finnhub news for ${symbol}.`);

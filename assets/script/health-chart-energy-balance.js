@@ -1,88 +1,82 @@
 // Energy Balance chart (Health Chart). Shared math/helpers live in health-chart.js.
 
-// Smallest half-span the axis scales to, so a run of all-deficit days still leaves a
-// band above zero to read them against instead of pinning zero to the top.
+// Smallest half-span of the axis, so all-deficit days still leave a band above zero.
 const ENERGY_BALANCE_AXIS_MIN_KCAL = 200;
 
-// Both bounds round out to a multiple of this, so every label sits on a gridline and
-// the halves step identically. niceAxisBound's ladder could land on 800 and leave one
-// odd tick among a run of 500s.
+// Both bounds round out to a multiple of this, so every label sits on a gridline.
 const ENERGY_BALANCE_TICK_KCAL = 250;
+
+// Headroom past the furthest value before rounding out to a tick.
+const ENERGY_BALANCE_AXIS_HEADROOM = 1.08;
+
+// The desired dash's half-height as a share of the axis span, so it stays a hairline.
+const ENERGY_BALANCE_DESIRED_CAP_FRACTION = 0.004;
 
 let healthEnergyBalanceChart = null;
 
-// Graded against the desired balance D (desiredGrade): the day's balance ÷ D, lifted by
-// its L_p-day average's. No desired figure means nothing to grade against, so it falls back
-// to the sign alone, toward or away from the way the user is headed.
+// The two grades used when there's no desired figure, only a direction.
+function energyBalanceSignGrade(toward) {
+  return toward
+    ? { name: 'Toward desired', color: chartColor('--chart-good') }
+    : { name: 'Away from desired', color: chartColor('--chart-bad') };
+}
+
+// Graded by balance ÷ desired balance, lifted by its average's grade. With no desired
+// figure, by sign alone: toward or away from the way the user is headed.
 function energyBalanceGrade(balance, isCut, desired, weeklyAvg) {
   if (balance === null) return { name: null, color: chartColor('--chart-neutral') };
-  if (!desired) {
-    return (isCut ? balance < 0 : balance > 0)
-      ? { name: 'Toward desired', color: chartColor('--chart-good') }
-      : { name: 'Away from desired', color: chartColor('--chart-bad') };
-  }
+  if (!desired) return energyBalanceSignGrade(isCut ? balance < 0 : balance > 0);
   return desiredGradeBlended(balance / desired, weeklyAvg === null || weeklyAvg === undefined ? null : weeklyAvg / desired);
 }
 
-// Each label's sleep-adjusted balance (null on a day with no food logged, or no BMR),
-// and the terms behind it by date: the arithmetic Calorie Balance and Health Chart's
-// Past Year heatmap both read.
+// Each label's sleep-adjusted balance (null with no food logged or no BMR) and the terms
+// behind it by date. Also read by the heatmap and Safe Pace.
 function energyBalanceDays(entries, labels) {
   const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
-  const intakeEntries = entries.filter((e) => (e.category === 'Calories' || e.category === 'Calories; Protein') && e.amount !== null);
+  const intakeEntries = calorieLogEntries(entries);
   const bodyMassForDate = carryForwardBodyMassByDate(bodyMassByDateMap(bodyMassEntries), labels);
 
-  const intakeByDate = new Map();
-  intakeEntries.forEach((e) => intakeByDate.set(e.date, (intakeByDate.get(e.date) || 0) + e.amount));
+  const intakeByDate = dailyValues(intakeEntries, () => true, (e) => e.amount, sumDailyValues);
 
-  // This day's own measured TEF (Physique column L, via 🧬 Micronutrients on its
-  // ingredients) where Physique has calculated one — falls back to the flat
-  // TEF_PERCENT_OF_INTAKE estimate below on any day without one, same as before
-  // this column existed.
-  const tefByDate = new Map();
-  intakeEntries.forEach((e) => {
-    if (e.tefKcal !== null && e.tefKcal !== undefined) tefByDate.set(e.date, (tefByDate.get(e.date) || 0) + e.tefKcal);
-  });
+  // The day's own measured TEF where Physique has one; otherwise the flat estimate below.
+  const tefByDate = dailyValues(
+    intakeEntries,
+    (e) => e.tefKcal !== null && e.tefKcal !== undefined,
+    (e) => e.tefKcal,
+    sumDailyValues,
+  );
 
-  // Through the one shared rule, at the same carried-forward body mass the BMR term uses.
-  const activityKcalByDate = new Map();
-  entries.forEach((e) => {
-    if ((e.category !== 'Activity' && e.category !== 'Activity; Calories') || e.amount === null) return;
-    const kcal = activityEntryKcal(e, bodyMassForDate.get(e.date) ?? null);
-    activityKcalByDate.set(e.date, (activityKcalByDate.get(e.date) || 0) + kcal);
-  });
+  // At the same carried-forward body mass the BMR term uses.
+  const activityKcalByDate = dailyValues(
+    entries,
+    (e) => isActivityCategory(e.category) && e.amount !== null,
+    (e) => activityEntryKcal(e, bodyMassForDate.get(e.date) ?? null),
+    sumDailyValues,
+  );
 
-  // Sleep Deprivation Effect: how much of the day's OWN balance (not the flat desired
-  // deficit — see the Sleep chart's dot for that) a short night cost — shrinking a
-  // deficit's fat loss, or growing a surplus's fat gain, whichever side of zero the day
-  // was already on. Folded straight into "balance" itself, so this chart, its
-  // weekly average, and State Trend & Forecast's Calorie-Implied Trajectory (which
-  // walks this same arithmetic day by day) all read the sleep-adjusted figure.
-  const sleepEntries = entries.filter((e) => e.category === 'Sleep' && e.amount !== null);
-  const sleepHoursByDate = new Map();
-  sleepEntries.forEach((e) => sleepHoursByDate.set(e.date, (sleepHoursByDate.get(e.date) || 0) + e.amount));
+  // A short night's cost is folded into the balance itself, so this chart, its average
+  // and the forecast all read the sleep-adjusted figure.
+  const sleepHoursByDate = dailyValues(
+    entries,
+    (e) => e.category === 'Sleep' && e.amount !== null,
+    (e) => e.amount,
+    sumDailyValues,
+  );
   const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
 
   const detailByDate = new Map();
 
   const balanceData = labels.map((date) => {
-    // No food logged is no data, not a day of eating nothing — an empty slot rather
-    // than a huge fake deficit.
+    // No food logged is no data, not a day of eating nothing.
     if (!intakeByDate.has(date)) return null;
 
     const intake = Math.round(intakeByDate.get(date));
-    // The day's stored Derived cell (Physique's Derived column); the BMR basis setting picks
-    // which figure drives the bar and the hover.
+    // The BMR basis setting picks which of the day's figures drives the bar.
     const bmrFigures = bmrFiguresForDate(date);
     const maintenance = pickBmrForBasis(bmrFigures);
     if (maintenance === null) return null;
     const activity = Math.round(activityKcalByDate.get(date) || 0);
-    // Digestion is an expenditure like the other two, so it comes off the same subtraction —
-    // otherwise switching TEF on would raise the desired intake here without also raising the
-    // cost of eating it, and this chart would contradict the one that set it. A share
-    // of what was ACTUALLY eaten, not of the desired figure: this row scores the day that
-    // happened. Measured (tefByDate, from the day's own breakdown macros) wins over estimated
-    // whenever Physique has calculated one for this day.
+    // Digestion is spent like the other two terms, as a share of what was actually eaten.
     const tefMeasured = tefByDate.has(date);
     const tef = Math.round(tefMeasured ? tefByDate.get(date) : intake * (1 - tefDivisor()));
     const { rawBalance, deprivationKcal, balance } = dailyEnergyBalanceKcal(
@@ -99,21 +93,10 @@ function energyBalanceDays(entries, labels) {
   return { balanceData, detailByDate };
 }
 
-// Eaten minus spent per day, with the fat change that balance implies on a twin axis.
-//
-// Spend is Mifflin-St Jeor BMR at that day's carried-forward body mass PLUS its logged
-// activity burn — no lifestyle multiplier, since logged activity is already real kcal
-// and scaling BMR too would count the same movement twice. The desired intake is built
-// the same way, so the two agree on any day activity hits the desired burn.
-//
-// The COLOURS follow the desired balance, not the sign — a deficit is only progress for someone
-// heading down, so the app's green and red keep meaning "toward" and "away" rather than
-// congratulating a bulker for undereating. Which side is progress comes from
-// getCalorieDesiredKind, the same read Caloric Intake uses. Against a desired figure the bar
-// is graded by how much of it the day made (energyBalanceGrade), not met-or-missed.
-//
-// Grams is balance ÷ kcal-per-kg, a fixed linear rescale off two population constants,
-// which is what makes the right axis a true twin of the left.
+// Eaten minus spent per day, with the fat change it implies on a twin grams axis.
+// Spend is the selected BMR plus logged activity, with no lifestyle multiplier, since
+// logged activity is already real kcal. Colours follow the desired balance, not the sign:
+// a deficit is only progress for someone heading down.
 function renderHealthEnergyBalanceChart(entries) {
   const ctx = document.getElementById('health-energy-balance-chart');
 
@@ -124,30 +107,26 @@ function renderHealthEnergyBalanceChart(entries) {
 
   const bodyMassEntries = entries.filter((e) => e.category === 'Body Mass' && e.amount !== null);
 
-  // No profile means no maintenance figure, no body-mass reading means no body mass to feed it.
-  // Either way the chart shows its explanatory empty state, not a misleading partial.
+  // Without a profile and a body mass there's no maintenance figure: show the empty state.
   const canCompute = haveProfile && bodyMassEntries.length > 0;
   const labels = canCompute ? healthCalorieChartDates(entries) : [];
   const { balanceData, detailByDate } = energyBalanceDays(entries, labels);
-  // Which side of zero is progress. Same read Caloric Intake's desired figure is built on, so
-  // the two charts can't disagree about which way the user is headed.
+  // Which side of zero is progress, read as Caloric Intake reads it.
   const isCut = getCalorieDesiredKind(entries) === 'max';
 
   const values = balanceData.filter((v) => v !== null);
   const hasData = values.length > 0;
 
-  // Folded into the axis range too, so the dashes can't fall off-plot on a stretch of
-  // days that all undershot them.
-  // At the smoothed body mass, since a pinned percentage makes the deficit a function of body
-  // mass: one dashed line for the whole window, drawn at the rate the plan's mass implies.
+  // At the plan's body mass: one figure for the whole window.
   const desired = hasData ? desiredBalanceKcal(planBodyMassKg(entries)) : null;
+  const desiredName = `Desired ${desired !== null && desired < 0 ? 'Deficit' : 'Surplus'}`;
 
-  // balanceData already nulls the unlogged days, so they sit out of the fit.
   const weeklyAvg = emaSeries(balanceData, bodyMassSmoothingDays());
 
-  // Legend entries switched off (renderToggleLegend below) leave the axis too; bars by their colour's name.
+  // Hidden legend entries leave the axis range too; bars by their grade's name.
   const hidden = legendHiddenNames('health-energy-balance-legend');
-  const word = desired !== null && desired < 0 ? 'Deficit' : 'Surplus';
+  const avgHidden = hidden.has(healthAvgName());
+  const desiredHidden = hidden.has(desiredName);
   const grades = balanceData.map((v, i) => energyBalanceGrade(v, isCut, desired, weeklyAvg[i]));
   const barColors = grades.map((g) => g.color);
   const barClasses = grades.map((g) => g.name);
@@ -155,18 +134,15 @@ function renderHealthEnergyBalanceChart(entries) {
   const shownBalance = maskHiddenClasses(balanceData, barClasses, hidden);
   const shown = [
     ...shownBalance,
-    ...(hidden.has(healthAvgName()) ? [] : weeklyAvg),
-    ...(desired === null || hidden.has(`Desired ${word}`) ? [] : [desired]),
+    ...(avgHidden ? [] : weeklyAvg),
+    ...(desired === null || desiredHidden ? [] : [desired]),
   ].filter((v) => v !== null);
   const maxDeficit = Math.max(0, ...shown.map((v) => -v));
   const maxSurplus = Math.max(0, ...shown);
-  const upToTick = (v) => Math.ceil(Math.max(v * 1.08, ENERGY_BALANCE_AXIS_MIN_KCAL) / ENERGY_BALANCE_TICK_KCAL)
+  const upToTick = (v) => Math.ceil(Math.max(v * ENERGY_BALANCE_AXIS_HEADROOM, ENERGY_BALANCE_AXIS_MIN_KCAL) / ENERGY_BALANCE_TICK_KCAL)
     * ENERGY_BALANCE_TICK_KCAL;
   const yMin = -upToTick(maxDeficit);
   const yMax = upToTick(maxSurplus);
-
-  // A fraction of the axis span, so the dash stays a hairline at any range.
-  const desiredHalf = (yMax - yMin) * 0.004;
 
   healthEnergyBalanceChart = upsertChart(healthEnergyBalanceChart, ctx, {
     data: {
@@ -179,22 +155,15 @@ function renderHealthEnergyBalanceChart(entries) {
           backgroundColor: barColors,
           order: 2,
         },
-        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: hidden.has(healthAvgName()) }),
-        // A dash per day, the idiom Caloric Intake uses for its own desired intake: a continuous
-        // line reads as one shared limit, a mark on each bar says the desired figure belongs to
-        // that day.
-        ...(desired === null ? [] : [{
-          type: 'bar',
-          label: 'Desired for the day',
-          data: labels.map(() => [desired - desiredHalf, desired + desiredHalf]),
-          // Cyan, as Body Mass's healthy mark, so it can't pass for the L_p-Day Average.
-          backgroundColor: chartColor('--chart-cyan'),
-          grouped: false,
-          isDesiredLine: true,
-          hidden: hidden.has(`Desired ${word}`),
-          // Lowest order paints last, so it stays visible on a bar that overshot it.
-          order: 0,
-        }]),
+        trendLineDataset(healthAvgName(), weeklyAvg, { hidden: avgHidden }),
+        // A dash per day, as Caloric Intake marks its desired intake.
+        ...(desired === null ? [] : [desiredCapDataset(
+          'Desired for the day',
+          labels.map(() => desired),
+          (yMax - yMin) * ENERGY_BALANCE_DESIRED_CAP_FRACTION,
+          // Cyan, so it can't pass for the average line.
+          { backgroundColor: chartColor('--chart-cyan'), isDesiredLine: true, hidden: desiredHidden },
+        )]),
       ],
     },
     options: {
@@ -213,54 +182,29 @@ function renderHealthEnergyBalanceChart(entries) {
           padding: { top: 40 },
         },
         tooltip: {
-          // The dashes are filtered out — a floating bar would report itself as a
-          // `[from, to]` pair — and stated in afterBody instead.
+          // The dash and average are stated in afterBody instead.
           filter: (item) => !item.dataset.isDesiredLine && !item.dataset.isWeeklyAverage,
           callbacks: {
             title: (items) => formatIsoDateShort(items[0].label),
-            // The chart IS the subtraction, so every term is spelled out — a bare
-            // "-450" wouldn't show whether eating less or moving more produced it.
+            // Every term of the subtraction, spent terms shown negative, so the column
+            // reads top-down as the arithmetic behind the bar.
             label: (item) => {
               const d = detailByDate.get(item.label);
               if (!d) return '';
-              // "Actual Intake", the same name Caloric Intake and Protein Intake give
-              // the figure in their own hovers — one day's eating shouldn't be called
-              // three different things across three charts of the same panel.
-              //
-              // Maintenance and Activity are the two things SUBTRACTED from it, so
-              // they're shown subtracted: the column reads top-down as the arithmetic
-              // behind the bar (intake, less maintenance, less activity, giving the
-              // balance) instead of three bare figures the reader has to remember the
-              // signs of. Activity especially — kcal burned printed as a positive reads
-              // as something ADDED to the day.
               const lines = [
                 `TEI (Total Energy Intake): ${d.intake} kcal`,
-                // Only the BMR Tune has selected, the one the bar runs on.
                 `${bmrHoverLabel(selectedBmrKey(d.bmrFigures))}: ${-d.maintenance} kcal`,
                 `AEE (Activity Energy Expenditure): ${-d.activity} kcal`,
-                // Only when there IS one. At the default f = 0 the row would be a
-                // permanent "-0", which reads as a term that failed to compute rather
-                // than one deliberately left out of the model. Labelled "measured" when
-                // it's this day's own Physique figure, "est." when it's the flat
-                // TEF_PERCENT_OF_INTAKE fallback — the two can differ by a real amount,
-                // so which one produced this bar shouldn't be left ambiguous.
+                // Omitted at zero, where it would read as a failed figure.
                 ...(d.tef > 0 ? [`TEF (Thermic Effect of Food): ${-d.tef} kcal`] : []),
-                // Added, not subtracted: on a deficit this is how much less of it became
-                // fat loss; on a surplus it's how much MORE was gained, since short sleep
-                // drives hunger and cuts NEAT rather than sitting out surplus days. Shown
-                // on every day, 0 when the night met desired sleep (or none was logged).
+                // Added either side of zero: less fat lost on a deficit, more gained on a surplus.
                 `SD (Sleep Deprivation Effect): ${Math.round(d.deprivationKcal ?? 0)} kcal`,
               ];
               return privacyMode ? lines.map(maskDigits) : lines;
             },
-            // The Tune's D. Flush left via afterBody, and signed like everything
-            // else here so it reads off the axis its dash is drawn on.
             afterBody: (items) => {
               const lines = [];
-              if (desired !== null) {
-                const word = desired < 0 ? 'Deficit' : 'Surplus';
-                lines.push(`D (Desired ${word}): ${desired} kcal/day`);
-              }
+              if (desired !== null) lines.push(`D (${desiredName}): ${desired} kcal/day`);
               const i = items[0]?.dataIndex;
               if (i !== undefined && weeklyAvg[i] !== null) {
                 lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} kcal`);
@@ -276,17 +220,13 @@ function renderHealthEnergyBalanceChart(entries) {
           min: yMin,
           max: yMax,
           afterFit: fixDatedYAxisWidth,
-          // Zero is the line the chart is read against, so it takes the tick-label
-          // colour instead of receding into the gridlines. Evaluated at draw time, so a
-          // theme switch recolours it.
+          // Zero takes the tick-label colour, since the chart is read against it.
           grid: { color: (ctx) => (ctx.tick.value === 0 ? Chart.defaults.color : Chart.defaults.borderColor) },
-          // autoSkip off, or Chart.js drops ticks it thinks are crowded and the spacing
-          // goes uneven again.
+          // autoSkip off, or Chart.js drops "crowded" ticks and the spacing goes uneven.
           ticks: { stepSize: ENERGY_BALANCE_TICK_KCAL, autoSkip: false, callback: maskedUnitTick('kcal') },
         },
         y1: {
-          // The gram equivalent of y's own bounds, so zero lines up and every bar reads
-          // off either side.
+          // y's bounds in grams of fat, so zero lines up and bars read off either side.
           min: (yMin / GENERIC_KCAL_PER_KG_FAT) * 1000,
           max: (yMax / GENERIC_KCAL_PER_KG_FAT) * 1000,
           position: 'right',
@@ -298,14 +238,9 @@ function renderHealthEnergyBalanceChart(entries) {
     },
   });
 
-  // Swatches under the chart, named as in the hover; bar colours from energyBalanceGrade.
   renderToggleLegend('health-energy-balance-legend', labels.length === 0 ? [] : [
-    ...(desired ? desiredGradeLegend() : [
-      { name: 'Toward desired', color: chartColor('--chart-good') },
-      { name: 'Away from desired', color: chartColor('--chart-bad') },
-    ]),
+    ...(desired ? desiredGradeLegend() : [true, false].map(energyBalanceSignGrade)),
     { name: healthAvgName(), color: desiredMarkColor() },
-    ...(desired !== null ? [{ name: `Desired ${word}`, color: chartColor('--chart-cyan') }] : []),
+    ...(desired !== null ? [{ name: desiredName, color: chartColor('--chart-cyan') }] : []),
   ], () => renderHealthEnergyBalanceChart(entries));
 }
-

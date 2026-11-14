@@ -1,24 +1,20 @@
-// Finance's Insight — the same preview/question/Send-to-AI flow as Health
-// Insight (health-insight.js), reusing its renderInsightLines/renderInsightText
-// helpers (health-insight-wellness.js) and aiChatText (ai.js), but for money instead of
-// health: net worth and cash flow, average spending by category over four
-// periods, and every account's Balance (deposited) vs. Market Value (today's
-// worth, where tracked) — so a gap between the two reads as the account's own
-// gain or loss, not a data error. There's only one report here, so unlike
-// Health Insight there's no mode-select table and no date range — every
-// figure here is already a fixed period (this month / Previous Month /
-// Quarter / Year / Lifelong / a live account snapshot), so there's nothing a
-// custom range would add.
-//
-// currentReport (app.js) and allAccounts (finance-account.js) are already loaded for
-// Finance's Charts and Account Summary table by the time this
-// panel is ever visible, so the preview renders straight from them — nothing
-// extra to fetch. Still, nothing is computed until "Financial Snapshot" is
-// clicked, same as Health Insight's mode buttons.
+// Finance's Insight: Health Insight's preview/question/Send-to-AI flow for money —
+// net worth, cash flow, spending by category over four periods, and each account's
+// Balance vs. Market Value. One report with fixed periods, so no modes or date range.
+// It renders from currentReport (app.js) and allAccounts (finance-account.js), which
+// are already loaded, and only once "Financial Snapshot" is clicked.
 
-// What's on screen right now — reused by Send to AI so it sends exactly what
-// the preview showed rather than re-gathering.
+// What the preview shows, so Send to AI sends exactly that.
 let financialInsightLoaded = null;
+
+const FINANCIAL_INSIGHT_PAGE = {
+  panelId: 'financial-insight-panel',
+  statusId: 'financial-insight-status',
+  errorId: 'financial-insight-form-error',
+  bodyId: 'financial-insight-body',
+  generatedAtId: 'financial-insight-generated-at',
+  generateBtnId: 'financial-insight-generate-btn',
+};
 
 function initFinancialInsight() {
   clearFieldError('financial-insight-form-error');
@@ -27,10 +23,8 @@ function initFinancialInsight() {
   document.getElementById('financial-insight-generate-btn').addEventListener('click', runFinancialInsightGeneration);
   // Back to /finance/insight/: the tile again.
   registerViewReset(document.getElementById('financial-insight-panel'), () => {
-    delete document.getElementById('financial-insight-panel').dataset.insightMode;
     financialInsightLoaded = null;
-    document.getElementById('financial-insight-status').textContent = '';
-    clearFieldError('financial-insight-form-error');
+    resetInsightPage(FINANCIAL_INSIGHT_PAGE);
   });
 }
 
@@ -38,26 +32,15 @@ function gatherFinancialInsightData() {
   const report = currentReport || {};
   const avg = report.quarterAverage;
 
-  // report.categoryComparison holds Math.abs'd PERIOD TOTALS, not monthly
-  // averages — renderSpendingTrendChart (finance-chart.js) is the only other reader
-  // of this data, and it divides by 3/12/totalMonths itself at chart-render
-  // time (SPENDING_TREND_PERIODS). Do the same division here, then negate:
-  // every one of these categories is real spending (Income is excluded
-  // upstream), so an expense reads as an expense, not an ambiguous positive
-  // sum mislabeled "avg".
-  const totalMonths = report.totalMonths || 1;
+  // categoryComparison holds positive period TOTALS: average them as the Spending
+  // Trend chart does, then negate so spending reads as spending.
   const categoryComparison = (report.categoryComparison || []).map((c) => ({
     name: c.name,
-    lastMonth: -c.lastMonth,
-    quarterAvg: -c.quarterAvg / 3,
-    yearAvg: -c.yearAvg / 12,
-    lifelongAvg: -c.lifelongAvg / totalMonths,
+    ...Object.fromEntries(SPENDING_TREND_PERIODS.map((p) => [p.key, -spendingMonthlyAverage(c, p, report.totalMonths)])),
   }));
 
-  // Same "blank counts as 0" convention as the Account Summary Total row
-  // (finance-account.js) and the Accounts sheet's own SUM() in E1 — summed across
-  // every account, not just the ones listed below, so it lines up with
-  // Net Worth (also a whole-sheet total).
+  // Blank counts as 0 and every account counts, like the Account Summary Total row,
+  // so it lines up with Net Worth.
   const totalMarketValue = allAccounts.reduce((sum, a) => sum + (a.currentValue || 0), 0);
 
   return {
@@ -69,9 +52,8 @@ function gatherFinancialInsightData() {
     monthlyExpenses: report.expenses || 0,
     quarterAvgExpenses: avg ? avg.expenses : null,
     categoryComparison,
-    // Closed accounts (balanceText set, e.g. "Closed") and empty ones (zero
-    // Balance, and no tracked Market Value or a zero one) hold no funds —
-    // reporting a page of them would bury the accounts that actually matter.
+    // Closed accounts (balanceText set) and empty ones hold no funds; listing them
+    // would bury the ones that matter.
     accounts: allAccounts
       .filter((a) => a.balanceText === null && (a.balance !== 0 || (a.currentValue !== null && a.currentValue !== 0)))
       .map((a) => ({
@@ -85,12 +67,8 @@ function gatherFinancialInsightData() {
   };
 }
 
-// "Monthly Income"/"Expenditure"/"Cash Flow" are the CURRENT month's SUMIFS
-// total, which only grows as the month goes on — early in the month it's
-// naturally a fraction of a full month's average, not a real decline. Without
-// this, the model reads day-7's partial total against a full-month average
-// and calls it a shortfall. Days elapsed only, not "today" itself — a whole
-// day's worth of transactions may still be unposted.
+// This month's Income/Expenditure/Cash Flow are still accumulating; without this
+// note the model reads an early partial total as a shortfall.
 function monthProgressNote() {
   const now = new Date();
   const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -100,13 +78,20 @@ function monthProgressNote() {
 
 function financialInsightSummaryLines(d) {
   const progress = monthProgressNote();
+  const priorAvg = (avg) => (avg !== null ? ` (previous months' avg: ${formatCurrency(avg)})` : '');
   return [
     `Net Worth: ${formatCurrency(d.netWorth)}`,
     `Total Market Value: ${formatCurrency(d.totalMarketValue)}`,
     `Monthly Cash Flow: ${formatCurrency(d.monthlyCashFlow)}${progress}`,
-    `Monthly Income: ${formatCurrency(d.monthlyIncome)}${progress}${d.quarterAvgIncome !== null ? ` (previous months' avg: ${formatCurrency(d.quarterAvgIncome)})` : ''}`,
-    `Monthly Expenditure: ${formatCurrency(d.monthlyExpenses)}${progress}${d.quarterAvgExpenses !== null ? ` (previous months' avg: ${formatCurrency(d.quarterAvgExpenses)})` : ''}`,
+    `Monthly Income: ${formatCurrency(d.monthlyIncome)}${progress}${priorAvg(d.quarterAvgIncome)}`,
+    `Monthly Expenditure: ${formatCurrency(d.monthlyExpenses)}${progress}${priorAvg(d.quarterAvgExpenses)}`,
   ];
+}
+
+// An account's Market Value as shown: its text, its amount, or "not tracked".
+function accountMarketValueText(a) {
+  if (a.currentValueText !== null) return a.currentValueText;
+  return a.currentValue !== null ? formatCurrency(a.currentValue) : 'not tracked';
 }
 
 function financialInsightCategoryLines(d) {
@@ -122,17 +107,12 @@ function financialInsightAccountLines(d) {
   if (d.accounts.length === 0) return ['Accounts: none open with a balance'];
   return [
     "Accounts — Balance (deposited) vs. Market Value (today's worth, where tracked):",
-    ...d.accounts.map((a) => {
-      const marketStr = a.currentValueText !== null ? a.currentValueText
-        : a.currentValue !== null ? formatCurrency(a.currentValue) : 'not tracked';
-      return `  ${a.name} (${a.type}): Balance ${formatCurrency(a.balance)}, Market Value ${marketStr}`;
-    }),
+    ...d.accounts.map((a) =>
+      `  ${a.name} (${a.type}): Balance ${formatCurrency(a.balance)}, Market Value ${accountMarketValueText(a)}`),
   ];
 }
 
-// The full text sent to Groq — every section above joined into one prompt.
-// The visual preview renders the category/account sections as tables instead
-// (renderFinancialInsightPreview below), but the model only ever sees text.
+// The text the model gets; the preview shows the same sections as tables.
 function formatFinancialInsightPrompt(d) {
   return [
     ...financialInsightSummaryLines(d),
@@ -177,9 +157,7 @@ function renderAccountsInsightTable(accounts) {
     const balanceCell = makeCell(formatCurrency(a.balance));
     balanceCell.className = a.balance < 0 ? 'expense' : 'income';
 
-    const marketStr = a.currentValueText !== null ? a.currentValueText
-      : a.currentValue !== null ? formatCurrency(a.currentValue) : 'not tracked';
-    const marketCell = makeCell(marketStr);
+    const marketCell = makeCell(accountMarketValueText(a));
     if (a.currentValueText === null && a.currentValue !== null) {
       marketCell.className = a.currentValue < 0 ? 'expense' : 'income';
     }
@@ -190,9 +168,7 @@ function renderAccountsInsightTable(accounts) {
   });
 }
 
-// The visual read-out — same data as formatFinancialInsightPrompt above, just
-// laid out as tables where a table reads easier than a wall of text, same as
-// Health Insight's Food mode (aggregate lines + an ingredient table).
+// The prompt's data, with the category and account sections as tables.
 function renderFinancialInsightPreview(d) {
   const summaryEl = document.getElementById('financial-insight-preview');
   summaryEl.hidden = false;
@@ -205,18 +181,13 @@ function renderFinancialInsightPreview(d) {
   renderAccountsInsightTable(d.accounts);
 }
 
-// The only path that computes anything, and it's cheap — formatting data the
-// dashboard already gathered, not a fresh aggregation pass.
+// Cheap: it formats data the dashboard already gathered.
 function refreshFinancialInsightPreview() {
-  const statusEl = document.getElementById('financial-insight-status');
-  const btn = document.getElementById('financial-insight-generate-btn');
-  clearFieldError('financial-insight-form-error');
-  // Snapshot's page, even while its data is still loading.
-  document.getElementById('financial-insight-panel').dataset.insightMode = 'snapshot';
+  openInsightPage(FINANCIAL_INSIGHT_PAGE, 'snapshot');
 
   if (!currentReport || !accountsDataLoaded) {
     showToast('Still loading your accounts — try again in a moment.');
-    btn.disabled = true;
+    document.getElementById('financial-insight-generate-btn').disabled = true;
     return;
   }
 
@@ -225,9 +196,7 @@ function refreshFinancialInsightPreview() {
 
   renderFinancialInsightPreview(data);
   renderSavedFinancialInsight();
-
-  statusEl.textContent = '';
-  btn.disabled = false;
+  document.getElementById('financial-insight-generate-btn').disabled = false;
 }
 
 const FINANCIAL_INSIGHT_SYSTEM_PROMPT = `You are a supportive personal finance coach reviewing someone's own tracked financial data. You are not a licensed financial advisor — do not recommend a specific company, ticker, fund name, or guarantee any return. When a suggestion involves investing, name the VEHICLE TYPE (e.g. "a broad-market index fund or ETF", "a dividend-focused ETF", "a bond ladder") so it's concrete enough to act on, not just "invest more" — but stop at the type, never a specific issuer or symbol.
@@ -258,85 +227,30 @@ If an additional question from the user is included after the data, also answer 
 Keep the whole report under 300 words.`;
 
 function financialInsightUserMessage(data, question) {
-  const prompt = formatFinancialInsightPrompt(data);
-  return question && question.trim() ? `${prompt}\n\nAdditional question: ${question.trim()}` : prompt;
+  return appendInsightQuestion(formatFinancialInsightPrompt(data), question);
 }
 
-// Only runs on an explicit Send to AI click, on the already-loaded preview
-// data — so gathering happens once per snapshot load, not again per request.
+// Send to AI: runs on the loaded preview data, not a fresh gather.
 async function runFinancialInsightGeneration() {
   if (!financialInsightLoaded) return;
 
   const data = financialInsightLoaded;
-  const body = document.getElementById('financial-insight-body');
-  const btn = document.getElementById('financial-insight-generate-btn');
   const textarea = document.getElementById('financial-insight-question');
-
-  body.innerHTML = '';
-  clearFieldError('financial-insight-form-error');
-
-  const loading = document.createElement('p');
-  loading.className = 'hint';
-  loading.textContent = 'Analyzing…';
-  body.appendChild(loading);
-
-  btn.disabled = true;
-  textarea.disabled = true;
-  Motion.iconBusy(btn);
-
-  try {
-    const text = await aiChatText(FINANCIAL_INSIGHT_SYSTEM_PROMPT, financialInsightUserMessage(data, textarea.value));
-    body.innerHTML = '';
-    renderInsightText(body, text);
-
-    const generatedAt = localTimestamp(new Date());
-    try {
-      await saveSettingValues({
-        FINANCIAL_INSIGHT_LAST_RESULT: text,
-        FINANCIAL_INSIGHT_LAST_GENERATED_AT: generatedAt,
-      });
-      renderFinancialInsightGeneratedAt(generatedAt);
-      renderInsightAgeBadges();
-    } catch (saveErr) {
-      showFieldError('financial-insight-form-error', `Generated, but couldn't save it: ${saveErr.message}`);
-    }
-  } catch (err) {
-    body.innerHTML = '';
-    showFieldError('financial-insight-form-error', err.message);
-  } finally {
-    btn.disabled = false;
-    textarea.disabled = false;
-    Motion.iconSettle(btn);
-  }
+  return generateInsight(FINANCIAL_INSIGHT_PAGE, {
+    controls: [textarea],
+    analyzing: 'Analyzing…',
+    prompts: () => [FINANCIAL_INSIGHT_SYSTEM_PROMPT, financialInsightUserMessage(data, textarea.value)],
+    resultKey: 'FINANCIAL_INSIGHT_LAST_RESULT',
+    generatedAtKey: 'FINANCIAL_INSIGHT_LAST_GENERATED_AT',
+  });
 }
 
 function renderFinancialInsightGeneratedAt(timestamp) {
-  const el = document.getElementById('financial-insight-generated-at');
-  if (!timestamp) {
-    el.hidden = true;
-    return;
-  }
-  el.hidden = false;
-  el.textContent = `Last generated ${timestamp}`;
+  renderInsightGeneratedAt(FINANCIAL_INSIGHT_PAGE, timestamp);
 }
 
-// The last AI result, straight from the Settings copy already in memory —
-// re-shown every time the snapshot loads/reloads, so a fresh page load's
-// first click doesn't go blank before anything new has been sent.
 function renderSavedFinancialInsight() {
-  const body = document.getElementById('financial-insight-body');
-  const text = getSettingString('FINANCIAL_INSIGHT_LAST_RESULT', null);
-
-  body.innerHTML = '';
-  if (!text) {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'hint';
-    placeholder.textContent = 'Review the data above, then click "Send to AI" to get a read on it.';
-    body.appendChild(placeholder);
-    renderFinancialInsightGeneratedAt(null);
-    return;
-  }
-
-  renderInsightText(body, text);
-  renderFinancialInsightGeneratedAt(getSettingString('FINANCIAL_INSIGHT_LAST_GENERATED_AT', null));
+  renderSavedInsightBody(FINANCIAL_INSIGHT_PAGE,
+    getSettingString('FINANCIAL_INSIGHT_LAST_RESULT', null),
+    getSettingString('FINANCIAL_INSIGHT_LAST_GENERATED_AT', null));
 }

@@ -27,9 +27,7 @@
 <meta name="twitter:description" content="Private, serverless personal life dashboard. Track health, finances, time, travel, applications, LeetCode and contacts — all backed by your own Google Sheet.">
 <meta name="twitter:image" content="https://ainlamyae.github.io/ledger/assets/images/social-preview.png">
 
-<!-- Who made this and what it is, for search engines and AI crawlers: the footer's
-     "© 2026 ALI — Ledger" as data. No version here: it changes every commit and
-     only version.js is stamped, so a copy here would go stale. -->
+<!-- Who made this, for search engines; no version (only version.js is stamped). -->
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
@@ -122,20 +120,12 @@
 <div id="app-backdrop" aria-hidden="true"></div>
 
 <header>
-    <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a><!--
-     Wide screens only: hides and shows the sidebar. With the
-     sidebar hidden it's the one thing left top-left, drawn as the logo until
-     hovered (page-nav.js's initSideNavToggle).
-     --><button type="button" id="side-nav-toggle" class="side-nav-toggle" title="Hide sidebar" aria-label="Hide sidebar" aria-controls="side-nav" aria-expanded="true"><img src="favicon.svg" class="side-nav-toggle-logo" alt="" width="20" height="20"><svg class="side-nav-toggle-icon" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7.5 3.5v13"/></svg></button></h1>
+    <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a><!-- Wide screens only: hides and shows the sidebar (initSideNavToggle). --><button type="button" id="side-nav-toggle" class="side-nav-toggle" title="Hide sidebar" aria-label="Hide sidebar" aria-controls="side-nav" aria-expanded="true"><img src="favicon.svg" class="side-nav-toggle-logo" alt="" width="20" height="20"><svg class="side-nav-toggle-icon" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7.5 3.5v13"/></svg></button></h1>
 
-    <!-- Each entry is a real address, not an in-page anchor: /health/, /finance/,
-         /track/ and /other/ are pages of their own that show that one wrapper (see
-         assets/script/section-page.js). data-section names the wrapper the
-         address stands for, and is the only list of them anywhere — the section
-         pages and the scroll-spy both read this nav rather than repeating it. -->
+    <!-- Each entry is a real address (section-page.js); data-section names its wrapper
+         and this nav is the only list of them. -->
     <nav id="main-nav" class="nav">
-        <!-- The home page, as the bottom tab bar's first tab on a phone (where the
-             header's logo is gone); hidden wherever the logo shows. -->
+        <!-- The home page, as the phone tab bar's first tab, where the logo is gone. -->
         <a href="." class="nav-home">
             <span class="nav-label">Ledger</span>
         </a>
@@ -148,8 +138,7 @@
         <a href="track/" data-section="track">
             <span class="nav-label">Track</span>
         </a>
-        <!-- Hidden: Contact and Settings open from the account menu instead; the
-             entry stays so /other/ still resolves (section-page.js). -->
+        <!-- Hidden: opened from the account menu; kept so /other/ resolves. -->
         <a href="other/" data-section="other" hidden>
             <span class="nav-label">Other</span>
         </a>
@@ -158,8 +147,7 @@
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
 
         <div id="account-menu" class="account-menu" hidden>
-            <!-- The Google profile picture; on a wide screen a full row with the name
-                 and email beside it. -->
+            <!-- The profile picture; a full row with name and email on a wide screen. -->
             <button id="account-menu-btn" class="account-avatar-btn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
                 <img id="account-avatar-img" class="account-avatar" alt="" hidden>
                 <span id="account-avatar-fallback" class="account-avatar account-avatar-fallback"></span>
@@ -176,12 +164,8 @@
                     <span id="last-updated" class="last-updated"></span>
                 </div>
 
-                <!-- Contact, Refresh data, Clear cache and Settings, then the show/hide
-                     settings as iPhone switches. Starts here (under the account row, where
-                     it belongs everywhere but a wide screen with the sidebar open) so a
-                     narrow screen's header-actions never has to lay it out and then rip it
-                     back out on first paint. app.js's placeSettingsSwitches moves it into the
-                     sidebar's bottom panel instead, only on that one wide-with-sidebar case. -->
+                <!-- Menu items, then the show/hide switches; placeSettingsSwitches moves them
+                     into the sidebar on a wide screen with the sidebar open. -->
                 <div id="settings-switches" class="settings-switches">
                     <a href="other/contact/" class="account-menu-item">Contact</a>
                     <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
@@ -376,30 +360,11 @@
             </div>
 
             <div class="body-mass-projection-wrap">
-                <!-- From/To replaced by the range buttons above (health-chart.js).
-                <div class="export-date-range">
-                    <label>From
-                        <input type="date" id="health-date-from">
-                    </label>
-                    <label>To
-                        <input type="date" id="health-date-to">
-                    </label>
-                </div>
-                -->
 
-                <!-- State Trend & Forecast chart — temporarily hidden; re-enable by uncommenting
-                <div class="body-mass-projection-header">
-                    <h4>State Trend &amp; Forecast</h4>
-                </div>
-                <div class="chart-box chart-box-flush">
-                    <canvas id="health-projection-chart"></canvas>
-                </div>
-                -->
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
             </div>
 
-            <!-- LeetCode's heatmap over the range row's days, each coloured as its
-                 Calorie Balance bar (health-chart-heatmap.js). -->
+            <!-- LeetCode's heatmap, each day coloured as its Calorie Balance bar. -->
             <div class="body-mass-projection-wrap card health-heatmap-card">
                 <h3>Daily Progress</h3>
                 <div class="chart-box chart-box-flush health-heatmap-box">
@@ -499,9 +464,7 @@
                 </div>
             </div>
 
-            <!-- Was its own "Protein Source Rotation" panel, moved in last so every
-                 Health chart is in one place and they collapse together. The wrap is
-                 what makes its heading one of the set, not a style of its own. -->
+            <!-- The wrap makes its heading one of the set. -->
             <div class="body-mass-projection-wrap card">
                 <h3>Protein Source Rotation</h3>
 
@@ -518,9 +481,7 @@
                 <div class="donut-legend" id="protein-rotation-ingredient-legend"></div>
             </div>
 
-            <!-- Same shape as Protein Source Rotation above: one horizontal bar chart
-                 (sessions done vs. desired per Group this window) and one rotational
-                 donut (reference weekly split, last 4 weeks, last week). -->
+            <!-- Done vs. desired per Group, and the rotation donut. -->
             <div class="body-mass-projection-wrap card">
                 <h3>Activity Rotation</h3>
 
@@ -611,9 +572,6 @@
                             <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
                             <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
                             <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your desired protein this ingredient should cover">%</th>
-                            <!-- Uses column retired (health-nutrition.js keeps its code commented).
-                            <th class="sortable" data-sort="uses" title="How many logged Consumption lines (across every Physique day) resolved to this ingredient — click 📊 Count Uses beside Search to fill this in, then click here to sort least-used first and find ones to remove. Never saved anywhere.">Uses</th>
-                            -->
                             <th></th>
                         </tr>
                         </thead>
@@ -654,8 +612,7 @@
         <div class="panel" id="workout-plan-panel" data-route="activity">
             <div class="panel-header">
                 <h2>Activity</h2>
-                <!-- Three buttons on one phone heading line, so each label is cut to a
-                     word and carries the full wording in its tooltip. -->
+                <!-- One-word labels for a phone; the tooltips carry the full wording. -->
                 <button type="button" id="activity-instruction-btn" data-route="workouts" class="btn btn-icon panel-header-btn" title="How to run the activities in this plan" aria-label="Workouts">💪</button>
                 <button type="button" id="log-workout-btn" class="btn btn-icon panel-header-btn" title="Log the ticked activities as today's workout" aria-label="Log">📝</button>
                 <button type="button" id="add-activity-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an exercise or activity to the plan" aria-label="Add">➕</button>
@@ -685,16 +642,6 @@
             <h2>Insight</h2>
             <p class="hint" id="insight-hint"></p>
 
-            <!-- From/To replaced by the range buttons below (health-insight.js).
-            <div class="export-date-range">
-                <label>From
-                    <input type="date" id="insight-date-from">
-                </label>
-                <label>To
-                    <input type="date" id="insight-date-to">
-                </label>
-            </div>
-            -->
             <!-- Indicator's range row (HEALTH_RANGES), ending today. -->
             <div class="panel-section card">
                 <h3>Range</h3>
@@ -721,8 +668,7 @@
                     <textarea id="insight-question" rows="4" placeholder="e.g. Should I prioritize sleep or protein right now?"></textarea>
                 </label>
 
-                <!-- What Send to AI sends for the loaded mode, with the data already on screen
-                     left as placeholders; Tune's Equations dropdown style. -->
+                <!-- What Send to AI sends for the loaded mode. -->
                 <details id="insight-prompt-details" hidden>
                     <summary>Prompt template</summary>
                     <div class="table-responsive">
@@ -856,18 +802,13 @@
                         <label><input type="radio" name="formula-solve-for" value="HEALTHY_MASS"> Healthy body mass</label>
                         <label><input type="radio" name="formula-solve-for" value="TAU"> Activity</label>
                         <label><input type="radio" name="formula-solve-for" value="DELTA_M" checked> Weekly fat loss</label>
-                        <!-- The odd one out, and named for what you hold rather than what it solves:
-                             here the percentage of body mass is the fixed input and BOTH TEI and t are
-                             computed from it, on the proportional journey a fixed share implies. -->
+                        <!-- Here the % of body mass is fixed and both TEI and t are computed from it. -->
                         <label title="Hold the weekly fat loss at a percentage of your body mass. The kilograms per week, the desired calorie intake and the arrival date are all computed from it — and the date follows the proportional journey, where the kilograms shrink as you do.">
                             <input type="radio" name="formula-solve-for" value="FIXED_PCT"> Weekly fat loss %
                         </label>
                     </fieldset>
 
-                    <!-- Which BMR equation the whole plan is built on. Both are kept and both are live:
-                         Mifflin-St Jeor is the default and what every existing sheet already runs on,
-                         and switching here re-derives the preview through the other one — including A
-                         and B, since maintenance stays affine in body mass under both. -->
+                    <!-- The BMR equation the plan is built on; both stay live. -->
                     <!-- Which LBM Katch-McArdle, protein and glycogen read. -->
                     <fieldset class="formula-solve-for formula-lbm-formula">
                         <legend>Lean body mass — feeds Katch-McArdle, the protein band and glycogen</legend>
@@ -977,16 +918,14 @@
                             <input type="text" id="formula-hip" inputmode="decimal">
                             <span class="formula-unit">cm</span>
                         </label>
-                        <!-- Opens on the latest reading; a typed figure is copied into m̄, which
-                             every identity is evaluated at. -->
+                        <!-- Opens on the latest reading; a typed figure is copied into m̄. -->
                         <label class="formula-row" title="Your most recent body-mass reading, exactly as logged. Editable: a typed figure is copied into m̄ below, so the whole plan runs at that mass.">
                             <span class="formula-sym">m</span>
                             <span class="formula-name">body mass</span>
                             <input type="text" id="formula-body-mass" inputmode="decimal">
                             <span class="formula-unit">kg</span>
                         </label>
-                        <!-- L_p sits here, above m̄, because it is m̄'s window as well as the length
-                             of each BMR_cal period below (n_p × L_p). -->
+                        <!-- L_p is m̄'s window and each BMR_cal period's length. -->
                         <label class="formula-row" title="How many days m̄ averages, and how many days each BMR_cal period averages">
                             <span class="formula-sym">L_p</span>
                             <span class="formula-name">period length</span>
@@ -1006,11 +945,7 @@
                             <input type="text" id="formula-healthy" inputmode="decimal">
                             <span class="formula-unit">kg</span>
                         </label>
-                        <!-- m_des's other face, and the same two-way pair Δm%/Δm are: one quantity in
-                             two units, so whichever box you last typed into is the known and the other
-                             is rewritten from it. Directly under m_des because a goal in kilograms is a
-                             number you pick and a goal in BMI is what tells you whether picking it was
-                             sensible — the verdict rides on the trace line, never in the unit column. -->
+                        <!-- m_des in BMI: type either box and the other follows. -->
                         <label class="formula-row" title="The BMI your healthy body mass comes to at your height — BMI = m_des / (h/100)². Type a healthy mass and this follows it; type a BMI here and the healthy mass follows instead. The healthy band is 20–25, and outside it the box goes red. In Solve for → Healthy body mass both are answers, so neither is typed.">
                             <span class="formula-sym">BMI_des</span>
                             <span class="formula-name">healthy body mass index</span>
@@ -1048,21 +983,14 @@
                             <input type="text" id="formula-lbm-navy" inputmode="decimal" readonly>
                             <span class="formula-unit">kg</span>
                         </label>
-                        <!-- Sits with the rest of the profile it's derived from (m̄, h, σ) and directly
-                             above BMR: under Katch-McArdle, BMR is built from this figure rather than
-                             the other way around, so it has to be known before BMR is. -->
+                        <!-- Above BMR: Katch-McArdle builds BMR from LBM. -->
                         <label class="formula-row" title="Lean body mass, Boer (1984): for men, 0.407×m̄ + 0.267×h − 19.2; for women, 0.252×m̄ + 0.473×h − 48.3. Not editable: it is derived from m̄, h and σ. Used across the sheet (Katch-McArdle, protein, glycogen) when Lean body mass is set to Boer.">
                             <span class="formula-sym">LBM_boer</span>
                             <span class="formula-name">lean body mass by Boer</span>
                             <input type="text" id="formula-lbm" inputmode="decimal" readonly>
                             <span class="formula-unit">kg</span>
                         </label>
-                        <!-- The figures everything downstream is measured against, readonly because
-                             they aren't settings. Both equations shown always, regardless of which one
-                             the radio below has active — only the ACTIVE one (via the coefficients/plan
-                             built from it) actually feeds the rest of the sheet; these two are reference.
-                             Placed with the profile rather than beside TEI because that's what they
-                             describe — the body, before any plan is applied to it. -->
+                        <!-- Readonly reference figures; only the active equation feeds the sheet. -->
                         <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Mifflin-St Jeor — shown regardless of which equation is active below. Not editable: derived from m̄, h, a and σ. Blank without a birth date (Mifflin needs age; Katch-McArdle doesn't).">
                             <span class="formula-sym">BMR_mif</span>
                             <span class="formula-name">basal metabolic rate by Mifflin-St Jeor</span>
@@ -1112,10 +1040,7 @@
                             <span class="formula-sym">m∞_adp</span>
                             <span class="formula-name">adapted plateau</span>
                             <input type="text" id="formula-plateau-adapt" inputmode="decimal" readonly>
-                            <!-- `kg` and nothing else, like every other row: the overshoot against m∞,
-                                 and the fact that a proportional journey has no plateau to overshoot,
-                                 are both said in the substituted trace. Same rule the Δm% verdict
-                                 follows — the unit column is a unit. -->
+                            <!-- The unit column is a unit; the verdict is in the trace. -->
                             <span class="formula-unit">kg</span>
                         </label>
                         <hr class="formula-divider">
@@ -1125,8 +1050,7 @@
                             <input type="text" id="formula-bmr-avg" inputmode="decimal" readonly>
                             <span class="formula-unit">kcal/day</span>
                         </label>
-                        <!-- Marks the end of the profile block (m, m̄, h, a, σ, m_des, BMI_des, LBM,
-                             BMR) before the activity block starts below. -->
+                        <!-- End of the profile block. -->
                         <hr class="formula-divider">
                         <label class="formula-row">
                             <span class="formula-sym">τ</span>
@@ -1138,9 +1062,7 @@
                             <span class="formula-sym">MET</span>
                             <span class="formula-name">walking activity intensity</span>
                             <input type="text" id="formula-met" inputmode="decimal">
-                            <!-- The unit is the symbol here: "metabolic equivalents" was the longest
-                                 string in the column and the only one that forced a second line on a
-                                 phone, and the row's own name already says what MET measures. -->
+                            <!-- The unit is the symbol, so the row fits one line on a phone. -->
                             <span class="formula-unit">MET</span>
                         </label>
                         <label class="formula-row">
@@ -1149,9 +1071,7 @@
                             <input type="text" id="formula-met-o2" inputmode="decimal">
                             <span class="formula-unit">mL O₂/kg/min</span>
                         </label>
-                        <!-- Directly under κ, the other half of the O₂-to-kcal conversion AEE runs: κ
-                             is how much oxygen the activity costs, ε is what that oxygen is worth in
-                             calories, and AEE right below is the two of them applied. -->
+                        <!-- ε: what κ's oxygen is worth in calories. -->
                         <div class="formula-row formula-row-fixed">
                             <span class="formula-sym">ε</span>
                             <span class="formula-name">oxygen energy yield</span>
@@ -1164,12 +1084,9 @@
                             <input type="text" id="formula-activity-kcal" inputmode="decimal" readonly>
                             <span class="formula-unit">kcal/day</span>
                         </label>
-                        <!-- Marks the end of the activity block (MET, τ, κ, AEE) before the sleep
-                             block starts below. -->
+                        <!-- End of the activity block. -->
                         <hr class="formula-divider">
-                        <!-- The sleep length the PLAN assumes, not a log of what actually happened — see
-                             the Sleep chart's own dot for the night-by-night reading. Defaults to the
-                             desired sleep itself (0 kcal effect) so an untouched box changes nothing. -->
+                        <!-- The sleep the plan assumes; defaults to the desired sleep (no effect). -->
                         <label class="formula-row" title="How much sleep the plan assumes you're actually getting, compared against the desired sleep in Settings. Short of it and the Sleep Efficiency Factor η below 1 means the same weekly fat-loss rate needs a bigger real deficit — see the Deprivation Effect row right below. Defaults to the desired sleep itself, which is 0 effect.">
                             <span class="formula-sym">s</span>
                             <span class="formula-name">sleep length</span>
@@ -1188,12 +1105,9 @@
                             <input type="text" id="formula-deprivation-effect" inputmode="decimal" readonly>
                             <span class="formula-unit">kcal/day</span>
                         </label>
-                        <!-- Marks the end of the sleep block (s, Deprivation Effect) before the rate
-                             block starts below. -->
+                        <!-- End of the sleep block. -->
                         <hr class="formula-divider">
-                        <!-- Δm's other face, and the row above it on purpose: the percentage is the
-                             unit the safety band is written in, so it's what you set the pace in and
-                             the kilograms below follow. Type either box and the other follows it. -->
+                        <!-- The pace is set in % (the safety band's unit); either box follows the other. -->
                         <label class="formula-row" title="A weekly loss of 0.5–1% of body mass is the usual sustainable range, and 1% the ceiling — above it, more of what comes off is lean mass. Type a percentage and Δm below follows it; type kilograms there and this follows instead.">
                             <span class="formula-sym">Δm%</span>
                             <span class="formula-name">weekly fat loss, as a share of body mass</span>
@@ -1212,25 +1126,16 @@
                             <span class="formula-fixed">7700</span>
                             <span class="formula-unit">kcal/kg</span>
                         </div>
-                        <!-- Directly under Δm and ρ, the two figures it's made of, and directly above
-                             TEI, the one it's subtracted from — so the three rows read as the sentence
-                             the identity is. Readonly like BMR and M: it's derived from the rate you set,
-                             not a dial of its own.
-                             Named the deficit rather than a "calorie burn", which in this app already
-                             means AEE — the burn is work you do, this is the shortfall the food has to
-                             leave. -->
+                        <!-- The deficit, derived from the rate (not AEE's "burn"). -->
                         <label class="formula-row" title="The daily energy shortfall your desired weekly fat loss implies: D = Δm × ρ / 7. This is what comes off maintenance to give the desired intake — not calories burned by activity, which is AEE.">
                             <span class="formula-sym">D</span>
                             <span class="formula-name">daily energy deficit</span>
                             <input type="text" id="formula-deficit" inputmode="decimal" readonly>
                             <span class="formula-unit">kcal/day</span>
                         </label>
-                        <!-- Marks the end of the rate block (Δm%, Δm, ρ, D) before the calorie-solve
-                             block (f, TEF, M, TEI) starts below. -->
+                        <!-- End of the rate block. -->
                         <hr class="formula-divider">
-                        <!-- Directly above TEF, the box it feeds: digestion costs a fraction of whatever
-                             you end up eating, so the identity is solved (TEI = (BMR + AEE − D)/(1 − f))
-                             rather than summed, and TEF = f × TEI reads as the very next line. -->
+                        <!-- TEF is a share of TEI, so TEI is solved: (BMR + AEE − D)/(1 − f). -->
                         <label class="formula-row" title="The thermic effect of food: the share of what you eat that is spent digesting it — about 10% on a mixed diet, higher on protein. It is part of expenditure, so counting it RAISES the intake that produces the same deficit. Left at 0 by default, which is the arithmetic this app has always used; type 10 and save to include it.">
                             <span class="formula-sym">f</span>
                             <span class="formula-name">thermic effect of food, as a share of TEI</span>
@@ -1245,10 +1150,7 @@
                         </label>
                         <!-- Marks the end of the TEF pair (f, TEF) before M and TEI start below. -->
                         <hr class="formula-divider">
-                        <!-- Directly under BMR and AEE, the two figures it's the sum of, and directly
-                             above TEI — the rate is set against maintenance, so the identity reads as a
-                             sentence: BMR + AEE = M, and M minus the deficit above is what's left to
-                             eat. -->
+                        <!-- Maintenance: BMR + AEE = M. -->
                         <label class="formula-row" title="Maintenance: BMR + the activity energy expenditure AEE that hitting τ minutes at MET produces. The intake that would hold your body mass still — the deficit D is measured down from this, and TEI is what's left.">
                             <span class="formula-sym">M</span>
                             <span class="formula-name">maintenance at m̄ — BMR + AEE</span>
@@ -1261,20 +1163,14 @@
                             <input type="text" id="formula-ein" inputmode="decimal">
                             <span class="formula-unit">kcal</span>
                         </label>
-                        <!-- Not part of the algebra above — a read on how hard the cut is, not a term
-                             any other row is built from. Directly under TEI because that's the one box
-                             it compares against BMR. Flags red past DEFICIT_VS_BMR_PCT_CEILING
-                             (health-tune-render.js): a deficit that size relative to resting rate is where
-                             more of what comes off tends to be lean mass rather than fat. -->
+                        <!-- How hard the cut is; red past DEFICIT_VS_BMR_PCT_CEILING. -->
                         <label class="formula-row" title="How far intake sits below resting rate: (BMR − TEI) / BMR × 100. A negative figure means TEI is above BMR — a surplus, not a deficit. Not editable: it is derived from BMR and TEI above.">
                             <span class="formula-sym">D_bmr%</span>
                             <span class="formula-name">daily deficit, as a share of BMR</span>
                             <input type="text" id="formula-deficit-bmr-pct" inputmode="decimal" readonly>
                             <span class="formula-unit">%</span>
                         </label>
-                        <!-- Marks the end of the calorie-solve block, TEI, before the journey block
-                             (t, dates) starts below — m_des itself now sits up with the profile, above
-                             LBM and BMR. -->
+                        <!-- End of the calorie-solve block. -->
                         <hr class="formula-divider" title="TEF is already built into TEI above — the identity is solved with f in the denominator, not summed — so it is not a further deficit to subtract on top of it.">
 
                         <label class="formula-row">
@@ -1289,23 +1185,10 @@
                             <input type="date" id="formula-eta">
                             <span class="formula-unit" id="formula-eta-note"></span>
                         </label>
-                        <!-- Marks the end of the journey block (t, arrival date) before the
-                             glycogen block starts below. -->
+                        <!-- End of the journey block. -->
                         <hr class="formula-divider">
-                        <!-- Glycogen follows the journey block now, straight after LBM up with the
-                             profile, since it reads that same LBM box rather than a flat guess: glycogen
-                             is stored in muscle, not fat, so it has to scale with lean mass, not sit
-                             unrelated to body mass/height/sex. Not read by any calorie identity — this is
-                             purely the explanation for why m and m̄ above don't agree from one day to the
-                             next: glycogen stores pull water in with them, so a day of low carbs (or a
-                             big refeed) can move the scale by kilograms with no fat gained or lost at
-                             all. LBM alone overstates it: skeletal muscle is only ~40-50% of LBM (the
-                             rest is water, organs, skin and bone, none of which store meaningful
-                             glycogen), and a published muscle-tissue glycogen density (g/kg wet muscle)
-                             applied straight to LBM comes out roughly double what it should. s and
-                             m_musc below cut LBM down to that muscle share first, so g_musc can be the
-                             real muscle-tissue figure rather than a diluted per-LBM one. Only s, g_musc,
-                             g_liver and the water ratio are editable — same shape as p_min/p_max below. -->
+                        <!-- Glycogen, scaled to muscle (s × LBM): why m and m̄ disagree day to day.
+                             Only s, g_musc, g_liver and the water ratio are editable. -->
                         <label class="formula-row" title="Skeletal muscle, as a direct share of LBM — not of m̄, since it's a fat-free-mass ratio and m̄ still carries the fat. Skeletal muscle runs roughly 40-50% of lean body mass; the rest of LBM is water, organs, skin and bone, none of which store meaningful glycogen. Higher toward 50% for a more muscular frame, lower toward 40% otherwise.">
                             <span class="formula-sym">s</span>
                             <span class="formula-name">skeletal muscle, share of lean mass</span>
@@ -1348,20 +1231,10 @@
                             <input type="text" id="formula-glycogen-swing" inputmode="decimal" readonly>
                             <span class="formula-unit">kg</span>
                         </label>
-                        <!-- Marks the end of the glycogen block (s…ΔM_gly) before the protein block
-                             starts below. -->
+                        <!-- End of the glycogen block. -->
                         <hr class="formula-divider">
-                        <!-- The protein block closes the list, and reads top to bottom as one
-                             derivation: the p_min/p_max rule you set, applied to LBM (up with the
-                             profile now — see its own comment), then the grams that rule produces. Only
-                             the rule is editable — no "Solve for" mode turns the other two into inputs,
-                             since no calorie identity involves protein, so they compute in all five. -->
-                        <!-- The rule, immediately above the grams it produces: p_min/p_max used to sit
-                             with the other editable knobs several rows up, which split the protein block
-                             in two and left `p × LBM = P` as a multiplication whose two halves were
-                             nowhere near each other. Editable among readonly rows is the point — LBM
-                             above and the two P rows below are all derived, and these are the only part
-                             of the band you set. -->
+                        <!-- The protein block: the rule applied to LBM, then the grams. -->
+                        <!-- The only editable part of the protein band. -->
                         <label class="formula-row">
                             <span class="formula-sym">p_min</span>
                             <span class="formula-name">protein floor per kg of lean mass</span>
@@ -1386,15 +1259,9 @@
                             <input type="text" id="formula-protein-max" inputmode="decimal" readonly>
                             <span class="formula-unit">g/day</span>
                         </label>
-                        <!-- Marks the end of the protein block (P_min, P_max) before the fiber block
-                             starts below. -->
+                        <!-- End of the protein block. -->
                         <hr class="formula-divider">
-                        <!-- The fiber band follows protein: a floor scaled to how much you eat (14 g per
-                             1,000 kcal, the USDA/DGA rule of thumb) and a ceiling scaled to body mass
-                             (0.5 g/kg) — two different bases, unlike protein's single LBM, so both
-                             coefficients are editable and neither rides on a box the other computes.
-                             Named b_min/b_max rather than f_min/f_max: TEF's own coefficient above is
-                             already `f`, and the two would otherwise share a letter. -->
+                        <!-- Fiber: a floor per 1,000 kcal and a ceiling per kg (b, since f is TEF's). -->
                         <label class="formula-row">
                             <span class="formula-sym">b_min</span>
                             <span class="formula-name">dietary fiber floor per 1,000 kcal of intake</span>
@@ -1419,18 +1286,9 @@
                             <input type="text" id="formula-fiber-max" inputmode="decimal" readonly>
                             <span class="formula-unit">g/day</span>
                         </label>
-                        <!-- Marks the end of the fiber block (F_min, F_max) before the fat block
-                             starts below. -->
+                        <!-- End of the fiber block. -->
                         <hr class="formula-divider">
-                        <!-- The fat band follows fiber, same two-different-bases shape but both ends
-                             scaled off TEI instead of one off body mass: 20-35% of total energy from
-                             fat is the Institute of Medicine's Acceptable Macronutrient Distribution
-                             Range for adults (Dietary Reference Intakes for Energy, Carbohydrate, Fiber,
-                             Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also the
-                             range the USDA Dietary Guidelines for Americans carries forward — not the
-                             user's own guessed 25%, which sits inside this band rather than defining it.
-                             9 kcal/g is fat's fixed energy density (Atwater), not a personal parameter,
-                             so only the two percentages are editable. -->
+                        <!-- Fat: 20-35% of TEI (IOM AMDR); 9 kcal/g is fixed. -->
                         <label class="formula-row">
                             <span class="formula-sym">k_min</span>
                             <span class="formula-name">fat floor</span>
@@ -1455,20 +1313,9 @@
                             <input type="text" id="formula-fat-max" inputmode="decimal" readonly>
                             <span class="formula-unit">g/day</span>
                         </label>
-                        <!-- Marks the end of the fat block (G_min, G_max) before the carb block
-                             starts below. -->
+                        <!-- End of the fat block. -->
                         <hr class="formula-divider">
-                        <!-- The carb band follows fat, same shape again — both ends a share of TEI:
-                             45-65% of total energy from carbohydrate is the same IOM AMDR report's range
-                             for carbohydrate (Dietary Reference Intakes for Energy, Carbohydrate, Fiber,
-                             Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, 2005), also carried
-                             forward by the USDA Dietary Guidelines for Americans. Too much carbohydrate
-                             at once — well above this ceiling — also means more glycogen stored (see
-                             m_gly above), which binds its own water; the ceiling here is about total
-                             energy balance, not that water-retention effect directly, but staying inside
-                             it keeps glycogen swings from compounding into a genuine overconsumption.
-                             4 kcal/g is carbohydrate's fixed energy density (Atwater), not a personal
-                             parameter, so only the two percentages are editable. -->
+                        <!-- Carbs: 45-65% of TEI (IOM AMDR); 4 kcal/g is fixed. -->
                         <label class="formula-row">
                             <span class="formula-sym">q_min</span>
                             <span class="formula-name">carbohydrate floor</span>
@@ -1502,10 +1349,7 @@
                     <div id="formula-expression" class="formula-substituted"></div>
                 </div>
 
-                <!-- LBM, P_min and P_max trace their arithmetic here alongside every other
-                     substituted term, rather than in a block of their own — appended in all four
-                     modes by renderFormulaSubstituted itself, since no calorie identity involves
-                     protein and a failed calorie solve has no bearing on them. -->
+                <!-- LBM, P_min and P_max trace here in every mode (renderFormulaSubstituted). -->
                 <div class="card formula-card">
                     <h3>Calculations</h3>
                     <div id="formula-substituted" class="formula-substituted"></div>
@@ -1569,8 +1413,7 @@
                 <div class="value expense" id="expenses-value">—</div>
             </div>
 
-            <!-- Full width under the four cards, like Health's Progress card: the
-                 Indicator's Cumulative Net Worth line alone, no axes or grid. -->
+            <!-- Full width under the four cards: the Cumulative Net Worth line alone. -->
             <div class="card finance-trend-card">
                 <h3>Cumulative Net Worth</h3>
                 <div class="chart-box chart-box-glance chart-box-flush">
@@ -1648,10 +1491,7 @@
             <div class="donut-legend" id="spending-trend-legend"></div>
         </div>
 
-        <!-- Spending Breakdown by Type — the per-category donut wall (Housing,
-             Transportation, Grocery, Personal, Household …), four periods each plus an
-             Untyped remainder; renderTypeBreakdownCharts (finance-chart.js) fills this
-             with one card per category, like every other Indicator chart. -->
+        <!-- One donut card per spending type (renderTypeBreakdownCharts). -->
         <div class="panel-section" id="type-breakdown-container"></div>
 
         <div class="panel-section card">
@@ -1754,22 +1594,19 @@
 
                         <tbody id="accounts-list-body"></tbody>
                         <tfoot>
-                            <tr id="accounts-total-row" class="accounts-total-row" hidden>
-                                <td colspan="3">Total</td>
-                                <td id="accounts-total-balance"></td>
-                                <td id="accounts-total-current-value"></td>
-                                <td></td>
-                            </tr>
+                        <tr id="accounts-total-row" class="accounts-total-row" hidden>
+                            <td colspan="3">Total</td>
+                            <td id="accounts-total-balance"></td>
+                            <td id="accounts-total-current-value"></td>
+                            <td></td>
+                        </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- The Breakdown tab, as a table you can maintain rather than only a chart
-             source. Its four money columns are the SHEET's own formulas — the app
-             reads them and never writes them, so only Category and Type are
-             editable here (finance-breakdown.js). -->
+        <!-- The money columns are the sheet's formulas; only Category and Type are editable. -->
         <div class="panel" data-route="breakdown">
             <div class="panel-header">
                 <h2>Breakdown</h2>
@@ -2173,8 +2010,7 @@
                 </div>
             </div>
 
-            <!-- Spaced as Car Service's cards: Daily Progress (solves per day since the first,
-                 sized as Health Chart's), Roadmap (a node per category, opening its card below), then the cards. -->
+            <!-- Daily Progress, Roadmap, then the category cards. -->
             <div class="donut-grid health-metrics-grid">
                 <div class="card">
                     <h3>Daily Progress</h3>
@@ -2207,14 +2043,11 @@
         <div class="panel" data-route="work-time">
             <div class="panel-header">
                 <h2>Work Time</h2>
-                <!-- One word, like every other panel's action button. Which day and what
-                     it logs is the modal's job to say; the tooltip carries the long form. -->
+                <!-- One word; the tooltip carries the long form. -->
                 <button id="log-today-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log time for a day" aria-label="Log">📝</button>
             </div>
 
-            <!-- What used to be a separate "Work Analytics" panel: the charts read
-                 the same logged hours as the table below them, so they live in the
-                 same panel and collapse with it. -->
+            <!-- Charts over the same logged hours as the table below. -->
             <div class="cards">
                 <div class="card">
                     <h3>Arrival Distribution</h3>
@@ -2287,8 +2120,7 @@
                 <h2>Car Service</h2>
             </div>
 
-            <!-- Read off Transportation transactions whose description carries the odometer
-                 ("@28902km"); predictions in track-car-service.js. -->
+            <!-- Odometer readings from transactions ("@28902km"); track-car-service.js. -->
             <div class="donut-grid health-metrics-grid">
                 <div class="card">
                     <h3>Odometer &amp; Service</h3>
@@ -2339,8 +2171,7 @@
                 <button id="add-travel-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a travel entry" aria-label="Log">📝</button>
             </div>
 
-            <!-- What used to be a separate "Travel Insights" panel, same as Work Time
-                 Analytics above: both views read the same rows as the table below. -->
+            <!-- Charts over the same rows as the table below. -->
             <div class="donut-grid travel-insights-grid">
                 <div class="card">
                     <h3>Time Spent by Country</h3>
@@ -2529,27 +2360,18 @@
                 <input type="text" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2">
             </label>
 
-            <!-- Directly under Amount, because the amount is what it moves: the
-                 sign does the work, so -10 on WV takes WV's Balance down ten and
-                 a deposit puts it back. Ticked by default — a transaction and the
-                 balance it moves are one act, and doing them separately is how
-                 the two drift apart. On an edit, the old amount is reversed first.
-                 Turned off with a reason where the sheet computes that Balance itself; see
-                 openTransactionForm. -->
+            <!-- Moves the account's Balance by the signed amount (see openTransactionForm). -->
             <label class="checkbox-inline-label" id="tx-update-balance-label" title="Add this amount to the selected account's Balance on the Account tab">
                 <input type="checkbox" id="tx-update-balance" checked>
                 Update the account balance
             </label>
             <p id="tx-update-balance-note" class="status status-info" hidden></p>
 
-            <!-- No hint line: the Amount placeholder already carries both halves of it
-                 (the sign convention and the expression form), and the paragraph was
-                 repeating the box it sat under. -->
+            <!-- No hint: the Amount placeholder says it. -->
             <p id="tx-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <!-- Not a submit: it rewrites the Amount box and leaves the form open, so
-                     the taxed figure is on screen to check before Save takes it. -->
+                <!-- Not a submit: rewrites Amount so it can be checked before Save. -->
                 <button type="button" id="tx-tax-btn" class="btn">Tax</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
@@ -2605,8 +2427,7 @@
                 <datalist id="breakdown-type-options"></datalist>
             </label>
 
-            <!-- Shown, never sent: the four amounts are the sheet's formulas, and the
-                 save below writes columns A and B only. -->
+            <!-- Shown, never sent: Save writes columns A and B only. -->
             <p class="hint" id="breakdown-amounts-note"></p>
             <p id="breakdown-form-error" class="status" hidden></p>
 
@@ -2926,8 +2747,7 @@
                 <input type="checkbox" id="physique-is-pattern">
                 Pattern
             </label>
-            <!-- Hidden while Pattern is ticked: a pattern has no date, body mass or sleep.
-                 Open on today only, like Consumption and Workout. -->
+            <!-- Hidden while Pattern is ticked; open on today only. -->
             <details id="physique-day-details">
                 <summary>Day</summary>
                 <div class="form-row" id="physique-date-row">
@@ -2947,9 +2767,7 @@
                     </label>
                 </div>
             </details>
-            <!-- Collapsed by default on any day but today (openPhysiqueForm), same
-                 disclosure style as Tune's Equations — today's is left open since
-                 that's the day actually being logged. -->
+            <!-- Collapsed on any day but today (openPhysiqueForm). -->
             <details id="physique-consumption-details">
                 <summary>Consumption</summary>
                 <div class="autocomplete-anchor">
@@ -2961,9 +2779,7 @@
                 <textarea id="physique-breakdown" rows="4"></textarea>
             </label>
 
-            <!-- All totals are read off the breakdown table's Total row below,
-                 so the fields Calculate writes them into stay hidden — they're
-                 still what Save sends to columns G, H, I, J, K and L. -->
+            <!-- Totals come from the Total row below; Save sends these to G-L. -->
             <label hidden>Calories In
                 <input type="text" id="physique-calories-in" placeholder="e.g. 2100 (kcal)">
             </label>
@@ -2983,9 +2799,7 @@
                 <input type="text" id="physique-tef" placeholder="e.g. 96 (kcal)">
             </label>
 
-            <!-- Collapsed by default on any day but today (openPhysiqueForm), same
-                 disclosure style as Tune's Equations — today's is left open since
-                 that's the day actually being logged. -->
+            <!-- Collapsed on any day but today (openPhysiqueForm). -->
             <details id="physique-workout-details">
                 <summary>Workout</summary>
                 <div class="autocomplete-anchor">
@@ -2993,9 +2807,7 @@
                     <ul id="physique-workout-suggestions" class="autocomplete-suggestions" hidden></ul>
                 </div>
             </details>
-            <!-- Read off the activity table's Total row below, same as Calories
-                 In / Protein In are read off the breakdown's. Still the fields
-                 Calculate writes and Save sends to columns N and O. -->
+            <!-- From the Total row below; Save sends these to N and O. -->
             <label hidden>Activity Duration
                 <input type="text" id="physique-activity-duration" placeholder="e.g. 45 (min)">
             </label>
@@ -3006,13 +2818,8 @@
             <p id="physique-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <!-- No `capture` attribute: on iOS Safari it jumps straight to the Camera app
-                     rather than the native picker sheet, and that app switch can make WebKit
-                     reload this page under memory pressure while the camera is open — which
-                     drops every listener bound here, so the 'change' event this button waits
-                     on (handlePhysiqueScanInput) never fires and the tap silently does nothing
-                     once a photo comes back. Dropping it restores the full sheet — Photo
-                     Library AND Take Photo — without leaving the page. -->
+                <!-- No `capture`: on iOS the Camera app switch can reload the page and lose
+                     the change listener. -->
                 <input type="file" id="physique-scan-input" accept="image/*" hidden>
                 <button type="button" id="physique-scan-btn" class="btn btn-icon" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption" aria-label="Scan">📷</button>
                 <button type="button" id="physique-form-micro-btn" class="btn btn-icon" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved" aria-label="Micronutrients">🧬</button>
@@ -3156,20 +2963,13 @@
 
 <div id="activity-instruction-modal" class="modal" role="dialog" aria-modal="true" aria-label="Instructions on the Activities" hidden>
     <div class="modal-card">
-        <!-- One tile per Group (health-activity-catalogue.js's renderInstructionList), in one card
-             titled Workouts, as a hub's tiles are; a group's page lists its activities below. -->
+        <!-- One tile per Group (renderInstructionList); a group's page lists its activities. -->
         <div class="card" id="instruction-groups-card">
             <h3>Workouts</h3>
             <div class="page-tiles instruction-groups" id="instruction-groups"></div>
         </div>
 
-        <!-- A copy of the Indicator panel's own Activity Rotation card (health-chart-activity-rotation.js),
-             same chart and donut off the same data, just also visible here so the gym's own
-             tiles page shows the rotation without leaving for Health → Indicator. Hidden
-             alongside the tiles themselves (renderInstructionList) once a Group's own page
-             is open. Builds lazily the same way the original does (upsertChart's
-             IntersectionObserver, charts-base.js) — behind this modal's own `hidden` until
-             it's first opened. -->
+        <!-- A copy of Indicator's Activity Rotation card, hidden on a Group's page. -->
         <div class="body-mass-projection-wrap card page-rotation-card" id="instruction-rotation-card">
             <h3>Activity Rotation</h3>
 
@@ -3280,9 +3080,7 @@
             </div>
             <p class="hint" id="nutrition-usda-source" hidden></p>
 
-            <!-- One row per value, Tune's layout: lock tick, name, box, unit. A ticked row is
-                 kept as typed — Complete never overwrites it (health-nutrition.js). Pulled
-                 micronutrient rows are appended below the divider. -->
+            <!-- Tune's row layout; a ticked row is kept as typed (health-nutrition.js). -->
             <div class="formula-inputs" id="nutrition-fields">
                 <label class="formula-row">
                     <input type="checkbox" id="nutrition-lock-calories" data-lock-name="Calories">

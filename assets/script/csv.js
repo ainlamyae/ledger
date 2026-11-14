@@ -1,4 +1,11 @@
-const CSV_HEADER = ['Date', 'Account', 'Payee', 'Category', 'Amount', 'Description'];
+// [header, record key] per exported column.
+const TRANSACTION_CSV_COLUMNS = [['Date', 'date'], ['Account', 'account'], ['Payee', 'payee'], ['Category', 'category'], ['Amount', 'amount'], ['Description', 'description']];
+
+const PHYSIQUE_CSV_COLUMNS = [
+  ['Date', 'date'], ['Body Mass', 'bodyMass'], ['Bed', 'bedtime'], ['Wake', 'wakeTime'], ['Sleep (hr)', 'sleep'],
+  ['Deprivation (kcal)', 'deprivation'], ['TEI', 'caloriesIn'], ['Protein (g)', 'proteinIn'], ['Dietary Fiber (g)', 'fiber'],
+  ['Fat (g)', 'fat'], ['Carbohydrate (g)', 'carbohydrate'], ['TEF', 'tef'], ['Workout', 'workout'], ['Duration (min)', 'duration'], ['AEE', 'caloriesOut'],
+];
 
 let csvListenersAttached = false;
 let exportFilterCount = 0;
@@ -13,9 +20,7 @@ function todayStamp() {
   return isoFromDate(new Date());
 }
 
-// Triggers a browser download of in-memory text content (CSV, etc.) without
-// a round trip to a server: wrap it in a Blob, point a throwaway <a> at an
-// object URL for it, click it, then release the URL.
+// Downloads in-memory text through a throwaway <a> on an object URL.
 function downloadTextFile(filename, content, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -28,9 +33,7 @@ function downloadTextFile(filename, content, mimeType) {
   URL.revokeObjectURL(url);
 }
 
-// Field-specific operator lists for the export filter builder. Amount is
-// numeric (comparison operators); the rest are plain text (substring/exact
-// match), matched case-insensitively.
+// Export filter fields: amount compares numbers, the rest match text case-insensitively.
 const EXPORT_FILTER_FIELDS = {
   account: { label: 'Account', type: 'text', list: 'export-account-options' },
   payee: { label: 'Payee', type: 'text', list: 'tx-payee-options' },
@@ -39,20 +42,21 @@ const EXPORT_FILTER_FIELDS = {
   amount: { label: 'Amount', type: 'number', list: null },
 };
 
+// `test(fieldValue, filterValue)` per operator; an unknown operator matches everything.
 const EXPORT_FILTER_OPERATORS = {
   text: [
-    { value: 'contains', label: 'Contains' },
-    { value: 'not_contains', label: 'Does not contain' },
-    { value: 'equals', label: 'Equals' },
-    { value: 'not_equals', label: 'Not equals' },
+    { value: 'contains', label: 'Contains', test: (hay, needle) => hay.includes(needle) },
+    { value: 'not_contains', label: 'Does not contain', test: (hay, needle) => !hay.includes(needle) },
+    { value: 'equals', label: 'Equals', test: (hay, needle) => hay === needle },
+    { value: 'not_equals', label: 'Not equals', test: (hay, needle) => hay !== needle },
   ],
   number: [
-    { value: 'eq', label: '=' },
-    { value: 'neq', label: '≠' },
-    { value: 'gt', label: '>' },
-    { value: 'gte', label: '>=' },
-    { value: 'lt', label: '<' },
-    { value: 'lte', label: '<=' },
+    { value: 'eq', label: '=', test: (a, b) => a === b },
+    { value: 'neq', label: '≠', test: (a, b) => a !== b },
+    { value: 'gt', label: '>', test: (a, b) => a > b },
+    { value: 'gte', label: '>=', test: (a, b) => a >= b },
+    { value: 'lt', label: '<', test: (a, b) => a < b },
+    { value: 'lte', label: '<=', test: (a, b) => a <= b },
   ],
 };
 
@@ -61,31 +65,17 @@ function exportFilterMatches(transaction, filter) {
 
   const fieldDef = EXPORT_FILTER_FIELDS[filter.field];
   const rawValue = transaction[filter.field];
+  const operator = EXPORT_FILTER_OPERATORS[fieldDef.type].find((op) => op.value === filter.operator);
 
   if (fieldDef.type === 'number') {
     const threshold = Number(filter.value);
     if (Number.isNaN(threshold)) return true;
-    const amount = Number(rawValue) || 0;
-    switch (filter.operator) {
-      case 'eq': return amount === threshold;
-      case 'neq': return amount !== threshold;
-      case 'gt': return amount > threshold;
-      case 'gte': return amount >= threshold;
-      case 'lt': return amount < threshold;
-      case 'lte': return amount <= threshold;
-      default: return true;
-    }
+    return operator ? operator.test(Number(rawValue) || 0, threshold) : true;
   }
 
   const haystack = String(rawValue || '').toLowerCase();
   const needle = filter.value.trim().toLowerCase();
-  switch (filter.operator) {
-    case 'contains': return haystack.includes(needle);
-    case 'not_contains': return !haystack.includes(needle);
-    case 'equals': return haystack === needle;
-    case 'not_equals': return haystack !== needle;
-    default: return true;
-  }
+  return operator ? operator.test(haystack, needle) : true;
 }
 
 // Combines filters left to right with each row's own join type (AND/OR),
@@ -110,17 +100,20 @@ function getExportFilters() {
   }));
 }
 
+// Appends an <option>; a datalist suggestion leaves `label` off.
+function appendOption(parent, value, label) {
+  const option = document.createElement('option');
+  option.value = value;
+  if (label !== undefined) option.textContent = label;
+  parent.appendChild(option);
+}
+
 function renderExportFilterOperators(row) {
   const field = row.querySelector('.export-filter-field').value;
   const fieldDef = EXPORT_FILTER_FIELDS[field];
   const operatorSelect = row.querySelector('.export-filter-operator');
   operatorSelect.innerHTML = '';
-  EXPORT_FILTER_OPERATORS[fieldDef.type].forEach(({ value, label }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    operatorSelect.appendChild(option);
-  });
+  EXPORT_FILTER_OPERATORS[fieldDef.type].forEach(({ value, label }) => appendOption(operatorSelect, value, label));
 
   const valueInput = row.querySelector('.export-filter-value');
   valueInput.type = fieldDef.type === 'number' ? 'number' : 'text';
@@ -144,12 +137,7 @@ function addExportFilterRow() {
   if (!isFirst) {
     const joinSelect = document.createElement('select');
     joinSelect.className = 'export-filter-join';
-    ['AND', 'OR'].forEach((value) => {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = value;
-      joinSelect.appendChild(option);
-    });
+    ['AND', 'OR'].forEach((value) => appendOption(joinSelect, value, value));
     joinSelect.addEventListener('change', () => {
       row.dataset.join = joinSelect.value;
       resetTransactionsPageAndRender();
@@ -159,12 +147,7 @@ function addExportFilterRow() {
 
   const fieldSelect = document.createElement('select');
   fieldSelect.className = 'export-filter-field';
-  Object.entries(EXPORT_FILTER_FIELDS).forEach(([value, { label }]) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    fieldSelect.appendChild(option);
-  });
+  Object.entries(EXPORT_FILTER_FIELDS).forEach(([value, { label }]) => appendOption(fieldSelect, value, label));
 
   const operatorSelect = document.createElement('select');
   operatorSelect.className = 'export-filter-operator';
@@ -198,59 +181,42 @@ function addExportFilterRow() {
   resetTransactionsPageAndRender();
 }
 
-// Keeps the filter builder's account suggestions in sync with whatever
-// accounts currently exist, same as the transaction form's own datalist.
+// The account suggestions follow whatever accounts exist now.
 function syncExportAccountOptions() {
   const accountDatalist = document.getElementById('export-account-options');
   accountDatalist.innerHTML = '';
-  accountOptions.forEach((name) => {
-    const option = document.createElement('option');
-    option.value = name;
-    accountDatalist.appendChild(option);
-  });
+  accountOptions.forEach((name) => appendOption(accountDatalist, name));
+}
+
+// Downloads `records` by date as `<prefix>-<today>.csv`, or alerts `emptyMessage`.
+function downloadRecordsCsv(prefix, columns, records, emptyMessage) {
+  const rows = records
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((record) => columns.map(([, key]) => record[key]));
+
+  if (rows.length === 0) {
+    alert(emptyMessage);
+    return;
+  }
+
+  const csv = [columns.map(([header]) => header), ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
+  downloadTextFile(`${prefix}-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
 }
 
 async function exportTransactionsCSV() {
   if (!confirm('Export every transaction to CSV?')) return;
   if (!transactionsDataLoaded) await initTransactions();
-  const rows = [...allTransactions]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((t) => [t.date, t.account, t.payee, t.category, t.amount, t.description]);
-
-  if (rows.length === 0) {
-    alert('No transactions to export.');
-    return;
-  }
-
-  const csv = [CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
-  downloadTextFile(`transactions-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
+  downloadRecordsCsv('transactions', TRANSACTION_CSV_COLUMNS, [...allTransactions], 'No transactions to export.');
 }
-
-const PHYSIQUE_CSV_HEADER = ['Date', 'Body Mass', 'Bed', 'Wake', 'Sleep (hr)', 'Deprivation (kcal)', 'TEI', 'Protein (g)', 'Dietary Fiber (g)', 'Fat (g)', 'Carbohydrate (g)', 'TEF', 'Workout', 'Duration (min)', 'AEE'];
 
 async function exportPhysiqueCSV() {
   if (!confirm('Export every Physique day to CSV?')) return;
-  // Health's data, read here on demand when this page is in another section.
+  // Health's data, read on demand when this page is in another section.
   if (!physiqueDataLoaded) {
     await initActivities();
     await initPhysique();
   }
-  const rows = allPhysiqueEntries
-    .filter((p) => p.date)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((p) => [
-      p.date, p.bodyMass ?? '', p.bedtime ?? '', p.wakeTime ?? '', p.sleep ?? '', p.deprivation ?? '',
-      p.caloriesIn ?? '', p.proteinIn ?? '', p.fiber ?? '', p.fat ?? '',
-      p.carbohydrate ?? '', p.tef ?? '', p.workout, p.duration ?? '', p.caloriesOut ?? '',
-    ]);
-
-  if (rows.length === 0) {
-    alert('No Physique days to export.');
-    return;
-  }
-
-  const csv = [PHYSIQUE_CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(',')).join('\r\n');
-  downloadTextFile(`physique-${todayStamp()}.csv`, csv, 'text/csv;charset=utf-8;');
+  downloadRecordsCsv('physique', PHYSIQUE_CSV_COLUMNS, allPhysiqueEntries.filter((p) => p.date), 'No Physique days to export.');
 }
 
 function parseCSV(text) {
@@ -264,6 +230,7 @@ function parseCSV(text) {
 
     if (inQuotes) {
       if (char === '"') {
+        // "" is an escaped quote; a lone " closes the field.
         if (text[i + 1] === '"') {
           field += '"';
           i++;
@@ -294,6 +261,7 @@ function parseCSV(text) {
     rows.push(row);
   }
 
+  // Drops blank lines.
   return rows.filter((r) => r.length > 1 || r[0] !== '');
 }
 
@@ -308,8 +276,9 @@ async function importTransactionsCSV(file) {
   const first = rows[0].map((c) => c.trim().toLowerCase());
   const dataRows = first[0] === 'date' ? rows.slice(1) : rows;
 
+  // The CSV ends Amount, Description; the sheet ends Description, Amount.
   const values = dataRows
-    .filter((r) => r.length >= 6 && r[0])
+    .filter((r) => r.length >= TRANSACTION_CSV_COLUMNS.length && r[0])
     .map((r) => [r[0], r[1], r[2], r[3], r[5], Number(r[4]) || 0]);
 
   if (!values.length) {

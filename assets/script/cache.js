@@ -1,19 +1,23 @@
-// The app keeps no copy of sheet data any more: every load reads the sheet. This
-// clears what earlier versions stored under ledger_cache_*, so a stale copy can't
-// linger in browser storage.
-try {
+// Earlier versions kept copies of sheet data under these keys; the app now reads
+// the sheet on every load.
+const LEGACY_CACHE_PREFIX = 'ledger_cache_';
+
+function clearLegacyCacheKeys() {
   Object.keys(localStorage)
-    .filter((key) => key.startsWith('ledger_cache_'))
+    .filter((key) => key.startsWith(LEGACY_CACHE_PREFIX))
     .forEach((key) => localStorage.removeItem(key));
+}
+
+// So a stale copy can't linger in browser storage.
+try {
+  clearLegacyCacheKeys();
 } catch {
   // Storage blocked: nothing could have been stored there either.
 }
 
-// Lets a numeric field (account balance, transaction amount) accept a simple
-// arithmetic expression — optionally prefixed with "=" — so quick math (e.g.
-// "=5000-1234.56" for credit card spend, or "=-9.97-1.30" to add tax) doesn't
-// need a separate calculator. Returns null if the input isn't a valid
-// number/expression.
+// Lets a numeric field accept simple arithmetic, optionally prefixed with "="
+// (e.g. "=5000-1234.56"), so quick math needs no calculator. Returns null if the
+// input isn't a valid number/expression.
 function evaluateNumberExpression(input) {
   const expr = input.trim().replace(/^=/, '');
   if (!expr) return 0;
@@ -21,21 +25,18 @@ function evaluateNumberExpression(input) {
 
   try {
     const result = Function(`"use strict"; return (${expr});`)();
-    // Round to the nearest cent so float arithmetic (e.g. 0.1 + 0.2) doesn't
-    // write sub-cent precision to the sheet.
+    // Rounded to the cent, so float noise (0.1 + 0.2) never reaches the sheet.
     return typeof result === 'number' && Number.isFinite(result) ? Math.round(result * 100) / 100 : null;
   } catch {
     return null;
   }
 }
 
-// The account menu's Clear cache. The app keeps no cache of its own, but the browser
-// still holds its copies of the app's files, and an old service worker or Cache
-// Storage entry can outlive an update — which is what ran new markup against old
-// scripts after a pull. This clears all of it: Cache Storage, any service worker,
-// leftover ledger_cache_* keys, and the HTTP cache's copy of every script and
-// stylesheet on the page (re-fetched with cache: 'reload', which replaces the stored
-// copy), then reloads. Sign-in and preferences in localStorage are kept.
+// The account menu's Clear cache. An old service worker or Cache Storage entry can
+// outlive an update and run new markup against old scripts, so this clears Cache
+// Storage, service workers, leftover ledger_cache_* keys and the HTTP cache's copy
+// of every own script and stylesheet (re-fetched with cache: 'reload'), then
+// reloads. Sign-in and preferences in localStorage are kept.
 async function clearCacheAndReload() {
   try {
     if ('caches' in window) {
@@ -46,9 +47,7 @@ async function clearCacheAndReload() {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map((reg) => reg.unregister()));
     }
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith('ledger_cache_'))
-      .forEach((key) => localStorage.removeItem(key));
+    clearLegacyCacheKeys();
     await clearMarketCache();
 
     const ownFiles = [

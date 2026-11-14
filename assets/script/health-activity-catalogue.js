@@ -1,18 +1,16 @@
-// The exercise catalogue: one row per movement, read from the 'Activity'
-// sheet tab. Single source for what used to live in five places at once — the
-// Activity Plan's static tables, the Instruction modal's name list, the MET
-// table (health-activity-estimator.js), the muscle-group map (health-insight-activity.js)
-// and the gif/jpg animation list (health-activity.js).
+// The exercise catalogue: one row per movement on the 'Activity' sheet tab. The
+// one source for the plan table, Workouts, METs, muscle groups and figures.
 //
-// Columns: Category · Group · Name · Unit · "Sets x Reps, Rest" · Image ·
-// MET · Muscle Group · Load (the sheet's Weight column). Name is the join key everything else matches
-// on — it has to be exactly what the workout note lines carry.
+// Columns: Category · Group · Name · Unit · "Sets x Reps, Rest" · Image · MET ·
+// Muscle Group · Load (the sheet's Weight) · Weekly Desired. Name is the join key:
+// it must match what the workout note lines carry.
 
-const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A2:J`;
+// Sheet row of the first catalogue entry; row 1 is the header.
+const ACTIVITY_FIRST_ROW = 2;
+const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A${ACTIVITY_FIRST_ROW}:J`;
 
-// Compendium 02054 general value, for a name the sheet doesn't price.
-// Distinct from health-math.js's ACTIVITY_MET_FALLBACK, which is the assumed
-// intensity for the daily desired activity rather than any one exercise.
+// Compendium 02054 general value, for a name the sheet doesn't price. Not
+// health-math.js's ACTIVITY_MET_FALLBACK, which is the daily activity's intensity.
 const EXERCISE_MET_FALLBACK = 3.5;
 
 let allActivities = [];
@@ -21,10 +19,8 @@ let activitiesDataLoaded = false;
 let activityListenersAttached = false;
 let activitiesSheetId = null;
 let editingActivityRow = null;
-// The entry being edited, kept alongside editingActivityRow so Update knows the
-// OLD name to sweep Physique for after Save rewrites the row (null in Add/
-// Duplicate mode — there's nothing already logged under this row to propagate
-// from). Mirrors health-nutrition.js's nutritionFormEntry.
+// The entry being edited, so Update knows the OLD name to sweep Physique for
+// (null for Add and Duplicate).
 let editingActivityEntry = null;
 
 async function fetchActivitiesSheetId() {
@@ -32,9 +28,8 @@ async function fetchActivitiesSheetId() {
   return findSheetId(metadata, CONFIG.SHEETS.ACTIVITIES);
 }
 
-// "3 x 10, 90 sec" -> { amount: "3 x 10", rest: "90 sec", restSec: 90 }. Split
-// on the LAST comma, so a hold row's own "3 x 45 sec, 45 sec" still divides
-// where it should.
+// "3 x 10, 90 sec" -> { amount: "3 x 10", rest: "90 sec", restSec: 90 }. Split on
+// the LAST comma, so a hold's "3 x 45 sec, 45 sec" divides correctly.
 function splitAmountAndRest(cell) {
   const text = String(cell || '').trim();
   const comma = text.lastIndexOf(',');
@@ -45,9 +40,7 @@ function splitAmountAndRest(cell) {
   return { amount: text.slice(0, comma).trim(), rest, restSec: restMatch ? Number(restMatch[1]) : null };
 }
 
-// The quantity half of that cell, read according to the row's own Unit — which
-// is what tells "3 x 45 sec" (a hold) from "3 x 15" (reps), and a step count
-// from a minute count.
+// The amount read by the row's Unit: a hold, reps, steps or minutes.
 function parseActivityAmount(amount, unit) {
   const holdMatch = /^(\d+)\s*[x×]\s*(\d+)\s*sec$/i.exec(amount);
   const repsMatch = /^(\d+)\s*[x×]\s*(\d+)$/.exec(amount);
@@ -58,6 +51,39 @@ function parseActivityAmount(amount, unit) {
   if (unit === 'min' && plainMatch) return { minutes: Number(plainMatch[1]) };
   if (repsMatch) return { sets: Number(repsMatch[1]), reps: Number(repsMatch[2]) };
   return {};
+}
+
+function activityCellText(row, index) {
+  return String(row[index] || '').trim();
+}
+
+// A number, or null for a blank cell.
+function activityCellNumber(row, index) {
+  return (row[index] !== undefined && row[index] !== '') ? Number(row[index]) : null;
+}
+
+function activityFromSheetRow(row, i) {
+  const unit = activityCellText(row, 3).toLowerCase();
+  const { amount, rest, restSec } = splitAmountAndRest(row[4]);
+  return {
+    // The sheet row an edit or delete addresses.
+    row: i + ACTIVITY_FIRST_ROW,
+    category: activityCellText(row, 0),
+    group: activityCellText(row, 1),
+    name: activityCellText(row, 2),
+    unit,
+    amount,
+    rest,
+    restSec,
+    quantity: parseActivityAmount(amount, unit),
+    image: activityCellText(row, 5),
+    met: activityCellNumber(row, 6),
+    muscleGroup: activityCellText(row, 7),
+    weight: activityCellText(row, 8),
+    // Desired sessions/week for the row's Group (Activity Rotation chart). Every
+    // row in a Group carries it; see trackedActivityGroups.
+    weeklyDesired: activityCellNumber(row, 9),
+  };
 }
 
 async function initActivities(forceRefresh = false) {
@@ -75,50 +101,16 @@ async function initActivities(forceRefresh = false) {
     document.getElementById('activity-log-btn').addEventListener('click', logActivityFromForm);
     onAsyncClick('activity-update-btn', updateActivityAndPropagate);
     onFormSubmit('activity-form', submitActivityForm);
-    // Live, not just on open — pasting a new path should preview it before Save,
-    // same as the Instruction modal's own figures do once saved.
+    // Live, so a pasted path previews before Save.
     document.getElementById('activity-image').addEventListener('input', renderActivityImagePreview);
-    // A path pointing at nothing hides the preview rather than showing a broken-
-    // image icon — same guard the Instruction modal's own figure uses.
+    // A path to nothing hides the preview rather than showing a broken image.
     document.getElementById('activity-image-preview').addEventListener('error', () => {
       document.getElementById('activity-image-preview').hidden = true;
     });
   }
 
   const resp = await getValues(ACTIVITIES_RANGE, VALUE_PARAMS);
-  const values = resp.values || [];
-
-  allActivities = values
-    .map((row, i) => {
-      const name = String(row[2] || '').trim();
-      const unit = String(row[3] || '').trim().toLowerCase();
-      const { amount, rest, restSec } = splitAmountAndRest(row[4]);
-      return {
-        // The sheet row this came from — what an edit or delete addresses. The
-        // range starts at A2, so the first parsed entry is row 2.
-        row: i + 2,
-        category: String(row[0] || '').trim(),
-        group: String(row[1] || '').trim(),
-        name,
-        unit,
-        amount,
-        rest,
-        restSec,
-        quantity: parseActivityAmount(amount, unit),
-        image: String(row[5] || '').trim(),
-        met: (row[6] !== undefined && row[6] !== '') ? Number(row[6]) : null,
-        muscleGroup: String(row[7] || '').trim(),
-        weight: String(row[8] || '').trim(),
-        // Desired sessions/week for this row's Group — read by the Activity
-        // Rotation chart (health-chart-activity-rotation.js). Shared by every row in a
-        // Group (Leg Day's five exercises all carry the same figure), so a
-        // Group counts as tracked once ANY of its rows sets it; see
-        // trackedActivityGroups for how the duplicates are reconciled.
-        weeklyDesired: (row[9] !== undefined && row[9] !== '') ? Number(row[9]) : null,
-      };
-    })
-    .filter((a) => a.name);
-
+  allActivities = (resp.values || []).map(activityFromSheetRow).filter((a) => a.name);
   activitiesByName = new Map(allActivities.map((a) => [a.name.toLowerCase(), a]));
   activitiesDataLoaded = true;
 
@@ -126,34 +118,28 @@ async function initActivities(forceRefresh = false) {
   renderInstructionList();
 }
 
-// Case-insensitive: a workout note line is typed by hand, and "bench press"
-// should price the same as "Bench Press" rather than falling to the
-// unmatched-name fallback over casing alone.
+// Case-insensitive, since note lines are typed by hand.
 function activityByName(name) {
   return activitiesByName.get(String(name || '').toLowerCase()) ?? null;
 }
 
-// Category is what the Physical Activity chart stacks by. 'Other' covers a
-// name the sheet doesn't list, so an unrecognized line is visible as its own
-// segment rather than silently folded into a real category.
+// What the Physical Activity chart stacks by; 'Other' for a name the sheet lacks.
 function activityCategory(name) {
   return activityByName(name)?.category || 'Other';
 }
 
-// Named for the exercise, not the day: health-math.js's activityMet() is the
-// desired-intensity MET and takes no argument.
+// The exercise's MET. health-math.js's activityMet() is the day's desired intensity.
 function exerciseMet(name) {
   const met = activityByName(name)?.met;
-  return (met !== null && met !== undefined && Number.isFinite(met)) ? met : EXERCISE_MET_FALLBACK;
+  return Number.isFinite(met) ? met : EXERCISE_MET_FALLBACK;
 }
 
 function activityMuscleGroup(name) {
   return activityByName(name)?.muscleGroup || '';
 }
 
-// Every muscle group the sheet actually names, in the order it names them —
-// so filling a blank cell with a group that didn't exist before (e.g. 'Core')
-// starts reporting without a code change.
+// Every muscle group the sheet names, in sheet order, so a new one reports
+// without a code change.
 function activityMuscleGroups() {
   const groups = [];
   allActivities.forEach((a) => {
@@ -164,8 +150,7 @@ function activityMuscleGroups() {
 
 // --- Activity Plan table ------------------------------------------------
 //
-// One table in the shape health-activity.js reads: each row's checkbox carries the
-// quantity attributes, from the same cell it displays.
+// Each row's checkbox carries the quantity health-activity.js reads.
 
 function groupInOrder(items, key) {
   const groups = new Map();
@@ -176,36 +161,24 @@ function groupInOrder(items, key) {
   return groups;
 }
 
+// Copied onto the checkbox's dataset when present, in this order.
+const ACTIVITY_QUANTITY_KEYS = ['sets', 'reps', 'hold', 'steps', 'minutes'];
+
 function makeActivityCheckbox(activity) {
   const box = document.createElement('input');
   box.type = 'checkbox';
   box.className = 'workout-check';
 
-  const { sets, reps, hold, steps, minutes } = activity.quantity;
-  if (sets !== undefined) box.dataset.sets = sets;
-  if (reps !== undefined) box.dataset.reps = reps;
-  if (hold !== undefined) box.dataset.hold = hold;
-  if (steps !== undefined) box.dataset.steps = steps;
-  if (minutes !== undefined) box.dataset.minutes = minutes;
+  ACTIVITY_QUANTITY_KEYS.forEach((key) => {
+    if (activity.quantity[key] !== undefined) box.dataset[key] = activity.quantity[key];
+  });
   if (activity.restSec !== null) box.dataset.rest = activity.restSec;
 
   return box;
 }
 
-// Muscle Group/Rest/Load, checked across every row of one table SHAPE
-// (every strength day together, or NEAT+Cardio together) rather than table by
-// table — so a column with real data somewhere in that shape (e.g. Muscle
-// Group, blank on Bodyweight Day's own rows but filled on every other
-// strength day) still renders, while one nothing in that shape has ever
-// filled in (Rest/Load on every NEAT/Cardio row; Load everywhere, before
-// it's ever been typed once) is dropped instead of rendering as a permanently
-// empty column. Deciding per shape, not per table, is also what keeps Leg Day
-// and Bodyweight Day showing the same columns in the same order as each other.
-// "Rhomboids, Trapezius, Latissimus Dorsi" (Seated Row's actual value) is
-// long enough to widen the Muscle Group column past what any other cell
-// needs. Truncated for display only — the full text is in the title
-// attribute, same convention truncateSettingValue (other-settings.js) uses
-// for an overlong Settings value.
+// Seated Row's "Rhomboids, Trapezius, Latissimus Dorsi" would widen the column;
+// the full text stays in the title.
 const ACTIVITY_MUSCLE_GROUP_DISPLAY_MAX = 16;
 
 function truncateMuscleGroup(text) {
@@ -214,6 +187,8 @@ function truncateMuscleGroup(text) {
     : text;
 }
 
+// Muscle Group, Rest and Load show only when some row fills them, so no column
+// renders permanently empty.
 function activityPlanColumnVisibility(activities) {
   return {
     muscleGroup: activities.some((a) => a.muscleGroup),
@@ -222,24 +197,44 @@ function activityPlanColumnVisibility(activities) {
   };
 }
 
-// One table for every activity, Category and Group as its first columns.
+// The columns after Activity. `visibleKey` names an optional one's
+// columnVisibility flag; Amount always shows.
+const ACTIVITY_PLAN_META_COLUMNS = [
+  { visibleKey: 'muscleGroup', label: 'Muscle Group', className: 'workout-muscle-group-cell',
+    cell: (a) => makeCell(truncateMuscleGroup(a.muscleGroup), a.muscleGroup) },
+  { visibleKey: 'weight', label: 'Load', cell: (a) => makeCell(a.weight) },
+  { label: 'Amount', className: 'workout-quantity-cell', cell: (a) => makeCell(a.amount) },
+  { visibleKey: 'rest', label: 'Rest', cell: (a) => makeCell(a.rest) },
+];
+
+// The route step for an activity's own form page.
+function activityRouteStep(activity) {
+  return { slug: routeSlug(activity.name), label: activity.name };
+}
+
+// Opens an activity's Edit (or Duplicate) as a routed page.
+function openActivityFormPage(activity, duplicate = false) {
+  const extra = duplicate ? [{ slug: 'duplicate', label: 'Duplicate' }] : [];
+  routeRecordEdit('activity', activityRouteStep(activity), ...extra);
+  openActivityForm(activity, duplicate);
+}
+
+// One table for every activity, Category and Group first. health-activity.js
+// and the mobile rules find cells by class, not position.
 function makeActivityTable(rows, columnVisibility) {
   const table = document.createElement('table');
   table.className = 'table-compact workout-table-strength';
 
-  // health-activity.js finds a row's name by workout-name-cell and its quantity by
-  // workout-quantity-cell. Mobile rules key off the classes, not positions.
+  const metaColumns = ACTIVITY_PLAN_META_COLUMNS
+    .filter((c) => !c.visibleKey || columnVisibility[c.visibleKey]);
   const headers = [
     { label: '', className: 'workout-check-col' },
     { label: 'Category' },
     { label: 'Group' },
     { label: 'Activity' },
+    ...metaColumns.map((c) => ({ label: c.label, className: c.className ? `workout-meta-cell ${c.className}` : 'workout-meta-cell' })),
+    { label: '' },
   ];
-  if (columnVisibility.muscleGroup) headers.push({ label: 'Muscle Group', className: 'workout-meta-cell workout-muscle-group-cell' });
-  if (columnVisibility.weight) headers.push({ label: 'Load', className: 'workout-meta-cell' });
-  headers.push({ label: 'Amount', className: 'workout-meta-cell workout-quantity-cell' });
-  if (columnVisibility.rest) headers.push({ label: 'Rest', className: 'workout-meta-cell' });
-  headers.push({ label: '' });
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
@@ -266,31 +261,18 @@ function makeActivityTable(rows, columnVisibility) {
     nameCell.className = 'workout-name-cell';
     tr.append(makeCell(activity.category), makeCell(activity.group), nameCell);
 
-    const cells = [];
-    if (columnVisibility.muscleGroup) {
-      const muscleCell = makeCell(truncateMuscleGroup(activity.muscleGroup), activity.muscleGroup);
-      muscleCell.classList.add('workout-muscle-group-cell');
-      cells.push(muscleCell);
-    }
-    if (columnVisibility.weight) cells.push(makeCell(activity.weight));
-    const quantityCell = makeCell(activity.amount);
-    quantityCell.classList.add('workout-quantity-cell');
-    cells.push(quantityCell);
-    if (columnVisibility.rest) cells.push(makeCell(activity.rest));
-    cells.forEach((cell) => cell.classList.add('workout-meta-cell'));
-    tr.append(...cells);
+    tr.append(...metaColumns.map((c) => {
+      const cell = c.cell(activity);
+      if (c.className) cell.classList.add(c.className);
+      cell.classList.add('workout-meta-cell');
+      return cell;
+    }));
 
     const actionsCell = document.createElement('td');
     actionsCell.className = 'workout-actions-cell';
     actionsCell.append(
-      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
-        routeRecordEdit('activity', { slug: routeSlug(activity.name), label: activity.name });
-        openActivityForm(activity);
-      } }),
-      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => {
-        routeRecordEdit('activity', { slug: routeSlug(activity.name), label: activity.name }, { slug: 'duplicate', label: 'Duplicate' });
-        openActivityForm(activity, true);
-      } }),
+      makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => openActivityFormPage(activity) }),
+      makeRowActionButton({ emoji: '📋', title: 'Duplicate', onClick: () => openActivityFormPage(activity, true) }),
       makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: () => deleteActivity(activity) }),
     );
     tr.appendChild(actionsCell);
@@ -302,9 +284,8 @@ function makeActivityTable(rows, columnVisibility) {
   return table;
 }
 
-// Sort activities by rotation completion: least done (biggest gap) first.
-// Groups with no Weekly Desired (untracked) fall to the end in sheet order.
-// Shared by the plan tables and the Instructions modal.
+// Least-done Group (biggest rotation gap) first; untracked Groups last, in
+// sheet order. Shared by the plan table and Workouts.
 function sortActivitiesByRotation(activities) {
   const rotationRows = computeActivityRotationRows(healthDateRange());
   const groupRank = new Map(rotationRows.map((r, i) => [r.name, i]));
@@ -328,7 +309,7 @@ function renderActivityPlanTables() {
   }
 
   const sorted = sortActivitiesByRotation(allActivities);
-  // Category, then Group, in rotation order; one table for all of them.
+  // Category, then Group, in rotation order.
   const rows = [...groupInOrder(sorted, 'category').values()]
     .flatMap((categoryRows) => [...groupInOrder(categoryRows, 'group').values()].flat());
 
@@ -343,32 +324,23 @@ function renderActivityPlanTables() {
   day.appendChild(wrap);
   container.appendChild(day);
 
-  // The table was just rebuilt from scratch, so today's ticks and tints went
-  // with it — put them back. Matters most after an edit here: the plan
-  // shouldn't look like nothing was logged just because a row was renamed.
+  // The rebuild dropped today's tints; put them back.
   renderWorkoutPlanProgress();
 }
 
 // --- Add / Edit / Duplicate / Delete --------------------------------------
 //
-// The catalogue was read-only in the UI until now: changing an exercise meant
-// opening the sheet. Same shape as Nutrition's ingredient form
-// (health-nutrition.js), which is the other user-owned catalogue the app reads.
+// Same shape as Nutrition's ingredient form (health-nutrition.js).
 
 function openActivityForm(activity, duplicate = false) {
   editingActivityRow = (activity && !duplicate) ? activity.row : null;
   editingActivityEntry = (activity && !duplicate) ? activity : null;
-  // Only meaningful once there's a saved row (and an old name/MET) to propagate
-  // FROM — an Add or Duplicate has nothing on the Physique sheet to find yet.
+  // Update needs a saved row to propagate from.
   document.getElementById('activity-update-btn').hidden = !editingActivityEntry;
 
-  // Category and Group are prefilled on a plain Add too — a new exercise is
-  // nearly always another one in the group you were just looking at, and the
-  // datalists carry the rest.
   setActivityField('category', activity?.category);
   setActivityField('group', activity?.group);
-  // A duplicate has to land on a different Name: it's the join key, so two rows
-  // sharing one would make the second shadow the first everywhere.
+  // Name is the join key, so a duplicate needs a different one.
   setActivityField('name', activity ? (duplicate ? `${activity.name} (copy)` : activity.name) : '');
   setActivityField('unit', activity?.unit || 'x');
   setActivityField('amount', activity?.amount);
@@ -389,8 +361,7 @@ function openActivityForm(activity, duplicate = false) {
   document.getElementById('activity-modal').hidden = false;
 }
 
-// Always 📝; the hover says whether today's workout already has lines, as
-// logWorkout's own button does (health-activity.js).
+// Always 📝; the hover says whether today's workout already has lines.
 function updateActivityLogButtonLabel() {
   const btn = document.getElementById('activity-log-btn');
   const hasToday = loggedWorkoutQuantities().size > 0;
@@ -400,23 +371,22 @@ function updateActivityLogButtonLabel() {
     : "Log this activity as today's workout";
 }
 
-// The quantity half of a workout note line ("30x", "6000step") for whatever's
-// currently typed in the form — same cases workoutNoteQuantityForBox
-// (health-activity.js) reads off a ticked plan row, just off the form's own
-// Unit/Sets x Reps fields instead of a checkbox's dataset.
+// The note-line quantity ("30x", "6000step") for a Unit and amount, as
+// workoutNoteQuantityForBox (health-activity.js) gives for a ticked row.
 function workoutNoteQuantityForForm(unit, amount) {
   const { sets, reps, hold, steps, minutes } = parseActivityAmount(amount, unit);
   if (steps !== undefined) return `${steps}step`;
   if (minutes !== undefined) return `${minutes}min`;
   if (hold !== undefined) return `${sets * hold}sec`;
   if (reps !== undefined) return `${sets * reps}x`;
+  // Decimal sets/reps ("2.5 x 4") total up the same way a ticked plan row does.
+  const totalReps = totalRepsFromSetsCell(amount);
+  if (totalReps !== null) return `${totalReps}x`;
   return amount.trim().replace(REPS_SEPARATOR_PATTERN, 'x');
 }
 
-// The modal's own Log button — logs whatever's currently typed as one line of
-// today's workout, the same way ticking this row in the Activity Plan and
-// clicking its Log button would, without requiring the row to be saved to the
-// catalogue first.
+// The form's Log button: logs what's typed as one line of today's workout,
+// saved to the catalogue or not.
 function logActivityFromForm() {
   const name = activityFieldValue('name');
   const amount = activityFieldValue('amount');
@@ -446,9 +416,7 @@ function activityFieldValue(id) {
   return document.getElementById(`activity-${id}`).value.trim();
 }
 
-// Shows what's currently typed in Image under the field itself, so a path
-// can be checked before Save rather than only after — the 'error' listener
-// wired in initActivities hides it again if the path resolves to nothing.
+// Previews the typed Image path under the field.
 function renderActivityImagePreview() {
   const img = document.getElementById('activity-image-preview');
   const src = activityFieldValue('image');
@@ -461,9 +429,8 @@ function renderActivityImagePreview() {
   img.hidden = false;
 }
 
-// Values already in use for a free-text column, most-used first — the same
-// guard against fragmenting into "Push"/"push"/"Pusg" that Nutrition's
-// Group datalist provides.
+// Values already in use for a free-text column, most-used first, so "Push"
+// doesn't fragment into "push" and "Pusg".
 function renderActivityDatalist(datalistId, key) {
   const counts = new Map();
   allActivities.forEach((a) => {
@@ -487,25 +454,27 @@ function closeActivityForm() {
   editingActivityEntry = null;
 }
 
-// Reads and validates every field of the Add/Edit Activity form, shared by
-// Save (submitActivityForm) and Update (updateActivityAndPropagate) so the two
-// can't drift on what counts as a valid activity. Shows its own field error and
-// returns { ok: false } on the first problem found. Mirrors health-nutrition.js's
-// readNutritionFormFields.
+// An optional numeric field: its value (null when blank) and whether what's
+// typed failed to parse.
+function readActivityNumberField(id) {
+  const raw = activityFieldValue(id);
+  const value = raw ? evaluateNumberExpression(raw) : null;
+  return { value, invalid: Boolean(raw) && value === null };
+}
+
+// Reads and validates the form for Save and Update alike. Shows the first
+// problem and returns { ok: false }.
 function readActivityFormFields() {
   const name = activityFieldValue('name');
   const category = activityFieldValue('category');
   const group = activityFieldValue('group');
-  const metRaw = activityFieldValue('met');
 
   if (!name || !category || !group) {
     showFieldError('activity-form-error', 'Category, Group and Name are all required — Group is the sub-table this row renders into.');
     return { ok: false };
   }
 
-  // Name is the join key for the note lines, the MET lookup, the muscle-group
-  // map and the plan's own ticks, so a second row under an existing name
-  // wouldn't be a duplicate — it would be invisible.
+  // Name is the join key, so a second row under it would be invisible.
   const clash = allActivities.find((a) => a.row !== editingActivityRow
     && a.name.toLowerCase() === name.toLowerCase());
   if (clash) {
@@ -513,25 +482,20 @@ function readActivityFormFields() {
     return { ok: false };
   }
 
-  const met = metRaw ? evaluateNumberExpression(metRaw) : null;
-  if (metRaw && met === null) {
+  const met = readActivityNumberField('met');
+  if (met.invalid) {
     showFieldError('activity-form-error', 'MET must be a number (e.g. 5 or 3.8), or blank to use the default.');
     return { ok: false };
   }
 
-  const weeklyDesiredRaw = activityFieldValue('weekly-desired');
-  const weeklyDesired = weeklyDesiredRaw ? evaluateNumberExpression(weeklyDesiredRaw) : null;
-  if (weeklyDesiredRaw && weeklyDesired === null) {
+  const weeklyDesired = readActivityNumberField('weekly-desired');
+  if (weeklyDesired.invalid) {
     showFieldError('activity-form-error', 'Weekly Desired must be a number (e.g. 7), or blank to leave this Group out of Activity Rotation.');
     return { ok: false };
   }
 
-  // Column E is one cell holding both halves, split on its LAST comma — so the
-  // rest half is joined back on the same way, and a hold's own "3 x 45 sec"
-  // amount keeps its internal spacing intact.
-  const rest = activityFieldValue('rest');
-  const amount = activityFieldValue('amount');
-  const amountAndRest = [amount, rest].filter(Boolean).join(', ');
+  // Column E holds both halves, split on its last comma, so join them the same way.
+  const amountAndRest = [activityFieldValue('amount'), activityFieldValue('rest')].filter(Boolean).join(', ');
 
   const values = [
     category,
@@ -540,17 +504,16 @@ function readActivityFormFields() {
     activityFieldValue('unit'),
     amountAndRest,
     activityFieldValue('image'),
-    met !== null ? met : '',
+    met.value ?? '',
     activityFieldValue('muscle-group'),
     activityFieldValue('weight'),
-    weeklyDesired !== null ? weeklyDesired : '',
+    weeklyDesired.value ?? '',
   ];
 
-  return { ok: true, name, met, values };
+  return { ok: true, name, met: met.value, values };
 }
 
-// Persists `values` (from readActivityFormFields) to editingActivityRow if it's
-// set, else appends a new row — the sheet write shared by Save and Update.
+// Writes `values` over editingActivityRow, or appends a new row.
 async function saveActivityFormFields(values) {
   if (editingActivityRow !== null) {
     await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:J${editingActivityRow}`, [values]);
@@ -569,8 +532,7 @@ async function submitActivityForm(event) {
     const editingRow = editingActivityRow;
     await saveActivityFormFields(fields.values);
     await initActivities(true);
-    // A new exercise saved from a day's Workout table (✏️, health-physique-breakdown.js)
-    // reprices that day from the sheet now, and drops the AI guess it was filled from.
+    // A name saved from a day's Workout table now prices from the sheet, not its AI guess.
     forgetActivityGuess(fields.name);
     if (!document.getElementById('physique-modal').hidden) runPhysiqueWorkoutCalc(false);
     const name = fields.name;
@@ -578,7 +540,7 @@ async function submitActivityForm(event) {
       || allActivities.filter((a) => a.name === name).at(-1);
     if (saved) {
       openActivityForm(saved);
-      stayOnSavedForm('activity-modal', { slug: routeSlug(saved.name), label: saved.name });
+      stayOnSavedForm('activity-modal', activityRouteStep(saved));
     }
     showFormSaved('activity-form-error');
   } catch (err) {
@@ -588,20 +550,16 @@ async function submitActivityForm(event) {
 
 // --- Update: propagate an edited activity into Physique -------------------
 //
-// Ordinary Calculate reuses a day's already-priced Workout as-is, so it never
-// re-checks an unchanged day against the Activity Plan — a renamed or re-MET'd
-// exercise otherwise leaves every past day quietly wrong (priced at the old
-// MET, or falling to 'Other' once the name no longer matches) until someone
-// notices. This button is the one path that reaches back and fixes them,
-// entirely locally (no Groq/USDA call): find every Workout line still under the
-// activity's OLD name, rename it to the new name, and reprice that whole day's
-// Duration and Calories Out at the new MET — the same combine + highest-burn-
-// first pass bulk Calculate runs (recalculatePhysiqueDay, health-physique.js).
+// Calculate never re-checks an unchanged day, so a renamed or re-MET'd exercise
+// would leave past days wrong. Update renames every Workout line under the OLD
+// name and reprices those days locally (no AI call).
 
-// Rebuilds one Workout note line under the activity's new name, keeping
-// whatever quantity/unit it already had — the same "<quantity> <name>" shape
-// Log Workout and Calculate both write. Null when the line doesn't parse as a
-// workout note line at all (a blank or hand-typed line left exactly as-is).
+// "1 line", "3 lines".
+function pluralCount(count, noun) {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+// A note line rebuilt under a new name, keeping its quantity; null if it doesn't parse.
 function renamedWorkoutLine(line, newName) {
   const [parsed] = parseWorkoutNoteLines(line);
   if (!parsed) return null;
@@ -623,19 +581,15 @@ async function updateActivityAndPropagate() {
     return;
   }
 
-  // Refresh the catalogue first so exerciseMet() below reads the just-saved MET
-  // when it reprices each day, and Physique so the sweep sees current days.
+  // Catalogue first, so exerciseMet() reads the saved MET.
   await initActivities(true);
   await refreshPhysique();
 
   const newName = fields.name;
-  // A day's own recorded body mass is preferred where it has one, falling back
-  // to the latest logged — the same choice bulk Calculate makes. Null only when
-  // no day has ever recorded one, in which case a day can still be renamed but
-  // not repriced (there's nothing to price calories against).
+  // A day's own body mass, else the latest logged; null means rename only.
   const latestBodyMassKg = physiqueBodyMassKgFromLog();
   const candidates = allPhysiqueEntries.filter((p) => p.workout.trim());
-  showToast(`Checking ${candidates.length} Physique day${candidates.length === 1 ? '' : 's'}…`);
+  showToast(`Checking ${pluralCount(candidates.length, 'Physique day')}…`);
 
   let linesRenamed = 0;
   const edits = candidates.map((p) => {
@@ -646,7 +600,7 @@ async function updateActivityAndPropagate() {
       if (!parsed || parsed.name.toLowerCase() !== oldName.toLowerCase()) return raw;
       mentions = true;
       const rebuilt = renamedWorkoutLine(line, newName);
-      if (!rebuilt || rebuilt === line) return raw;
+      if (rebuilt === line) return raw;
       linesRenamed += 1;
       return rebuilt;
     });
@@ -656,24 +610,13 @@ async function updateActivityAndPropagate() {
     const textChanged = newWorkoutText !== p.workout;
     const bodyMassKg = p.bodyMass ?? latestBodyMassKg;
 
-    // MET-only edit (name unchanged) on a day with no body mass to price
-    // against has nothing to do — skip it rather than write the row back
-    // unchanged.
+    // A MET-only edit with no body mass to price against changes nothing.
     if (!textChanged && bodyMassKg === null) return null;
 
     const day = physiqueDayCopy(p);
-    if (bodyMassKg !== null) {
-      const { text: combined } = combineWorkoutText(newWorkoutText);
-      const { minutes, calories, perLine } = estimateWorkoutActivity(combined, bodyMassKg);
-      const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
-      day.workout = sortedPerLine.map((l) => `${l.quantity} ${l.name}`).join('\n');
-      day.duration = minutes;
-      day.caloriesOut = calories;
-    } else {
-      // Rename only — leave the stale Duration/Calories Out for a later
-      // Calculate (once a body mass exists) to reprice.
-      day.workout = newWorkoutText;
-    }
+    if (bodyMassKg !== null) repriceWorkoutDay(day, newWorkoutText, bodyMassKg);
+    // Rename only: a later Calculate reprices once a body mass exists.
+    else day.workout = newWorkoutText;
 
     return { row: p.row, day, snapshot: physiqueDayCopy(p) };
   }).filter(Boolean);
@@ -699,17 +642,14 @@ async function updateActivityAndPropagate() {
   closeActivityForm();
   await refreshPhysique(true);
 
-  const dayCount = `${succeeded.length} Physique day${succeeded.length === 1 ? '' : 's'}`;
-  const renameNote = linesRenamed ? ` (${linesRenamed} line${linesRenamed === 1 ? '' : 's'} renamed)` : '';
+  const renameNote = linesRenamed ? ` (${pluralCount(linesRenamed, 'line')} renamed)` : '';
   showUndoToast(
-    `"${newName}" updated — ${dayCount} repriced${renameNote}.`,
+    `"${newName}" updated — ${pluralCount(succeeded.length, 'Physique day')} repriced${renameNote}.`,
     () => restorePhysiqueSnapshots(succeeded),
   );
 }
 
-// Deleting the catalogue row doesn't touch a workout already logged against
-// it — that's free text on a Physique day. It just stops being priced by its
-// own MET and stacks under 'Other', which the confirmation says out loud.
+// Logged days keep their lines; they just fall to the default MET and 'Other'.
 async function deleteActivity(activity) {
   await confirmAndDelete(
     `Delete "${activity.name}" from the Activity Plan? Days already logged against it keep their lines, but will be priced at the default MET if recalculated.`,
@@ -726,13 +666,8 @@ async function deleteActivity(activity) {
   );
 }
 
-// "45 lbs · 3 x 10 · 90 sec rest" — Load leads, so it reads left of the
-// Sets x Reps it applies to rather than trailing after Rest where it'd read
-// as an afterthought. Amount/Rest come from the single cell
-// splitAmountAndRest already divides, so that half shows exactly what the
-// plan table's Sets x Reps and Rest columns do; Load is its own column
-// (row[8]), blank on any activity that doesn't load one (steps, minutes).
-// Either half missing just drops out rather than leaving a stray separator.
+// "45 lbs · 3 x 10 · 90 sec rest": Load first, then amount and rest; a missing
+// part drops out with its separator.
 function instructionPrescription(activity) {
   const prescription = activity.amount
     ? (activity.rest ? `${activity.amount} · ${activity.rest} rest` : activity.amount)
@@ -740,15 +675,15 @@ function instructionPrescription(activity) {
   return [activity.weight, prescription].filter(Boolean).join(' · ');
 }
 
-// Workouts: one tile per Group (Insight's tile style), and under them the chosen
-// group's activities — figure, name, muscle group, then load, sets x reps and rest.
-// Each group is a page of its own, …/activity/workouts/<group>/ (registerFormSubView,
-// router.js); Workouts' own address shows just the tiles. Figures come from the
-// sheet's Image column.
+// --- Workouts -------------------------------------------------------------
+//
+// One tile per Group; a group's activities on its own page,
+// …/activity/workouts/<group>/ (registerFormSubView, router.js).
 let guideGroupSlug = null;
 
+const GUIDE_TICKED_SELECTOR = '#instruction-body .instruction-check:checked';
+
 function guideGroups() {
-  // Every activity, pictured or not: the strength days, then Cardio and NEAT.
   return groupInOrder(sortActivitiesByRotation(allActivities), 'group');
 }
 
@@ -759,13 +694,74 @@ function guideGroupName(slug) {
 
 // Shows a group's page (or the tiles alone, for null) and puts it in the address.
 function showGuideGroup(slug) {
-  const groups = guideGroups();
-  const name = [...groups.keys()].find((g) => routeSlug(g) === slug) ?? null;
+  const name = guideGroupName(slug);
   guideGroupSlug = name === null ? null : slug;
   renderInstructionList();
   if (!document.getElementById('activity-instruction-modal').hidden) {
     setFormSubView(guideGroupSlug, name);
   }
+}
+
+// The figure, or an empty box of the same size when there's no image or it 404s.
+function makeInstructionFigure(activity) {
+  const blank = () => {
+    const box = document.createElement('div');
+    box.className = 'instruction-figure';
+    return box;
+  };
+  if (!activity.image) return blank();
+  const figure = document.createElement('img');
+  figure.className = 'instruction-figure';
+  figure.src = activity.image;
+  figure.alt = `${activity.name}, movement guide`;
+  figure.loading = 'lazy';
+  figure.addEventListener('error', () => figure.replaceWith(blank()), { once: true });
+  return figure;
+}
+
+// One activity's card: tick and ✏️ in the corners, name, prescription, figure.
+function makeInstructionCard(activity, isLogged) {
+  const li = document.createElement('li');
+  li.className = 'card';
+  // A card already in today's workout is tinted and can't be ticked.
+  li.classList.toggle('instruction-logged', isLogged);
+  const tick = document.createElement('input');
+  tick.type = 'checkbox';
+  tick.className = 'instruction-check';
+  tick.dataset.name = activity.name;
+  tick.disabled = isLogged;
+  tick.title = isLogged ? "Already in today's workout" : 'Tick to log with 📝';
+  tick.setAttribute('aria-label', `Log ${activity.name}`);
+  tick.addEventListener('change', updateGuideLogButton);
+  const edit = makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (event) => {
+    event.stopPropagation();
+    openActivityFormPage(activity);
+  } });
+  edit.classList.add('instruction-edit');
+  li.append(tick, edit);
+  // The whole card toggles its tick: one tap per activity at the gym.
+  li.addEventListener('click', (event) => {
+    if (event.target === tick || tick.disabled) return;
+    tick.checked = !tick.checked;
+    updateGuideLogButton();
+  });
+
+  const figure = makeInstructionFigure(activity);
+  const label = document.createElement('h3');
+  label.textContent = activity.name;
+  li.append(label);
+
+  // Read mid-set, so it's in the text colour, not muted.
+  const prescription = instructionPrescription(activity);
+  if (prescription) {
+    const meta = document.createElement('span');
+    meta.className = 'instruction-activity-meta instruction-activity-prescription';
+    meta.textContent = prescription;
+    li.appendChild(meta);
+  }
+
+  li.appendChild(figure);
+  return li;
 }
 
 function renderInstructionList() {
@@ -774,13 +770,9 @@ function renderInstructionList() {
   tiles.innerHTML = '';
   body.innerHTML = '';
   const groups = guideGroups();
-  // As Insight's modes: the tiles alone on Workouts' page, a group's list alone on
-  // its own (the breadcrumb's Workouts goes back to the tiles).
+  // The tiles (with the Rotation card) alone on Workouts' page, a group's list alone on its own.
   document.getElementById('instruction-groups-card').hidden = guideGroupSlug !== null;
-  // Empty on the tiles view; hidden so its top margin adds no gap between the cards.
   body.hidden = guideGroupSlug === null;
-  // The Activity Rotation copy (health-chart-activity-rotation.js) rides along with the
-  // tiles — a group's own page has no room for it beside the activity list.
   document.getElementById('instruction-rotation-card').hidden = guideGroupSlug !== null;
 
   groups.forEach((rows, group) => {
@@ -802,77 +794,8 @@ function renderInstructionList() {
 
     const list = document.createElement('ul');
     list.className = 'instruction-activities';
-
     const logged = loggedWorkoutQuantities();
-    rows.forEach((activity) => {
-      const li = document.createElement('li');
-      li.className = 'card';
-      // A tick in the figure's corner picks it for 📝 (logGuideTicks); a card already
-      // in today's workout is tinted instead, as the plan tables' rows are.
-      const isLogged = logged.has(activity.name);
-      li.classList.toggle('instruction-logged', isLogged);
-      const tick = document.createElement('input');
-      tick.type = 'checkbox';
-      tick.className = 'instruction-check';
-      tick.dataset.name = activity.name;
-      tick.disabled = isLogged;
-      tick.title = isLogged ? "Already in today's workout" : 'Tick to log with 📝';
-      tick.setAttribute('aria-label', `Log ${activity.name}`);
-      tick.addEventListener('change', updateGuideLogButton);
-      // ✏️ in the figure's other corner opens the activity's Edit page over this one;
-      // its ❌ comes back here.
-      const edit = makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (event) => {
-        event.stopPropagation();
-        routeRecordEdit('activity', { slug: routeSlug(activity.name), label: activity.name });
-        openActivityForm(activity);
-      } });
-      edit.classList.add('instruction-edit');
-      li.append(tick, edit);
-      // The whole card toggles its tick: one tap per activity at the gym.
-      li.addEventListener('click', (event) => {
-        if (event.target === tick || tick.disabled) return;
-        tick.checked = !tick.checked;
-        updateGuideLogButton();
-      });
-
-      // No image (a blank cell, or a path that 404s) keeps the figure's box, empty,
-      // so every card in the grid stays the same height.
-      const blank = () => {
-        const box = document.createElement('div');
-        box.className = 'instruction-figure';
-        return box;
-      };
-      let figure = blank();
-      if (activity.image) {
-        figure = document.createElement('img');
-        figure.className = 'instruction-figure';
-        figure.src = activity.image;
-        figure.alt = `${activity.name}, movement guide`;
-        figure.loading = 'lazy';
-        figure.addEventListener('error', () => figure.replaceWith(blank()), { once: true });
-      }
-
-      // The name is the card's label (.card h3), as on every other card.
-      const label = document.createElement('h3');
-      label.textContent = activity.name;
-
-      li.append(label);
-
-      // Under the name, above the figure: how much of it to do (load, sets/reps,
-      // rest — see instructionPrescription), skipped when the sheet gives none. It's
-      // what's read mid-set, so it's in the text colour, not muted.
-      const prescription = instructionPrescription(activity);
-      if (prescription) {
-        const meta = document.createElement('span');
-        meta.className = 'instruction-activity-meta instruction-activity-prescription';
-        meta.textContent = prescription;
-        li.appendChild(meta);
-      }
-
-      li.appendChild(figure);
-      list.appendChild(li);
-    });
-
+    rows.forEach((activity) => list.appendChild(makeInstructionCard(activity, logged.has(activity.name))));
     body.append(list);
   });
   updateGuideLogButton();
@@ -881,7 +804,7 @@ function renderInstructionList() {
 // 📝 shows on a group's page and is live once something is ticked.
 function updateGuideLogButton() {
   const btn = document.getElementById('guide-log-btn');
-  const ticked = document.querySelectorAll('#instruction-body .instruction-check:checked').length;
+  const ticked = document.querySelectorAll(GUIDE_TICKED_SELECTOR).length;
   btn.hidden = guideGroupSlug === null;
   btn.disabled = ticked === 0;
   btn.title = ticked ? `Log ${ticked} ticked to today's workout` : 'Tick activities to log them';
@@ -890,8 +813,8 @@ function updateGuideLogButton() {
 // Saves the ticked activities straight into today's workout; the page stays put.
 async function logGuideTicks() {
   const btn = document.getElementById('guide-log-btn');
-  const lines = [...document.querySelectorAll('#instruction-body .instruction-check:checked')]
-    .map((box) => activitiesByName.get(box.dataset.name.toLowerCase()))
+  const lines = [...document.querySelectorAll(GUIDE_TICKED_SELECTOR)]
+    .map((box) => activityByName(box.dataset.name))
     .filter(Boolean)
     .map((a) => `${workoutNoteQuantityForForm(a.unit, a.amount)} ${a.name}`);
   if (!lines.length) return;

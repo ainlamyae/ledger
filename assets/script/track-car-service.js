@@ -2,15 +2,14 @@
 // whose description carries the odometer as "@12345km", and the next service of each
 // kind predicted from a linear fit of those readings.
 //
-// Sources for the intervals (km only, by request — no month limits):
-// - Toyota Canada maintenance schedule (Service #1 every 8,000 km, #3 every 32,000 km,
-//   brake fluid at 48,000 km): toyota.ca owners maintenance-schedule generator.
-// - Toyota 2023 Corolla Warranty & Maintenance Guide (air filters 30,000 mi ≈ 48,000 km,
-//   coolant 100,000 mi ≈ 160,000 km, spark plugs 120,000 mi ≈ 193,000 km).
-// - Tire sets: replace at 6 years old (Toyota tire warranty ends at 6 years; CAA Insurance
-//   won't cover tires older than 6), sooner if the tread is worn.
-// - Winter tires: predicted on TD Insurance's hard deadline, 1 Dec (its Ontario discount
-//   needs them on December–March), with rust protection on the same day.
+// Interval sources (km only, by request):
+// - Toyota Canada maintenance schedule: Service #1 every 8,000 km, #3 every 32,000 km,
+//   brake fluid at 48,000 km.
+// - Toyota 2023 Corolla Warranty & Maintenance Guide: air filters 48,000 km, coolant
+//   160,000 km, spark plugs 193,000 km.
+// - Tire sets: replace at 6 years old (Toyota warranty and CAA cover end there).
+// - Winter tires: by 1 Dec, TD Insurance's Ontario discount deadline; rust protection
+//   the same day.
 
 const CAR_ODOMETER_PATTERN = /@\s*([\d,.]+)\s*km/i;
 
@@ -51,6 +50,20 @@ const CAR_REMINDER_DAYS = 7;
 // Predictions further out than this stay in the table but off the chart.
 const CAR_CHART_HORIZON_DAYS = 730;
 
+// Changeover seasons by month: spring Mar–Jun, fall from Sep.
+const CAR_SPRING_FIRST_MONTH = 3;
+const CAR_SPRING_LAST_MONTH = 6;
+const CAR_FALL_FIRST_MONTH = 9;
+// Day of year (from 1 Jan) for spring with no history: 15 Apr.
+const CAR_SPRING_DEFAULT_DAY = 104;
+// TD's discount needs winter tires through March and on by 1 Dec.
+const CAR_SPRING_EARLIEST = '04-01';
+const CAR_WINTER_BY = '12-01';
+const CAR_TO_SPRING = { label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C — TD' };
+const CAR_TO_WINTER = { label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, by 1 Dec — TD' };
+
+const CAR_NOTIFIED_KEY = 'ledger_last_car_service_notified';
+
 let carServiceChart = null;
 
 function carServiceType(description) {
@@ -62,7 +75,7 @@ function carTypeInfo(type) {
 }
 
 function carDaysBetween(fromIso, toIso) {
-  return Math.round((parseIsoDateUTC(toIso) - parseIsoDateUTC(fromIso)) / 86400000);
+  return Math.round((parseIsoDateUTC(toIso) - parseIsoDateUTC(fromIso)) / MS_PER_DAY);
 }
 
 function carKmText(km) {
@@ -103,35 +116,34 @@ function carOdometerFit(records) {
   };
 }
 
+const carIsoYear = (iso) => Number(iso.slice(0, 4));
+const carIsoMonth = (iso) => Number(iso.slice(5, 7));
+
 // The next fall (on) and spring (off) changeover dates after the last one logged.
 function carSeasonalChangeovers(records, today) {
   const changeovers = records.filter((r) => r.type === 'changeover');
   const springDays = changeovers
-    .filter((r) => { const m = Number(r.date.slice(5, 7)); return m >= 3 && m <= 6; })
+    .filter((r) => { const m = carIsoMonth(r.date); return m >= CAR_SPRING_FIRST_MONTH && m <= CAR_SPRING_LAST_MONTH; })
     .map((r) => carDaysBetween(`${r.date.slice(0, 4)}-01-01`, r.date));
-  // Your own average spring date, never before 1 Apr (TD's discount runs through March).
-  const avgSpringDay = springDays.length ? Math.round(springDays.reduce((s, d) => s + d, 0) / springDays.length) : 104;
-  const springDate = (year) => {
+  // Your own average spring date, never before TD's earliest.
+  const avgSpringDay = springDays.length ? Math.round(springDays.reduce((s, d) => s + d, 0) / springDays.length) : CAR_SPRING_DEFAULT_DAY;
+  const toSpring = (year) => {
     const avg = isoDatePlusDays(`${year}-01-01`, avgSpringDay);
-    return avg < `${year}-04-01` ? `${year}-04-01` : avg;
+    const earliest = `${year}-${CAR_SPRING_EARLIEST}`;
+    return { date: avg < earliest ? earliest : avg, ...CAR_TO_SPRING };
   };
+  const toWinter = (year) => ({ date: `${year}-${CAR_WINTER_BY}`, ...CAR_TO_WINTER });
 
   const last = changeovers[changeovers.length - 1];
-  const lastMonth = last ? Number(last.date.slice(5, 7)) : 6;
-  const year = Number(today.slice(0, 4));
-  // A fall changeover (Sep–Dec) means winter tires are on: spring comes next.
-  if (lastMonth >= 9) {
-    const springYear = Number(last.date.slice(0, 4)) + 1;
-    return [
-      { date: springDate(springYear), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C — TD' },
-      { date: `${springYear}-12-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, by 1 Dec — TD' },
-    ];
+  // No changeover yet counts as summer tires on.
+  const lastMonth = last ? carIsoMonth(last.date) : CAR_SPRING_LAST_MONTH;
+  // A fall changeover means winter tires are on: spring comes next.
+  if (lastMonth >= CAR_FALL_FIRST_MONTH) {
+    const springYear = carIsoYear(last.date) + 1;
+    return [toSpring(springYear), toWinter(springYear)];
   }
-  const fallYear = last ? Number(last.date.slice(0, 4)) : year;
-  return [
-    { date: `${fallYear}-12-01`, label: 'Tire Changeover to Winter', basis: 'at +7 °C or below, by 1 Dec — TD' },
-    { date: springDate(fallYear + 1), label: 'Tire Changeover to All-Season', basis: 'after 31 Mar, above +7 °C — TD' },
-  ];
+  const fallYear = last ? carIsoYear(last.date) : carIsoYear(today);
+  return [toWinter(fallYear), toSpring(fallYear + 1)];
 }
 
 // The next occurrence of every rule.
@@ -141,10 +153,9 @@ function predictCarServices(records, fit, today) {
 
   CAR_SERVICE_RULES.forEach((rule) => {
     const info = carTypeInfo(rule.type);
+    const onDate = (label, date, basis) => predictions.push({ type: rule.type, label, date, km: fit.kmAt(date), basis });
     if (rule.seasonal) {
-      carSeasonalChangeovers(records, today).forEach((c) => predictions.push({
-        type: rule.type, label: c.label, date: c.date, km: fit.kmAt(c.date), basis: c.basis,
-      }));
+      carSeasonalChangeovers(records, today).forEach((c) => onDate(c.label, c.date, c.basis));
       return;
     }
     // One row per tire set: the car's original set (its first record) and each bought since.
@@ -152,16 +163,13 @@ function predictCarServices(records, fit, today) {
       const sets = [{ date: records[0].date, name: 'original set' },
         ...records.filter((r) => r.type === rule.type).map((r) => ({ date: r.date, name: `set from ${r.date}` }))];
       sets.forEach((set) => {
-        const date = `${Number(set.date.slice(0, 4)) + rule.everyYears}${set.date.slice(4)}`;
-        predictions.push({ type: rule.type, label: `${info.label} (${set.name})`, date, km: fit.kmAt(date), basis: rule.basis });
+        onDate(`${info.label} (${set.name})`, `${carIsoYear(set.date) + rule.everyYears}${set.date.slice(4)}`, rule.basis);
       });
       return;
     }
     if (rule.everyDays) {
       const last = lastOf([rule.type]);
-      if (!last) return;
-      const date = isoDatePlusDays(last.date, rule.everyDays);
-      predictions.push({ type: rule.type, label: info.label, date, km: fit.kmAt(date), basis: rule.basis });
+      if (last) onDate(info.label, isoDatePlusDays(last.date, rule.everyDays), rule.basis);
       return;
     }
 
@@ -185,15 +193,15 @@ function predictCarServices(records, fit, today) {
 
   // Rust protection is done with the fall changeover to winter, so it shares that day.
   const rust = predictions.find((p) => p.type === 'rust');
-  const toWinter = predictions.find((p) => p.type === 'changeover' && /to Winter/.test(p.label));
+  const toWinter = predictions.find((p) => p.type === 'changeover' && p.label === CAR_TO_WINTER.label);
   if (rust && toWinter) {
     rust.date = toWinter.date;
     rust.km = toWinter.km;
     rust.basis = 'yearly, with the changeover to winter — your own history';
   }
 
-  // A changeover is also a rotation + inspection: when the next one comes before the
-  // rotation's 8,000 km, the rotation happens there rather than on its own.
+  // A changeover is also a rotation + inspection: one due before the rotation's km
+  // replaces it.
   const rotation = predictions.find((p) => p.type === 'rotation');
   const changeovers = predictions.filter((p) => p.type === 'changeover');
   if (rotation && changeovers.some((c) => c.km <= rotation.km)) {
@@ -221,24 +229,17 @@ function renderCarServiceTable(records, predictions) {
     return;
   }
 
+  const addRow = (body, cells) => {
+    const tr = document.createElement('tr');
+    tr.append(...cells.map((text) => makeCell(text)));
+    body.appendChild(tr);
+  };
   // Upcoming, soonest first; a date already passed says so in the Service cell.
-  predictions.forEach((p) => {
-    const tr = document.createElement('tr');
-    tr.append(
-      makeCell(p.date),
-      makeCell(`${carKmText(p.km)} km`),
-      makeCell(p.status === 'Overdue' ? `${p.label} — overdue` : p.label),
-      makeCell(p.basis),
-    );
-    predictedBody.appendChild(tr);
-  });
-
+  predictions.forEach((p) => addRow(predictedBody, [
+    p.date, `${carKmText(p.km)} km`, p.status === 'Overdue' ? `${p.label} — overdue` : p.label, p.basis,
+  ]));
   // History, newest first.
-  [...records].reverse().forEach((r) => {
-    const tr = document.createElement('tr');
-    tr.append(makeCell(r.date), makeCell(`${carKmText(r.km)} km`), makeCell(r.service));
-    doneBody.appendChild(tr);
-  });
+  [...records].reverse().forEach((r) => addRow(doneBody, [r.date, `${carKmText(r.km)} km`, r.service]));
 }
 
 function renderCarServiceChart(records, predictions, fit, today) {
@@ -264,6 +265,7 @@ function renderCarServiceChart(records, predictions, fit, today) {
     });
     byType.forEach((list, type) => {
       const info = carTypeInfo(type);
+      const color = chartColor(info.color);
       const data = new Array(dates.length).fill(null);
       const names = new Array(dates.length).fill(null);
       list.forEach((item) => {
@@ -274,8 +276,8 @@ function renderCarServiceChart(records, predictions, fit, today) {
       });
       pointSets.push({
         type: 'line', label: info.label, data, names, status, showLine: false,
-        pointRadius: 5, pointHoverRadius: 6, borderColor: chartColor(info.color), borderWidth: 2,
-        backgroundColor: hollow ? 'transparent' : chartColor(info.color), order: 0,
+        pointRadius: 5, pointHoverRadius: 6, borderColor: color, borderWidth: 2,
+        backgroundColor: hollow ? 'transparent' : color, order: 0,
       });
     });
   };
@@ -355,9 +357,9 @@ function updateCarServiceReminder(predictions, today) {
   setPageBadge('track', 'car-service', { text: `${days}d`, title: `Car service due: ${detail}` });
 
   if ('Notification' in window && Notification.permission === 'granted'
-    && localStorage.getItem('ledger_last_car_service_notified') !== today) {
+    && localStorage.getItem(CAR_NOTIFIED_KEY) !== today) {
     new Notification('Ledger', { body: `Car service ${days}d: ${names}` });
-    localStorage.setItem('ledger_last_car_service_notified', today);
+    localStorage.setItem(CAR_NOTIFIED_KEY, today);
   }
 }
 
@@ -365,14 +367,14 @@ function updateCarServiceReminder(predictions, today) {
 function renderCarService() {
   if (!document.getElementById('car-service-done-body')) return;
   const records = parseCarServiceTransactions();
+  const today = isoFromDate(new Date());
   if (!records.length) {
     renderCarServiceTable([], []);
     if (carServiceChart) carServiceChart.destroy();
     carServiceChart = null;
-    updateCarServiceReminder([], isoFromDate(new Date()));
+    updateCarServiceReminder([], today);
     return;
   }
-  const today = isoFromDate(new Date());
   const fit = carOdometerFit(records);
   const predictions = predictCarServices(records, fit, today);
   renderCarServiceTable(records, predictions);

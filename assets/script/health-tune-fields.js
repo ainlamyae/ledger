@@ -1,55 +1,33 @@
-// "Tune" in the Health Chart heading: shows the desired daily intake as a
-// formula with its tunable inputs editable, recomputes as you type, and can write
-// the values back to the Settings tab.
-//
-// A "Solve for" radio picks which one quantity is the unknown — everything else
-// on the sheet becomes a known you type in, and that one field goes readonly and
-// shows the answer. Eᵢₙ (calories) and t (days to m_g) are two more fields
-// alongside the rest, not a fixed pair of results: whether each is typed or
-// computed depends on the mode, and for TAU/DELTA_M on which one you last
-// typed into (see computedIdsForMode below).
-//
-// The point is that the desired intake is the one number in the app derived from settings
-// you can't see the effect of until you save them — this makes the arithmetic and
-// the sensitivity visible first, in whichever direction you actually want it. It
-// computes with the SAME functions the charts use (calorieDesiredDetail,
-// projectHealthyDays, maintenanceAffineCoefficients, via a temporary settings
-// overlay), so the preview can't drift from what saving would actually produce.
+// Tune: the desired daily intake as an editable formula that recomputes as you type
+// and can save its inputs to Settings. "Solve for" picks the one unknown; the rest are
+// typed. It runs the charts' own functions under a settings overlay, so the preview
+// can't drift from what saving produces.
 
 // What a fresh user (no Settings, no readings) sees in Tune's profile boxes.
 const TUNE_PROFILE_DEFAULTS = { heightCm: 170, age: 35, neckCm: 38, waistCm: 91, hipCm: 99, bodyMassKg: 78.9, smoothBodyMassKg: 79 };
 const WEEKLY_FAT_LOSS_PCT_DEFAULT = 1;
 
-// Editable rows: the Settings key, its input, and the fallback shown when the key
-// isn't set. Order matches the formula's own term order. Every one of these can
-// also become the computed field (see FORMULA_SOLVE_FIELD_ID) except κ, which
-// stays a plain input in every mode — a technical constant, not something
-// anyone solves for.
+// The calorie solve's inputs: Settings key, input, fallback. A blank one blocks the
+// whole solve. Each but κ can become a mode's computed field.
 const FORMULA_FIELDS = [
   { key: 'KCAL_PER_MET_KG_MIN', inputId: 'formula-met-o2', fallback: () => MET_ML_O2_PER_KG_MIN_DEFAULT },
-  // Walk's own catalogue MET (Edit Activity) — the Activity sheet row is the one place
-  // that number is maintained. A typed value only drives the preview: its key is a
-  // preview-only one (activityMet, health-math.js) that Save never writes.
+  // Walk's MET lives on the Activity sheet; a typed one is preview-only and never saved.
   { key: ACTIVITY_MET_PREVIEW_KEY, inputId: 'formula-met', value: () => activityMet() },
   { key: 'ACTIVITY_DESIRED_MIN', inputId: 'formula-activity-min', fallback: () => ACTIVITY_DESIRED_MIN_DEFAULT },
-  // Defaults to the desired sleep itself (Settings' SLEEP_DESIRED_HOURS) — "assume you hit
-  // it" — so an untouched box keeps producing the exact deficit this app always has. Type
-  // fewer hours and D (below) grows to compensate for the lost fat-loss efficiency.
+  // Defaults to the desired sleep, so an untouched box adds no sleep penalty.
   { key: 'PLAN_SLEEP_HOURS', inputId: 'formula-plan-sleep-hours', fallback: () => getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT) },
-  // The literature's own 2-3%/hr range, defaulting to its midpoint — a rate, not a fixed
-  // constant, so it's tunable here like every other coefficient on this sheet.
   { key: SLEEP_DEPRIVATION_PCT_PER_HOUR_KEY, inputId: 'formula-sleep-deprivation-pct', fallback: () => SLEEP_DEPRIVATION_PCT_PER_HOUR_DEFAULT },
-  // Unset: 1%/week of m̄, Tune's starting Δm%.
+  // Unset: 1%/week of m̄.
   { key: 'WEEKLY_FAT_LOSS_KG', inputId: 'formula-weekly-loss', fallback: () => weeklyFatLossKgFromPct(WEEKLY_FAT_LOSS_PCT_DEFAULT, planBodyMassKg(physiqueAsHealthEntries()) ?? TUNE_PROFILE_DEFAULTS.smoothBodyMassKg) },
   { key: 'BODY_MASS_HEALTHY_KG', inputId: 'formula-healthy', fallback: () => BODY_MASS_HEALTHY_KG_DEFAULT },
-  // In this list, not the two below it: f divides the whole intake identity, so a blank
-  // one leaves Eᵢₙ genuinely uncomputable rather than merely undecorated.
+  // f divides the whole intake identity, so a blank one does block Eᵢₙ.
   { key: TEF_PERCENT_KEY, inputId: 'formula-tef-pct', fallback: () => TEF_PERCENT_DEFAULT },
 ];
 
-// Metabolic adaptation's pair, kept out of FORMULA_FIELDS for the same reason the protein
-// band is: λ feeds only the two reported rows (BMR_a and the adapted plateau), so a blank
-// one should stop those from being shown, never stop the desired intake from being computed.
+// The lists below feed only their own rows, so a blank one hides those rows
+// without blocking the calorie solve.
+
+// Metabolic adaptation (λ, λt_max).
 const ADAPT_FORMULA_FIELDS = [
   { key: ADAPT_PCT_PER_WEEK_KEY, inputId: 'formula-adapt-per-week', fallback: () => ADAPT_PCT_PER_WEEK_DEFAULT },
   { key: ADAPT_PCT_CAP_KEY, inputId: 'formula-adapt-cap', fallback: () => ADAPT_PCT_CAP_DEFAULT },
@@ -68,41 +46,37 @@ const CALIBRATION_FORMULA_FIELDS = [
   { key: BMR_CALIBRATION_PERIOD_DAYS_KEY, inputId: 'formula-cal-period-days', fallback: () => BMR_CALIBRATION_PERIOD_DAYS_DEFAULT },
 ];
 
-// The lean-mass protein band: its own pair of fields, kept out of FORMULA_FIELDS on
-// purpose. Those are read unconditionally and a blank one invalidates the whole calorie
-// preview — but protein feeds nothing in the calorie identities, so an empty p_min
-// should only stop protein from being computed and saved, not the desired intake.
+// Lean-mass protein band (g/kg LBM).
 const PROTEIN_FORMULA_FIELDS = [
   { key: 'PROTEIN_G_PER_KG_LBM_MIN', inputId: 'formula-protein-per-kg-min', fallback: () => PROTEIN_G_PER_KG_LBM_MIN_DEFAULT },
   { key: 'PROTEIN_G_PER_KG_LBM_MAX', inputId: 'formula-protein-per-kg-max', fallback: () => PROTEIN_G_PER_KG_LBM_MAX_DEFAULT },
 ];
 
-// The fiber band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
-// PROTEIN_FORMULA_FIELDS: fiber feeds no calorie identity, so a blank one should only stop
-// fiber from being computed and saved, not the desired intake.
+// Fiber band: a floor per 1000 kcal, a ceiling per kg.
 const FIBER_FORMULA_FIELDS = [
   { key: 'FIBER_G_PER_1000_KCAL_MIN', inputId: 'formula-fiber-per-1000kcal-min', fallback: () => FIBER_G_PER_1000_KCAL_MIN_DEFAULT },
   { key: 'FIBER_G_PER_KG_MAX', inputId: 'formula-fiber-per-kg-max', fallback: () => FIBER_G_PER_KG_MAX_DEFAULT },
 ];
 
-// The fat band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
-// FIBER_FORMULA_FIELDS: fat feeds no calorie identity, so a blank one should only stop
-// fat from being computed and saved, not the desired intake.
+// Fat band, % of intake.
 const FAT_FORMULA_FIELDS = [
   { key: 'FAT_PCT_OF_KCAL_MIN', inputId: 'formula-fat-pct-min', fallback: () => FAT_PCT_OF_KCAL_MIN_DEFAULT },
   { key: 'FAT_PCT_OF_KCAL_MAX', inputId: 'formula-fat-pct-max', fallback: () => FAT_PCT_OF_KCAL_MAX_DEFAULT },
 ];
 
-// The carb band's two coefficients, kept out of FORMULA_FIELDS for the same reason as
-// FAT_FORMULA_FIELDS: carb feeds no calorie identity, so a blank one should only stop
-// carb from being computed and saved, not the desired intake.
+// Carb band, % of intake.
 const CARB_FORMULA_FIELDS = [
   { key: 'CARB_PCT_OF_KCAL_MIN', inputId: 'formula-carb-pct-min', fallback: () => CARB_PCT_OF_KCAL_MIN_DEFAULT },
   { key: 'CARB_PCT_OF_KCAL_MAX', inputId: 'formula-carb-pct-max', fallback: () => CARB_PCT_OF_KCAL_MAX_DEFAULT },
 ];
 
-// Which box each "Solve for" radio value fills in. Activity intensity (MET)
-// isn't offered as a solvable unknown — only τ, on the activity side, is.
+// Every settings-backed Tune field, for loading and live re-rendering.
+const ALL_FORMULA_FIELDS = [
+  ...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS,
+  ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS, ...CALIBRATION_FORMULA_FIELDS, ...NAVY_FORMULA_FIELDS,
+];
+
+// The box each "Solve for" value fills. MET isn't solvable; τ is.
 const FORMULA_SOLVE_FIELD_ID = {
   EIN: 'formula-ein',
   HEALTHY_MASS: 'formula-healthy',
@@ -110,56 +84,25 @@ const FORMULA_SOLVE_FIELD_ID = {
   DELTA_M: 'formula-weekly-loss',
 };
 
-// Every box that can go readonly in some mode — the five solvable fields plus
-// Eᵢₙ and t, which follow whichever is picked rather than having their own radio.
-// formula-eta (the estimated-arrival date) always tracks formula-days: the two
-// are just two views of the same t, so they're always both typed or both
-// computed together — never listed separately below.
-// formula-weekly-loss-pct is on the list for the opposite reason to formula-eta: it's
-// never typed in DELTA_M mode, where Δm is the answer, so the percentage is an answer
-// too and the box has to go readonly with it.
-// formula-healthy-bmi is on the list for the same reason formula-weekly-loss-pct is: in
-// HEALTHY_MASS the kilograms are the answer, so the BMI they come to is an answer too and the
-// box has to go readonly with them.
+// Every box that can go readonly in some mode. Each unit pair (t/date, Δm/Δm%,
+// m_g/BMI_g) is typed or computed together.
 const FORMULA_TOGGLE_IDS = [...Object.values(FORMULA_SOLVE_FIELD_ID), 'formula-days', 'formula-eta', 'formula-weekly-loss-pct', 'formula-healthy-bmi'];
 
-// Which fields are computed in EIN and HEALTHY_MASS — fixed, unlike TAU and
-// DELTA_M below, which let you type either Eᵢₙ or t and compute whichever
-// you didn't touch.
-// FIXED_PCT is the one mode named for what it HOLDS rather than what it solves: Δm% is
-// the typed input and everything the rate feeds is computed from it — the kilograms, the
-// intake, and the day count. Which makes it EIN's twin, differing only in that Δm comes
-// from a share of body mass and the journey is proportional rather than constant-intake.
+// Computed boxes in the fixed modes. FIXED_PCT is EIN's twin: Δm% is held and the
+// kilograms, intake and day count follow from it.
 const FORMULA_COMPUTED_IDS = {
   EIN: ['formula-ein', 'formula-days', 'formula-eta'],
   HEALTHY_MASS: ['formula-healthy', 'formula-healthy-bmi'],
   FIXED_PCT: ['formula-weekly-loss', 'formula-ein', 'formula-days', 'formula-eta'],
 };
 
-// For TAU and DELTA_M, either Eᵢₙ or t can be the known that drives the solve
-// — whichever you last typed into. Tracked per mode (not reset when you
-// switch radios and back) so it remembers which one you were using. Both
-// default to a typed Eᵢₙ: picking either radio should let you fix a calorie
-// figure and see what it solves for immediately, not open on a dashed,
-// look-readonly Calories box you have to type into once before it responds.
+// TAU and DELTA_M solve from whichever of Eᵢₙ or t was typed last, remembered per
+// mode. Eᵢₙ by default, so either mode responds straight away.
 const dualKnownField = { TAU: 'ein', DELTA_M: 'ein' };
 
-// The same idea for Δm, which also has two boxes: kg/week and % of current body mass
-// per week. One quantity in two units, like t and its arrival date, so whichever you last
-// typed into is the known and the other is rewritten from it on every render.
-//
-// Two modes overrule the memory, in opposite directions: DELTA_M solves for Δm, so both
-// boxes are answers and neither is typed; FIXED_PCT is defined by holding the percentage,
-// so it's typed there whatever you last touched.
+// Which box of a unit pair was typed last; the other is rewritten from it each render.
+// DELTA_M computes both Δm boxes, FIXED_PCT always types the %, HEALTHY_MASS computes both m_g boxes.
 let weeklyLossKnownField = 'kg';   // 'kg' | 'pct'
-
-// The same idea again for the healthy body mass, which also has two boxes: kilograms and the
-// BMI they come to at this height. One quantity in two units, so whichever you last typed
-// into is the known and the other is rewritten from it on every render.
-//
-// One mode overrules the memory: HEALTHY_MASS solves for m_g, so both boxes are answers and
-// neither is typed. (There's no FIXED_PCT-style counterpart pinning the BMI — nothing in the
-// app holds a BMI still, so there's nothing to overrule it in the other direction.)
 let healthyMassKnownField = 'kg';   // 'kg' | 'bmi'
 
 function healthyBmiIsTyped() {
@@ -174,88 +117,72 @@ function weeklyLossPctIsTyped() {
   return weeklyLossKnownField === 'pct';
 }
 
-function currentPinMode() {
-  return document.querySelector('input[name="formula-pin-mode"]:checked').value;
+function checkedRadioValue(name) {
+  return document.querySelector(`input[name="${name}"]:checked`).value;
 }
 
-// Which REAL equation (mifflin/katch) is underneath, whichever radio in
-// formula-bmr-formula is actually checked — including while "BMR_cal" is checked there,
-// since that radio doesn't replace the equation, it layers the calibrated offset on top of
-// whichever one was already active. Updated by the mifflin/katch change handler
-// (health-tune.js) each time one of them is explicitly picked; read as the fallback
-// whenever the checked radio is 'bmr_cal'.
+function currentPinMode() {
+  return checkedRadioValue('formula-pin-mode');
+}
+
+// The equation (mifflin/katch) under a BMR_cal/adp/avg pick, which layers on it.
 let lastExplicitBmrFormula = 'mifflin';
 
-// The BMR fieldset's three basis options: each layers on the active equation rather
-// than replacing it.
 const BMR_BASIS_RADIO_VALUES = ['bmr_cal', 'bmr_adp', 'bmr_avg'];
 
-// Which BMR equation the preview is running. Both are first-class: this is read into the
-// settings overlay so calorieDesiredDetail and activityDesiredKcal see it, and passed
-// explicitly to maintenanceAffineCoefficients, which is called outside the overlay. Never
-// 'bmr_cal' itself — see lastExplicitBmrFormula above.
+// The equation the preview runs on; never a basis value.
 function currentBmrFormula() {
-  const checked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+  const checked = checkedRadioValue('formula-bmr-formula');
   return BMR_BASIS_RADIO_VALUES.includes(checked) ? lastExplicitBmrFormula : checked;
 }
 
-// Which basis (applyBmrBasis, health-math.js) every deficit and desired calorie figure
-// in the app runs on: BMR_cal / BMR_adp / BMR_avg, or plain ('bmr') under Mifflin or Katch.
+// The basis (applyBmrBasis, health-math.js): a layered pick, or plain 'bmr'.
 function currentBmrBasis() {
-  const checked = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
+  const checked = checkedRadioValue('formula-bmr-formula');
   return BMR_BASIS_RADIO_VALUES.includes(checked) ? checked : 'bmr';
 }
 
-// The mass every identity on this sheet is evaluated at — the smoothed box, never the raw
-// body-mass reading above it. One accessor rather than a dozen getElementById calls so there is
-// exactly one place that decides which of the two rows the formulas read.
+// m̄, the mass every identity here runs at (not the raw reading).
 function formulaBodyMassKg() {
   return formulaNumber('formula-body-mass-smooth');
 }
 
-// The percentage in play this render: the typed one wherever the percentage is what's held,
-// otherwise the one the kilograms imply. Every consumer goes through this — the box, the
-// trace and the journey the day count is measured along — so the three can't quote
-// different rates, and none of them reads a box a keystroke behind the kilograms.
+// Δm% this render: typed when held, else implied by the kilograms. The box, trace and
+// journey all read it, so they can't disagree.
 function weeklyLossPctInPlay(weeklyLossKg, bodyMassKg) {
   return weeklyLossPctIsTyped()
     ? formulaNumber('formula-weekly-loss-pct')
     : weeklyFatLossPct(weeklyLossKg, bodyMassKg);
 }
 
-// The selected radio's own field is always computed, plus exactly one of
-// {Eᵢₙ, t} — never both, never neither — for whichever this mode's OTHER
-// field is (dualKnownField picks it for TAU/DELTA_M; EIN and HEALTHY_MASS have
-// no choice to make, see FORMULA_COMPUTED_IDS above).
+// TAU and DELTA_M's own computed boxes.
+const FORMULA_DUAL_OWN_IDS = {
+  TAU: ['formula-activity-min'],
+  DELTA_M: ['formula-weekly-loss', 'formula-weekly-loss-pct'],
+};
+
+function isDualSolveMode(mode) {
+  return mode === 'TAU' || mode === 'DELTA_M';
+}
+
+// The mode's own field, plus exactly one of Eᵢₙ or t.
 function computedIdsForMode(mode) {
-  if (mode === 'TAU') {
-    return dualKnownField.TAU === 'ein'
-      ? ['formula-activity-min', 'formula-days', 'formula-eta']
-      : ['formula-activity-min', 'formula-ein'];
-  }
-  if (mode === 'DELTA_M') {
-    return dualKnownField.DELTA_M === 'ein'
-      ? ['formula-weekly-loss', 'formula-weekly-loss-pct', 'formula-days', 'formula-eta']
-      : ['formula-weekly-loss', 'formula-weekly-loss-pct', 'formula-ein'];
-  }
-  return FORMULA_COMPUTED_IDS[mode];
+  if (!isDualSolveMode(mode)) return FORMULA_COMPUTED_IDS[mode];
+  const other = dualKnownField[mode] === 'ein' ? ['formula-days', 'formula-eta'] : ['formula-ein'];
+  return [...FORMULA_DUAL_OWN_IDS[mode], ...other];
 }
 
 function currentSolveFor() {
-  return document.querySelector('input[name="formula-solve-for"]:checked').value;
+  return checkedRadioValue('formula-solve-for');
 }
 
-// Eᵢₙ, t, and its date box: in TAU and DELTA_M, whichever of these isn't
-// currently driving the solve is still the one you'd click into to switch
-// which one does — so it can't be truly readonly there, unlike everywhere
-// else a field is "computed". It's marked with this class instead, which
-// marks it as computed without blocking interaction (it looks like every
-// other box).
+// In TAU/DELTA_M these stay editable even when computed (typing one makes it the
+// known), so they get a class instead of readonly.
 const FORMULA_DUAL_FIELD_IDS = ['formula-ein', 'formula-days', 'formula-eta'];
 
 function applySolveForMode(mode) {
   const computed = new Set(computedIdsForMode(mode));
-  const isDualMode = mode === 'TAU' || mode === 'DELTA_M';
+  const isDualMode = isDualSolveMode(mode);
   FORMULA_TOGGLE_IDS.forEach((id) => {
     const el = document.getElementById(id);
     if (isDualMode && FORMULA_DUAL_FIELD_IDS.includes(id)) {
@@ -268,10 +195,8 @@ function applySolveForMode(mode) {
   });
 }
 
-// Shown in Tune's collapsed "Equations" dropdown (initFormulaPlayground), and sent
-// verbatim to the AI by formatPlanInsightPrompt (health-insight-plan.js), so both read the
-// one definition of the model. The four-space indent sets each formula off from its
-// heading.
+// Tune's Equations list, also sent verbatim to the AI (health-insight-plan.js).
+// Indented lines are formulas; the rest are headings.
 const FORMULA_EXPRESSION = `Smoothing the scale — daily weight carries water and glycogen, m(t) means clean mass. Ending yesterday: today's own reading, if any, is still excluded
     m̄     =  (1/L_p) × Σ m(t−i),  i = 1…L_p
 The healthy body mass as a BMI — ${BMI_HEALTHY_MIN}–${BMI_HEALTHY_MAX} healthy band
@@ -352,19 +277,16 @@ Carb band — both ends a share of intake, 45-65% AMDR
     C_max =  (q_max/100 × TEI) / 4`;
 
 function currentLbmFormula() {
-  return document.querySelector('input[name="formula-lbm-formula"]:checked').value;
+  return checkedRadioValue('formula-lbm-formula');
 }
 
+// `value` is for fields whose source isn't a Settings key (MET).
 function formulaFieldValue(field) {
-  // `value` skips Settings entirely — for fields (like Activity Intensity) whose
-  // real source is somewhere else on the sheet, not a Settings key.
   if (field.value) return field.value();
   return getSetting(field.key, null) ?? field.fallback();
 }
 
-// Runs fn with `currentSettings` overlaid by the Tune's edits, so the
-// preview goes through the real calorieDesiredDetail/metKcal path instead of a
-// second copy of the arithmetic that could disagree with it.
+// Runs fn with Tune's edits laid over `currentSettings`, so the preview uses the real functions.
 function withFormulaOverrides(overrides, fn) {
   const saved = currentSettings;
   currentSettings = { ...currentSettings, ...overrides };
@@ -391,17 +313,13 @@ function tuneBmrCalibration() {
   return { periodCount: n, periodDays: d, result: bmrCalibrationForWindow(n, d) };
 }
 
-// Writes a computed answer into a box, masked like every other derived figure
-// when privacy mode is on. Never used for a box the user is currently typing
-// into — only for whichever field the current mode just solved.
+// Writes a computed answer into a box, masked in privacy mode. Never for a typed box.
 function setComputedField(inputId, text) {
   document.getElementById(inputId).value = privacyMode ? maskDigits(text) : text;
 }
 
-// A BIRTH_DATE that reads back as exactly `age` whole years, so the preview can
-// drive the real ageFromBirthDate path instead of a second copy of the formula
-// that takes an age directly. Feb 29 is clamped to the 28th, which is the one
-// date where subtracting years would roll into March and lose a year.
+// A BIRTH_DATE exactly `age` years ago, so the preview runs ageFromBirthDate.
+// Feb 29 becomes the 28th so it can't roll into March.
 function birthDateForAge(age) {
   const today = new Date();
   const month = today.getMonth();
@@ -409,40 +327,22 @@ function birthDateForAge(age) {
   return isoFromDate(new Date(today.getFullYear() - age, month, day));
 }
 
-// today + days, as the exact ISO date an <input type="date"> box needs — the
-// inverse of daysFromTodayIso below. setDate rather than raw ms arithmetic, so
-// this can't land on the wrong side of a DST change.
+// Today + days as an ISO date; setDate so DST can't shift it.
 function isoDateFromDays(days) {
   const eta = new Date();
   eta.setDate(eta.getDate() + Math.round(days));
   return isoFromDate(eta);
 }
 
-// The inverse: how many days from today a typed/picked date is. Both ends go
-// through parseIsoDateUTC (UTC midnight, not local) rather than subtracting
-// two `Date` objects directly — a local-time subtraction is off by one on the
-// two days a year local midnight isn't exactly 24h away from the next one.
+// Days from today to a date, in UTC so DST can't make it off by one.
 function daysFromTodayIso(dateIso) {
   return Math.round((parseIsoDateUTC(dateIso) - parseIsoDateUTC(isoFromDate(new Date()))) / 86400000);
 }
 
-// Every box maps to a Settings key except current body mass, which is a Physique
-// measurement — it belongs here because both terms of the formula scale with it,
-// but there is no setting to write it to. Eᵢₙ and t are never settings-backed in
-// any mode (see the module comment) so they're read separately from
-// FORMULA_FIELDS and never enter `overrides`.
-//
-// `preview` always carries the typed age as a BIRTH_DATE so the calculation runs
-// through the real ageFromBirthDate path; `overrides` (what Save writes) only
-// includes BIRTH_DATE when the typed age actually differs from the stored date's,
-// so saving an untouched age can't replace a real birth date with a synthetic one
-// that merely happens to yield the same number of years.
-//
-// FORMULA_FIELDS is read unconditionally regardless of mode: whichever one of the
-// five is this mode's computed field still holds a valid, freshly-solved number
-// by the time this runs (renderFormulaPreview always writes it back before
-// returning), so there's nothing to skip — and Save relies on that to persist
-// the solved value along with everything else.
+// Reads every box. `overrides` is what Save writes; `preview` is the overlay the render
+// runs under. FORMULA_FIELDS is read in every mode: the computed one already holds its
+// solved value, which Save persists. BIRTH_DATE is only saved when the typed age differs
+// from the stored one, so a real date isn't swapped for a synthetic one.
 function readFormulaInputs() {
   const mode = currentSolveFor();
   const overrides = {};
@@ -460,8 +360,7 @@ function readFormulaInputs() {
   const formula = currentBmrFormula();
   if (bodyMassKg === null) invalid.push('m̄ (smoothed body mass)');
   if (heightCm === null) invalid.push('HEIGHT_CM');
-  // Age is a Mifflin input only — Katch-McArdle reads lean mass instead — so on that
-  // equation a blank age isn't missing, it's simply not part of the model.
+  // Only Mifflin uses age.
   if (age === null && bmrNeedsAge(formula)) invalid.push('BIRTH_DATE (age)');
 
   if (heightCm !== null) overrides.HEIGHT_CM = heightCm;
@@ -470,11 +369,7 @@ function readFormulaInputs() {
   overrides[BMR_BASIS_KEY] = currentBmrBasis();
   overrides[LBM_FORMULA_KEY] = currentLbmFormula();
 
-  // The Δm box is the preview's only source of truth for the rate, so the pin key is
-  // blanked out of the overlay: a WEEKLY_FAT_LOSS_PCT already on the sheet would otherwise
-  // make calorieDesiredDetail recompute the rate from the saved percentage and ignore what's
-  // typed here. Not blanked in `overrides` — what Save writes to that key is the pin
-  // fieldset's decision, not this function's.
+  // The Δm box drives the preview, so a saved % pin is blanked from the overlay only.
   const preview = { ...overrides, [WEEKLY_FAT_LOSS_PCT_PIN_KEY]: '' };
   if (age !== null) {
     preview.BIRTH_DATE = birthDateForAge(age);
@@ -483,8 +378,7 @@ function readFormulaInputs() {
     }
   }
 
-  // Blank exactly when the current mode is about to compute it — not invalid,
-  // just not typed yet.
+  // A box this mode computes isn't missing when blank.
   const computed = computedIdsForMode(mode);
   const einIsTyped = !computed.includes('formula-ein');
   const daysIsTyped = !computed.includes('formula-days');
@@ -495,10 +389,7 @@ function readFormulaInputs() {
   const days = daysIsTyped ? formulaNumber('formula-days') : null;
   if (daysIsTyped && days === null) invalid.push('t (days)');
 
-  // FIXED_PCT is the only mode where the percentage is an INPUT, so it's the only one where
-  // a blank one is missing rather than merely not derived yet. Δm is reported blank by the
-  // loop above in every mode, but there it's the box you'd fill; here it's the one that
-  // can't be filled by hand, so naming the percentage is what points at the right box.
+  // Only FIXED_PCT types the %, so only there is a blank one missing.
   if (mode === 'FIXED_PCT' && formulaNumber('formula-weekly-loss-pct') === null) {
     invalid.push('Δm% (weekly fat loss, % of body mass)');
   }

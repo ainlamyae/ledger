@@ -6,16 +6,19 @@
 //   1. Timing         springs and curves
 //   2. Stylesheet     transitions, keyframes, view transitions
 //   3. Page loads     down, up or sideways between pages
-//   4. Forms          opening is down, closing up
-//   5. Toast
-//   6. Pages          hub, page and view (router.js): down, up or sideways
-//   7. Feedback       busy icons, panel entry, confetti, warning
+//   4. Moving content shared by forms and pages
+//   5. Forms          opening is down, closing up
+//   6. Toast
+//   7. Pages          hub, page and view (router.js): down, up or sideways
+//   8. Feedback       busy icons, panel entry, confetti, warning
 //
 // Two motions only: down/up a level (by the breadcrumb) and sideways on the
 // same level. Only content moves; the background, bars and breadcrumb stay still.
 
 (function () {
   'use strict';
+
+  const html = document.documentElement;
 
   // ── 1. Timing ─────────────────────────────────────────────────────────────
 
@@ -36,18 +39,42 @@
     return { duration: Math.round(end * 1000), easing: `linear(${points.join(', ')}, 1)` };
   }
 
-  const POP = spring(0.38, 0.28); // toast
-  // Every move (down, up, sideways): one even timing, slow enough to watch.
-  const SWIPE = { duration: 1500, easing: 'cubic-bezier(.45, 0, .2, 1)' };
-
-  // Curves for CSS transitions (micro-interactions).
   const EASE = 'cubic-bezier(.2, .8, .2, 1)'; // quick start, soft settle
   const EASE_BOUNCE = 'cubic-bezier(.3, 1.3, .5, 1)'; // springs back past rest
+  const EASE_AWAY = 'cubic-bezier(.4, 0, 1, 1)'; // speeds up as it leaves
+
+  // Every move (down, up, sideways): what leaves accelerates away and is gone first,
+  // so what arrives (slowing as it lands) never overlaps its content.
+  const SWIPE_IN = { duration: 550, easing: EASE };
+  const SWIPE_OUT = { duration: 350, easing: EASE_AWAY };
+  // Sideways crosses the screen's width, so on a wide screen it gets up to 30% longer
+  // to look as fast as down and up; never shorter.
+  const SIDEWAYS_MAX_SCALE = 1.3;
+  const moveScale = (move) => (move === 'sideways'
+    ? Math.min(SIDEWAYS_MAX_SCALE, Math.max(1, Math.sqrt(innerWidth / innerHeight)))
+    : 1);
+  const swipe = (timing, move) => ({ ...timing, duration: Math.round(timing.duration * moveScale(move)) });
+
+  const POP = spring(0.38, 0.28); // toast in
+  const SINK = { duration: 260, easing: EASE_AWAY }; // toast out
+
   // Same-rank sections, left to right: the nav's order, Other (account menu) last.
   // Listed here because a section page has no nav yet when it's revealed.
   const SECTION_ORDER = ['health', 'finance', 'track', 'other'];
 
   // ── 2. Stylesheet ─────────────────────────────────────────────────────────
+
+  // Held still while the page moves: [selector, view-transition name].
+  const HELD = [
+    ['#app-backdrop', 'app-backdrop'],
+    ['header h1', 'app-logo'], // the logo row on a wide screen, with the sidebar's toggle
+    ['.nav', 'app-nav'],
+    ['.side-nav', 'app-side-nav'],
+    ['.header-actions', 'app-account'],
+    ['.page-crumb', 'app-crumb'],
+    ['.action-bar', 'app-action-bar'],
+    ['.site-footer', 'app-footer'],
+  ];
 
   const CSS = `
 :root {
@@ -114,6 +141,11 @@ html.section-pages .panel.page-active:hover {
 .btn.btn-icon.icon-settle, .btn.row-action-btn.icon-settle {
   animation: icon-busy-settle .4s cubic-bezier(.34, 1.56, .64, 1);
 }
+/* In front of its neighbours while enlarged. */
+.btn.btn-icon:is(.icon-busy, .icon-settle), .btn.row-action-btn:is(.icon-busy, .icon-settle) {
+  position: relative;
+  z-index: 5;
+}
 @keyframes icon-busy-grow { from { transform: scale(1); } to { transform: scale(1.4); } }
 @keyframes icon-busy-pulse { 0%, 100% { transform: scale(1.4); } 50% { transform: scale(1.5); } }
 @keyframes icon-busy-settle {
@@ -150,21 +182,12 @@ html.section-pages .panel.page-active:hover {
 }
 
 /* Page loads, by html[data-move] (set below): down, up or sideways (--move-side
-   1 to the right, -1 to the left). The background, logo row (with the sidebar's toggle), sidebar,
-   bars, account, breadcrumb and footer are named out and held still. */
+   1 to the right, -1 to the left). The HELD parts are named out and stay still. */
 @view-transition { navigation: auto; }
-#app-backdrop { view-transition-name: app-backdrop; }
-.nav { view-transition-name: app-nav; }
-.side-nav { view-transition-name: app-side-nav; }
-.header-actions { view-transition-name: app-account; }
-.page-crumb { view-transition-name: app-crumb; }
-.action-bar { view-transition-name: app-action-bar; }
-.site-footer { view-transition-name: app-footer; }
-/* The logo row on a wide screen: logo, name and the sidebar's toggle. */
-header h1 { view-transition-name: app-logo; }
-${['app-backdrop', 'app-nav', 'app-side-nav', 'app-account', 'app-crumb', 'app-action-bar', 'app-footer', 'app-logo'].map((n) => `
-::view-transition-group(${n}) { animation: none; }
-::view-transition-old(${n}), ::view-transition-new(${n}) { animation: none; mix-blend-mode: normal; }`).join('')}
+${HELD.map(([selector, name]) => `
+${selector} { view-transition-name: ${name}; }
+::view-transition-group(${name}) { animation: none; }
+::view-transition-old(${name}), ::view-transition-new(${name}) { animation: none; mix-blend-mode: normal; }`).join('')}
 /* The background never moves. What moves is the page's content alone (body, named
    app-page while moving, see-through), never the whole page: a whole-page image
    carries the canvas colour with it. Both pages are marked while moving (the
@@ -181,13 +204,14 @@ html:is([data-move], [data-move-out]) body::before { visibility: hidden; }
 /* The arriving page's own held parts and background stay hidden while it moves in,
    so they never ride along (a section page builds them after the move has begun);
    the leaving page's, held still, show until it lands. */
-html[data-move] :is(#app-backdrop, header h1, .nav, .side-nav, .header-actions, .page-crumb, .action-bar, .site-footer) { visibility: hidden; }
+html[data-move] :is(${HELD.map(([selector]) => selector).join(', ')}) { visibility: hidden; }
 ::view-transition-old(app-page), ::view-transition-new(app-page) {
-  animation-duration: ${SWIPE.duration}ms;
-  animation-timing-function: ${SWIPE.easing};
   animation-fill-mode: both;
   mix-blend-mode: normal;
 }
+/* --move-scale lengthens a sideways move on a wide screen (moveScale). */
+::view-transition-old(app-page) { animation-duration: calc(${SWIPE_OUT.duration}ms * var(--move-scale, 1)); animation-timing-function: ${SWIPE_OUT.easing}; }
+::view-transition-new(app-page) { animation-duration: calc(${SWIPE_IN.duration}ms * var(--move-scale, 1)); animation-timing-function: ${SWIPE_IN.easing}; }
 html[data-move="down"]::view-transition-old(app-page) { animation-name: down-out; }
 html[data-move="down"]::view-transition-new(app-page) { animation-name: down-in; }
 html[data-move="up"]::view-transition-old(app-page) { animation-name: up-out; z-index: 1; }
@@ -218,6 +242,9 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
   // way it came. No Navigation API needed, so Safari moves too.
 
   const FROM_KEY = 'ledger_motion_from';
+  const FROM_MAX_AGE_MS = 10000; // an older note is a stale visit, not this load's origin
+  const MOVE_WAIT_MAX_MS = 3000; // longest a building page holds both pages still
+  const MOVE_CLEAR_FAILSAFE_MS = SWIPE_IN.duration * SIDEWAYS_MAX_SCALE + 4000;
 
   // Address parts under the app root: ['health', 'physique'], [] for home.
   function addressParts(url) {
@@ -246,7 +273,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     try {
       const note = JSON.parse(sessionStorage.getItem(FROM_KEY) || 'null');
       sessionStorage.removeItem(FROM_KEY);
-      if (!note || Date.now() - note.at > 10000 || note.url === location.href) return null;
+      if (!note || Date.now() - note.at > FROM_MAX_AGE_MS || note.url === location.href) return null;
       return note;
     } catch {
       return null;
@@ -263,23 +290,25 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
   let built = false;
   let viewMoving = false; // a page transition is carrying this load
 
+  const MOVE_PROPS = ['--move-side', '--move-old-y', '--move-scale'];
+
   function markMove(m) {
-    document.documentElement.dataset.move = m.move;
-    document.documentElement.style.setProperty('--move-side', m.side);
-    document.documentElement.style.setProperty('--move-old-y', leftAtY);
+    html.dataset.move = m.move;
+    html.style.setProperty('--move-side', m.side);
+    html.style.setProperty('--move-old-y', leftAtY);
+    html.style.setProperty('--move-scale', moveScale(m.move));
   }
 
   function clearMove() {
-    delete document.documentElement.dataset.move;
-    delete document.documentElement.dataset.moveWait;
-    document.documentElement.style.removeProperty('--move-side');
-    document.documentElement.style.removeProperty('--move-old-y');
+    delete html.dataset.move;
+    delete html.dataset.moveWait;
+    MOVE_PROPS.forEach((prop) => html.style.removeProperty(prop));
   }
 
   // Only where a page transition will read it; cleared when it ends (failsafe).
-  if (loadMove && revealed === false) {
+  if (loadMove && !revealed) {
     markMove(loadMove);
-    setTimeout(clearMove, SWIPE.duration + 4000);
+    setTimeout(clearMove, MOVE_CLEAR_FAILSAFE_MS);
   }
 
   // The transition moves old and new together; a page still building holds
@@ -304,8 +333,8 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
       viewMoving = true;
       pendingMove = null;
       if (isSectionPage && !built) {
-        document.documentElement.dataset.moveWait = '';
-        setTimeout(() => delete document.documentElement.dataset.moveWait, 3000);
+        html.dataset.moveWait = '';
+        setTimeout(() => delete html.dataset.moveWait, MOVE_WAIT_MAX_MS);
       }
       vt.finished.then(clearMove, clearMove);
     }
@@ -315,7 +344,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
   // Called by section-page.js once the page is built.
   function enterPage() {
     built = true;
-    delete document.documentElement.dataset.moveWait;
+    delete html.dataset.moveWait;
     if (revealed) moveBuiltPage();
   }
 
@@ -327,20 +356,28 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     if (screen) moveIn(screen.matches('.modal') ? screen.querySelector('.modal-card') || screen : screen, m.move, m.side);
   }
 
-  // ── Shared helpers ────────────────────────────────────────────────────────
+  // ── 4. Moving content ─────────────────────────────────────────────────────
+  // Down a level the new screen rises from the bottom as the old one goes off the
+  // top; up a level the reverse. Sideways, the new one sweeps in from the right
+  // (going on) or the left (going back), the old one out the other side. Only
+  // cards and fields move: the breadcrumb, bars and background stay put, on top.
 
   function currentSection() {
     return window.ledgerSectionPage && typeof routedSectionId === 'function' ? document.getElementById(routedSectionId(null)) : null;
   }
 
-  const removeOnFinish = (anim, el) => { const done = () => el.remove(); anim.finished.then(done, done); };
+  const whenDone = (anim, fn) => anim.finished.then(fn, fn);
+  const removeOnFinish = (anim, el) => whenDone(anim, () => el.remove());
 
-  // ── The two motions, by the breadcrumb: down a level the new screen rises
-  // from the bottom as the old one goes off the top; up a level the reverse.
-  // On the same level, sideways: the new one sweeps in from the right (going on
-  // in the order) or the left (going back), the old one out the other side.
-  // Only cards and fields move: the breadcrumb, the bars and the background stay
-  // put, and on top.
+  // A copy of el for an exit animation: no ids to clash with the live one, unfocusable.
+  function inertCopy(el) {
+    const copy = el.cloneNode(true);
+    copy.removeAttribute('id');
+    copy.querySelectorAll('[id]').forEach((child) => child.removeAttribute('id'));
+    copy.inert = true;
+    copy.setAttribute('aria-hidden', 'true');
+    return copy;
+  }
 
   const STILL = '.page-crumb, .action-bar';
   const GHOST_Z = '5'; // over the page, under the breadcrumb (8) and the bars (9+)
@@ -381,13 +418,12 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
       const base = parseFloat(cs[prop]) || 0;
       const wasStatic = cs.position === 'static';
       if (wasStatic) root.style.position = 'relative';
-      const anim = root.animate([{ [prop]: `${base + d}px` }, { [prop]: `${base}px` }], SWIPE);
-      const done = () => { if (wasStatic) root.style.position = ''; };
-      anim.finished.then(done, done);
+      const anim = root.animate([{ [prop]: `${base + d}px` }, { [prop]: `${base}px` }], swipe(SWIPE_IN, move));
+      whenDone(anim, () => { if (wasStatic) root.style.position = ''; });
       return;
     }
     const frames = [{ transform: `translate${axis}(${d}px)` }, { transform: 'none' }];
-    movers(root).forEach((el) => el.animate(frames, SWIPE));
+    movers(root).forEach((el) => el.animate(frames, swipe(SWIPE_IN, move)));
   }
 
   // The old screen's copy out: down, off the top under the new one; up, off the
@@ -398,7 +434,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     const to = move === 'down' ? `translateY(${-innerHeight}px)`
       : move === 'up' ? `translateY(${innerHeight}px)`
         : `translateX(${-side * innerWidth}px)`;
-    const anim = snap.wrap.animate([{ transform: 'none' }, { transform: to }], { ...SWIPE, fill: 'forwards' });
+    const anim = snap.wrap.animate([{ transform: 'none' }, { transform: to }], { ...swipe(SWIPE_OUT, move), fill: 'forwards' });
     removeOnFinish(anim, snap.wrap);
     return anim;
   }
@@ -440,7 +476,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     wrap.setAttribute('aria-hidden', 'true');
     Object.assign(wrap.style, {
       position: 'fixed', left: `${r.left}px`, top: '0', width: `${r.width}px`, height: `${innerHeight}px`,
-      overflow: 'hidden', pointerEvents: 'none', zIndex: '5',
+      overflow: 'hidden', pointerEvents: 'none', zIndex: GHOST_Z,
     });
     const inner = wrap.appendChild(document.createElement('div'));
     Object.assign(inner.style, { display: cs.display, flexDirection: cs.flexDirection, gap: cs.gap, transform: `translateY(${r.top}px)` });
@@ -452,10 +488,10 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
         try { c.width = from[i].width; c.height = from[i].height; c.getContext('2d').drawImage(from[i], 0, 0); } catch { /* blank is fine */ }
       });
     });
-    return { wrap, top: 0 };
+    return { wrap };
   }
 
-  // ── 4. Forms and dialogs ──────────────────────────────────────────────────
+  // ── 5. Forms and dialogs ──────────────────────────────────────────────────
 
   const ghosts = new Map(); // modal -> its closing copy
 
@@ -477,7 +513,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     if (modal.classList.contains('form-page') && behind) moveOut(behind, 'down');
     else {
       behind?.wrap.remove();
-      fadeBackdrop(modal, true, SWIPE);
+      fadeBackdrop(modal, true, SWIPE_IN);
     }
     moveIn(card, 'down');
   }
@@ -488,13 +524,9 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     const r = card && card.getBoundingClientRect();
     if (!r?.width || !r.height) return null;
     const cs = getComputedStyle(card);
-    const ghost = card.cloneNode(true);
-    ghost.removeAttribute('id');
-    ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+    const ghost = inertCopy(card);
     hideLikeLive(ghost, card);
     hideStill(ghost, card);
-    ghost.inert = true;
-    ghost.setAttribute('aria-hidden', 'true');
     const page = modal.classList.contains('form-page');
     Object.assign(ghost.style, {
       position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`,
@@ -530,7 +562,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
   function closeCard(modal, g) {
     if (ghosts.get(modal) !== g) return;
     g.started = true;
-    if (g.backdrop) fadeBackdrop(g.backdrop, false, SWIPE);
+    if (g.backdrop) fadeBackdrop(g.backdrop, false, SWIPE_OUT);
     const screen = g.page && currentScreen();
     if (screen) {
       const root = screen.matches('.modal') ? screen.querySelector('.modal-card') : screen;
@@ -538,9 +570,8 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
       moveIn(root, 'up');
     }
     const anim = g.ghost.animate([{ transform: 'none' }, { transform: `translateY(${innerHeight - Math.max(g.top, 0)}px)` }],
-      { ...SWIPE, fill: 'forwards' });
-    const done = () => { if (ghosts.get(modal) === g) dropGhost(modal); };
-    anim.finished.then(done, done);
+      { ...SWIPE_OUT, fill: 'forwards' });
+    whenDone(anim, () => { if (ghosts.get(modal) === g) dropGhost(modal); });
   }
 
   function beforeOpen(modal) {
@@ -562,7 +593,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     return () => closeCard(modal, g);
   }
 
-  // ── 5. Toast: springs up from the bottom, sinks away ──────────────────────
+  // ── 6. Toast: springs up from the bottom, sinks away ──────────────────────
 
   function beforeToast(toast, show) {
     if (show) {
@@ -573,17 +604,14 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
       ], POP);
     }
     if (!toast.getBoundingClientRect().width) return null;
-    const ghost = toast.cloneNode(true);
-    ghost.removeAttribute('id');
-    ghost.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
-    ghost.inert = true;
+    const ghost = inertCopy(toast);
     ghost.hidden = false;
     Object.assign(ghost.style, { pointerEvents: 'none', bottom: getComputedStyle(toast).bottom });
     document.body.appendChild(ghost);
     return () => removeOnFinish(ghost.animate([
       { transform: 'translate(-50%, 0) scale(1)', opacity: 1 },
       { transform: 'translate(-50%, 60%) scale(.94)', opacity: 0 },
-    ], { duration: 260, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' }), ghost);
+    ], { ...SINK, fill: 'forwards' }), ghost);
   }
 
   // Every open and close goes through each modal's (and the toast's) `hidden`,
@@ -611,7 +639,7 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     document.querySelectorAll('.toast').forEach((toast) => hook(toast, (t, value) => beforeToast(t, !value), () => {}));
   }
 
-  // ── 6. Pages ──────────────────────────────────────────────────────────────
+  // ── 7. Pages ──────────────────────────────────────────────────────────────
   // Hub, page and view, by the breadcrumb: hub → page and page → view are down,
   // the reverse up; two pages, or two views, on the same level go sideways in
   // their order on screen.
@@ -626,16 +654,17 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
     return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1;
   }
 
+  // From a to b on one level (null is the level above): down into it, up out of it, or sideways.
+  function levelMove(a, b) {
+    if (!a) return { move: 'down', side: 1 };
+    if (!b) return { move: 'up', side: 1 };
+    return { move: 'sideways', side: sideOf(a, b) };
+  }
+
   function pageMove(from, to) {
-    if (from.panel !== to.panel) {
-      if (!from.panel) return { move: 'down', side: 1 };
-      if (!to.panel) return { move: 'up', side: 1 };
-      return { move: 'sideways', side: sideOf(from.panel, to.panel) };
-    }
+    if (from.panel !== to.panel) return levelMove(from.panel, to.panel);
     if (from.view === to.view) return null;
-    if (!from.view) return { move: 'down', side: 1 };
-    if (!to.view) return { move: 'up', side: 1 };
-    return { move: 'sideways', side: sideOf(from.view, to.view) };
+    return levelMove(from.view, to.view);
   }
 
   // Before the router swaps pages (or a view opens): what to move from.
@@ -672,15 +701,14 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
         const anim = moveOut(m.snap, m.move, m.side);
         moveIn(section, m.move, m.side);
         pageGhost = m.snap;
-        const done = () => { if (pageGhost === m.snap) pageGhost = null; };
-        anim.finished.then(done, done);
+        whenDone(anim, () => { if (pageGhost === m.snap) pageGhost = null; });
       } catch {
         m.snap?.wrap.remove();
       }
     });
   }
 
-  // ── 7. Feedback ───────────────────────────────────────────────────────────
+  // ── 8. Feedback ───────────────────────────────────────────────────────────
 
   // Restarts a one-shot animation class on el and clears it when it ends.
   function playClass(el, name) {
@@ -825,10 +853,10 @@ html[data-move-wait]::view-transition-old(app-page), html[data-move-wait]::view-
   window.addEventListener('pagehide', noteLeaving);
   // Leaving with a page transition: see-through before it's captured.
   window.addEventListener('pageswap', (event) => {
-    if (event.viewTransition) document.documentElement.dataset.moveOut = '';
+    if (event.viewTransition) html.dataset.moveOut = '';
   });
   // Back from the back/forward cache: no longer leaving.
-  window.addEventListener('pageshow', () => delete document.documentElement.dataset.moveOut);
+  window.addEventListener('pageshow', () => delete html.dataset.moveOut);
   document.addEventListener('click', (event) => {
     const link = event.target.closest?.('a[href]');
     if (link && link.origin === location.origin) noteLeaving();

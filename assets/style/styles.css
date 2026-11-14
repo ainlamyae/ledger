@@ -9,9 +9,8 @@
     display: none !important;
 }
 
-/* Every field's look, written once: forms, filters, Export, Insight's question, the
-   clock's location box and Tune all start from this. :where() keeps it at zero
-   specificity, so each group's own rule (width, height, Tune's padding) still wins. */
+/* Every field's base look; :where() keeps it at zero specificity so each group's
+   own rule still wins. */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
     max-width: 100%;
     font: inherit;
@@ -52,46 +51,42 @@ textarea {
     --color-error-bg: #fef2f2;
     --radius-md: 8px;
     --radius-lg: 16px;
-    --shadow-card: 0 1px 3px rgba(0,0,0,.08);
-    --shadow-dropdown: 0 4px 16px rgba(0,0,0,.15);
-    /* The lift on a hovered tile or panel — darker than a dropdown's, so the
-       raised block reads clearly against the page. */
-    --shadow-hover: 0 6px 20px rgba(0,0,0,.32);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, .08);
+    --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, .15);
+    /* A hovered tile or panel's lift, darker than a dropdown's. */
+    --shadow-hover: 0 6px 20px rgba(0, 0, 0, .32);
     --input-font-size: 15px;
-    /* The six spacing steps — every margin, padding and gap uses one of these,
-       each visibly different from the next (about 3.5px apart or more). */
+    /* The six spacing steps every margin, padding and gap uses. */
     --space-xs: .2rem;
     --space-s: .5rem;
     --space-m: .75rem;
     --space-l: 1rem;
     --space-xl: 1.5rem;
     --space-xxl: 2rem;
-    /* Both phone bottom bars, the tab bar and a page's action bar: one height. */
+    /* Both phone bottom bars (tab bar, action bar). */
     --bottom-bar-height: 3.75rem;
-    /* Their gap from the screen's edges, so all four rounded corners show. */
+    /* Their gap from the screen's sides, so the corners show. */
     --bottom-bar-inset: .4rem;
-    /* Their gap from the screen's bottom edge, a quarter less than the sides'. */
+    /* Their gap from the bottom edge. */
     --bottom-bar-bottom: .3rem;
-    /* Inside the bar: each end's margin (the ❌ at the right, the account circle at
-       the left), the gap between buttons, and the circle's size, so the account
-       circle sits as far from the first button as the buttons sit from each other. */
+    /* Inside the bar: end margin, button gap and the account circle's size, so the
+       circle sits as far from the first button as the buttons from each other. */
     --bottom-bar-edge: .64rem;
     --bottom-bar-gap: var(--space-s);
     --bottom-bar-circle: 42px;
     --bottom-bar-start: calc(var(--bottom-bar-edge) + var(--bottom-bar-circle) + var(--bottom-bar-gap));
-    /* The type scale: four sizes, every font-size in this file is one of them
-       (inputs aside: --input-font-size keeps iOS from zooming). */
+    /* The four-step type scale (inputs use --input-font-size). */
     --text-small: .8rem;
     --text-body: 13px;
     --text-title: 1.1rem;
     --text-display: 1.4rem;
-    /* Every card's own text (glance cards and widgets alike): 12px. */
+    /* Every card's own text. */
     --card-text-size: var(--text-small);
-    /* Chart colours: read by charts-base.js's chartColor when a chart is drawn. */
+    /* Chart colours, read by charts-base.js's chartColor. */
     --chart-good: var(--color-income);
     --chart-good-high: #166534;
     --chart-good-light: #4ade80;
-    /* Near desired: between Desired met's green and Short of desired's amber. */
+    /* Near desired: between met's green and short's amber. */
     --chart-near: #a3e635;
     --chart-bad: var(--color-danger);
     --chart-warn: #f59e0b;
@@ -102,16 +97,15 @@ textarea {
     --chart-cyan: #0891b2;
     --chart-indigo: #6366f1;
     --chart-point-border: var(--color-surface);
-    /* Generated category palettes (seriesColor): evenly spaced hues at these. */
+    /* Generated category palettes (seriesColor). */
     --chart-series-saturation: 65%;
     --chart-series-lightness: 55%;
     --chart-series-light: 62%;
     --chart-series-shade-step: 9%;
     --chart-ring-saturation: 45%;
     --chart-ring-lightness: 42%;
-    /* Glass (Apple's Liquid Glass): the floating layer only — header, bottom bars,
-       sidebar, menus, wide-screen modals. Content (cards, tiles, tables, charts,
-       inputs) stays solid on --color-surface so numbers stay readable. */
+    /* Glass for the floating layer only (header, bars, sidebar, menus, modals);
+       content stays solid so numbers stay readable. */
     --glass-bg: rgba(255, 255, 255, .55);
     --glass-bg-strong: rgba(255, 255, 255, .78);
     --glass-border: rgba(255, 255, 255, .65);
@@ -120,14 +114,13 @@ textarea {
     --glass-shadow: 0 8px 32px rgba(15, 23, 42, .12);
     --glass-text: var(--color-text);
     --glass-text-muted: var(--color-text-muted);
-    /* The page's two soft colour washes, for the glass to blur. */
+    /* The page's two colour washes, for the glass to blur. */
     --bg-wash-1: rgba(0, 122, 255, .10);
     --bg-wash-2: rgba(124, 58, 237, .08);
-}
-
-/* The space between fields side by side (From/To, a form's pairs); 16px on a phone. */
-:root {
+    /* The gap between paired fields (From/To); wider on a phone. */
     --field-pair-gap: var(--space-s);
+    /* The copyright strip's height. */
+    --phone-footer-height: 1.3rem;
 }
 
 /* iOS Safari zooms into any field under 16px on tap. */
@@ -161,8 +154,7 @@ textarea {
     --bg-wash-2: rgba(124, 58, 237, .14);
 }
 
-/* No blur available, or the device asks for less transparency (iOS's Reduce
-   Transparency): the glass turns solid. */
+/* No blur support, or Reduce Transparency: solid glass. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     :root {
         --glass-bg: var(--color-surface);
@@ -180,14 +172,13 @@ textarea {
     }
 }
 
-/* A section page before it has read its address (section-page.js): hidden, so it
-   never shows the whole section before the page asked for. */
+/* A section page before section-page.js has routed it. */
 html[data-routing] .container,
 html[data-routing] .site-footer {
     visibility: hidden;
 }
 
-/* A page's whole message when it can't run: no JavaScript, or a failed load. */
+/* The message shown when the page can't run. */
 .page-note {
     margin: var(--space-xxl);
 }
@@ -211,8 +202,7 @@ html {
     text-size-adjust: 100%;
 }
 
-/* Every heading one title size and the one bold; th/strong/b drop the browser's
-   700 to it too. Specific rules (.card h3's label size, the landing title) still win. */
+/* One heading size and one bold weight. */
 h1,
 h2,
 h3,
@@ -227,7 +217,7 @@ b {
     font-weight: 600;
 }
 
-/* The wash on its own still layer, never moved by page motion (motion.js). */
+/* The wash on its own layer, never moved by motion.js. */
 #app-backdrop {
     position: fixed;
     inset: 0;
@@ -245,8 +235,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    /* The phone's visible height (100vh is its tallest, address bar hidden), so a
-       short page fits without scrolling. */
+    /* The phone's visible height (100vh is its tallest); 100vh is the fallback. */
     min-height: 100dvh;
     overflow-x: hidden;
 }
@@ -274,8 +263,7 @@ header h1 {
     gap: var(--space-s);
 }
 
-/* The logo is the way back to the whole dashboard from a section page, so it's
-   a link — styled to look exactly like the plain heading it replaced. */
+/* The logo links home, styled as a plain heading. */
 .logo-link {
     display: flex;
     align-items: center;
@@ -290,8 +278,7 @@ header h1 {
     flex-shrink: 0;
 }
 
-/* Hides and shows the wide-screen sidebar (page-nav.js's initSideNavToggle);
-   below 1180px there's no sidebar to hide. */
+/* The wide-screen sidebar's toggle (page-nav.js); shown from 1180px. */
 .side-nav-toggle {
     display: none;
 }
@@ -311,8 +298,7 @@ header h1 {
     display: none;
 }
 
-/* The Ledger tab: only in the phone's bottom tab bar (below), where the header's
-   logo is gone; the logo is the way home everywhere else. */
+/* The Ledger tab: only in the phone's tab bar, where the logo is gone. */
 .nav .nav-home {
     display: none;
 }
@@ -340,8 +326,7 @@ header h1 {
     margin-left: auto;
 }
 
-/* In the account menu's info block, under the email and above Refresh — reads
-   like a third, muted line rather than a button. */
+/* A muted third line in the account menu's info block. */
 .last-updated {
     display: block;
     margin-top: var(--space-xs);
@@ -407,7 +392,7 @@ header .btn:hover {
 .account-menu-dropdown,
 .location-picker-dropdown {
     position: absolute;
-    top: calc(100% + .5rem);
+    top: calc(100% + var(--space-s));
     right: 0;
     background: var(--glass-bg-strong);
     -webkit-backdrop-filter: var(--glass-blur);
@@ -442,8 +427,7 @@ header .btn:hover {
     word-break: break-all;
 }
 
-/* The one exception to centred buttons: the account menu reads as a list, so its
-   items are left-aligned. */
+/* The account menu reads as a list: its items are left-aligned. */
 .account-menu-item {
     display: flex;
     width: 100%;
@@ -529,12 +513,12 @@ header .btn:hover {
     outline-offset: 2px;
 }
 
-/* Refresh data and Clear cache, above the switches: rows of the same height. */
+/* Refresh and Clear cache: the switch rows' height. */
 .settings-switches .account-menu-item {
     min-height: 34px;
 }
 
-/* In the account menu: between the name and email and the menu's buttons. */
+/* In the account menu, between the info block and the buttons. */
 .account-menu-dropdown .settings-switches {
     margin-bottom: var(--space-xs);
     padding-bottom: var(--space-xs);
@@ -552,10 +536,8 @@ header .btn:hover {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
-/* Three button sizes, the same at every screen width: 24px (row buttons in tables),
-   30px (every other button — the field height) and 42px (the phone's action bar
-   and the tiles, set in their own rules). Emoji buttons are square. Each kind
-   only picks its font; height and padding come from here. */
+/* Three button heights: 24px (table rows), 30px (here, the field height) and
+   42px (phone action bar, tiles). Emoji buttons are square. */
 .btn {
     font: inherit;
     font-size: var(--text-small);
@@ -578,17 +560,14 @@ header .btn:hover {
     cursor: not-allowed;
 }
 
-/* Mid-action (withButtonBusy, assets/script/ui-helpers.js) — a word-label
-   button's label already carries an ellipsis; this takes the clicks away so a
-   slow save can't be fired twice. An icon button grows instead (motion.js). */
+/* Mid-action (withButtonBusy, ui-helpers.js): no second click on a slow save. */
 .btn[aria-busy="true"] {
     opacity: .5;
     cursor: progress;
     pointer-events: none;
 }
 
-/* Colours for word buttons only: blue saves or logs, gray opens something, red
-   destroys. An emoji button is always the default white (below). */
+/* Word buttons only: blue saves, gray opens, red destroys. */
 .btn-primary {
     background: var(--color-primary);
     border-color: var(--color-primary);
@@ -599,10 +578,7 @@ header .btn:hover {
     background: var(--color-primary-hover);
 }
 
-/* Tune, Today, Transfer — each opens a modal/editor rather than committing a
-   change itself, so it reads as its own role rather than either the panel's
-   primary Add/Log action or a plain default button lost among Guide/Export
-   CSV/Advanced Filters. */
+/* Opens an editor (Tune, Today, Transfer) rather than committing a change. */
 .btn-secondary {
     background: var(--color-muted);
     border-color: var(--color-muted);
@@ -623,7 +599,7 @@ header .btn:hover {
     background: var(--color-danger-hover);
 }
 
-/* An emoji button is never coloured: the default white, whatever role class it gets. */
+/* An emoji button stays the default white whatever its role class. */
 .btn.btn-icon,
 .btn.row-action-btn,
 .btn.modal-close {
@@ -641,17 +617,13 @@ header .btn:hover {
 }
 
 .landing {
-    /* Wide enough that the largest group (Health, 6 cards) can lay out in
-       one row at the grid's existing 200px column floor (6 × 200px + 5 ×
-       1rem gaps ≈ 1360px) instead of always wrapping to ~4 per row the way
-       the previous 900px cap forced regardless of viewport width. */
+    /* Fits the largest group (6 cards at 200px) on one row. */
     max-width: 1400px;
     width: 100%;
     text-align: center;
 }
 
-/* Only #file-gate's "Connect your Ledger spreadsheet" step uses this now — the
-   sign-in step itself is just a banner over the dashboard shell (gate.js). */
+/* #file-gate's "Connect your Ledger spreadsheet" step. */
 .landing-hero h1 {
     font-size: var(--text-display);
     margin-bottom: var(--space-m);
@@ -689,7 +661,7 @@ header .btn:hover {
 .toast {
     position: fixed;
     left: 50%;
-    bottom: 1.5rem;
+    bottom: var(--space-xl);
     transform: translateX(-50%);
     display: flex;
     align-items: center;
@@ -700,15 +672,14 @@ header .btn:hover {
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-dropdown);
     padding: var(--space-m) var(--space-l);
-    /* Long results wrap instead of running off a phone. */
+    /* Long results wrap on a phone. */
     width: max-content;
     max-width: min(560px, calc(100vw - 2rem));
-    /* Above .modal's 100, keeping the order it had when the modal had no z-index:
-       an undo toast has a countdown, so it can't be the one thing a form covers. */
+    /* Above .modal's 100: an undo toast's countdown must stay visible. */
     z-index: 110;
 }
 
-/* An error in the toast (showToast's error): red text and edge. */
+/* showToast's error: red text and edge. */
 .toast.toast-error {
     color: var(--color-danger);
     border-color: var(--color-danger);
@@ -772,7 +743,7 @@ kbd {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 260px));
     justify-content: start;
-    /* One gap between bulbs, and from them to widgets, tiles and sections (--space-s). */
+    /* One gap between bulbs, and to widgets, tiles and sections. */
     gap: var(--space-s);
     margin-bottom: var(--space-m);
 }
@@ -822,9 +793,7 @@ kbd {
 }
 
 .widget-clock-time-value {
-    /* Fixed-width digits so the colons stay put as the numbers tick over —
-       otherwise a "1" is narrower than a "0" and the whole clock (and its ":")
-       jitters horizontally every second. */
+    /* Fixed-width digits so the clock doesn't jitter as it ticks. */
     font-variant-numeric: tabular-nums;
 }
 
@@ -841,15 +810,12 @@ kbd {
     padding: var(--space-xs) 0;
 }
 
-/* A value that doesn't fit beside its label wraps as a whole onto its own line —
-   flex-wrap above moves the whole span down instead of this splitting mid-word
-   (e.g. "kcal" stranded alone under "— / 1300"). */
+/* A value too long for its line wraps whole, never mid-value. */
 .widget-row > span:last-child {
     white-space: nowrap;
 }
 
-/* Marks a row as the end of a group — e.g. the Status card's SD row closes out
-   the five energy-balance inputs before D/Δm/t, the outcomes computed from them. */
+/* Ends a group of rows (e.g. Status's inputs before its outcomes). */
 .widget-row-divider {
     border-bottom: 1px solid var(--color-border);
     padding-bottom: var(--space-s);
@@ -867,10 +833,7 @@ kbd {
     grid-column: 1 / -1;
 }
 
-/* Each row is a plain wrapper in the markup, but lays out as if its icon/year/
-   month/day spans were direct children of the #widget-date grid above — that
-   shared grid (not each row sizing its own columns) is what lines the three
-   calendars' days, months, and years up under each other. */
+/* Rows join #widget-date's grid, so the three calendars' columns line up. */
 .widget-date-row {
     display: contents;
 }
@@ -939,9 +902,8 @@ kbd {
     position: relative;
 }
 
-/* Per-line ingredient suggestions for the Consumption and Workout textareas (health-physique-breakdown.js) —
-   a plain <datalist> can't suggest for one line of a multi-line value, so this is a
-   hand-rolled dropdown instead, styled to match .account-menu-dropdown. */
+/* Per-line suggestions for multi-line textareas (health-physique-breakdown.js),
+   which a <datalist> can't do. */
 .autocomplete-suggestions {
     position: absolute;
     top: 100%;
@@ -960,8 +922,7 @@ kbd {
     box-shadow: var(--shadow-dropdown);
 }
 
-/* Phone variant (positionPinnedSuggestions): placed by JS next to the caret's
-   line, inside the visible area, clear of the keyboard and its ∧ ∨ Done bar. */
+/* Phone variant (positionPinnedSuggestions): placed by JS clear of the keyboard. */
 .autocomplete-suggestions--pinned {
     position: fixed;
     top: var(--suggestions-top, 0px);
@@ -1027,32 +988,24 @@ html:not(.section-pages) .panel-group + .panel-group {
     margin-top: var(--space-s);
 }
 
-/* The "Hide widgets" preference, applied before the row itself even exists in
-   the DOM — index.html's early head script reads the cached SHOW_WIDGETS
-   setting straight out of localStorage (synchronously, before first paint)
-   and stamps this attribute on <html>, same trick as its dark-mode data-theme
-   above it. Without it the row always painted visible for one frame (its
-   default state) and only got hidden once app.js's own settings fetch
-   resolved — a flash on every refresh for anyone who'd turned it off. */
+/* "Hide widgets", stamped by index.html's head script before first paint so the
+   row never flashes on a refresh. */
 html[data-widgets-pref="hidden"] .widget-cards {
     display: none;
 }
 
-/* "Hide bulbs": the home page's section glance cards, set the same way. Progress
-   is a bulb moved under the tile card (data-under-tiles), so it hides too. */
+/* "Hide bulbs", set the same way; data-under-tiles bulbs hide too. */
 html[data-bulbs-pref="hidden"] #dashboard .panel-group > .cards,
 html[data-bulbs-pref="hidden"] #dashboard .panel-group > [data-under-tiles] {
     display: none;
 }
 
-/* The home page is an overview: each section's glance cards and its page tiles
-   (page-nav.js), never the blocks themselves — a tile opens the block's page. */
+/* The home page shows glance cards and tiles, never the blocks themselves. */
 html.home-hub #dashboard .panel-group > .panel[data-route] {
     display: none;
 }
 
-/* Never shown: the sidebar or the bottom tab bar names the sections. Kept for
-   the page titles, which read it (routeTitle). */
+/* Never shown; kept for routeTitle's page titles. */
 .panel-group-title {
     display: none;
 }
@@ -1073,17 +1026,13 @@ html.home-hub #dashboard .panel-group > .panel[data-route] {
     cursor: pointer;
 }
 
-/* Wraps a panel's h2 with an action button to its right. Excluded from the
-   collapse rules below (like a bare h2 is), so the button stays reachable
-   whether the panel is open or shut. */
+/* A panel's h2 and its buttons; never collapsed, so the buttons stay reachable. */
 .panel-header,
 .panel-header-actions {
     display: flex;
     align-items: center;
     gap: var(--space-m);
-    /* Activity Plan carries three buttons, which is more than a phone's heading
-       line can hold — they drop to a second line rather than squeezing the
-       heading to nothing or overflowing the panel. */
+    /* Buttons drop to a second line on a phone rather than overflowing. */
     flex-wrap: wrap;
 }
 
@@ -1162,8 +1111,7 @@ table {
     border-collapse: collapse;
 }
 
-/* Past a phone, a card's table fills the card; wider ones still scroll. Only the data
-   columns grow: tick boxes and row buttons stay their own size. */
+/* Past a phone a card's table fills the card; only the data columns grow. */
 @media (min-width: 821px) {
     .card .table-responsive > table {
         min-width: 100%;
@@ -1175,9 +1123,7 @@ table {
     }
 }
 
-/* Table rows: 19px for a line of text, 32px when it wraps onto two (16px lines), at
-   every width; the cells have no vertical padding, so the row is its lines. 2.5px
-   at each side, so columns sit 5px apart in every table at every width. */
+/* Rows are their 16px lines (19px for one); columns sit 5px apart. */
 th,
 td {
     height: 19px;
@@ -1185,39 +1131,28 @@ td {
     text-align: left;
     font-size: var(--text-small);
     line-height: 16px;
-    /* iOS-style separators: a hairline in the line gray (--color-border); the
-       structural lines below (header, Total, group breaks) are 1px of the same. */
+    /* A hairline separator; structural lines below are 1px. */
     border-bottom: .5px solid var(--color-border);
 }
 
-/* A row carrying buttons (✏️ 📋 🗑️, a plan tick row) is 29px: its 24px buttons with
-   room around them. */
+/* A row of 24px buttons is 29px tall. */
 tr:has(> td .btn) > td,
 tr:has(> td .btn) > th {
     height: 29px;
 }
 
-/* Row buttons always stay side by side on one line, never stacked, however narrow
-   the cell or the screen. */
+/* Row buttons never stack. */
 td:has(.btn) {
     white-space: nowrap;
 }
 
-/* The app's one "dense data table" look — no per-row border —
-   shared by every table that's mostly rows of short figures (Nutrition,
-   Physique, Transaction, Account, Breakdown, Work Time, Travel, Contact,
-   Insight's Pattern periods).
-   One class instead of a border-bottom rule repeated per table id, so
-   changing the look changes it everywhere at once. Add `table-compact` to a
-   `<table>` to opt it in; table-specific column widths/nowrap rules stay
-   scoped to their own id below, since those genuinely differ per table. */
+/* The shared dense-table look: no per-row border. */
 .table-compact th,
 .table-compact td {
     border-bottom: none;
 }
 
-/* The row under the pointer is tinted, so a long row can be read across without
-   losing its line. Follows the theme's primary colour, so it works in dark mode too. */
+/* The hovered row is tinted so a long row reads across. */
 .table-compact tbody tr > td {
     transition: background-color .12s ease;
 }
@@ -1226,10 +1161,7 @@ td:has(.btn) {
     background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
-/* The 🧮 Calculate breakdown's summed last row (assets/script/health-physique-estimator.js's
-   renderCalcBreakdown) and the activity table's (health-physique.js's
-   renderPhysiqueActivityBreakdown) — bold and a top border set it apart from the
-   per-item rows above it. */
+/* Total rows: bold, with a line above. */
 #physique-calc-breakdown tr.calc-breakdown-total td,
 #physique-activity-breakdown tr.calc-breakdown-total td,
 #accounts-table tr.accounts-total-row td,
@@ -1238,10 +1170,7 @@ td:has(.btn) {
     border-top: 1px solid var(--color-border);
 }
 
-/* The same line under the header row of Physique's, Nutrition's, Pattern's,
-   Transaction's, Account's, Breakdown's, Work Time's, Car Service's, Travel's,
-   Contact's, Settings', Activity's and both Micronutrients' tables and both
-   Physique breakdowns. */
+/* A line under these tables' header rows. */
 #physique-micro-table thead th,
 #physique-micro-range-table thead th,
 #insight-micro-table thead th,
@@ -1264,18 +1193,8 @@ td:has(.btn) {
     border-bottom: 1px solid var(--color-border);
 }
 
-/* One line per week in the Physique table (renderPhysiqueList, health-physique.js),
-   plus one line under the Pattern rows that always float to the top —
-   both mark "a new group of rows starts here" the same way. */
-#physique-table tr.physique-week-start td {
-    border-top: 1px solid var(--color-border);
-}
-
-/* Breakdown: one line where the Category changes from the row above
-   (renderBreakdownList, finance-breakdown.js), so each category's rows read as a
-   visual group, and one line closing the table under its last row — the
-   compact look's per-row border is off, so without this the table would
-   otherwise just stop. Activity's table does the same where the Group changes. */
+/* A line where a new group of rows starts (week, category, group, receipt). */
+#physique-table tr.physique-week-start td,
 #breakdown-table tr.breakdown-category-start td,
 .workout-table-strength tr.workout-group-start td,
 #transactions-table tr.tx-receipt-start td,
@@ -1310,14 +1229,9 @@ td:has(.btn) {
     color: var(--color-primary);
 }
 
+/* A line closing a table, or a group of its rows. */
 #breakdown-table tbody tr:last-child td,
-.workout-table-strength tbody tr:last-child td {
-    border-bottom: 1px solid var(--color-border);
-}
-
-/* Physique's Derived table: one line closing each group (mass, BMR, the
-   energy-balance inputs) before the next one starts, same idiom as
-   physique-week-start/breakdown-category-start above. */
+.workout-table-strength tbody tr:last-child td,
 #physique-derived-table tr.physique-derived-group-end td,
 #market-signal-table tr.physique-derived-group-end td {
     border-bottom: 1px solid var(--color-border);
@@ -1333,11 +1247,7 @@ td:has(.btn) {
     text-align: right;
 }
 
-/* Desired — the day's Calorie/Protein/Fiber/Fat/Carb goals (Calculate breakdown) or its
-   Duration/Cal workout goal (activity table), directly under the Total they're measured
-   against. A desired value, not a measurement, so it's set off with a dashed top border instead
-   of the Total row's solid one — same idiom as the Food insight table's own Ideal/day row
-   (#insight-food-table tr.insight-food-ideal-row below). */
+/* Desired rows under a Total: a dashed line, since they aren't measurements. */
 #physique-calc-breakdown tr.calc-breakdown-desired td,
 #physique-activity-breakdown tr.calc-breakdown-desired td,
 #insight-food-table tr.insight-food-ideal-row td {
@@ -1352,18 +1262,7 @@ td:has(.btn) {
     margin-bottom: var(--space-s);
 }
 
-/* Both Calculate tables are dense (the breakdown carries 9 columns —
-   Name/Amount/Cal/Pro/Fiber/Fat/Carb/TEF/Source — now Fiber/Carbohydrate/Fat/TEF
-   folded into it; the activity table 6, its last the same Source) — the `table-compact` class on their
-   wrapping div (see index.html) keeps them narrow instead of pushing the
-   modal wide or wrapping onto a second line on a phone screen. The Total
-   row's own top border (above) still marks it off from the per-item rows
-   above it. */
-
-/* Every numeric/short column is bounded by its own (now abbreviated) header
-   rather than its data — same reasoning as the Calculate breakdown's column
-   widths below. Only Classification/Name/Amount are left wrappable, since
-   those are the genuinely variable-length columns. */
+/* Only Classification, Name and Amount wrap. */
 #nutrition-table th:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)),
 #nutrition-table td:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)) {
     white-space: nowrap;
@@ -1380,23 +1279,13 @@ td:has(.btn) {
     width: auto;
 }
 
-/* Column widths from what the columns actually hold, rather than the even split
-   `table { width: 100% }` produces on its own.
-   Every column but the first is bounded by its own HEADER, not its data: the
-   abbreviated "Cal"/"Pro"/"Carb"/"Fat"/"TEF" headers are each wider than the
-   figure they hold, "Calories" (the activity table's own header) wider than
-   any calorie figure (integers, and the day ceiling is 6000), and "Save" wider
-   than one 💾. Only the ingredient/exercise name is genuinely variable. So
-   nowrap pins each of the others to its own content width, and the name column
-   takes width: 100% of whatever is left — which is how it stops being the one
-   column that has to wrap while the rest carry space they can't use. No fixed
-   widths: change a header word or a value's precision and the columns
-   re-measure themselves. Name itself is left wrappable, for the outlier long
-   enough to need it. */
+/* Every column but the name keeps to its content width; the name takes the rest. */
 #physique-calc-breakdown th:not(:first-child),
 #physique-calc-breakdown td:not(:first-child),
 #physique-activity-breakdown th:not(:first-child),
-#physique-activity-breakdown td:not(:first-child) {
+#physique-activity-breakdown td:not(:first-child),
+#physique-derived-table th:not(:first-child),
+#physique-derived-table td:not(:first-child) {
     white-space: nowrap;
 }
 
@@ -1416,53 +1305,26 @@ td:has(.btn) {
     width: 100%;
 }
 
-#physique-derived-table th:not(:first-child),
-#physique-derived-table td:not(:first-child) {
-    white-space: nowrap;
-}
-
-/* Account Summary's Total row (assets/script/finance-account.js) — same bold/top-border
-   treatment as the other summed-last-row tables above. */
-
-/* Classification header above each group of ingredients in the Food insight
-   preview (assets/script/health-insight-food.js) — spans the table, so the tint and
-   weight are what separate it from the ingredient rows it heads. */
+/* The Food insight table's Classification header rows. */
 #insight-food-table tr.insight-food-group-row td {
     font-weight: 600;
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
 }
 
-/* The two summary rows closing out the Food insight table — Total across
-   every ingredient, then that Total divided by days logged. Same bold/top-border
-   treatment as the other summed-last-row tables above; the average row skips
-   its own top border since it reads as a continuation of the Total directly
-   above it, not a new section. */
-
+/* The average row continues the Total, so it has no line of its own. */
 #insight-food-table tr.insight-food-average-row td {
     font-weight: 600;
 }
 
-/* Ideal/day — a desired value, not a measurement, so it's set off from Total/Avg with a
-   dashed top border instead of their solid one, the same idiom the wellness charts'
-   own dashed desired lines use. */
-
-/* Micronutrients table gap flags (assets/script/health-insight-micronutrient.js,
-   assets/script/health-physique.js) — a row is flagged 'severe'/'mild' once its
-   measured average sits well under a get-enough-of nutrient's FDA Daily Value;
-   running over never flags, even on a limit-type nutrient like sodium, per
-   health-nutrient-desired.js's nutrientGapSeverity. Left-border rather than a filled
-   background so the row's own numbers stay legible at both severities. */
-/* Section breaks: under the last Nutrition Facts line (Iron, when present), and
-   above the first nutrient with no daily desired value. Heavier than the row borders so
-   each reads as a break. */
+/* Micronutrient tables: a line ending the Nutrition Facts block. */
 #insight-micro-table tr.nutrient-facts-end td,
 #physique-micro-table tr.nutrient-facts-end td,
 #physique-micro-range-table tr.nutrient-facts-end td {
     border-bottom: 1px solid var(--color-border);
 }
 
-/* A nutrient short of its daily desired value, severe or mild alike: red. */
+/* A nutrient short of its daily desired value: a red edge (numbers stay legible). */
 #insight-micro-table tr.nutrient-gap td,
 #physique-micro-table tr.nutrient-gap td,
 #physique-micro-range-table tr.nutrient-gap td {
@@ -1475,8 +1337,7 @@ td:has(.btn) {
     color: var(--color-danger);
 }
 
-/* Hidden at every width — opened only below, on a small screen. A laptop keeps the plain
-   mouse hover (the name cell's title) and never shows this at all. */
+/* A nutrient's sources: opened by a tap on a phone only (below). */
 #insight-micro-table .nutrient-sources,
 #physique-micro-table .nutrient-sources,
 #physique-micro-range-table .nutrient-sources {
@@ -1486,12 +1347,8 @@ td:has(.btn) {
     color: var(--color-text-muted);
 }
 
-/* A touch screen has no hover to show the name cell's title (its ingredient sources), so
-   below the phone breakpoint a tap toggles the same list open as lines under the name
-   instead (nutrientNameCell, health-insight-micronutrient.js) — the dotted underline is
-   the only hint there's more here. A wider screen keeps the plain mouse hover and never
-   shows either the hint or the opened list, even though the tap listener is still
-   attached (it just has nothing visible to toggle there). */
+/* No hover on a phone, so a tap opens the sources under the name
+   (nutrientNameCell); the dotted underline hints at it. */
 @media (max-width: 640px) {
     #insight-micro-table td.nutrient-name-cell,
     #physique-micro-table td.nutrient-name-cell,
@@ -1529,15 +1386,8 @@ td:has(.btn) {
     text-align: right;
 }
 
-/* Every remaining Physique column is a short date/time/number now that
-   Consumption/Workout/Breakdown are gone, so none of them need to wrap —
-   letting one (usually Date) wrap mid-value was what starved the actions
-   column of width and forced its 3 buttons onto separate lines. The dense
-   padding/no-border look itself comes from the shared `.table-compact` rule
-   above; this table also blanket-nowraps every column, which nutrition-table
-   doesn't (it only nowraps the numeric ones — Classification/Name/Amount stay
-   wrappable there). The .today-row tint (below) is a plain `background` on
-   the cell, not a border, so it's untouched by dropping border-bottom. */
+/* Physique's columns are all short values, so none wraps (a wrapping Date
+   starved the actions column). */
 #physique-table th,
 #physique-table td {
     white-space: nowrap;
@@ -1632,8 +1482,7 @@ th.sortable:hover {
     padding-left: var(--space-m);
 }
 
-/* LeetCode's roadmap graph (track-leetcode.js): category nodes joined parent to child;
-   a finished one has a green rim, the open one a blue rim. */
+/* LeetCode's roadmap (track-leetcode.js): green rim done, blue rim open. */
 .leetcode-roadmap {
     display: block;
     width: 100%;
@@ -1698,8 +1547,7 @@ th.sortable:hover {
     fill: var(--color-income);
 }
 
-/* LeetCode's heatmap: 7 day rows, one column per week (--weeks, set in JS), 11px
-   cells at least. LeetCode's days hold their solve count, shaded inline by minutes. */
+/* LeetCode's heatmap: 7 day rows, one column per week (--weeks, from JS). */
 .leetcode-heatmap,
 .leetcode-heatmap-months {
     display: grid;
@@ -1740,11 +1588,8 @@ th.sortable:hover {
     font-variant-numeric: tabular-nums;
 }
 
-/* Health Chart's copy of the grid, one column per week of the range, each day coloured
-   inline as its Calorie Balance bar. It sits in a .chart-box, the same height as every
-   chart on the page, and its square cells are the largest that fit both that height
-   (7 rows under the month names) and the card's width; under 11px they stop shrinking
-   and the grid scrolls. */
+/* Health Chart's copy in a .chart-box: the largest square cells that fit its
+   height and width, scrolling below 11px. */
 .health-heatmap-box {
     container-type: size;
 }
@@ -1820,10 +1665,7 @@ th.sortable:hover {
     text-align: right;
 }
 
-/* A column of figures reads by comparing magnitudes, so it lines up on the last
-   digit — header included. .income/.expense already right-align the coloured
-   cells; this is for the ones between them (a zero, a blank) and for any header
-   above a money column, which otherwise sat left over a right-aligned column. */
+/* A column of figures lines up on the last digit, header included. */
 .num {
     text-align: right;
 }
@@ -1855,8 +1697,7 @@ th.sortable:hover {
     max-width: 100%;
 }
 
-/* Bars left, rotation donut right. One shared height on both boxes so the
-   two read as a single row — the bar chart no longer grows per ingredient. */
+/* Bars left, donut right, one shared height. */
 .protein-rotation-charts {
     display: grid;
     grid-template-columns: 550px minmax(0, 1fr);
@@ -1898,28 +1739,20 @@ th.sortable:hover {
     margin-top: var(--space-s);
 }
 
-/* Four across only works while .container is at its full 950px; between there
-   and the 820px general breakpoint the tiles narrow past what two figures fit,
-   so these go two-up early instead of shrinking further. Scoped by id so the
-   Health glance tiles, whose values are shorter, keep their own breakpoint. */
+/* Finance's cards go two-up before the general breakpoint: their figures are wider. */
 @media (max-width: 949px) {
     #finance > .cards {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
-/* Status carries far more rows than the other three, so a flat 4-up grid left
-   three cards mostly empty next to one packed one. Two columns instead: Status
-   alone, the other three stacked beside it, the stack as tall as Status. */
+/* Status alone, the other three stacked beside it as tall as Status. */
 .today-glance-cards {
     grid-template-columns: 1fr 1fr;
     align-items: stretch;
 }
 
-/* The spare height goes BETWEEN the cards, not inside them: the first card's top
-   lines up with Status's top and the last one's bottom with Status's bottom.
-   Growing each card to fill its share instead (Status is now 14 rows) padded
-   every one with a band of empty space above and below its own rows. */
+/* Spare height goes between the stacked cards, not inside them. */
 .today-glance-stack {
     justify-content: space-between;
 }
@@ -1928,8 +1761,6 @@ th.sortable:hover {
     text-align: left;
     font-size: var(--text-small);
 }
-
-
 
 .chart-box.chart-box-map {
     height: auto;
@@ -2005,8 +1836,6 @@ th.sortable:hover {
     margin-top: 0;
 }
 
-/* Flush under its heading like .chart-box-donut, minus the narrow-cell height. */
-
 .donut-legend {
     display: flex;
     flex-wrap: wrap;
@@ -2031,13 +1860,8 @@ th.sortable:hover {
     flex-shrink: 0;
 }
 
-/* A legend entry that switches its series off is a <button> — that's what makes it
-   reachable by keyboard and announced as pressable — but it must not LOOK like one:
-   it's a swatch and a word, and the browser's default chrome put a box around every
-   name. Every default a button brings is stripped, so the only thing that changes
-   when an entry became clickable is the cursor.
-   font-family alone, not the `font` shorthand: that would also reset the .85rem
-   .donut-legend-item sets, which this rule comes after. */
+/* A toggling legend entry is a <button> for the keyboard, without a button's look.
+   font-family, not `font`, so .donut-legend-item's size stays. */
 .donut-legend-item-toggle {
     appearance: none;
     -webkit-appearance: none;
@@ -2051,9 +1875,7 @@ th.sortable:hover {
     cursor: pointer;
 }
 
-/* Switched off: struck through and dimmed, still in the legend. The strike runs
-   across the swatch too, which is the clearest "this one isn't in the chart" the
-   entry can give without leaving. */
+/* Switched off: struck through and dimmed. */
 .donut-legend-item-off {
     opacity: .5;
     text-decoration: line-through;
@@ -2064,17 +1886,13 @@ td .btn {
     margin-right: var(--space-xs);
 }
 
-/* Above the sticky header (z-index 10), and above every dropdown/tooltip that
-   hangs off it (20-50). Without a z-index of its own a modal loses to the header
-   on paint order — both are positioned, and the header's 10 beats the modal's
-   auto — so on a phone, where a tall wrapped nav bar meets a card centred in a
-   .5rem gutter, the header covered the top of the card. That band is exactly
-   where .modal-close sits, which made a long form uncloseable. */
+/* Above the sticky header (10) and its dropdowns (20-50), which otherwise covered
+   a phone form's close button. */
 .modal {
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(0,0,0,.4);
+    background: rgba(0, 0, 0, .4);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2095,8 +1913,7 @@ td .btn {
     margin-bottom: var(--space-s);
 }
 
-/* A form's own hints sit between the last field and the actions row, where the
-   .hint default 1rem reads as a gap rather than as spacing. */
+/* A form's hints sit just above its actions row. */
 .app-form .hint {
     margin-bottom: var(--space-s);
 }
@@ -2105,8 +1922,7 @@ td .btn {
     margin-top: var(--space-s);
 }
 
-/* ❌ in a row of actions sits the same gap from its neighbour as every other
-   button (the header group's and a form's), not the extra margin it had alone. */
+/* ❌ in a row of actions keeps the row's own gap. */
 .panel-header-actions .header-action-close,
 .modal-actions > .modal-close {
     margin-left: 0;
@@ -2118,23 +1934,14 @@ td .btn {
     margin: 0 0 var(--space-s);
 }
 
-/* The three read-only viewers (Instructions, Micronutrients, Keyboard
-   shortcuts — no Save, nothing to scroll to) keep this floated at the top
-   beside their <h2>, same as always. Every form modal instead places this
-   same button as the last child of its own .modal-actions, beside Save —
-   flex items ignore float/margin-left, so the one rule serves both without a
-   variant: floats top-right when it's alone at the top, sits inline at the
-   end of the actions row when it's there instead. Moved out of the top
-   corner because a long form on a phone put Close off the top of the screen,
-   so closing meant scrolling all the way back up to find it — beside Save
-   it's wherever you already scrolled to finish the form. */
+/* Floats top-right in a read-only viewer; in a form's .modal-actions (a flex row)
+   the float is ignored and it sits beside Save. */
 .modal-close {
     float: right;
     margin-left: var(--space-m);
 }
 
-/* An emoji-only button (💾 🧮 📷 🧬 ➕): white like ❌, so the emoji reads on it, and
-   one larger emoji size for all of them and ❌ alike. */
+/* Emoji-only buttons and ❌: square, one larger emoji size. */
 .btn.btn-icon,
 .btn.modal-close {
     font-size: var(--text-title);
@@ -2146,8 +1953,7 @@ td .btn {
     margin-top: var(--space-l);
 }
 
-/* Each guide is one wide picture carrying both ends of the movement, so the
-   cells are sized for a landscape image rather than a square one. */
+/* Cells sized for the guides' landscape pictures. */
 .instruction-activities {
     list-style: none;
     display: grid;
@@ -2162,13 +1968,7 @@ td .btn {
     cursor: pointer;
 }
 
-/* A fixed height with object-fit: contain, not a fixed aspect ratio. The figures
-   are nowhere near one shape — square animated loops next to guides three times
-   as wide — so pinning a ratio would squash them and letting them run free makes
-   every row a different height. Contain gives one tidy band and leaves every
-   figure at its own proportions.
-
-   On the app's one white (--color-surface), like every card. */
+/* A fixed height with contain: the figures vary in shape, so one tidy band. */
 .instruction-figure,
 .activity-image-preview {
     display: block;
@@ -2183,19 +1983,14 @@ td .btn {
     margin-top: var(--space-s);
 }
 
-/* Edit Activity's own live preview under the Image field — same fixed-height/
-   contain/white-background treatment as .instruction-figure above, so what
-   you see while editing the path is what the Instruction modal will actually
-   show once saved. Hidden (not just empty) whenever the field is blank or the
-   path 404s — see renderActivityImagePreview/the 'error' listener in
-   health-activity-catalogue.js. */
+/* Edit Activity's preview, shown as the Instruction modal will
+   (renderActivityImagePreview hides it when blank or broken). */
 .activity-image-preview {
     margin-top: calc(-1 * var(--space-s));
     margin-bottom: var(--space-m);
 }
 
-/* The sets/reps/rest line under the name (the card's h3), above the figure, at
-   the default weight. */
+/* The sets/reps/rest line under the name. */
 .instruction-activity-meta {
     display: block;
     color: var(--color-text-muted);
@@ -2211,11 +2006,7 @@ td .btn {
     }
 }
 
-/* Tight by design. The gaps between a label, its box and the next field are cut
-   hardest — they cost height without buying anything — while the box's own
-   vertical padding is only trimmed, since it sets the tap area. Horizontal
-   padding is left alone: that's the gap between the border and the text you're
-   reading, and it's the one that looks cramped when shaved. */
+/* Tight by design: label and field gaps cut hardest, the tap area only trimmed. */
 .app-form label,
 .insight-question-label,
 .export-date-range label {
@@ -2228,33 +2019,21 @@ td .btn {
     margin-bottom: var(--space-xs);
 }
 
-/* Pairs two short fields onto one line, so a form of one-word values doesn't
-   scroll as far as one of paragraphs. No margin of its own — each label keeps
-   its own bottom margin, which lands under the row and matches the gap a
-   stacked field would have left. */
+/* Two short fields on one line; the labels' own margins space the row. */
 .form-row {
     display: grid;
-    /* minmax(0, 1fr), not a bare 1fr. A bare fr is minmax(auto, 1fr), and that
-       auto floors each track at its content's min-content width — which for a
-       date input is far wider than for a text box, since it has to fit
-       "yyyy-mm-dd" plus a picker icon. A wide modal has slack to absorb the
-       difference and the two tracks still look equal, but on a phone the Date
-       track claimed what it needed and Body Mass beside it came out visibly
-       narrower. A 0 floor lets both tracks stay exactly half at every width;
-       each control is width: 100% of its own track, so they end up identical. */
+    /* minmax(0, 1fr): a bare 1fr floors at min-content, so a date track grew wider
+       than its neighbour on a phone. */
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0 var(--field-pair-gap);
 }
 
-/* Three short fields on one line instead of two — same minmax(0, 1fr) floor,
-   just one more track. Falls back to .form-row's own single-column override
-   below 420px like every other row. */
+/* Three fields on one line; one column below 420px like .form-row. */
 .form-row-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* Same reason: a grid item's own auto minimum would re-introduce the floor
-   minmax(0, …) just removed. */
+/* Same reason: no auto minimum on the items. */
 .form-row > label {
     min-width: 0;
 }
@@ -2270,9 +2049,7 @@ td .btn,
     padding: 0;
 }
 
-/* Every button's text is centred — word, emoji and row buttons, menu items, tiles,
-   the phone's tab bar and action bar, sign-in — one rule for all of them, so no
-   button drifts left or right. */
+/* Every button's text is centred. */
 button,
 .btn,
 .page-tile,
@@ -2281,15 +2058,12 @@ button,
     text-align: center !important;
 }
 
-/* Every textarea is one height — four lines — whatever form it's in. Dragging its
-   corner can still make one taller while you type. */
+/* Every textarea starts four lines tall. */
 textarea {
     height: 92px;
 }
 
-/* Every field's text is left-aligned, on every page and at every width — one rule
-   for all of them, so no box drifts to the centre or the right. Date and time
-   fields need it most: iOS Safari centres them by default. */
+/* Every field's text is left-aligned (iOS centres date and time fields). */
 input,
 select,
 textarea,
@@ -2310,8 +2084,7 @@ input[type="datetime-local"] {
     display: block;
 }
 
-/* The value's own box and the editable fields inside it (WebKit/Blink), each of
-   which can carry its own centring. */
+/* The value's box and its inner fields can each carry their own centring. */
 input[type="date"]::-webkit-date-and-time-value,
 input[type="time"]::-webkit-date-and-time-value,
 input[type="datetime-local"]::-webkit-date-and-time-value {
@@ -2340,23 +2113,19 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-xs);
 }
 
-/* Tune-style rows inside a form (the ingredient form): one line each — tick, name,
-   box, unit — rather than the form's own stacked label/field. */
+/* Tune-style rows in a form: tick, name, box, unit on one line. */
 .app-form .formula-row {
     display: grid;
     margin-bottom: var(--space-xs);
 }
 
-/* Name and unit as wide as their longest text (the name still wraps on a screen
-   too narrow for it); nothing stretches to fill the row. The box keeps one width. */
+/* Name and unit as wide as their text; the box keeps one width. */
 .app-form .formula-inputs {
     grid-template-columns: max-content minmax(0, max-content) 5.07rem max-content;
     overflow-x: visible;
 }
 
-/* Name and unit match the form's labels; Tune keeps its own look. */
-/* The page's own text size, like the values beside them, not the smaller field-
-   label size. */
+/* Name and unit at the page's text size; Tune keeps its own look. */
 .app-form .formula-name,
 .app-form .formula-unit {
     font-family: inherit;
@@ -2375,14 +2144,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin: 0;
 }
 
-/* One height for every single-line control, because they don't agree on their
-   own: a date or time input carries a picker indicator in its shadow DOM and a
-   select carries an arrow, so each computes an intrinsic height a pixel or two
-   off a plain text box. Stacked fields hid that; pairing Date with Body Mass on
-   one row put two different types side by side and made it obvious.
-   30px, the same at every width, for forms and the filter rows alike (borders
-   included: box-sizing is border-box). Checkboxes and radios are excluded:
-   they'd stretch into 30px squares. */
+/* One 30px height for every single-line control: date, time and select boxes
+   otherwise differ by a pixel or two. */
 .app-form input:not([type="checkbox"]):not([type="radio"]),
 .app-form select,
 .filters input:not([type="checkbox"]):not([type="radio"]),
@@ -2392,20 +2155,12 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 .export-filter-row select {
     height: 30px;
     line-height: 1.2;
-    /* Nothing may floor at its own content width. Every control here is
-       width: 100% of a container that's already the right size, so an intrinsic
-       minimum can only make it overflow — which is what a too-wide field
-       actually is. */
+    /* An intrinsic minimum could only make a field overflow. */
     min-width: 0;
 }
 
-/* iOS Safari sizes a date/time input to its own native content and ignores a
-   smaller width: 100%, so beside a plain text box in a .form-row the picker
-   spilled past its half of the row and the text box next to it read as the
-   narrow one. Dropping the native appearance is what makes it honour the width;
-   the picker itself is unaffected (the indicator is a separate shadow child, so
-   Chrome keeps its calendar icon). Desktop never showed this — a ~410px column
-   is wider than the native width, so there was nothing to overflow. */
+/* iOS sizes a native date/time input to its content; no native appearance makes
+   it honour the width (the picker still works). */
 .app-form input[type="date"],
 .app-form input[type="time"],
 .export-date-range input[type="date"] {
@@ -2424,10 +2179,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     resize: vertical;
 }
 
-/* Break has no native duration input, so it's two plain number spinners
-   (hours, minutes) instead of the type="time" clock-of-day control — that
-   avoids both the AM/PM reading and a value that isn't actually a time of
-   day. */
+/* Break as hours and minutes spinners: a duration, not a time of day. */
 .work-time-break-inputs {
     display: flex;
     align-items: center;
@@ -2448,12 +2200,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     gap: var(--space-s);
 }
 
-/* Transfer Funds' From/To selects, each with its account's current balance
-   read off right beside it. The select shrinks to its own content instead of
-   the app-wide `.app-form select { width: 100% }` — full-width here stretched
-   the select across the whole 900px modal card and stranded the balance far
-   off to the right of the actual account name, a wide dead gap between the
-   two that read as broken rather than as one field. */
+/* Transfer's selects, each with its balance right beside it (content width). */
 .select-with-balance,
 .body-mass-projection-header {
     display: flex;
@@ -2481,16 +2228,13 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: 0 !important;
 }
 
-/* A day off — weekend or holiday alike, one tint. */
+/* A day off, weekend or holiday. */
 .work-time-off {
     background: rgba(99, 102, 241, 0.07);
     color: var(--color-text-muted);
 }
 
-.work-time-holiday-badge {
-    color: var(--color-text-muted);
-}
-
+.work-time-holiday-badge,
 .work-time-no-entry {
     color: var(--color-text-muted);
 }
@@ -2499,8 +2243,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-s);
 }
 
-/* A panel's range row (both Indicators), Nutrition's and Activity's rotation cards,
-   the Workouts card above the gym one, and Travel's cards: none above, one gap below. */
+/* Range rows, rotation cards, Workouts and Travel's cards: one gap below only. */
 .pagination.panel-range,
 .body-mass-projection-wrap.page-rotation-card,
 #instruction-groups-card,
@@ -2529,8 +2272,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     justify-content: space-between;
 }
 
-/* Only a note to show (reached, no change, wrong direction, levelling off) takes
-   room; on track it's empty, and the card ends at its last bar. */
+/* An empty note (on track) takes no room. */
 .body-mass-eta:empty,
 .body-mass-plateau-note:empty {
     display: none;
@@ -2540,8 +2282,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-m);
 }
 
-/* Progress: full width under Status and the stack beside it, swapped into Micronutrient
-   Gaps' old slot (that card now sits under the tiles, in Progress's old one). */
+/* Progress: full width under Status and its stack. */
 .today-glance-cards > .body-mass-progress-meter {
     grid-column: 1 / -1;
     margin-top: 0;
@@ -2559,13 +2300,12 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     }
 }
 
-/* Micronutrient Gaps, full width under the two glance columns — Progress's old spot. */
+/* Micronutrient Gaps, full width under the glance columns. */
 .panel-group > .micro-gaps-card {
     margin: 0;
 }
 
-/* Finance's Cumulative Net Worth card, full width under its four cards like Health's
-   Progress card, about its height: just the line. */
+/* Finance's Cumulative Net Worth card, full width under its four cards. */
 .finance-trend-card {
     grid-column: 1 / -1;
 }
@@ -2574,16 +2314,12 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     height: 6.5rem;
 }
 
-/* The time meter is a second, nested .body-mass-progress-meter directly under the
-   body-mass one. Its track is drawn a touch lighter so the pair reads as
-   "distance (primary) / time (secondary)" rather than two competing bars. */
+/* The nested time meter is lighter: secondary to the body-mass one. */
 .time-progress-meter .body-mass-progress-meter-fill {
     opacity: .5;
 }
 
-/* Padding-top clears room for the callout bubble, which is positioned absolute
-   against this wrapper rather than the track itself — the track keeps its own
-   overflow:hidden for the fill's rounded corners, which would clip the bubble. */
+/* Room for the callout, placed here since the track's overflow would clip it. */
 .body-mass-progress-meter-track-wrap {
     position: relative;
     padding-top: var(--space-xl);
@@ -2597,7 +2333,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     position: relative;
 }
 
-/* A mark every --mark-step % of the track (2 kg / 4 weeks, set in JS; 10% until then), over the fill. */
+/* A mark every --mark-step % of the track (set in JS), over the fill. */
 .body-mass-progress-meter-track::after {
     content: '';
     position: absolute;
@@ -2608,9 +2344,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
         var(--color-surface) calc(var(--mark-step, 10) * 1% - 2px) calc(var(--mark-step, 10) * 1%));
 }
 
-/* Floats over the fill's leading edge, left offset set inline in JS to match the
-   fill's width so it tracks the same number the bar is showing. Colour matches
-   the fill — this is the current reading, not a second, competing value. */
+/* The current reading over the fill's edge, in the fill's colour. */
 .body-mass-progress-meter-callout {
     position: absolute;
     top: 0;
@@ -2646,11 +2380,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     border-top-color: var(--color-danger);
 }
 
-/* One continuous red-to-green gradient, sized to the TRACK's own full width
-   (not the fill's, which is only pct% of it) via the 100/pct scale-up below —
-   so the fill's box always crops the same fixed gradient at the same points,
-   and growing the bar reveals more of it rather than re-stretching a fresh
-   red-to-green run into whatever sliver is currently filled. */
+/* One gradient sized to the whole track (scaled by 100/pct), so growing the bar
+   reveals more of it instead of re-stretching it. */
 .body-mass-progress-meter-fill {
     /* --meter-pct: how far along (health-chart.js). */
     width: calc(var(--meter-pct, 0) * 1%);
@@ -2672,9 +2403,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-s);
 }
 
-/* Each stat is a single line, number then label — "23% there" / "16.9 kg to
-   go" — shown with equal visual weight side by side, instead of one
-   abstract percentage standing alone. */
+/* Each stat on one line, number then label. */
 .body-mass-progress-meter-stat {
     display: flex;
     flex-wrap: wrap;
@@ -2687,8 +2416,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     color: var(--color-text-muted);
 }
 
-/* The "→ 70 ± 1.9 kg" / "→ 2027-01-27" trailing "left" / "ahead". Regular weight,
-   like every other card's figures. */
+/* The "→ 70 ± 1.9 kg" / "→ 2027-01-27" figures. */
 .body-mass-progress-meter-healthy,
 .body-mass-progress-meter-pct {
     font-size: var(--card-text-size);
@@ -2709,27 +2437,13 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-bottom: var(--space-l);
 }
 
-/* Several hints are filled in by script and blank until then — without this
-   their margin still reserves a band of empty space. */
+/* A hint not yet filled in takes no room. */
 .hint:empty {
     display: none;
 }
 
-/* Bare h3s ("Strength Training", "NEAT", "Cardio") had no override, so they
-   fell back to the browser's default ~1.17em h3 size — larger than this
-   panel's own h2 (.panel h2, 1.1rem) and its h4 day headings (1rem via
-   default sizing), an inverted, inconsistent hierarchy. Matches
-   .panel-section > h3's existing 1rem convention used elsewhere in the app
-   for a sub-heading directly under a panel's h2. 1.75rem top margin (same
-   gap .workout-day + .workout-day already uses between strength days) before
-   NEAT/Cardio separates them from the table above; the first one right under
-   h2 needs none. Scoped to :not(.collapsed) — .panel.collapsed > *:not(h2)
-   zeroes every direct child's margin to collapse the panel down to just its
-   h2, but that rule is class-based while this one used to be a bare
-   #workout-plan-panel id selector, so it won ID-vs-class specificity even
-   while collapsed and left a visible gap under the (invisible) h3s; scoping
-   the margin rule itself out while collapsed removes the conflict instead of
-   fighting it with specificity. */
+/* The plan's h3s, spaced like its days. :not(.collapsed), since an id selector
+   would outrank the collapse rule's margin reset. */
 #workout-plan-panel:not(.collapsed) h3 {
     margin: var(--space-xl) 0 var(--space-s);
 }
@@ -2742,14 +2456,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-xl);
 }
 
-/* .panel-actions carries a bottom margin only, which left Log Workout visually
-   glued to the last Cardio row directly above it. 1.75rem matches the gap
-   .workout-day + .workout-day and this panel's h3s already use between tables,
-   so the button separates from the plan on the same rhythm. Scoped to
-   :not(.collapsed) for the reason spelled out on the h3 rule below: an
-   id-prefixed selector outranks the class-based .panel.collapsed margin reset,
-   so an unscoped margin-top here would survive collapsing and leave a gap under
-   the panel's own h2. */
+/* Log Workout clear of the plan, on the same rhythm (:not(.collapsed) as above). */
 #workout-plan-panel:not(.collapsed) .panel-actions {
     margin-top: var(--space-xl);
 }
@@ -2764,10 +2471,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     text-align: left;
 }
 
-/* Edit/Duplicate/Delete on a plan row: nowrap so the three stay on one line
-   rather than wrapping under each other and doubling the row height, and tight
-   horizontal padding so the set fits a column narrow enough to leave the
-   exercise name its room. */
+/* A plan row's buttons stay on one line. */
 .workout-actions-cell {
     white-space: nowrap;
 }
@@ -2776,17 +2480,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-right: 0;
 }
 
-/* Already in today's log (health-activity.js): the tint alone marks it, with no
-   tick, as on a logged Nutrition row. Flat
-   rgba of --color-income rather than the variable, so one value reads correctly
-   over both themes' row backgrounds.
-
-   .today-row is the same tint on today's row in the Physique and Work tables,
-   and .nutrition-row-logged (health-nutrition.js) is the same tint on a Nutrition
-   row already resolved into today's Consumption breakdown — one declaration
-   for all three, because they mean the same thing (this is the row your
-   logging lands on / already has) and drifting into separate greens would
-   just look like a mistake. */
+/* Already logged today, or today's row: one green tint, a flat rgba so it reads
+   in both themes. */
 .workout-row-logged > td,
 .instruction-activities li.instruction-logged,
 .nutrition-row-logged > td,
@@ -2794,16 +2489,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     background: rgba(52, 199, 89, .13);
 }
 
-/* Every column sized to its own content, not to a hardcoded pixel guess: the
-   table drops the app-wide `table { width: 100% }` (see the base rule above)
-   so there's no leftover container width for auto table-layout to redistribute
-   across columns. That redistribution was the actual bug — with width: 100%,
-   the browser stretched Sets x Reps/Rest/Weight/Done past what their own text
-   needed and starved the unconstrained name column of the space it was
-   supposed to get, wrapping "Exercise/Machine" / "Muscle Group" onto two lines
-   despite visible slack elsewhere in the row. white-space: nowrap on every
-   header still guards against a header itself wrapping ("Sets x Reps" onto 2
-   lines), independent of column width. */
+/* Columns sized to their content; headers never wrap. */
 .workout-table-strength,
 .workout-table-neat {
     width: auto;
@@ -2815,15 +2501,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 }
 
 @media (max-width: 820px) {
-    /* Class-based, not nth-child: a table's own column count now depends on
-       columnVisibility (health-activity-catalogue.js) — Muscle Group, Rest and Weight only
-       render at all when some row in that table's shape actually has a
-       value — so a fixed position no longer reliably means the same column
-       in every table. */
-
-    /* Muscle Group is reference info, not something needed mid-workout on a
-       phone — dropping it entirely frees room back for the exercise name and
-       the columns that matter on a small screen. */
+    /* Muscle Group is dropped on a phone (by class: column counts vary). */
     .workout-muscle-group-cell {
         display: none;
     }
@@ -2871,8 +2549,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     display: none;
 }
 
-/* Every mode's report is renderInsightText output — one <p> per line, section
-   labels in <strong>. One rule set now that one panel renders all three. */
+/* renderInsightText output: one <p> per line, labels in <strong>. */
 .insight-body p {
     margin: 0 0 var(--space-l);
     line-height: 1.5;
@@ -2886,11 +2563,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     color: var(--color-text);
 }
 
-/* Which data set to load. Doubles as the load trigger, so the label is the
-   action; aria-pressed marks the one on screen. */
-/* Health's and Finance's Insight: their modes as the hub's tiles, each opening its
-   own page (data-insight-mode, health-insight.js / finance-insight.js). The tiles
-   page shows only the tiles. */
+/* Insight's modes as hub tiles, each opening its own page (data-insight-mode). */
 :is(#insight-mode-actions, #financial-insight-mode-actions),
 html.section-pages[data-page="hub"] .page-tiles,
 html.home-hub .page-tiles,
@@ -2998,21 +2671,9 @@ html.home-hub .page-tiles,
     margin-bottom: var(--space-l);
 }
 
-@media (max-width: 800px) {
-    .container {
-        padding: var(--space-l);
-    }
-
-    .donut-grid {
-        gap: var(--space-s);
-    }
-}
-
 @media (max-width: 1179px) {
-    /* No top bar below the sidebar's own breakpoint (1180px): the header's box
-       goes, the tab bar (.nav) and the account avatar (.header-actions) stay,
-       both pinned to the bottom, on tablet as well as phone. The breadcrumb's
-       Ledger link replaces the logo. */
+    /* No top bar below 1180px: the tab bar and the avatar stay, pinned to the
+       bottom; the breadcrumb's Ledger link replaces the logo. */
     header {
         display: contents;
     }
@@ -3021,17 +2682,18 @@ html.home-hub .page-tiles,
         display: none;
     }
 
-    /* The bars and the account circle sit just above the copyright strip. */
+    /* The bars sit just above the copyright strip; paired fields sit further apart. */
     :root {
         --bottom-bar-bottom: var(--phone-footer-height);
+        --field-pair-gap: var(--space-l);
     }
 
-    /* 10px lower than centred, nearer the home indicator; the bars above don't move. */
+    /* 10px lower, nearer the home indicator. */
     html .site-footer {
         transform: translateY(10px);
     }
 
-    /* Solid under the status bar, so iOS doesn't blur the page scrolling past. */
+    /* Solid under the status bar. */
     body::before {
         content: "";
         position: fixed;
@@ -3061,8 +2723,7 @@ html.home-hub .page-tiles,
         margin: 0;
     }
 
-    /* The same circle as the bar's round ❌ (3rem), so the two ends of the bottom
-       row match: the photo, its initial fallback, and the signed-out sign-in button. */
+    /* The same circle as the bar's round ❌, so the row's two ends match. */
     .account-avatar,
     #signin-btn {
         width: var(--bottom-bar-circle);
@@ -3109,8 +2770,7 @@ html.home-hub .page-tiles,
         -webkit-backdrop-filter: var(--glass-blur);
         backdrop-filter: var(--glass-blur);
         border: 1px solid var(--glass-border);
-        /* Lifts the bar off the content it floats over so it reads as a layer,
-           not a strip fused to the last panel. */
+        /* Lifts the bar off the content under it. */
         box-shadow: var(--glass-highlight), var(--glass-shadow);
     }
 
@@ -3124,7 +2784,7 @@ html.home-hub .page-tiles,
         color: var(--glass-text);
     }
 
-    /* Each tab fills the bar's height (--bottom-bar-height), the action bar's too. */
+    /* Each tab fills the bar's height. */
     .nav a {
         flex: 1;
         display: flex;
@@ -3133,13 +2793,12 @@ html.home-hub .page-tiles,
         justify-content: center;
         min-height: var(--bottom-bar-height);
         padding: 0 var(--space-xs);
-        /* Body-size labels; the bar's own height (--bottom-bar-height) is unchanged. */
         font-size: var(--text-body);
         font-weight: 600;
         line-height: 1.2;
     }
 
-    /* Faded divider on the left of each visible tab after the first, so none after the last. */
+    /* A faded divider before each visible tab after the first. */
     .nav a:not([hidden]) ~ a:not([hidden])::after {
         content: '';
         position: absolute;
@@ -3156,27 +2815,15 @@ html.home-hub .page-tiles,
         padding: var(--space-l);
     }
 
-    /* Fields side by side sit further apart on a phone, as From/To. */
-    :root {
-        --field-pair-gap: var(--space-l);
-    }
-
     .location-picker-dropdown {
         min-width: 180px;
-    }
-
-    .landing-hero h1 {
-        font-size: var(--text-display);
     }
 
     .panel {
         padding: var(--space-s);
     }
 
-    .chart-box {
-        height: 240px;
-    }
-
+    .chart-box,
     .protein-rotation-charts .chart-box {
         height: 240px;
     }
@@ -3225,22 +2872,13 @@ html.home-hub .page-tiles,
         flex: 1 1 100%;
     }
 
-    /* WCAG's 24px minimum tap area (the small button size), so a row of
-       ✏️/📋/🧬/🗑️ can't mis-tap onto Delete; no taller, so rows stay thin. */
-    td .btn {
-        margin-right: var(--space-xs);
-    }
-
-    /* Full-screen overlay — no gap around the card. */
+    /* A full-screen overlay. */
     .modal {
         padding: 0;
         align-items: stretch;
     }
 
-    /* Full-screen form card: fills the entire viewport so there is no
-       background page visible or scrollable behind it.
-       overscroll-behavior: contain stops the card's own rubber-band from
-       chaining out to the page when the user reaches the top or bottom. */
+    /* A full-screen card; overscroll-behavior keeps its bounce off the page. */
     .modal-card {
         max-width: 100%;
         max-height: 100%;
@@ -3273,8 +2911,7 @@ html.home-hub .page-tiles,
         font-size: var(--text-small);
     }
 
-    /* Horizontal only — the vertical padding is already at the floor where the
-       box still reads as a tap area. */
+    /* Vertical padding is already at the tap-area floor. */
     .app-form input,
     .app-form select,
     .app-form textarea {
@@ -3307,7 +2944,6 @@ html.home-hub .page-tiles,
         flex-direction: column;
         align-items: flex-start;
     }
-
 }
 
 @media (max-width: 420px) {
@@ -3321,19 +2957,13 @@ html.home-hub .page-tiles,
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    /* Half of a phone this narrow is under 190px, which a date picker fills to
-       the edge — back to one field per line. */
+    /* Half this width can't fit a date picker: one field per line. */
     .form-row {
         grid-template-columns: 1fr;
     }
 }
 
-/* The copyright line: a slim strip fixed at the very bottom of the screen, on
-   every screen size. */
-:root {
-    --phone-footer-height: 1.3rem;
-}
-
+/* The copyright line, a slim strip fixed at the bottom of every screen. */
 .site-footer {
     position: fixed;
     left: 0;
@@ -3361,8 +2991,7 @@ html.home-hub .page-tiles,
     }
 }
 
-/* A spaced em dash between the footer's two parts: typeset as a real
-   character, so text readers (search engines, AI) see the break too. */
+/* A spaced em dash between the footer's two parts. */
 .site-footer .footer-divider {
     margin: 0 var(--space-xs);
 }
@@ -3378,8 +3007,7 @@ html.home-hub .page-tiles,
     text-decoration: underline;
 }
 
-/* A plain break between the calorie-solve rows and the journey block below —
-   no symbol, box or unit to give it, so a formula-row would sit oddly here. */
+/* A plain break between the calorie-solve rows and the journey block. */
 .formula-divider {
     grid-column: 1 / -1;
     margin: var(--space-s) 0;
@@ -3420,12 +3048,8 @@ html.home-hub .page-tiles,
     margin-bottom: 0;
 }
 
-/* Δm% above the 1%/week ceiling; BMI_g outside the healthy 20–25 band; C_waist, WHtR, WHR
-   and BF% past their lines (renderBodyShapeFields, renderNavyFields). The colour is
-   the whole warning — the unit column stays `%/week` or `kg/m²` like every other row's, and
-   the words are in the substituted trace. Two names for one look because they mark different
-   things: a rate over a ceiling, and a goal outside a band at either end.
-   Not an invalid value — nothing here is blocked, so no error background. */
+/* A rate over its ceiling or a goal outside its band: a red warning, not an
+   error (nothing is blocked). */
 .formula-row input.formula-pct-over,
 .formula-row input.formula-out-of-band {
     border-color: var(--color-danger);
@@ -3435,30 +3059,20 @@ html.home-hub .page-tiles,
 
 .formula-inputs {
     margin-bottom: var(--space-l);
-    /* One grid for every row (each row is a subgrid of it), so the symbol, name and
-       unit columns take their longest text's width; scrolls sideways when too wide. */
+    /* One grid shared by every row (subgrid); scrolls sideways when too wide. */
     display: grid;
     grid-template-columns: max-content max-content 8.45rem max-content;
     column-gap: var(--space-s);
     overflow-x: auto;
 }
 
-/* One variable per line: symbol, what it is, its box, its unit — the same four
-   columns the formula's own legend used to spell out separately, so the legend and
-   the inputs are one thing rather than two lists to cross-reference. */
+/* One variable per line: symbol, name, box, unit. */
 .formula-row {
     display: grid;
-    /* Name and unit share the leftover width equally. Capping the unit instead
-       (it used to be minmax(0, 9rem)) dumped every spare pixel into the name,
-       which on a full-width modal left a several-hundred-pixel gap between a
-       label like "body mass" and its own box. */
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
     align-items: center;
-    /* No divider between rows, and no padding either: the boxed inputs already mark
-       where one variable ends and the next begins, so the rules were 14 lines of ink
-       doing nothing but adding height — and the padding was the same mistake in
-       whitespace. The border around each box is the separation. */
+    /* The boxes' borders separate the rows. */
     padding: 0;
     font-size: var(--text-small);
 }
@@ -3468,28 +3082,15 @@ html.home-hub .page-tiles,
     grid-template-columns: max-content 8.45rem max-content;
 }
 
-/* Contact: every column as wide as its text, one line per cell, rather than the
-   global full-width table squeezing a dozen columns (name, phones, emails,
-   address, …) into the panel. .table-responsive scrolls sideways when it's wider. */
+/* Contact's and Pattern's wide tables: content width, one line per cell;
+   .table-responsive scrolls. */
 #contacts-table,
 #insight-pattern-table {
     width: max-content;
 }
 
 #contacts-table th,
-#contacts-table td {
-    white-space: nowrap;
-}
-
-/* Settings (Health and Other): the actions column (👁️ ✏️ 🗑️) is as wide as its
-   buttons on one line, rather than squeezed by the Key/Value columns until the
-   buttons stacked. Key stays on one line too; Value takes the rest. */
-
-/* Pattern's Periods table: ~20 columns, so the global `table { width: 100% }`
-   squeezed every one of them into the panel and wrapped Period's date range
-   ("2026-08-07 → 2026-08-16") into a narrow column. Sized to its content instead,
-   one line per cell; .table-responsive scrolls sideways when it's wider than the panel. */
-
+#contacts-table td,
 #insight-pattern-table th,
 #insight-pattern-table td {
     white-space: nowrap;
@@ -3512,34 +3113,17 @@ html.home-hub .page-tiles,
     white-space: nowrap;
 }
 
-/* The list runs to thirty variables, so each row's height is paid thirty times: the boxes
-   carry the app-wide 16px figure (anything smaller makes iOS zoom the page on focus) but
-   give up the vertical padding and the inherited line-height around it, which is where a
-   field's height actually comes from. The vertical padding is now zero outright — the
-   line-height is already generous enough to keep the digits off the border, and thirty
-   rows × two paddings is most of a screen of nothing. Horizontal padding stays: that one
-   isn't whitespace around the field, it's what keeps the text off its own left edge. */
+/* Thirty rows of boxes: no vertical padding, a tight line-height. */
 .formula-row input:not([type="checkbox"]),
 .formula-row select {
     width: 100%;
-    /* Every box is exactly its column, whatever type it is. A date input carries
-       three inner fields and a picker icon, so its min-content width is wider
-       than the column and `min-width: auto` let it — and it alone — bulge past
-       the shared box column, which read as one big field among twenty small
-       ones. The column is sized to hold a date comfortably below. */
+    /* Exactly its column: a date input's min-content would bulge past it. */
     min-width: 0;
     padding: 0 var(--space-s);
     line-height: 1.2;
 }
 
-/* A population constant, not an input — shown so the formula reads completely,
-   styled as text so it can't be mistaken for something editable. */
-/* Same figure size and padding as the input beside it, so ρ's 7700 sits on the
-   same line and scale as the editable values above it. Only the border and
-   background are withheld — those are what mark a field as editable, and they
-   do that job without the figure also having to be a different size. */
-/* Tune's boxes, date, select and read-only figures: one height, 21px, at every
-   width — compact, since the page is 59 rows of them. */
+/* Tune's boxes and read-only figures: one compact 21px height. */
 #health-tune-panel .formula-row input:not([type="checkbox"]),
 #health-tune-panel .formula-row select,
 #health-tune-panel .formula-fixed {
@@ -3561,22 +3145,11 @@ html.home-hub .page-tiles,
     color: var(--color-text-muted);
 }
 
-/* All four cells stay on one line at every width. The unit used to drop to a
-   full-width second grid row here, which doubled each variable's height (14 of
-   them, so the modal scrolled about twice as far as it needed to) and left the
-   1fr name column absorbing all the slack as one dead gap. Everything is
-   tightened instead: narrower symbol/box columns free the width for the name
-   and unit, which split what's left and wrap inside their own cell if a label
-   really is too long for the screen. */
+/* A phone keeps all four cells on one line, tightened. */
 @media (max-width: 560px) {
-    /* Same shared grid on a phone, with a narrower box column and gap. */
     .formula-inputs {
         grid-template-columns: max-content max-content 8.1rem max-content;
         column-gap: var(--space-xs);
-    }
-
-    .formula-row {
-        font-size: var(--text-small);
     }
 
     .formula-sym {
@@ -3595,12 +3168,7 @@ html.home-hub .page-tiles,
         padding: 0 var(--space-xs);
     }
 
-    /* The date box was the one field that ignored all of the above: a phone draws
-       input[type=date] as a native control with its own metrics, so it came out
-       both wider than its grid column and visibly taller than the twenty text
-       boxes around it — one fat field in a column of thin ones. Dropping the
-       native appearance hands its width back to the grid and its height back to
-       the padding/line-height every other box here is sized by. */
+    /* A native date box is wider and taller than the rest; no native appearance. */
     .formula-row input[type="date"] {
         -webkit-appearance: none;
         appearance: none;
@@ -3609,16 +3177,12 @@ html.home-hub .page-tiles,
         line-height: 1.2;
     }
 
-    /* WebKit renders the value in its own inner element, which carries a margin
-       and its own alignment — the two things that pushed the field past the
-       column and off the right-aligned column of figures. */
+    /* WebKit's inner value element carries its own margin. */
     .formula-row input[type="date"]::-webkit-date-and-time-value {
         margin: 0;
     }
 
-    /* And the picker glyph, which is sized for a full-width native field. Kept
-       (it's the only way to open the calendar on a phone) but given roughly a
-       character's worth of room instead of its default box. */
+    /* The picker glyph, kept but about a character wide. */
     .formula-row input[type="date"]::-webkit-calendar-picker-indicator {
         width: .85rem;
         padding: 0;
@@ -3628,10 +3192,6 @@ html.home-hub .page-tiles,
 
     .formula-solve-for {
         gap: var(--space-xs) var(--space-s);
-        font-size: var(--text-small);
-    }
-
-    .formula-solve-for label {
         font-size: var(--text-small);
     }
 }
@@ -3647,22 +3207,18 @@ html.home-hub .page-tiles,
     color: var(--color-text);
 }
 
-/* .status is red by design (it's an error slot) — this flips just the colour for
-   the one place that reports a success in the same element. */
+/* .status is an error slot; this greens a success in it. */
 .status.status-ok {
     color: var(--color-income);
 }
 
 /* --- Hub and pages (page-nav.js, router.js's showSectionPage) ------------------
-   On a section page, html[data-page] says which view is current: "hub" shows the
-   glance cards and one tile per block, "block" shows one block alone under its
-   breadcrumb. The home page has neither class and keeps its overview. */
+   html[data-page]: "hub" shows glance cards and tiles, "block" one block under
+   its breadcrumb. */
 .page-tiles,
 .page-crumb {
     display: none;
 }
-
-/* Name-only tiles, as many a row as fit: 4 on a phone, up to 7 on a laptop. */
 
 html.section-pages[data-page="hub"] .panel-group > .panel[data-route] {
     display: none;
@@ -3686,19 +3242,17 @@ html.section-pages[data-page="hub"] .page-crumb-back {
     display: none;
 }
 
-/* One breadcrumb look everywhere — hub, page and form page — so the trail reads
-   the same whichever view it tops. Only where it shows differs (below, and the
-   form page's rule further down). */
+/* One breadcrumb look for hub, page and form page. */
 .page-crumb {
     flex-wrap: wrap;
     align-items: baseline;
     gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-xs) var(--space-xs);
+    padding: var(--space-xs);
     font-size: var(--text-body);
     color: var(--color-text-muted);
 }
 
-/* The home page's sits above the sections, so it takes their .5rem gap itself. */
+/* The home page's sits above the sections, with their gap. */
 html.home-hub .page-crumb {
     margin-bottom: var(--space-s);
 }
@@ -3739,15 +3293,12 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     gap: var(--space-xs);
     justify-content: center;
     align-items: center;
-    /* The large button size, the same as the phone's action-bar buttons. */
+    /* The large button size. */
     min-height: 42px;
-    /* Narrow sides, so a long one-word label ("Transaction") fits four a row. */
+    /* Narrow sides, so "Transaction" fits four a row. */
     padding: var(--space-s) var(--space-xs);
-    text-align: center;
-    /* Liquid glass, as iOS 26's buttons, over the tile's own colour: the same
-       see-through 15% wash of --tile-tint as before (Apple's system gray, or its
-       kind's colour below), frosted, with a curved shine across the top, a lit
-       rim (::before) and a soft shadow under it. */
+    /* Liquid glass over a 15% wash of --tile-tint: a shine, a lit rim (::before)
+       and a soft shadow. */
     --tile-tint: var(--color-text-muted);
     isolation: isolate;
     background:
@@ -3761,7 +3312,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         inset 0 -6px 12px -8px rgba(15, 23, 42, .18),
         0 1px 2px rgba(15, 23, 42, .08),
         0 4px 12px rgba(15, 23, 42, .06);
-    /* A capsule, as iOS 26 / macOS Tahoe buttons and the glass bottom bar are. */
+    /* A capsule. */
     border-radius: 999px;
     color: var(--color-text);
     text-decoration: none;
@@ -3824,10 +3375,9 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     }
 }
 
-/* A block's short sign (setPageBadge, page-nav.js): on its tile's corner and after
-   its page's breadcrumb. */
+/* A block's badge (setPageBadge): on its tile's corner and after its breadcrumb. */
 .page-badge {
-    padding: var(--space-xs) var(--space-xs);
+    padding: var(--space-xs);
     border-radius: 999px;
     background: var(--color-danger);
     color: #fff;
@@ -3854,10 +3404,8 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     cursor: pointer;
 }
 
-/* A tile's colour says what it opens (page-nav.js's TILE_KINDS): the glass's tint
-   (--tile-tint), gray by default, green for a form (Tune, Today, Workouts), orange for charts
-   (Indicator) and purple for AI (Insight, Market, and Insight's own mode tiles).
-   A block of sheet rows keeps the gray. */
+/* A tile's tint says what it opens (TILE_KINDS): gray rows, green form, orange
+   charts, purple AI. */
 .page-tile[data-kind="form"] {
     --tile-tint: #34c759;
 }
@@ -3871,7 +3419,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     --tile-tint: var(--color-other);
 }
 
-/* Four a row on a phone, down to a 375px-wide one (5rem each plus the gaps). */
+/* Four a row on a phone, down to 375px. */
 @media (max-width: 820px) {
     html.section-pages[data-page="hub"] .page-tiles,
     html.home-hub .page-tiles,
@@ -3880,8 +3428,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     }
 }
 
-/* Every section and page on a wide screen, the current one marked. Below this
-   width the bottom tab bar and the hub tiles do the same job. */
+/* The wide-screen sidebar; below 1180px the tab bar and tiles do its job. */
 .side-nav {
     display: none;
 }
@@ -3949,9 +3496,8 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         color: #fff !important;
     }
 
-    /* A dialog floats as glass here only: below 1180px it's a full-screen form
-       page, and a blur on it would also trap its fixed action bar inside it. A
-       section page's form page (.form-page) sits on the page background instead. */
+    /* Glass dialogs on a wide screen only (a blur would trap a phone's fixed
+       action bar); a .form-page sits on the page instead. */
     .modal:not(.form-page) {
         background: rgba(15, 23, 42, .25);
         -webkit-backdrop-filter: blur(6px);
@@ -3970,8 +3516,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         padding-left: var(--space-l) !important;
     }
 
-    /* No top bar: Ledger tops the sidebar, the account avatar sits in its
-       bottom-left corner, and the sidebar replaces the section links. */
+    /* No top bar: Ledger tops the sidebar, the avatar sits at its foot. */
     header {
         display: contents;
     }
@@ -3987,12 +3532,11 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         z-index: 6;
         width: 13rem;
         box-sizing: border-box;
-        padding: var(--space-l) var(--space-l);
+        padding: var(--space-l);
         color: var(--color-text);
     }
 
-    /* The sidebar's button, at the right end of the logo row: a panel drawn
-       with its left column. */
+    /* The sidebar's toggle, at the right end of the logo row. */
     .side-nav-toggle {
         display: inline-flex;
         align-items: center;
@@ -4020,9 +3564,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         height: 1.25rem;
     }
 
-    /* Hidden: the sidebar slides away and the page centres in the full width.
-       Top-left keeps only the button, drawn as Ledger's logo until it's hovered
-       (then the panel icon). */
+    /* Closed: the page centres; the toggle shows the logo until hovered. */
     html[data-side-nav="closed"] .side-nav {
         transform: translateX(-100%);
         visibility: hidden;
@@ -4135,11 +3677,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         display: none;
     }
 
-    .account-menu-dropdown {
-        width: 100%;
-        box-sizing: border-box;
-    }
-
     /* Sidebar hidden: only the picture stays, bottom-left; the switches move
        into its menu (placeSettingsSwitches). */
     html[data-side-nav="closed"] .header-actions {
@@ -4167,8 +3704,10 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     }
 
     .account-menu-dropdown {
+        width: 100%;
+        box-sizing: border-box;
         top: auto;
-        bottom: calc(100% + .5rem);
+        bottom: calc(100% + var(--space-s));
         right: auto;
         left: 0;
         max-height: calc(100vh - 5rem);
@@ -4177,10 +3716,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
 }
 
 /* --- Form pages (router.js's updateFormPage) ---------------------------------
-   On a section page an open routed form (Log, Add, a row's Edit or view, GYM)
-   takes the page's place instead of covering it, and looks like a block page:
-   the breadcrumb over one white rounded card (.panel), at the page container's
-   width and padding. The form element plays the section, its card the panel. */
+   A routed form takes the section page's place, laid out like a block page. */
 html.section-pages[data-form-page] #dashboard {
     display: none;
 }
@@ -4190,8 +3726,7 @@ html.section-pages[data-form-page] .modal.form-page-under {
 }
 
 html.section-pages[data-form-page] .modal.form-page {
-    /* The container's box: max 1000px wide with 2rem padding, so its content is
-       936px at most, centered — the same box a block page's wrapper fills. */
+    /* The container's box (1000px with its gutter), as a block page. */
     --form-page-gutter: var(--space-xxl);
     position: static;
     inset: auto;
@@ -4226,8 +3761,7 @@ html.section-pages[data-form-page] .modal.form-page .modal-card {
     box-shadow: none;
 }
 
-/* The footer stays at the bottom of the screen under a short form, as it does
-   under a short block page (where .container's flex: 1 pushes it down). */
+/* The footer stays at the bottom under a short form. */
 html.section-pages[data-form-page] .site-footer {
     order: 3;
     margin-top: auto;
@@ -4257,36 +3791,26 @@ html.section-pages[data-form-page] body.modal-open {
     }
 }
 
-/* Tablet and phone: the container's 1rem gutter, clear of the bottom tab bar,
-   the card's corners and padding kept (the full-screen overlay squared them
-   off), and the pinned action bar just above the tab bar. */
+/* Tablet and phone: a 1rem gutter, clear of the bottom bar. */
 @media (max-width: 1179px) {
     html.section-pages[data-form-page] .modal.form-page {
         --form-page-gutter: var(--space-l);
         margin-bottom: calc(var(--space-l) + var(--bottom-bar-height) + var(--bottom-bar-bottom) + env(safe-area-inset-bottom, 0px));
     }
-}
 
-@media (max-width: 1179px) {
     html.section-pages[data-form-page] .modal.form-page .modal-card {
         height: auto;
-        /* At least the screen between the breadcrumb and the tab bar, so a short
-           form's action bar still lands at the bottom, as it did full-screen. */
+        /* Tall enough that a short form's action bar lands at the bottom. */
         min-height: calc(100dvh - 12rem - env(safe-area-inset-bottom, 0px));
     }
-
 }
 
-/* A block's header buttons, grouped (page-nav.js's groupHeaderActions): in the
-   header on a wide screen, spaced as they were; the group's ❌ only appears once
-   it's the phone's bottom bar. */
+/* A block's header buttons (groupHeaderActions); their ❌ shows in the phone's bar only. */
 .panel-header-actions {
     flex-shrink: 0;
 }
 
-/* Every page's ❌: top right of its header on a wide screen. On a phone it moves to
-   the bottom bar instead (below), so a page's own action row (Tune's Save,
-   Insight's Send to AI) keeps its ❌ only there. */
+/* A page's ❌: in its header on a wide screen, in the bottom bar on a phone. */
 .panel-header-actions .header-action-close {
     float: none;
 }
@@ -4320,11 +3844,8 @@ html.section-pages .panel.page-active:hover {
 }
 
 /* --- One bottom bar at a time (page-nav.js's updateActionBar) -------------------
-   The page's own action row (.action-bar: a form page's actions, a selection bar,
-   Tune's or Insight's actions) always ends in ❌ at the far right. On a phone it
-   replaces the section tab bar as the one bar pinned to the bottom of the screen,
-   in the tab bar's own look: one row that scrolls sideways when it holds more
-   buttons than fit, with ❌ kept in view at the right. */
+   A page's .action-bar ends in ❌; on a phone it replaces the tab bar, in its look,
+   scrolling sideways with ❌ kept in view. */
 .panel-actions .page-action-close {
     float: none;
     margin-left: auto;
@@ -4348,10 +3869,11 @@ html.section-pages .panel.page-active:hover {
         gap: var(--bottom-bar-gap);
         overflow-x: auto;
         margin: 0;
-        /* The tab bar's own height, which this bar replaces. */
+        /* The tab bar's height. */
         box-sizing: border-box;
         height: calc(var(--bottom-bar-height) + 1px);
-        padding: 0 var(--bottom-bar-edge);
+        /* Room at the left for the account avatar. */
+        padding: 0 var(--bottom-bar-edge) 0 var(--bottom-bar-start);
         background: var(--glass-bg);
         -webkit-backdrop-filter: var(--glass-blur);
         backdrop-filter: var(--glass-blur);
@@ -4369,8 +3891,7 @@ html.section-pages .panel.page-active:hover {
         flex: 0 0 auto;
     }
 
-    /* While an emoji grows (motion.js's iconBusy), the bar crops only its sides;
-       the scroll is held by --bar-scroll. */
+    /* While an emoji grows (iconBusy), only the sides crop; --bar-scroll holds the scroll. */
     html[data-action-bar] .action-bar.bar-unclipped,
     html[data-action-bar] .app-form .modal-actions.action-bar.bar-unclipped {
         overflow-x: clip;
@@ -4386,10 +3907,7 @@ html.section-pages .panel.page-active:hover {
         display: inline-flex;
     }
 
-    /* Finger-sized: the large button size, 42px, close to the 44px touch guideline.
-       A long label wraps onto a second line inside its button ("Export" over
-       "Transactions") instead of stretching it: up to two lines fit, and the
-       narrower buttons leave more of the bar in view. */
+    /* Finger-sized 42px; a long label wraps to two lines rather than widening. */
     html[data-action-bar] .action-bar .btn {
         height: 42px;
         max-width: 6.5rem;
@@ -4397,7 +3915,6 @@ html.section-pages .panel.page-active:hover {
         font-size: var(--text-small);
         line-height: 1.2;
         white-space: normal;
-        text-align: center;
     }
 
     html[data-action-bar] .action-bar .btn-icon,
@@ -4406,17 +3923,14 @@ html.section-pages .panel.page-active:hover {
         font-size: var(--text-display);
     }
 
-    /* A selection bar's "3 selected" count rides along at the left, readable on
-       the glass bar. */
+    /* A selection bar's count. */
     html[data-action-bar] .action-bar > span {
         color: var(--glass-text);
         font-size: var(--text-small);
         white-space: nowrap;
     }
 
-    /* Every button in the bar shares the rule above; only colour differs. ❌ sits
-       last, pinned at the right edge. */
-    /* ❌ round, like the sign-in button, at the bar's right end. */
+    /* ❌ round, pinned at the bar's right end. */
     html[data-action-bar] .action-bar > .modal-close {
         position: sticky;
         right: 0;
@@ -4424,10 +3938,8 @@ html.section-pages .panel.page-active:hover {
         width: 42px;
         border-radius: 50%;
     }
-}
 
-/* The bottom bars: lighter glass than the rest. */
-@media (max-width: 1179px) {
+    /* The bottom bars: lighter glass than the rest. */
     .nav,
     html[data-action-bar] .action-bar,
     html[data-action-bar] .app-form .modal-actions.action-bar {
@@ -4442,14 +3954,6 @@ html.section-pages .panel.page-active:hover {
     html[data-action-bar] .app-form .modal-actions.action-bar {
         --glass-bg: var(--color-surface);
         --glass-blur: none;
-    }
-}
-
-/* Room at the left for the account avatar (.header-actions), pinned there. */
-@media (max-width: 1179px) {
-    html[data-action-bar] .action-bar,
-    html[data-action-bar] .app-form .modal-actions.action-bar {
-        padding-left: var(--bottom-bar-start);
     }
 }
 
@@ -4482,15 +3986,10 @@ html.section-pages .panel.page-active:hover {
 }
 
 /* ───────────────────────────── Print ─────────────────────────────
-   Chrome stamps every position:fixed element onto EVERY sheet — which is
-   why the bottom tab bar (.nav) and footer showed up on all the A4 pages,
-   while the panel's 🤖/➕ icon buttons (normal flow) only landed on the
-   first. A printout wants the page's content, not the app's controls, so
-   this drops the chrome and flattens the shell onto paper. */
+   Chrome repeats fixed elements on every sheet, so the app's chrome goes and
+   the shell flattens onto paper. */
 @media print {
-    /* The fixed bottom tab bar + footer (the bars that repeated on every
-       page), the sidebar and its toggle, the fixed status-bar strip, and
-       transient overlays. */
+    /* Fixed bars, the sidebar, transient overlays and on-screen controls. */
     .nav,
     .side-nav,
     .side-nav-toggle,
@@ -4498,13 +3997,7 @@ html.section-pages .panel.page-active:hover {
     .toast,
     .confetti-canvas,
     .modal,
-    body::before {
-        display: none !important;
-    }
-
-    /* On-screen controls: the header's account/settings actions, the
-       🤖 "Send to AI" and ➕ icon buttons, every other button, the chart
-       range pickers and sticky form action bars — all useless on paper. */
+    body::before,
     .header-actions,
     .btn,
     .btn-icon,
@@ -4514,17 +4007,14 @@ html.section-pages .panel.page-active:hover {
         display: none !important;
     }
 
-    /* Keep the page title for context, but don't let the header stick,
-       cast a shadow, or carry its glass background onto the sheet. */
+    /* The title stays, without the header's stickiness, shadow or glass. */
     header {
         position: static !important;
         box-shadow: none !important;
         background: none !important;
     }
 
-    /* Flatten the shell so the whole page flows onto paper rather than being
-       clipped to the screen height, and drop the washes/blur that otherwise
-       print as muddy grey. */
+    /* The whole page flows onto paper, without the washes. */
     html,
     body {
         min-height: 0 !important;
@@ -4533,8 +4023,7 @@ html.section-pages .panel.page-active:hover {
         background: #fff !important;
     }
 
-    /* The container padded its bottom to clear the (now-hidden) tab bar —
-       reclaim that space so the page doesn't end in a tall blank strip. */
+    /* No room kept for the hidden tab bar. */
     .container {
         padding: var(--space-l) !important;
     }
@@ -4555,8 +4044,7 @@ html.section-pages .panel.page-active:hover {
         grid-template-columns: 550px minmax(0, 1fr);
     }
 
-    /* Don't slice a chart or card across a page break where it can be helped.
-       Not .panel: a page-tall panel got pushed whole to sheet 2, leaving sheet 1 blank. */
+    /* Don't slice charts or cards (not .panel: a tall one left sheet 1 blank). */
     canvas,
     .chart-box,
     .app-card,

@@ -1,42 +1,24 @@
-// BMR calibration: measures how wrong the equation's BMR actually is, from logged data over
-// a trailing window (n_p periods of L_p days ending yesterday), rather than trying to
-// predict BMR from height/age/sex (or lean mass) alone. Shown in Tune (BMR_cal row, its
-// Periods under Calculations, Update) and stored per day in Physique's Derived column.
-// Local only, no AI — every number in the trace is one this app already tracks.
+// BMR calibration: how wrong the equation's BMR is, measured from logged data over n_p
+// periods of L_p days. Shown in Tune and stored per day in Physique's Derived column.
 //
-// The core idea is two INDEPENDENT estimates of the same day's energy deficit, compared:
-//   D  = TEI − equationBMR − AEE − TEF (+SD)   — what the CURRENT equation BMR implies happened
-//   ΔM = (massStart − massEnd) × 7700 / 7       — what ACTUALLY happened, from real mass change,
-//                                                  the equation never enters into it
-// If the equation's BMR were exactly right, D and ΔM would already agree. The gap (D − ΔM) IS
-// the equation's error — that's the Offset. Priced one WEEK at a time (D and ΔM each averaged/
-// measured over that week's own days and its own mass reading, never blended across raw days
-// first), then combined with a linear recency weight — 0.1 for the oldest week, 1.0 for the
-// newest (weekRecencyWeight) — so a long window can draw on months of data without letting
-// six-week-old numbers outvote last week's.
-//
-// Applied as an OFFSET from what the equation says (latestStoredCalibration, health-math.js:
-// the latest Physique day's stored BMR_cal minus its equation BMR), not a raw replacement BMR — applyBmrBasis/maintenanceAffineCoefficients
-// add that offset to whatever the equation says at any body mass, so the app keeps the
-// equation's own slope (how BMR moves as you gain/lose) and just shifts the whole line to
-// match what was actually measured, per the "keep slope, shift level" design.
+// Two independent daily deficits are compared per period:
+//   D  = TEI − BMR − AEE − TEF (+SD)   what the equation implies happened
+//   ΔM = Δm̄ × 7700 / L_p               what the mass change says happened
+// Their gap is the equation's error (the offset), averaged over periods weighted 0.1
+// (oldest) to 1.0 (newest). The app adds that offset to the equation at any mass, so
+// it keeps the equation's slope and shifts its level.
 
 const BMR_CALIBRATION_WINDOW_DAYS = 7;
 const BMR_CALIBRATION_PERIOD_DAYS_DEFAULT = 7;
 const BMR_CALIBRATION_PERIOD_COUNT_DEFAULT = 4;
 
-// One ISO date, `days` away from `dateIso` — UTC arithmetic throughout (parseIsoDateUTC),
-// never a local Date object, so this can't drift a day off depending on the machine's
-// timezone the way mixing UTC and local math would.
+// `days` from an ISO date, in UTC so the timezone can't shift it.
 function isoDatePlusDays(dateIso, days) {
   const d = new Date(parseIsoDateUTC(dateIso) + days * 86400000);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
-// Linear recency weight across the calibration's weeks — 0.1 for the OLDEST week, 1.0 for
-// the NEWEST, so five months of history can be included without an ingredient logged
-// differently (or a body genuinely different) six weeks ago outvoting last week's numbers.
-// A single week is always weight 1 — there's nothing to rank it against.
+// Linear recency weight: 0.1 for the oldest period up to 1.0 for the newest; 1 if alone.
 const BMR_CALIBRATION_OLDEST_WEEK_WEIGHT = 0.1;
 function weekRecencyWeight(weekIndex, totalWeeks) {
   if (totalWeeks <= 1) return 1;
@@ -44,9 +26,7 @@ function weekRecencyWeight(weekIndex, totalWeeks) {
     + (1 - BMR_CALIBRATION_OLDEST_WEEK_WEIGHT) * (weekIndex / (totalWeeks - 1));
 }
 
-// Weighted mean of `valueFn(item)` over whichever items have a non-null value, weighted by
-// `weightFn(item)` — null (not 0) when nothing qualifies, so a week that never got logged
-// simply drops out of the average rather than pulling it toward zero.
+// Weighted mean over items with a non-null value; null when none has one.
 function weightedMean(items, weightFn, valueFn) {
   const valid = items.filter((it) => valueFn(it) !== null);
   const totalWeight = valid.reduce((sum, it) => sum + weightFn(it), 0);
@@ -54,27 +34,22 @@ function weightedMean(items, weightFn, valueFn) {
   return valid.reduce((sum, it) => sum + weightFn(it) * valueFn(it), 0) / totalWeight;
 }
 
-// The whole calculation, pure data in and a result object out — no DOM. `ok: false` always
-// carries whatever partial `days`/`weeks` it managed to build, so the caller can show the
-// day-by-day and period-by-period tables even when there isn't enough to finish the arithmetic
-// (the same "don't hide the process" the rest of this form follows).
+// Mean of `valueFn` over items, or null when empty.
+function meanOf(items, valueFn) {
+  return items.length ? items.reduce((sum, it) => sum + valueFn(it), 0) / items.length : null;
+}
+
+// The calculation, data in and result out, no DOM. A failure (`ok: false`) still returns
+// the days and periods built so far, so their tables can show.
 //
-// The window runs from `startDateIso` (null defaults to BMR_CALIBRATION_WINDOW_DAYS days back)
-// through the latest ELIGIBLE day, rounded UP to whole `chunkDays`-long periods — a picked
-// start of "10 days back" with a 7-day chunk becomes 2 full periods, never a partial
-// one, since every period needs a complete span to average and mass-smooth on its own. Priced
-// one PERIOD at a time (each its own average intake/activity, its own D, its own mass-based
-// ΔM), then combined with a recency weight per period (weekRecencyWeight) rather than one flat
-// average over the whole span — the size of the chunk only changes how many days each period
-// covers, never the "weigh each period, not each day" shape of the calculation.
-//
-// With `numChunks`, the window is exactly that many periods ending ON endDateIso instead.
+// The window runs from `startDateIso` (default BMR_CALIBRATION_WINDOW_DAYS back) to the
+// latest eligible day, rounded up to whole `chunkDays` periods. With `numChunks`, it is
+// exactly that many periods ending on endDateIso.
 function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_PERIOD_DAYS_DEFAULT, endDateIso = null, numChunks = null) {
   const eligible = (p) => p.caloriesIn !== null && p.caloriesOut !== null;
 
-  // Anchored on the latest ELIGIBLE day, not today — the same "end the window at the latest
-  // real reading" choice smoothedBodyMassKg makes, so a day or two away from logging doesn't
-  // empty the window entirely. endDateIso (Health Insight's To) caps it.
+  // Anchored on the latest eligible day, so a gap in logging can't empty the window.
+  // endDateIso caps it.
   const latestEligible = allPhysiqueEntries
     .filter((p) => p.date && eligible(p) && (!endDateIso || p.date <= endDateIso))
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -96,15 +71,14 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
   // Smoothed over this window's own period length, so each period's m̄ spans one period.
   const massAsOf = (dateIso) => smoothedBodyMassKg(healthEntries.filter((e) => e.date <= dateIso), chunkDays);
 
-  // Read early (not just at the validation check below) so TEF/SD — informational columns in
-  // the day table, not part of the arithmetic below — can still be shown per day even in a
-  // window that ultimately fails the profile check.
-  const heightCmEarly = getSetting('HEIGHT_CM', null);
-  const ageEarly = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
-  const sexEarly = getSettingString('SEX', null);
-  const formulaEarly = bmrFormula();
-  const haveProfile = heightCmEarly !== null && (sexEarly === 'male' || sexEarly === 'female')
-    && (ageEarly !== null || !bmrNeedsAge(formulaEarly));
+  // The profile is read up front so each day's TEF/SD can show even when the
+  // profile check below fails.
+  const heightCm = getSetting('HEIGHT_CM', null);
+  const age = ageFromBirthDate(getSettingString('BIRTH_DATE', null));
+  const sex = getSettingString('SEX', null);
+  const formula = bmrFormula();
+  const haveProfile = heightCm !== null && (sex === 'male' || sex === 'female')
+    && (age !== null || !bmrNeedsAge(formula));
   const sleepDesired = getSetting('SLEEP_DESIRED_HOURS', SLEEP_DESIRED_HOURS_DEFAULT);
   const tefPct = tefPercent();
   const divisor = tefDivisor(tefPct);
@@ -114,21 +88,13 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     const date = isoDatePlusDays(windowStart, i);
     const p = byDate.get(date) || null;
     const m = massAsOf(date);
-    // TEI/AEE are just this day's own logged figures — the standard symbols the Status card
-    // and Tune use for the same two numbers, not a fresh calculation. TEF falls
-    // back to the flat f-share estimate when the day has no measured figure of its own, same
-    // as the Status card's own TEF row does. D (and SD, the sleep-driven piece of it) need a
-    // maintenance figure to react against (dailyEnergyBalanceKcal), so both are null wherever
-    // the profile or that day's own body mass is missing — never a confident zero for
-    // "nothing to show yet". D itself doesn't ALSO need a sleep log — dailyEnergyBalanceKcal
-    // already treats a missing one as "no adjustment" — only SD does, since there's nothing
-    // sleep-driven to report without one.
+    // TEF falls back to the f share when unmeasured. D needs the day's stored BMR, so it's
+    // null without a profile; SD also needs a sleep log.
     let tef = null;
     let sd = null;
     let deficit = null;
     if (p && p.caloriesIn !== null) {
       tef = p.tef !== null ? p.tef : Math.round(p.caloriesIn * (1 - divisor));
-      // The day's stored plain BMR (Physique's Derived column), not recomputed here.
       const maintenanceForDay = haveProfile ? pickBmrForBasis(bmrFiguresForDate(date), 'bmr') : null;
       if (maintenanceForDay !== null) {
         const activity = p.caloriesOut ?? 0;
@@ -151,11 +117,7 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
   }
   const eligibleCount = days.filter((d) => d.eligible).length;
 
-  // One entry per week, oldest first (index 0). Offset is the direct gap between two
-  // independent deficit estimates: D (the Daily table's own, averaged — what the CURRENT
-  // equation BMR implies happened) minus ΔM (the mass-based figure — what actually happened,
-  // independent of the equation). If the equation's BMR were exactly right the two would
-  // already agree and Offset would be 0; the size of the gap IS the correction.
+  // One entry per period, oldest first. Offset = D − ΔM (both negative for a deficit).
   const weeks = [];
   for (let w = 0; w < numWeeks; w++) {
     const weekStart = isoDatePlusDays(windowStart, w * chunkDays);
@@ -164,19 +126,10 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     const weekEligible = weekDays.filter((d) => d.eligible);
     const massEndW = massAsOf(weekEnd);
     const massStartW = massAsOf(isoDatePlusDays(weekStart, -1));
-    const avgIntakeW = weekEligible.length ? weekEligible.reduce((s, d) => s + d.caloriesIn, 0) / weekEligible.length : null;
-    const avgActivityW = weekEligible.length ? weekEligible.reduce((s, d) => s + d.caloriesOut, 0) / weekEligible.length : null;
+    const avgIntakeW = meanOf(weekEligible, (d) => d.caloriesIn);
+    const avgActivityW = meanOf(weekEligible, (d) => d.caloriesOut);
+    const deficitW = meanOf(weekDays.filter((d) => d.deficit !== null), (d) => d.deficit);
 
-    // D: the Daily table's own D, averaged over the week — same negative-for-deficit sign
-    // both tables already use.
-    const weekDeficitDays = weekDays.filter((d) => d.deficit !== null);
-    const deficitW = weekDeficitDays.length
-      ? weekDeficitDays.reduce((s, d) => s + d.deficit, 0) / weekDeficitDays.length
-      : null;
-
-    // massEndW doubles as "this period's own mass" for the Daily table's m column too: it's
-    // already the chunkDays-smoothed average (m̄ over one period length) ending exactly on
-    // this period's last day.
     const deltaMassW = (massStartW !== null && massEndW !== null) ? massEndW - massStartW : null;
     const deltaMKcalW = deltaMassW === null ? null : (deltaMassW * GENERIC_KCAL_PER_KG_FAT) / chunkDays;
 
@@ -199,33 +152,31 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
     });
   }
 
-  const avgIntake = weightedMean(weeks, (w) => w.weight, (w) => w.avgIntake);
-  const avgActivity = weightedMean(weeks, (w) => w.weight, (w) => w.avgActivity);
-  const deficitActual = weightedMean(weeks, (w) => w.weight, (w) => w.deficit);
-  const deltaMActual = weightedMean(weeks, (w) => w.weight, (w) => w.deltaMKcal);
+  const weighted = (valueFn) => weightedMean(weeks, (w) => w.weight, valueFn);
+  const fail = (reason) => ({ ok: false, reason, days, weeks, eligibleCount, chunkDays });
+  const avgIntake = weighted((w) => w.avgIntake);
+  const avgActivity = weighted((w) => w.avgActivity);
+  const deficitActual = weighted((w) => w.deficit);
+  const deltaMActual = weighted((w) => w.deltaMKcal);
   if (avgIntake === null || avgActivity === null) {
-    return { ok: false, reason: 'No period in this window has both Calories In and Calories Out logged.', days, weeks, eligibleCount, chunkDays };
+    return fail('No period in this window has both Calories In and Calories Out logged.');
   }
   if (deltaMActual === null) {
-    return { ok: false, reason: 'Not enough body-mass readings logged around this window to measure any period\'s mass change.', days, weeks, eligibleCount, chunkDays };
+    return fail('Not enough body-mass readings logged around this window to measure any period\'s mass change.');
   }
 
-  const heightCm = heightCmEarly;
-  const age = ageEarly;
-  const sex = sexEarly;
-  const formula = formulaEarly;
   if (!haveProfile) {
     const missing = [
       heightCm === null ? 'Height' : null,
       (sex !== 'male' && sex !== 'female') ? 'Sex' : null,
       (bmrNeedsAge(formula) && age === null) ? 'Birth Date' : null,
     ].filter(Boolean).join(', ');
-    return { ok: false, reason: `Needs ${missing} filled in under Settings first — the offset is measured against the equation's own figure.`, days, weeks, eligibleCount, chunkDays };
+    return fail(`Needs ${missing} filled in under Settings first — the offset is measured against the equation's own figure.`);
   }
 
-  const offsetKcal = weightedMean(weeks, (w) => w.weight, (w) => w.offset);
+  const offsetKcal = weighted((w) => w.offset);
   if (offsetKcal === null) {
-    return { ok: false, reason: 'No single period has both a D figure and a measurable ΔM to compare.', days, weeks, eligibleCount, chunkDays };
+    return fail('No single period has both a D figure and a measurable ΔM to compare.');
   }
 
   const bodyMassNowKg = planBodyMassKg(healthEntries);
@@ -241,22 +192,21 @@ function computeBmrCalibration(startDateIso = null, chunkDays = BMR_CALIBRATION_
   };
 }
 
-// Tune's Periods table and lines, under Calculations.
+// Tune's Periods table, under Calculations.
 function renderBmrCalibrationWeeks(weeks, tbodyId) {
   const tbody = document.getElementById(tbodyId);
   tbody.innerHTML = '';
   weeks.forEach((w) => {
     const tr = document.createElement('tr');
-    // w.deficit (D, averaged) and w.deltaMKcal (ΔM) are both already display-signed
-    // (negative-for-deficit/loss) — Offset = w.offset = w.deficit − w.deltaMKcal, computed
-    // once in computeBmrCalibration, not re-derived here.
+    const shown = (value, format) => (value === null ? '—' : format(value));
+    const kcal = (v) => Math.round(v).toString();
     const cells = [
       `${w.weekStart} → ${w.weekEnd}`,
-      w.massEnd === null ? '—' : w.massEnd.toFixed(1),
-      w.deltaMass === null ? '—' : w.deltaMass.toFixed(1),
-      w.deltaMKcal === null ? '—' : Math.round(w.deltaMKcal).toString(),
-      w.deficit === null ? '—' : Math.round(w.deficit).toString(),
-      w.offset === null ? '—' : withExplicitSign(Math.round(w.offset)),
+      shown(w.massEnd, (v) => v.toFixed(1)),
+      shown(w.deltaMass, (v) => v.toFixed(1)),
+      shown(w.deltaMKcal, kcal),
+      shown(w.deficit, kcal),
+      shown(w.offset, (v) => withExplicitSign(Math.round(v))),
       w.weight.toFixed(2),
     ];
     cells.forEach((text) => {
@@ -274,36 +224,27 @@ function renderBmrCalibrationSubstituted(result, elId) {
   if (!result.ok) return;
 
   const offsetSign = result.offsetKcal >= 0 ? '+' : '−';
-  const rows = [
+  appendLabelledRows(el, [
     ['D', `${Math.round(result.deficitActual)} kcal/day — equation-implied`],
     ['ΔM', `${Math.round(result.deltaMActual)} kcal/day — measured, from mass change`],
     ['Offset', `D − ΔM = ${withExplicitSign(result.offsetKcal)} kcal/day`],
     ['BMR_cal', `${result.equationBmrNow} ${offsetSign} ${Math.abs(result.offsetKcal)} = ${result.bmrCal} kcal/day`],
-  ];
-  rows.forEach(([label, value]) => {
-    const p = document.createElement('p');
-    const strong = document.createElement('strong');
-    strong.textContent = `${label}: `;
-    p.append(strong, document.createTextNode(privacyMode ? maskDigits(value) : value));
-    el.appendChild(p);
-  });
+  ]);
 }
 
-// A typed box's whole number, or `fallback` when it's blank/zero/negative/non-numeric —
-// never NaN or 0 into the date arithmetic.
+// A box's whole number, or `fallback` when it isn't one ≥ 1.
 function periodInputValue(inputId, fallback) {
   const raw = Number(document.getElementById(inputId).value);
   return (Number.isFinite(raw) && raw >= 1) ? Math.round(raw) : fallback;
 }
 
-// Ends yesterday: today is usually still being logged. Shared with Tune's BMR_cal.
+// Ends yesterday, since today is usually still being logged.
 function bmrCalibrationForWindow(periodCount, periodDays) {
   return computeBmrCalibration(null, periodDays, isoDateFromDays(-1), periodCount);
 }
 
-// Tune's Update: saves n_p / L_p and rewrites every day's stored Derived cell (its BMR_cal
-// over the new window) and its body-mass figures (m_avg over the new L_p, with the BMI and m_d that
-// follow it) in the Physique sheet, in one request.
+// Tune's Update: saves n_p / L_p and recomputes every Physique day's BMR_cal and
+// m_avg (with its BMI and m_d) in one request.
 async function updateStoredBmrCalibration() {
   const periodCount = periodInputValue('formula-cal-period-count', BMR_CALIBRATION_PERIOD_COUNT_DEFAULT);
   const periodDays = periodInputValue('formula-cal-period-days', BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);

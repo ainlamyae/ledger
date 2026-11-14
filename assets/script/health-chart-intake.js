@@ -17,32 +17,27 @@ function renderHealthIntakeChart(entries) {
 
   const desired = getCalorieDesired(entries);
 
-  const calorieEntries = calorieLogEntries(entries);
   const dates = healthCalorieChartDates(entries);
   const byDate = new Map();
-  calorieEntries.forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
+  calorieLogEntries(entries).forEach((e) => byDate.set(e.date, (byDate.get(e.date) || 0) + e.amount));
 
   // kcal per macro per day. Carbohydrate is USDA's "by difference", fiber included, so
   // fiber comes off it first.
-  const macroEntries = entries.filter((e) => e.category === 'Calories; Protein');
   const gramsOf = (e, key) => {
     const g = e[key] ?? 0;
     return key === 'carbG' ? Math.max(0, g - (e.fiberG ?? 0)) : g;
   };
+  const addTo = (m, d, x) => m.set(d, (m.get(d) || 0) + x);
   // Grams as logged, for the hover.
-  const gramsByMacro = INTAKE_MACROS.map(({ key }) => {
-    const m = new Map();
-    macroEntries.forEach((e) => {
-      if (e[key] !== null && e[key] !== undefined) m.set(e.date, (m.get(e.date) || 0) + e[key]);
+  const gramsByMacro = INTAKE_MACROS.map(() => new Map());
+  const kcalByMacro = INTAKE_MACROS.map(() => new Map());
+  entries.forEach((e) => {
+    if (e.category !== 'Calories; Protein') return;
+    INTAKE_MACROS.forEach(({ key, kcalPerG }, m) => {
+      if (e[key] === null || e[key] === undefined) return;
+      addTo(gramsByMacro[m], e.date, e[key]);
+      addTo(kcalByMacro[m], e.date, gramsOf(e, key) * kcalPerG);
     });
-    return m;
-  });
-  const kcalByMacro = INTAKE_MACROS.map(({ key, kcalPerG }) => {
-    const m = new Map();
-    macroEntries.forEach((e) => {
-      if (e[key] !== null && e[key] !== undefined) m.set(e.date, (m.get(e.date) || 0) + gramsOf(e, key) * kcalPerG);
-    });
-    return m;
   });
 
   // Atwater rates don't sum to each food's own USDA energy, so each day's segments are
@@ -65,17 +60,19 @@ function renderHealthIntakeChart(entries) {
     BMR_avg: chartColor('--chart-warn'),
   };
   const tuneBmrKey = { bmr_cal: 'BMR_cal', bmr_adp: 'BMR_adp', bmr_avg: 'BMR_avg' }[bmrBasis()] ?? BMR_EQUATION_KEYS[bmrFormula()];
-  const BMR_CAPS = [{ key: tuneBmrKey, color: BMR_COLORS[tuneBmrKey] }];
-  const bmrByKey = { [tuneBmrKey]: new Map() };
+  const bmrColor = BMR_COLORS[tuneBmrKey];
+  const bmrName = BMR_DEFINITIONS[tuneBmrKey];
+  const bmrByDate = new Map();
   const bmrKeyByDate = new Map();
   dates.forEach((d) => {
     const figures = bmrFiguresForDate(d);
     const selected = pickBmrForBasis(figures);
     if (selected !== null) {
-      bmrByKey[tuneBmrKey].set(d, selected);
+      bmrByDate.set(d, selected);
       bmrKeyByDate.set(d, selectedBmrKey(figures));
     }
   });
+  const hasBmr = bmrByDate.size > 0;
 
   const desiredByDay = calorieDesiredSeries(entries, dates);
   const dayDesired = (i) => ({ ...desired, kcal: desiredByDay[i].kcal });
@@ -106,8 +103,7 @@ function renderHealthIntakeChart(entries) {
   }));
   const stackTops = dates.map((d, i) => macroDatasets.reduce((sum, ds) => sum + (ds.hidden ? 0 : ds.data[i]), 0));
 
-  const restingKcalValues = BMR_CAPS.filter(({ key }) => !hidden.has(BMR_DEFINITIONS[key]))
-    .flatMap(({ key }) => [...bmrByKey[key].values()]);
+  const restingKcalValues = hidden.has(bmrName) ? [] : [...bmrByDate.values()];
   const axis = calorieAxisBounds(
     shownValues.filter((v) => v !== null).concat(stackTops.filter((v) => v > 0), hidden.has(healthAvgName()) ? [] : weeklyAvg.filter((v) => v !== null)),
     (hidden.has(`Desired ${desired.word}`) ? [] : desiredByDay.map((b) => b.kcal)).concat(restingKcalValues),
@@ -132,10 +128,10 @@ function renderHealthIntakeChart(entries) {
           isDesiredLine: true,
           order: 1,
         },
-        ...BMR_CAPS.filter(({ key }) => bmrByKey[key].size > 0).map(({ key, color }) => desiredCapDataset(
-          key, dates.map((d) => bmrByKey[key].get(d) ?? null), capHalf,
-          { yAxisID: 'y1', isDesiredLine: true, backgroundColor: color, hidden: hidden.has(BMR_DEFINITIONS[key]), order: 1 },
-        )),
+        ...(hasBmr ? [desiredCapDataset(
+          tuneBmrKey, dates.map((d) => bmrByDate.get(d) ?? null), capHalf,
+          { yAxisID: 'y1', isDesiredLine: true, backgroundColor: bmrColor, hidden: hidden.has(bmrName), order: 1 },
+        )] : []),
         {
           type: 'line',
           label: 'Calories',
@@ -180,7 +176,7 @@ function renderHealthIntakeChart(entries) {
               const i = items[0]?.dataIndex;
               if (i === undefined) return '';
               const lines = [`Desired ${desired.word}: ${desiredByDay[i].kcal} kcal`];
-              const kcal = bmrByKey[tuneBmrKey].get(items[0].label);
+              const kcal = bmrByDate.get(items[0].label);
               if (kcal !== undefined) lines.push(`${bmrHoverLabel(bmrKeyByDate.get(items[0].label))}: ${Math.round(kcal)} kcal`);
               if (weeklyAvg[i] !== null) lines.push(`${healthAvgName()}: ${Math.round(weeklyAvg[i])} kcal`);
               return privacyMode ? lines.map(maskDigits) : lines;
@@ -208,6 +204,6 @@ function renderHealthIntakeChart(entries) {
     ...desiredGradeLegend(),
     { name: healthAvgName(), color: desiredMarkColor() },
     { name: `Desired ${desired.word}`, color: chartColor('--chart-cyan') },
-    ...BMR_CAPS.filter(({ key }) => bmrByKey[key].size > 0).map(({ key, color }) => ({ name: BMR_DEFINITIONS[key], color })),
+    ...(hasBmr ? [{ name: bmrName, color: bmrColor }] : []),
   ], () => renderHealthIntakeChart(entries));
 }

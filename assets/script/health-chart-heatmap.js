@@ -58,7 +58,8 @@ function renderHealthHeatmap(entries) {
         cell.style.background = grade.color;
         cell.style.color = '#fff';
       }
-      const text = `${iso}: ${balance > 0 ? '+' : ''}${Math.round(balance)} kcal · ${grade.name}`;
+      // Sign only on negatives, as every chart hover.
+      const text = `${iso}: ${Math.round(balance)} kcal · ${grade.name}`;
       cell.title = privacyMode ? maskDigits(text) : text;
     }
     grid.appendChild(cell);

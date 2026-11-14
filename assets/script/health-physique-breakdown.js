@@ -1,4 +1,3 @@
-
 // A corrupt or hand-mangled cell degrades to "no breakdown" rather than
 // failing the form.
 function parsePhysiqueBreakdown(raw) {
@@ -11,14 +10,8 @@ function parsePhysiqueBreakdown(raw) {
   }
 }
 
-// Draws the shared breakdown table (health-physique-estimator.js) under the Breakdown
-// field, or hides it when there's nothing parseable to show. renderCalcBreakdown
-// itself merges same-name rows and sorts highest calories first for display,
-// so an entry saved before that existed (or hand-edited out of order) still
-// shows correctly without touching the stored JSON's own order. Each row's
-// Carbohydrate/Fat/TEF cells come along for free once estimateTefBreakdown
-// (health-insight-micronutrient.js) has annotated the breakdown array passed in —
-// this function itself just draws whatever's already on the rows.
+// Draws the shared breakdown table (health-physique-estimator.js), or hides it
+// when there's nothing to show.
 function renderPhysiqueBreakdown(breakdown, calories, protein) {
   if (breakdown.length) {
     renderCalcBreakdown(breakdown, calories || 0, protein || 0, 'physique');
@@ -27,14 +20,8 @@ function renderPhysiqueBreakdown(breakdown, calories, protein) {
   }
 }
 
-// Re-derives Calories In/Protein In/Fiber/Fat/Carbohydrate/TEF straight from
-// an already-drawn Consumption breakdown array — the same tail end of
-// calculatePhysiqueDay (above) runs once a fresh Calculate has its own
-// figures, but this is for when something else changes a row's numbers
-// afterwards without a full re-Calculate (currently just the ✏️ button on a
-// breakdown row, health-physique-estimator.js's applyEditedRowToBreakdown), so what
-// Save eventually writes matches what the table now shows rather than the
-// stale figures the original Calculate produced.
+// Writes Calories In/Protein In/Fiber/Fat/Carbohydrate/TEF from a breakdown, so
+// Save matches the table. A macro nothing measured keeps its field as it was.
 function syncPhysiqueTotalsFromBreakdown(breakdown, calories, protein) {
   physiqueField('calories-in').value = calories;
   physiqueField('protein-in').value = protein.toFixed(1);
@@ -47,74 +34,52 @@ function syncPhysiqueTotalsFromBreakdown(breakdown, calories, protein) {
   if (tef) physiqueField('tef').value = tef.tefKcal;
 }
 
-// The Workout counterpart to the breakdown table above: one row per parsed
-// exercise, the MET it was priced at, and the same summed Total row — which is
-// where the day's duration and burn are now read, the two fields themselves
-// being hidden.
-//
-// Nothing here is stored. Unlike Breakdown there's no JSON column behind it:
-// the whole table is local arithmetic over the Workout text
-// (health-activity-estimator.js), so it can be rebuilt on demand and never has to be
-// kept in step with a saved copy of itself.
+// The Workout's table: one row per exercise and the MET it was priced at. Not
+// stored: it's rebuilt from the Workout text (health-activity-estimator.js).
 function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg) {
   const tbody = document.getElementById('physique-activity-breakdown-body');
   tbody.innerHTML = '';
 
   perLine.forEach((line) => {
-    const tr = document.createElement('tr');
-    tr.append(
+    appendTableRow(tbody, '', [
       makeCell(titleCaseIngredientName(line.name)),
       makeCell(line.quantity),
       makeCell(String(line.met)),
       makeCell(activityLineMinutes(line.seconds)),
       makeCell(String(Math.round(line.calories))),
       activitySourceCell(line),
-    );
-    tbody.appendChild(tr);
+    ]);
   });
 
-  const totalRow = document.createElement('tr');
-  totalRow.className = 'calc-breakdown-total';
-  totalRow.append(
+  appendTableRow(tbody, 'calc-breakdown-total', [
     makeCell('Total'),
     makeCell(''),
     makeCell(''),
     makeCell(String(minutes)),
     makeCell(String(calories)),
     makeCell(''),
-  );
-  tbody.appendChild(totalRow);
+  ]);
 
-  // ACTIVITY_DESIRED_MIN's minutes/kcal at today's body mass — same pinned-vs-flat
-  // rule the Physical Activity tile/chart use (getActivityDesiredMin/Kcal, health-math.js),
-  // so this row can't drift from what "hitting the workout goal" means elsewhere.
-  // Only today's own form: every other day is read after the fact, so "still left
-  // to reach today's goal" doesn't apply to it the way it does to the one day
-  // actually being logged.
+  // Today's workout goal at today's body mass, as the Physical Activity tile
+  // reads it (health-math.js). Only on today's form.
   if (physiqueField('date').value === isoFromDate(new Date())) {
     const desireMin = Math.round(getActivityDesiredMin(bodyMassKg));
     const desireKcal = Math.round(getActivityDesiredKcal(bodyMassKg));
-    const desiredRow = document.createElement('tr');
-    desiredRow.className = 'calc-breakdown-desired';
-    desiredRow.append(
+    appendTableRow(tbody, 'calc-breakdown-desired', [
       makeCell('Desire', 'Workout duration/burn goal — from Tune and Settings, not today\'s Workout'),
       makeCell(''),
       makeCell(''),
       makeCell(String(desireMin)),
       makeCell(String(desireKcal)),
       makeCell(''),
-    );
-    tbody.appendChild(desiredRow);
+    ]);
   }
 
   document.getElementById('physique-activity-breakdown').hidden = document.getElementById('physique-is-pattern').checked;
 }
 
-// The Workout table's last column, as Consumption's (health-physique-estimator.js's
-// sourceCell): ✅ for an exercise on the Activity sheet; AI for one the AI
-// priced (guessUnknownActivities), then 💾 to save it to the sheet as-is and ✏️
-// to fix it first; Default for one priced at EXERCISE_MET_FALLBACK, which
-// 🧮 Calculate sends to the AI.
+// Last column, as Consumption's sourceCell: ✅ on the Activity sheet; AI for an
+// AI-priced exercise, with 💾 and ✏️; Default for EXERCISE_MET_FALLBACK.
 function activitySourceCell(line) {
   const cell = document.createElement('td');
   const label = document.createElement('span');
@@ -174,9 +139,8 @@ function makeSaveActivityGuessButton(guess) {
   });
 }
 
-// Opens the Add Activity form the Activity Plan's own Add uses, filled with the
-// guess, under the activity's own address; its Save reprices the day
-// (submitActivityForm, health-activity-catalogue.js).
+// Opens the Activity Plan's Add form, filled with the guess, under the
+// activity's own address; its Save reprices the day (submitActivityForm).
 function makeEditActivityGuessButton(guess) {
   return makeRowActionButton({
     emoji: '✏️',
@@ -197,24 +161,13 @@ function makeEditActivityGuessButton(guess) {
   });
 }
 
-// One decimal rather than whole minutes: a strength line is often well under a
-// minute of active time, and rounding each row to 0 or 1 would leave the rows
-// looking nothing like the Total they add up to.
+// One decimal: a strength line is often under a minute.
 function activityLineMinutes(seconds) {
   return String(Math.round(seconds / 6) / 10);
 }
 
-// The same estimate 🧮 Calculate runs, run when the form opens so a saved day
-// arrives showing its table — and so what the table shows is what Save writes.
-// Repricing on open is the point, not a side effect: the estimate is pure local
-// arithmetic over the day's own Workout and Body Mass, so a day opened after
-// WORKOUT_REP_SEC (or an Activities MET) changed is worth more than the figure
-// it was saved with. A workout that can't be priced writes nothing at all, so a
-// hand-typed one keeps whatever it was saved with either way.
-//
-// Warnings are dropped rather than shown: the form has just opened, and
-// openPhysiqueForm clears the error line straight after this anyway. Pressing
-// Calculate is what surfaces them.
+// Reprices the Workout when the form opens, so the table shows what Save will
+// write. Warnings are dropped; Calculate is what shows them.
 function refreshPhysiqueActivityBreakdown() {
   runPhysiqueWorkoutCalc(false);
 }
@@ -224,23 +177,12 @@ function hidePhysiqueActivityBreakdown() {
   document.getElementById('physique-activity-breakdown-body').innerHTML = '';
 }
 
-// Re-estimates only the Consumption lines that actually changed.
-//
-// Every breakdown item records the standardized line it produced (noteLine,
-// health-physique-estimator.js), and Calculate writes those same lines back into
-// Consumption — so on a second run, any line still matching one of them is
-// already solved and its numbers are reused verbatim. Only the leftovers go to
-// Groq/USDA, which is what makes editing one ingredient in a ten-line day cost
-// one lookup instead of ten.
-//
-// A saved breakdown from before noteLine existed simply matches nothing and
-// the whole day re-estimates, exactly as it used to.
+// Re-estimates only the Consumption lines that changed: a line matching a saved
+// item's noteLine reuses its numbers, so editing one ingredient costs one lookup.
 async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) {
   const lines = consumption.split('\n').map((line) => line.trim()).filter(Boolean);
 
-  // Each saved item can back at most one line, so the same ingredient typed
-  // twice re-estimates its second occurrence rather than double-counting one
-  // result.
+  // Each saved item backs at most one line, so a repeated line isn't double-counted.
   const pool = new Map();
   parsePhysiqueBreakdown(savedBreakdownRaw).forEach((item) => {
     if (!item.noteLine) return;
@@ -263,19 +205,17 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
     ? await estimateCaloriesAndProtein(staleLines.join('\n'), { autoBank: false })
     : { calories: 0, protein: 0, breakdown: [], usdaUnreachable: false };
 
-  // Nothing reused means this is an ordinary full Calculate — pass its own
-  // totals straight through, so the same text gives the same figures here as
-  // on a first run. A mixed run has to re-sum the per-item numbers
-  // instead, which can differ by a fraction of a kcal from a single-pass
-  // total (each item is already rounded).
+  // Nothing reused: pass the full run's own totals through. A mixed run re-sums
+  // the already-rounded items.
   if (!reused.length) {
     return { ...fresh, reusedCount: 0, estimatedCount: fresh.breakdown.length };
   }
 
   const breakdown = [...reused, ...fresh.breakdown].sort((a, b) => b.calories - a.calories);
+  const { calories, protein } = breakdownTotals(breakdown);
   return {
-    calories: Math.round(breakdown.reduce((total, i) => total + i.calories, 0)),
-    protein: Math.round(breakdown.reduce((total, i) => total + i.protein, 0) * 10) / 10,
+    calories,
+    protein,
     breakdown,
     usdaUnreachable: fresh.usdaUnreachable,
     reusedCount: reused.length,
@@ -283,26 +223,12 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
   };
 }
 
-// Prices the Workout field, writing both the hidden Activity Duration and
-// Calories Out fields (columns N and O on Save) and the table they're read from,
-// so the two can't disagree. Warnings are returned rather than shown — 🧮
-// Calculate merges them with the food side's, Log a Workout (health-activity.js)
-// shows them on their own, and opening the form
-// (refreshPhysiqueActivityBreakdown) drops them.
-//
-// Nothing is written unless the estimate succeeds: a day whose Workout is free
-// text, or which has no body mass to price it, keeps the pair it was saved with.
-//
-// Synchronous: unlike the food estimator this is pure local arithmetic, no
-// Groq or USDA involved.
-// Workout's counterpart to combineAndSortConsumptionText: two lines for the
-// same exercise sum into one rather than staying split. Unlike Consumption,
-// "same" also needs the same quantity TYPE — two "Nx Push-ups" lines sum
-// their reps, but "Nx Push-ups" and "Nmin Push-ups" don't merge, since
-// summing a rep count into a minute figure (or vice-versa) wouldn't mean
-// anything as one quantity token. A line the parser doesn't recognize at all
-// passes through unmerged, same as Consumption's own unparseable-line
-// fallback — nothing typed ever just vanishes.
+// The quantity field each parsed workout line type sums.
+const WORKOUT_QUANTITY_FIELD = { reps: 'reps', duration: 'minutes', steps: 'steps', hold: 'seconds' };
+
+// Workout's combineAndSortConsumptionText: lines for the same exercise and
+// quantity type sum ("30x" and "10min" of one exercise don't). An unparsed line
+// passes through as typed.
 function combineWorkoutText(text) {
   const rawLines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!rawLines.length) return { text, combinedCount: 0 };
@@ -317,10 +243,8 @@ function combineWorkoutText(text) {
       groups.set(key, { parsed, raw });
       return;
     }
-    if (parsed.type === 'reps') existing.parsed.reps += parsed.reps;
-    else if (parsed.type === 'duration') existing.parsed.minutes += parsed.minutes;
-    else if (parsed.type === 'steps') existing.parsed.steps += parsed.steps;
-    else existing.parsed.seconds += parsed.seconds;
+    const field = WORKOUT_QUANTITY_FIELD[parsed.type];
+    existing.parsed[field] += parsed[field];
   });
   const combinedCount = rawLines.length - groups.size;
 
@@ -328,27 +252,21 @@ function combineWorkoutText(text) {
   return { text: rebuilt.join('\n'), combinedCount };
 }
 
-// reorderWorkoutField: rewrite the Workout box itself into the combined,
-// sorted order, not just the table below it — only on an explicit Calculate
-// click. The table sorts either way (harmless, nothing typed gets touched),
-// but the on-open refresh (refreshPhysiqueActivityBreakdown) leaves the box
-// exactly as saved, so opening a day never silently reorders or merges text
-// you didn't ask it to.
+// Prices the Workout into the hidden Activity Duration/Calories Out fields and
+// the table, returning warnings for the caller to show. A Workout that can't be
+// priced writes nothing. reorderWorkoutField (an explicit Calculate only) also
+// rewrites the box combined and sorted; opening a day never touches its text.
 function runPhysiqueWorkoutCalc(reorderWorkoutField) {
   const messages = [];
   const workout = physiqueField('workout').value.trim();
   if (!workout) {
-    // No table for an empty Workout, the same as Consumption's: a fresh Log shouldn't
-    // open on a 0 Total against the day's Desire before anything is typed. The table
-    // appears once there's a workout to price. Display only: the hidden duration/burn
-    // fields are left untouched.
+    // No table (and no 0 Total against the Desire) until there's a workout.
     hidePhysiqueActivityBreakdown();
     return messages;
   }
 
-  // Without the catalogue every exercise would price at EXERCISE_MET_FALLBACK,
-  // and since this runs on open and its result is what Save writes, that would
-  // quietly flatten a real day's burn to the default. Better to show nothing.
+  // Without the catalogue every line would price at the default MET, and Save
+  // would write that flattened burn.
   if (!activitiesDataLoaded) {
     hidePhysiqueActivityBreakdown();
     messages.push('⚠️ Workout skipped — loading catalogue.');
@@ -374,16 +292,10 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
     }
 
     const { minutes, calories, unmatchedNames, perLine } = estimateWorkoutActivity(estimateSource, bodyMassKg);
-    // Highest-burn exercise first, same "biggest contributor at the top"
-    // read Combine & Sort gives Consumption.
+    // Highest burn first, as Consumption sorts by calories.
     const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
     if (reorderWorkoutField) {
-      // Rebuilt from quantity + name rather than kept as the original lines,
-      // same as Combine & Sort rebuilds Consumption — quantity is recovered
-      // in the same token shape parsing expects (workoutNoteQuantityForLine),
-      // so a later Calculate reads this box back exactly as it would the
-      // original.
-      // Names title-cased, as Consumption's are (titleCaseIngredientName, health-nutrition.js).
+      // Rebuilt in the token shape parsing expects, names title-cased.
       physiqueField('workout').value = sortedPerLine.map((line) => `${line.quantity} ${titleCaseIngredientName(line.name)}`).join('\n');
       if (combinedCount > 0) messages.push(`🔗 ${combinedCount} workout lines combined.`);
     }
@@ -400,20 +312,11 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
   return messages;
 }
 
-// Grams-per-unit for mass units only — a fixed unit-to-unit conversion, not
-// an ingredient-specific one, so it's safe to apply without knowing what the
-// ingredient even is. Deliberately excludes volume units (cup, tbsp, ml, ...):
-// converting those to grams needs the ingredient's density, which is exactly
-// the kind of lookup that requires Groq/USDA, i.e. what this button exists to
-// avoid. A line in one of those units just won't get a local calorie figure.
+// Mass units only: volume units need the food's density, i.e. a USDA/AI lookup.
 const PHYSIQUE_MASS_UNIT_TO_GRAMS = { g: 1, kg: 1000, mg: 0.001, oz: 28.3495, lb: 453.592 };
 
-// Best-effort calorie figure for one Consumption line, straight off the
-// Nutrition table — the same two lookup paths health-physique-estimator.js's
-// Calculate uses for an exact table hit (by weight or by unit count), minus
-// its USDA/AI fallback for a miss. Returns null (not 0) when there's nothing
-// local to go on, so a genuinely unknown ingredient doesn't masquerade as a
-// 0-calorie one and sort to the bottom for the wrong reason.
+// A line's calories from the Nutrition table alone (by count or by mass), or
+// null (not 0) when it can't be priced locally.
 function localIngredientCalories(quantity, unit, name) {
   if (quantity === null) return null;
   const entry = findNutritionEntry(name);
@@ -430,26 +333,17 @@ function localIngredientCalories(quantity, unit, name) {
   return tableGrams ? (entry.calories / tableGrams) * (quantity * gramsPerUnit) : null;
 }
 
-// Local-only tidy-up for a Consumption block, run by Calculate (form and bulk):
-// combines lines that are really the same entry typed twice (e.g. two
-// separate "38g onion" additions through the day), orders the rest by
-// calories (the same "highest first" order Calculate itself settles on), and
-// title-cases every line's name. Two lines only combine when their extracted
-// name AND unit both match exactly — no unit conversion is attempted, so
-// "100g rice" and "1cup rice" stay separate rather than guessing a conversion
-// between them. A line with no parseable quantity (rare — Consumption is
-// meant to always lead with an amount) is left exactly as typed — never
-// merged, never recased. Pure text in, text out — no DOM, so the form's and the
-// bulk Calculate share the exact same logic instead of two copies that could
-// drift apart.
-//
-// `caloriesForName` lets a caller supply the per-ingredient calories to rank by
-// — Calculate passes the breakdown's real (USDA/AI-priced) figures so the field
-// lands in the SAME order as the Breakdown table (mergeDuplicateBreakdownRows),
-// not the order a local-catalogue lookup alone would give (which can't price a
-// USDA/AI item at all and so would sink it to the bottom). Called by name, with
-// localIngredientCalories as the fallback for any line it doesn't cover — so the
-// bulk Tidy, which has no breakdown to pass, keeps its old local-only ranking.
+// A Consumption line rebuilt as "<quantity><canonical unit> <name>".
+function consumptionLineText(quantity, unit, name) {
+  const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
+  return `${Math.round(quantity * 100) / 100}${unitText} ${name}`.trim();
+}
+
+// Tidies a Consumption block: lines with the same name AND unit combine (no unit
+// conversion), names are title-cased, and lines sort by calories, highest first.
+// A line with no quantity stays as typed. caloriesForName supplies the ranking
+// (Calculate passes the breakdown's, so the field sorts like the table);
+// localIngredientCalories covers any name it doesn't.
 function combineAndSortConsumptionText(text, caloriesForName = null) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!lines.length) return { text, combinedCount: 0 };
@@ -466,13 +360,9 @@ function combineAndSortConsumptionText(text, caloriesForName = null) {
   });
   const combinedCount = lines.length - groups.size;
 
-  const rebuilt = [...groups.values()].map((g) => {
-    if (g.quantity === null) return g.raw;
-    const unitText = g.unit ? (UNIT_CANONICAL[g.unit] || g.unit) : '';
-    // Capitalized here too (titleCaseIngredientName, health-nutrition.js), so one
-    // Calculate combines, sorts, AND fixes casing.
-    return `${Math.round(g.quantity * 100) / 100}${unitText} ${titleCaseIngredientName(g.name)}`.trim();
-  });
+  const rebuilt = [...groups.values()].map((g) => (
+    g.quantity === null ? g.raw : consumptionLineText(g.quantity, g.unit, titleCaseIngredientName(g.name))
+  ));
 
   const scored = rebuilt.map((line) => {
     const { quantity, unit } = extractIngredientQuantity(line);
@@ -480,21 +370,14 @@ function combineAndSortConsumptionText(text, caloriesForName = null) {
     const supplied = caloriesForName ? caloriesForName(name) : null;
     return { line, calories: supplied ?? localIngredientCalories(quantity, unit, name) };
   });
-  // Unranked (no supplied/local match) lines sort after every ranked one,
-  // keeping their relative order among themselves — Array#sort is stable, and
-  // there's nothing here to break a tie between two nulls.
+  // Unranked lines go last, in their own order (the sort is stable).
   scored.sort((a, b) => (b.calories ?? -Infinity) - (a.calories ?? -Infinity));
 
   return { text: scored.map((s) => s.line).join('\n'), combinedCount };
 }
 
-// A name -> real-calories lookup over a Calculate breakdown, for ranking the
-// Consumption field by the same figures the Breakdown table sorts on. Duplicate
-// rows (the same ingredient typed twice) are summed, matching how the table
-// merges them before sorting (mergeDuplicateBreakdownRows). Names are matched
-// case-insensitively so the field's title-cased lines line up with whatever
-// casing the breakdown items carry; returns null for a name not in the
-// breakdown, letting combineAndSortConsumptionText fall back to local pricing.
+// Name -> calories over a breakdown, duplicates summed and case ignored, as the
+// table merges them; null for a name not in it.
 function breakdownCaloriesLookup(breakdown) {
   const byName = new Map();
   breakdown.forEach((item) => {
@@ -504,57 +387,28 @@ function breakdownCaloriesLookup(breakdown) {
   return (name) => (byName.has(name.toLowerCase()) ? byName.get(name.toLowerCase()) : null);
 }
 
-// Ingredient-name suggestions for the Consumption textarea, scoped to
-// whichever line the caret is on — a <datalist> (tx-payee-options in
-// finance-transaction.js) only ever suggests a whole <input>'s value, and Consumption
-// is a multi-line textarea where each line is its own "1x apple"-style entry,
-// so this is a hand-rolled dropdown instead. Source list is the Nutrition
-// catalogue (allNutritionEntries, health-nutrition.js) — the same names Log/Add
-// ingredient and Calculate itself resolve Consumption lines against.
-let consumptionSuggestionMatches = [];
-let consumptionSuggestionIndex = -1;
-
-function consumptionSuggestionsList() {
-  return document.getElementById('physique-consumption-suggestions');
-}
-
-function setupConsumptionAutocomplete() {
-  physiqueField('consumption').addEventListener('input', renderConsumptionSuggestions);
-  physiqueField('consumption').addEventListener('keydown', handleConsumptionSuggestionKey);
-  // Deferred so a mousedown on a suggestion (which fires blur first) still
-  // lands — applyConsumptionSuggestion below already hides the list itself,
-  // this is only the fallback for e.g. Tab-ing or clicking away.
-  physiqueField('consumption').addEventListener('blur', () => setTimeout(hideConsumptionSuggestions, 150));
-
-  consumptionSuggestionsList().addEventListener('mousedown', (e) => {
-    const item = e.target.closest('li');
-    if (!item) return;
-    e.preventDefault(); // keeps focus (and the caret position) on the textarea
-    applyConsumptionSuggestion(item.dataset.name);
-  });
-
-  // The keyboard opening/closing on mobile resizes the visual viewport, not
-  // the layout one — this is what lets positionConsumptionSuggestions track
-  // it live instead of just placing it once on show.
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', positionConsumptionSuggestions);
-    window.visualViewport.addEventListener('scroll', positionConsumptionSuggestions);
-  }
-}
+// Per-line name suggestions for the Consumption and Workout textareas: a
+// <datalist> only completes a whole <input>, and each line here is its own entry.
+const SUGGESTION_LIMIT = 8;
+// Lets a mousedown on a suggestion land before blur hides the list.
+const SUGGESTION_BLUR_DELAY_MS = 150;
 
 function isPhoneSuggestionViewport() {
   return window.matchMedia('(max-width: 820px)').matches;
 }
 
-// Desktop keeps the plain dropdown under the field. On a phone, the list sits just
-// above the caret's line (below it when there's more room there), inside the visible
-// area, so it covers neither that line nor the keyboard and its ∧ ∨ Done bar.
+function unpinSuggestions(list) {
+  list.classList.remove('autocomplete-suggestions--pinned');
+  list.style.removeProperty('--suggestions-top');
+  list.style.removeProperty('--suggestions-max-height');
+}
+
+// On a phone the list sits above the caret's line (below when there's more room),
+// clear of that line and the keyboard; desktop keeps the plain dropdown.
 function positionPinnedSuggestions(list, field) {
   if (list.hidden) return;
   if (!isPhoneSuggestionViewport() || !window.visualViewport) {
-    list.classList.remove('autocomplete-suggestions--pinned');
-    list.style.removeProperty('--suggestions-top');
-    list.style.removeProperty('--suggestions-max-height');
+    unpinSuggestions(list);
     return;
   }
   const vv = window.visualViewport;
@@ -574,227 +428,165 @@ function positionPinnedSuggestions(list, field) {
   list.style.setProperty('--suggestions-max-height', `${height}px`);
 }
 
-function positionConsumptionSuggestions() {
-  positionPinnedSuggestions(consumptionSuggestionsList(), physiqueField('consumption'));
-}
-
-// The line the caret's currently on, split at the caret — "prefix" is what's
-// been typed so far on that line, which is what gets matched against and,
-// on accept, replaced.
-function currentConsumptionLinePrefix() {
-  const field = physiqueField('consumption');
+// The caret line's start and its text up to the caret.
+function caretLinePrefix(field) {
   const before = field.value.slice(0, field.selectionStart);
   const lineStart = before.lastIndexOf('\n') + 1;
   return { lineStart, prefix: before.slice(lineStart) };
 }
 
-function renderConsumptionSuggestions() {
-  const { prefix } = currentConsumptionLinePrefix();
-  const query = extractIngredientName(prefix).toLowerCase();
-  if (!query) { hideConsumptionSuggestions(); return; }
-
-  // Prefix matches ("a" -> "apple") before substring matches ("a" -> "salad"),
-  // same ranking a browser's own datalist applies.
+// Prefix matches before substring ones, as a browser's datalist ranks them.
+// An exact match is already typed, so it isn't offered.
+function rankSuggestionNames(names, query) {
   const starts = [];
   const contains = [];
-  allNutritionEntries.forEach((n) => {
-    const name = n.name.toLowerCase();
-    if (name === query) return; // already typed in full — nothing to suggest
-    if (name.startsWith(query)) starts.push(n.name);
-    else if (name.includes(query)) contains.push(n.name);
-  });
-  consumptionSuggestionMatches = [...starts, ...contains].slice(0, 8);
-  if (consumptionSuggestionMatches.length === 0) { hideConsumptionSuggestions(); return; }
-
-  const list = consumptionSuggestionsList();
-  list.innerHTML = '';
-  consumptionSuggestionMatches.forEach((name) => {
-    const li = document.createElement('li');
-    li.textContent = name;
-    li.dataset.name = name;
-    list.appendChild(li);
-  });
-  consumptionSuggestionIndex = -1;
-  list.hidden = false;
-  positionConsumptionSuggestions();
-}
-
-function hideConsumptionSuggestions() {
-  const list = consumptionSuggestionsList();
-  list.hidden = true;
-  list.innerHTML = '';
-  list.classList.remove('autocomplete-suggestions--pinned');
-  list.style.removeProperty('--suggestions-top');
-  list.style.removeProperty('--suggestions-max-height');
-  consumptionSuggestionMatches = [];
-  consumptionSuggestionIndex = -1;
-}
-
-function handleConsumptionSuggestionKey(e) {
-  const list = consumptionSuggestionsList();
-  if (list.hidden || consumptionSuggestionMatches.length === 0) return;
-
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    const count = consumptionSuggestionMatches.length;
-    consumptionSuggestionIndex = e.key === 'ArrowDown'
-      ? (consumptionSuggestionIndex + 1) % count
-      : (consumptionSuggestionIndex - 1 + count) % count;
-    [...list.children].forEach((li, i) => li.classList.toggle('active', i === consumptionSuggestionIndex));
-    list.children[consumptionSuggestionIndex].scrollIntoView({ block: 'nearest' });
-  } else if (e.key === 'Enter' || e.key === 'Tab') {
-    // Only an arrow-picked suggestion; otherwise the key acts as usual.
-    if (consumptionSuggestionIndex < 0) { hideConsumptionSuggestions(); return; }
-    e.preventDefault();
-    applyConsumptionSuggestion(consumptionSuggestionMatches[consumptionSuggestionIndex]);
-  } else if (e.key === 'Escape') {
-    hideConsumptionSuggestions();
-  }
-}
-
-// Replaces just the name portion of the current line — everything after
-// whatever quantity/unit (extractIngredientQuantity's own leading tokens)
-// already parsed off the front — leaving the quantity typed and the rest of
-// the textarea untouched.
-function applyConsumptionSuggestion(name) {
-  const field = physiqueField('consumption');
-  const { lineStart, prefix } = currentConsumptionLinePrefix();
-  const nameStart = lineStart + (prefix.length - stripLeadingIngredientTokens(prefix).rest.length);
-
-  const before = field.value.slice(0, nameStart);
-  const after = field.value.slice(field.selectionEnd);
-  field.value = `${before}${name}${after}`;
-
-  const caret = before.length + name.length;
-  field.setSelectionRange(caret, caret);
-  field.focus();
-
-  hideConsumptionSuggestions();
-}
-
-// Exercise-name suggestions for the Workout textarea: the same per-line dropdown
-// as Consumption's (beside the caret's line on a phone), offering the Activity
-// sheet's names (allActivities, health-activity-catalogue.js) — the names a workout line is
-// priced against. Matches what's typed after the line's amount ("36x ", "3x10 ",
-// "30min ", "10000step ", "45sec "), and accepting keeps that amount.
-const WORKOUT_LINE_AMOUNT_PATTERN = /^\s*\d+(?:[x×]\d+)?(?:[x×]|min|step|sec)?\s+/i;
-let workoutSuggestionMatches = [];
-let workoutSuggestionIndex = -1;
-
-function workoutSuggestionsList() {
-  return document.getElementById('physique-workout-suggestions');
-}
-
-function currentWorkoutLine() {
-  const field = physiqueField('workout');
-  const before = field.value.slice(0, field.selectionStart);
-  const lineStart = before.lastIndexOf('\n') + 1;
-  const prefix = before.slice(lineStart);
-  const amount = prefix.match(WORKOUT_LINE_AMOUNT_PATTERN)?.[0] ?? '';
-  return { nameStart: lineStart + amount.length, query: prefix.slice(amount.length).trim().toLowerCase() };
-}
-
-function setupWorkoutAutocomplete() {
-  const field = physiqueField('workout');
-  field.addEventListener('input', renderWorkoutSuggestions);
-  field.addEventListener('keydown', handleWorkoutSuggestionKey);
-  // Deferred, as Consumption's: a mousedown on a suggestion fires blur first.
-  field.addEventListener('blur', () => setTimeout(hideWorkoutSuggestions, 150));
-  workoutSuggestionsList().addEventListener('mousedown', (e) => {
-    const item = e.target.closest('li');
-    if (!item) return;
-    e.preventDefault();
-    applyWorkoutSuggestion(item.dataset.name);
-  });
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', positionWorkoutSuggestions);
-    window.visualViewport.addEventListener('scroll', positionWorkoutSuggestions);
-  }
-}
-
-function positionWorkoutSuggestions() {
-  positionPinnedSuggestions(workoutSuggestionsList(), physiqueField('workout'));
-}
-
-function renderWorkoutSuggestions() {
-  const { query } = currentWorkoutLine();
-  if (!query) { hideWorkoutSuggestions(); return; }
-  const starts = [];
-  const contains = [];
-  allActivities.forEach((a) => {
-    const name = String(a.name || '').trim();
+  names.forEach((name) => {
     const lower = name.toLowerCase();
     if (!name || lower === query) return;
     if (lower.startsWith(query)) starts.push(name);
     else if (lower.includes(query)) contains.push(name);
   });
-  workoutSuggestionMatches = [...new Set([...starts, ...contains])].slice(0, 8);
-  if (!workoutSuggestionMatches.length) { hideWorkoutSuggestions(); return; }
-  const list = workoutSuggestionsList();
-  list.innerHTML = '';
-  workoutSuggestionMatches.forEach((name) => {
-    const li = document.createElement('li');
-    li.textContent = name;
-    li.dataset.name = name;
-    list.appendChild(li);
-  });
-  workoutSuggestionIndex = -1;
-  list.hidden = false;
-  positionWorkoutSuggestions();
+  return [...starts, ...contains];
+}
+
+// One textarea's dropdown. currentLine() gives the caret line's {nameStart,
+// query}; suggest(query) the names to offer. Accepting replaces only the name.
+function createLineAutocomplete({ fieldId, listId, currentLine, suggest }) {
+  let matches = [];
+  let activeIndex = -1;
+  const field = () => physiqueField(fieldId);
+  const list = () => document.getElementById(listId);
+  const position = () => positionPinnedSuggestions(list(), field());
+
+  function hide() {
+    const el = list();
+    if (!el) return;
+    el.hidden = true;
+    el.innerHTML = '';
+    unpinSuggestions(el);
+    matches = [];
+    activeIndex = -1;
+  }
+
+  function render() {
+    const { query } = currentLine();
+    if (!query) { hide(); return; }
+    matches = suggest(query);
+    if (!matches.length) { hide(); return; }
+    const el = list();
+    el.innerHTML = '';
+    matches.forEach((name) => {
+      const li = document.createElement('li');
+      li.textContent = name;
+      li.dataset.name = name;
+      el.appendChild(li);
+    });
+    activeIndex = -1;
+    el.hidden = false;
+    position();
+  }
+
+  function apply(name) {
+    const input = field();
+    const { nameStart } = currentLine();
+    const before = input.value.slice(0, nameStart);
+    const after = input.value.slice(input.selectionEnd);
+    input.value = `${before}${name}${after}`;
+    const caret = before.length + name.length;
+    input.setSelectionRange(caret, caret);
+    input.focus();
+    hide();
+  }
+
+  function onKey(e) {
+    const el = list();
+    if (el.hidden || !matches.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const count = matches.length;
+      activeIndex = e.key === 'ArrowDown'
+        ? (activeIndex + 1) % count
+        : (activeIndex - 1 + count) % count;
+      [...el.children].forEach((li, i) => li.classList.toggle('active', i === activeIndex));
+      el.children[activeIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      // Only an arrow-picked suggestion; otherwise the key acts as usual.
+      if (activeIndex < 0) { hide(); return; }
+      e.preventDefault();
+      apply(matches[activeIndex]);
+    } else if (e.key === 'Escape') {
+      hide();
+    }
+  }
+
+  function setup() {
+    const input = field();
+    input.addEventListener('input', render);
+    input.addEventListener('keydown', onKey);
+    input.addEventListener('blur', () => setTimeout(hide, SUGGESTION_BLUR_DELAY_MS));
+    list().addEventListener('mousedown', (e) => {
+      const item = e.target.closest('li');
+      if (!item) return;
+      e.preventDefault(); // keeps focus (and the caret) on the textarea
+      apply(item.dataset.name);
+    });
+    // A phone keyboard resizes the visual viewport, so the list tracks it live.
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', position);
+      window.visualViewport.addEventListener('scroll', position);
+    }
+  }
+
+  return { setup, hide };
+}
+
+// Consumption offers Nutrition names, matched on what follows the line's quantity.
+const consumptionAutocomplete = createLineAutocomplete({
+  fieldId: 'consumption',
+  listId: 'physique-consumption-suggestions',
+  currentLine: () => {
+    const { lineStart, prefix } = caretLinePrefix(physiqueField('consumption'));
+    return {
+      nameStart: lineStart + (prefix.length - stripLeadingIngredientTokens(prefix).rest.length),
+      query: extractIngredientName(prefix).toLowerCase(),
+    };
+  },
+  suggest: (query) => rankSuggestionNames(allNutritionEntries.map((n) => n.name), query).slice(0, SUGGESTION_LIMIT),
+});
+
+// Workout offers Activity sheet names, after the line's amount ("36x ", "3x10 ",
+// "30min ", "10000step ", "45sec ").
+const WORKOUT_LINE_AMOUNT_PATTERN = /^\s*\d+(?:[x×]\d+)?(?:[x×]|min|step|sec)?\s+/i;
+const workoutAutocomplete = createLineAutocomplete({
+  fieldId: 'workout',
+  listId: 'physique-workout-suggestions',
+  currentLine: () => {
+    const { lineStart, prefix } = caretLinePrefix(physiqueField('workout'));
+    const amount = prefix.match(WORKOUT_LINE_AMOUNT_PATTERN)?.[0] ?? '';
+    return { nameStart: lineStart + amount.length, query: prefix.slice(amount.length).trim().toLowerCase() };
+  },
+  // A name can repeat on the sheet; it is offered once.
+  suggest: (query) => [...new Set(rankSuggestionNames(allActivities.map((a) => String(a.name || '').trim()), query))]
+    .slice(0, SUGGESTION_LIMIT),
+});
+
+function setupConsumptionAutocomplete() {
+  consumptionAutocomplete.setup();
+}
+
+function hideConsumptionSuggestions() {
+  consumptionAutocomplete.hide();
+}
+
+function setupWorkoutAutocomplete() {
+  workoutAutocomplete.setup();
 }
 
 function hideWorkoutSuggestions() {
-  const list = workoutSuggestionsList();
-  if (!list) return;
-  list.hidden = true;
-  list.innerHTML = '';
-  list.classList.remove('autocomplete-suggestions--pinned');
-  list.style.removeProperty('--suggestions-top');
-  list.style.removeProperty('--suggestions-max-height');
-  workoutSuggestionMatches = [];
-  workoutSuggestionIndex = -1;
+  workoutAutocomplete.hide();
 }
 
-function handleWorkoutSuggestionKey(e) {
-  const list = workoutSuggestionsList();
-  if (list.hidden || !workoutSuggestionMatches.length) return;
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    const count = workoutSuggestionMatches.length;
-    workoutSuggestionIndex = e.key === 'ArrowDown'
-      ? (workoutSuggestionIndex + 1) % count
-      : (workoutSuggestionIndex - 1 + count) % count;
-    [...list.children].forEach((li, i) => li.classList.toggle('active', i === workoutSuggestionIndex));
-    list.children[workoutSuggestionIndex].scrollIntoView({ block: 'nearest' });
-  } else if (e.key === 'Enter' || e.key === 'Tab') {
-    if (workoutSuggestionIndex < 0) { hideWorkoutSuggestions(); return; }
-    e.preventDefault();
-    applyWorkoutSuggestion(workoutSuggestionMatches[workoutSuggestionIndex]);
-  } else if (e.key === 'Escape') {
-    hideWorkoutSuggestions();
-  }
-}
-
-// Replaces the name typed after the line's amount, keeping the amount and the
-// rest of the box.
-function applyWorkoutSuggestion(name) {
-  const field = physiqueField('workout');
-  const { nameStart } = currentWorkoutLine();
-  const before = field.value.slice(0, nameStart);
-  const after = field.value.slice(field.selectionEnd);
-  field.value = `${before}${name}${after}`;
-  const caret = before.length + name.length;
-  field.setSelectionRange(caret, caret);
-  field.focus();
-  hideWorkoutSuggestions();
-}
-
-// The form's own 🧬 action — same view the table row's button opens
-// (openPhysiqueMicronutrients), reachable without closing back out to the
-// row. Only meaningful for a day already on the sheet: aggregateMicronutrientIntake
-// reads the SAVED Physique rows (physiqueAsHealthEntries), not whatever's
-// currently typed in this form, so a still-unsaved Log/Duplicate has nothing
-// yet to look up.
+// The form's 🧬, for a day already saved: it reads the saved log, not the form.
 function openPhysiqueMicronutrientsFromForm() {
   const entry = allPhysiqueEntries.find((p) => p.row === editingPhysiqueRow);
   if (!entry) {
@@ -823,9 +615,7 @@ async function handlePhysiqueScanInput(e) {
 
     const ingredientText = await aiAnalyzeFoodImage(base64, file.type);
 
-    // Lives inside the already-open Log form now, so it appends to whatever
-    // Consumption already holds rather than wiping the rest of the day's
-    // fields the way opening a fresh blank form would.
+    // Appends to the open form's Consumption rather than replacing it.
     const consumptionField = physiqueField('consumption');
     consumptionField.value = consumptionField.value.trim()
       ? `${consumptionField.value.trim()}\n${ingredientText}`
@@ -840,16 +630,13 @@ async function handlePhysiqueScanInput(e) {
   }
 }
 
-// Consumption lines wrapped as "(<lines>)/<n>" or "(<lines>)*<n>" (× or x too):
-// a shared portion or several servings, without scaling each line by hand. A group
-// opens with "(" at a line's start and closes with ")<op><n>" at a line's end, so
-// a field can hold several groups among plain lines. A line's own "200/5g" is
-// resolved later, per line (resolveDivisionQuantities).
+// "(<lines>)/<n>" or "(<lines>)*<n>" (× or x too): a shared portion or several
+// servings. "(" opens a line and ")<op><n>" ends one, so groups can sit among
+// plain lines.
 const CONSUMPTION_SCALE_GROUP_RE = /^\(([\s\S]*?)\)[ \t]*([/*×x])[ \t]*([\d.]+)[ \t]*$/gm;
 
-// Each grouped line rebuilt as its quantity scaled, in `${quantity}${unit} ${name}`
-// form; a line with no parseable quantity stays as typed. Null when the field has
-// no group, so Calculate leaves it alone.
+// Each grouped line with its quantity scaled; a line with no quantity stays as
+// typed. Null when the field has no group, so Calculate leaves it alone.
 function applyConsumptionScaling(text) {
   let found = false;
   const scaled = text.replace(CONSUMPTION_SCALE_GROUP_RE, (group, lines, op, n) => {
@@ -863,19 +650,15 @@ function applyConsumptionScaling(text) {
 
       const { quantity, unit } = extractIngredientQuantity(trimmed);
       if (quantity === null) return trimmed;
-
-      const name = extractIngredientName(trimmed);
-      const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
-      return `${Math.round(quantity * factor * 100) / 100}${unitText} ${name}`.trim();
+      return consumptionLineText(quantity * factor, unit, extractIngredientName(trimmed));
     }).filter(Boolean).join('\n');
   });
   return found ? scaled : null;
 }
 
-// Both estimators run together:
-// Consumption fills Breakdown/Calories In/Protein In, Workout fills Activity
-// Duration/Calories Out. Whichever field is empty is simply skipped, and
-// neither side's failure stops the other.
+// Both estimators: Consumption fills Breakdown/Calories In/Protein In, Workout
+// fills Activity Duration/Calories Out. An empty side is skipped, and neither
+// side's failure stops the other.
 async function calculatePhysiqueDay() {
   const scaled = applyConsumptionScaling(physiqueField('consumption').value);
   if (scaled !== null) {
@@ -904,12 +687,8 @@ async function calculatePhysiqueDay() {
       const { calories, protein, breakdown, usdaUnreachable, reusedCount, estimatedCount } =
         await estimateConsumptionIncrementally(consumption, physiqueField('breakdown').value);
 
-      // Consumption gets title-cased below via combineAndSortConsumptionText —
-      // applied here too so the Breakdown table/JSON (rendered straight from
-      // this array) shows the same casing instead of the AI/reused item's
-      // original name. noteLine is patched the same way since it's what next
-      // Calculate's reuse matching compares against a future (also title-cased)
-      // Consumption line.
+      // Title-cased like the Consumption lines below; noteLine too, so the next
+      // Calculate's reuse still matches.
       breakdown.forEach((item) => {
         const titleCased = titleCaseIngredientName(item.name);
         if (titleCased === item.name) return;
@@ -917,30 +696,15 @@ async function calculatePhysiqueDay() {
         item.name = titleCased;
       });
 
-      // Rebuilt from the merged breakdown rather than the fresh estimate's own
-      // standardizedNotes, which only covers the lines that were re-estimated —
-      // then straight through the tidy-up (combine, sort, capitalize), so
-      // Calculate leaves Consumption tidy with no separate step.
+      // Rebuilt from the whole breakdown (the fresh run's notes cover only the
+      // re-estimated lines), then combined, sorted and capitalised.
       const rebuiltConsumption = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
       const { text: sortedConsumption, combinedCount } =
         combineAndSortConsumptionText(rebuiltConsumption, breakdownCaloriesLookup(breakdown));
       physiqueField('consumption').value = sortedConsumption;
       if (combinedCount > 0) messages.push(`🔗 ${combinedCount} combined.`);
-      physiqueField('calories-in').value = calories;
-      physiqueField('protein-in').value = protein.toFixed(1);
-
-      // Annotates each matched row with fiber/fat/carbohydrate/tef BEFORE
-      // drawing the table, so DF/Fat/Carb/TEF show up in the same pass as
-      // Cal/Pro rather than a second one. Only when it's actually measurable —
-      // a day whose ingredients have no 🧬 Micronutrients pulled yet leaves
-      // each field exactly as it was (blank, or whatever a previous Calculate
-      // last wrote) rather than overwriting a real figure with nothing.
-      const tef = estimateTefBreakdown(breakdown);
-      const dayMacros = sumBreakdownMacros(breakdown);
-      if (dayMacros.fiber !== null) physiqueField('fiber').value = dayMacros.fiber;
-      if (dayMacros.fat !== null) physiqueField('fat').value = dayMacros.fat;
-      if (dayMacros.carbohydrate !== null) physiqueField('carbohydrate').value = dayMacros.carbohydrate;
-      if (tef) physiqueField('tef').value = tef.tefKcal;
+      // Annotates the rows with fiber/fat/carbohydrate/TEF before the table draws.
+      syncPhysiqueTotalsFromBreakdown(breakdown, calories, protein);
       // Writes the Breakdown field's JSON as well as drawing the table.
       renderPhysiqueBreakdown(breakdown, calories, protein);
 

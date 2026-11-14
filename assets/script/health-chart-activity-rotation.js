@@ -1,34 +1,17 @@
-// "Activity Rotation" panel: for every Activity Group (Leg Day, Push Day,
-// Pull Day, Cardio, NEAT, ...) that has a Weekly Desired set on any of its
-// rows (health-activity-catalogue.js), shows a horizontal bar — sessions actually logged for
-// that Group in the lookback window vs. a live desired count scaled off the weekly
-// figure — so a low/empty bar flags "you're behind on this one." Weekly
-// Desired is typed on the Activity sheet tab, same cell repeated across every
-// exercise row that shares a Group (e.g. every NEAT row carries "7"); see
-// trackedActivityGroups for how that duplication is reconciled. Beside the
-// bars, a three-ring donut splits the same Groups by share of the weekly
-// desired — outermost ring the reference split, middle ring the 4 weeks ending
-// on the To date, inner ring the last week of it — so a Group's short-term
-// and medium-term rotation can both be read against what it's actually
-// supposed to be. Wired up by initActivityRotationPanel(), called from app.js.
-//
-// A "session" of a Group is any day whose Workout notes include at least one
-// exercise belonging to it — a mixed day (e.g. a lift plus a walk) counts as
-// one session for EACH Group it touches, not just the dominant one.
+// "Activity Rotation" panel: one bar per Activity Group with a Weekly Desired
+// set (health-activity-catalogue.js), sessions logged in the window vs. that
+// figure scaled to the window, plus the same three-ring donut as Protein Source
+// Rotation. A "session" is any day whose Workout notes touch the Group, so a
+// mixed day counts once for EACH Group it touches. Shared rotation code lives
+// in health-chart-protein-rotation.js.
 
-const ACTIVITY_UNCLASSIFIED_LABEL = 'Unclassified';
-
-// One row per distinct Group across the Activity sheet, Weekly Desired being
-// the sole "is this tracked" switch — same role activityRotationPalette's
-// protein-rotation counterpart gives proteinPercent. Every row that shares a
-// Group is expected to carry the same figure (it's typed once, then copied
-// down); when rows disagree anyway, the max survives rather than whichever
-// row happened to load first, so a typed number is never silently dropped.
+// One row per Group with a Weekly Desired. Rows sharing a Group should carry
+// the same copied-down figure; if they disagree, the max wins.
 function trackedActivityGroups() {
   const groups = new Map();
   allActivities.forEach((a) => {
     if (!a.group) return;
-    const existing = groups.get(a.group) || { classification: a.category || ACTIVITY_UNCLASSIFIED_LABEL, weeklyDesired: null };
+    const existing = groups.get(a.group) || { classification: a.category || ROTATION_UNCLASSIFIED_LABEL, weeklyDesired: null };
     if (a.weeklyDesired !== null && a.weeklyDesired > 0) {
       existing.weeklyDesired = existing.weeklyDesired === null ? a.weeklyDesired : Math.max(existing.weeklyDesired, a.weeklyDesired);
     }
@@ -40,10 +23,7 @@ function trackedActivityGroups() {
     .map(([name, v]) => ({ name, classification: v.classification, weeklyDesired: v.weeklyDesired }));
 }
 
-// Sessions actually logged per Group over the lookback window — one day's
-// Workout note can credit more than one Group (a lift plus a walk logged the
-// same day), so this counts DISTINCT DAYS touching a Group, not exercise
-// lines, or a day with three leg exercises would over-count as three sessions.
+// Distinct days touching each Group, so three leg exercises in a day are one session.
 function actualSessionsByGroup(from, to) {
   const sessionsByGroup = new Map();
   allPhysiqueEntries
@@ -59,85 +39,31 @@ function actualSessionsByGroup(from, to) {
   return sessionsByGroup;
 }
 
-// One row per tracked Group: sessions actually logged this window vs. its
-// Weekly Desired scaled to the window length (weeklyDesired × lookbackDays/7),
-// so a 10-day window still reads "on track" at 10 rather than demanding a
-// full 7 more sessions on top of the last full week. Sorted by remaining gap
-// (desired minus actual) descending — same to-do-list read as Protein Source
-// Rotation.
+// One row per tracked Group: sessions logged vs. Weekly Desired scaled to the
+// window length. Most sessions still owed first; Unclassified last.
 function computeActivityRotationRows(from, to) {
   const lookbackDays = datesInRange(from, to).length;
-  const sources = trackedActivityGroups();
   const sessionsByGroup = actualSessionsByGroup(from, to);
 
-  const rows = sources.map((s) => {
+  const rows = trackedActivityGroups().map((s) => {
     const actualSessions = sessionsByGroup.get(s.name) || 0;
-    const desiredSessions = s.weeklyDesired * (lookbackDays / 7);
+    const desiredSessions = s.weeklyDesired * (lookbackDays / DAYS_PER_WEEK);
     return {
       name: s.name,
       classification: s.classification,
       actualSessions,
-      desiredSessions: Math.round(desiredSessions * 10) / 10,
+      desiredSessions: roundTenth(desiredSessions),
       weeklyDesired: s.weeklyDesired,
-      actualPercentOfDesired: desiredSessions > 0 ? Math.round((actualSessions / desiredSessions) * 1000) / 10 : 0,
+      actualPercentOfDesired: desiredSessions > 0 ? percentTenth(actualSessions, desiredSessions) : 0,
     };
   });
 
-  return sortActivityRowsByGap(rows);
-}
-
-// Most sessions still owed first, met or passed last; Unclassified at the
-// bottom, as in groupProteinRotationRows.
-function sortActivityRowsByGap(rows) {
   const gap = (r) => r.desiredSessions - r.actualSessions;
-  return [...rows].sort((a, b) => {
-    const aUnknown = a.classification === ACTIVITY_UNCLASSIFIED_LABEL;
-    const bUnknown = b.classification === ACTIVITY_UNCLASSIFIED_LABEL;
-    if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
-    return gap(b) - gap(a);
-  });
+  return rows.sort((a, b) => compareUnclassifiedLast(a.classification, b.classification) || gap(b) - gap(a));
 }
 
-// One hue per classification (the Activity sheet's Category column), stepped
-// lightness within it — same convention as proteinRotationPalette, shared by
-// the bars and the donut so a Group keeps one colour everywhere in the panel.
-function activityRotationPalette(rows) {
-  const classifications = [...new Set(rows.map((r) => r.classification))];
-  const hueFor = (c) => Math.round((classifications.indexOf(c) * 360) / classifications.length);
-  const seen = new Map();
-
-  const barColors = rows.map((r) => {
-    const n = seen.get(r.classification) || 0;
-    seen.set(r.classification, n + 1);
-    return seriesColor(hueFor(r.classification), { lightness: '--chart-series-light', shade: n % 4 });
-  });
-
-  return {
-    barColors,
-    legend: classifications.map((name) => ({ name, color: seriesColor(hueFor(name), { lightness: '--chart-series-light' }) })),
-  };
-}
-
-// Same two time-windowed rings as PROTEIN_ROTATION_DONUT_RINGS, both ending on
-// the To date the bars use.
-const ACTIVITY_ROTATION_DONUT_RINGS = [
-  { label: 'Last 4 weeks', days: 28 },
-  { label: 'Last week', days: 7 },
-];
-
-function activityRotationWindow(toIso, days) {
-  const to = dateFromIso(toIso);
-  if (!toIso || Number.isNaN(to.getTime())) return { from: null, to: null };
-  const from = new Date(to);
-  from.setDate(to.getDate() - (days - 1));
-  return { from: isoFromDate(from), to: toIso };
-}
-
-// Two independent sets of chart instances: the Chart panel's own, and the
-// GYM modal's copy of the same card (instruction-rotation-card, index.html) —
-// same data and functions, a different pair of canvases, so each needs its
-// own upsertChart handle rather than sharing one (reusing one would destroy
-// whichever copy wasn't rendered most recently the next time the other redraws).
+// Separate chart handles per copy (Chart panel, GYM modal, Activity page), or
+// redrawing one copy would destroy another's chart.
 const activityRotationCharts = {
   chart: { chart: null, donut: null },
   gym: { chart: null, donut: null },
@@ -146,150 +72,51 @@ const activityRotationCharts = {
 const ACTIVITY_ROTATION_DEFAULT_IDS = {
   chart: 'activity-rotation-chart', donut: 'activity-rotation-donut', legend: 'activity-rotation-legend',
 };
-// The GYM modal's copy (instruction-rotation-card, index.html) — shared by
-// initActivityRotationPanel's boot-time render (app.js) and the post-load
-// refresh once Physique/Activities data is actually in (app.js), so the two
-// can't drift onto different element ids.
 const ACTIVITY_ROTATION_GYM_IDS = {
   chart: 'activity-rotation-chart-gym', donut: 'activity-rotation-donut-gym', legend: 'activity-rotation-legend-gym',
 };
-// The Activity page's copy, at the top of that page.
 const ACTIVITY_ROTATION_ACTIVITY_IDS = {
   chart: 'activity-rotation-chart-activity', donut: 'activity-rotation-donut-activity', legend: 'activity-rotation-legend-activity',
 };
 
 function renderActivityRotationDonut(rows, barColors, toIso, slot, ids) {
-  const ctx = document.getElementById(ids.donut);
-  const labels = rows.map((r) => r.name);
-
-  // Not a time window like the two below it — each Group's own Weekly Desired,
-  // the fixed split the other two rings are read against. No `days`, which
-  // the tooltip callback below uses to tell it apart from a sessions-logged ring.
-  const referenceRing = {
-    label: 'Reference desired',
-    data: rows.map((r) => r.weeklyDesired),
-    total: rows.reduce((sum, r) => sum + r.weeklyDesired, 0),
-  };
-
-  const rings = ACTIVITY_ROTATION_DONUT_RINGS.map((ring) => {
-    const { from, to } = activityRotationWindow(toIso, ring.days);
-    const sessions = from ? actualSessionsByGroup(from, to) : new Map();
-    const data = rows.map((r) => sessions.get(r.name) || 0);
-    return { ...ring, data, total: data.reduce((sum, v) => sum + v, 0) };
-  });
-
-  const hasData = rings.some((ring) => ring.total > 0);
-  const allRings = [referenceRing, ...rings];
-
-  activityRotationCharts[slot].donut = upsertChart(activityRotationCharts[slot].donut, ctx, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: allRings.map((ring) => ({ data: ring.data, backgroundColor: barColors })),
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'point' },
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: rows.length > 0 && !hasData,
-          text: ['No sessions logged for a tracked', 'Group in these 4 weeks'],
-          color: Chart.defaults.color,
-          font: { size: chartFontSize() },
-          padding: { top: 40 },
-        },
-        tooltip: {
-          callbacks: {
-            title: (items) => rows[items[0].dataIndex].classification,
-            label: (item) => {
-              const ring = allRings[item.datasetIndex];
-              if (ring.days === undefined) {
-                const value = `${item.formattedValue} sessions/week desired`;
-                return `${labels[item.dataIndex]} — ${ring.label}: ${privacyMode ? maskDigits(value) : value}`;
-              }
-              const pct = ring.total ? Math.round((item.raw / ring.total) * 1000) / 10 : 0;
-              const value = `${item.formattedValue} sessions (${pct}% of the window)`;
-              return `${labels[item.dataIndex]} — ${ring.label}: ${privacyMode ? maskDigits(value) : value}`;
-            },
-          },
-        },
-      },
-    },
+  renderRotationDonut(activityRotationCharts[slot], ids.donut, rows, barColors, toIso, {
+    referenceValue: (r) => r.weeklyDesired,
+    countsBetween: actualSessionsByGroup,
+    ringValue: (r, sessions) => sessions.get(r.name) || 0,
+    emptyText: ['No sessions logged for a tracked', 'Group in these 4 weeks'],
+    tooltipTitle: (r) => r.classification,
+    referenceUnit: ' sessions/week desired',
+    windowUnit: ' sessions',
   });
 }
 
 function renderActivityRotationChart({ from, to }, slot = 'chart', ids = ACTIVITY_ROTATION_DEFAULT_IDS) {
-  const ctx = document.getElementById(ids.chart);
   const rows = computeActivityRotationRows(from, to);
-
-  const labels = rows.map((r) => r.name);
   const actualData = rows.map((r) => r.actualSessions);
-  const desiredData = rows.map((r) => r.desiredSessions);
-  const { barColors, legend } = activityRotationPalette(rows);
+  const { barColors, legend } = rotationPalette(rows, 'classification');
 
   renderCategoryLegend(ids.legend, legend);
 
-  const hasData = labels.length > 0;
-  const maxValue = Math.ceil(Math.max(1, ...actualData, ...desiredData)) + 1;
-
-  activityRotationCharts[slot].chart = upsertChart(activityRotationCharts[slot].chart, ctx, {
-    data: {
-      labels,
-      datasets: [
-        { type: 'bar', label: 'Done', data: actualData, backgroundColor: barColors, order: 2 },
-        {
-          type: 'line',
-          label: 'Desired',
-          data: desiredData,
-          showLine: false,
-          pointStyle: 'line',
-          rotation: 90,
-          pointRadius: 12,
-          borderWidth: 3,
-          borderColor: chartColor('--chart-bad'),
-          backgroundColor: chartColor('--chart-bad'),
-          order: 1,
-        },
-      ],
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: !hasData,
-          text: 'No Activity Groups tracked yet — open Activity, edit a row, and set its Weekly Desired',
-          color: Chart.defaults.color,
-          font: { size: chartFontSize() },
-          padding: { top: 40 },
-        },
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              const row = rows[items[0].dataIndex];
-              return `${row.name} — ${row.classification}`;
-            },
-            label: (item) => {
-              const row = rows[item.dataIndex];
-              const value = item.dataset.label === 'Done'
-                ? `${item.formattedValue} sessions done (${row.actualPercentOfDesired}% of desired this window)`
-                : `${item.formattedValue} sessions desired this window (${row.weeklyDesired}/week)`;
-              return `${item.dataset.label}: ${privacyMode ? maskDigits(value) : value}`;
-            },
-          },
-        },
+  renderRotationBars(activityRotationCharts[slot], ids.chart, {
+    labels: rows.map((r) => r.name),
+    datasets: [{ type: 'bar', label: 'Done', data: actualData, backgroundColor: barColors, order: 2 }],
+    actualData,
+    desiredData: rows.map((r) => r.desiredSessions),
+    stacked: false,
+    emptyText: 'No Activity Groups tracked yet — open Activity, edit a row, and set its Weekly Desired',
+    unit: 'sessions',
+    tooltip: {
+      title: (items) => {
+        const row = rows[items[0].dataIndex];
+        return `${row.name} — ${row.classification}`;
       },
-      scales: {
-        x: {
-          beginAtZero: true,
-          max: maxValue,
-          ticks: { callback: maskedUnitTick('sessions', 1), maxRotation: 45, minRotation: 45 },
-        },
-        y: { afterFit: fixTrendYAxisWidth, ticks: { autoSkip: false, callback: trendYAxisCategoryTick } },
+      label: (item) => {
+        const row = rows[item.dataIndex];
+        const value = item.dataset.label === 'Done'
+          ? `${item.formattedValue} sessions done (${row.actualPercentOfDesired}% of desired this window)`
+          : `${item.formattedValue} sessions desired this window (${row.weeklyDesired}/week)`;
+        return `${item.dataset.label}: ${maskRotationValue(value)}`;
       },
     },
   });
@@ -297,18 +124,8 @@ function renderActivityRotationChart({ from, to }, slot = 'chart', ids = ACTIVIT
   renderActivityRotationDonut(rows, barColors, to, slot, ids);
 }
 
-// No From/To pair of its own, same as Protein Source Rotation: the Health
-// Chart panel's healthDateRange() (health-chart.js) is the one
-// window every chart in it reads, and initHealthRangeControl() redraws this
-// on a change. This first call runs at boot, before Physique/Activities data
-// has loaded — app.js's own Promise.all([physiquePromise, activitiesPromise])
-// callback re-renders both copies again once it's actually in, which is the
-// render that puts real bars (rather than "No Activity Groups tracked yet")
-// on screen either copy first shows. The GYM modal's own copy
-// (instruction-rotation-card, index.html) otherwise doesn't redraw again after
-// that — same one-time-build idiom upsertChart's own IntersectionObserver
-// already gives a chart sitting behind a collapsed panel or, here, a closed
-// modal, just for the whole render rather than only the Chart.js construction.
+// Boot-time render, before data loads; app.js re-renders every copy once
+// Physique and Activities are in.
 function initActivityRotationPanel() {
   renderActivityRotationChart(healthDateRange());
   renderActivityRotationChart(healthDateRange(), 'gym', ACTIVITY_ROTATION_GYM_IDS);

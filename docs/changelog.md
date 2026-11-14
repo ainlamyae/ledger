@@ -6,7 +6,9 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.40.0** | feat(health): add body-shape checks to tune and stop unasked sign-in popups |
+| (this commit) | 3.41.1 | refactor: tidy every script, the stylesheet and index.html, and fix eleven bugs |
+| `ac60ac9` | **3.41.0** | feat(health): seed Tune's τ/s/f from logged history, unify the healthy BMI band, and consolidate the intake charts |
+| `e6a3310` | **3.40.0** | feat(health): add body-shape checks to tune and stop unasked sign-in popups |
 | `3da8d61` | **3.39.0** | feat(health): add safe pace chart, daily supplements and micronutrient gaps |
 | `89c2002` | **3.38.0** | feat(physique): multiply consumption groups and add quick bulk duplicate |
 | `1076b97` | 3.37.1 | fix(physique): give USDA and AI-priced breakdown rows a TEF |

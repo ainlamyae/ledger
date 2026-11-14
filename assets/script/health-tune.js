@@ -1,19 +1,12 @@
-
-// τ, s and f, seeded from the logged history whenever there's enough of it — the same
-// "recomputed every open, not frozen at whatever was last saved" idea m̄ already follows,
-// just anchored to the L_p days ending YESTERDAY rather than the latest reading (see
-// trailingToYesterday, health-math.js). Never blanks a box that already holds a value —
-// unlike m̄'s own re-smooth below, these three feed straight into whether Eᵢₙ can be
-// computed at all, so "no data yet" has to mean "leave it alone", not "clear it".
+// τ, s and f from their L_p-day logged averages ending yesterday. A box with no
+// history is left as is, never blanked: all three are needed to compute Eᵢₙ.
 function seedLoggedAverageFields(healthEntries, periodDays) {
   const bodyMassKg = formulaBodyMassKg();
 
   const avgSleep = trailingSleepHours(healthEntries, periodDays);
   if (avgSleep !== null) document.getElementById('formula-plan-sleep-hours').value = Math.round(avgSleep * 10) / 10;
 
-  // bodyMassKg guards the inversion below: it's null on the rare L_p-retype where there's
-  // no body-mass reading at all yet (m̄ itself goes blank then, see the listener below) —
-  // without it, kcal / (met × null × κ) divides by zero instead of by a mass.
+  // No m̄ yet means no kcal → minutes conversion.
   const avgActivityKcal = bodyMassKg ? trailingActivityKcal(healthEntries, bodyMassKg, periodDays) : null;
   const avgActivityMin = avgActivityKcal !== null ? activityMinutesFromKcal(avgActivityKcal, bodyMassKg) : null;
   if (avgActivityMin !== null) document.getElementById('formula-activity-min').value = Math.round(avgActivityMin);
@@ -23,49 +16,24 @@ function seedLoggedAverageFields(healthEntries, periodDays) {
 }
 
 function loadFormulaInputsFromSettings() {
-  [...FORMULA_FIELDS, ...PROTEIN_FORMULA_FIELDS, ...FIBER_FORMULA_FIELDS, ...FAT_FORMULA_FIELDS, ...CARB_FORMULA_FIELDS, ...ADAPT_FORMULA_FIELDS, ...CALIBRATION_FORMULA_FIELDS, ...NAVY_FORMULA_FIELDS].forEach((field) => {
+  ALL_FORMULA_FIELDS.forEach((field) => {
     document.getElementById(field.inputId).value = formulaFieldValue(field);
   });
-  // Seeded from the same places the charts read, so the figure shown on open
-  // matches the one on the Caloric Intake line before anything is touched.
-  //
-  // Both mass boxes, from the two functions that define them: the raw one is the last
-  // body-mass reading (typing in it sets m̄), and m̄ is planBodyMassKg — the same rolling average
-  // the tile and the chart's desired intake are computed at, so the modal opens agreeing with them.
+  // m is the latest reading; m̄ is the charts' own average, over the L_p just loaded.
   const healthEntries = physiqueAsHealthEntries();
   document.getElementById('formula-body-mass').value = latestBodyMassKg(healthEntries) ?? TUNE_PROFILE_DEFAULTS.bodyMassKg;
-  // Over the L_p just loaded into its box above, so the two agree on open.
   const periodDays = periodInputValue('formula-cal-period-days', bodyMassSmoothingDays());
-  document.getElementById('formula-body-mass-smooth').value = smoothedBodyMassKg(
-    healthEntries,
-    periodDays,
-  ) ?? TUNE_PROFILE_DEFAULTS.smoothBodyMassKg;
-  // τ/s/f next, now that m̄ is in its box — they're seeded at this same L_p and read it
-  // back off that box (formulaBodyMassKg).
+  document.getElementById('formula-body-mass-smooth').value =
+    smoothedBodyMassKg(healthEntries, periodDays) ?? TUNE_PROFILE_DEFAULTS.smoothBodyMassKg;
+  // After m̄, which τ's seed reads off its box.
   seedLoggedAverageFields(healthEntries, periodDays);
   document.getElementById('formula-height').value = getSetting('HEIGHT_CM', null) ?? TUNE_PROFILE_DEFAULTS.heightCm;
   document.getElementById('formula-age').value = ageFromBirthDate(getSettingString('BIRTH_DATE', null)) ?? TUNE_PROFILE_DEFAULTS.age;
-  // Falls back to male only because the formula needs one of the two — an unset
-  // SEX has no neutral value to substitute here.
+  // The formulas need one of the two; unset falls back to male.
   const sex = getSettingString('SEX', null);
   document.getElementById('formula-sex').value = sex === 'female' ? 'female' : 'male';
-  // t is never seeded here — every mode either computes it itself on the render
-  // that follows, or (HEALTHY_MASS) leaves whatever day count was already typed
-  // in place.
-  //
-  // Eᵢₙ IS seeded, unlike t — the default mode (DELTA_M, opened on a typed
-  // Eᵢₙ) needs a starting number in that box before the first render, since
-  // that mode computes Δm FROM it rather than the other way around.
-  //
-  // A pinned intake wins here: pinnedCalorieDesiredKcal is the number actually saved and
-  // in force everywhere else (the dashboard tile, getCalorieDesiredKcal) — seeding from
-  // calorieDesiredDetail's own tracking-mode arithmetic instead would silently replace a
-  // real saved pin with a freshly re-derived figure the moment the modal opens, before
-  // Save is even clicked again. Only falls back to calorieDesiredDetail (the same
-  // maintenance-minus-deficit arithmetic EIN mode itself would have shown) when nothing
-  // is pinned — the render that follows recomputes it from these exact boxes anyway
-  // wherever the mode leaves it computed, so that fallback is purely a plausible
-  // starting figure for wherever it's typed.
+  // Eᵢₙ is seeded (DELTA_M, the opening mode, solves from it); t isn't. A pinned intake
+  // wins, so opening Tune can't replace it; otherwise the plan's own figure.
   const pinnedEin = pinnedCalorieDesiredKcal();
   if (pinnedEin !== null) {
     document.getElementById('formula-ein').value = pinnedEin;
@@ -73,12 +41,7 @@ function loadFormulaInputsFromSettings() {
     const seedDetail = calorieDesiredDetail(planBodyMassKg(healthEntries));
     document.getElementById('formula-ein').value = seedDetail ? Math.round(seedDetail.kcal) : '';
   }
-  //
-  // Δm% likewise: normally it's derived from the kg box on that same render. The exception
-  // is a pinned percentage, where IT is the saved authority and the kilograms are what get
-  // derived — WEEKLY_FAT_LOSS_KG on the sheet is then only the figure the last save's body
-  // mass happened to imply. Written only in that case, so a save from a session where the
-  // percentage was being typed doesn't blank the box it's typed into.
+  // Δm% only when pinned; otherwise the render derives it from the kilograms.
   const pinnedPct = pinnedWeeklyFatLossPct();
   if (pinnedPct !== null) document.getElementById('formula-weekly-loss-pct').value = pinnedPct;
 }
@@ -86,45 +49,26 @@ function loadFormulaInputsFromSettings() {
 function openFormulaPlayground() {
   clearFieldError('formula-status');
   document.querySelector('input[name="formula-solve-for"][value="DELTA_M"]').checked = true;
-  // A fresh look at TAU/DELTA_M's original single-direction behavior each
-  // time the modal opens, rather than carrying over whichever side of either
-  // one was last typed into in a previous session.
+  const pctPinned = pinnedWeeklyFatLossPct() !== null;
+  // Each open starts fresh: every pair's known is whichever the sheet stores.
   dualKnownField.TAU = 'ein';
   dualKnownField.DELTA_M = 'ein';
-  // Same fresh start for the Δm pair — 'kg' unless the percentage is the pinned quantity,
-  // in which case it's the one on the sheet and the kilograms are what follow from it.
-  weeklyLossKnownField = pinnedWeeklyFatLossPct() !== null ? 'pct' : 'kg';
-  // And the healthy-mass pair, always on kilograms: BODY_MASS_HEALTHY_KG is what the sheet stores,
-  // so the kilograms are the known on open and the BMI is derived from them.
+  weeklyLossKnownField = pctPinned ? 'pct' : 'kg';
   healthyMassKnownField = 'kg';
-  // Set from what's actually on the sheet, so the trio always shows the live state rather
-  // than defaulting to one and inviting an accidental switch. The two pinnable keys are
-  // mutually exclusive (Save blanks one whenever it writes the other), so this reads them
-  // in a fixed order rather than trying to reconcile a sheet holding both.
-  const pinMode = pinnedWeeklyFatLossPct() !== null
-    ? 'pct'
-    : (pinnedCalorieDesiredKcal() !== null ? 'intake' : 'deficit');
-  document.querySelector(`input[name="formula-pin-mode"][value="${pinMode}"]`).checked = true;
-  const activityPinMode = pinnedActivityDesiredKcal() !== null ? 'calorie' : 'time';
-  document.querySelector(`input[name="formula-activity-pin-mode"][value="${activityPinMode}"]`).checked = true;
-  // Also from the sheet rather than a fixed default: which BMR equation is in force is a
-  // saved decision, and opening the modal on the other one would misdescribe every figure
-  // behind it until something was touched. lastExplicitBmrFormula resets to the real saved
-  // equation every open too, same "fresh look, no carried-over session state" rule the
-  // dual-known fields (TAU/DELTA_M) follow above — and the radio shows "BMR_cal" / "BMR_adp"
-  // instead whenever that's the saved basis.
+  const check = (name, value) => { document.querySelector(`input[name="${name}"][value="${value}"]`).checked = true; };
+  // The radios show what's saved; Save keeps the two pins exclusive.
+  check('formula-pin-mode', pctPinned ? 'pct' : (pinnedCalorieDesiredKcal() !== null ? 'intake' : 'deficit'));
+  check('formula-activity-pin-mode', pinnedActivityDesiredKcal() !== null ? 'calorie' : 'time');
+  // The saved equation, or the saved basis layered on it.
   lastExplicitBmrFormula = bmrFormula();
-  const equationRadioValue = BMR_BASIS_RADIO_VALUES.includes(bmrBasis()) ? bmrBasis() : bmrFormula();
-  document.querySelector(`input[name="formula-bmr-formula"][value="${equationRadioValue}"]`).checked = true;
-  document.querySelector(`input[name="formula-lbm-formula"][value="${lbmFormula()}"]`).checked = true;
+  check('formula-bmr-formula', BMR_BASIS_RADIO_VALUES.includes(bmrBasis()) ? bmrBasis() : bmrFormula());
+  check('formula-lbm-formula', lbmFormula());
   loadFormulaInputsFromSettings();
   applySolveForMode('DELTA_M');
   renderFormulaPreview();
 }
 
-// Eᵢₙ as the Tune currently shows it — computed in most modes, typed in the
-// ones that solve for something else. Read off the box either way, so what gets
-// pinned is exactly the number on screen.
+// Eᵢₙ as shown, typed or computed, so a pin is exactly the number on screen.
 function formulaEinKcal() {
   const shown = evaluateNumberExpression(document.getElementById('formula-ein').value.trim());
   return (shown !== null && shown > 0) ? Math.round(shown) : null;
@@ -134,13 +78,9 @@ async function saveFormulaSettings() {
   const { overrides, invalid, bodyMassKg } = readFormulaInputs();
   if (invalid.length) return;
 
-  // THREE ways to hold a plan steady, and each excludes the other two: pinning the intake
-  // writes the shown Eᵢₙ, pinning the percentage writes the shown Δm%, and pinning the
-  // deficit writes a blank into both — which is how either setting gets cleared, since
-  // getSetting reads an empty cell as unset and WEEKLY_FAT_LOSS_KG (saved with the rest of
-  // these inputs) is what the deficit is then held at. Each key is only written when it's
-  // changing, so a save from the default mode doesn't add two blank rows to a sheet that
-  // never had either.
+  // Pin the intake, the % or the deficit; each excludes the others. Pinning the deficit
+  // blanks both keys, leaving WEEKLY_FAT_LOSS_KG in force. A key is only written when it
+  // changes, so an unpinned sheet gains no blank rows.
   const pinMode = currentPinMode();
   const pinned = pinMode === 'intake';
   const pctPinned = pinMode === 'pct';
@@ -149,8 +89,6 @@ async function saveFormulaSettings() {
     showFieldError('formula-status', "Can't pin a daily intake while TEI has no value — fill the other inputs in first, or pin the deficit instead.");
     return;
   }
-  // Off the box, like the intake pin reads Eᵢₙ off its own: what gets pinned is the figure
-  // on screen, whether it was typed there or derived from the kilograms.
   const pctToPin = formulaNumber('formula-weekly-loss-pct');
   if (pctPinned && pctToPin === null) {
     showFieldError('formula-status', "Can't pin a fat-loss percentage while Δm% has no value — it needs a body mass and a weekly rate, or pin the deficit instead.");
@@ -163,12 +101,8 @@ async function saveFormulaSettings() {
     overrides[WEEKLY_FAT_LOSS_PCT_PIN_KEY] = pctPinned ? pctToPin : '';
   }
 
-  // Same shape, for desired activity instead of daily intake: pinning the calorie
-  // burn writes Eₐ as the currently typed τ/MET/body-mass imply it (via activityDesiredKcal,
-  // the same pin-blind calculation this preview already uses); pinning the time writes a
-  // blank, which is how ACTIVITY_DESIRED_MIN — saved with the rest of these inputs — goes
-  // back to being what the burn is held at.
-  const activityPinned = document.querySelector('input[name="formula-activity-pin-mode"]:checked').value === 'calorie';
+  // Activity: pin the burn the typed τ implies, or blank it so τ is held.
+  const activityPinned = checkedRadioValue('formula-activity-pin-mode') === 'calorie';
   const activityKcalToPin = activityPinned
     ? Math.round(withFormulaOverrides(overrides, () => activityDesiredKcal(bodyMassKg)))
     : null;
@@ -176,78 +110,26 @@ async function saveFormulaSettings() {
     overrides[ACTIVITY_DESIRED_PIN_KEY] = activityPinned ? activityKcalToPin : '';
   }
 
-  // Both the rule and the grams it produced. The per-kg pair is only ever read back into
-  // these two boxes, while PROTEIN_DESIRED_G_MIN/MAX is what the tile, the chart and the
-  // Insight prompt actually use — so the sheet keeps the reasoning next to the result
-  // instead of leaving two unexplained gram figures behind.
-  const protein = readProteinFormula();
-  if (protein !== null) {
-    overrides.PROTEIN_G_PER_KG_LBM_MIN = protein.perKgMin;
-    overrides.PROTEIN_G_PER_KG_LBM_MAX = protein.perKgMax;
-    overrides.PROTEIN_DESIRED_G_MIN = protein.minG;
-    overrides.PROTEIN_DESIRED_G_MAX = protein.maxG;
-  }
-
-  // Same shape as protein just above: both coefficients, and the grams they produced —
-  // FIBER_DESIRED_G_MIN/MAX is what the tile and the chart actually read.
-  const fiber = readFiberFormula();
-  if (fiber !== null) {
-    overrides.FIBER_G_PER_1000_KCAL_MIN = fiber.perKcalMin;
-    overrides.FIBER_G_PER_KG_MAX = fiber.perKgMax;
-    overrides.FIBER_DESIRED_G_MIN = fiber.minG;
-    overrides.FIBER_DESIRED_G_MAX = fiber.maxG;
-  }
-
-  // Same shape again: both coefficients (as the % of Eᵢₙ they are), and the grams they
-  // produced — FAT_DESIRED_G_MIN/MAX so anything that reads it later has the same
-  // reasoning-next-to-result the protein/fiber bands do, even though nothing reads it yet.
-  const fat = readFatFormula();
-  if (fat !== null) {
-    overrides.FAT_PCT_OF_KCAL_MIN = fat.pctMin;
-    overrides.FAT_PCT_OF_KCAL_MAX = fat.pctMax;
-    overrides.FAT_DESIRED_G_MIN = fat.minG;
-    overrides.FAT_DESIRED_G_MAX = fat.maxG;
-  }
-
-  // Same shape again: both coefficients (as the % of Eᵢₙ they are), and the grams they
-  // produced — CARB_DESIRED_G_MIN/MAX so the Carbohydrate Intake chart reads the same band this
-  // sheet just computed.
-  const carb = readCarbFormula();
-  if (carb !== null) {
-    overrides.CARB_PCT_OF_KCAL_MIN = carb.pctMin;
-    overrides.CARB_PCT_OF_KCAL_MAX = carb.pctMax;
-    overrides.CARB_DESIRED_G_MIN = carb.minG;
-    overrides.CARB_DESIRED_G_MAX = carb.maxG;
-  }
-
-  // Keeps the Micronutrients table's own Protein/Fiber/Fat/Carb rows (and their gap-severity
-  // coloring) in step with the band just computed above, instead of leaving them on
-  // whatever flat FDA Daily Value MICRONUTRIENT_DAILY_DESIRED_JSON shipped or was last
-  // typed with. The band's MIN is what's written — kind stays 'floor'/'reference' either
-  // way, and that's the "did you get enough" question gap severity actually asks; the full
-  // min~max band still shows everywhere else (the tile, the chart, Food Insight's
-  // Ideal/day row), all read straight from PROTEIN_DESIRED_G_MIN/MAX, FIBER_DESIRED_G_MIN/MAX,
-  // FAT_DESIRED_G_MIN/MAX and CARB_DESIRED_G_MIN/MAX rather than from this JSON.
+  // Each macro band saves its coefficients beside the grams they give; its minimum
+  // also becomes that nutrient's row in the Micronutrients table.
+  const bands = MACRO_BANDS.map((band) => ({ ...band, values: band.read() }));
   const micronutrientPatch = {};
-  if (protein !== null) micronutrientPatch['Protein'] = protein.minG;
-  if (fiber !== null) micronutrientPatch['Fiber, total dietary'] = fiber.minG;
-  if (fat !== null) micronutrientPatch['Total lipid (fat)'] = fat.minG;
-  if (carb !== null) micronutrientPatch['Carbohydrate, by difference'] = carb.minG;
+  bands.forEach(({ keys, nutrient, values }) => {
+    if (values === null) return;
+    Object.entries(keys).forEach(([field, key]) => { overrides[key] = values[field]; });
+    micronutrientPatch[nutrient] = values.minG;
+  });
   if (Object.keys(micronutrientPatch).length > 0) {
     overrides.MICRONUTRIENT_DAILY_DESIRED_JSON = patchMicronutrientDailyDesiredAmounts(micronutrientPatch);
   }
 
-  // The adaptation pair, saved the same way and for the same reason as the per-kg protein
-  // rule: they change no desired figure, but the Health Plan prompt quotes them, so the sheet has to
-  // remember what the plateau caveat was computed with. Each only when it holds a number —
-  // a blank one is left alone rather than written as an empty cell.
+  // Adaptation and girths: only boxes holding a number.
   [...ADAPT_FORMULA_FIELDS, ...NAVY_FORMULA_FIELDS].forEach((field) => {
     const value = formulaNumber(field.inputId);
     if (value !== null) overrides[field.key] = value;
   });
 
-  // The BMR_cal window. The calibration it measures isn't saved here: each day's BMR_cal
-  // lives in Physique's Derived column, and the app reads the latest one from there.
+  // The BMR_cal window only; each day's BMR_cal lives in Physique's Derived column.
   const calibration = tuneBmrCalibration();
   if (calibration) {
     overrides[BMR_CALIBRATION_PERIOD_COUNT_KEY] = calibration.periodCount;
@@ -268,8 +150,7 @@ async function saveFormulaSettings() {
     const swing = readGlycogenSwingFormula();
     if (swing) overrides[GLYCOGEN_SWING_KEY] = swing.swingKg;
     await saveSettingValues(overrides);
-    // saveSettingValues has already refreshed currentSettings, so re-rendering
-    // here is what makes the charts agree with it immediately.
+    // Settings are already refreshed; re-render so everything agrees with them.
     applySettingsToWidgets();
     renderHealthCharts(physiqueAsHealthEntries());
     loadFormulaInputsFromSettings();
@@ -283,10 +164,7 @@ async function saveFormulaSettings() {
       pinned ? `Intake pinned at ${einKcal} kcal` : null,
       pctPinned && !pinned ? `Fat loss pinned at ${pctToPin}%/week` : null,
       activityPinned ? `Activity pinned at ${activityKcalToPin} kcal/day` : null,
-      band('Protein', protein),
-      band('Fiber', fiber),
-      band('Fat', fat),
-      band('Carbs', carb),
+      ...bands.map(({ label, values }) => band(label, values)),
       `BMR: ${currentBmrFormula() === 'katch' ? 'Katch-McArdle' : 'Mifflin-St Jeor'}`,
       tefSaved ? `TEF ${tefSaved}%` : null,
       !calibration ? null : calibration.result.ok
@@ -322,40 +200,24 @@ function initFormulaPlayground() {
     wasCollapsed = collapsed;
   }).observe(panel, { attributes: true, attributeFilter: ['class'] });
 
-  // Δm is left out here and wired with Δm% below: both have to record which of the pair
-  // is the known BEFORE the render, and a plain render-only listener firing first would
-  // let the previous known overwrite the box being typed into.
-  // formula-body-mass is NOT here: nothing reads it, so a typed m is copied into m̄ below.
-  //
-  // m_g is left out for the same reason Δm is, and wired with BMI_g below: both have to
-  // record which of their pair is the known BEFORE the render, and a plain render-only
-  // listener firing first would let the previous known overwrite the box being typed into.
   // A typed m becomes m̄, the mass every formula runs at.
   document.getElementById('formula-body-mass').addEventListener('input', (event) => {
     if (!event.target.value) return;
     document.getElementById('formula-body-mass-smooth').value = event.target.value;
     renderFormulaPreview();
   });
-  // m̄ is averaged over L_p, so a typed L_p re-smooths it before the render below reads it.
-  // Registered ahead of the render listeners so it runs first.
+  // A typed L_p re-averages m̄, τ, s and f; registered first so the render reads them.
   document.getElementById('formula-cal-period-days').addEventListener('input', () => {
     const days = periodInputValue('formula-cal-period-days', bodyMassSmoothingDays());
     const healthEntries = physiqueAsHealthEntries();
     document.getElementById('formula-body-mass-smooth').value =
       smoothedBodyMassKg(healthEntries, days) ?? '';
-    // τ/s/f re-seed at the new L_p too, same live re-derive m̄ just got above — but only
-    // where there's a fresh average to show (seedLoggedAverageFields never blanks them).
     seedLoggedAverageFields(healthEntries, days);
   });
 
-  [...FORMULA_FIELDS.map((f) => f.inputId).filter((id) => id !== 'formula-weekly-loss' && id !== 'formula-healthy'),
-    ...PROTEIN_FORMULA_FIELDS.map((f) => f.inputId),
-    ...FIBER_FORMULA_FIELDS.map((f) => f.inputId),
-    ...FAT_FORMULA_FIELDS.map((f) => f.inputId),
-    ...CARB_FORMULA_FIELDS.map((f) => f.inputId),
-    ...ADAPT_FORMULA_FIELDS.map((f) => f.inputId),
-    ...CALIBRATION_FORMULA_FIELDS.map((f) => f.inputId),
-    ...NAVY_FORMULA_FIELDS.map((f) => f.inputId),
+  // Δm and m_g are wired with their unit pairs below, which record the known first.
+  const pairedIds = ['formula-weekly-loss', 'formula-healthy'];
+  [...ALL_FORMULA_FIELDS.map((f) => f.inputId).filter((id) => !pairedIds.includes(id)),
     'formula-body-mass-smooth', 'formula-height', 'formula-age',
     'formula-glycogen-skeletal-frac', 'formula-glycogen-per-kg-muscle', 'formula-glycogen-liver',
     'formula-glycogen-water-ratio'].forEach((id) => {
@@ -366,67 +228,41 @@ function initFormulaPlayground() {
     radio.addEventListener('change', renderFormulaPreview);
   });
 
-  // Switching BMR equations re-derives everything: the figure, A and B, the plateau and the
-  // arrival date, and (under Katch) whether a blank age is even a problem — so it goes
-  // through the same full render a typed input does, not a cosmetic swap of one line.
-  // The one place the BMR is picked: Mifflin/Katch (plain), BMR_cal or BMR_adp on top of
-  // the last equation picked.
+  // An equation pick is remembered for any basis later layered on it.
   document.querySelectorAll('input[name="formula-bmr-formula"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       clearFieldError('formula-status');
-      const value = document.querySelector('input[name="formula-bmr-formula"]:checked').value;
-      // An explicit equation means plain BMR on it.
+      const value = checkedRadioValue('formula-bmr-formula');
       if (!BMR_BASIS_RADIO_VALUES.includes(value)) lastExplicitBmrFormula = value;
       renderFormulaPreview();
     });
   });
 
-  // Either box can be the one you fill in; typing into it makes it the known and pushes
-  // the other one. No mode check needed: in DELTA_M both are readonly, and a readonly
-  // input fires no input event.
-  [['formula-weekly-loss', 'kg'], ['formula-weekly-loss-pct', 'pct']].forEach(([id, field]) => {
-    document.getElementById(id).addEventListener('input', () => {
-      weeklyLossKnownField = field;
-      renderFormulaPreview();
-    });
-  });
-
-  // The healthy mass's own pair, the same way: type kilograms and the BMI follows, type a BMI and
-  // the kilograms follow. No mode check needed here either — in HEALTHY_MASS both are readonly,
-  // and a readonly input fires no input event.
-  [['formula-healthy', 'kg'], ['formula-healthy-bmi', 'bmi']].forEach(([id, field]) => {
-    document.getElementById(id).addEventListener('input', () => {
-      healthyMassKnownField = field;
-      renderFormulaPreview();
-    });
-  });
-
-  // Typing into Eᵢₙ or t marks it as the known driving TAU/DELTA_M's solve
-  // (see dualKnownField) before reapplying which field looks computed and
-  // re-rendering — outside those two modes this is a no-op, since EIN and
-  // HEALTHY_MASS don't have a choice to record.
+  // Typing Eᵢₙ or t makes it TAU/DELTA_M's known; other modes have no choice to record.
   const markDualKnown = (field) => {
     const mode = currentSolveFor();
-    if (mode === 'TAU' || mode === 'DELTA_M') {
+    if (isDualSolveMode(mode)) {
       dualKnownField[mode] = field;
       applySolveForMode(mode);
     }
   };
-  document.getElementById('formula-ein').addEventListener('input', () => {
-    markDualKnown('ein');
-    renderFormulaPreview();
-  });
-  document.getElementById('formula-days').addEventListener('input', () => {
-    markDualKnown('days');
-    renderFormulaPreview();
+  // Typing either box of a unit pair makes it the known. Readonly boxes fire no input,
+  // so no mode check is needed.
+  [
+    ['formula-weekly-loss', () => { weeklyLossKnownField = 'kg'; }],
+    ['formula-weekly-loss-pct', () => { weeklyLossKnownField = 'pct'; }],
+    ['formula-healthy', () => { healthyMassKnownField = 'kg'; }],
+    ['formula-healthy-bmi', () => { healthyMassKnownField = 'bmi'; }],
+    ['formula-ein', () => markDualKnown('ein')],
+    ['formula-days', () => markDualKnown('days')],
+  ].forEach(([id, markKnown]) => {
+    document.getElementById(id).addEventListener('input', () => {
+      markKnown();
+      renderFormulaPreview();
+    });
   });
 
-  // The date box is the other view of t, not a separate value: whenever it's
-  // editable, picking or typing a date converts straight to a day count and
-  // drives the same render formula-days itself would — so either box can be
-  // the one you actually fill in. 'change', not 'input': a date input doesn't
-  // have a complete value to convert until a full date is picked, unlike the
-  // free-typed number boxes above.
+  // The date is t in another unit. 'change', since a date is complete only once picked.
   document.getElementById('formula-eta').addEventListener('change', (event) => {
     if (event.target.readOnly || !event.target.value) return;
     markDualKnown('days');
@@ -436,10 +272,7 @@ function initFormulaPlayground() {
 
   document.querySelectorAll('input[name="formula-solve-for"]').forEach((radio) => {
     radio.addEventListener('change', () => {
-      // Holding the percentage and pinning it are one decision, so picking the mode picks
-      // the pin — otherwise a plan built here would be saved as a fixed-kilogram one and
-      // the app would immediately stop doing what the modal just showed. The reverse isn't
-      // forced: the pin is about the saved plan and applies in every mode.
+      // FIXED_PCT holds the %, so it pins it too and the save matches the preview.
       if (currentSolveFor() === 'FIXED_PCT') {
         document.querySelector('input[name="formula-pin-mode"][value="pct"]').checked = true;
       }
@@ -449,9 +282,7 @@ function initFormulaPlayground() {
     });
   });
 
-  // The pin fieldset used to be Save-only state. It isn't any more: pinning the percentage
-  // changes which journey t is measured along, so the preview has to re-render with it —
-  // and the percentage becomes the held quantity, which is what pinning it means.
+  // A % pin changes the journey t is measured along and makes the % the known.
   document.querySelectorAll('input[name="formula-pin-mode"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       if (currentPinMode() === 'pct') weeklyLossKnownField = 'pct';

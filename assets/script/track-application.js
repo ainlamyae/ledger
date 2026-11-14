@@ -1,4 +1,9 @@
-const APPLICATIONS_RANGE = `'${CONFIG.SHEETS.APPLICATIONS}'!A2:E`;
+// Row 1 is the header, so data (and a new application's insert) starts here.
+const APPLICATIONS_FIRST_ROW = 2;
+const APPLICATIONS_SHEET = `'${CONFIG.SHEETS.APPLICATIONS}'`;
+const APPLICATIONS_RANGE = `${APPLICATIONS_SHEET}!A${APPLICATIONS_FIRST_ROW}:E`;
+// The sheet's own spelling.
+const APPLICATION_DEFAULT_ACTION = 'Submited';
 
 let allApplications = [];
 let editApplication = null;
@@ -7,9 +12,13 @@ let applicationsSheetId = null;
 let editingApplicationRow = null;
 const expandedApplicationRows = new Set();
 
-async function fetchApplicationsSheetId() {
-  const metadata = await getSpreadsheetMetadata();
-  return findSheetId(metadata, CONFIG.SHEETS.APPLICATIONS);
+// Fetched once, then cached.
+async function getApplicationsSheetId() {
+  if (!applicationsSheetId) {
+    const metadata = await getSpreadsheetMetadata();
+    applicationsSheetId = findSheetId(metadata, CONFIG.SHEETS.APPLICATIONS);
+  }
+  return applicationsSheetId;
 }
 
 async function initApplications(forceRefresh = false) {
@@ -27,29 +36,21 @@ async function initApplications(forceRefresh = false) {
   await refreshApplications(forceRefresh);
 }
 
-// Applications!A2:E isn't a flat table: a row starting a new application has
-// both Type (col D) and App Number (col E) set, and is optionally followed by
-// status-update rows that only carry Date + Action, until the next
-// application's header row. The sheet's last two rows are whole-column
-// SUM/DATEDIF footer formulas ("Total Waiting time" / "Total Time in
-// Canada") rather than data, so any row whose Action mentions "Total" is
-// skipped entirely instead of being treated as an update.
+// Not a flat table: a header row (Type and App Number set) starts an application,
+// followed by status-update rows with only Date + Action. The sheet's "Total …"
+// footer formula rows are skipped.
 function parseApplications(rows) {
   const applications = [];
   let current = null;
 
   rows.forEach((row, i) => {
-    const sheetRow = i + 2;
-    const delay = row[0];
-    const date = row[1] || '';
-    const action = row[2] || '';
-    const type = row[3] || '';
-    const appNumber = row[4] || '';
+    const sheetRow = i + APPLICATIONS_FIRST_ROW;
+    const [delay = '', date = '', action = '', type = '', appNumber = ''] = row.map((cell) => cell || '');
 
     if (/total/i.test(action)) return;
 
     if (type && appNumber) {
-      current = { headerRow: sheetRow, lastRow: sheetRow, delayDays: delay || '', date, action, type, appNumber, updates: [] };
+      current = { headerRow: sheetRow, lastRow: sheetRow, delayDays: delay, date, action, type, appNumber, updates: [] };
       applications.push(current);
     } else if (current && (date || action)) {
       current.updates.push({ row: sheetRow, date, action });
@@ -60,16 +61,13 @@ function parseApplications(rows) {
   return applications;
 }
 
-async function refreshApplications(forceRefresh = false) {
+async function refreshApplications() {
   const resp = await getValues(APPLICATIONS_RANGE, VALUE_PARAMS);
-  const values = resp.values || [];
-
-  allApplications = parseApplications(values);
+  allApplications = parseApplications(resp.values || []);
   renderApplicationsList();
 }
 
-// Malformed/unparseable dates sort as oldest (0) rather than throwing off
-// the whole list.
+// Unparseable dates sort as oldest.
 function dateTimestamp(dateStr) {
   const t = new Date(dateStr).getTime();
   return Number.isNaN(t) ? 0 : t;
@@ -93,11 +91,7 @@ function latestStatus(app) {
   return app.updates[app.updates.length - 1];
 }
 
-// A bare "YYYY-MM-DD" string (what the sheet gives us) is parsed by `new
-// Date()` as UTC midnight, not local midnight — comparing that against a
-// local "today" silently shifts the date back a day in any negative-UTC
-// timezone (e.g. it never matches "today" in Waterloo). Parse the y/m/d
-// parts directly into a local Date to avoid that.
+// `new Date('YYYY-MM-DD')` is UTC midnight, a day early west of UTC: build a local date.
 function isSameDayAsToday(dateStr) {
   if (!dateStr) return false;
 
@@ -109,12 +103,16 @@ function isSameDayAsToday(dateStr) {
   return !Number.isNaN(d.getTime()) && d.toDateString() === new Date().toDateString();
 }
 
-// An application counts as "ongoing" as long as its most recent activity —
-// the submission itself, or any status update — is dated today. Once an
-// application is closed, its last recorded date stops moving forward, so
-// after the day it closed it will no longer match today's date.
+// Ongoing while its submission or any update is dated today; a closed one stops moving.
 function isApplicationOngoing(app) {
   return isSameDayAsToday(app.date) || app.updates.some((u) => isSameDayAsToday(u.date));
+}
+
+function applicationEl(tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
 }
 
 function renderApplicationsList() {
@@ -127,61 +125,40 @@ function renderApplicationsList() {
     const message = allApplications.length === 0
       ? 'No applications yet — click "Log" in the panel heading to get started.'
       : 'No applications match your search.';
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.textContent = message;
-    container.appendChild(empty);
+    container.appendChild(applicationEl('div', 'empty-state', message));
     return;
   }
 
-  const ongoing = filtered.filter(isApplicationOngoing);
-  const closed = filtered.filter((app) => !isApplicationOngoing(app));
-
   const renderGroup = (title, apps) => {
     if (apps.length === 0) return;
-
-    const heading = document.createElement('h3');
-    heading.className = 'applications-group-title';
-    heading.textContent = `${title} (${apps.length})`;
-    container.appendChild(heading);
-
+    container.appendChild(applicationEl('h3', 'applications-group-title', `${title} (${apps.length})`));
     apps.forEach((app) => container.appendChild(buildApplicationCard(app)));
   };
 
-  renderGroup('Ongoing', ongoing);
-  renderGroup('Closed', closed);
+  renderGroup('Ongoing', filtered.filter(isApplicationOngoing));
+  renderGroup('Closed', filtered.filter((app) => !isApplicationOngoing(app)));
 }
 
 function buildApplicationCard(app) {
-  const card = document.createElement('div');
-  card.className = 'app-card';
+  const card = applicationEl('div', 'app-card');
   if (!expandedApplicationRows.has(app.headerRow)) card.classList.add('collapsed');
 
-  const header = document.createElement('div');
-  header.className = 'app-card-header';
+  const header = applicationEl('div', 'app-card-header');
   header.setAttribute('role', 'button');
   header.setAttribute('tabindex', '0');
   header.setAttribute('aria-expanded', String(!card.classList.contains('collapsed')));
 
-  const icon = document.createElement('span');
-  icon.className = 'panel-toggle-icon app-card-toggle-icon';
-  icon.textContent = '▾';
+  const icon = applicationEl('span', 'panel-toggle-icon app-card-toggle-icon', '▾');
 
-  const title = document.createElement('div');
-  title.className = 'app-card-title';
   const status = latestStatus(app);
+  const delay = app.delayDays !== '' ? ` · Delay ${app.delayDays}d` : '';
+  const title = applicationEl('div', 'app-card-title');
+  title.append(
+    applicationEl('strong', '', `${app.type} — ${app.appNumber}`),
+    applicationEl('span', 'app-card-meta', `Submitted ${app.date}${delay} · Latest: ${status.action} (${status.date})`),
+  );
 
-  const titleMain = document.createElement('strong');
-  titleMain.textContent = `${app.type} — ${app.appNumber}`;
-  const titleMeta = document.createElement('span');
-  titleMeta.className = 'app-card-meta';
-  titleMeta.textContent = `Submitted ${app.date}${app.delayDays !== '' ? ` · Delay ${app.delayDays}d` : ''} · Latest: ${status.action} (${status.date})`;
-
-  title.append(titleMain, titleMeta);
-
-  const actions = document.createElement('div');
-  actions.className = 'app-card-actions';
-
+  const actions = applicationEl('div', 'app-card-actions');
   actions.append(
     makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: (e) => { e.stopPropagation(); editApplication(app); } }),
     makeRowActionButton({ emoji: '🗑️', title: 'Delete', onClick: (e) => { e.stopPropagation(); return deleteApplication(app); } }),
@@ -204,26 +181,15 @@ function buildApplicationCard(app) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
   });
 
-  const body = document.createElement('div');
-  body.className = 'app-card-body';
+  const body = applicationEl('div', 'app-card-body');
 
   if (app.updates.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'hint';
-    empty.textContent = 'No status updates recorded yet.';
-    body.appendChild(empty);
+    body.appendChild(applicationEl('p', 'hint', 'No status updates recorded yet.'));
   } else {
-    const list = document.createElement('ul');
-    list.className = 'app-history';
+    const list = applicationEl('ul', 'app-history');
     app.updates.forEach((u) => {
       const item = document.createElement('li');
-      const date = document.createElement('span');
-      date.className = 'app-history-date';
-      date.textContent = u.date;
-      const action = document.createElement('span');
-      action.className = 'app-history-action';
-      action.textContent = u.action;
-      item.append(date, action);
+      item.append(applicationEl('span', 'app-history-date', u.date), applicationEl('span', 'app-history-action', u.action));
       list.appendChild(item);
     });
     body.appendChild(list);
@@ -238,8 +204,7 @@ const APPLICATION_FIELD_IDS = ['type', 'number', 'date', 'action'];
 function openApplicationForm(app) {
   editingApplicationRow = app ? app.headerRow : null;
 
-
-  const values = app ? [app.type, app.appNumber, app.date, app.action] : ['', '', '', 'Submited'];
+  const values = app ? [app.type, app.appNumber, app.date, app.action] : ['', '', '', APPLICATION_DEFAULT_ACTION];
   APPLICATION_FIELD_IDS.forEach((id, i) => {
     document.getElementById(`application-${id}`).value = values[i];
   });
@@ -259,25 +224,20 @@ async function submitApplicationForm(event) {
 
   try {
     if (editingApplicationRow !== null) {
-      await updateValues(`'${CONFIG.SHEETS.APPLICATIONS}'!B${editingApplicationRow}:E${editingApplicationRow}`, [[date, action, type, appNumber]]);
+      await updateValues(`${APPLICATIONS_SHEET}!B${editingApplicationRow}:E${editingApplicationRow}`, [[date, action, type, appNumber]]);
     } else {
-      if (!applicationsSheetId) applicationsSheetId = await fetchApplicationsSheetId();
-
-      // Insert a fresh row 2 rather than appending at the bottom, so the new
-      // application lands above the existing data and the whole-column
-      // SUM/DATEDIF footer formulas (last two rows) shift down and stay intact
-      // instead of having a new row written after them.
+      const sheetId = await getApplicationsSheetId();
+      // Insert at the top rather than append, so the footer formulas shift down intact.
       await batchUpdate([{
         insertDimension: {
-          range: { sheetId: applicationsSheetId, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+          range: { sheetId, dimension: 'ROWS', startIndex: APPLICATIONS_FIRST_ROW - 1, endIndex: APPLICATIONS_FIRST_ROW },
           inheritFromBefore: false,
         },
       }]);
-      await updateValues(`'${CONFIG.SHEETS.APPLICATIONS}'!A2:E2`, [['', date, action, type, appNumber]]);
+      await updateValues(`${APPLICATIONS_SHEET}!A${APPLICATIONS_FIRST_ROW}:E${APPLICATIONS_FIRST_ROW}`, [['', date, action, type, appNumber]]);
     }
-    await refreshApplications(true);
-    // A new application is inserted at row 2.
-    const saved = allApplications.find((a) => a.headerRow === (editingApplicationRow ?? 2));
+    await refreshApplications();
+    const saved = allApplications.find((a) => a.headerRow === (editingApplicationRow ?? APPLICATIONS_FIRST_ROW));
     if (saved) {
       openApplicationForm(saved);
       stayOnSavedForm('application-modal', editApplication.step(saved));
@@ -292,18 +252,13 @@ async function deleteApplication(app) {
   const historyNote = app.updates.length > 0 ? ` and its ${app.updates.length} status update(s)` : '';
 
   await confirmAndDelete(`Delete "${app.type} — ${app.appNumber}"${historyNote}? This cannot be undone.`, async () => {
-    if (!applicationsSheetId) applicationsSheetId = await fetchApplicationsSheetId();
+    const sheetId = await getApplicationsSheetId();
     await batchUpdate([{
       deleteDimension: {
-        range: {
-          sheetId: applicationsSheetId,
-          dimension: 'ROWS',
-          startIndex: app.headerRow - 1,
-          endIndex: app.lastRow,
-        },
+        range: { sheetId, dimension: 'ROWS', startIndex: app.headerRow - 1, endIndex: app.lastRow },
       },
     }]);
     expandedApplicationRows.delete(app.headerRow);
-    await refreshApplications(true);
+    await refreshApplications();
   }, "Couldn't delete application");
 }

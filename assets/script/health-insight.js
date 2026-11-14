@@ -1,32 +1,23 @@
-// The one "Health Insight" panel, shared by every AI read (Plan, Wellness, Food,
-// Micronutrient, Activity, Protein, Pattern). The first three used to be separate
-// panels running an identical flow — pick a range, compute a local preview,
-// optionally ask a question, POST to Groq, render, persist — so everything except
-// the real per-mode differences (what data to gather, how to phrase it, which
-// system prompt to send) lives here once, and those live in INSIGHT_MODES below.
-//
-// Nothing is computed until a mode button is clicked. The old panels each
-// rendered their preview on page load and again when wellness data arrived,
-// which meant dozens of passes over the day log — including the expensive
-// muscle-group note re-parse — before anyone had opened them. Now a load that
-// never touches this panel does no aggregation at all.
+// The Health Insight panel, shared by every AI read (Plan, Wellness, Food,
+// Micronutrient, Activity, Protein, Pattern). The flow (pick a range, preview, ask,
+// send, persist) lives here once; the per-mode differences live in INSIGHT_MODES.
+// Nothing is computed until a mode button is clicked.
+
+// Wellness, Activity, Protein and Plan preview their prompt text as lines here.
+const INSIGHT_TEXT_PREVIEW_ID = 'insight-preview-text';
 
 // Every per-mode difference. resultKeys[0]/generatedAtKeys[0] are what a save
-// writes; the rest of each array is fallback read order (getSettingStringAny),
-// which is how the pre-rename WELLNESS_INSIGHT_*-style rows stay readable.
+// writes; the rest are older names still read as fallbacks.
+// A mode without renderPreview shows its own prompt in INSIGHT_TEXT_PREVIEW_ID.
+// appendQuestion false: the mode inlines the question (with its own default) itself.
 const INSIGHT_MODES = {
   wellness: {
     label: 'Wellness',
-    hint: '',
     questionPlaceholder: 'e.g. Should I prioritize sleep or protein right now?',
-    previewId: 'insight-preview-text',
     gather: (from, to) => gatherInsightMetrics(from, to),
     formatPrompt: (data) => formatInsightPrompt(data),
-    renderPreview: (data) => renderInsightPreviewLines(formatInsightPrompt(data)),
     appendQuestion: true,
-    // Fat/fiber (health-insight-wellness.js's gatherInsightMetrics) are pulled the same way
-    // Micronutrients mode pulls its numbers — via aggregateMicronutrientIntake,
-    // which needs the Nutrition table loaded.
+    // Fat/fiber/carbohydrate come from aggregateMicronutrientIntake.
     needsNutrition: true,
     systemPrompt: INSIGHT_SYSTEM_PROMPT,
     resultKeys: ['INSIGHT_WELLNESS_LAST_RESULT', 'WELLNESS_INSIGHT_LAST_RESULT'],
@@ -34,12 +25,9 @@ const INSIGHT_MODES = {
   },
   food: {
     label: 'Food',
-    hint: '',
     questionPlaceholder: 'e.g. Which vitamins or minerals might be missing?',
     previewId: 'insight-preview-food',
     gather: (from, to) => aggregateFoodIntake(from, to),
-    // Food is the one mode that inlines the question (and its own default) into
-    // the prompt body rather than appending it, so appendQuestion is false.
     formatPrompt: (rows, { from, to, question }) => formatFoodInsightPrompt(rows, from, to, question),
     renderPreview: (rows, { from, to }) => renderFoodInsightPreview(rows, from, to),
     // Group and ingredient lines: the table above.
@@ -52,13 +40,9 @@ const INSIGHT_MODES = {
   },
   micronutrient: {
     label: 'Micronutrient',
-    hint: '',
     questionPlaceholder: 'e.g. Is this amount enough? What is missing?',
     previewId: 'insight-preview-micronutrient',
     gather: (from, to) => aggregateMicronutrientIntake(from, to),
-    // Micronutrient is the other mode (with Food) that inlines the question
-    // into the prompt body rather than appending it — same reasoning as Food:
-    // it has its own default question and phrasing built around it.
     formatPrompt: (data, { from, to, question }) => formatMicronutrientInsightPrompt(data, { from, to, question }),
     renderPreview: (data) => renderMicronutrientInsightPreview(data),
     dataLine: /^ {2}- /,
@@ -70,12 +54,9 @@ const INSIGHT_MODES = {
   },
   activity: {
     label: 'Activity',
-    hint: '',
     questionPlaceholder: 'e.g. Which muscle group should I prioritize next?',
-    previewId: 'insight-preview-text',
     gather: (from, to) => gatherActivityInsightMetrics(from, to),
     formatPrompt: (data) => formatActivityInsightPrompt(data),
-    renderPreview: (data) => renderInsightPreviewLines(formatActivityInsightPrompt(data)),
     appendQuestion: true,
     needsNutrition: false,
     systemPrompt: ACTIVITY_INSIGHT_SYSTEM_PROMPT,
@@ -84,15 +65,10 @@ const INSIGHT_MODES = {
   },
   protein: {
     label: 'Protein',
-    hint: '',
     questionPlaceholder: 'e.g. Which source should I prioritize next?',
-    previewId: 'insight-preview-text',
-    // computeProteinRotationRows is health-chart-protein-rotation.js's — same rows the
-    // Protein Source Rotation chart plots, so this mode can't quote a
-    // different figure for the same ingredient.
+    // The Protein Source Rotation chart's own rows, so the two can't disagree.
     gather: (from, to) => computeProteinRotationRows(from, to),
     formatPrompt: (rows) => formatProteinRotationInsightPrompt(rows),
-    renderPreview: (rows) => renderInsightPreviewLines(formatProteinRotationInsightPrompt(rows)),
     appendQuestion: true,
     needsNutrition: true,
     systemPrompt: PROTEIN_ROTATION_INSIGHT_SYSTEM_PROMPT,
@@ -101,14 +77,10 @@ const INSIGHT_MODES = {
   },
   plan: {
     label: 'Plan',
-    hint: '',
     questionPlaceholder: 'e.g. Is the deficit too aggressive for this timeline?',
-    previewId: 'insight-preview-text',
-    // The only mode whose data is the app's own SETTINGS rather than the day log —
-    // the range still matters, because the actuals it's judged against come from it.
+    // The plan comes from Settings; the range only picks the actuals it's judged against.
     gather: (from, to) => gatherPlanInsight(from, to),
     formatPrompt: (data) => formatPlanInsightPrompt(data),
-    renderPreview: (data) => renderInsightPreviewLines(formatPlanInsightPrompt(data)),
     appendQuestion: true,
     needsNutrition: false,
     systemPrompt: PLAN_INSIGHT_SYSTEM_PROMPT,
@@ -117,7 +89,6 @@ const INSIGHT_MODES = {
   },
   pattern: {
     label: 'Pattern',
-    hint: '',
     questionPlaceholder: 'e.g. Does more strength training raise my BMR?',
     previewId: 'insight-preview-pattern',
     gather: (from, to) => gatherFatLossPattern(from, to, patternChunkDays()),
@@ -132,28 +103,34 @@ const INSIGHT_MODES = {
   },
 };
 
-const INSIGHT_LOOKBACK_DEFAULT_DAYS = 7;
-const INSIGHT_PREVIEW_IDS = ['insight-preview-text', 'insight-preview-food', 'insight-preview-micronutrient', 'insight-preview-pattern'];
+// Element ids for the flow both Insight pages share (Finance has its own).
+const HEALTH_INSIGHT_PAGE = {
+  panelId: 'insight-panel',
+  statusId: 'insight-mode-status',
+  errorId: 'insight-status',
+  bodyId: 'insight-body',
+  generatedAtId: 'insight-generated-at',
+  generateBtnId: 'insight-generate-btn',
+};
 
-// What's on screen right now: which mode, the range it was gathered for, and
-// the gathered data itself. Send to AI reuses this data rather than re-running
-// the aggregation, and a null value is the single "nothing loaded yet" signal.
+const INSIGHT_PREVIEW_IDS = [INSIGHT_TEXT_PREVIEW_ID, 'insight-preview-food', 'insight-preview-micronutrient', 'insight-preview-pattern'];
+const INSIGHT_DATA_PLACEHOLDER = '[data shown above]';
+
+// The mode on screen, its range and gathered data; Send to AI reuses this data.
+// null means nothing is loaded.
 let insightLoaded = null;
 
 let getInsightDateRange = () => ({ from: null, to: null });
-// 1w matches the old 7-day default.
 let insightRangeSlug = '1w';
+
+const insightPreviewId = (mode) => mode.previewId || INSIGHT_TEXT_PREVIEW_ID;
+const insightSystemPrompt = (mode, data) => (typeof mode.systemPrompt === 'function' ? mode.systemPrompt(data) : mode.systemPrompt);
+const insightModeButtons = () => [...document.querySelectorAll('#insight-mode-actions [data-insight-mode]')];
 
 function initInsightPanel() {
   clearFieldError('insight-status');
-  // Starts blank — the element still carries the real status messages below
-  // ("Still loading your Physique data…"), it just no longer opens with a prompt.
   document.getElementById('insight-mode-status').textContent = '';
 
-  // From/To retired for the range buttons.
-  // getInsightDateRange = initDateRangeControl('insight-date-from', 'insight-date-to', INSIGHT_LOOKBACK_DEFAULT_DAYS, () => {
-  //   if (insightLoaded) loadInsightMode(insightLoaded.mode);
-  // });
   // A pick only recomputes once a mode has been loaded.
   getInsightDateRange = () => healthRangeDates(insightRangeSlug);
   const pick = (slug) => {
@@ -179,15 +156,26 @@ function initInsightPanel() {
 }
 
 function clearInsightMode() {
-  delete document.getElementById('insight-panel').dataset.insightMode;
   insightLoaded = null;
   setInsightModeButtons(null);
-  document.getElementById('insight-mode-status').textContent = '';
-  clearFieldError('insight-status');
+  resetInsightPage(HEALTH_INSIGHT_PAGE);
 }
 
-// Pattern's L_p box, starting at Tune's L_p (its box, else the saved setting); a blank
-// or invalid entry falls back to Tune's.
+// Opens `modeKey`'s page, even while its data is still loading.
+function openInsightPage(page, modeKey) {
+  document.getElementById(page.panelId).dataset.insightMode = modeKey;
+  document.getElementById(page.statusId).textContent = '';
+  clearFieldError(page.errorId);
+}
+
+// Back to the tiles.
+function resetInsightPage(page) {
+  delete document.getElementById(page.panelId).dataset.insightMode;
+  document.getElementById(page.statusId).textContent = '';
+  clearFieldError(page.errorId);
+}
+
+// Pattern's L_p box, seeded from Tune's L_p; blank or invalid falls back to Tune's.
 function patternChunkDays() {
   const saved = getSetting(BMR_CALIBRATION_PERIOD_DAYS_KEY, BMR_CALIBRATION_PERIOD_DAYS_DEFAULT);
   const tuneDays = periodInputValue('formula-cal-period-days', saved);
@@ -200,25 +188,20 @@ function patternChunkDays() {
   return periodInputValue('insight-pattern-period-days', tuneDays);
 }
 
-// The only path that computes anything. Gathers the mode's data for the current
-// range, shows its preview and its last saved report, and arms Send to AI.
+// The only path that computes anything: gathers the mode's data, shows its
+// preview and last saved report, and arms Send to AI.
 function loadInsightMode(modeKey) {
   const mode = INSIGHT_MODES[modeKey];
   if (!mode) return;
-  // The mode's page, even while its data is still loading.
-  document.getElementById('insight-panel').dataset.insightMode = modeKey;
-
+  openInsightPage(HEALTH_INSIGHT_PAGE, modeKey);
   const { from, to } = getInsightDateRange();
-  const statusEl = document.getElementById('insight-mode-status');
-  clearFieldError('insight-status');
 
   if (!from || !to) {
     showFieldError('insight-status', 'Pick a From and To date first.');
     return;
   }
 
-  // An empty in-memory array isn't the same answer as "nothing logged" — say so
-  // rather than gathering a preview full of zeros from data that's still in flight.
+  // An unloaded table isn't "nothing logged"; don't preview zeros.
   if (!physiqueDataLoaded || (mode.needsNutrition && !nutritionDataLoaded)) {
     showToast('Still loading your Physique data — try again in a moment.');
     return;
@@ -229,21 +212,19 @@ function loadInsightMode(modeKey) {
   const data = mode.gather(from, to);
   insightLoaded = { mode: modeKey, from, to, data };
 
-  document.getElementById('insight-hint').textContent = mode.hint;
+  document.getElementById('insight-hint').textContent = '';
   textarea.placeholder = mode.questionPlaceholder;
-  showInsightPreview(mode.previewId);
-  mode.renderPreview(data, ctx);
+  showInsightPreview(insightPreviewId(mode));
+  if (mode.renderPreview) mode.renderPreview(data, ctx);
+  else renderInsightPreviewLines(mode.formatPrompt(data, ctx));
   renderInsightPromptTemplate(mode, data, ctx);
   renderSavedInsight(mode);
   setInsightModeButtons(modeKey);
-
-  statusEl.textContent = '';
   showToast(`${mode.label} data for ${from} to ${to}.`);
   document.getElementById('insight-generate-btn').disabled = false;
 }
 
-// Wellness and Activity share one text-lines container, Food has its own
-// profile-line-plus-table one; only the active mode's is visible.
+// Only the active mode's preview container is visible.
 function showInsightPreview(previewId) {
   INSIGHT_PREVIEW_IDS.forEach((id) => {
     document.getElementById(id).hidden = id !== previewId;
@@ -251,16 +232,14 @@ function showInsightPreview(previewId) {
 }
 
 function setInsightModeButtons(modeKey) {
-  document.querySelectorAll('#insight-mode-actions [data-insight-mode]').forEach((btn) => {
+  insightModeButtons().forEach((btn) => {
     const active = btn.dataset.insightMode === modeKey;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   });
 }
 
-// One <p> per line. Every mode's preview uses this, which is what keeps the
-// shared profile block (age/sex/height/body mass/BMI) looking identical across all
-// three instead of each mode inventing its own layout for the same five facts.
+// One <p> per line; every preview uses it, so the profile block looks the same everywhere.
 function renderInsightLines(el, lines) {
   el.innerHTML = '';
   lines.forEach((line) => {
@@ -270,27 +249,24 @@ function renderInsightLines(el, lines) {
   });
 }
 
-// Shows exactly what would be sent to Groq, in plain language, so nothing about
-// the request is a black box. Our own computed text, not model output.
+// Shows exactly what would be sent to the AI.
 function renderInsightPreviewLines(text) {
-  renderInsightLines(document.getElementById('insight-preview-text'), text.split('\n'));
+  renderInsightLines(document.getElementById(INSIGHT_TEXT_PREVIEW_ID), text.split('\n'));
 }
 
-// The three modes only ever differed by system prompt and by whether the
-// question is appended or already inlined in the prompt body; the call itself is
-// ai.js's aiChatText.
+function appendInsightQuestion(prompt, question) {
+  return question && question.trim() ? `${prompt}\n\nAdditional question: ${question.trim()}` : prompt;
+}
+
 function insightUserMessage(mode, data, ctx) {
   const prompt = mode.formatPrompt(data, ctx);
-  if (mode.appendQuestion && ctx.question && ctx.question.trim()) {
-    return `${prompt}\n\nAdditional question: ${ctx.question.trim()}`;
-  }
-  return prompt;
+  return mode.appendQuestion ? appendInsightQuestion(prompt, ctx.question) : prompt;
 }
 
-// The system prompt plus the user message, with every line the preview already
-// shows (or a table row of it) folded into one placeholder per run.
+// The system prompt plus the user message, with each run of lines the preview
+// already shows (or a table row of it) folded into one placeholder.
 function renderInsightPromptTemplate(mode, data, ctx) {
-  const preview = document.getElementById(mode.previewId);
+  const preview = document.getElementById(insightPreviewId(mode));
   const seen = new Set([...preview.querySelectorAll('p, td')].map((el) => el.textContent.trim()).filter(Boolean));
   const isData = (line) => seen.has(line.trim()) || (mode.dataLine && mode.dataLine.test(line));
 
@@ -302,93 +278,92 @@ function renderInsightPromptTemplate(mode, data, ctx) {
     }
     // Blank lines between two runs of data fold into the one placeholder too.
     while (lines.length && !lines.at(-1).trim() && lines.some((l) => l.trim())
-      && lines.findLast((l) => l.trim()) === '[data shown above]') lines.pop();
-    if (lines.at(-1) !== '[data shown above]') lines.push('[data shown above]');
+      && lines.findLast((l) => l.trim()) === INSIGHT_DATA_PLACEHOLDER) lines.pop();
+    if (lines.at(-1) !== INSIGHT_DATA_PLACEHOLDER) lines.push(INSIGHT_DATA_PLACEHOLDER);
   });
   if (mode.appendQuestion) lines.push('', 'Additional question: [your question, if any]');
 
-  const system = typeof mode.systemPrompt === 'function' ? mode.systemPrompt(data) : mode.systemPrompt;
   document.getElementById('insight-prompt-template').textContent =
-    `SYSTEM\n${system}\n\nUSER\n${lines.join('\n')}`;
+    `SYSTEM\n${insightSystemPrompt(mode, data)}\n\nUSER\n${lines.join('\n')}`;
   document.getElementById('insight-prompt-details').hidden = false;
 }
 
-// Only runs on an explicit Send to AI click, on the already-loaded data — so
-// the aggregation happens once per load, not again per request.
+function appendInsightHint(container, text) {
+  const p = document.createElement('p');
+  p.className = 'hint';
+  p.textContent = text;
+  container.appendChild(p);
+}
+
+// Send to AI: runs on the data already loaded, so what was shown is what's sent.
 async function runInsightGeneration() {
   if (!insightLoaded) return;
 
   const mode = INSIGHT_MODES[insightLoaded.mode];
   const { from, to } = insightLoaded;
-  const body = document.getElementById('insight-body');
-  const btn = document.getElementById('insight-generate-btn');
-  // const fromEl = document.getElementById('insight-date-from');
-  // const toEl = document.getElementById('insight-date-to');
-  const rangeButtons = [...document.querySelectorAll('#insight-range button')];
   const textarea = document.getElementById('insight-question');
-  const modeButtons = [...document.querySelectorAll('#insight-mode-actions [data-insight-mode]')];
+  // Saved per mode, so a fresh load shows the last read.
+  return generateInsight(HEALTH_INSIGHT_PAGE, {
+    controls: [...document.querySelectorAll('#insight-range button'), textarea, ...insightModeButtons()],
+    analyzing: `Analyzing ${from} to ${to}…`,
+    prompts: () => {
+      const ctx = { from, to, question: textarea.value };
+      return [insightSystemPrompt(mode, insightLoaded.data), insightUserMessage(mode, insightLoaded.data, ctx)];
+    },
+    resultKey: mode.resultKeys[0],
+    generatedAtKey: mode.generatedAtKeys[0],
+  });
+}
+
+// Both pages' Send to AI. `prompts` runs inside the try, so a formatting error
+// shows like an AI one.
+async function generateInsight(page, { controls, analyzing, prompts, resultKey, generatedAtKey }) {
+  const body = document.getElementById(page.bodyId);
+  const btn = document.getElementById(page.generateBtnId);
+  const setControlsDisabled = (disabled) => [btn, ...controls].forEach((c) => { c.disabled = disabled; });
 
   body.innerHTML = '';
-  clearFieldError('insight-status');
+  clearFieldError(page.errorId);
+  appendInsightHint(body, analyzing);
 
-  const loading = document.createElement('p');
-  loading.className = 'hint';
-  loading.textContent = `Analyzing ${from} to ${to}…`;
-  body.appendChild(loading);
-
-  btn.disabled = true;
-  // fromEl.disabled = true;
-  // toEl.disabled = true;
-  rangeButtons.forEach((b) => { b.disabled = true; });
-  textarea.disabled = true;
-  modeButtons.forEach((b) => { b.disabled = true; });
+  setControlsDisabled(true);
   Motion.iconBusy(btn);
 
   try {
-    // Built from the data the preview above was rendered from, not a fresh
-    // pass — what was shown is exactly what gets sent.
-    const ctx = { from, to, question: textarea.value };
-    const systemPrompt = typeof mode.systemPrompt === 'function' ? mode.systemPrompt(insightLoaded.data) : mode.systemPrompt;
-    const text = await aiChatText(systemPrompt, insightUserMessage(mode, insightLoaded.data, ctx));
+    const text = await aiChatText(...prompts());
     body.innerHTML = '';
     renderInsightText(body, text);
 
-    // Persisted per mode, so a fresh page load can show the last read once that
-    // mode is loaded again instead of going blank.
     const generatedAt = localTimestamp(new Date());
     try {
       await saveSettingValues({
-        [mode.resultKeys[0]]: text,
-        [mode.generatedAtKeys[0]]: generatedAt,
+        [resultKey]: text,
+        [generatedAtKey]: generatedAt,
       });
-      renderInsightGeneratedAt(generatedAt);
+      renderInsightGeneratedAt(page, generatedAt);
       renderInsightAgeBadges();
     } catch (saveErr) {
-      showFieldError('insight-status', `Generated, but couldn't save it: ${saveErr.message}`);
+      showFieldError(page.errorId, `Generated, but couldn't save it: ${saveErr.message}`);
     }
   } catch (err) {
     body.innerHTML = '';
-    showFieldError('insight-status', err.message);
+    showFieldError(page.errorId, err.message);
   } finally {
-    btn.disabled = false;
-    // fromEl.disabled = false;
-    // toEl.disabled = false;
-    rangeButtons.forEach((b) => { b.disabled = false; });
-    textarea.disabled = false;
-    modeButtons.forEach((b) => { b.disabled = false; });
+    setControlsDisabled(false);
     Motion.iconSettle(btn);
   }
 }
 
 // A red "<days>d" badge on each mode tile last generated over 30 days ago.
 const INSIGHT_STALE_DAYS = 30;
+const INSIGHT_MS_PER_DAY = 86400000;
 
 // `stamp` is the tile's saved "YYYY-MM-DD HH:mm"; shared with Finance's Snapshot.
 function placeInsightAgeBadge(btn, stamp) {
   btn.querySelector(':scope > .page-badge')?.remove();
   if (!stamp) return;
   const today = dateFromIso(isoFromDate(new Date()));
-  const days = Math.round((today - dateFromIso(stamp.slice(0, 10))) / 86400000);
+  const days = Math.round((today - dateFromIso(stamp.slice(0, 10))) / INSIGHT_MS_PER_DAY);
   if (!(days > INSIGHT_STALE_DAYS)) return;
   const badge = document.createElement('span');
   badge.className = 'page-badge';
@@ -398,14 +373,14 @@ function placeInsightAgeBadge(btn, stamp) {
 }
 
 function renderInsightAgeBadges() {
-  document.querySelectorAll('#insight-mode-actions [data-insight-mode]').forEach((btn) => {
+  insightModeButtons().forEach((btn) => {
     placeInsightAgeBadge(btn, getSettingStringAny(INSIGHT_MODES[btn.dataset.insightMode].generatedAtKeys, null));
   });
   placeInsightAgeBadge(document.getElementById('financial-insight-load-btn'), getSettingString('FINANCIAL_INSIGHT_LAST_GENERATED_AT', null));
 }
 
-function renderInsightGeneratedAt(timestamp) {
-  const el = document.getElementById('insight-generated-at');
+function renderInsightGeneratedAt(page, timestamp) {
+  const el = document.getElementById(page.generatedAtId);
   if (!timestamp) {
     el.hidden = true;
     return;
@@ -414,22 +389,21 @@ function renderInsightGeneratedAt(timestamp) {
   el.textContent = `Last generated ${timestamp}`;
 }
 
-// The loaded mode's last AI result, straight from the Settings copy already in
-// memory — no sheet read, so it stays free enough to run on every mode switch.
+// The mode's last AI result from the in-memory Settings; no sheet read.
 function renderSavedInsight(mode) {
-  const body = document.getElementById('insight-body');
-  const text = getSettingStringAny(mode.resultKeys, null);
+  renderSavedInsightBody(HEALTH_INSIGHT_PAGE, getSettingStringAny(mode.resultKeys, null), getSettingStringAny(mode.generatedAtKeys, null));
+}
 
+// A page's last saved result, so a fresh load isn't blank.
+function renderSavedInsightBody(page, text, generatedAt) {
+  const body = document.getElementById(page.bodyId);
   body.innerHTML = '';
   if (!text) {
-    const placeholder = document.createElement('p');
-    placeholder.className = 'hint';
-    placeholder.textContent = 'Review the data above, then click "Send to AI" to get a read on it.';
-    body.appendChild(placeholder);
-    renderInsightGeneratedAt(null);
+    appendInsightHint(body, 'Review the data above, then click "Send to AI" to get a read on it.');
+    renderInsightGeneratedAt(page, null);
     return;
   }
 
   renderInsightText(body, text);
-  renderInsightGeneratedAt(getSettingStringAny(mode.generatedAtKeys, null));
+  renderInsightGeneratedAt(page, generatedAt);
 }

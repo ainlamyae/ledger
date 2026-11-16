@@ -1,7 +1,8 @@
-const REPORT_RANGE = `'${CONFIG.SHEETS.REPORT}'!A1:Z149`;
-const BALANCE_RANGE = `'${CONFIG.SHEETS.BALANCE}'!A1:D1`;
-const INSIGHT_RANGE = `${CONFIG.SHEETS.INSIGHT}!A2:F200`;
-const SETTINGS_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
+// To ZZ: past ~21 categories Statement's Saved/Cumulative columns pass Z.
+const REPORT_RANGE = sheetRange(CONFIG.SHEETS.REPORT, 'A1:ZZ149');
+const BALANCE_RANGE = sheetRange(CONFIG.SHEETS.BALANCE, 'A1:D1');
+const INSIGHT_RANGE = sheetRange(CONFIG.SHEETS.INSIGHT, 'A2:F200');
+const SETTINGS_RANGE = sheetRange(CONFIG.SHEETS.SETTINGS, 'A2:C');
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -138,10 +139,10 @@ function parseTypeBreakdown(insightRows) {
   const breakdown = {};
 
   insightRows.forEach((row) => {
-    const category = row[0];
+    const category = cellText(row[0]);
     if (!category) return;
 
-    const type = row[1] || '';
+    const type = cellText(row[1]);
     const stats = {
       lastMonth: row[2] || 0,
       lastQuarter: row[3] || 0,
@@ -358,7 +359,7 @@ async function loadReport() {
   const insightRows = valueRanges[2].values || [];
 
   // Breakdown lists each category once per Type plus a total row: keep each name once, in order.
-  const categoryNames = [...new Set(insightRows.map((row) => row[0]).filter(Boolean))];
+  const categoryNames = [...new Set(insightRows.map((row) => cellText(row[0])).filter(Boolean))];
 
   // The blank-Type totals double as each category's benchmarks.
   const typeBreakdown = parseTypeBreakdown(insightRows);

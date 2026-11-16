@@ -1,7 +1,7 @@
-const TRANSACTIONS_RANGE = `${CONFIG.SHEETS.TRANSACTIONS}!A2:F`;
+const TRANSACTIONS_RANGE = sheetRange(CONFIG.SHEETS.TRANSACTIONS, 'A2:F');
 const PAGE_SIZE = 25;
 // The account names, and Breakdown's categories (repeated once per Type, so deduped).
-const TRANSACTION_OPTION_RANGES = [`'${CONFIG.SHEETS.ACCOUNTS}'!A3:A100`, `${CONFIG.SHEETS.INSIGHT}!A2:A200`];
+const TRANSACTION_OPTION_RANGES = [sheetRange(CONFIG.SHEETS.ACCOUNTS, 'A3:A'), sheetRange(CONFIG.SHEETS.INSIGHT, 'A2:A')];
 const TX_AMOUNT_ERROR = 'Amount must be a number or a simple expression, e.g. =-9.97-1.30';
 // Filter controls; any change resets the page and selection.
 const TRANSACTION_FILTER_EVENTS = [
@@ -59,12 +59,28 @@ function fillFrequencyDatalist(datalistId, values) {
 
 // --- Transactions ---
 
-function transactionRowValues(t) {
-  return [t.date, t.account, t.payee, t.category, t.description, t.amount];
+// Columns A–F, in sheet order.
+const TRANSACTION_FIELDS = ['date', 'account', 'payee', 'category', 'description', 'amount'];
+
+// Rows are written USER_ENTERED so Date parses; text is kept exactly as typed.
+function transactionCellValue(field, value) {
+  return field === 'date' || field === 'amount' ? value : sheetText(value);
 }
 
-function transactionRowRange(row) {
-  return `${CONFIG.SHEETS.TRANSACTIONS}!A${row}:F${row}`;
+function transactionRowValues(t) {
+  return TRANSACTION_FIELDS.map((field) => transactionCellValue(field, t[field]));
+}
+
+function transactionRowRange(row, lastColumn = 'F') {
+  return sheetRange(CONFIG.SHEETS.TRANSACTIONS, `A${row}:${lastColumn}${row}`);
+}
+
+// Per-cell writes of just `fields`, so other cells (a formula Amount) are left alone.
+function transactionFieldUpdates(transactions, fields) {
+  return transactions.flatMap((t) => fields.map((field) => ({
+    range: sheetRange(CONFIG.SHEETS.TRANSACTIONS, `${String.fromCharCode(65 + TRANSACTION_FIELDS.indexOf(field))}${t.row}`),
+    values: [[transactionCellValue(field, t[field])]],
+  })));
 }
 
 function selectedTransactions() {
@@ -148,11 +164,11 @@ async function refreshTransactions(forceRefresh = false) {
 
   allTransactions = values.map((row, i) => ({
     row: i + 2,
-    date: row[0] || '',
-    account: row[1] || '',
-    payee: row[2] || '',
-    category: row[3] || '',
-    description: row[4] || '',
+    date: cellText(row[0]),
+    account: cellText(row[1]),
+    payee: cellText(row[2]),
+    category: cellText(row[3]),
+    description: cellText(row[4]),
     amount: Number(row[5]) || 0,
   }));
   transactionsDataLoaded = true;
@@ -195,8 +211,8 @@ async function refreshAccountOptions() {
 
 // Reads TRANSACTION_OPTION_RANGES' result into the option lists and their filters.
 function applyTransactionOptionLists(valueRanges) {
-  accountOptions = (valueRanges[0].values || []).map((r) => r[0]).filter(Boolean);
-  categoryOptions = [...new Set((valueRanges[1].values || []).map((r) => r[0]).filter(Boolean))];
+  accountOptions = (valueRanges[0].values || []).map((r) => cellText(r[0])).filter(Boolean);
+  categoryOptions = [...new Set((valueRanges[1].values || []).map((r) => cellText(r[0])).filter(Boolean))];
   populateTransactionFilter('tx-account-filter', 'All Accounts', accountOptions);
   populateTransactionFilter('tx-category-filter', 'All Categories', categoryOptions);
 }
@@ -436,7 +452,8 @@ function syncTxAccountBalance() {
 
 function openTransactionForm(transaction, duplicate = false) {
   editingRow = (transaction && !duplicate) ? transaction.row : null;
-  editingOriginal = editingRow ? { account: transaction.account, amount: transaction.amount } : null;
+  // amountText: an Amount box left as opened keeps the cell (it may be a formula).
+  editingOriginal = editingRow ? { account: transaction.account, amount: transaction.amount, amountText: String(transaction.amount) } : null;
 
   document.getElementById('tx-date').value = transaction ? transaction.date : isoFromDate(new Date());
   document.getElementById('tx-payee').value = transaction ? transaction.payee : '';
@@ -521,7 +538,10 @@ function transactionBalanceChanges(original, account, amount) {
 async function submitTransactionForm(event) {
   event.preventDefault();
 
-  const amount = evaluateNumberExpression(document.getElementById('tx-amount').value);
+  const original = editingOriginal;
+  const amountText = document.getElementById('tx-amount').value;
+  const keepAmount = !!original && amountText.trim() === original.amountText;
+  const amount = keepAmount ? original.amount : evaluateNumberExpression(amountText);
   if (amount === null) {
     showFieldError('tx-form-error', TX_AMOUNT_ERROR);
     return;
@@ -530,22 +550,24 @@ async function submitTransactionForm(event) {
   const account = document.getElementById('tx-account').value;
   const balanceBox = document.getElementById('tx-update-balance');
   const updateBalance = balanceBox.checked && !balanceBox.disabled;
-  const original = editingOriginal;
   const category = document.getElementById('tx-category').value;
 
-  const values = [[
-    document.getElementById('tx-date').value,
+  const row = transactionRowValues({
+    date: document.getElementById('tx-date').value,
     account,
-    document.getElementById('tx-payee').value,
+    payee: document.getElementById('tx-payee').value,
     category,
-    document.getElementById('tx-description').value,
+    description: document.getElementById('tx-description').value,
     amount,
-  ]];
+  });
+  const values = [row];
 
   try {
     let savedRow = editingRow;
     if (editingRow) {
-      await updateValues(transactionRowRange(editingRow), values);
+      // An unchanged Amount isn't rewritten, so a formula there survives.
+      if (keepAmount) await updateValues(transactionRowRange(editingRow, 'E'), [row.slice(0, 5)]);
+      else await updateValues(transactionRowRange(editingRow), values);
     } else {
       savedRow = appendedRow(await appendValues(TRANSACTIONS_RANGE, values));
     }
@@ -636,23 +658,24 @@ async function submitBulkEditForm(event) {
 
   const selected = selectedTransactions();
   const snapshots = selected.map((t) => ({ ...t }));
+  const fields = Object.keys(patch);
 
   try {
-    await Promise.all(selected.map((t) => updateValues(transactionRowRange(t.row), [transactionRowValues({ ...t, ...patch })])));
+    await batchUpdateValues(transactionFieldUpdates(selected.map((t) => ({ ...t, ...patch })), fields));
 
     // The rows stay ticked, so a second 💾 edits them again.
     await refreshTransactions(true);
     showFormSaved('tx-bulk-edit-form-error');
-    showUndoToast(`${selected.length} transaction(s) updated.`, () => restoreBulkEdit(snapshots));
+    showUndoToast(`${selected.length} transaction(s) updated.`, () => restoreBulkEdit(snapshots, fields));
   } catch (err) {
     showFieldError('tx-bulk-edit-form-error', err.message);
   }
 }
 
-// The edited rows still exist, so undo writes each snapshot back in place.
-async function restoreBulkEdit(snapshots) {
+// The edited rows still exist, so undo writes the edited cells back in place.
+async function restoreBulkEdit(snapshots, fields) {
   try {
-    await Promise.all(snapshots.map((t) => updateValues(transactionRowRange(t.row), [transactionRowValues(t)])));
+    await batchUpdateValues(transactionFieldUpdates(snapshots, fields));
     await refreshTransactions(true);
   } catch (err) {
     alert(`Failed to restore: ${err.message}`);

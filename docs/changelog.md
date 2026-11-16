@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](versi
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | 3.41.1 | refactor: tidy every script, the stylesheet and index.html, and fix eleven bugs |
+| (this commit) | 3.41.2 | fix(sheets): make every Google Sheets read and write safe and consistent |
+| `a3efdc9` | 3.41.1 | refactor: tidy every script, the stylesheet and index.html, and fix eleven bugs |
 | `ac60ac9` | **3.41.0** | feat(health): seed Tune's τ/s/f from logged history, unify the healthy BMI band, and consolidate the intake charts |
 | `e6a3310` | **3.40.0** | feat(health): add body-shape checks to tune and stop unasked sign-in popups |
 | `3da8d61` | **3.39.0** | feat(health): add safe pace chart, daily supplements and micronutrient gaps |

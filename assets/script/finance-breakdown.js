@@ -5,7 +5,7 @@
 // file may replace a formula with the number it produced.
 //
 // A2:F — Category, Type, Last Month, Last Quarter, Last Year, Lifelong.
-const BREAKDOWN_RANGE = `'${CONFIG.SHEETS.INSIGHT}'!A2:F200`;
+const BREAKDOWN_RANGE = sheetRange(CONFIG.SHEETS.INSIGHT, 'A2:F');
 const BREAKDOWN_PAGE_SIZE = 100;
 // A:F, the width a copied row spans.
 const BREAKDOWN_COLUMN_COUNT = 6;
@@ -27,6 +27,8 @@ let bSort = { key: null, dir: 1 };
 let bCurrentPage = 1;
 
 async function initBreakdown(forceRefresh = false) {
+  // Re-resolved after each load, as the spreadsheet may have been switched.
+  breakdownSheetId = null;
   if (!breakdownListenersAttached) {
     breakdownListenersAttached = true;
 
@@ -53,9 +55,9 @@ async function refreshBreakdown(forceRefresh = false) {
   allBreakdownRows = values
     .map((row, i) => ({
       row: i + 2,
-      category: (row[0] || '').trim(),
+      category: cellText(row[0]).trim(),
       // Blank is a category's total row; kept '' since that's what the sheet reads and an edit writes back.
-      type: (row[1] || '').trim(),
+      type: cellText(row[1]).trim(),
       ...Object.fromEntries(BREAKDOWN_AMOUNT_FIELDS.map((f, col) => {
         const cell = row[col + 2];
         return [f.key, (cell !== undefined && cell !== '') ? Number(cell) : null];
@@ -178,12 +180,10 @@ async function submitBreakdownForm(event) {
   }
 
   try {
-    // A:B only, on both paths: a wider range would flatten C:F's formulas.
-    const row = editingBreakdownRow ?? await insertBreakdownRowFrom(type);
-    await updateValues(
-      `'${CONFIG.SHEETS.INSIGHT}'!A${row}:B${row}`,
-      [[category, type]]
-    );
+    // A:B only, on both paths: a wider range would flatten C:F's formulas. RAW: plain text.
+    let row = editingBreakdownRow;
+    if (row === null) row = await insertBreakdownRowFrom(category, type);
+    else await updateValues(sheetRange(CONFIG.SHEETS.INSIGHT, `A${row}:B${row}`), [[category, type]], 'RAW');
     await refreshBreakdown(true);
     const saved = allBreakdownRows.find((b) => b.row === row);
     if (saved) {
@@ -205,17 +205,13 @@ function breakdownTemplateRow(type) {
   return (candidates.length ? candidates : allBreakdownRows).slice(-1)[0] || null;
 }
 
-// A new row for the form to fill, returning its row number: a copy of a template
-// row (so it has formulas), or on an empty tab a plain append with no formulas.
-async function insertBreakdownRowFrom(type) {
+// Adds the named row, returning its row number: a copy of a template row (so it has
+// formulas), or on an empty tab a plain append with no formulas.
+async function insertBreakdownRowFrom(category, type) {
   const template = breakdownTemplateRow(type);
-  if (!template) {
-    await appendValues(BREAKDOWN_RANGE, [['', '']]);
-    const resp = await getValues(BREAKDOWN_RANGE, VALUE_PARAMS);
-    return (resp.values || []).length + 1;
-  }
+  if (!template) return appendedRow(await appendValues(BREAKDOWN_RANGE, [[category, type]], 'RAW'));
 
-  await copyBreakdownRowBelow(template.row);
+  await copyBreakdownRowBelow(template.row, [category, type]);
   return template.row + 1;
 }
 
@@ -228,10 +224,11 @@ async function breakdownSheetIdOrFetch() {
 
 // Inserts a copy of a 1-based row directly below it. copyPaste, not an append,
 // because it rewrites the formulas' relative references for the new row.
-async function copyBreakdownRowBelow(row) {
+// `names` ([Category, Type]) go in the same request, so a failure leaves no stray copy.
+async function copyBreakdownRowBelow(row, names = null) {
   const sheetId = await breakdownSheetIdOrFetch();
   const columns = { startColumnIndex: 0, endColumnIndex: BREAKDOWN_COLUMN_COUNT };
-  await batchUpdate([
+  const requests = [
     {
       insertDimension: {
         range: { sheetId, dimension: 'ROWS', startIndex: row, endIndex: row + 1 },
@@ -245,13 +242,28 @@ async function copyBreakdownRowBelow(row) {
         pasteType: 'PASTE_NORMAL',
       },
     },
-  ]);
+  ];
+  if (names) {
+    requests.push({
+      updateCells: {
+        start: { sheetId, rowIndex: row, columnIndex: 0 },
+        // An empty value clears the cell (a total row's blank Type).
+        rows: [{ values: names.map((text) => (text ? { userEnteredValue: { stringValue: text } } : {})) }],
+        fields: 'userEnteredValue',
+      },
+    });
+  }
+  await batchUpdate(requests);
 }
 
 // A copy computes its own figures; edit its Category/Type afterwards.
 async function duplicateBreakdownRow(entry) {
-  await copyBreakdownRowBelow(entry.row);
-  await refreshBreakdown(true);
+  try {
+    await copyBreakdownRowBelow(entry.row);
+    await refreshBreakdown(true);
+  } catch (err) {
+    showToast(`Couldn't duplicate: ${err.message}`, true);
+  }
 }
 
 async function deleteBreakdownRow(entry) {

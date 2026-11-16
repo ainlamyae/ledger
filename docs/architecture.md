@@ -161,7 +161,7 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 | 1 | `config.js` | `CONFIG`: Client ID, template spreadsheet ID, Picker API key, sheet tab names |
 | 2 | `auth.js` | Google sign-in/out, token persistence, quiet expiry, profile lookup |
 | 3 | `drive.js` | Template copy link, Google Picker, active spreadsheet ID storage |
-| 4 | `sheets.js` | Sheets API v4 wrapper; `USER_ENTERED` by default, `RAW` for Settings writes |
+| 4 | `sheets.js` | Sheets API v4 wrapper (batched reads, 401 renew, 429 backoff); `sheetRange` / `cellText` / `sheetText` cell helpers; `ensureSheetTab` creates a tab once even when two saves race |
 | 5 | `cache.js` | Numeric-expression evaluator; deletes the `ledger_cache_*` keys earlier versions stored |
 | 6 | `ui-helpers.js` | Shared table/modal helpers: sheet-ID lookup, confirm-delete, field errors, row buttons, sortable headers, pager, **busy-button + form-submit wiring** |
 | 7 | `ai.js` | AI chat client for Groq or OpenRouter (`AI_PROVIDER`), models from `GROQ_MODELS`/`OPENROUTER_MODELS`; tolerant JSON parsing; never rewrites the user's own Notes; vision calls (`aiAnalyzeFoodImage`, `aiReadNutritionLabel`) for photo scans |
@@ -262,9 +262,9 @@ Classic `<script>` tags, no bundler, loaded in this order, one shared global sco
 
 **Writes**
 
-1. UI calls `appendValues` / `updateValues` / `batchUpdate` directly.
+1. UI calls `appendValues` / `updateValues` / `batchUpdateValues` / `batchUpdate` directly, following the rules in [Data Model → Reading and writing](data-model.md#reading-and-writing): typed text stays as typed, only the app's own columns are written, and a failed write always reaches the user.
 2. Only the affected data is re-read — no page reload.
-3. The clicked button shows `…` and blocks re-clicks until the write settles.
+3. The clicked button shows `…` and blocks re-clicks until the write settles. Settings saves run one at a time, so two quick switch flips can't add a key twice.
 
 **Insight**
 

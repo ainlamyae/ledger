@@ -3,7 +3,7 @@
 // appended to the Analysis tab, so past verdicts stay as a track record.
 
 const ANALYSIS_HEADERS = ['Date', 'Symbol', 'Verdict', 'Score', 'Close', 'Stop', 'Report'];
-const ANALYSIS_RANGE = () => `'${CONFIG.SHEETS.STOCK_ANALYSIS}'!A2:G`;
+const ANALYSIS_RANGE = () => sheetRange(CONFIG.SHEETS.STOCK_ANALYSIS, 'A2:G');
 const ANALYSIS_LABELS = ['Overview', 'Signals', 'News', 'Risk', 'Levels', 'Verdict', 'Answer', 'Alerts'];
 const ANALYSIS_DISCLAIMER = 'Not financial advice. A rules-based summary of past prices and recent headlines; no signal here is anywhere near 95% reliable.';
 const ANALYSIS_STALE_DAYS = 30;
@@ -56,13 +56,13 @@ async function initStockAnalysisLog() {
     const resp = await getValues(ANALYSIS_RANGE(), VALUE_PARAMS);
     allStockAnalyses = (resp.values || []).map((row, i) => ({
       row: i + 2,
-      date: String(row[0] || ''),
-      symbol: String(row[1] || '').trim().toUpperCase(),
-      verdict: row[2] || '',
-      score: row[3] || '',
+      date: cellText(row[0]),
+      symbol: cellText(row[1]).trim().toUpperCase(),
+      verdict: cellText(row[2]),
+      score: cellText(row[3]),
       close: Number(row[4]),
       stop: Number(row[5]),
-      report: String(row[6] || ''),
+      report: cellText(row[6]),
     })).filter((a) => a.symbol);
   }
   updateAnalysisAgeBadge();

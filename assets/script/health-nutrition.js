@@ -2,7 +2,7 @@
 // (health-physique-estimator.js) checks before falling back to an AI/USDA estimate.
 
 // Read with its header row: columns are found by name, so a moved column can't shift data.
-const NUTRITION_RANGE = nutritionA1('A1:Z');
+const NUTRITION_RANGE = nutritionA1('A1:ZZ');
 const NUTRITION_COLUMNS = [
   { key: 'group', header: 'Group' },
   { key: 'name', header: 'Name' },
@@ -19,6 +19,12 @@ const NUTRITION_COLUMNS = [
 const NUTRITION_DEFAULT_COLUMNS = Object.fromEntries(NUTRITION_COLUMNS.map(({ key }, i) => [key, i]));
 // key -> 0-based column, from the header row. `legacyVerified` is the old Verification column.
 let nutritionColumnIndex = NUTRITION_DEFAULT_COLUMNS;
+// The header row and widest row as last read, for ensureNutritionColumns.
+let nutritionHeaderRow = null;
+let nutritionUsedWidth = 0;
+// Row deletes sent, and the count when the last read started (migrateNutritionAmountOrder).
+let nutritionRowDeletes = 0;
+let nutritionRowDeletesAtRead = 0;
 const N_PAGE_SIZE = 25;
 
 // The optional typed macros (form/table label for each); null falls back to an estimate.
@@ -100,7 +106,7 @@ let nutritionUsageCounts = null;
 
 // The Nutrition sheet's A1 reference for `ref`.
 function nutritionA1(ref) {
-  return `'${CONFIG.SHEETS.NUTRITION}'!${ref}`;
+  return sheetRange(CONFIG.SHEETS.NUTRITION, ref);
 }
 
 function nutritionPluralS(count) {
@@ -178,11 +184,17 @@ function selectedNutritionEntries() {
 }
 
 async function refreshNutrition(forceRefresh = false) {
+  // Re-resolved on use, so a spreadsheet switch can't keep the old tab's id.
+  nutritionSheetId = null;
+  const deletesAtRead = nutritionRowDeletes;
   const resp = await getValues(NUTRITION_RANGE, VALUE_PARAMS);
+  nutritionRowDeletesAtRead = deletesAtRead;
   const values = resp.values || [];
   const header = values[0] || [];
 
   nutritionColumnIndex = nutritionColumnsFromHeader(header);
+  nutritionHeaderRow = header;
+  nutritionUsedWidth = Math.max(0, ...values.map((row) => row.length));
   renameLegacyGroupHeader(header);
   const cell = (row, key) => (nutritionColumnIndex[key] === undefined ? undefined : row[nutritionColumnIndex[key]]);
   const numberOrNull = (v) => (v !== undefined && v !== '' ? Number(v) : null);
@@ -190,12 +202,12 @@ async function refreshNutrition(forceRefresh = false) {
   allNutritionEntries = values.slice(1)
     .map((row, i) => ({
       row: i + 2,
-      // Every cell as read, so a write keeps columns this app doesn't know about.
+      // Every cell as read.
       cells: row,
       // Free-text grouping (e.g. "Dairy"); blank on rows the app banks.
-      group: (cell(row, 'group') || '').trim(),
-      name: (cell(row, 'name') || '').trim(),
-      amount: cell(row, 'amount') || '',
+      group: cellText(cell(row, 'group')).trim(),
+      name: cellText(cell(row, 'name')).trim(),
+      amount: cellText(cell(row, 'amount')),
       calories: numberOrNull(cell(row, 'calories')),
       protein: numberOrNull(cell(row, 'protein')),
       // Typed Fiber/Fat/Carb (g) and TEF (kcal); null falls back to resolvedNutritionMacros.
@@ -204,11 +216,11 @@ async function refreshNutrition(forceRefresh = false) {
       carb: numberOrNull(cell(row, 'carb')),
       tef: numberOrNull(cell(row, 'tef')),
       // Old Verification column: "1" locks Amount–Carbohydrates (nutritionLockedNames).
-      verified: String(cell(row, 'legacyVerified') || '').trim() === '1',
+      verified: cellText(cell(row, 'legacyVerified')).trim() === '1',
       // % of desired protein this ingredient should cover; blank = untracked by Protein Source Rotation.
       proteinPercent: numberOrNull(cell(row, 'proteinPercent')),
       // JSON: the six top values, then the micronutrients, each with its lock tick.
-      micronutrients: (cell(row, 'micronutrients') || '').trim(),
+      micronutrients: cellText(cell(row, 'micronutrients')).trim(),
     }))
     .filter((n) => n.name);
   migrateNutritionAmountOrder();
@@ -237,7 +249,7 @@ function nutritionColumnsFromHeader(headerRow) {
 function renameLegacyGroupHeader(headerRow) {
   const i = headerRow.findIndex((h) => String(h ?? '').trim().toLowerCase() === 'classification');
   if (i === -1) return;
-  updateValues(nutritionA1(`${nutritionColumnLetter(i)}1`), [['Group']]).catch(() => {});
+  updateValues(nutritionA1(`${sheetColumnLetter(i)}1`), [['Group']]).catch(() => {});
 }
 
 // Rewrites old count-first Amounts ("1x (325g)") grams-first, in one batch; a
@@ -247,43 +259,46 @@ function migrateNutritionAmountOrder() {
   const changed = allNutritionEntries.filter((n) => gramsFirstAmount(n.amount) !== n.amount);
   if (changed.length === 0) return;
   changed.forEach((n) => { n.amount = gramsFirstAmount(n.amount); });
-  batchUpdateValues(changed.map((n) => ({ range: nutritionCellRange('amount', n.row), values: [[n.amount]] })))
+  // A delete sent since the read shifts the rows; its reload migrates instead.
+  if (nutritionRowDeletes !== nutritionRowDeletesAtRead) return;
+  batchUpdateValues(changed.map((n) => ({ range: nutritionCellRange('amount', n.row), values: [[n.amount]] })), 'RAW')
     .catch(() => {});
 }
 
-// Column letter(s) for a 0-based index.
-function nutritionColumnLetter(i) {
+// Column letter(s) for a 0-based index (0 -> A, 26 -> AA), for any tab.
+function sheetColumnLetter(i) {
   let letters = '';
   for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
   return letters;
 }
 
-// An entry's cells in the sheet's column order; unknown columns keep what was read.
-function nutritionRowCells(entry) {
-  const cells = [...(entry.cells || [])];
-  NUTRITION_COLUMNS.forEach(({ key }) => {
-    const i = nutritionColumnIndex[key];
-    if (i === undefined) return;
-    while (cells.length < i) cells.push('');
-    const value = entry[key];
-    cells[i] = value === null || value === undefined ? '' : value;
-  });
-  return cells;
-}
-
 // The A1 range for one key's cell on `row`.
 function nutritionCellRange(key, row) {
-  return nutritionA1(`${nutritionColumnLetter(nutritionColumnIndex[key])}${row}`);
+  return nutritionA1(`${sheetColumnLetter(nutritionColumnIndex[key])}${row}`);
 }
 
+function nutritionCellValue(entry, key) {
+  const value = entry[key];
+  return value === null || value === undefined ? '' : value;
+}
+
+// Only the app's columns, RAW (none is a date or formula): "1/2" or "711" stays as
+// typed, and the user's own columns are never rewritten.
 async function writeNutritionRow(row, entry) {
-  const cells = nutritionRowCells(entry);
-  await updateValues(nutritionA1(`A${row}:${nutritionColumnLetter(cells.length - 1)}${row}`), [cells]);
+  const data = NUTRITION_COLUMNS
+    .filter(({ key }) => nutritionColumnIndex[key] !== undefined)
+    .map(({ key }) => ({ range: nutritionCellRange(key, row), values: [[nutritionCellValue(entry, key)]] }));
+  await batchUpdateValues(data, 'RAW');
 }
 
+// A new row has nothing to keep, so the columns between the app's go blank.
 async function appendNutritionRow(entry) {
-  const cells = nutritionRowCells(entry);
-  await appendValues(nutritionA1(`A:${nutritionColumnLetter(cells.length - 1)}`), [cells]);
+  const width = Math.max(...NUTRITION_COLUMNS.map(({ key }) => nutritionColumnIndex[key] ?? -1)) + 1;
+  const cells = Array(width).fill('');
+  NUTRITION_COLUMNS.forEach(({ key }) => {
+    if (nutritionColumnIndex[key] !== undefined) cells[nutritionColumnIndex[key]] = nutritionCellValue(entry, key);
+  });
+  await appendValues(nutritionA1(`A:${sheetColumnLetter(width - 1)}`), [cells], 'RAW');
 }
 
 // Fiber/Fat/Carb grams from the row's pulled 🧬 Micronutrients panel; null when never pulled.
@@ -1194,10 +1209,8 @@ function readNutritionFormFields() {
 // Writes the form's fields over `editingNutritionRow`, or appends a new row.
 async function saveNutritionFormFields(fields) {
   await ensureNutritionColumns();
-  const existing = allNutritionEntries.find((n) => n.row === editingNutritionRow);
-  const entry = { ...fields, cells: existing ? existing.cells : [] };
-  if (editingNutritionRow) await writeNutritionRow(editingNutritionRow, entry);
-  else await appendNutritionRow(entry);
+  if (editingNutritionRow) await writeNutritionRow(editingNutritionRow, fields);
+  else await appendNutritionRow(fields);
 }
 
 async function submitNutritionForm(event) {
@@ -1362,7 +1375,7 @@ async function updateNutritionEntryAndPropagate() {
 
   let done = 0;
   const succeeded = [];
-  await Promise.allSettled(edits.map(async (e) => {
+  const results = await Promise.allSettled(edits.map(async (e) => {
     try {
       await writePhysiqueRow(e.row, e.day);
       succeeded.push({ row: e.row, values: e.snapshot });
@@ -1376,21 +1389,20 @@ async function updateNutritionEntryAndPropagate() {
   await refreshNutrition(true);
   await refreshPhysique(true);
 
+  // Reported like bulk Calculate's, so a failed day isn't taken as rewritten.
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  const failedNote = failed ? `, ${failed} failed` : '';
   showUndoToast(
-    `"${updatedEntry.name}" updated — ${succeeded.length} Physique day${nutritionPluralS(succeeded.length)} (${linesChanged} line${nutritionPluralS(linesChanged)}) rewritten.`,
+    `"${updatedEntry.name}" updated — ${succeeded.length} Physique day${nutritionPluralS(succeeded.length)} (${linesChanged} line${nutritionPluralS(linesChanged)}) rewritten${failedNote}.`,
     () => restorePhysiqueSnapshots(succeeded),
   );
 }
 
-// The batchUpdate request deleting one sheet row.
-function nutritionRowDeleteRequest(row) {
-  return { deleteDimension: { range: { sheetId: nutritionSheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row } } };
-}
-
 async function deleteNutritionEntry(entry) {
   await confirmAndDelete(`Delete "${entry.name}" from Nutrition?`, async () => {
-    if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
-    await batchUpdate([nutritionRowDeleteRequest(entry.row)]);
+    if (nutritionSheetId === null) nutritionSheetId = await fetchNutritionSheetId();
+    nutritionRowDeletes += 1;
+    await batchUpdate([sheetRowDeleteRequest(nutritionSheetId, entry.row)]);
     selectedNutritionRows.delete(entry.row);
     await refreshNutrition(true);
   }, "Couldn't delete ingredient");
@@ -1417,16 +1429,17 @@ async function mergeSelectedNutritionEntries() {
     `${others.map((o) => o.name).join(', ')} will be combined into "${kept.name}" and their rows deleted. ` +
     `Fields already filled on "${kept.name}" are kept as-is; blanks are filled in from the others. This cannot be undone.`,
     async () => {
-      if (!nutritionSheetId) nutritionSheetId = await fetchNutritionSheetId();
+      if (nutritionSheetId === null) nutritionSheetId = await fetchNutritionSheetId();
       if (NUTRITION_MACRO_KEYS.some((key) => merged[key] !== null)) await ensureNutritionColumns();
 
-      await writeNutritionRow(kept.row, { ...merged, cells: kept.cells });
+      await writeNutritionRow(kept.row, merged);
 
       // Bottom-up, so each delete leaves the next row's index intact.
       const deleteRequests = others
         .map((o) => o.row)
         .sort((a, b) => b - a)
-        .map(nutritionRowDeleteRequest);
+        .map((row) => sheetRowDeleteRequest(nutritionSheetId, row));
+      nutritionRowDeletes += 1;
       await batchUpdate(deleteRequests);
 
       selectedNutritionRows.clear();
@@ -1455,34 +1468,70 @@ async function capitalizeSelectedNutritionNames() {
   }
 
   const originalLabel = btn.textContent;
-  for (let i = 0; i < changed.length; i++) {
-    const { n, newName } = changed[i];
-    btn.textContent = `Capitalizing ${i + 1} of ${changed.length}…`;
-    await updateValues(nutritionCellRange('name', n.row), [[newName]]);
+  let written = 0;
+  try {
+    for (let i = 0; i < changed.length; i++) {
+      const { n, newName } = changed[i];
+      btn.textContent = `Capitalizing ${i + 1} of ${changed.length}…`;
+      await updateValues(nutritionCellRange('name', n.row), [[newName]], 'RAW');
+      written += 1;
+    }
+    showToast(`Capitalized ${changed.length} of ${rows.length} selected ingredient name${nutritionPluralS(changed.length)}.`);
+  } catch (err) {
+    // Says how far it got, since the names before the failure did change.
+    showToast(`Capitalized ${written} of ${changed.length} name${nutritionPluralS(changed.length)}, then failed: ${err.message}`, true);
+  } finally {
+    btn.textContent = originalLabel;
   }
-  btn.textContent = originalLabel;
-
-  showToast(`Capitalized ${changed.length} of ${rows.length} selected ingredient name${nutritionPluralS(changed.length)}.`);
   selectedNutritionRows.clear();
   await refreshNutrition(true);
 }
 
-// Sheets rejects writes past the grid ("Range exceeds grid limits"), so a sheet from
-// before Fiber/Fat/Carbohydrate/TEF is widened, and those headers written, once.
+// Missing app headers go after the last used column, with the grid widened to fit
+// (Sheets rejects writes past it), in one request; the index updates before the write.
 async function ensureNutritionColumns() {
   const metadata = await getSpreadsheetMetadata();
-  const sheet = metadata.sheets.find((s) => s.properties.title === CONFIG.SHEETS.NUTRITION);
-  const columnCount = sheet ? sheet.properties.gridProperties.columnCount : 0;
-  if (columnCount >= NUTRITION_COLUMNS.length) return;
-
   const sheetId = findSheetId(metadata, CONFIG.SHEETS.NUTRITION);
+  const sheet = metadata.sheets.find((s) => s.properties.sheetId === sheetId);
+  const columnCount = sheet.properties.gridProperties.columnCount;
   nutritionSheetId = sheetId;
-  await batchUpdate([{
-    appendDimension: { sheetId, dimension: 'COLUMNS', length: NUTRITION_COLUMNS.length - columnCount },
-  }]);
 
-  const headers = [['F1', 'Fiber'], ['G1', 'Fat'], ['H1', 'Carbohydrate'], ['I1', 'TEF']];
-  await Promise.all(headers.map(([cell, label]) => updateValues(nutritionA1(cell), [[label]])));
+  // Not loaded yet (a Calculate banking a row): the header row alone.
+  if (nutritionHeaderRow === null) {
+    nutritionHeaderRow = ((await getValues(nutritionA1('A1:ZZ1'), VALUE_PARAMS)).values || [])[0] || [];
+    nutritionUsedWidth = nutritionHeaderRow.length;
+  }
+  const index = nutritionColumnsFromHeader(nutritionHeaderRow);
+  // No Name header: the columns are taken by position, so no header is added.
+  const missing = index === NUTRITION_DEFAULT_COLUMNS ? [] : NUTRITION_COLUMNS.filter(({ key }) => index[key] === undefined);
+  const start = Math.max(nutritionUsedWidth, ...Object.values(index).map((i) => i + 1));
+  missing.forEach(({ key }, i) => { index[key] = start + i; });
+  const width = Math.max(...Object.values(index)) + 1;
+
+  const requests = [];
+  if (columnCount < width) {
+    requests.push({ appendDimension: { sheetId, dimension: 'COLUMNS', length: width - columnCount } });
+  }
+  if (missing.length) {
+    requests.push({
+      updateCells: {
+        start: { sheetId, rowIndex: 0, columnIndex: start },
+        rows: [{ values: missing.map(({ header }) => ({ userEnteredValue: { stringValue: header } })) }],
+        fields: 'userEnteredValue',
+      },
+    });
+  }
+  if (!requests.length) {
+    nutritionColumnIndex = index;
+    return;
+  }
+  await batchUpdate(requests);
+
+  const header = [...nutritionHeaderRow];
+  missing.forEach(({ key, header: label }) => { header[index[key]] = label; });
+  nutritionHeaderRow = header;
+  nutritionUsedWidth = Math.max(nutritionUsedWidth, width);
+  nutritionColumnIndex = index;
 }
 
 // Bulk Complete's lookup: USDA's top match for `name`, scaled to Amount's gram figure

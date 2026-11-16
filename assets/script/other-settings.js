@@ -1,4 +1,4 @@
-﻿const SETTINGS_PANEL_RANGE = `${CONFIG.SHEETS.SETTINGS}!A2:C`;
+﻿const SETTINGS_PANEL_RANGE = sheetRange(CONFIG.SHEETS.SETTINGS, 'A2:C');
 // Notes | Key | Value | actions.
 const SETTING_COLUMN_COUNT = 4;
 
@@ -9,7 +9,7 @@ let editingSettingRow = null;
 let settingPanelListenersAttached = false;
 
 function settingRange(cells) {
-  return `${CONFIG.SHEETS.SETTINGS}!${cells}`;
+  return sheetRange(CONFIG.SHEETS.SETTINGS, cells);
 }
 
 function missingSettingsTabMessage(purpose) {
@@ -109,9 +109,10 @@ async function refreshSettingsList(forceRefresh = false) {
 
   allSettingRows = values.map((row, i) => ({
     row: i + 2,
-    key: row[0] || '',
-    value: row[1] || '',
-    notes: row[2] || '',
+    // cellText: a stored 0 (SHOW_AMOUNTS) must read "0", not blank.
+    key: cellText(row[0]),
+    value: cellText(row[1]),
+    notes: cellText(row[2]),
   }));
 
   renderSettingsList();
@@ -361,7 +362,18 @@ function settingDefaultNote(key) {
 // RAW, not USER_ENTERED: Sheets parsed a written "2026-07-30" into a date, which
 // date-formatted the cell and the rows appended beside it, so numbers there read
 // back as date strings and getSetting() reported them as absent.
-async function saveSettingValues(values) {
+//
+// One save at a time: two at once could both append a missing key, or one's
+// row delete shift the rows the other updates.
+let settingsSaveChain = Promise.resolve();
+
+function saveSettingValues(values) {
+  const saving = settingsSaveChain.then(() => writeSettingValues(values));
+  settingsSaveChain = saving.catch(() => {});
+  return saving;
+}
+
+async function writeSettingValues(values) {
   await initSettingsPanel(true);
   if (settingsSheetMissing) {
     throw new Error(missingSettingsTabMessage('save this'));

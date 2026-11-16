@@ -7,7 +7,7 @@
 
 // Sheet row of the first catalogue entry; row 1 is the header.
 const ACTIVITY_FIRST_ROW = 2;
-const ACTIVITIES_RANGE = `'${CONFIG.SHEETS.ACTIVITIES}'!A${ACTIVITY_FIRST_ROW}:J`;
+const ACTIVITIES_RANGE = sheetRange(CONFIG.SHEETS.ACTIVITIES, `A${ACTIVITY_FIRST_ROW}:J`);
 
 // Compendium 02054 general value, for a name the sheet doesn't price. Not
 // health-math.js's ACTIVITY_MET_FALLBACK, which is the daily activity's intensity.
@@ -31,7 +31,7 @@ async function fetchActivitiesSheetId() {
 // "3 x 10, 90 sec" -> { amount: "3 x 10", rest: "90 sec", restSec: 90 }. Split on
 // the LAST comma, so a hold's "3 x 45 sec, 45 sec" divides correctly.
 function splitAmountAndRest(cell) {
-  const text = String(cell || '').trim();
+  const text = cellText(cell).trim();
   const comma = text.lastIndexOf(',');
   if (comma === -1) return { amount: text, rest: '', restSec: null };
 
@@ -54,7 +54,7 @@ function parseActivityAmount(amount, unit) {
 }
 
 function activityCellText(row, index) {
-  return String(row[index] || '').trim();
+  return cellText(row[index]).trim();
 }
 
 // A number, or null for a blank cell.
@@ -109,6 +109,8 @@ async function initActivities(forceRefresh = false) {
     });
   }
 
+  // Re-resolved on use, so a spreadsheet switch can't keep the old tab's id.
+  activitiesSheetId = null;
   const resp = await getValues(ACTIVITIES_RANGE, VALUE_PARAMS);
   allActivities = (resp.values || []).map(activityFromSheetRow).filter((a) => a.name);
   activitiesByName = new Map(allActivities.map((a) => [a.name.toLowerCase(), a]));
@@ -513,12 +515,13 @@ function readActivityFormFields() {
   return { ok: true, name, met: met.value, values };
 }
 
-// Writes `values` over editingActivityRow, or appends a new row.
+// Writes `values` over editingActivityRow, or appends a new row. RAW: nothing is a
+// date or formula, so "3-4" or "-20 lbs" stays as typed.
 async function saveActivityFormFields(values) {
   if (editingActivityRow !== null) {
-    await updateValues(`'${CONFIG.SHEETS.ACTIVITIES}'!A${editingActivityRow}:J${editingActivityRow}`, [values]);
+    await updateValues(sheetRange(CONFIG.SHEETS.ACTIVITIES, `A${editingActivityRow}:J${editingActivityRow}`), [values], 'RAW');
   } else {
-    await appendValues(ACTIVITIES_RANGE, [values]);
+    await appendValues(ACTIVITIES_RANGE, [values], 'RAW');
   }
 }
 
@@ -629,7 +632,7 @@ async function updateActivityAndPropagate() {
 
   let done = 0;
   const succeeded = [];
-  await Promise.allSettled(edits.map(async (e) => {
+  const results = await Promise.allSettled(edits.map(async (e) => {
     try {
       await writePhysiqueRow(e.row, e.day);
       succeeded.push({ row: e.row, values: e.snapshot });
@@ -643,8 +646,11 @@ async function updateActivityAndPropagate() {
   await refreshPhysique(true);
 
   const renameNote = linesRenamed ? ` (${pluralCount(linesRenamed, 'line')} renamed)` : '';
+  // Reported like bulk Calculate's, so a failed day isn't taken as repriced.
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  const failedNote = failed ? `, ${failed} failed` : '';
   showUndoToast(
-    `"${newName}" updated — ${pluralCount(succeeded.length, 'Physique day')} repriced${renameNote}.`,
+    `"${newName}" updated — ${pluralCount(succeeded.length, 'Physique day')} repriced${renameNote}${failedNote}.`,
     () => restorePhysiqueSnapshots(succeeded),
   );
 }
@@ -654,12 +660,8 @@ async function deleteActivity(activity) {
   await confirmAndDelete(
     `Delete "${activity.name}" from the Activity Plan? Days already logged against it keep their lines, but will be priced at the default MET if recalculated.`,
     async () => {
-      if (!activitiesSheetId) activitiesSheetId = await fetchActivitiesSheetId();
-      await batchUpdate([{
-        deleteDimension: {
-          range: { sheetId: activitiesSheetId, dimension: 'ROWS', startIndex: activity.row - 1, endIndex: activity.row },
-        },
-      }]);
+      if (activitiesSheetId === null) activitiesSheetId = await fetchActivitiesSheetId();
+      await batchUpdate([sheetRowDeleteRequest(activitiesSheetId, activity.row)]);
       await initActivities(true);
     },
     "Couldn't delete activity",

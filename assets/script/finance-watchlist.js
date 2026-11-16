@@ -3,7 +3,7 @@
 // Alerts (column F, JSON) are checked on every Finance load for alerted stocks only.
 
 const WATCHLIST_HEADERS = ['Symbol', 'Name', 'Exchange', 'Currency', 'Notes', 'Alerts'];
-const watchlistSheetRange = (cells) => `'${CONFIG.SHEETS.WATCHLIST}'!${cells}`;
+const watchlistSheetRange = (cells) => sheetRange(CONFIG.SHEETS.WATCHLIST, cells);
 const WATCHLIST_RANGE = () => watchlistSheetRange('A2:F');
 const ALERT_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 const ALERT_SMA_DAYS = 200; // fewer daily bars than this: the average needs monthly bars
@@ -32,13 +32,6 @@ function watchlistField(name) {
   return document.getElementById(`watchlist-${name}`);
 }
 
-// Deletes one sheet row (Watchlist and Trade tabs).
-function deleteSheetRow(sheetId, row) {
-  return batchUpdate([{
-    deleteDimension: { range: { sheetId, dimension: 'ROWS', startIndex: row - 1, endIndex: row } },
-  }]);
-}
-
 async function ensureWatchlistTab() {
   watchlistSheetId = await ensureSheetTab(CONFIG.SHEETS.WATCHLIST, WATCHLIST_HEADERS);
 }
@@ -59,18 +52,20 @@ async function initWatchlist(forceRefresh = false) {
 }
 
 async function refreshWatchlist() {
-  if (!(await sheetTabExists(CONFIG.SHEETS.WATCHLIST))) {
+  // The id is re-read each time, as the spreadsheet may have been switched.
+  const tab = (await getSpreadsheetMetadata()).sheets.find((s) => s.properties.title === CONFIG.SHEETS.WATCHLIST);
+  watchlistSheetId = tab ? tab.properties.sheetId : null;
+  if (!tab) {
     allWatchlist = [];
-    watchlistSheetId = null;
   } else {
     const resp = await getValues(WATCHLIST_RANGE(), VALUE_PARAMS);
     allWatchlist = (resp.values || []).map((row, i) => ({
       row: i + 2,
-      symbol: String(row[0] || '').trim().toUpperCase(),
-      name: row[1] || '',
-      exchange: row[2] || '',
-      currency: row[3] || symbolCurrency(String(row[0] || '')),
-      notes: row[4] || '',
+      symbol: cellText(row[0]).trim().toUpperCase(),
+      name: cellText(row[1]),
+      exchange: cellText(row[2]),
+      currency: cellText(row[3]) || symbolCurrency(cellText(row[0])),
+      notes: cellText(row[4]),
       alerts: parseAlerts(row[5]),
     })).filter((w) => w.symbol);
   }
@@ -268,12 +263,23 @@ async function clearStaleDismissals(alerted) {
     const keep = w.alerts.dismissed.filter((rule) => results.find((r) => r.rule === rule)?.met !== false);
     if (keep.length === w.alerts.dismissed.length) continue;
     w.alerts.dismissed = keep;
-    await writeWatchlistAlerts(w).catch((err) => console.warn(`[alerts] ${w.symbol}: ${err.message}`));
+    await writeWatchlistAlerts(w, true).catch((err) => {
+      setMarketStatus('watchlist-status', `Couldn't re-arm ${w.symbol}'s dismissed alert: ${err.message}`);
+    });
   }
 }
 
-function writeWatchlistAlerts(w) {
-  return updateValues(watchlistSheetRange(`F${w.row}`), [[alertsCell(w.alerts)]], 'RAW');
+// `relocate`: a background write finds the row by symbol first, as a delete since the
+// last read shifts rows; a stock no longer listed is skipped.
+async function writeWatchlistAlerts(w, relocate = false) {
+  let row = w.row;
+  if (relocate) {
+    const resp = await getValues(WATCHLIST_RANGE(), VALUE_PARAMS);
+    const i = (resp.values || []).findIndex((r) => cellText(r[0]).trim().toUpperCase() === w.symbol);
+    if (i === -1) return;
+    row = i + 2;
+  }
+  await updateValues(watchlistSheetRange(`F${row}`), [[alertsCell(w.alerts)]], 'RAW');
 }
 
 // Column F's header goes in with the first stock that has rules.
@@ -462,13 +468,17 @@ async function submitWatchlistForm() {
 async function deleteWatchlistEntry(entry) {
   await confirmAndDelete(`Remove ${entry.symbol} from the watchlist? Its trades in Portfolio stay.`, async () => {
     if (watchlistSheetId === null) await ensureWatchlistTab();
-    await deleteSheetRow(watchlistSheetId, entry.row);
+    await batchUpdate([sheetRowDeleteRequest(watchlistSheetId, entry.row)]);
     await refreshWatchlist();
     updateWatchlistAlertBadges();
     showUndoToast(`${entry.symbol} removed.`, async () => {
-      await appendValues(WATCHLIST_RANGE(), [watchlistRowValues(entry)], 'RAW');
-      await refreshWatchlist();
-      checkWatchlistAlerts();
+      try {
+        await appendValues(WATCHLIST_RANGE(), [watchlistRowValues(entry)], 'RAW');
+        await refreshWatchlist();
+        checkWatchlistAlerts();
+      } catch (err) {
+        alert(`Failed to restore: ${err.message}`);
+      }
     });
   }, "Couldn't remove the stock");
 }

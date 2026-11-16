@@ -4,7 +4,7 @@
 
 ## At a glance
 
-- Columns are **matched by header name**, so sheet column order can change.
+- Columns are **matched by header name**, so sheet column order can change. Saves write only the app's own columns, one cell each, so extra columns of yours and any formulas in them are never rewritten. Consumption, Workout and Breakdown text is stored exactly as typed, even a line starting with `=`, `+` or `-`.
 - **Stored, not recalculated:** Sleep, Deprivation and Derived (JSON: the four BMR figures plus `m`, `BMI`, `m_avg`, `m_d`) are computed once and saved. Status, charts and the table read them.
 - Missing values fill in on load; a changed profile or BMR setting rewrites all in one request. Re-saving a day keeps its BMR unless Body Mass changed.
 - **Breakdown amounts are in grams:** a unit-counted food is stored as its Nutrition weight (`31g (1 scoop)` → `31g`); `×N` remains only when no weight is known.

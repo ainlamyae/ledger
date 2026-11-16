@@ -86,10 +86,12 @@ function carKmText(km) {
 // Past services, oldest first.
 function parseCarServiceTransactions() {
   return allTransactions
-    .filter((t) => t.date && t.category.trim().toLowerCase() === 'transportation' && CAR_ODOMETER_PATTERN.test(t.description))
+    // cellText: a category or description Sheets stored as a number has no .trim().
+    .filter((t) => t.date && cellText(t.category).trim().toLowerCase() === 'transportation' && CAR_ODOMETER_PATTERN.test(cellText(t.description)))
     .map((t) => {
-      const km = Number(CAR_ODOMETER_PATTERN.exec(t.description)[1].replace(/,/g, ''));
-      const service = t.description.replace(CAR_ODOMETER_PATTERN, '').trim();
+      const description = cellText(t.description);
+      const km = Number(CAR_ODOMETER_PATTERN.exec(description)[1].replace(/,/g, ''));
+      const service = description.replace(CAR_ODOMETER_PATTERN, '').trim();
       return { date: t.date, km, service, payee: t.payee, amount: t.amount, type: carServiceType(service).type };
     })
     .sort((a, b) => a.date.localeCompare(b.date) || a.km - b.km);

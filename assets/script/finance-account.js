@@ -1,5 +1,4 @@
-const ACCOUNTS_TAB = `'${CONFIG.SHEETS.ACCOUNTS}'`;
-const ACCOUNTS_RANGE = `${ACCOUNTS_TAB}!A3:F100`;
+const ACCOUNTS_RANGE = sheetRange(CONFIG.SHEETS.ACCOUNTS, 'A3:F');
 // Reads a cell as its formula text rather than its computed value.
 const ACCOUNT_FORMULA_PARAMS = { valueRenderOption: 'FORMULA' };
 
@@ -73,9 +72,9 @@ function parseAccountRow(row, i) {
 
   return {
     row: i + 3,
-    name: row[0] || '',
-    institution: row[1] || '',
-    type: row[2] || '',
+    name: cellText(row[0]),
+    institution: cellText(row[1]),
+    type: cellText(row[2]),
     balance: Number.isFinite(balanceNum) ? balanceNum : 0,
     balanceText: Number.isFinite(balanceNum) ? null : (row[3] || null),
     currentValue: Number.isFinite(currentValueNum) ? currentValueNum : null,
@@ -238,7 +237,7 @@ function renderAccountsTotalRow(hasAccounts) {
 // would flatten a formula it couldn't see.
 async function accountRowCells(row) {
   try {
-    const resp = await getValues(`${ACCOUNTS_TAB}!A${row}:F${row}`, ACCOUNT_FORMULA_PARAMS);
+    const resp = await getValues(sheetRange(CONFIG.SHEETS.ACCOUNTS, `A${row}:F${row}`), ACCOUNT_FORMULA_PARAMS);
     return (resp.values && resp.values[0]) || [];
   } catch (err) {
     console.error('Failed to read account formulas:', err);
@@ -326,10 +325,11 @@ async function submitAccountForm(event) {
     return;
   }
 
+  // USER_ENTERED for the Balance/Market Value formulas; the text stays as typed.
   const values = [[
-    document.getElementById('account-name').value,
-    document.getElementById('account-institution').value,
-    document.getElementById('account-type').value,
+    sheetText(document.getElementById('account-name').value),
+    sheetText(document.getElementById('account-institution').value),
+    sheetText(document.getElementById('account-type').value),
     balance,
     currentValue,
     paymentDay,
@@ -338,7 +338,7 @@ async function submitAccountForm(event) {
   try {
     let row = editingAccountRow;
     if (row) {
-      await updateValues(`${ACCOUNTS_TAB}!A${row}:F${row}`, values);
+      await updateValues(sheetRange(CONFIG.SHEETS.ACCOUNTS, `A${row}:F${row}`), values);
     } else {
       row = appendedRow(await appendValues(ACCOUNTS_RANGE, values));
     }
@@ -357,11 +357,11 @@ async function submitAccountForm(event) {
 async function loadAccountBalanceCells() {
   if (accountBalanceCells) return accountBalanceCells;
 
-  const resp = await getValues(`${ACCOUNTS_TAB}!A3:D100`, ACCOUNT_FORMULA_PARAMS);
+  const resp = await getValues(sheetRange(CONFIG.SHEETS.ACCOUNTS, 'A3:D'), ACCOUNT_FORMULA_PARAMS);
 
   accountBalanceCells = new Map();
   (resp.values || []).forEach((row) => {
-    if (row[0]) accountBalanceCells.set(row[0], row[3]);
+    if (cellText(row[0])) accountBalanceCells.set(cellText(row[0]), row[3]);
   });
   return accountBalanceCells;
 }
@@ -410,7 +410,7 @@ async function addToAccountBalance(name, amount) {
   if (!cell.writable) return cell;
 
   const next = roundMoneyCents(cell.current + amount);
-  await updateValues(`${ACCOUNTS_TAB}!D${cell.row}`, [[next]]);
+  await updateValues(sheetRange(CONFIG.SHEETS.ACCOUNTS, `D${cell.row}`), [[next]]);
 
   await refreshAccountsList(true);
   await refreshNetWorth();
@@ -512,16 +512,35 @@ async function submitTransferForm(event) {
     return;
   }
 
+  // Two writes, one per leg, so a failure says which leg and what was applied.
+  const [fromCell, toCell] = cells;
+  const writeLeg = (cell, change) => updateValues(
+    sheetRange(CONFIG.SHEETS.ACCOUNTS, `D${cell.row}`), [[roundMoneyCents(cell.current + change)]]);
   try {
-    await addToAccountBalance(from, -amount);
-    await addToAccountBalance(to, amount);
-    // The amount clears, so a second 💾 can't repeat the transfer.
-    document.getElementById('transfer-amount').value = '';
-    document.getElementById('transfer-payoff').checked = false;
-    showFormSaved('transfer-form-error');
+    await writeLeg(fromCell, -amount);
   } catch (err) {
-    showFieldError('transfer-form-error', err.message);
+    showFieldError('transfer-form-error', `Nothing was transferred: ${from}'s balance couldn't be lowered (${err.message}).`);
+    return;
   }
+
+  let failure = null;
+  try {
+    await writeLeg(toCell, amount);
+  } catch (err) {
+    failure = `Half applied: ${from}'s balance went down by ${formatCurrency(amount)}, but ${to}'s couldn't be raised (${err.message}). Add ${formatCurrency(amount)} to ${to} by hand.`;
+  }
+  // The amount clears either way, so a second 💾 can't repeat the transfer.
+  document.getElementById('transfer-amount').value = '';
+  document.getElementById('transfer-payoff').checked = false;
+
+  try {
+    await refreshAccountsList(true);
+    await refreshNetWorth();
+  } catch (err) {
+    failure = failure || `Transferred, but the accounts couldn't reload: ${err.message}`;
+  }
+  if (failure) showFieldError('transfer-form-error', failure);
+  else showFormSaved('transfer-form-error');
 }
 
 async function deleteAccount(row) {

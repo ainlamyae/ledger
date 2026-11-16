@@ -4,7 +4,7 @@
 
 ## At a glance
 
-- **LeetCode** (`/track/leetcode/`): the NeetCode 250 by category, ticked off from your logged solves, with a Progress card (solved, left, video hours watched and a finish date at last week's pace), a Daily Progress heatmap since the first solve and NeetCode's roadmap graph (the solved summary under its title), the category tables and a Python Cheat Sheet by category; 📝 logs one.
+- **LeetCode** (`/track/leetcode/`): the NeetCode 250 by category, ticked off from your logged solves, with a Progress card (solved, left, video hours watched and a finish date at your recent pace (the faster of the last 7 days with today and the 7 days before it, so an empty morning doesn't push it out)), a Daily Progress heatmap since the first solve and NeetCode's roadmap graph (the solved summary under its title), the category tables and a Python Cheat Sheet by category; 📝 logs one.
   - Counts only NeetCode 250 problems you've logged, so it can differ from LeetCode's own solved total (which counts every problem, roadmap or not).
 - **Work Time** (`/track/work-time/`): see [Time Tracker](time-tracker.md).
 - **Car Service** (`/track/car-service/`): services from Transportation transactions tagged `@<km>km`, a linear odometer forecast, and the next service of each kind.

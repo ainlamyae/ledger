@@ -2,7 +2,7 @@
 // cost (finance-portfolio-math.js) and gain/loss in CAD. Prices load when the page opens.
 
 const TRADE_HEADERS = ['Date', 'Account', 'Symbol', 'Action', 'Quantity', 'Price', 'Fees', 'Currency', 'Notes', 'FX to CAD'];
-const tradeSheetRange = (cells) => `'${CONFIG.SHEETS.TRADES}'!${cells}`;
+const tradeSheetRange = (cells) => sheetRange(CONFIG.SHEETS.TRADES, cells);
 const TRADES_RANGE = () => tradeSheetRange('A2:J');
 const TRADE_PAGE_SIZE = 50;
 const TRADE_TABLE_COLUMNS = 9; // the holdings and trades tables alike
@@ -59,26 +59,28 @@ async function initTrades(forceRefresh = false) {
 }
 
 async function refreshTrades() {
-  if (!(await sheetTabExists(CONFIG.SHEETS.TRADES))) {
+  // The id is re-read each time, as the spreadsheet may have been switched.
+  const tab = (await getSpreadsheetMetadata()).sheets.find((s) => s.properties.title === CONFIG.SHEETS.TRADES);
+  tradesSheetId = tab ? tab.properties.sheetId : null;
+  if (!tab) {
     allTrades = [];
-    tradesSheetId = null;
   } else {
     const resp = await getValues(TRADES_RANGE(), VALUE_PARAMS);
     allTrades = (resp.values || []).map((row, i) => {
-      const symbol = String(row[2] || '').trim().toUpperCase();
-      const currency = row[7] || symbolCurrency(symbol);
+      const symbol = cellText(row[2]).trim().toUpperCase();
+      const currency = cellText(row[7]) || symbolCurrency(symbol);
       const fx = Number(row[9]);
       return {
         row: i + 2,
-        date: String(row[0] || '').slice(0, 10),
-        account: String(row[1] || ''),
+        date: cellText(row[0]).slice(0, 10),
+        account: cellText(row[1]),
         symbol,
-        action: String(row[3] || 'Buy'),
+        action: cellText(row[3]) || 'Buy',
         quantity: Number(row[4]),
         price: Number(row[5]) || 0,
         fees: Number(row[6]) || 0,
         currency,
-        notes: row[8] || '',
+        notes: cellText(row[8]),
         fx: currency === 'CAD' ? 1 : (Number.isFinite(fx) && fx > 0 ? fx : null),
       };
     }).filter((t) => t.symbol && t.date);
@@ -250,22 +252,31 @@ function renderPortfolioAccounts(rows, fxNow) {
 async function writeHoldingsToMarketValue() {
   if (!portfolioAccountHoldings.size) return;
   if (!confirm("Write each account's Holdings (CAD) into its Market Value? Cells holding a formula are left alone.")) return;
-  const accountCell = (cells) => `'${CONFIG.SHEETS.ACCOUNTS}'!${cells}`;
-  const resp = await getValues(accountCell('A3:E100'), { valueRenderOption: 'FORMULA' });
+  const accountCell = (cells) => sheetRange(CONFIG.SHEETS.ACCOUNTS, cells);
   const data = [];
   const skipped = [];
-  (resp.values || []).forEach((row, i) => {
-    const name = row[0];
-    if (!portfolioAccountHoldings.has(name)) return;
-    const cell = row[4];
-    if (typeof cell === 'string' && cell.startsWith('=')) {
-      skipped.push(`${name} (E${i + 3} is a formula)`);
-      return;
-    }
-    data.push({ range: accountCell(`E${i + 3}`), values: [[Math.round(portfolioAccountHoldings.get(name) * 100) / 100]] });
-  });
-  if (data.length) await batchUpdateValues(data, 'RAW');
-  await refreshAccountsList(true);
+  try {
+    const resp = await getValues(accountCell('A3:E'), { valueRenderOption: 'FORMULA' });
+    (resp.values || []).forEach((row, i) => {
+      const name = cellText(row[0]);
+      if (!portfolioAccountHoldings.has(name)) return;
+      const cell = row[4];
+      if (typeof cell === 'string' && cell.startsWith('=')) {
+        skipped.push(`${name} (E${i + 3} is a formula)`);
+        return;
+      }
+      data.push({ range: accountCell(`E${i + 3}`), values: [[Math.round(portfolioAccountHoldings.get(name) * 100) / 100]] });
+    });
+    if (data.length) await batchUpdateValues(data, 'RAW');
+  } catch (err) {
+    showToast(`Couldn't write Market Value: ${err.message}`, true);
+    return;
+  }
+  try {
+    await refreshAccountsList(true);
+  } catch (err) {
+    showToast(`Market Value written, but the accounts couldn't reload: ${err.message}`, true);
+  }
   renderPortfolio();
   setMarketStatus('portfolio-status', `Updated ${data.length} account${data.length === 1 ? '' : 's'}.${skipped.length ? ` Left alone: ${skipped.join(', ')}.` : ''}`);
 }
@@ -444,11 +455,15 @@ async function submitTradeForm() {
 async function deleteTrade(trade) {
   await confirmAndDelete(`Delete the ${trade.action} of ${trade.symbol} on ${trade.date}?`, async () => {
     if (tradesSheetId === null) await ensureTradesTab();
-    await deleteSheetRow(tradesSheetId, trade.row);
+    await batchUpdate([sheetRowDeleteRequest(tradesSheetId, trade.row)]);
     await refreshTrades();
     showUndoToast(`${trade.action} of ${trade.symbol} deleted.`, async () => {
-      await appendValues(TRADES_RANGE(), [tradeRowValues(trade)], 'RAW');
-      await refreshTrades();
+      try {
+        await appendValues(TRADES_RANGE(), [tradeRowValues(trade)], 'RAW');
+        await refreshTrades();
+      } catch (err) {
+        alert(`Failed to restore: ${err.message}`);
+      }
     });
   }, "Couldn't delete the trade");
 }

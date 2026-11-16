@@ -1,4 +1,4 @@
-const TRAVEL_RANGE = `'${CONFIG.SHEETS.TRAVEL}'!A2:H`;
+const TRAVEL_RANGE = sheetRange(CONFIG.SHEETS.TRAVEL, 'A2:H');
 const TRAVEL_PAGE_SIZE = 25;
 // Sheet columns A–H, in order; each has a travel-<kebab-case> form field.
 const TRAVEL_FIELD_KEYS = ['countryCity', 'port', 'type', 'via', 'date', 'time', 'reason', 'detail'];
@@ -38,16 +38,25 @@ async function initTravel(forceRefresh = false) {
 }
 
 async function refreshTravel(forceRefresh = false) {
+  // Dropped so a delete looks the tab up again (the spreadsheet may have changed).
+  travelSheetId = null;
   const resp = await getValues(TRAVEL_RANGE, VALUE_PARAMS);
   const values = resp.values || [];
 
   allTravel = values
-    .map((row, i) => ({ row: i + 2, ...Object.fromEntries(TRAVEL_FIELD_KEYS.map((key, col) => [key, row[col] || ''])) }))
+    .map((row, i) => ({ row: i + 2, ...Object.fromEntries(TRAVEL_FIELD_KEYS.map((key, col) => [key, travelCellValue(key, row[col])])) }))
     .filter((t) => t.countryCity || t.port);
 
   renderTravelList();
   renderCountryDaysList(computeCountryDays(allTravel, getSettingString('BIRTH_DATE', '')));
   renderWorldMapChart(getVisitedCountries(allTravel));
+}
+
+// Older rows were USER_ENTERED, so Date/Time may read in a display format.
+function travelCellValue(key, value) {
+  if (key === 'date') return sheetDateIso(value);
+  if (key === 'time') return normalizeTimeCell(value);
+  return cellText(value);
 }
 
 // Newest (last sheet row) first until a column is sorted.
@@ -126,9 +135,10 @@ async function submitTravelForm(event) {
   try {
     let row = editingTravelRow;
     if (row !== null) {
-      await updateValues(`'${CONFIG.SHEETS.TRAVEL}'!A${row}:H${row}`, [rowData]);
+      // RAW: nothing here needs parsing, and "1/2" or "=x" must stay as typed.
+      await updateValues(sheetRange(CONFIG.SHEETS.TRAVEL, `A${row}:H${row}`), [rowData], 'RAW');
     } else {
-      row = appendedRow(await appendValues(TRAVEL_RANGE, [rowData]));
+      row = appendedRow(await appendValues(TRAVEL_RANGE, [rowData], 'RAW'));
     }
     await refreshTravel(true);
     const saved = allTravel.find((t) => t.row === row);
@@ -144,7 +154,7 @@ async function submitTravelForm(event) {
 
 async function deleteTravelEntry(travel) {
   await confirmAndDelete(`Delete this travel entry (${travel.countryCity || travel.port})?`, async () => {
-    if (!travelSheetId) travelSheetId = findSheetId(await getSpreadsheetMetadata(), CONFIG.SHEETS.TRAVEL);
+    if (travelSheetId === null) travelSheetId = findSheetId(await getSpreadsheetMetadata(), CONFIG.SHEETS.TRAVEL);
     await batchUpdate([sheetRowDeleteRequest(travelSheetId, travel.row)]);
     await refreshTravel(true);
   }, "Couldn't delete travel entry");

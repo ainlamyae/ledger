@@ -1,4 +1,4 @@
-const WORK_TIME_RANGE = `${CONFIG.SHEETS.WORK_TIME}!A2:H`;
+const WORK_TIME_RANGE = sheetRange(CONFIG.SHEETS.WORK_TIME, 'A2:H');
 const TS_PAGE_SIZE = 28;
 const WORK_TIME_TASK_DISPLAY_MAX = 30;
 // The table's default date range around today.
@@ -84,6 +84,34 @@ function isoFromDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+// True where the browser's locale writes the day before the month (20/11/2026).
+function localeDayFirst() {
+  const parts = new Intl.DateTimeFormat().formatToParts(new Date(2026, 10, 20));
+  return parts.findIndex((p) => p.type === 'day') < parts.findIndex((p) => p.type === 'month');
+}
+
+// A date cell as yyyy-mm-dd, from ISO or a display format ("20/11/2026",
+// "11/20/2026", "Nov 20, 2026"), so a date input can show it. Else returned as read.
+function sheetDateIso(value) {
+  const text = cellText(value).trim();
+  const iso = (y, m, d) => (m >= 1 && m <= 12 && d >= 1 && d <= 31
+    ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    : text);
+  let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:$|[ T])/.exec(text);
+  if (m) return iso(m[1], Number(m[2]), Number(m[3]));
+  m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/.exec(text);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    const dayFirst = a > 12 || (b <= 12 && localeDayFirst());
+    return dayFirst ? iso(m[3], b, a) : iso(m[3], a, b);
+  }
+  if (/[a-z]/i.test(text) && /\d{4}/.test(text)) {
+    const date = new Date(text);
+    if (!Number.isNaN(date.getTime())) return isoFromDate(date);
+  }
+  return text;
+}
+
 // Local "YYYY-MM-DD HH:mm", for timestamps shown to the user.
 function localTimestamp(date) {
   const hh = String(date.getHours()).padStart(2, '0');
@@ -161,12 +189,12 @@ async function refreshWorkTime(forceRefresh = false) {
   allTimeEntries = values
     .map((row, i) => ({
       row: i + 2,
-      company: (row[0] || '').trim(),
-      date: row[1] || '',
+      company: cellText(row[0]).trim(),
+      date: sheetDateIso(row[1]),
       start: normalizeTimeString(row[3]),
       end: normalizeTimeString(row[4]),
       breakMinutes: parseBreakMinutes(row[5]),
-      task: row[7] || '',
+      task: cellText(row[7]),
     }))
     .filter((e) => e.date);
 
@@ -389,7 +417,8 @@ async function backfillMissingDates(untilDate) {
     cursor.setDate(cursor.getDate() + 1);
   }
 
-  if (rows.length) await appendValues(WORK_TIME_RANGE, rows);
+  // RAW like the main append: a parsed date could read back as "19/11/2026".
+  if (rows.length) await appendValues(WORK_TIME_RANGE, rows, 'RAW');
 }
 
 async function submitWorkTimeForm(event) {
@@ -414,13 +443,15 @@ async function submitWorkTimeForm(event) {
     const existing = allTimeEntries.find((e) => e.date === date);
 
     if (existing) {
-      const sheet = CONFIG.SHEETS.WORK_TIME;
+      const cells = (a1) => sheetRange(CONFIG.SHEETS.WORK_TIME, a1);
       const row = existing.row;
-      // Three writes, so Day (C) and Duration (G) are never touched.
-      await updateValues(`${sheet}!A${row}`, [[company]]);
-      // RAW: USER_ENTERED would turn "09:40" into a time cell that reads back reformatted.
-      await updateValues(`${sheet}!D${row}:F${row}`, [[start, end, breakValue]], 'RAW');
-      await updateValues(`${sheet}!H${row}`, [[task]]);
+      // One request, skipping Day (C) and Duration (G). RAW: USER_ENTERED would turn
+      // "09:40" into a time cell that reads back reformatted.
+      await batchUpdateValues([
+        { range: cells(`A${row}`), values: [[company]] },
+        { range: cells(`D${row}:F${row}`), values: [[start, end, breakValue]] },
+        { range: cells(`H${row}`), values: [[task]] },
+      ], 'RAW');
     } else {
       await backfillMissingDates(date);
       await appendValues(WORK_TIME_RANGE, [[company, date, dayNameFromDate(date), start, end, breakValue, '', task]], 'RAW');

@@ -1,4 +1,4 @@
-const CONTACTS_RANGE = `'${CONFIG.SHEETS.CONTACTS}'!A2:U`;
+const CONTACTS_RANGE = sheetRange(CONFIG.SHEETS.CONTACTS, 'A2:U');
 const C_PAGE_SIZE = 25;
 // Checkbox | First | Last | Phone | Email | Tags | actions.
 const CONTACT_COLUMN_COUNT = 7;
@@ -21,12 +21,12 @@ let selectedContactRows = new Set();
 let editContact = null;
 
 function contactRowRange(row) {
-  return `'${CONFIG.SHEETS.CONTACTS}'!A${row}:U${row}`;
+  return sheetRange(CONFIG.SHEETS.CONTACTS, `A${row}:U${row}`);
 }
 
 // Fetched on first use; only deletes and merges need it.
 async function ensureContactsSheetId() {
-  if (!contactsSheetId) contactsSheetId = findSheetId(await getSpreadsheetMetadata(), CONFIG.SHEETS.CONTACTS);
+  if (contactsSheetId === null) contactsSheetId = findSheetId(await getSpreadsheetMetadata(), CONFIG.SHEETS.CONTACTS);
   return contactsSheetId;
 }
 
@@ -70,13 +70,16 @@ function resetContactsView() {
 }
 
 async function refreshContacts(forceRefresh = false) {
+  // Dropped so a delete or merge looks the tab up again (the spreadsheet may have changed).
+  contactsSheetId = null;
   const resp = await getValues(CONTACTS_RANGE, VALUE_PARAMS);
   const values = resp.values || [];
 
   allContacts = values
     .map((row, i) => ({
       row: i + 2,
-      ...Object.fromEntries(CONTACT_FIELD_IDS.map((id, col) => [id, row[col] || ''])),
+      // Birthday was USER_ENTERED before, so it may read in a display format.
+      ...Object.fromEntries(CONTACT_FIELD_IDS.map((id, col) => [id, id === 'birthday' ? sheetDateIso(row[col]) : cellText(row[col])])),
     }))
     .filter((c) => c.first || c.last);
 
@@ -217,9 +220,10 @@ async function submitContactForm(event) {
   try {
     let row = editingContactRow;
     if (row !== null) {
-      await updateValues(contactRowRange(row), [rowData]);
+      // RAW: nothing here needs parsing, and phone numbers must keep their digits.
+      await updateValues(contactRowRange(row), [rowData], 'RAW');
     } else {
-      row = appendedRow(await appendValues(CONTACTS_RANGE, [rowData]));
+      row = appendedRow(await appendValues(CONTACTS_RANGE, [rowData], 'RAW'));
     }
     await refreshContacts(true);
     const saved = allContacts.find((c) => c.row === row);
@@ -275,11 +279,11 @@ function dedupeCap(values, cap, isSame) {
 }
 
 function phoneDigits(s) {
-  const d = (s || '').replace(/\D/g, '');
+  const d = cellText(s).replace(/\D/g, '');
   return d.length >= 7 ? d.slice(-10) : '';
 }
 
-const sameText = (a, b) => a.toLowerCase() === b.toLowerCase();
+const sameText = (a, b) => cellText(a).toLowerCase() === cellText(b).toLowerCase();
 
 // List fields merged across contacts into their numbered slots.
 const CONTACT_MERGE_LISTS = [
@@ -337,7 +341,7 @@ async function mergeSelectedContacts() {
     `blanks are filled in from the others. This cannot be undone.`,
     async () => {
       const sheetId = await ensureContactsSheetId();
-      await updateValues(contactRowRange(primary.row), [contactToRowArray(merged)]);
+      await updateValues(contactRowRange(primary.row), [contactToRowArray(merged)], 'RAW');
       await deleteContactRows(sheetId, others.map((c) => c.row));
       selectedContactRows.clear();
       await refreshContacts(true);

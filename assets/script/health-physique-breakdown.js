@@ -130,7 +130,7 @@ function makeSaveActivityGuessButton(guess) {
     title: `Not in your Activity sheet yet — save "${guess.name}" (MET ${guess.met}, ${guess.category || 'Other'} · ${guess.group || 'Other'}) so it's a trusted lookup next time instead of a fresh guess`,
     onClick: async () => {
       try {
-        if (!activityByName(guess.name)) await appendValues(ACTIVITIES_RANGE, [activityGuessRowValues(guess)]);
+        if (!activityByName(guess.name)) await appendValues(ACTIVITIES_RANGE, [activityGuessRowValues(guess)], 'RAW');
         await reloadActivitiesIntoPhysique(guess.name);
       } catch (err) {
         showFieldError('physique-form-error', err.message);

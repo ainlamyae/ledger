@@ -2,7 +2,7 @@
 // Insight and the Activity Plan read it through physiqueAsHealthEntries().
 
 // Read with its header row, so columns are found by name, not position.
-const PHYSIQUE_RANGE = `'${CONFIG.SHEETS.PHYSIQUE}'!A1:Z`;
+const PHYSIQUE_RANGE = sheetRange(CONFIG.SHEETS.PHYSIQUE, 'A1:ZZ');
 
 // Sheet columns by header: current name first, then older ones. This order is
 // the fallback when there's no header row.
@@ -13,7 +13,7 @@ const PHYSIQUE_COLUMNS = [
   { key: 'bmr', headers: ['Derived', 'BMR'] },
   { key: 'bedtime', headers: ['Bed', 'Bedtime'] },
   { key: 'wakeTime', headers: ['Wake', 'Wake-up Time'] },
-  // Written on every save (physiqueRowCells), not recomputed per render.
+  // Written on every save (physiqueRowValues), not recomputed per render.
   { key: 'sleep', headers: ['Sleep'] },
   { key: 'deprivation', headers: ['Deprivation'] },
   { key: 'consumption', headers: ['Consumption'] },
@@ -351,7 +351,7 @@ async function initPhysique(forceRefresh = false) {
   await refreshPhysique(forceRefresh);
 }
 
-const physiqueTextCell = (value) => String(value || '');
+const physiqueTextCell = cellText;
 
 // Entry key -> cell parser, in the entry's own key order.
 const PHYSIQUE_CELL_PARSERS = {
@@ -376,7 +376,11 @@ const PHYSIQUE_CELL_PARSERS = {
 };
 
 async function refreshPhysique(forceRefresh = false) {
+  // Re-resolved on use, so a spreadsheet switch can't keep the old tab's id.
+  physiqueSheetId = null;
+  const deletesAtRead = physiqueRowDeletes;
   const resp = await getValues(PHYSIQUE_RANGE, VALUE_PARAMS);
+  physiqueRowDeletesAtRead = deletesAtRead;
   const values = resp.values || [];
 
   // Row 1 is always the header.
@@ -387,7 +391,7 @@ async function refreshPhysique(forceRefresh = false) {
   allPhysiqueEntries = values.slice(1)
     .map((row, i) => ({
       row: i + 2,
-      // Every cell as read, so a write keeps columns this app doesn't know about.
+      // Every cell as read.
       cells: row,
       ...Object.fromEntries(parsers.map(([key, parse]) => [key, parse(cell(row, key))])),
     }))
@@ -429,12 +433,9 @@ function physiqueColumnsFromHeader(headerRow) {
   return index.date === undefined ? PHYSIQUE_DEFAULT_COLUMNS : index;
 }
 
+// Kept for track-leetcode.js.
 function physiqueColumnLetter(i) {
-  let letters = '';
-  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) {
-    letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
-  }
-  return letters;
+  return sheetColumnLetter(i);
 }
 
 // --- Stored body mass --------------------------------------------------------
@@ -777,52 +778,71 @@ function physiqueStoredSleepHours(p) {
   return p.sleep ?? physiqueSleepHours(p);
 }
 
+// Free text in a row that stays USER_ENTERED for its Date/Bed/Wake: quoted, so
+// "1/2 cup" or "=..." is kept as typed.
+const PHYSIQUE_TEXT_KEYS = new Set(['consumption', 'breakdown', 'workout']);
+
 function physiqueCellValue(key, value) {
+  if (PHYSIQUE_TEXT_KEYS.has(key)) return sheetText(value);
   if (key !== 'bmr') return value ?? '';
   const present = DERIVED_JSON_ORDER.filter((k) => value?.[k] !== undefined);
   return present.length ? JSON.stringify(Object.fromEntries(present.map((k) => [k, value[k]]))) : '';
 }
 
-// A day's cells in sheet order. Unknown columns keep what was read; Sleep, BMR,
-// Deprivation and Mass are recomputed from the day's other fields.
-function physiqueRowCells(day) {
-  const values = { ...day, ...physiqueDerivedFigures(day) };
-  const cells = [...(day.cells || [])];
-  PHYSIQUE_COLUMNS.forEach(({ key }) => {
-    const i = physiqueColumnIndex[key];
-    if (i === undefined) return;
-    while (cells.length < i) cells.push('');
-    cells[i] = physiqueCellValue(key, values[key]);
-  });
-  return cells;
+// A day's values by key; Sleep, BMR, Deprivation and Mass recomputed from its other fields.
+function physiqueRowValues(day) {
+  return { ...day, ...physiqueDerivedFigures(day) };
 }
 
+// Only the app's own columns, one cell each, so the user's columns (formulas
+// included) are never rewritten.
 async function writePhysiqueRow(row, day) {
-  const cells = physiqueRowCells(day);
-  await updateValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A${row}:${physiqueColumnLetter(cells.length - 1)}${row}`, [cells]);
+  const values = physiqueRowValues(day);
+  const data = PHYSIQUE_COLUMNS
+    .filter(({ key }) => hasPhysiqueColumn(key))
+    .map(({ key }) => physiqueCellUpdate(key, row, values[key]));
+  await batchUpdateValues(data);
 }
 
+// A new row has nothing to keep, so the columns between the app's go blank.
 async function appendPhysiqueRow(day) {
-  const cells = physiqueRowCells(day);
-  await appendValues(`'${CONFIG.SHEETS.PHYSIQUE}'!A:${physiqueColumnLetter(cells.length - 1)}`, [cells]);
+  const values = physiqueRowValues(day);
+  const width = Math.max(...PHYSIQUE_COLUMNS.map(({ key }) => physiqueColumnIndex[key] ?? -1)) + 1;
+  const cells = Array(width).fill('');
+  PHYSIQUE_COLUMNS.forEach(({ key }) => {
+    if (hasPhysiqueColumn(key)) cells[physiqueColumnIndex[key]] = physiqueCellValue(key, values[key]);
+  });
+  await appendValues(sheetRange(CONFIG.SHEETS.PHYSIQUE, `A:${sheetColumnLetter(width - 1)}`), [cells]);
 }
 
-// Cell ranges the one-off fills have written this session, so a second load racing
-// the first write can't send them again.
+// Cell ranges the one-off fills have written to this spreadsheet, so a second load
+// racing the first write can't send them again.
 const physiqueBackfilledCells = new Set();
+let physiqueBackfillSpreadsheetId = null;
 
 function physiqueCellRange(key, row) {
-  return `'${CONFIG.SHEETS.PHYSIQUE}'!${physiqueColumnLetter(physiqueColumnIndex[key])}${row}`;
+  return sheetRange(CONFIG.SHEETS.PHYSIQUE, `${sheetColumnLetter(physiqueColumnIndex[key])}${row}`);
 }
 
 function physiqueCellUpdate(key, row, value) {
   return { range: physiqueCellRange(key, row), values: [[physiqueCellValue(key, value)]] };
 }
 
-// Writes `data` in one request and reloads; one run at a time. False on failure.
+// Counts row deletes sent. Background writes address rows from the last read, so
+// a delete sent since then would shift them: they wait for that delete's reload.
+let physiqueRowDeletes = 0;
+let physiqueRowDeletesAtRead = 0;
+
+function physiqueRowsShiftedSinceRead() {
+  return physiqueRowDeletes !== physiqueRowDeletesAtRead;
+}
+
+// Writes `data` in one request and reloads; one run at a time. False on failure
+// (or when a delete has moved the rows since the read).
 let physiqueBatchRunning = false;
 async function runPhysiqueBatch(data, label) {
   if (!data.length) return true;
+  if (physiqueRowsShiftedSinceRead()) return false;
   physiqueBatchRunning = true;
   try {
     await batchUpdateValues(data);
@@ -838,8 +858,16 @@ async function runPhysiqueBatch(data, label) {
   }
 }
 
-// A one-off fill's cells not yet sent this session, in one batch.
+// A one-off fill's cells not yet sent to this spreadsheet, in one batch.
 async function runPhysiqueBackfill(data, label) {
+  // Ranges don't name the spreadsheet, so a switch starts the record afresh.
+  const spreadsheetId = getActiveSpreadsheetId();
+  if (spreadsheetId !== physiqueBackfillSpreadsheetId) {
+    physiqueBackfilledCells.clear();
+    physiqueBackfillSpreadsheetId = spreadsheetId;
+  }
+  // Left unmarked, so the delete's reload sends them at the right rows.
+  if (physiqueRowsShiftedSinceRead()) return;
   const fresh = data.filter((d) => !physiqueBackfilledCells.has(d.range));
   fresh.forEach((d) => physiqueBackfilledCells.add(d.range));
   await runPhysiqueBatch(fresh, label);
@@ -1546,9 +1574,7 @@ async function submitPhysiqueForm(event) {
 
   const isPattern = document.getElementById('physique-is-pattern').checked;
 
-  // An edit keeps the row's other cells (columns this app doesn't know about).
-  const editing = allPhysiqueEntries.find((p) => p.row === editingPhysiqueRow);
-  const day = { cells: editing ? editing.cells : [] };
+  const day = {};
   for (const { id, key, numeric } of PHYSIQUE_FIELDS) {
     const raw = (isPattern && PHYSIQUE_PATTERN_BLANK_FIELDS.has(id)) ? '' : physiqueField(id).value.trim();
     if (!numeric) {
@@ -1729,17 +1755,9 @@ async function deletePhysiqueEntry(entry) {
     ? `the logged day for ${entry.date}`
     : `pattern (${physiquePatternLabel(entry)})`;
   await confirmAndDelete(`Delete ${label}?`, async () => {
-    if (!physiqueSheetId) physiqueSheetId = await fetchPhysiqueSheetId();
-    await batchUpdate([{
-      deleteDimension: {
-        range: {
-          sheetId: physiqueSheetId,
-          dimension: 'ROWS',
-          startIndex: entry.row - 1,
-          endIndex: entry.row,
-        },
-      },
-    }]);
+    if (physiqueSheetId === null) physiqueSheetId = await fetchPhysiqueSheetId();
+    physiqueRowDeletes += 1;
+    await batchUpdate([sheetRowDeleteRequest(physiqueSheetId, entry.row)]);
     await refreshPhysique(true);
   }, "Couldn't delete day");
 }

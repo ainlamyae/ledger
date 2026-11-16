@@ -11,7 +11,8 @@ const LEETCODE_COLUMNS = [
 const LEETCODE_OLD_HEADERS = { neetcode: 'neetcode video', minutes: 'video minutes' };
 let leetcodeOldHeaders = []; // keys found under an old header
 const LEETCODE_HEADERS = LEETCODE_COLUMNS.map(([, header]) => header);
-const LEETCODE_RANGE = () => `'${CONFIG.SHEETS.LEETCODE}'!A1:Z`;
+// To ZZ, so a header past Z is still found (not re-added on every save).
+const LEETCODE_RANGE = () => sheetRange(CONFIG.SHEETS.LEETCODE, 'A1:ZZ');
 let leetcodeColumnIndex = {}; // key -> 0-based column, from the header row
 const NEETCODE_BY_SLUG = new Map(NEETCODE_250.map((p) => [p.slug, p]));
 // Category -> its problems, in NeetCode's order.
@@ -93,9 +94,11 @@ function readLeetcodeHeader(header) {
 }
 
 async function refreshLeetcode() {
-  if (!(await sheetTabExists(CONFIG.SHEETS.LEETCODE))) {
+  // The id is re-read each time, so a spreadsheet switch can't leave a stale one.
+  const sheet = (await getSpreadsheetMetadata()).sheets.find((s) => s.properties.title === CONFIG.SHEETS.LEETCODE);
+  leetcodeSheetId = sheet ? sheet.properties.sheetId : null;
+  if (leetcodeSheetId === null) {
     allLeetcodeLogs = [];
-    leetcodeSheetId = null;
   } else {
     const [header = [], ...rows] = (await getValues(LEETCODE_RANGE(), VALUE_PARAMS)).values || [];
     readLeetcodeHeader(header);
@@ -567,7 +570,7 @@ async function submitLeetcodeForm() {
 // the end, an old one renamed); `row` null appends. Returns the sheet row.
 async function writeLeetcodeLog(log, row = null) {
   const tab = CONFIG.SHEETS.LEETCODE;
-  const cellRange = (key, r) => `'${tab}'!${physiqueColumnLetter(leetcodeColumnIndex[key])}${r}`;
+  const cellRange = (key, r) => sheetRange(tab, `${physiqueColumnLetter(leetcodeColumnIndex[key])}${r}`);
   leetcodeSheetId = await ensureSheetTab(tab, LEETCODE_HEADERS);
   if (!Object.keys(leetcodeColumnIndex).length) await refreshLeetcode();
   const header = [];
@@ -582,7 +585,7 @@ async function writeLeetcodeLog(log, row = null) {
     const width = Math.max(...Object.values(leetcodeColumnIndex)) + 1;
     const values = Array(width).fill('');
     LEETCODE_COLUMNS.forEach(([key]) => { values[leetcodeColumnIndex[key]] = log[key] ?? ''; });
-    return appendedRow(await appendValues(`'${tab}'!A2:${physiqueColumnLetter(width - 1)}`, [values], 'RAW'));
+    return appendedRow(await appendValues(sheetRange(tab, `A2:${physiqueColumnLetter(width - 1)}`), [values], 'RAW'));
   }
   await batchUpdateValues(LEETCODE_COLUMNS.map(([key]) => ({ range: cellRange(key, row), values: [[log[key] ?? '']] })), 'RAW');
   return row;
@@ -591,13 +594,15 @@ async function writeLeetcodeLog(log, row = null) {
 async function deleteLeetcodeLog(log) {
   await confirmAndDelete(`Delete the ${log.date} solve of ${log.name}?`, async () => {
     if (leetcodeSheetId === null) leetcodeSheetId = await ensureSheetTab(CONFIG.SHEETS.LEETCODE, LEETCODE_HEADERS);
-    await batchUpdate([{
-      deleteDimension: { range: { sheetId: leetcodeSheetId, dimension: 'ROWS', startIndex: log.row - 1, endIndex: log.row } },
-    }]);
+    await batchUpdate([sheetRowDeleteRequest(leetcodeSheetId, log.row)]);
     await refreshLeetcode();
     showUndoToast(`${log.name} solve deleted.`, async () => {
-      await writeLeetcodeLog(log);
-      await refreshLeetcode();
+      try {
+        await writeLeetcodeLog(log);
+        await refreshLeetcode();
+      } catch (err) {
+        showToast(`Couldn't restore the solve: ${err.message}`, true);
+      }
     });
   }, "Couldn't delete the solve");
 }

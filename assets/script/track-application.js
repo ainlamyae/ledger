@@ -1,7 +1,7 @@
 // Row 1 is the header, so data (and a new application's insert) starts here.
 const APPLICATIONS_FIRST_ROW = 2;
-const APPLICATIONS_SHEET = `'${CONFIG.SHEETS.APPLICATIONS}'`;
-const APPLICATIONS_RANGE = `${APPLICATIONS_SHEET}!A${APPLICATIONS_FIRST_ROW}:E`;
+const applicationsRange = (a1) => sheetRange(CONFIG.SHEETS.APPLICATIONS, a1);
+const APPLICATIONS_RANGE = applicationsRange(`A${APPLICATIONS_FIRST_ROW}:E`);
 // The sheet's own spelling.
 const APPLICATION_DEFAULT_ACTION = 'Submited';
 
@@ -12,9 +12,9 @@ let applicationsSheetId = null;
 let editingApplicationRow = null;
 const expandedApplicationRows = new Set();
 
-// Fetched once, then cached.
+// Fetched on first use after each refresh.
 async function getApplicationsSheetId() {
-  if (!applicationsSheetId) {
+  if (applicationsSheetId === null) {
     const metadata = await getSpreadsheetMetadata();
     applicationsSheetId = findSheetId(metadata, CONFIG.SHEETS.APPLICATIONS);
   }
@@ -45,7 +45,11 @@ function parseApplications(rows) {
 
   rows.forEach((row, i) => {
     const sheetRow = i + APPLICATIONS_FIRST_ROW;
-    const [delay = '', date = '', action = '', type = '', appNumber = ''] = row.map((cell) => cell || '');
+    // Delay is the sheet's number (0 shows nothing); the rest is text. Dates read
+    // in the column's display format.
+    const delay = row[0] || '';
+    const [rawDate, action, type, appNumber] = [1, 2, 3, 4].map((col) => cellText(row[col]));
+    const date = sheetDateIso(rawDate);
 
     if (/total/i.test(action)) return;
 
@@ -62,6 +66,8 @@ function parseApplications(rows) {
 }
 
 async function refreshApplications() {
+  // Dropped so an add or delete looks the tab up again (the spreadsheet may have changed).
+  applicationsSheetId = null;
   const resp = await getValues(APPLICATIONS_RANGE, VALUE_PARAMS);
   allApplications = parseApplications(resp.values || []);
   renderApplicationsList();
@@ -222,9 +228,11 @@ async function submitApplicationForm(event) {
 
   const [type, appNumber, date, action] = APPLICATION_FIELD_IDS.map((id) => document.getElementById(`application-${id}`).value.trim());
 
+  // USER_ENTERED so Date stays a real date for the sheet's formulas; the text is quoted.
+  const cells = [date, sheetText(action), sheetText(type), sheetText(appNumber)];
   try {
     if (editingApplicationRow !== null) {
-      await updateValues(`${APPLICATIONS_SHEET}!B${editingApplicationRow}:E${editingApplicationRow}`, [[date, action, type, appNumber]]);
+      await updateValues(applicationsRange(`B${editingApplicationRow}:E${editingApplicationRow}`), [cells]);
     } else {
       const sheetId = await getApplicationsSheetId();
       // Insert at the top rather than append, so the footer formulas shift down intact.
@@ -234,7 +242,7 @@ async function submitApplicationForm(event) {
           inheritFromBefore: false,
         },
       }]);
-      await updateValues(`${APPLICATIONS_SHEET}!A${APPLICATIONS_FIRST_ROW}:E${APPLICATIONS_FIRST_ROW}`, [['', date, action, type, appNumber]]);
+      await writeInsertedApplication(sheetId, ['', ...cells]);
     }
     await refreshApplications();
     const saved = allApplications.find((a) => a.headerRow === (editingApplicationRow ?? APPLICATIONS_FIRST_ROW));
@@ -248,16 +256,27 @@ async function submitApplicationForm(event) {
   }
 }
 
+// A failed write takes back the blank row it was inserted for, and says which step failed.
+async function writeInsertedApplication(sheetId, rowCells) {
+  try {
+    await updateValues(applicationsRange(`A${APPLICATIONS_FIRST_ROW}:E${APPLICATIONS_FIRST_ROW}`), [rowCells]);
+  } catch (err) {
+    const undone = await batchUpdate([sheetRowDeleteRequest(sheetId, APPLICATIONS_FIRST_ROW)]).then(() => true, () => false);
+    throw new Error(`Couldn't write the new application (${err.message}); ${undone
+      ? 'its inserted row was removed'
+      : `a blank row is left at row ${APPLICATIONS_FIRST_ROW}`}.`);
+  }
+}
+
 async function deleteApplication(app) {
   const historyNote = app.updates.length > 0 ? ` and its ${app.updates.length} status update(s)` : '';
 
   await confirmAndDelete(`Delete "${app.type} — ${app.appNumber}"${historyNote}? This cannot be undone.`, async () => {
     const sheetId = await getApplicationsSheetId();
-    await batchUpdate([{
-      deleteDimension: {
-        range: { sheetId, dimension: 'ROWS', startIndex: app.headerRow - 1, endIndex: app.lastRow },
-      },
-    }]);
+    // Bottom-up, so each deletion leaves the rows above where they were.
+    const rows = [];
+    for (let row = app.lastRow; row >= app.headerRow; row--) rows.push(sheetRowDeleteRequest(sheetId, row));
+    await batchUpdate(rows);
     expandedApplicationRows.delete(app.headerRow);
     await refreshApplications();
   }, "Couldn't delete application");

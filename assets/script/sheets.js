@@ -64,6 +64,26 @@ function valuesPath(range) {
   return `/values/${encodeURIComponent(range)}`;
 }
 
+// --- Cell helpers -------------------------------------------------------------
+
+// An A1 range on a tab, quoted (apostrophes doubled) so any tab name works.
+function sheetRange(tab, a1) {
+  return `'${String(tab).replace(/'/g, "''")}'!${a1}`;
+}
+
+// A cell read as text. Sheets stores typed digits ("711", "4165550100") as numbers,
+// which UNFORMATTED_VALUE returns as numbers.
+function cellText(value) {
+  return value === undefined || value === null ? '' : String(value);
+}
+
+// Free text for a USER_ENTERED write: the leading ' keeps it as typed (never a
+// formula, number, date or boolean); Sheets doesn't store the quote itself.
+function sheetText(value) {
+  const text = cellText(value);
+  return text === '' ? '' : `'${text}`;
+}
+
 // --- Read coalescing ---------------------------------------------------------
 //
 // Sheets counts quota per request, not per range, so reads are shared here with
@@ -171,9 +191,30 @@ async function ensureSheetTab(title, headers) {
   const meta = await getSpreadsheetMetadata();
   const existing = meta.sheets.find((s) => s.properties.title === title);
   if (existing) return existing.properties.sheetId;
-  const res = await batchUpdate([{ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } }]);
+  // One creation per tab at a time, so two first saves can't both add it.
+  if (!pendingTabCreations.has(title)) {
+    const creating = createSheetTab(title, headers).finally(() => pendingTabCreations.delete(title));
+    pendingTabCreations.set(title, creating);
+  }
+  return pendingTabCreations.get(title);
+}
+
+const pendingTabCreations = new Map(); // title -> Promise<sheetId>
+
+async function createSheetTab(title, headers) {
+  let sheetId;
+  try {
+    const res = await batchUpdate([{ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } }]);
+    sheetId = res.replies[0].addSheet.properties.sheetId;
+  } catch (err) {
+    // Another tab or device added it first: use that one.
+    const meta = await getSpreadsheetMetadata();
+    const existing = meta.sheets.find((s) => s.properties.title === title);
+    if (!existing) throw err;
+    return existing.properties.sheetId;
+  }
   await updateValues(`'${title}'!A1`, [headers], 'RAW');
-  return res.replies[0].addSheet.properties.sheetId;
+  return sheetId;
 }
 
 // True when the tab exists, so a load can skip reading a tab not made yet.
@@ -182,8 +223,13 @@ async function sheetTabExists(title) {
   return meta.sheets.some((s) => s.properties.title === title);
 }
 
-function batchUpdate(requests) {
-  // Can add, delete or rename tabs, so the shared tab list may be out of date.
+async function batchUpdate(requests) {
+  // Can add, delete or rename tabs, so the shared tab list is dropped before and
+  // after: a read made while this was in flight can't keep the old list.
   resetSheetReads();
-  return sheetsWrite(':batchUpdate', 'POST', { requests });
+  try {
+    return await sheetsWrite(':batchUpdate', 'POST', { requests });
+  } finally {
+    resetSheetReads();
+  }
 }

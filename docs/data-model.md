@@ -4,11 +4,24 @@
 
 One Google Sheet per user, cloned from the template, with these tabs.
 
+## Reading and writing
+
+Every tab follows the same rules (`sheets.js` helpers):
+
+- **Typed text stays as typed.** Names, notes, payees, phone numbers, consumption and workout lines are written `RAW`. If a row must stay `USER_ENTERED` because Sheets has to parse its date or formula, each text cell is written with `sheetText()` instead. Either way, `=1+1`, `+1 416…`, `00123`, `1/2` or `TRUE` are stored exactly as typed, never as a formula, number, date or boolean.
+- **Text is read with `cellText()`,** so older rows where Sheets stored typed digits as numbers ("711", "4165550100") still read as text.
+- **Only the app's own columns are written** on Physique, Nutrition, LeetCode and Transaction edits, one cell at a time. Extra columns you add, and any formulas in them, are never rewritten. A Transaction Amount typed as a formula keeps its formula unless the amount is changed.
+- **Columns are found by header** on Physique, Nutrition and LeetCode. A missing header is added after the last used column, never over an existing one.
+- **Dates and times are normalised on read** to `YYYY-MM-DD` / `HH:MM`, whatever format the column displays, so a cell shown as `20/11/2026` or `2:30:00 PM` still fills its form box.
+- **Ranges are quoted** (`sheetRange()`), and reads have no fixed row limit (Account, Breakdown) and run past column Z (Physique, Nutrition, LeetCode, the report).
+- **Sheet ids are looked up on every load,** so a spreadsheet switch can't send a delete to the wrong tab. Id `0`, the first tab, is valid.
+- **A failed write always tells you,** with a field error, toast or alert. A write that needs several steps is one request where possible (Breakdown add, Work Time edit, Nutrition headers); otherwise the message names the step that failed (Account transfer, Application add).
+
 ## `Transaction`
 
 | Column | Type | Notes |
 |---|---|---|
-| A — Date | Date | ISO format |
+| A — Date | Date | ISO format; written `USER_ENTERED` so the `Statement` formulas see a real date |
 | B — Account | Text | Must match a name in `Account` column A |
 | C — Payee | Text | Merchant / person / institution |
 | D — Category | Text | Must match a category in `Breakdown` column A |

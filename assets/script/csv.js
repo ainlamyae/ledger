@@ -279,7 +279,7 @@ async function importTransactionsCSV(file) {
   // The CSV ends Amount, Description; the sheet ends Description, Amount.
   const values = dataRows
     .filter((r) => r.length >= TRANSACTION_CSV_COLUMNS.length && r[0])
-    .map((r) => [r[0], r[1], r[2], r[3], r[5], Number(r[4]) || 0]);
+    .map((r) => transactionRowValues({ date: r[0], account: r[1], payee: r[2], category: r[3], description: r[5], amount: Number(r[4]) || 0 }));
 
   if (!values.length) {
     alert('No valid transaction rows found in the CSV.');

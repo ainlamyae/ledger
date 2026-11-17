@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- Only the app's own scripts and the hosts it uses may load (docs/development/security.md). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com https://cdn.jsdelivr.net/npm/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https:; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com/gsi/ https://cdn.jsdelivr.net/npm/ https://api.groq.com https://openrouter.ai https://api.twelvedata.com https://www.alphavantage.co https://finnhub.io https://api.nal.usda.gov https://api.bigdatacloud.net https://geocoding-api.open-meteo.com https://api.open-meteo.com; frame-src https://accounts.google.com/gsi/ https://docs.google.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -13,18 +15,8 @@
 
 <title>Other — Settings — Add — Ledger</title>
 
-<!-- The same two lines index.html runs, repeated because they have to land
-     before the first paint and so can't wait for the fetch below. -->
-<script>
-    if (localStorage.getItem('ledger_theme') === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-    }
-    try {
-        if (localStorage.getItem('ledger_side_nav') === 'closed') {
-            document.documentElement.dataset.sideNav = 'closed';
-        }
-    } catch (e) {}
-</script>
+<!-- Runs before first paint, so it can't wait for the fetch below. -->
+<script src="assets/script/theme-boot.js"></script>
 
 <!-- Named here, rather than left to arrive with the rest of index.html's head,
      so the stylesheet and the icon download alongside index.html instead of

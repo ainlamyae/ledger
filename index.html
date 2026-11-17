@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- Only the app's own scripts and the hosts it uses may load (docs/development/security.md). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com https://cdn.jsdelivr.net/npm/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https:; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com/gsi/ https://cdn.jsdelivr.net/npm/ https://api.groq.com https://openrouter.ai https://api.twelvedata.com https://www.alphavantage.co https://finnhub.io https://api.nal.usda.gov https://api.bigdatacloud.net https://geocoding-api.open-meteo.com https://api.open-meteo.com; frame-src https://accounts.google.com/gsi/ https://docs.google.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -50,69 +52,8 @@
 <link rel="stylesheet" href="assets/style/styles.css">
 <!-- Every animation (motion.js), in before the first paint. -->
 <script src="assets/script/motion.js"></script>
-<script>
-    if (localStorage.getItem('ledger_theme') === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-    }
-    // Chrome restores the previous scroll position on a plain reload of the
-    // same page by default — always start at the top instead, since panels
-    // are collapsed/re-rendered fresh on every load anyway.
-    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    // Same reasoning as the theme check above, for the Widgets and
-    // Bulbs switches (app.js's SWITCHES_KEY): their real values aren't known
-    // until the Settings tab is fetched, long after this page has painted, so a
-    // row turned off would flash on every refresh. Read from this browser's copy
-    // here instead, so styles.css starts it hidden; the fetch still corrects it.
-    try {
-        var ledgerSwitches = JSON.parse(localStorage.getItem('ledger_switches') || 'null');
-        // Both start off (app.js's widgetsVisible/bulbsVisible) unless this browser
-        // last had them on.
-        if (!(ledgerSwitches && ledgerSwitches.SHOW_WIDGETS === 1)) {
-            document.documentElement.setAttribute('data-widgets-pref', 'hidden');
-        }
-        // Main page only: section pages run this head too.
-        if (!window.ledgerSectionPage && !(ledgerSwitches && ledgerSwitches.SHOW_BULBS === 1)) {
-            document.documentElement.setAttribute('data-bulbs-pref', 'hidden');
-        }
-    } catch (e) {}
-    // The wide-screen sidebar hidden with its toggle (page-nav.js), before first
-    // paint so a reload doesn't show it open for a moment.
-    try {
-        if (localStorage.getItem('ledger_side_nav') === 'closed') {
-            document.documentElement.dataset.sideNav = 'closed';
-        }
-    } catch (e) {}
-    // The hub/page layout before first paint, so a reload never shows the blocks as
-    // they sit in the raw page (every one open, Indicator's charts first) while the
-    // scripts load. page-nav.js and router.js add the same classes later and fill
-    // in the rest — the tiles, and which block a page shows — on the same layout.
-    if (!window.ledgerSectionPage) {
-        document.documentElement.classList.add('home-hub');
-    } else {
-        document.documentElement.classList.add('section-pages');
-        document.documentElement.dataset.page = window.ledgerSectionPage.route.length ? 'block' : 'hub';
-    }
-</script>
-<script>
-    // There's no service worker any more: it served its saved copy of every
-    // script first, while section-page.js always fetches index.html fresh, so
-    // any update ran new markup against old scripts ("document.getElementById(...)
-    // is null"). This removes one a browser still has from before, along with
-    // its cached files, and reloads once so the page comes straight from the
-    // server. sw.js itself is now a stub that does the same from the worker's
-    // side, for a tab the old worker still answers with an old index.html.
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(async (registrations) => {
-            if (!registrations.length) return;
-            await Promise.all(registrations.map((reg) => reg.unregister()));
-            if ('caches' in window) {
-                const keys = await caches.keys();
-                await Promise.all(keys.map((key) => caches.delete(key)));
-            }
-            window.location.reload();
-        }).catch(() => {});
-    }
-</script>
+<script src="assets/script/theme-boot.js"></script>
+<script src="assets/script/page-boot.js"></script>
 </head>
 
 <body>
@@ -3345,8 +3286,8 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js" async defer></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" integrity="sha384-Emf5ZVIUiarAdhkgtqK+5/Z5qIvM6QoVrS+qAVtfyZVuD5lIHrac0me485+Antp0" crossorigin="anonymous" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4.3.6/build/index.umd.min.js" integrity="sha384-EW6qTcZh7bPyECHRcIzVvefbUO37nGjPkmDFEdcdAe7ex44EjBA0GWnoleczHbC/" crossorigin="anonymous" defer></script>
 <script src="assets/script/config.js"></script>
 <script src="assets/script/auth.js"></script>
 <script src="assets/script/drive.js"></script>

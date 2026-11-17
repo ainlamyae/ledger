@@ -397,8 +397,17 @@ function tradeNumber(id) {
   const raw = document.getElementById(id).value.trim();
   if (!raw) return null;
   // Not evaluateNumberExpression: it rounds to cents, and FX and share counts need more.
-  const value = Number(raw.replace(/[,\s$]/g, ''));
+  const value = parseTradeAmount(raw);
   return Number.isFinite(value) ? value : NaN;
+}
+
+// "1,234.5" groups thousands; a lone comma otherwise is a decimal comma
+// (a phone's decimal keypad), so "1,5" is 1.5, never 15. Anything else is NaN.
+function parseTradeAmount(raw) {
+  const text = String(raw).replace(/[\s$]/g, '');
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(text)) return Number(text.replace(/,/g, ''));
+  if (/^-?\d*,\d+$/.test(text)) return Number(text.replace(',', '.'));
+  return Number(text);
 }
 
 async function submitTradeForm() {

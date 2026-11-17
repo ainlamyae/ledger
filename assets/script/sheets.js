@@ -162,12 +162,25 @@ function batchGetValues(ranges, params = {}) {
 // USER_ENTERED (the default) parses a typed date or formula as the cell would.
 // Pass 'RAW' for values that must round-trip byte-for-byte (see
 // other-settings.js's saveSettingValues).
-function appendValues(range, values, valueInputOption = 'USER_ENTERED') {
+async function appendValues(range, values, valueInputOption = 'USER_ENTERED') {
   return sheetsWrite(
-    `${valuesPath(range)}:append?valueInputOption=${valueInputOption}&insertDataOption=INSERT_ROWS`,
+    `${valuesPath(await appendStart(range))}:append?valueInputOption=${valueInputOption}&insertDataOption=INSERT_ROWS`,
     'POST',
     { values }
   );
+}
+
+// The range moved to start on the row after the last one holding data
+// ("Tab!A2:U" -> "Tab!A40:U"). Sheets' own append stops at the first blank
+// row, so a gap inside a table would put new rows mid-sheet.
+async function appendStart(range) {
+  const bang = range.lastIndexOf('!');
+  const cells = /^([A-Z]+)(\d*)(?::([A-Z]+)\d*)?$/.exec(range.slice(bang + 1));
+  if (bang < 0 || !cells) return range;
+  const read = await getValuesNow(range);
+  const start = /^[A-Z]+(\d+)/.exec(String(read.range || '').slice(String(read.range || '').lastIndexOf('!') + 1));
+  const next = Number(start ? start[1] : cells[2] || 1) + (read.values?.length || 0);
+  return `${range.slice(0, bang)}!${cells[1]}${next}${cells[3] ? `:${cells[3]}` : ''}`;
 }
 
 // The sheet row an append landed on, from its response ("Tab!A12:U12" -> 12).

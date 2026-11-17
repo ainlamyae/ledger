@@ -153,6 +153,12 @@ function attachLongPress(btn, onLongPress) {
   btn.addEventListener('contextmenu', (event) => event.preventDefault());
 }
 
+// A link from data, kept only if http(s)/mailto/tel; else ''.
+function safeHref(url) {
+  const text = String(url ?? '').trim();
+  return /^(https?|mailto|tel):/i.test(text) ? text : '';
+}
+
 // A <td> with text and an optional title (e.g. for a truncated value).
 function makeCell(text, title) {
   const td = document.createElement('td');

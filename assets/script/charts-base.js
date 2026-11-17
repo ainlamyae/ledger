@@ -433,6 +433,7 @@ function wellnessCategoryXScale(dates) {
 // 📤 on a chart page: the whole page as a PNG, named by the button's data-screenshot.
 // html2canvas-pro (reads color-mix, unlike html2canvas) loads on first use only.
 const HTML2CANVAS_URL = 'https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js';
+const HTML2CANVAS_INTEGRITY = 'sha384-QbVSYhU9faw2C7l92rI0Dmke8Yod6KaOixC1kkbO/dGnMDKtbWhwcxSSOkmHXWom';
 let html2canvasPromise = null;
 // What body's system-ui resolves to on each platform; html2canvas can't draw system-ui itself.
 const SCREENSHOT_FONT_STACK = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -441,6 +442,8 @@ function loadHtml2canvas() {
   html2canvasPromise ??= new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = HTML2CANVAS_URL;
+    script.integrity = HTML2CANVAS_INTEGRITY;
+    script.crossOrigin = 'anonymous';
     script.onload = () => resolve(window.html2canvas);
     script.onerror = () => { html2canvasPromise = null; reject(new Error('html2canvas failed to load')); };
     document.head.appendChild(script);

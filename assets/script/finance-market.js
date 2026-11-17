@@ -341,7 +341,8 @@ function renderNews() {
   news.slice(0, ANALYSIS_NEWS_SHOWN).forEach((n) => {
     const p = document.createElement('p');
     const a = document.createElement('a');
-    a.href = n.url;
+    const href = safeHref(n.url);
+    if (href) a.href = href;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.textContent = n.headline;

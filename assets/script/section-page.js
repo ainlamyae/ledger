@@ -64,7 +64,7 @@
     parent.appendChild(script);
   }
 
-  function adoptHead(source, pending) {
+  function adoptHead(source, pending, ordered) {
     const stylesheets = new Set(
       [...document.head.querySelectorAll('link[rel="stylesheet"]')].map((l) => l.getAttribute('href')),
     );
@@ -74,9 +74,9 @@
       if (node.tagName === 'BASE' || node.tagName === 'TITLE') return;
       if (node.tagName === 'LINK' && stylesheets.has(node.getAttribute('href'))) return;
       if (node.tagName === 'SCRIPT') {
-        // The stub's own head already ran it (motion.js).
+        // The stub's own head already ran it (motion.js, theme-boot.js).
         if (node.getAttribute('src') && document.head.querySelector(`script[src="${node.getAttribute('src')}"]`)) return;
-        appendScript(node, document.head, pending);
+        appendScript(node, document.head, pending, ordered);
         return;
       }
       document.head.appendChild(document.importNode(node, true));
@@ -140,9 +140,10 @@
       .find((a) => a.getAttribute('href').replace(/\/+$/, '') === SLUG);
     if (!link) throw new Error(`"${SLUG}" isn't one of the dashboard's sections`);
 
-    // Re-runs index.html's (idempotent) theme script and adds the rest of its head.
+    // Adds the rest of index.html's head (page-boot.js runs before the body's scripts).
     const pending = [];
-    adoptHead(source, pending);
+    const ordered = [];
+    adoptHead(source, pending, ordered);
 
     if (document.readyState === 'loading') {
       await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
@@ -150,7 +151,6 @@
 
     const scripts = adoptBody(source);
     showOnly(link.dataset.section);
-    const ordered = [];
     scripts.forEach((node) => appendScript(node, document.body, pending, ordered));
 
     await Promise.all(ordered);

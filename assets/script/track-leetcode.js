@@ -461,7 +461,7 @@ function buildLeetcodeCategory(category, problems, solves) {
     // The outside links, as buttons like ✏️/🗑️.
     const open = (href) => () => window.open(href, '_blank', 'noopener');
     actions.append(...LEETCODE_LINKS.map(({ key, emoji, title: linkTitle, href }) => makeRowActionButton({
-      emoji, title: linkTitle, onClick: open(latest?.[key] || href(p)), readOnly: true,
+      emoji, title: linkTitle, onClick: open(safeHref(latest?.[key]) || href(p)), readOnly: true,
     })));
     if (latest) {
       actions.append(

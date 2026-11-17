@@ -144,12 +144,14 @@ function renderCountryDaysList(countryTotals) {
 let worldMapChart = null;
 let worldTopologyPromise = null;
 
-const WORLD_TOPOLOGY_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+const WORLD_TOPOLOGY_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
+// The pinned file's hash: the browser rejects any other bytes.
+const WORLD_TOPOLOGY_INTEGRITY = 'sha384-yOCJ+8ShBm8UDqtAVtAvxTDDf4gXo5edxl/YG0FmVC5OTmqVLl7utuVGBDEeZWHf';
 
 // Fetched once per page session; only which countries are visited changes.
 function loadWorldTopology() {
   if (!worldTopologyPromise) {
-    worldTopologyPromise = fetch(WORLD_TOPOLOGY_URL)
+    worldTopologyPromise = fetch(WORLD_TOPOLOGY_URL, { integrity: WORLD_TOPOLOGY_INTEGRITY })
       .then((res) => res.json());
   }
   return worldTopologyPromise;

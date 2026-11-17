@@ -76,7 +76,7 @@ function writeChangelog({ pendingHead = false } = {}) {
     '',
     '[← Back to README](../README.md)',
     '',
-    'Every commit, newest first, with the version it produced (see [Versioning](versioning.md)); major and minor releases in bold. Rewritten on every commit by the post-commit hook (`scripts/version.cjs`); the newest row reads *(this commit)* until the next commit fills in its id.',
+    'Every commit, newest first, with the version it produced (see [Versioning](development/versioning.md)); major and minor releases in bold. Rewritten on every commit by the post-commit hook (`scripts/version.cjs`); the newest row reads *(this commit)* until the next commit fills in its id.',
     '',
     '| Commit | Version | Changes |',
     '|---|---|---|',

@@ -154,12 +154,8 @@ function aiEvaluateArithmeticFields(jsonText) {
     if (trimmed === 'null') return match;
     if (!Number.isNaN(Number(trimmed))) return match;
     if (!/^[\d.\s*+\-/()]+$/.test(trimmed)) return match;
-    try {
-      const value = Function(`"use strict"; return (${trimmed});`)();
-      return Number.isFinite(value) ? `${prefix}${value}` : match;
-    } catch {
-      return match;
-    }
+    const value = evaluateArithmetic(trimmed);
+    return value === null ? match : `${prefix}${value}`;
   });
 }
 

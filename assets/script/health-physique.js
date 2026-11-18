@@ -1589,6 +1589,10 @@ async function submitPhysiqueForm(event) {
     }
     day[key] = evaluated;
   }
+  if (day.bodyMass !== null && day.bodyMass <= 0) {
+    showFieldError('physique-form-error', 'Body Mass must be over 0.');
+    return;
+  }
 
   // One row per day: a date already logged is more of that day. The first Save
   // merges it into the form and edits that row; the second Save writes it.

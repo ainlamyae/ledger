@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](devel
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.42.0** | feat(security): add a Content-Security-Policy, pin CDN libraries and rewrite the docs |
+| (this commit) | 3.42.1 | fix(forms): parse number fields without eval so the CSP stops rejecting every value |
+| `54b20d4` | **3.42.0** | feat(security): add a Content-Security-Policy, pin CDN libraries and rewrite the docs |
 | `9eb7e22` | 3.41.2 | fix(sheets): make every Google Sheets read and write safe and consistent |
 | `a3efdc9` | 3.41.1 | refactor: tidy every script, the stylesheet and index.html, and fix eleven bugs |
 | `ac60ac9` | **3.41.0** | feat(health): seed Tune's τ/s/f from logged history, unify the healthy BMI band, and consolidate the intake charts |

@@ -23,10 +23,40 @@ function evaluateNumberExpression(input) {
   if (!expr) return 0;
   if (!/^[0-9+\-*/().\s]+$/.test(expr)) return null;
 
+  const result = evaluateArithmetic(expr);
+  // Rounded to the cent, so float noise (0.1 + 0.2) never reaches the sheet.
+  return result === null ? null : Math.round(result * 100) / 100;
+}
+
+// Parses + - * / ( ) and decimals without eval, which the CSP blocks. Null if invalid.
+function evaluateArithmetic(input) {
+  const tokens = String(input).match(/\d+\.?\d*|\.\d+|[+\-*/()]|\S/g) || [];
+  let i = 0;
+  const factor = () => {
+    const t = tokens[i++];
+    if (t === '-') return -factor();
+    if (t === '+') return factor();
+    if (t === '(') {
+      const v = sum();
+      if (tokens[i++] !== ')') throw new Error('paren');
+      return v;
+    }
+    if (t === undefined || !/^[\d.]+$/.test(t)) throw new Error('token');
+    return Number(t);
+  };
+  const product = () => {
+    let v = factor();
+    while (tokens[i] === '*' || tokens[i] === '/') v = tokens[i++] === '*' ? v * factor() : v / factor();
+    return v;
+  };
+  const sum = () => {
+    let v = product();
+    while (tokens[i] === '+' || tokens[i] === '-') v = tokens[i++] === '+' ? v + product() : v - product();
+    return v;
+  };
   try {
-    const result = Function(`"use strict"; return (${expr});`)();
-    // Rounded to the cent, so float noise (0.1 + 0.2) never reaches the sheet.
-    return typeof result === 'number' && Number.isFinite(result) ? Math.round(result * 100) / 100 : null;
+    const v = sum();
+    return i === tokens.length && Number.isFinite(v) ? v : null;
   } catch {
     return null;
   }

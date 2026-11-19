@@ -673,11 +673,17 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
   const totals = {};
   let totalGrams = 0;
   let totalCount = 0;
+  // Gray, so amounts don't read as calories.
+  const amountCell = (text) => {
+    const td = makeCell(text);
+    td.className = 'neutral';
+    return td;
+  };
 
   mergeDuplicateBreakdownRows(breakdown).forEach((row) => {
     appendTableRow(tbody, '', [
       makeCell(row.name),
-      makeCell(row.amount),
+      amountCell(row.amount),
       makeCell(String(row.calories)),
       makeCell(row.protein.toFixed(1)),
       macroCell(row.fiber),
@@ -704,7 +710,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
   ].filter(Boolean).join(' + ');
   appendTableRow(tbody, 'calc-breakdown-total', [
     makeCell('Total'),
-    makeCell(totalAmount),
+    amountCell(totalAmount),
     totalCell(totalCalories),
     totalCell(totalProtein),
     totalCell(totals.fiber),

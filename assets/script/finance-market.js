@@ -82,7 +82,7 @@ function updateAnalysisAgeBadge() {
     const days = Math.round((today - dateFromIso(last.date.slice(0, 10))) / MS_PER_DAY);
     if (oldest === null || days > oldest.days) oldest = { days, symbol: w.symbol, date: last.date };
   });
-  const stale = oldest && oldest.days > ANALYSIS_STALE_DAYS ? `${oldest.symbol} last analyzed ${oldest.days} days ago (${oldest.date})` : null;
+  const stale = oldest && oldest.days > ANALYSIS_STALE_DAYS ? `${oldest.symbol} last analyzed ${oldest.days} days ago (${shortYearDate(oldest.date)})` : null;
   // A met alert outranks the age badge, which moves into the hover.
   const alert = watchlistAlertBadge();
   if (alert) setPageBadge('finance', 'market', { text: alert.text, title: stale ? `${alert.title}\n${stale}` : alert.title });
@@ -346,7 +346,7 @@ function renderNews() {
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.textContent = n.headline;
-    p.append(`${n.date} · ${n.source} · `, a);
+    p.append(`${shortYearDate(n.date)} · ${n.source} · `, a);
     box.appendChild(p);
   });
 }
@@ -559,7 +559,7 @@ function renderAnalysisReport(text, stamp) {
   body.appendChild(disclaimer);
   const at = document.getElementById('analysis-generated-at');
   at.hidden = !stamp;
-  at.textContent = stamp ? `Last generated ${stamp}` : '';
+  at.textContent = stamp ? `Last generated ${shortYearDate(stamp)}` : '';
   renderSuggestedAlerts(text);
 }
 

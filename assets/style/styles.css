@@ -9,8 +9,7 @@
     display: none !important;
 }
 
-/* Every field's base look; :where() keeps it at zero specificity so each group's
-   own rule still wins. */
+/* Every field's base look; :where() keeps it at zero specificity. */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
     max-width: 100%;
     font: inherit;
@@ -69,8 +68,7 @@ textarea {
     --bottom-bar-inset: .4rem;
     /* Their gap from the bottom edge. */
     --bottom-bar-bottom: .3rem;
-    /* Inside the bar: end margin, button gap and the account circle's size, so the
-       circle sits as far from the first button as the buttons from each other. */
+    /* Inside the bar: end margin, button gap and the account circle's size. */
     --bottom-bar-edge: .64rem;
     --bottom-bar-gap: var(--space-s);
     --bottom-bar-circle: 42px;
@@ -104,8 +102,7 @@ textarea {
     --chart-series-shade-step: 9%;
     --chart-ring-saturation: 45%;
     --chart-ring-lightness: 42%;
-    /* Glass for the floating layer only (header, bars, sidebar, menus, modals);
-       content stays solid so numbers stay readable. */
+    /* Glass for the floating layer only; content stays solid. */
     --glass-bg: rgba(255, 255, 255, .55);
     --glass-bg-strong: rgba(255, 255, 255, .78);
     --glass-border: rgba(255, 255, 255, .65);
@@ -190,7 +187,6 @@ html[data-routing] .site-footer {
 
 .panel h2:focus-visible,
 th.sortable:focus-visible {
-    outline-offset: 2px;
     border-radius: 3px;
 }
 
@@ -508,11 +504,6 @@ header .btn:hover {
     transform: translateX(16px);
 }
 
-.switch:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-}
-
 /* Refresh and Clear cache: the switch rows' height. */
 .settings-switches .account-menu-item {
     min-height: 34px;
@@ -536,8 +527,7 @@ header .btn:hover {
     border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
-/* Three button heights: 24px (table rows), 30px (here, the field height) and
-   42px (phone action bar, tiles). Emoji buttons are square. */
+/* Button heights: 24px (table rows), 30px (here), 42px (phone bar, tiles). */
 .btn {
     font: inherit;
     font-size: var(--text-small);
@@ -902,8 +892,7 @@ kbd {
     position: relative;
 }
 
-/* Per-line suggestions for multi-line textareas (health-physique-breakdown.js),
-   which a <datalist> can't do. */
+/* Per-line suggestions for multi-line textareas (no <datalist> there). */
 .autocomplete-suggestions {
     position: absolute;
     top: 100%;
@@ -988,8 +977,7 @@ html:not(.section-pages) .panel-group + .panel-group {
     margin-top: var(--space-s);
 }
 
-/* "Hide widgets", stamped by index.html's head script before first paint so the
-   row never flashes on a refresh. */
+/* "Hide widgets", stamped before first paint by index.html's head script. */
 html[data-widgets-pref="hidden"] .widget-cards {
     display: none;
 }
@@ -1170,7 +1158,7 @@ td:has(.btn) {
     border-top: 1px solid var(--color-border);
 }
 
-/* A line under these tables' header rows. */
+/* A line under header rows, closing a table, or ending a group of rows. */
 #physique-micro-table thead th,
 #physique-micro-range-table thead th,
 #insight-micro-table thead th,
@@ -1189,7 +1177,13 @@ td:has(.btn) {
 #physique-activity-breakdown thead th,
 #physique-derived-table thead th,
 .workout-table-strength thead th,
-.workout-table-neat thead th {
+#breakdown-table tbody tr:last-child td,
+.workout-table-strength tbody tr:last-child td,
+#physique-derived-table tr.physique-derived-group-end td,
+#market-signal-table tr.physique-derived-group-end td,
+#insight-micro-table tr.nutrient-facts-end td,
+#physique-micro-table tr.nutrient-facts-end td,
+#physique-micro-range-table tr.nutrient-facts-end td {
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -1198,6 +1192,7 @@ td:has(.btn) {
 #breakdown-table tr.breakdown-category-start td,
 .workout-table-strength tr.workout-group-start td,
 #transactions-table tr.tx-receipt-start td,
+#work-time-table tr.work-time-group-start td,
 #leetcode-cheatsheet tr.leetcode-cheatsheet-start th {
     border-top: 1px solid var(--color-border);
 }
@@ -1229,21 +1224,17 @@ td:has(.btn) {
     color: var(--color-primary);
 }
 
-/* A line closing a table, or a group of its rows. */
-#breakdown-table tbody tr:last-child td,
-.workout-table-strength tbody tr:last-child td,
-#physique-derived-table tr.physique-derived-group-end td,
-#market-signal-table tr.physique-derived-group-end td {
-    border-bottom: 1px solid var(--color-border);
-}
-
-/* Physique's number columns line up on the last digit, like .num. */
+/* Number columns line up on the last digit, like .num. */
 #physique-derived-table th:nth-child(n+2):nth-child(-n+4),
 #physique-derived-table td:nth-child(n+2):nth-child(-n+4),
 #physique-calc-breakdown th:not(:first-child):not(:last-child),
 #physique-calc-breakdown td:not(:first-child):not(:last-child),
 #physique-activity-breakdown th:not(:first-child):not(:last-child),
-#physique-activity-breakdown td:not(:first-child):not(:last-child) {
+#physique-activity-breakdown td:not(:first-child):not(:last-child),
+#transactions-table th:nth-child(7),
+#accounts-table th:nth-child(4),
+#accounts-table th:nth-child(5),
+#accounts-table td:nth-child(5) {
     text-align: right;
 }
 
@@ -1262,15 +1253,29 @@ td:has(.btn) {
     margin-bottom: var(--space-s);
 }
 
-/* Only Classification, Name and Amount wrap. */
+/* Cells on one line (.table-responsive scrolls): Nutrition wraps only
+   Classification, Name and Amount; Physique's breakdowns only the name. */
 #nutrition-table th:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)),
-#nutrition-table td:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)) {
-    white-space: nowrap;
-}
-
-/* Car Service: every cell on one line; .table-responsive scrolls sideways instead. */
+#nutrition-table td:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)),
 .car-service-table th,
-.car-service-table td {
+.car-service-table td,
+#physique-calc-breakdown th:not(:first-child),
+#physique-calc-breakdown td:not(:first-child),
+#physique-activity-breakdown th:not(:first-child),
+#physique-activity-breakdown td:not(:first-child),
+#physique-derived-table th:not(:first-child),
+#physique-derived-table td:not(:first-child),
+#transactions-table th:first-child,
+#transactions-table td:first-child,
+#transactions-table th:nth-child(2),
+#transactions-table td:nth-child(2),
+#transactions-table th:nth-child(3),
+#transactions-table td:nth-child(3),
+#breakdown-table th:last-child,
+#breakdown-table td:last-child,
+#settings-table td,
+#physique-table th,
+#physique-table td {
     white-space: nowrap;
 }
 
@@ -1279,23 +1284,10 @@ td:has(.btn) {
     width: auto;
 }
 
-/* Every column but the name keeps to its content width; the name takes the rest. */
-#physique-calc-breakdown th:not(:first-child),
-#physique-calc-breakdown td:not(:first-child),
-#physique-activity-breakdown th:not(:first-child),
-#physique-activity-breakdown td:not(:first-child),
-#physique-derived-table th:not(:first-child),
-#physique-derived-table td:not(:first-child) {
-    white-space: nowrap;
-}
-
-/* All three Physique tables fill their cards: Name takes the spare width, and shrinks first on a phone. */
+/* Physique's tables fill their cards; Name takes the spare width and shrinks first. */
 #physique-calc-breakdown table,
 #physique-activity-breakdown table,
-#physique-derived-table {
-    width: 100%;
-}
-
+#physique-derived-table,
 #physique-calc-breakdown th:first-child,
 #physique-calc-breakdown td:first-child,
 #physique-activity-breakdown th:first-child,
@@ -1315,13 +1307,6 @@ td:has(.btn) {
 /* The average row continues the Total, so it has no line of its own. */
 #insight-food-table tr.insight-food-average-row td {
     font-weight: 600;
-}
-
-/* Micronutrient tables: a line ending the Nutrition Facts block. */
-#insight-micro-table tr.nutrient-facts-end td,
-#physique-micro-table tr.nutrient-facts-end td,
-#physique-micro-range-table tr.nutrient-facts-end td {
-    border-bottom: 1px solid var(--color-border);
 }
 
 /* A nutrient short of its daily desired value: a red edge (numbers stay legible). */
@@ -1347,8 +1332,7 @@ td:has(.btn) {
     color: var(--color-text-muted);
 }
 
-/* No hover on a phone, so a tap opens the sources under the name
-   (nutrientNameCell); the dotted underline hints at it. */
+/* No hover on a phone: a tap opens the sources (nutrientNameCell). */
 @media (max-width: 640px) {
     #insight-micro-table td.nutrient-name-cell,
     #physique-micro-table td.nutrient-name-cell,
@@ -1366,37 +1350,11 @@ td:has(.btn) {
     }
 }
 
-#transactions-table th:first-child,
-#transactions-table td:first-child,
-#transactions-table th:nth-child(2),
-#transactions-table td:nth-child(2),
-#transactions-table th:nth-child(3),
-#transactions-table td:nth-child(3),
-#breakdown-table th:last-child,
-#breakdown-table td:last-child,
-#settings-table td {
-    white-space: nowrap;
-}
-
 #transactions-table th:last-child,
 #transactions-table td:last-child,
 #accounts-table th:last-child,
 #accounts-table td:last-child {
     white-space: nowrap;
-    text-align: right;
-}
-
-/* Physique's columns are all short values, so none wraps (a wrapping Date
-   starved the actions column). */
-#physique-table th,
-#physique-table td {
-    white-space: nowrap;
-}
-
-#transactions-table th:nth-child(7),
-#accounts-table th:nth-child(4),
-#accounts-table th:nth-child(5),
-#accounts-table td:nth-child(5) {
     text-align: right;
 }
 
@@ -1475,6 +1433,13 @@ th.sortable:hover {
     max-height: 2000px;
     opacity: 1;
     overflow: hidden;
+}
+
+.app-card.collapsed .app-card-body {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 /* A LeetCode category's table starts at the card's edge, not under its title. */
@@ -1588,8 +1553,7 @@ th.sortable:hover {
     font-variant-numeric: tabular-nums;
 }
 
-/* Health Chart's copy in a .chart-box: the largest square cells that fit its
-   height and width, scrolling below 11px. */
+/* Health Chart's copy: the largest square cells that fit, scrolling below 11px. */
 .health-heatmap-box {
     container-type: size;
 }
@@ -1622,13 +1586,6 @@ th.sortable:hover {
     border-color: transparent;
 }
 
-.app-card.collapsed .app-card-body {
-    max-height: 0;
-    opacity: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-}
-
 .app-history {
     list-style: none;
     display: flex;
@@ -1651,21 +1608,21 @@ th.sortable:hover {
 
 .income {
     color: var(--color-income);
-    text-align: right;
 }
 
 .expense {
     color: var(--color-danger);
-    text-align: right;
 }
 
-/* A value that is neither good nor bad: a closed account, carbs under their band. */
+/* Neither good nor bad: a closed account, carbs under their band. */
 .neutral {
     color: var(--color-text-muted);
-    text-align: right;
 }
 
-/* A column of figures lines up on the last digit, header included. */
+/* Figures line up on the last digit, header included. */
+.income,
+.expense,
+.neutral,
 .num {
     text-align: right;
 }
@@ -1860,8 +1817,7 @@ th.sortable:hover {
     flex-shrink: 0;
 }
 
-/* A toggling legend entry is a <button> for the keyboard, without a button's look.
-   font-family, not `font`, so .donut-legend-item's size stays. */
+/* A toggling legend entry: a <button> without a button's look (font-family keeps the size). */
 .donut-legend-item-toggle {
     appearance: none;
     -webkit-appearance: none;
@@ -1886,8 +1842,7 @@ td .btn {
     margin-right: var(--space-xs);
 }
 
-/* Above the sticky header (10) and its dropdowns (20-50), which otherwise covered
-   a phone form's close button. */
+/* Above the sticky header (10) and its dropdowns (20-50). */
 .modal {
     position: fixed;
     inset: 0;
@@ -1934,8 +1889,7 @@ td .btn {
     margin: 0 0 var(--space-s);
 }
 
-/* Floats top-right in a read-only viewer; in a form's .modal-actions (a flex row)
-   the float is ignored and it sits beside Save. */
+/* Floats top-right in a viewer; beside Save in a form's .modal-actions. */
 .modal-close {
     float: right;
     margin-left: var(--space-m);
@@ -1983,8 +1937,7 @@ td .btn {
     margin-top: var(--space-s);
 }
 
-/* Edit Activity's preview, shown as the Instruction modal will
-   (renderActivityImagePreview hides it when blank or broken). */
+/* Edit Activity's preview, as the Instruction modal shows it. */
 .activity-image-preview {
     margin-top: calc(-1 * var(--space-s));
     margin-bottom: var(--space-m);
@@ -2022,8 +1975,7 @@ td .btn {
 /* Two short fields on one line; the labels' own margins space the row. */
 .form-row {
     display: grid;
-    /* minmax(0, 1fr): a bare 1fr floors at min-content, so a date track grew wider
-       than its neighbour on a phone. */
+    /* minmax(0, 1fr): a bare 1fr floors at min-content. */
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0 var(--field-pair-gap);
 }
@@ -2144,8 +2096,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin: 0;
 }
 
-/* One 30px height for every single-line control: date, time and select boxes
-   otherwise differ by a pixel or two. */
+/* One 30px height for every single-line control. */
 .app-form input:not([type="checkbox"]):not([type="radio"]),
 .app-form select,
 .filters input:not([type="checkbox"]):not([type="radio"]),
@@ -2159,8 +2110,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     min-width: 0;
 }
 
-/* iOS sizes a native date/time input to its content; no native appearance makes
-   it honour the width (the picker still works). */
+/* iOS sizes a native date/time input to its content; appearance: none fixes it. */
 .app-form input[type="date"],
 .app-form input[type="time"],
 .export-date-range input[type="date"] {
@@ -2235,7 +2185,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 }
 
 .work-time-holiday-badge,
-.work-time-no-entry {
+.work-time-no-entry,
+#physique-table td.physique-muted {
     color: var(--color-text-muted);
 }
 
@@ -2243,24 +2194,21 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-s);
 }
 
-/* Range rows, rotation cards, Workouts and Travel's cards: one gap below only. */
+/* Range rows, rotation cards, Workouts, Travel's cards and any page's first card
+   or card grid: one gap below only. */
 .pagination.panel-range,
 .body-mass-projection-wrap.page-rotation-card,
 #instruction-groups-card,
-.donut-grid.travel-insights-grid {
+.donut-grid.travel-insights-grid,
+.panel-header + .card,
+.panel-header + .cards,
+.panel-header + .donut-grid {
     margin: 0 0 var(--space-s);
 }
 
 /* A field row ending its card (nothing shown after it) adds no space under it. */
 .card > :is(.panel-range, .filters, .insight-question-label, .checkbox-inline-label, details):not(:has(~ :not([hidden]))) {
     margin-bottom: 0;
-}
-
-/* Any page's first card or card grid, the same: none above, one card gap below. */
-.panel-header + .card,
-.panel-header + .cards,
-.panel-header + .donut-grid {
-    margin: 0 0 var(--space-s);
 }
 
 /* The plateau-note wrap takes no room while the note is empty. */
@@ -2380,8 +2328,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     border-top-color: var(--color-danger);
 }
 
-/* One gradient sized to the whole track (scaled by 100/pct), so growing the bar
-   reveals more of it instead of re-stretching it. */
+/* One gradient sized to the whole track, so growing the bar reveals more of it. */
 .body-mass-progress-meter-fill {
     /* --meter-pct: how far along (health-chart.js). */
     width: calc(var(--meter-pct, 0) * 1%);
@@ -2442,8 +2389,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     display: none;
 }
 
-/* The plan's h3s, spaced like its days. :not(.collapsed), since an id selector
-   would outrank the collapse rule's margin reset. */
+/* The plan's h3s, spaced like its days (:not(.collapsed) keeps the collapse reset). */
 #workout-plan-panel:not(.collapsed) h3 {
     margin: var(--space-xl) 0 var(--space-s);
 }
@@ -2480,8 +2426,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-right: 0;
 }
 
-/* Already logged today, or today's row: one green tint, a flat rgba so it reads
-   in both themes. */
+/* Logged today, or today's row: one green tint for both themes. */
 .workout-row-logged > td,
 .instruction-activities li.instruction-logged,
 .nutrition-row-logged > td,
@@ -2490,13 +2435,11 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
 }
 
 /* Columns sized to their content; headers never wrap. */
-.workout-table-strength,
-.workout-table-neat {
+.workout-table-strength {
     width: auto;
 }
 
-.workout-table-strength th,
-.workout-table-neat th {
+.workout-table-strength th {
     white-space: nowrap;
 }
 
@@ -2858,10 +2801,7 @@ html.home-hub .page-tiles,
         grid-template-columns: 1fr 1fr;
     }
 
-    .pagination {
-        flex-wrap: wrap;
-    }
-
+    .pagination,
     .export-filter-row {
         flex-wrap: wrap;
     }
@@ -2904,11 +2844,6 @@ html.home-hub .page-tiles,
         flex: 1 0 auto;
         display: flex;
         flex-direction: column;
-    }
-
-    .app-form label {
-        margin-bottom: var(--space-xs);
-        font-size: var(--text-small);
     }
 
     /* Vertical padding is already at the tap-area floor. */
@@ -3048,8 +2983,7 @@ html.home-hub .page-tiles,
     margin-bottom: 0;
 }
 
-/* A rate over its ceiling or a goal outside its band: a red warning, not an
-   error (nothing is blocked). */
+/* A rate over its ceiling or a goal outside its band: a red warning. */
 .formula-row input.formula-pct-over,
 .formula-row input.formula-out-of-band {
     border-color: var(--color-danger);
@@ -3082,8 +3016,7 @@ html.home-hub .page-tiles,
     grid-template-columns: max-content 8.45rem max-content;
 }
 
-/* Contact's and Pattern's wide tables: content width, one line per cell;
-   .table-responsive scrolls. */
+/* Contact's and Pattern's wide tables: content width, one line per cell. */
 #contacts-table,
 #insight-pattern-table {
     width: max-content;
@@ -3215,31 +3148,19 @@ html.home-hub .page-tiles,
 /* --- Hub and pages (page-nav.js, router.js's showSectionPage) ------------------
    html[data-page]: "hub" shows glance cards and tiles, "block" one block under
    its breadcrumb. */
+/* A block page keeps only the open block and its breadcrumb (which names it). */
 .page-tiles,
-.page-crumb {
-    display: none;
-}
-
-html.section-pages[data-page="hub"] .panel-group > .panel[data-route] {
-    display: none;
-}
-
-/* A page: everything in the section but the open block and its breadcrumb goes. */
-html.section-pages[data-page="block"] .panel-group > :not(.page-active):not(.page-crumb) {
-    display: none;
-}
-
-/* The breadcrumb already ends in the block's name; its buttons stay at the right. */
+.page-crumb,
+html.section-pages[data-page="hub"] .panel-group > .panel[data-route],
+html.section-pages[data-page="hub"] .page-crumb-back,
+html.section-pages[data-page="block"] .panel-group > :not(.page-active):not(.page-crumb),
 html.section-pages[data-page="block"] .panel.page-active > .panel-header > h2 {
     display: none;
 }
 
+/* The block's buttons stay at the right. */
 html.section-pages[data-page="block"] .panel.page-active > .panel-header > .panel-header-actions {
     margin-left: auto;
-}
-
-html.section-pages[data-page="hub"] .page-crumb-back {
-    display: none;
 }
 
 /* One breadcrumb look for hub, page and form page. */
@@ -3297,8 +3218,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     min-height: 42px;
     /* Narrow sides, so "Transaction" fits four a row. */
     padding: var(--space-s) var(--space-xs);
-    /* Liquid glass over a 15% wash of --tile-tint: a shine, a lit rim (::before)
-       and a soft shadow. */
+    /* Liquid glass over a 15% --tile-tint wash, with a rim (::before). */
     --tile-tint: var(--color-text-muted);
     isolation: isolate;
     background:
@@ -3404,8 +3324,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     cursor: pointer;
 }
 
-/* A tile's tint says what it opens (TILE_KINDS): gray rows, green form, orange
-   charts, purple AI. */
+/* A tile's tint says what it opens (TILE_KINDS). */
 .page-tile[data-kind="form"] {
     --tile-tint: #34c759;
 }
@@ -3496,8 +3415,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         color: #fff !important;
     }
 
-    /* Glass dialogs on a wide screen only (a blur would trap a phone's fixed
-       action bar); a .form-page sits on the page instead. */
+    /* Glass dialogs on a wide screen only; a .form-page sits on the page. */
     .modal:not(.form-page) {
         background: rgba(15, 23, 42, .25);
         -webkit-backdrop-filter: blur(6px);
@@ -3677,8 +3595,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         display: none;
     }
 
-    /* Sidebar hidden: only the picture stays, bottom-left; the switches move
-       into its menu (placeSettingsSwitches). */
+    /* Sidebar hidden: only the picture stays; switches move into its menu. */
     html[data-side-nav="closed"] .header-actions {
         width: auto;
         border-top: 0;
@@ -3717,10 +3634,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
 
 /* --- Form pages (router.js's updateFormPage) ---------------------------------
    A routed form takes the section page's place, laid out like a block page. */
-html.section-pages[data-form-page] #dashboard {
-    display: none;
-}
-
+html.section-pages[data-form-page] #dashboard,
 html.section-pages[data-form-page] .modal.form-page-under {
     display: none;
 }
@@ -3785,12 +3699,6 @@ html.section-pages[data-form-page] body.modal-open {
     }
 }
 
-@media (max-width: 800px) {
-    html.section-pages[data-form-page] .modal.form-page {
-        --form-page-gutter: var(--space-l);
-    }
-}
-
 /* Tablet and phone: a 1rem gutter, clear of the bottom bar. */
 @media (max-width: 1179px) {
     html.section-pages[data-form-page] .modal.form-page {
@@ -3824,17 +3732,6 @@ html.section-pages[data-form-page] body.modal-open {
     display: none !important;
 }
 
-@media (max-width: 1179px) {
-    .panel-header-actions .header-action-close {
-        display: none;
-    }
-
-    /* Shown again in the phone's action bar (hidden on the page above). */
-    html[data-action-bar] .panel-actions[data-page-actions].action-bar .page-action-close {
-        display: inline-flex;
-    }
-}
-
 /* A page sits on the page background; only its small cards are white. */
 html.section-pages .panel.page-active,
 html.section-pages .panel.page-active:hover {
@@ -3852,8 +3749,14 @@ html.section-pages .panel.page-active:hover {
 }
 
 @media (max-width: 1179px) {
+    .panel-header-actions .header-action-close,
     html[data-action-bar] .nav {
         display: none;
+    }
+
+    /* Shown again in the phone's action bar (hidden on the page above). */
+    html[data-action-bar] .panel-actions[data-page-actions].action-bar .page-action-close {
+        display: inline-flex;
     }
 
     html[data-action-bar] .action-bar,

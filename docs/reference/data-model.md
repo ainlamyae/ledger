@@ -84,7 +84,7 @@ Every tab of the Google Sheet behind Ledger, column by column.
 
 ## Breakdown
 
-- **Formula-driven:** per-category, per-type spend for the Type donuts; data from row 2 (`A2:F`).
+- **Formula-driven:** per-category, per-type spend; data from row 2 (`A2:F`). The Chart page reads only its Category and Type names.
 - **Category list:** column A is the app-wide category list.
 - **Types:** a free-text prefix on Transaction's Description, not a Transaction column.
 - **Blank Type row:** the category's overall total (the "Untyped" remainder).

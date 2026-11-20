@@ -97,7 +97,7 @@ Every folder and file in the repository, one line each.
 
 | File | Role |
 |---|---|
-| `finance-chart.js` | Finance Chart renderers: net worth, category trend, breakdowns, allocation |
+| `finance-chart.js` | Finance Chart data (from Transaction) and renderers: net worth, category trend, breakdowns, allocation |
 | `finance-transaction.js` | Transaction log: filters, sorting, paging, edit, bulk actions |
 | `finance-account.js` | Account block, formula-preserving edits, transfers |
 | `finance-breakdown.js` | Breakdown block: Category and Type rows |

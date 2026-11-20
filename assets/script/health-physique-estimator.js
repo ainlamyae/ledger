@@ -1,11 +1,10 @@
-// Physique's 🧮 Calculate for food: the AI (ai.js) splits a freeform ingredient
-// list, each item is priced from the personal Nutrition table first and from
-// USDA FoodData Central (checked against the AI's own guess) only on a miss.
-// Also draws the shared breakdown table. Driven by health-physique-breakdown.js.
+// Physique's 🧮 Calculate: the AI (ai.js) splits an ingredient list; each item is
+// priced from the Nutrition table, else from USDA (checked against the AI's guess).
+// Also draws the breakdown table. Driven by health-physique-breakdown.js.
 
 const NUTRITION_TABLE_SOURCE_LABEL = CONFIG.SHEETS.NUTRITION;
 
-// Every name the Nutrition tab has had: each is still written in saved breakdowns.
+// Every name the Nutrition tab has had; saved breakdowns still hold each.
 const NUTRITION_TABLE_SOURCE_LABELS = [NUTRITION_TABLE_SOURCE_LABEL, 'Nutrition', 'Nutrition Facts'];
 
 // The label each pricing path stores in a breakdown row's `source`.
@@ -20,6 +19,9 @@ const BREAKDOWN_SOURCE_LABELS = {
 const BREAKDOWN_MACRO_KEY = { fiber: 'fiber', fat: 'fat', carb: 'carbohydrate' };
 const TYPED_MACRO_FIELDS = Object.keys(BREAKDOWN_MACRO_KEY);
 
+// Optional breakdown row keys, summed when merging and in the Total row.
+const OPTIONAL_TOTAL_KEYS = ['fiber', 'fat', 'carbohydrate', 'tef'];
+
 // USDA nutrient name for each optional macro.
 const USDA_MACRO_NUTRIENT = {
   fiber: 'Fiber, total dietary',
@@ -32,13 +34,12 @@ function roundPlaces(value, places) {
   return Math.round(value * factor) / factor;
 }
 
-// '' rather than "[]" for an empty breakdown: both read back as [].
+// '' rather than "[]" for an empty breakdown.
 function breakdownToJson(breakdown) {
   return (breakdown && breakdown.length) ? JSON.stringify(breakdown) : '';
 }
 
-// Grams in one unit of a counted Nutrition row ("31g (1 scoop)" -> 31); null
-// for a plain weight or a row with no weight.
+// Grams per unit of a counted Nutrition row ("31g (1 scoop)" -> 31), else null.
 function nutritionGramsPerUnit(entry) {
   const grams = parseGramsFromAmount(entry.amount);
   const count = parseCountFromAmount(entry.amount);
@@ -54,21 +55,25 @@ function breakdownAmountInGrams(name, amount) {
   return perUnit === null ? null : `${roundPlaces(parseFloat(match[1]) * perUnit, 1)}g`;
 }
 
-// Sum of two optional macros; undefined (not measured) when neither side has one.
+// Sum of two optional macros; undefined when neither has one.
 function sumOptional(a, b) {
   if (a === undefined && b === undefined) return undefined;
   return roundPlaces((a || 0) + (b || 0), 2);
 }
 
-// Display only: lines for the same ingredient and amount type (grams vs "×N")
-// merge into one row. The saved breakdown keeps one entry per line.
+// A breakdown Amount's number, "×3" or "50g" alike.
+function breakdownQuantity(amount) {
+  return parseFloat(amount.replace('×', ''));
+}
+
+// Display only: same ingredient and amount type (grams vs "×N") merge into one row.
 function mergeDuplicateBreakdownRows(rows) {
   const merged = new Map();
 
   rows.forEach((row) => {
     const isCount = row.amount.startsWith('×');
     const key = `${row.name.toLowerCase()}|${isCount ? 'count' : 'grams'}`;
-    const quantity = parseFloat(row.amount.replace('×', ''));
+    const quantity = breakdownQuantity(row.amount);
     const existing = merged.get(key);
 
     if (!existing) {
@@ -79,7 +84,7 @@ function mergeDuplicateBreakdownRows(rows) {
     existing.quantity += quantity;
     existing.calories += row.calories;
     existing.protein = roundPlaces(existing.protein + row.protein, 1);
-    ['fiber', 'carbohydrate', 'fat', 'tef'].forEach((field) => { existing[field] = sumOptional(existing[field], row[field]); });
+    OPTIONAL_TOTAL_KEYS.forEach((field) => { existing[field] = sumOptional(existing[field], row[field]); });
     existing.amount = isCount ? `×${existing.quantity}` : `${roundPlaces(existing.quantity, 1)}g`;
     if (existing.source !== row.source) existing.source = `${existing.source} + ${row.source}`;
     existing.noteLine = `${existing.noteLine}\n${row.noteLine}`;
@@ -97,9 +102,8 @@ function usdaMacroPer100g(candidate, nutrientName) {
   return nutrient ? nutrient.amountPer100g : null;
 }
 
-// USDA search can rank a false match first ("soybeans" -> soybean oil), so a
-// candidate is trusted only near the AI's own kcal guess. All macros come from
-// that one candidate; fiber/fat/carb have no AI fallback, so they stay null.
+// USDA can rank a false match first ("soybeans" -> soybean oil), so a candidate is
+// trusted only near the AI's kcal guess. Fiber/fat/carb have no AI fallback.
 function pickPlausibleMacros(candidates, kcalFallback, proteinFallback) {
   const best = pickPlausibleUsdaCandidate(candidates, kcalFallback);
   if (!best) return { kcal: kcalFallback, protein: proteinFallback, fiber: null, fat: null, carb: null, candidate: null };
@@ -118,8 +122,7 @@ function splitNotesIntoSegments(notes) {
   return notes.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
 }
 
-// Every spelling of each unit, keyed by its canonical form. Order matters: the
-// unit regexes below are built from it.
+// Every spelling of each unit by canonical form. Order matters for the regexes below.
 const UNIT_SPELLINGS = {
   x: ['x'],
   g: ['g', 'gram', 'grams'],
@@ -153,8 +156,7 @@ const INGREDIENT_UNIT_WORDS_BASE = Object.entries(UNIT_SPELLINGS)
   .flatMap(([, spellings]) => spellings)
   .join('|');
 
-// Units counted one by one: the typed number is the count, trusted over the AI's
-// (which has decided e.g. "spray" isn't discrete). Weights and volumes aren't counts.
+// Units counted one by one: the typed number is trusted over the AI's count.
 const COUNT_LIKE_UNITS = new Set(
   ['x', 'piece', 'serving', 'scoop', 'slice', 'spray', 'shot', 'can', 'clove'].flatMap((u) => UNIT_SPELLINGS[u]),
 );
@@ -162,16 +164,14 @@ const COUNT_LIKE_UNITS = new Set(
 // Fixed weight for a unit the AI can only guess: a standard 30 g/ml shot.
 const UNIT_TO_GRAMS = { shot: 30, shots: 30 };
 
-// A leading energy amount is an anchor ("300kcal cookie": the energy eaten, not
-// the food's weight). "cal" on a food label means kcal; kJ is converted.
+// A leading energy amount is an anchor ("300kcal cookie"). "cal" means kcal; kJ converts.
 const KJ_PER_KCAL = 4.184;
 const ENERGY_UNIT_TO_KCAL = {
   kcal: 1, kcals: 1, calories: 1, calorie: 1, cals: 1, cal: 1,
   kilojoules: 1 / KJ_PER_KCAL, kilojoule: 1 / KJ_PER_KCAL, kj: 1 / KJ_PER_KCAL,
 };
 
-// Anchor words per macro: "100kcal 5p 4fiber 5fat 8carb bar" logs exactly those
-// figures for the line. Longest spelling first within each.
+// Anchor words per macro ("100kcal 5p 4fiber 5fat 8carb bar"), longest first.
 const MACRO_ANCHOR_WORDS = {
   kcal: Object.keys(ENERGY_UNIT_TO_KCAL),
   protein: ['p', 'pro'],
@@ -185,15 +185,14 @@ const MACRO_UNIT_TO_FIELD = Object.fromEntries(
 );
 // One anchor token; a segment may hold several.
 const MACRO_TOKEN_PATTERN = new RegExp(`^\\s*([\\d.]+)\\s*(${MACRO_UNIT_WORDS})\\b\\.?\\s*`, 'i');
-// Leading quantity plus an optional unit glued on ("100g"), so "100g egg white"
-// leaves "egg white". "x" is here so an already-tidied "1x apple" re-parses.
+// Leading quantity plus optional unit ("100g egg white" -> "egg white"). "x" lets a
+// tidied "1x apple" re-parse.
 const INGREDIENT_UNIT_WORDS = `x|${MACRO_UNIT_WORDS}|${INGREDIENT_UNIT_WORDS_BASE}`;
 const INGREDIENT_QUANTITY_PATTERN = new RegExp(
   `^\\s*([\\d.]+)(?:\\s*[-/]\\s*[\\d.]+)?\\s*(${INGREDIENT_UNIT_WORDS})?\\b\\.?\\s*`, 'i'
 );
 
-// "200/5g bar" (a 200g bar split 5 ways) is divided here rather than by the AI.
-// Only a unit-glued fraction: a bare "2-3" is a range, not arithmetic.
+// "200/5g bar" (200g split 5 ways) is divided here, not by the AI. Unit-glued only.
 const DIVISION_QUANTITY_PATTERN = new RegExp(
   `(^|[,\\n]\\s*)([\\d.]+)\\s*/\\s*([\\d.]+)\\s*(${INGREDIENT_UNIT_WORDS})\\b`, 'gi'
 );
@@ -207,14 +206,12 @@ function resolveDivisionQuantities(notes) {
 
 // A unit word ending the name ("watermelon slice") is dropped too.
 const TRAILING_UNIT_PATTERN = new RegExp(`\\s+(?:${INGREDIENT_UNIT_WORDS_BASE})\\s*$`, 'i');
-// A size word after the quantity changes weight, not the food. "mini" stays:
-// a mini muffin is its own product.
+// A size word changes weight, not the food. "mini" stays: it's its own product.
 const SIZE_DESCRIPTOR_WORDS = 'extra small|extra large|small|medium|large|big|jumbo|tiny';
 const LEADING_DESCRIPTOR_PATTERN = new RegExp(`^(?:${SIZE_DESCRIPTOR_WORDS})\\s+`, 'i');
 
-// Splits a segment's leading quantity/anchors from its name. Anchors repeat and
-// sum by field; quantity/unit echo the first anchor, or null when several
-// macros were typed (merging by one would drop the rest).
+// Splits a segment's leading quantity/anchors from its name. Anchors sum by field;
+// quantity/unit echo the first anchor, or null when several macros were typed.
 function stripLeadingIngredientTokens(segment) {
   let rest = segment;
   const anchors = {};
@@ -263,8 +260,7 @@ function typedAnchor({ anchors }, field) {
   return (anchors && anchors[field] !== undefined) ? Math.max(0, anchors[field]) : null;
 }
 
-// Grams of a food that hold `amount` of a macro at `per100g`. A zero density
-// ("300kcal water") falls back to the AI's grams.
+// Grams holding `amount` of a macro at `per100g`; a zero density keeps the AI's grams.
 function gramsForAnchor(amount, per100g, fallbackGrams) {
   return per100g > 0 ? (amount / per100g) * 100 : fallbackGrams;
 }
@@ -272,10 +268,9 @@ function gramsForAnchor(amount, per100g, fallbackGrams) {
 // The USDA food Calculate priced each new ingredient from, by lowercase name.
 const usdaCandidateByName = new Map();
 
-// Calories/protein for a Consumption text; pure (no DOM). Throws on empty input
-// or an AI failure. autoBank saves each USDA/AI miss to Nutrition straight away
-// (bulk Calculate); the form passes false and offers 💾 per row instead, so a
-// typo can be fixed before it is banked under the wrong name.
+// Calories/protein for a Consumption text; no DOM. Throws on empty input or AI
+// failure. autoBank saves each USDA/AI miss to Nutrition at once; the form passes
+// false and offers 💾 per row, so a typo isn't banked.
 async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   const notes = resolveDivisionQuantities(notesText.trim());
   if (!notes) throw new Error('No ingredients to calculate from.');
@@ -283,8 +278,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   const extraction = await aiExtractIngredients(notes);
   const { items } = extraction;
 
-  // Names come from the user's own text, not the AI's "query", paired by
-  // position. If the AI split differently there's no safe pairing, so "query" it is.
+  // Names come from the user's text, paired by position; else the AI's "query".
   const segments = splitNotesIntoSegments(notes);
   const pairingReliable = segments.length === items.length;
   const segmentQuantities = pairingReliable ? segments.map(extractIngredientQuantity) : [];
@@ -292,16 +286,13 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     pairingReliable ? extractIngredientName(segments[i]) : item.query
   );
 
-  // What the user typed beats the AI's guess: a shot's fixed weight, a count unit's number.
+  // What the user typed beats the AI: a shot's fixed weight, a count unit's number.
   if (pairingReliable) {
     items.forEach((item, i) => {
       const { quantity, unit } = segmentQuantities[i];
-      if (unit && UNIT_TO_GRAMS[unit]) {
-        item.grams = (quantity ?? 1) * UNIT_TO_GRAMS[unit];
-      }
-      if (unit && COUNT_LIKE_UNITS.has(unit)) {
-        item.count = quantity ?? 1;
-      }
+      if (!unit) return;
+      if (UNIT_TO_GRAMS[unit]) item.grams = (quantity ?? 1) * UNIT_TO_GRAMS[unit];
+      if (COUNT_LIKE_UNITS.has(unit)) item.count = quantity ?? 1;
     });
   }
 
@@ -317,8 +308,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     const { quantity: originalQuantity, unit: originalUnit } = parsed || { quantity: null, unit: null };
     const typed = (field) => (parsed ? typedAnchor(parsed, field) : null);
 
-    // A Nutrition row always wins. Scaled by count when one is usable (an exact
-    // count beats the AI's weight guess), else by weight; neither is a miss.
+    // A Nutrition row always wins, scaled by count when usable, else by weight.
     const tableEntry = findNutritionEntry(name);
     const tableGrams = tableEntry ? parseGramsFromAmount(tableEntry.amount) : null;
     let tableCount = null;
@@ -327,10 +317,8 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       tableCount = explicitCount !== null ? explicitCount : (tableGrams === null ? 1 : null);
     }
 
-    // An anchored line ("300kcal cookie", "20p chicken") reads the same sources
-    // backwards: the macro is known, the amount is derived. The row needs a
-    // positive figure to divide by, and weight beats count (the scale's number
-    // is the useful rewrite). Only energy, else protein, drives the amount.
+    // An anchored line ("300kcal cookie") derives the amount from the macro. The row
+    // needs a positive figure; weight beats count. Energy, else protein, drives it.
     const energyKcal = typed('kcal');
     const proteinG = typed('protein');
     const anchored = energyKcal !== null || proteinG !== null;
@@ -356,8 +344,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     let newRow = null;
     let usedCount = null;
     let usedGrams = grams;
-    // Typed fiber/fat/carb are the line's figure on every path; USDA only fills
-    // gaps. A table hit leaves the rest to estimateTefBreakdown on render.
+    // Typed fiber/fat/carb win on every path; USDA only fills gaps.
     const extras = {};
     TYPED_MACRO_FIELDS.forEach((field) => {
       const value = typed(field);
@@ -374,7 +361,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       itemCalories = kcalPerUnit * usedCount;
       itemProtein = proteinPerUnit * usedCount;
       source = 'nutrition-table-count';
-      // Grams when the row gives a weight per unit; the note line keeps the count.
+      // Grams when the row has a weight per unit; the note line keeps the count.
       const gramsPerUnit = nutritionGramsPerUnit(tableEntry);
       amount = gramsPerUnit !== null
         ? `${roundPlaces(usedCount * gramsPerUnit, 1)}g`
@@ -409,8 +396,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       source = lookupFailed ? 'usda-unreachable' : 'usda/ai';
       amount = `${roundPlaces(usedGrams, 1)}g`;
 
-      // An offline guess is never banked. Banked per 100g under the user's own
-      // name, so it's reusable however the next line states the amount.
+      // Never banks an offline guess. Per 100g under the user's name, for reuse.
       if (!lookupFailed) {
         newRow = { name, amount: '100g', calories: Math.round(kcal), protein: Math.round(protein) };
         TYPED_MACRO_FIELDS.forEach((field) => {
@@ -424,8 +410,8 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     if (energyKcal !== null) itemCalories = energyKcal;
     if (proteinG !== null) itemProtein = proteinG;
 
-    // The tidied note line: a typed unit is kept (canonical, glued: "50g");
-    // a bare count or an anchor becomes what Calculate resolved.
+    // Tidied note line: a typed unit stays (canonical, glued: "50g"); a bare count
+    // or an anchor becomes what Calculate resolved.
     let noteQuantity;
     if (originalUnit && !anchored) {
       noteQuantity = `${originalQuantity ?? 1}${UNIT_CANONICAL[originalUnit] || originalUnit}`;
@@ -469,7 +455,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       calories: Math.round(m.itemCalories),
       protein: roundPlaces(m.itemProtein, 1),
       source: BREAKDOWN_SOURCE_LABELS[m.source] || m.source,
-      // Lets the next Calculate reuse an unchanged line (estimateConsumptionIncrementally).
+      // Lets the next Calculate reuse an unchanged line.
       noteLine: m.noteLine,
       // Only a still-unbanked miss keeps one; it's what shows 💾.
       newRow: autoBank ? null : m.newRow,
@@ -496,8 +482,8 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   return { calories, protein, breakdown, standardizedNotes, usdaUnreachable };
 }
 
-// The full USDA panel for a new row, as its Micronutrients cell ('' if none).
-// After a reload the candidate is looked up again against the row's own kcal.
+// The USDA panel for a new row as its Micronutrients cell ('' if none). After a
+// reload the candidate is looked up again.
 async function usdaMicronutrientsForNewRow(newRow) {
   let candidate = usdaCandidateByName.get(newRow.name.toLowerCase());
   if (!candidate) {
@@ -512,10 +498,15 @@ async function usdaMicronutrientsForNewRow(newRow) {
   const panel = nutrientPanelFromCandidate(candidate, grams);
   const top = nutritionTopValues({
     calories: newRow.calories, protein: newRow.protein,
-    fiber: newRow.fiber ?? null, fat: newRow.fat ?? null, carb: newRow.carb ?? null, tef: null,
+    ...newRowOptionalMacros(newRow), tef: null,
     micronutrients: JSON.stringify(panel),
   });
   return nutritionColumnL(top, panel, new Set());
+}
+
+// A new row's fiber/fat/carb, null when unknown.
+function newRowOptionalMacros(newRow) {
+  return { fiber: newRow.fiber ?? null, fat: newRow.fat ?? null, carb: newRow.carb ?? null };
 }
 
 // 💾 on a USDA/AI row: banks it as-is, then every line of that food reads ✅.
@@ -550,8 +541,8 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, f
   return btn;
 }
 
-// ✏️ on a USDA/AI row: the Nutrition page's own Add form, prefilled with the
-// guess. Its Save banks the fix and reprices this line (applyEditedRowToBreakdown).
+// ✏️ on a USDA/AI row: Nutrition's Add form prefilled with the guess; Save banks
+// the fix and reprices this line.
 function makeEditNewRowButton(row, breakdown, form) {
   return makeRowActionButton({
     emoji: '✏️',
@@ -567,9 +558,7 @@ function makeEditNewRowButton(row, breakdown, form) {
         amount: row.newRow.amount,
         calories: row.newRow.calories,
         protein: row.newRow.protein,
-        fiber: row.newRow.fiber ?? null,
-        fat: row.newRow.fat ?? null,
-        carb: row.newRow.carb ?? null,
+        ...newRowOptionalMacros(row.newRow),
         tef: null,
         verified: false,
         proteinPercent: null,
@@ -579,8 +568,7 @@ function makeEditNewRowButton(row, breakdown, form) {
   });
 }
 
-// From a saved row's Amount to what the line ate: by weight, else by count,
-// else 1 (rather than NaN).
+// Saved Amount -> eaten amount: by weight, else count, else 1.
 function scaleFactorBetweenAmounts(basisAmount, consumedAmount) {
   const basisGrams = parseGramsFromAmount(basisAmount);
   const consumedGrams = parseGramsFromAmount(consumedAmount);
@@ -601,8 +589,7 @@ function breakdownTotals(breakdown) {
   };
 }
 
-// ✏️'s Save: replaces `row` with the corrected figures at this line's amount,
-// then re-totals, since the edit changed the numbers.
+// ✏️'s Save: replaces `row` with the corrected figures at this line's amount, then re-totals.
 function applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, form) {
   const scale = scaleFactorBetweenAmounts(saved.amount, consumedAmount);
   const idx = breakdown.indexOf(row);
@@ -627,8 +614,7 @@ function applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, form) 
   renderCalcBreakdown(breakdown, totalCalories, totalProtein, form);
 }
 
-// Source and 💾 share a column: a table hit (✅) never has anything to save.
-// Matched on the stored label, so breakdowns saved under old tab names collapse too.
+// Source and 💾 share a column. Matched on any past tab name, so old breakdowns read ✅.
 function sourceCell(row, breakdown, totalCalories, totalProtein, form) {
   const cell = document.createElement('td');
   const fromTable = NUTRITION_TABLE_SOURCE_LABELS.includes(row.source);
@@ -652,7 +638,6 @@ function macroCell(value, decimals = 1) {
   return makeCell(value === undefined ? '—' : value.toFixed(decimals));
 }
 
-// Appends a <tr> of `cells` with `className` to `tbody`.
 function appendTableRow(tbody, className, cells) {
   const tr = document.createElement('tr');
   if (className) tr.className = className;
@@ -660,12 +645,8 @@ function appendTableRow(tbody, className, cells) {
   tbody.appendChild(tr);
 }
 
-// Summed in the Total row when any row has them.
-const OPTIONAL_TOTAL_KEYS = ['fiber', 'fat', 'carbohydrate', 'tef'];
-
-// The per-ingredient table under Consumption. Its Total uses the given totals
-// (what the fields hold), not a re-sum of the rounded rows. Physique also
-// mirrors the JSON into its Breakdown field.
+// The per-ingredient table under Consumption. Its Total uses the given totals, not a
+// re-sum of rounded rows. Physique also mirrors the JSON into its Breakdown field.
 function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'physique') {
   const tbody = document.getElementById(`${form}-calc-breakdown-body`);
   tbody.innerHTML = '';
@@ -693,7 +674,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
       sourceCell(row, breakdown, totalCalories, totalProtein, form),
     ]);
 
-    const quantity = parseFloat(row.amount.replace('×', '')) || 0;
+    const quantity = breakdownQuantity(row.amount) || 0;
     if (row.amount.startsWith('×')) totalCount += quantity;
     else totalGrams += quantity;
     OPTIONAL_TOTAL_KEYS.forEach((key) => {
@@ -701,7 +682,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
     });
   });
 
-  // Whole grams, floored as the Derived table and Intake Macros card show them.
+  // Whole grams, floored as the Derived table shows them.
   const totalCell = (value) => makeCell(value === undefined ? '—' : String(Math.floor(value)));
   // Grams and counts can't add, so each sums on its own: "850g + ×3".
   const totalAmount = [
@@ -720,9 +701,8 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
     makeCell(''),
   ]);
 
-  // Today's desired figures under the Total, on Physique's form for today only.
-  // Fat/Carbohydrate use the FDA Daily Values; TEF is what the desired calories
-  // cost to digest (blank while TEF isn't counted).
+  // Today's desired figures, on Physique's form for today only. Fat/Carbohydrate are
+  // FDA Daily Values; TEF is the desired calories' digestion cost.
   if (form === 'physique' && physiqueField('date').value === isoFromDate(new Date())) {
     const healthEntries = physiqueAsHealthEntries();
     const calorieDesired = getCalorieDesired(healthEntries);

@@ -1,8 +1,6 @@
-// Finance's Insight: Health Insight's preview/question/Send-to-AI flow for money —
-// net worth, cash flow, spending by category over four periods, and each account's
-// Balance vs. Market Value. One report with fixed periods, so no modes or date range.
-// It renders from currentReport (app.js) and allAccounts (finance-account.js), which
-// are already loaded, and only once "Financial Snapshot" is clicked.
+// Finance's Insight: Health Insight's preview/question/Send-to-AI flow for money.
+// Fixed periods, no modes; renders from currentReport (app.js) and allAccounts
+// (finance-account.js) once "Financial Snapshot" is clicked.
 
 // What the preview shows, so Send to AI sends exactly that.
 let financialInsightLoaded = null;
@@ -17,12 +15,12 @@ const FINANCIAL_INSIGHT_PAGE = {
 };
 
 function initFinancialInsight() {
-  clearFieldError('financial-insight-form-error');
+  clearFieldError(FINANCIAL_INSIGHT_PAGE.errorId);
 
   document.getElementById('financial-insight-load-btn').addEventListener('click', refreshFinancialInsightPreview);
-  document.getElementById('financial-insight-generate-btn').addEventListener('click', runFinancialInsightGeneration);
+  document.getElementById(FINANCIAL_INSIGHT_PAGE.generateBtnId).addEventListener('click', runFinancialInsightGeneration);
   // Back to /finance/insight/: the tile again.
-  registerViewReset(document.getElementById('financial-insight-panel'), () => {
+  registerViewReset(document.getElementById(FINANCIAL_INSIGHT_PAGE.panelId), () => {
     financialInsightLoaded = null;
     resetInsightPage(FINANCIAL_INSIGHT_PAGE);
   });
@@ -32,15 +30,13 @@ function gatherFinancialInsightData() {
   const report = currentReport || {};
   const avg = report.quarterAverage;
 
-  // categoryComparison holds positive period TOTALS: average them as the Spending
-  // Trend chart does, then negate so spending reads as spending.
+  // Period totals averaged as Spending Trend does, negated to read as spending.
   const categoryComparison = (report.categoryComparison || []).map((c) => ({
     name: c.name,
-    ...Object.fromEntries(SPENDING_TREND_PERIODS.map((p) => [p.key, -spendingMonthlyAverage(c, p, report.totalMonths)])),
+    ...Object.fromEntries(FINANCE_PERIODS.map((p) => [p.key, -spendingMonthlyAverage(c, p, report.lifelongMonths)])),
   }));
 
-  // Blank counts as 0 and every account counts, like the Account Summary Total row,
-  // so it lines up with Net Worth.
+  // Every account, blank as 0, like Account Summary's Total row.
   const totalMarketValue = allAccounts.reduce((sum, a) => sum + (a.currentValue || 0), 0);
 
   return {
@@ -52,8 +48,7 @@ function gatherFinancialInsightData() {
     monthlyExpenses: report.expenses || 0,
     quarterAvgExpenses: avg ? avg.expenses : null,
     categoryComparison,
-    // Closed accounts (balanceText set) and empty ones hold no funds; listing them
-    // would bury the ones that matter.
+    // Skips closed (balanceText set) and empty accounts.
     accounts: allAccounts
       .filter((a) => a.balanceText === null && (a.balance !== 0 || (a.currentValue !== null && a.currentValue !== 0)))
       .map((a) => ({
@@ -67,8 +62,7 @@ function gatherFinancialInsightData() {
   };
 }
 
-// This month's Income/Expenditure/Cash Flow are still accumulating; without this
-// note the model reads an early partial total as a shortfall.
+// So the model doesn't read a partial month's totals as a shortfall.
 function monthProgressNote() {
   const now = new Date();
   const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -99,7 +93,7 @@ function financialInsightCategoryLines(d) {
   return [
     'Spending by category (Previous Month / Quarter avg / Year avg / Lifelong avg — all four are complete periods, unaffected by today\'s date):',
     ...d.categoryComparison.map((c) =>
-      `  ${c.name}: ${formatCurrency(c.lastMonth)} / ${formatCurrency(c.quarterAvg)} / ${formatCurrency(c.yearAvg)} / ${formatCurrency(c.lifelongAvg)}`),
+      `  ${c.name}: ${FINANCE_PERIODS.map((p) => formatCurrency(c[p.key])).join(' / ')}`),
   ];
 }
 
@@ -133,12 +127,12 @@ function renderCategoryComparisonTable(categoryComparison) {
   }
 
   categoryComparison.forEach((c) => {
-    const tr = document.createElement('tr');
-    const cells = [c.lastMonth, c.quarterAvg, c.yearAvg, c.lifelongAvg].map((v) => {
-      const cell = makeCell(formatCurrency(v));
+    const cells = FINANCE_PERIODS.map((p) => {
+      const cell = makeCell(formatCurrency(c[p.key]));
       cell.className = 'expense';
       return cell;
     });
+    const tr = document.createElement('tr');
     tr.append(makeCell(c.name), ...cells);
     tbody.appendChild(tr);
   });
@@ -153,13 +147,14 @@ function renderAccountsInsightTable(accounts) {
     return;
   }
 
+  const signClass = (value) => (value < 0 ? 'expense' : 'income');
   accounts.forEach((a) => {
     const balanceCell = makeCell(formatCurrency(a.balance));
-    balanceCell.className = a.balance < 0 ? 'expense' : 'income';
+    balanceCell.className = signClass(a.balance);
 
     const marketCell = makeCell(accountMarketValueText(a));
     if (a.currentValueText === null && a.currentValue !== null) {
-      marketCell.className = a.currentValue < 0 ? 'expense' : 'income';
+      marketCell.className = signClass(a.currentValue);
     }
 
     const tr = document.createElement('tr');
@@ -185,18 +180,17 @@ function renderFinancialInsightPreview(d) {
 function refreshFinancialInsightPreview() {
   openInsightPage(FINANCIAL_INSIGHT_PAGE, 'snapshot');
 
+  const generateBtn = document.getElementById(FINANCIAL_INSIGHT_PAGE.generateBtnId);
   if (!currentReport || !accountsDataLoaded) {
     showToast('Still loading your accounts — try again in a moment.');
-    document.getElementById('financial-insight-generate-btn').disabled = true;
+    generateBtn.disabled = true;
     return;
   }
 
-  const data = gatherFinancialInsightData();
-  financialInsightLoaded = data;
-
-  renderFinancialInsightPreview(data);
+  financialInsightLoaded = gatherFinancialInsightData();
+  renderFinancialInsightPreview(financialInsightLoaded);
   renderSavedFinancialInsight();
-  document.getElementById('financial-insight-generate-btn').disabled = false;
+  generateBtn.disabled = false;
 }
 
 const FINANCIAL_INSIGHT_SYSTEM_PROMPT = `You are a supportive personal finance coach reviewing someone's own tracked financial data. You are not a licensed financial advisor — do not recommend a specific company, ticker, fund name, or guarantee any return. When a suggestion involves investing, name the VEHICLE TYPE (e.g. "a broad-market index fund or ETF", "a dividend-focused ETF", "a bond ladder") so it's concrete enough to act on, not just "invest more" — but stop at the type, never a specific issuer or symbol.
@@ -226,10 +220,6 @@ If an additional question from the user is included after the data, also answer 
 
 Keep the whole report under 300 words.`;
 
-function financialInsightUserMessage(data, question) {
-  return appendInsightQuestion(formatFinancialInsightPrompt(data), question);
-}
-
 // Send to AI: runs on the loaded preview data, not a fresh gather.
 async function runFinancialInsightGeneration() {
   if (!financialInsightLoaded) return;
@@ -239,14 +229,10 @@ async function runFinancialInsightGeneration() {
   return generateInsight(FINANCIAL_INSIGHT_PAGE, {
     controls: [textarea],
     analyzing: 'Analyzing…',
-    prompts: () => [FINANCIAL_INSIGHT_SYSTEM_PROMPT, financialInsightUserMessage(data, textarea.value)],
+    prompts: () => [FINANCIAL_INSIGHT_SYSTEM_PROMPT, appendInsightQuestion(formatFinancialInsightPrompt(data), textarea.value)],
     resultKey: 'FINANCIAL_INSIGHT_LAST_RESULT',
     generatedAtKey: 'FINANCIAL_INSIGHT_LAST_GENERATED_AT',
   });
-}
-
-function renderFinancialInsightGeneratedAt(timestamp) {
-  renderInsightGeneratedAt(FINANCIAL_INSIGHT_PAGE, timestamp);
 }
 
 function renderSavedFinancialInsight() {

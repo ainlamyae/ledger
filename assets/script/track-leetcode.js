@@ -279,7 +279,7 @@ function renderLeetcodeProgress(solves) {
   remainingEl.textContent = days(daysToGo);
   const eta = new Date(today);
   eta.setDate(eta.getDate() + daysToGo);
-  etaEl.textContent = `→ ${isoFromDate(eta)}`;
+  etaEl.textContent = `→ ${shortYearDate(isoFromDate(eta))}`;
 }
 
 // Solves per day from the first solve's Monday to today, as Health Chart's All:
@@ -316,7 +316,7 @@ function renderLeetcodeHeatmap() {
       if (pct >= 50) cell.style.color = '#fff';
       cell.textContent = String(count);
     }
-    cell.title = `${iso}: ${count} solve${count === 1 ? '' : 's'} · ${minutes} min`;
+    cell.title = `${shortYearDate(iso)}: ${count} solve${count === 1 ? '' : 's'} · ${minutes} min`;
     grid.appendChild(cell);
     // A month's name over the first week it starts in.
     if (d.getDate() <= 7 && d.getDay() === 1) {
@@ -449,13 +449,14 @@ function buildLeetcodeCategory(category, problems, solves) {
   table.innerHTML = '<thead><tr><th></th><th>Solved</th><th>Problem</th><th>Difficulty</th><th>Duration</th><th></th></tr></thead>';
   const tbody = document.createElement('tbody');
   const today = isoFromDate(new Date());
+  let left = 0;
   problems.forEach((p) => {
     const logs = solves.get(p.slug) || [];
     const latest = logs.at(-1);
     const tr = document.createElement('tr');
     if (latest?.date === today) tr.className = 'today-row';
     const notes = logs.map((l) => l.notes).filter(Boolean).join(' · ');
-    const solvedText = logs.length ? `${logs[0].date}${logs.length > 1 ? ` ×${logs.length}` : ''}` : '';
+    const solvedText = logs.length ? `${shortYearDate(logs[0].date)}${logs.length > 1 ? ` ×${logs.length}` : ''}` : '';
     const actions = document.createElement('td');
     actions.className = 'workout-actions-cell';
     // The outside links, as buttons like ✏️/🗑️.
@@ -476,7 +477,8 @@ function buildLeetcodeCategory(category, problems, solves) {
       } }));
     }
     tr.append(
-      makeCell(logs.length ? '✅' : ''), makeCell(solvedText, logs.map((l) => l.date).join(', ') + (notes ? ` — ${notes}` : '')),
+      // ✅ once solved, else its count among those left (1, 2, …).
+      makeCell(logs.length ? '✅' : String(++left)), makeCell(solvedText, logs.map((l) => shortYearDate(l.date)).join(', ') + (notes ? ` — ${notes}` : '')),
       makeCell(p.name), makeCell(latest?.difficulty || p.difficulty),
       makeCell(`${latest?.minutes || p.minutes} min`), actions,
     );
@@ -592,7 +594,7 @@ async function writeLeetcodeLog(log, row = null) {
 }
 
 async function deleteLeetcodeLog(log) {
-  await confirmAndDelete(`Delete the ${log.date} solve of ${log.name}?`, async () => {
+  await confirmAndDelete(`Delete the ${shortYearDate(log.date)} solve of ${log.name}?`, async () => {
     if (leetcodeSheetId === null) leetcodeSheetId = await ensureSheetTab(CONFIG.SHEETS.LEETCODE, LEETCODE_HEADERS);
     await batchUpdate([sheetRowDeleteRequest(leetcodeSheetId, log.row)]);
     await refreshLeetcode();

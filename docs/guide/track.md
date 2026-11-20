@@ -27,7 +27,7 @@ The Track section logs everything outside health and money: LeetCode practice, w
   - **Summary line:** `Solved 45/250 · Easy 27/60 · Medium 17/155 · Hard 1/35`.
   - **Rims:** green when a category is finished, blue on the one that's open.
 - **Category cards:** one table per category (`5/22 solved`), one open at a time, all closed on load.
-  - **Columns:** ✅, Solved (first date, `×2` when solved again), Problem, Difficulty, Duration, then the row's buttons.
+  - **Columns:** ✅ once solved, else its count among the unsolved (1, 2, …), Solved (first date, `×2` when solved again), Problem, Difficulty, Duration, then the row's buttons.
 - **Cheat Sheet:** every Python construct the 250 solutions use, by topic from basic to advanced.
 - **Badge:** a number on the tile, the solves today still owes to match the last 7 days' average.
 
@@ -51,7 +51,7 @@ The Track section logs everything outside health and money: LeetCode practice, w
 ### What it shows
 
 - **Charts:** Arrival, Departure and Hours Worked distributions, and Daily Hours Average over Last Week, Month, Quarter, Year and Lifelong.
-- **Log card:** an overtime line, then the table: Company, Date, Day, Start, End, Break, Duration, Task.
+- **Log card:** an overtime line, then the table: Date, Day, Company, Start, End, Break, Duration, Task.
 - **Overtime line:** time beyond an 8h/day pace overall, then Last Year, Last Month and Last Week.
 - **Badge:** `3d` on an unlogged weekday (days since the last logged day); it opens today's form.
 
@@ -60,7 +60,8 @@ The Track section logs everything outside health and money: LeetCode practice, w
 - **📝 Log** (`/track/work-time/log/`): Company, Date, Holiday / day off, Start, End, Break (h and m), Task.
   - **Log Time:** a live duration preview under the times.
 - **✏️:** edits a day; saving a date that already exists updates that row.
-- **From / To:** the table's date range, by default 7 days back to 14 days ahead.
+- **From / To:** the table's date range, by default the last 7 days through today.
+- **Next holiday:** the first weekday holiday after today is pinned as the top row, above a line, when the range doesn't already show it.
 - **Reminder:** account menu → **Enable notifications**; Chrome then shows "Work Time: log today" once a day.
 
 ### Rules & calculations

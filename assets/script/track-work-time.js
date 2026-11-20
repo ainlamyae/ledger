@@ -1,9 +1,8 @@
 const WORK_TIME_RANGE = sheetRange(CONFIG.SHEETS.WORK_TIME, 'A2:H');
 const TS_PAGE_SIZE = 28;
 const WORK_TIME_TASK_DISPLAY_MAX = 30;
-// The table's default date range around today.
+// The table's default range: this many days back, through today.
 const WORK_TIME_DEFAULT_DAYS_BACK = 7;
-const WORK_TIME_DEFAULT_DAYS_AHEAD = 14;
 // The form fields a holiday blanks and disables (suffixes of work-time-*).
 const WORK_TIME_SHIFT_FIELDS = ['start', 'end', 'break-h', 'break-m'];
 
@@ -22,8 +21,7 @@ function timeToMinutes(hhmm) {
   return h * 60 + m;
 }
 
-// A cell Sheets once auto-formatted as a time reads back as e.g. "9:40:00 AM";
-// strips it back to the 24-hour "HH:mm" that was typed.
+// A time-formatted cell ("9:40:00 AM") back to the typed 24-hour "HH:mm".
 function normalizeTimeString(raw) {
   if (!raw) return '';
   const match = String(raw).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
@@ -90,8 +88,7 @@ function localeDayFirst() {
   return parts.findIndex((p) => p.type === 'day') < parts.findIndex((p) => p.type === 'month');
 }
 
-// A date cell as yyyy-mm-dd, from ISO or a display format ("20/11/2026",
-// "11/20/2026", "Nov 20, 2026"), so a date input can show it. Else returned as read.
+// A date cell (ISO, "20/11/2026", "11/20/2026", "Nov 20, 2026") as yyyy-mm-dd; else as read.
 function sheetDateIso(value) {
   const text = cellText(value).trim();
   const iso = (y, m, d) => (m >= 1 && m <= 12 && d >= 1 && d <= 31
@@ -165,7 +162,7 @@ async function initWorkTime(forceRefresh = false) {
   await refreshWorkTime(forceRefresh);
 }
 
-// Seeds the filter around today, once; never overrides a range the user set.
+// Seeds an empty filter to the last days through today.
 function setDefaultWorkTimeDateRange() {
   const fromInput = workTimeField('date-from');
   const toInput = workTimeField('date-to');
@@ -174,14 +171,19 @@ function setDefaultWorkTimeDateRange() {
   const today = new Date();
   const fromDate = new Date(today);
   fromDate.setDate(today.getDate() - WORK_TIME_DEFAULT_DAYS_BACK);
-  const toDate = new Date(today);
-  toDate.setDate(today.getDate() + WORK_TIME_DEFAULT_DAYS_AHEAD);
   fromInput.value = isoFromDate(fromDate);
-  toInput.value = isoFromDate(toDate);
+  toInput.value = isoFromDate(today);
 }
 
-// Day (C) and Duration (G) are never read: Duration is computed here, and Day is
-// only written on a new row.
+// The first weekday holiday after today, or null.
+function nextWorkTimeHoliday() {
+  const today = isoFromDate(new Date());
+  return allTimeEntries
+    .filter((e) => e.date > today && !isWeekend(e.date) && isHolidayEntry(e))
+    .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+}
+
+// Day (C) and Duration (G) are never read: Day is write-only, Duration computed.
 async function refreshWorkTime(forceRefresh = false) {
   const resp = await getValues(WORK_TIME_RANGE, VALUE_PARAMS);
   const values = resp.values || [];
@@ -207,8 +209,7 @@ async function refreshWorkTime(forceRefresh = false) {
   checkWorkTimeReminder();
 }
 
-// The company on the latest entry dated on or before today. Future rows (e.g.
-// pre-filled placeholders) haven't been worked, so they can't name it.
+// The company on the latest entry up to today; future placeholder rows don't count.
 function getLastCompany(entries) {
   const today = isoFromDate(new Date());
   const withCompany = entries.filter((e) => e.company && e.date <= today).sort((a, b) => b.date.localeCompare(a.date));
@@ -240,8 +241,7 @@ function populateWorkTimeCompanyOptions() {
   });
 }
 
-// A weekday with nothing logged today: a red "<days>d" badge (days since the last
-// logged day) opening today, and once allowed one notification a day. A holiday counts.
+// Weekday with today unlogged: a "<days since last log>d" badge and one notification a day.
 function checkWorkTimeReminder() {
   const today = isoFromDate(new Date());
   const entries = entriesForLastCompany(allTimeEntries).filter((e) => e.date <= today);
@@ -251,7 +251,7 @@ function checkWorkTimeReminder() {
   }
   const last = entries.reduce((max, e) => (e.date > max ? e.date : max), '');
   const days = Math.round((dateFromIso(today) - dateFromIso(last)) / MS_PER_DAY);
-  setPageBadge('track', 'work-time', { text: `${days}d`, title: `Today's hours aren't logged; last logged ${days} days ago (${last})`, record: today });
+  setPageBadge('track', 'work-time', { text: `${days}d`, title: `Today's hours aren't logged; last logged ${days} days ago (${shortYearDate(last)})`, record: today });
   if ('Notification' in window && Notification.permission === 'granted'
     && localStorage.getItem('ledger_last_reminder_notified') !== today) {
     new Notification('Ledger', { body: 'Work Time: log today' });
@@ -279,6 +279,14 @@ function renderWorkTimeList() {
   const start = (tsCurrentPage - 1) * TS_PAGE_SIZE;
   const pageEntries = entries.slice(start, start + TS_PAGE_SIZE);
 
+  // Read per render, so a tab left open past midnight moves the mark.
+  const todayIso = isoFromDate(new Date());
+
+  // The next holiday pinned on top of page 1, unless the range already shows it.
+  const holiday = nextWorkTimeHoliday();
+  const pinned = tsCurrentPage === 1 && holiday && !entries.includes(holiday) ? holiday : null;
+  if (pinned) tbody.appendChild(workTimeRow(pinned, todayIso));
+
   if (pageEntries.length === 0) {
     const message = allTimeEntries.length === 0
       ? 'No time logged yet — click "Log" in the panel heading above.'
@@ -286,55 +294,10 @@ function renderWorkTimeList() {
     tbody.appendChild(renderEmptyRow(9, message));
   }
 
-  // Read per render, so a tab left open past midnight moves the mark.
-  const todayIso = isoFromDate(new Date());
-
-  pageEntries.forEach((e) => {
-    const tr = document.createElement('tr');
-    const weekend = isWeekend(e.date);
-    // A weekday without times is a holiday, or (no Task either) not filled in yet.
-    const noTimes = !e.start && !e.end;
-    const isHoliday = !weekend && isHolidayEntry(e);
-    const isNoEntry = !weekend && noTimes && !e.task;
-
-    const firstSpace = e.company.indexOf(' ');
-    const company = firstSpace === -1 ? e.company : `${e.company.slice(0, firstSpace)}…`;
-    const task = e.task.length > WORK_TIME_TASK_DISPLAY_MAX ? `${e.task.slice(0, WORK_TIME_TASK_DISPLAY_MAX)}…` : e.task;
-
-    const durationCell = document.createElement('td');
-    if (isHoliday) {
-      durationCell.textContent = '🏖 Holiday';
-      durationCell.classList.add('work-time-holiday-badge');
-    } else if (isNoEntry) {
-      durationCell.textContent = '—';
-      durationCell.classList.add('work-time-no-entry');
-    } else {
-      const durationMin = computeDurationMinutes(e.start, e.end, e.breakMinutes);
-      durationCell.textContent = durationMin !== null ? minutesToHm(durationMin) : '—';
-    }
-
-    const actionsCell = document.createElement('td');
-    actionsCell.appendChild(makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
-      routeRecordEdit('work-time', { slug: e.date, label: e.date });
-      openWorkTimeForm(e.date);
-    } }));
-
-    tr.append(
-      makeCell(company, e.company),
-      makeCell(e.date),
-      makeCell(dayNameFromDate(e.date)),
-      makeCell(noTimes ? '—' : e.start.slice(0, 5)),
-      makeCell(noTimes ? '—' : e.end.slice(0, 5)),
-      makeCell(noTimes || !e.breakMinutes ? '—' : `${e.breakMinutes}m`),
-      durationCell,
-      makeCell(task, e.task),
-      actionsCell,
-    );
-    // A weekend and a holiday are both a day off here.
-    if (weekend || isHoliday) tr.classList.add('work-time-off');
-    else if (isNoEntry) tr.classList.add('work-time-no-entry');
-    // Separate: today's tint lands on the cells, so it shows over a day off's row tint.
-    if (e.date === todayIso) tr.classList.add('today-row');
+  pageEntries.forEach((e, i) => {
+    const tr = workTimeRow(e, todayIso);
+    // A line between the pinned holiday and the range's days.
+    if (pinned && i === 0) tr.classList.add('work-time-group-start');
     tbody.appendChild(tr);
   });
 
@@ -346,6 +309,56 @@ function renderWorkTimeList() {
       renderWorkTimeList();
     },
   });
+}
+
+// One day's row: a weekend or holiday tinted as a day off, today highlighted.
+function workTimeRow(e, todayIso) {
+  const tr = document.createElement('tr');
+  const weekend = isWeekend(e.date);
+  const noTimes = !e.start && !e.end;
+  // A weekday without times is a holiday, or (no Task either) not filled in yet.
+  const timelessWeekday = !weekend && noTimes;
+  const isHoliday = timelessWeekday && !!e.task;
+  const isNoEntry = timelessWeekday && !e.task;
+
+  const firstSpace = e.company.indexOf(' ');
+  const company = firstSpace === -1 ? e.company : `${e.company.slice(0, firstSpace)}…`;
+  const task = e.task.length > WORK_TIME_TASK_DISPLAY_MAX ? `${e.task.slice(0, WORK_TIME_TASK_DISPLAY_MAX)}…` : e.task;
+
+  const durationCell = document.createElement('td');
+  if (isHoliday) {
+    durationCell.textContent = '🏖 Holiday';
+    durationCell.classList.add('work-time-holiday-badge');
+  } else if (isNoEntry) {
+    durationCell.textContent = '—';
+    durationCell.classList.add('work-time-no-entry');
+  } else {
+    const durationMin = computeDurationMinutes(e.start, e.end, e.breakMinutes);
+    durationCell.textContent = durationMin !== null ? minutesToHm(durationMin) : '—';
+  }
+
+  const actionsCell = document.createElement('td');
+  actionsCell.appendChild(makeRowActionButton({ emoji: '✏️', title: 'Edit', onClick: () => {
+    routeRecordEdit('work-time', { slug: e.date, label: e.date });
+    openWorkTimeForm(e.date);
+  } }));
+
+  tr.append(
+    makeCell(shortYearDate(e.date)),
+    makeCell(dayNameFromDate(e.date)),
+    makeCell(company, e.company),
+    makeCell(noTimes ? '—' : e.start.slice(0, 5)),
+    makeCell(noTimes ? '—' : e.end.slice(0, 5)),
+    makeCell(noTimes || !e.breakMinutes ? '—' : `${e.breakMinutes}m`),
+    durationCell,
+    makeCell(task, e.task),
+    actionsCell,
+  );
+  if (weekend || isHoliday) tr.classList.add('work-time-off');
+  else if (isNoEntry) tr.classList.add('work-time-no-entry');
+  // On the cells, so it shows over a day off's row tint.
+  if (e.date === todayIso) tr.classList.add('today-row');
+  return tr;
 }
 
 function toggleWorkTimeHolidayFields() {
@@ -381,9 +394,9 @@ function openWorkTimeForm(dateStr) {
   workTimeField('date').value = dateStr;
   workTimeField('start').value = existing?.start || '';
   workTimeField('end').value = existing?.end || '';
-  const breakMinutes = Math.max(0, Math.round(existing?.breakMinutes || 0));
-  workTimeField('break-h').value = Math.floor(breakMinutes / 60);
-  workTimeField('break-m').value = breakMinutes % 60;
+  const [breakH, breakM] = minutesToTimeInput(existing?.breakMinutes || 0).split(':').map(Number);
+  workTimeField('break-h').value = breakH;
+  workTimeField('break-m').value = breakM;
   workTimeField('task').value = existing?.task || '';
 
   workTimeField('holiday').checked = isHolidayEntry(existing);
@@ -398,15 +411,13 @@ function closeWorkTimeForm() {
   workTimeField('modal').hidden = true;
 }
 
-// Keeps one row per calendar day: blank rows for every missing day between the
-// last earlier entry and the new date.
+// One row per day: blank rows for each missing day since the last earlier entry.
 async function backfillMissingDates(untilDate) {
   const existingDates = new Set(allTimeEntries.map((e) => e.date));
-  const priorDates = [...existingDates].filter((d) => d < untilDate).sort();
-  if (priorDates.length === 0) return;
+  const lastPriorDate = [...existingDates].reduce((max, d) => (d < untilDate && d > max ? d : max), '');
+  if (!lastPriorDate) return;
 
-  const lastDate = priorDates[priorDates.length - 1];
-  const cursor = dateFromIso(lastDate);
+  const cursor = dateFromIso(lastPriorDate);
   cursor.setDate(cursor.getDate() + 1);
   const endDate = dateFromIso(untilDate);
 
@@ -429,8 +440,7 @@ async function submitWorkTimeForm(event) {
   const holiday = workTimeField('holiday').checked;
   const start = holiday ? '' : workTimeField('start').value;
   const end = holiday ? '' : workTimeField('end').value;
-  // Written as "HH:MM", not minutes: a duration-formatted Break cell would read
-  // a bare 15 as 15 days.
+  // "HH:MM": a duration-formatted Break cell would read a bare 15 as 15 days.
   const breakValue = minutesToTimeInput(holiday ? 0 : workTimeBreakMinutesFromInputs());
   const task = workTimeField('task').value;
 
@@ -445,8 +455,7 @@ async function submitWorkTimeForm(event) {
     if (existing) {
       const cells = (a1) => sheetRange(CONFIG.SHEETS.WORK_TIME, a1);
       const row = existing.row;
-      // One request, skipping Day (C) and Duration (G). RAW: USER_ENTERED would turn
-      // "09:40" into a time cell that reads back reformatted.
+      // Skips Day (C) and Duration (G). RAW keeps "09:40" from turning into a time cell.
       await batchUpdateValues([
         { range: cells(`A${row}`), values: [[company]] },
         { range: cells(`D${row}:F${row}`), values: [[start, end, breakValue]] },

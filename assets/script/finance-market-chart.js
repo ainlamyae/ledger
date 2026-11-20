@@ -113,7 +113,7 @@ function marketLineChart(existing, canvasId, labels, series, { money = null, mas
             maxRotation: 0,
             callback(value) {
               const label = this.getLabelForValue(value);
-              return intraday ? label.slice(5, 16) : label.slice(0, 10);
+              return intraday ? label.slice(5, 16) : shortYearDate(label.slice(0, 10));
             },
           },
         },

@@ -316,7 +316,7 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
   const projection = calcProjection(entries);
   const etaText = projection?.status === 'reached' ? '0 days'
     : projection?.status === 'ok'
-      ? `${projection.daysToHealthy} ${projection.daysToHealthy === 1 ? 'day' : 'days'} (${isoFromDate(projection.etaDate)})`
+      ? `${projection.daysToHealthy} ${projection.daysToHealthy === 1 ? 'day' : 'days'} (${shortYearDate(isoFromDate(projection.etaDate))})`
       : '—';
   setMaskedText('today-status-eta-value', etaText);
 }

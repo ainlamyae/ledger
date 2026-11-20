@@ -153,7 +153,7 @@ function renderFoodInsightPreview(rows, from, to) {
   tbody.innerHTML = '';
 
   if (rows.length === 0) {
-    tbody.appendChild(renderEmptyRow(FOOD_TABLE_COLUMN_COUNT, `No Calculate-derived ingredients logged from ${from} to ${to}.`));
+    tbody.appendChild(renderEmptyRow(FOOD_TABLE_COLUMN_COUNT, `No Calculate-derived ingredients logged from ${shortYearDate(from)} to ${shortYearDate(to)}.`));
     return;
   }
 

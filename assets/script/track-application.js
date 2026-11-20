@@ -4,6 +4,8 @@ const applicationsRange = (a1) => sheetRange(CONFIG.SHEETS.APPLICATIONS, a1);
 const APPLICATIONS_RANGE = applicationsRange(`A${APPLICATIONS_FIRST_ROW}:E`);
 // The sheet's own spelling.
 const APPLICATION_DEFAULT_ACTION = 'Submited';
+// Form fields, as application-<id>.
+const APPLICATION_FIELD_IDS = ['type', 'number', 'date', 'action'];
 
 let allApplications = [];
 let editApplication = null;
@@ -36,17 +38,15 @@ async function initApplications(forceRefresh = false) {
   await refreshApplications(forceRefresh);
 }
 
-// Not a flat table: a header row (Type and App Number set) starts an application,
-// followed by status-update rows with only Date + Action. The sheet's "Total …"
-// footer formula rows are skipped.
+// A row with Type and App Number starts an application; Date + Action rows below are
+// its updates. "Total …" footer rows are skipped.
 function parseApplications(rows) {
   const applications = [];
   let current = null;
 
   rows.forEach((row, i) => {
     const sheetRow = i + APPLICATIONS_FIRST_ROW;
-    // Delay is the sheet's number (0 shows nothing); the rest is text. Dates read
-    // in the column's display format.
+    // Delay is the sheet's number (0 shows nothing); the rest is text.
     const delay = row[0] || '';
     const [rawDate, action, type, appNumber] = [1, 2, 3, 4].map((col) => cellText(row[col]));
     const date = sheetDateIso(rawDate);
@@ -66,7 +66,7 @@ function parseApplications(rows) {
 }
 
 async function refreshApplications() {
-  // Dropped so an add or delete looks the tab up again (the spreadsheet may have changed).
+  // Re-looked up on the next add or delete, in case the spreadsheet changed.
   applicationsSheetId = null;
   const resp = await getValues(APPLICATIONS_RANGE, VALUE_PARAMS);
   allApplications = parseApplications(resp.values || []);
@@ -147,12 +147,14 @@ function renderApplicationsList() {
 
 function buildApplicationCard(app) {
   const card = applicationEl('div', 'app-card');
-  if (!expandedApplicationRows.has(app.headerRow)) card.classList.add('collapsed');
-
   const header = applicationEl('div', 'app-card-header');
   header.setAttribute('role', 'button');
   header.setAttribute('tabindex', '0');
-  header.setAttribute('aria-expanded', String(!card.classList.contains('collapsed')));
+  const setExpanded = (expanded) => {
+    card.classList.toggle('collapsed', !expanded);
+    header.setAttribute('aria-expanded', String(expanded));
+  };
+  setExpanded(expandedApplicationRows.has(app.headerRow));
 
   const icon = applicationEl('span', 'panel-toggle-icon app-card-toggle-icon', '▾');
 
@@ -161,7 +163,7 @@ function buildApplicationCard(app) {
   const title = applicationEl('div', 'app-card-title');
   title.append(
     applicationEl('strong', '', `${app.type} — ${app.appNumber}`),
-    applicationEl('span', 'app-card-meta', `Submitted ${app.date}${delay} · Latest: ${status.action} (${status.date})`),
+    applicationEl('span', 'app-card-meta', `Submitted ${shortYearDate(app.date)}${delay} · Latest: ${status.action} (${shortYearDate(status.date)})`),
   );
 
   const actions = applicationEl('div', 'app-card-actions');
@@ -172,9 +174,8 @@ function buildApplicationCard(app) {
   header.append(icon, title, actions);
 
   const toggle = () => {
-    card.classList.toggle('collapsed');
-    const expanded = !card.classList.contains('collapsed');
-    header.setAttribute('aria-expanded', String(expanded));
+    const expanded = card.classList.contains('collapsed');
+    setExpanded(expanded);
     if (expanded) expandedApplicationRows.add(app.headerRow);
     else expandedApplicationRows.delete(app.headerRow);
   };
@@ -195,7 +196,7 @@ function buildApplicationCard(app) {
     const list = applicationEl('ul', 'app-history');
     app.updates.forEach((u) => {
       const item = document.createElement('li');
-      item.append(applicationEl('span', 'app-history-date', u.date), applicationEl('span', 'app-history-action', u.action));
+      item.append(applicationEl('span', 'app-history-date', shortYearDate(u.date)), applicationEl('span', 'app-history-action', u.action));
       list.appendChild(item);
     });
     body.appendChild(list);
@@ -204,8 +205,6 @@ function buildApplicationCard(app) {
   card.append(header, body);
   return card;
 }
-
-const APPLICATION_FIELD_IDS = ['type', 'number', 'date', 'action'];
 
 function openApplicationForm(app) {
   editingApplicationRow = app ? app.headerRow : null;
@@ -273,10 +272,10 @@ async function deleteApplication(app) {
 
   await confirmAndDelete(`Delete "${app.type} — ${app.appNumber}"${historyNote}? This cannot be undone.`, async () => {
     const sheetId = await getApplicationsSheetId();
-    // Bottom-up, so each deletion leaves the rows above where they were.
-    const rows = [];
-    for (let row = app.lastRow; row >= app.headerRow; row--) rows.push(sheetRowDeleteRequest(sheetId, row));
-    await batchUpdate(rows);
+    // Bottom-up, so each deletion leaves the rows above in place.
+    const requests = [];
+    for (let row = app.lastRow; row >= app.headerRow; row--) requests.push(sheetRowDeleteRequest(sheetId, row));
+    await batchUpdate(requests);
     expandedApplicationRows.delete(app.headerRow);
     await refreshApplications();
   }, "Couldn't delete application");

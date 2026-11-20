@@ -22,7 +22,7 @@ async function confirmAndDelete(message, deleteFn, errorPrefix = 'Failed to dele
 
 // Every form/panel message is a toast now; red unless it's progress ("…").
 function showFieldError(elId, message) {
-  document.getElementById(elId).hidden = true;
+  clearFieldError(elId);
   showToast(message, !message.endsWith('…'));
 }
 
@@ -36,11 +36,9 @@ function clearFieldError(elId) {
   document.getElementById(elId).hidden = true;
 }
 
-// Marks a button busy while an async action runs, so a slow save isn't clicked
-// twice; restores it even on a throw, and accepts a null button.
-// An emoji button (.btn-icon/.row-action-btn) grows and bounces; a word button gets "…".
-// aria-busy rather than `disabled`, which some buttons drive from the selection;
-// the data-busy guard covers keyboard and implicit submits that CSS can't block.
+// Marks a button busy while `run` goes, so a slow save isn't clicked twice; null
+// button allowed. Emoji buttons bounce, word buttons get "…". aria-busy, not
+// `disabled` (some buttons drive that from the selection); data-busy blocks keyboard submits.
 async function withButtonBusy(btn, run) {
   if (!btn) return run();
   if (btn.dataset.busy) return undefined;
@@ -49,21 +47,15 @@ async function withButtonBusy(btn, run) {
   const label = btn.textContent;
   btn.dataset.busy = '1';
   btn.setAttribute('aria-busy', 'true');
-  if (isIcon) {
-    Motion.iconBusy(btn);
-  } else {
-    btn.textContent = `${label}…`;
-  }
+  if (isIcon) Motion.iconBusy(btn);
+  else btn.textContent = `${label}…`;
   try {
     return await run();
   } finally {
     delete btn.dataset.busy;
     btn.removeAttribute('aria-busy');
-    if (isIcon) {
-      Motion.iconSettle(btn);
-    } else {
-      btn.textContent = label;
-    }
+    if (isIcon) Motion.iconSettle(btn);
+    else btn.textContent = label;
   }
 }
 
@@ -159,6 +151,11 @@ function safeHref(url) {
   return /^(https?|mailto|tel):/i.test(text) ? text : '';
 }
 
+// Display only: "2026-11-21" -> "26-11-21", "2026-11" -> "26-11".
+function shortYearDate(text) {
+  return String(text ?? '').replace(/^20(\d{2}-)/, '$1');
+}
+
 // A <td> with text and an optional title (e.g. for a truncated value).
 function makeCell(text, title) {
   const td = document.createElement('td');
@@ -216,14 +213,17 @@ function renderPager(containerId, { page, totalPages, onChange }) {
   container.innerHTML = '';
   if (totalPages <= 1) return;
 
-  const prev = makeRowActionButton({ emoji: '⬅️', title: 'Previous page', onClick: () => onChange(page - 1) });
-  prev.disabled = page === 1;
-
+  const pageButton = (emoji, title, toPage, disabled) => {
+    const btn = makeRowActionButton({ emoji, title, onClick: () => onChange(toPage) });
+    btn.disabled = disabled;
+    return btn;
+  };
   const info = document.createElement('span');
   info.textContent = `${page} of ${totalPages}`;
 
-  const next = makeRowActionButton({ emoji: '➡️', title: 'Next page', onClick: () => onChange(page + 1) });
-  next.disabled = page === totalPages;
-
-  container.append(prev, info, next);
+  container.append(
+    pageButton('⬅️', 'Previous page', page - 1, page === 1),
+    info,
+    pageButton('➡️', 'Next page', page + 1, page === totalPages),
+  );
 }

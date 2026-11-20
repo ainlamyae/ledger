@@ -124,9 +124,8 @@ async function aiChatText(systemPrompt, userMessage, temperature = 0.4) {
   return content;
 }
 
-// Never asks the model to rewrite the user's text: renamed items ("egg" -> "egg,
-// whole") used to be written back over what they typed. "query" is only a USDA
-// search term; health-physique-estimator.js prefers the user's own text.
+// Never asks the model to rewrite the user's text; "query" is only a USDA search
+// term (health-physique-estimator.js prefers what the user typed).
 const AI_EXTRACT_SYSTEM_PROMPT = `You are a nutrition estimator for a personal health log. The user gives you a freeform
 description of food ingredients and amounts (e.g. "2 eggs, 1 slice toast, 1 tbsp butter").
 
@@ -151,9 +150,8 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
 function aiEvaluateArithmeticFields(jsonText) {
   return jsonText.replace(/("(?:grams|count|kcalPer100gFallback|proteinPer100gFallback)"\s*:\s*)([^,}]+)/g, (match, prefix, rawValue) => {
     const trimmed = rawValue.trim();
-    if (trimmed === 'null') return match;
-    if (!Number.isNaN(Number(trimmed))) return match;
-    if (!/^[\d.\s*+\-/()]+$/.test(trimmed)) return match;
+    // Already a number (or not arithmetic at all, which evaluateArithmetic nulls).
+    if (trimmed === 'null' || !Number.isNaN(Number(trimmed))) return match;
     const value = evaluateArithmetic(trimmed);
     return value === null ? match : `${prefix}${value}`;
   });
@@ -176,7 +174,7 @@ async function aiExtractIngredients(notesText) {
   const items = parsed.items.map((item) => ({
     query: item.query,
     grams: parseFloat(item.grams),
-    count: (item.count === null || item.count === undefined || item.count === '') ? null : parseFloat(item.count),
+    count: (item.count ?? '') === '' ? null : parseFloat(item.count),
     kcalPer100gFallback: parseFloat(item.kcalPer100gFallback),
     proteinPer100gFallback: parseFloat(item.proteinPer100gFallback),
   }));
@@ -218,15 +216,16 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
   const parsed = aiParseJsonReply(provider, content);
   if (!Array.isArray(parsed.activities)) throw aiUnexpectedResponse(provider, content, 'missing "activities" array');
 
+  const text = (value) => String(value || '').trim();
   return parsed.activities
     .map((a) => ({
-      name: String(a.name || '').trim(),
+      name: text(a.name),
       met: parseFloat(a.met),
-      category: String(a.category || '').trim(),
-      group: String(a.group || '').trim(),
-      muscleGroup: String(a.muscleGroup || '').trim(),
-      amount: String(a.amount || '').trim(),
-      rest: String(a.rest || '').trim(),
+      category: text(a.category),
+      group: text(a.group),
+      muscleGroup: text(a.muscleGroup),
+      amount: text(a.amount),
+      rest: text(a.rest),
     }))
     .filter((a) => a.name && Number.isFinite(a.met) && a.met > 0);
 }
@@ -253,7 +252,7 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
   // Any unreadable reply gets the same reason-less error.
   const text = aiJsonObjectText(content);
   let parsed = null;
-  try { parsed = text === null ? null : JSON.parse(text); } catch { parsed = null; }
+  try { if (text !== null) parsed = JSON.parse(text); } catch {}
   if (!parsed || !Array.isArray(parsed.nutrients)) throw aiUnexpectedResponse(provider, content);
   return parsed;
 }

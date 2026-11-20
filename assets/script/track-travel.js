@@ -38,13 +38,16 @@ async function initTravel(forceRefresh = false) {
 }
 
 async function refreshTravel(forceRefresh = false) {
-  // Dropped so a delete looks the tab up again (the spreadsheet may have changed).
+  // Re-looked up on the next delete, in case the spreadsheet changed.
   travelSheetId = null;
   const resp = await getValues(TRAVEL_RANGE, VALUE_PARAMS);
   const values = resp.values || [];
 
   allTravel = values
-    .map((row, i) => ({ row: i + 2, ...Object.fromEntries(TRAVEL_FIELD_KEYS.map((key, col) => [key, travelCellValue(key, row[col])])) }))
+    .map((row, i) => {
+      const fields = TRAVEL_FIELD_KEYS.map((key, col) => [key, travelCellValue(key, row[col])]);
+      return { row: i + 2, ...Object.fromEntries(fields) };
+    })
     .filter((t) => t.countryCity || t.port);
 
   renderTravelList();
@@ -66,10 +69,10 @@ function getFilteredTravel() {
   const filtered = allTravel.filter((t) => !search
     || TRAVEL_SEARCH_KEYS.some((key) => t[key].toLowerCase().includes(search)));
 
-  if (!travelSort.key) return [...filtered].reverse();
+  if (!travelSort.key) return filtered.reverse();
 
   const { key, dir } = travelSort;
-  return [...filtered].sort((a, b) => String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * dir);
+  return filtered.sort((a, b) => String(a[key] || '').localeCompare(String(b[key] || ''), undefined, { sensitivity: 'base' }) * dir);
 }
 
 function renderTravelList() {
@@ -92,7 +95,7 @@ function renderTravelList() {
 
   pageItems.forEach((t) => {
     const tr = document.createElement('tr');
-    tr.append(...TRAVEL_TABLE_KEYS.map((key) => makeCell(t[key])));
+    tr.append(...TRAVEL_TABLE_KEYS.map((key) => makeCell(key === 'date' ? shortYearDate(t[key]) : t[key])));
 
     const actionsCell = document.createElement('td');
     actionsCell.append(

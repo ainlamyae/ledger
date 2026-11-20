@@ -135,7 +135,7 @@ function paymentBadgeElement(due) {
   const el = document.createElement('span');
   el.className = 'page-badge';
   el.textContent = paymentBadgeText(due);
-  el.title = `Payment day was ${due.dueIso}, ${due.days} day${due.days === 1 ? '' : 's'} ago, and no payment into this account since last month's`;
+  el.title = `Payment day was ${shortYearDate(due.dueIso)}, ${due.days} day${due.days === 1 ? '' : 's'} ago, and no payment into this account since last month's`;
   return el;
 }
 
@@ -162,7 +162,7 @@ function renderAccountPaymentBadge() {
   const oldest = Math.max(...overdue.map((x) => x.due.days));
   setAccountBadgePart('payment', {
     text: paymentBadgeText({ days: oldest }),
-    title: `Payment day passed unpaid: ${overdue.map((x) => `${x.account.name} (${x.due.dueIso})`).join(', ')}`,
+    title: `Payment day passed unpaid: ${overdue.map((x) => `${x.account.name} (${shortYearDate(x.due.dueIso)})`).join(', ')}`,
   });
 }
 

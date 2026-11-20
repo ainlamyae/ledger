@@ -200,7 +200,7 @@ function alertText(w, r) {
   const name = { below: '', above: '', belowAvg: average, aboveAvg: average, belowStop: 'the trailing stop ' }[r.rule];
   const side = r.rule.startsWith('above') ? 'above' : 'below';
   if (r.met === null) return `${w.symbol}: close ${side} ${name.trim() || 'the level'} — needs more price history`;
-  return `${w.symbol}: close ${money(r.close)} ${r.met ? 'is' : 'is not'} ${side} ${name}${money(r.level)} (${r.date})`;
+  return `${w.symbol}: close ${money(r.close)} ${r.met ? 'is' : 'is not'} ${side} ${name}${money(r.level)} (${shortYearDate(r.date)})`;
 }
 
 // Gray while waiting, red when met (until dismissed).
@@ -344,7 +344,7 @@ async function showWatchlistAlertLevels(symbol) {
     const cur = daily.currency || symbolCurrency(symbol);
     const money = (v) => (v === null ? 'n/a' : formatMoney(v, cur, { mask: false }));
     const [avg, stop] = r;
-    hint.textContent = `${base} Now (${avg.date}): close ${money(avg.close)} · trailing stop ${money(stop.level)} · ${avg.basis} ${money(avg.level)}.`;
+    hint.textContent = `${base} Now (${shortYearDate(avg.date)}): close ${money(avg.close)} · trailing stop ${money(stop.level)} · ${avg.basis} ${money(avg.level)}.`;
   } catch { /* no saved prices yet */ }
 }
 

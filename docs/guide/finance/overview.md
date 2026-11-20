@@ -26,22 +26,27 @@ The Finance section tracks money: summary cards, charts, transactions, accounts,
 
 ### What it shows
 
-- **Cumulative Net Worth:** net worth month by month.
-- **Category Expenditure Trend:** stacked monthly spending by category, with that month's income as a stepped line over the bars.
-- **Average Monthly Spending by Category:** grouped bars for Last Month, Quarter ÷ 3, Year ÷ 12 and Lifelong ÷ months.
+- **Cumulative Net Worth:** a daily line of the running total, with a step on each deposit.
+- **Category Expenditure Trend:** stacked spend by category per step, with that step's income as a stepped line.
+- **Average Monthly Spending by Category:** grouped bars for Last Month, Quarter ÷ 3, Year ÷ 12 and Lifelong ÷ its complete months.
 - **Spending Breakdown by Category:** four donuts (Last Month, Last Quarter, Last Year, Lifelong).
 - **`<Category> by Type`:** one card of four donuts per category with named Types, plus an *Untyped* remainder.
 - **Account Allocation:** a nested donut of account type (inner), institution (middle) and account (outer).
 
 ### Actions
 
-- **Range:** 3m, 6m, 1y (default), 5y, All; sets the months of the first two charts.
+- **Range:** 3m, 6m, 1y (default), 5y, All; windows the first two charts and sets their step: weekly (3m, 6m), monthly (1y), quarterly (5y, All).
 - **Legend:** click an entry to hide or show it; the axis refits.
 - **📤 Screenshot:** saves the whole page (phone gallery, or a download on a laptop).
 
 ### Rules & calculations
 
-- **Whole months:** the charts read the Statement tab's monthly rows.
+- **Source:** every figure is summed from the Transaction tab; Statement only names the categories.
+- **Net worth:** the running total of every amount, one point per day through today.
+- **Income:** every positive amount; a category's spend is its net (refunds lower it).
+- **Periods:** complete months only (previous month, 3, 12, all), so the current month never counts.
+- **Types:** a Description starting with one of that category's Breakdown Types counts as that Type.
+- **Labels:** thinned so they never overlap; grid lines stay on every step.
 - **Allocation sizes:** slices use the absolute balance, so a debt account still draws.
 
 ## Transactions
@@ -132,7 +137,7 @@ The Finance section tracks money: summary cards, charts, transactions, accounts,
 
 ### Rules & calculations
 
-- **Money is never written:** the amount columns are the sheet's formulas, the same ones the Chart page uses.
+- **Money is never written:** the amount columns are the sheet's formulas; the Chart page computes its own from Transaction.
 
 ## Insight
 
@@ -172,7 +177,7 @@ The Finance section tracks money: summary cards, charts, transactions, accounts,
 | File | Role |
 |---|---|
 | `assets/script/app.js` | Summary cards and the reconciliation badge |
-| `assets/script/finance-chart.js` | Chart page |
+| `assets/script/finance-chart.js` | Chart page: builds every figure from Transaction, then draws each chart |
 | `assets/script/finance-transaction.js` | Transaction table, form and bulk actions |
 | `assets/script/csv.js` | Advanced filters and CSV export |
 | `assets/script/finance-account.js` | Accounts, payment badge and Transfer |

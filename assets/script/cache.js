@@ -1,5 +1,4 @@
-// Earlier versions kept copies of sheet data under these keys; the app now reads
-// the sheet on every load.
+// Earlier versions cached sheet data under these keys; the sheet is now read every load.
 const LEGACY_CACHE_PREFIX = 'ledger_cache_';
 
 function clearLegacyCacheKeys() {
@@ -15,58 +14,53 @@ try {
   // Storage blocked: nothing could have been stored there either.
 }
 
-// Lets a numeric field accept simple arithmetic, optionally prefixed with "="
-// (e.g. "=5000-1234.56"), so quick math needs no calculator. Returns null if the
-// input isn't a valid number/expression.
+// A numeric field's value, allowing arithmetic with an optional "=" (e.g.
+// "=5000-1234.56"); null if it isn't a number or expression.
 function evaluateNumberExpression(input) {
   const expr = input.trim().replace(/^=/, '');
   if (!expr) return 0;
-  if (!/^[0-9+\-*/().\s]+$/.test(expr)) return null;
-
   const result = evaluateArithmetic(expr);
-  // Rounded to the cent, so float noise (0.1 + 0.2) never reaches the sheet.
+  // Rounded to the cent, so float noise never reaches the sheet.
   return result === null ? null : Math.round(result * 100) / 100;
 }
 
 // Parses + - * / ( ) and decimals without eval, which the CSP blocks. Null if invalid.
 function evaluateArithmetic(input) {
   const tokens = String(input).match(/\d+\.?\d*|\.\d+|[+\-*/()]|\S/g) || [];
-  let i = 0;
+  let pos = 0;
   const factor = () => {
-    const t = tokens[i++];
-    if (t === '-') return -factor();
-    if (t === '+') return factor();
-    if (t === '(') {
-      const v = sum();
-      if (tokens[i++] !== ')') throw new Error('paren');
-      return v;
+    const token = tokens[pos++];
+    if (token === '-') return -factor();
+    if (token === '+') return factor();
+    if (token === '(') {
+      const value = sum();
+      if (tokens[pos++] !== ')') throw new Error('paren');
+      return value;
     }
-    if (t === undefined || !/^[\d.]+$/.test(t)) throw new Error('token');
-    return Number(t);
+    if (token === undefined || !/^[\d.]+$/.test(token)) throw new Error('token');
+    return Number(token);
   };
   const product = () => {
-    let v = factor();
-    while (tokens[i] === '*' || tokens[i] === '/') v = tokens[i++] === '*' ? v * factor() : v / factor();
-    return v;
+    let value = factor();
+    while (tokens[pos] === '*' || tokens[pos] === '/') value = tokens[pos++] === '*' ? value * factor() : value / factor();
+    return value;
   };
   const sum = () => {
-    let v = product();
-    while (tokens[i] === '+' || tokens[i] === '-') v = tokens[i++] === '+' ? v + product() : v - product();
-    return v;
+    let value = product();
+    while (tokens[pos] === '+' || tokens[pos] === '-') value = tokens[pos++] === '+' ? value + product() : value - product();
+    return value;
   };
   try {
-    const v = sum();
-    return i === tokens.length && Number.isFinite(v) ? v : null;
+    const value = sum();
+    return pos === tokens.length && Number.isFinite(value) ? value : null;
   } catch {
     return null;
   }
 }
 
-// The account menu's Clear cache. An old service worker or Cache Storage entry can
-// outlive an update and run new markup against old scripts, so this clears Cache
-// Storage, service workers, leftover ledger_cache_* keys and the HTTP cache's copy
-// of every own script and stylesheet (re-fetched with cache: 'reload'), then
-// reloads. Sign-in and preferences in localStorage are kept.
+// The account menu's Clear cache: drops Cache Storage, service workers, legacy keys
+// and the HTTP cache's copy of every own script/stylesheet, then reloads, so old
+// scripts can't outlive an update. Sign-in and preferences are kept.
 async function clearCacheAndReload() {
   try {
     if ('caches' in window) {

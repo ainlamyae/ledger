@@ -1,15 +1,8 @@
-// Car Service block (Track section): past services from Transportation transactions
-// whose description carries the odometer as "@12345km", and the next service of each
-// kind predicted from a linear fit of those readings.
-//
-// Interval sources (km only, by request):
-// - Toyota Canada maintenance schedule: Service #1 every 8,000 km, #3 every 32,000 km,
-//   brake fluid at 48,000 km.
-// - Toyota 2023 Corolla Warranty & Maintenance Guide: air filters 48,000 km, coolant
-//   160,000 km, spark plugs 193,000 km.
-// - Tire sets: replace at 6 years old (Toyota warranty and CAA cover end there).
-// - Winter tires: by 1 Dec, TD Insurance's Ontario discount deadline; rust protection
-//   the same day.
+// Car Service: past services from Transportation transactions tagged "@12345km", and
+// each kind's next service predicted from a linear fit of those readings.
+// Sources: Toyota Canada schedule (#1 8,000 km, #3 32,000 km, brake fluid 48,000 km);
+// 2023 Corolla guide (filters 48,000, coolant 160,000, plugs 193,000 km); tire sets at
+// 6 years; winter tires and rust protection by 1 Dec (TD Insurance, Ontario).
 
 const CAR_ODOMETER_PATTERN = /@\s*([\d,.]+)\s*km/i;
 
@@ -97,8 +90,7 @@ function parseCarServiceTransactions() {
     .sort((a, b) => a.date.localeCompare(b.date) || a.km - b.km);
 }
 
-// Least-squares km/day over every reading, anchored at the latest one so the forecast
-// continues from where the odometer actually is.
+// Least-squares km/day over every reading, anchored at the latest one.
 function carOdometerFit(records) {
   const last = records[records.length - 1];
   const xs = records.map((r) => carDaysBetween(records[0].date, r.date));
@@ -155,42 +147,32 @@ function predictCarServices(records, fit, today) {
 
   CAR_SERVICE_RULES.forEach((rule) => {
     const info = carTypeInfo(rule.type);
+    const done = records.filter((r) => r.type === rule.type);
+    const lastDone = done[done.length - 1] || null;
     const onDate = (label, date, basis) => predictions.push({ type: rule.type, label, date, km: fit.kmAt(date), basis });
+    const atKm = (km, basis = rule.basis) => predictions.push({ type: rule.type, label: info.label, date: fit.dateFor(km), km, basis });
+
     if (rule.seasonal) {
       carSeasonalChangeovers(records, today).forEach((c) => onDate(c.label, c.date, c.basis));
-      return;
-    }
-    // One row per tire set: the car's original set (its first record) and each bought since.
-    if (rule.everyYears) {
+    } else if (rule.everyYears) {
+      // One row per tire set: the original (the first record) and each bought since.
       const sets = [{ date: records[0].date, name: 'original set' },
-        ...records.filter((r) => r.type === rule.type).map((r) => ({ date: r.date, name: `set from ${r.date}` }))];
+        ...done.map((r) => ({ date: r.date, name: `set from ${shortYearDate(r.date)}` }))];
       sets.forEach((set) => {
         onDate(`${info.label} (${set.name})`, `${carIsoYear(set.date) + rule.everyYears}${set.date.slice(4)}`, rule.basis);
       });
-      return;
-    }
-    if (rule.everyDays) {
-      const last = lastOf([rule.type]);
-      if (last) onDate(info.label, isoDatePlusDays(last.date, rule.everyDays), rule.basis);
-      return;
-    }
-
-    let km;
-    let basis = rule.basis;
-    if (rule.ownAverage) {
-      const done = records.filter((r) => r.type === rule.type);
+    } else if (rule.everyDays) {
+      if (lastDone) onDate(info.label, isoDatePlusDays(lastDone.date, rule.everyDays), rule.basis);
+    } else if (rule.ownAverage) {
       const gaps = done.slice(1).map((r, i) => r.km - done[i].km);
       const gap = gaps.length ? gaps.reduce((s, g) => s + g, 0) / gaps.length : rule.fallbackKm;
-      km = (done.length ? done[done.length - 1].km : 0) + gap;
-      basis = `every ${carKmText(gap)} km — ${rule.basis}`;
+      atKm((lastDone ? lastDone.km : 0) + gap, `every ${carKmText(gap)} km — ${rule.basis}`);
     } else if (rule.atKm) {
-      if (lastOf([rule.type])) return;
-      km = rule.atKm;
+      if (!lastDone) atKm(rule.atKm);
     } else {
       const last = lastOf(rule.resetBy || [rule.type]);
-      km = last ? last.km + rule.everyKm : rule.everyKm;
+      atKm(last ? last.km + rule.everyKm : rule.everyKm);
     }
-    predictions.push({ type: rule.type, label: info.label, date: fit.dateFor(km), km, basis });
   });
 
   // Rust protection is done with the fall changeover to winter, so it shares that day.
@@ -202,8 +184,7 @@ function predictCarServices(records, fit, today) {
     rust.basis = 'yearly, with the changeover to winter — your own history';
   }
 
-  // A changeover is also a rotation + inspection: one due before the rotation's km
-  // replaces it.
+  // A changeover includes a rotation: one due first replaces the rotation.
   const rotation = predictions.find((p) => p.type === 'rotation');
   const changeovers = predictions.filter((p) => p.type === 'changeover');
   if (rotation && changeovers.some((c) => c.km <= rotation.km)) {
@@ -238,10 +219,10 @@ function renderCarServiceTable(records, predictions) {
   };
   // Upcoming, soonest first; a date already passed says so in the Service cell.
   predictions.forEach((p) => addRow(predictedBody, [
-    p.date, `${carKmText(p.km)} km`, p.status === 'Overdue' ? `${p.label} — overdue` : p.label, p.basis,
+    shortYearDate(p.date), `${carKmText(p.km)} km`, p.status === 'Overdue' ? `${p.label} — overdue` : p.label, p.basis,
   ]));
   // History, newest first.
-  [...records].reverse().forEach((r) => addRow(doneBody, [r.date, `${carKmText(r.km)} km`, r.service]));
+  [...records].reverse().forEach((r) => addRow(doneBody, [shortYearDate(r.date), `${carKmText(r.km)} km`, r.service]));
 }
 
 function renderCarServiceChart(records, predictions, fit, today) {
@@ -331,7 +312,7 @@ function renderCarServiceChart(records, predictions, fit, today) {
             autoSkip: false,
             callback(value) {
               // Year-month, the app's YYYY-MM-DD order.
-              return new Date(parseIsoDateUTC(this.getLabelForValue(value))).toISOString().slice(0, 7);
+              return new Date(parseIsoDateUTC(this.getLabelForValue(value))).toISOString().slice(0, 7).replace(/^20/, '');
             },
           },
         },
@@ -341,11 +322,13 @@ function renderCarServiceChart(records, predictions, fit, today) {
   });
 
   const legendTypes = [...new Set([...records, ...charted].map((r) => r.type))];
-  renderCategoryLegend('car-service-legend', legendTypes.map((type) => ({ name: carTypeInfo(type).label, color: chartColor(carTypeInfo(type).color) })));
+  renderCategoryLegend('car-service-legend', legendTypes.map((type) => {
+    const info = carTypeInfo(type);
+    return { name: info.label, color: chartColor(info.color) };
+  }));
 }
 
-// The heading flag (like Account's "Acct>Txn") and a once-a-day Chrome notification
-// (like Work Time's), for every service due within CAR_REMINDER_DAYS or overdue.
+// Heading badge and a once-a-day notification for services due soon or overdue.
 function updateCarServiceReminder(predictions, today) {
   const due = predictions.filter((p) => carDaysBetween(today, p.date) <= CAR_REMINDER_DAYS);
   if (!due.length) {
@@ -355,7 +338,7 @@ function updateCarServiceReminder(predictions, today) {
 
   const days = carDaysBetween(today, due[0].date);
   const names = [...new Set(due.map((p) => carTypeInfo(p.type).short))].join('+');
-  const detail = due.map((p) => `${p.label} (${p.date})`).join(', ');
+  const detail = due.map((p) => `${p.label} (${shortYearDate(p.date)})`).join(', ');
   setPageBadge('track', 'car-service', { text: `${days}d`, title: `Car service due: ${detail}` });
 
   if ('Notification' in window && Notification.permission === 'granted'

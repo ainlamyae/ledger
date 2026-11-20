@@ -9,7 +9,7 @@ The one name, unit and format each thing uses everywhere in Ledger.
 - **Body mass, never weight:** for the body; an exercise's load is **Load**.
 - **Goal words:** the body-mass goal is **healthy**; every other goal is **desired**; no other word for a goal.
 - **Hover format:** `label (definition): number unit`, with a sign on negatives only.
-- **Dates:** `YYYY-MM-DD` everywhere, `YYYY-MM` on a month axis.
+- **Dates:** stored and typed as `YYYY-MM-DD`; shown as `YY-MM-DD` in tables and on chart axes.
 - **Units:** standard symbols only (`g`, `mg`, `µg`, `IU`, `kcal`).
 
 ## Wording
@@ -62,8 +62,9 @@ The one name, unit and format each thing uses everywhere in Ledger.
 
 ## Dates and times
 
-- **Dates:** `YYYY-MM-DD` (`2026-10-04`) in tables, cards, chart axes and hovers.
-- **Month axes:** `YYYY-MM`.
+- **Stored and typed:** `YYYY-MM-DD` (`2026-10-04`) in the sheet and every form field.
+- **Shown:** `YY-MM-DD` (`26-10-04`) in tables, chart axes and chart hovers, via `shortYearDate`.
+- **Month axes:** `YY-MM`; Finance trend steps read `Nov 26`, `Q4 26`.
 - **Times:** `HH:MM`, 24-hour.
 - **Home Date card:** the one exception, reading year, month and day.
 

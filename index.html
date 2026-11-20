@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- Only the app's own scripts and the hosts it uses may load (docs/development/security.md). -->
+<!-- What may load (docs/development/security.md). -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com https://cdn.jsdelivr.net/npm/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https:; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com/gsi/ https://cdn.jsdelivr.net/npm/ https://api.groq.com https://openrouter.ai https://api.twelvedata.com https://www.alphavantage.co https://finnhub.io https://api.nal.usda.gov https://api.bigdatacloud.net https://geocoding-api.open-meteo.com https://api.open-meteo.com; frame-src https://accounts.google.com/gsi/ https://docs.google.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -29,7 +29,7 @@
 <meta name="twitter:description" content="Private, serverless personal life dashboard. Track health, finances, time, travel, applications, LeetCode and contacts — all backed by your own Google Sheet.">
 <meta name="twitter:image" content="https://ainlamyae.github.io/ledger/assets/images/social-preview.png">
 
-<!-- Who made this, for search engines; no version (only version.js is stamped). -->
+<!-- Authorship for search engines; no version here. -->
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
@@ -50,7 +50,7 @@
 <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="assets/style/styles.css">
-<!-- Every animation (motion.js), in before the first paint. -->
+<!-- Animations (motion.js), before first paint. -->
 <script src="assets/script/motion.js"></script>
 <script src="assets/script/theme-boot.js"></script>
 <script src="assets/script/page-boot.js"></script>
@@ -61,12 +61,11 @@
 <div id="app-backdrop" aria-hidden="true"></div>
 
 <header>
-    <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a><!-- Wide screens only: hides and shows the sidebar (initSideNavToggle). --><button type="button" id="side-nav-toggle" class="side-nav-toggle" title="Hide sidebar" aria-label="Hide sidebar" aria-controls="side-nav" aria-expanded="true"><img src="favicon.svg" class="side-nav-toggle-logo" alt="" width="20" height="20"><svg class="side-nav-toggle-icon" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7.5 3.5v13"/></svg></button></h1>
+    <h1><a href="." class="logo-link" title="All sections"><img src="favicon.svg" class="logo-icon" alt="" width="20" height="20"><span class="logo-text">Ledger</span></a><!-- Wide screens: sidebar toggle (initSideNavToggle). --><button type="button" id="side-nav-toggle" class="side-nav-toggle" title="Hide sidebar" aria-label="Hide sidebar" aria-controls="side-nav" aria-expanded="true"><img src="favicon.svg" class="side-nav-toggle-logo" alt="" width="20" height="20"><svg class="side-nav-toggle-icon" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M7.5 3.5v13"/></svg></button></h1>
 
-    <!-- Each entry is a real address (section-page.js); data-section names its wrapper
-         and this nav is the only list of them. -->
+    <!-- Real addresses (section-page.js); data-section names each wrapper. -->
     <nav id="main-nav" class="nav">
-        <!-- The home page, as the phone tab bar's first tab, where the logo is gone. -->
+        <!-- Home: the phone tab bar's first tab. -->
         <a href="." class="nav-home">
             <span class="nav-label">Ledger</span>
         </a>
@@ -79,7 +78,7 @@
         <a href="track/" data-section="track">
             <span class="nav-label">Track</span>
         </a>
-        <!-- Hidden: opened from the account menu; kept so /other/ resolves. -->
+        <!-- Hidden; kept so /other/ resolves. -->
         <a href="other/" data-section="other" hidden>
             <span class="nav-label">Other</span>
         </a>
@@ -88,7 +87,7 @@
         <button id="signin-btn" class="btn" title="Sign in" aria-label="Sign in">🔑</button>
 
         <div id="account-menu" class="account-menu" hidden>
-            <!-- The profile picture; a full row with name and email on a wide screen. -->
+            <!-- Avatar; adds name and email on wide screens. -->
             <button id="account-menu-btn" class="account-avatar-btn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
                 <img id="account-avatar-img" class="account-avatar" alt="" hidden>
                 <span id="account-avatar-fallback" class="account-avatar account-avatar-fallback"></span>
@@ -105,8 +104,7 @@
                     <span id="last-updated" class="last-updated"></span>
                 </div>
 
-                <!-- Menu items, then the show/hide switches; placeSettingsSwitches moves them
-                     into the sidebar on a wide screen with the sidebar open. -->
+                <!-- Moved into the open sidebar on wide screens (placeSettingsSwitches). -->
                 <div id="settings-switches" class="settings-switches">
                     <a href="other/contact/" class="account-menu-item">Contact</a>
                     <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
@@ -282,7 +280,7 @@
             </div>
         </div>
 
-        <!-- Moved under the Health tile card by buildPageTiles (page-nav.js). -->
+        <!-- Moved under the Health tile by buildPageTiles. -->
         <div class="card micro-gaps-card" data-under-tiles>
             <h3>Micronutrient Gaps</h3>
             <div id="today-micro-gaps" class="micro-gaps-rows"><div class="widget-row"><span>—</span></div></div>
@@ -294,7 +292,7 @@
                 <button type="button" data-screenshot="health-chart" class="btn btn-icon panel-header-btn" title="Screenshot the whole page: save to the phone's gallery, or download on a laptop" aria-label="Screenshot">📤</button>
             </div>
 
-            <!-- Market's range row (renderRangeButtons), ending today; governs every chart below. -->
+            <!-- Market's range row; governs every chart below. -->
             <div class="panel-section card">
                 <h3>Range</h3>
                 <div class="pagination panel-range" id="health-range"></div>
@@ -305,7 +303,7 @@
                 <p id="body-mass-plateau-note" class="body-mass-plateau-note"></p>
             </div>
 
-            <!-- LeetCode's heatmap, each day coloured as its Calorie Balance bar. -->
+            <!-- LeetCode's heatmap, coloured by Calorie Balance. -->
             <div class="body-mass-projection-wrap card health-heatmap-card">
                 <h3>Daily Progress</h3>
                 <div class="chart-box chart-box-flush health-heatmap-box">
@@ -455,22 +453,22 @@
                 <div class="table-responsive">
                     <table id="physique-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
-                            <th class="sortable" data-sort="date">Date</th>
-                            <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
-                            <th title="Sleep — hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">S</th>
-                            <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
-                            <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
-                            <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
-                            <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
-                            <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
-                            <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Crb</th>
-                            <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
-                            <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
-                            <th class="sortable" data-sort="caloriesOut" title="AEE — Activity Energy Expenditure (Calories Out)">AEE</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th><input type="checkbox" id="physique-select-all" aria-label="Select all days on this page"></th>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th class="sortable" data-sort="bodyMass" title="Body Mass">m</th>
+                                <th title="Sleep — hours slept, wake time minus bedtime — open Edit to see the two clock times themselves">S</th>
+                                <th title="SD — Sleep Deprivation Effect (kcal) — how much a short night shrank this day's deficit, or grew its surplus. Needs a profile (Settings), a body mass and Calories In to compute">SD</th>
+                                <th class="sortable" data-sort="caloriesIn" title="TEI — Total Energy Intake (Calories In)">TEI</th>
+                                <th class="sortable" data-sort="proteinIn" title="Protein In">Pro</th>
+                                <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">DF</th>
+                                <th class="sortable" data-sort="fat" title="Fat (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Fat</th>
+                                <th class="sortable" data-sort="carbohydrate" title="Carbohydrate (g) — from Calculate's own breakdown macros where available (🧬 Micronutrients pulled or typed on the Nutrition row)">Crb</th>
+                                <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food — from the day's own breakdown macros where available (🧬 Micronutrients pulled), otherwise not shown here (charts fall back to a flat % of intake)">TEF</th>
+                                <th class="sortable" data-sort="duration" title="Activity Duration">Dur</th>
+                                <th class="sortable" data-sort="caloriesOut" title="AEE — Activity Energy Expenditure (Calories Out)">AEE</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="physique-body"></tbody>
                     </table>
@@ -501,20 +499,20 @@
                 <div class="table-responsive">
                     <table id="nutrition-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
-                            <th class="sortable" data-sort="group">Group</th>
-                            <th class="sortable" data-sort="name">Name</th>
-                            <th class="sortable" data-sort="amount">Amount</th>
-                            <th class="sortable" data-sort="calories" title="Calories">Cal</th>
-                            <th class="sortable" data-sort="protein" title="Protein (g)">Pro</th>
-                            <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">DF</th>
-                            <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
-                            <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
-                            <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
-                            <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your desired protein this ingredient should cover">%</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th><input type="checkbox" id="nutrition-select-all" aria-label="Select all ingredients on this page"></th>
+                                <th class="sortable" data-sort="group">Group</th>
+                                <th class="sortable" data-sort="name">Name</th>
+                                <th class="sortable" data-sort="amount">Amount</th>
+                                <th class="sortable" data-sort="calories" title="Calories">Cal</th>
+                                <th class="sortable" data-sort="protein" title="Protein (g)">Pro</th>
+                                <th class="sortable" data-sort="fiber" title="Dietary Fiber (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">DF</th>
+                                <th class="sortable" data-sort="fat" title="Fat (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Fat</th>
+                                <th class="sortable" data-sort="carb" title="Carbohydrate (g) — your own typed figure if you've saved one, else read from its pulled 🧬 Micronutrients panel">Carb</th>
+                                <th class="sortable" data-sort="tef" title="Estimated Thermic Effect of Food (kcal) — your own typed figure if you've saved one, else Protein (typed) plus Carb/Fat at the Atwater/TEF-share rates set in Settings">TEF</th>
+                                <th class="sortable" data-sort="proteinPercent" title="Protein % — tracked by the Protein Source Rotation chart when set — the % of your desired protein this ingredient should cover">%</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="nutrition-body"></tbody>
                     </table>
@@ -532,7 +530,7 @@
             </div>
             <p id="nutrition-pull-status" class="status" hidden></p>
 
-            <!-- A copy of Health → Chart's Protein Source Rotation card, same data and window. -->
+            <!-- Copy of Health → Chart's Protein Source Rotation card. -->
             <div class="body-mass-projection-wrap card page-rotation-card">
                 <h3>Protein Source Rotation</h3>
 
@@ -553,13 +551,13 @@
         <div class="panel" id="workout-plan-panel" data-route="activity">
             <div class="panel-header">
                 <h2>Activity</h2>
-                <!-- One-word labels for a phone; the tooltips carry the full wording. -->
+                <!-- Short labels; tooltips hold the full wording. -->
                 <button type="button" id="activity-instruction-btn" data-route="workouts" class="btn btn-icon panel-header-btn" title="How to run the activities in this plan" aria-label="Workouts">💪</button>
                 <button type="button" id="log-workout-btn" class="btn btn-icon panel-header-btn" title="Log the ticked activities as today's workout" aria-label="Log">📝</button>
                 <button type="button" id="add-activity-btn" data-route="add" class="btn btn-icon panel-header-btn" title="Add an exercise or activity to the plan" aria-label="Add">➕</button>
             </div>
 
-            <!-- A copy of Health → Chart's Activity Rotation card, same data and window. -->
+            <!-- Copy of Health → Chart's Activity Rotation card. -->
             <div class="body-mass-projection-wrap card page-rotation-card">
                 <h3>Activity Rotation</h3>
 
@@ -575,7 +573,7 @@
                 <div class="donut-legend" id="activity-rotation-legend-activity"></div>
             </div>
 
-            <!-- Rebuilt from the Activity sheet tab by health-activity-catalogue.js -->
+            <!-- Built from the Activity tab (health-activity-catalogue.js). -->
             <div id="activity-plan-tables"></div>
         </div>
 
@@ -589,7 +587,7 @@
                 <div class="pagination panel-range" id="insight-range"></div>
             </div>
 
-            <!-- The modes, in one card titled Insight, as a hub's tiles are. -->
+            <!-- The modes as tiles in one Insight card. -->
             <div class="card insight-mode-actions">
                 <h3>Insight</h3>
                 <div id="insight-mode-actions">
@@ -632,16 +630,16 @@
                     <div class="table-responsive">
                         <table id="insight-food-table">
                             <thead>
-                            <tr>
-                                <th>Ingredient</th>
-                                <th>Amount</th>
-                                <th>Calories</th>
-                                <th>Protein</th>
-                                <th title="This ingredient's own fiber grams over the picked range — its own typed Fiber if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fiber</th>
-                                <th title="This ingredient's own fat grams over the picked range — its own typed Fat if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fat</th>
-                                <th title="This ingredient's own carbohydrate grams over the picked range — its own typed Carb if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Carbohydrate</th>
-                                <th title="Estimated Thermic Effect of Food — this ingredient's own typed TEF if it has one, else its protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when neither is available">TEF</th>
-                            </tr>
+                                <tr>
+                                    <th>Ingredient</th>
+                                    <th>Amount</th>
+                                    <th>Calories</th>
+                                    <th>Protein</th>
+                                    <th title="This ingredient's own fiber grams over the picked range — its own typed Fiber if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fiber</th>
+                                    <th title="This ingredient's own fat grams over the picked range — its own typed Fat if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Fat</th>
+                                    <th title="This ingredient's own carbohydrate grams over the picked range — its own typed Carb if it has one, else scaled from its pulled 🧬 Micronutrients. Blank when neither is available">Carbohydrate</th>
+                                    <th title="Estimated Thermic Effect of Food — this ingredient's own typed TEF if it has one, else its protein/carb/fat grams (from pulled 🧬 Micronutrients) via Atwater and each macro's TEF share. Blank when neither is available">TEF</th>
+                                </tr>
                             </thead>
                             <tbody id="insight-food-body"></tbody>
                         </table>
@@ -656,13 +654,13 @@
                     <div class="table-responsive">
                         <table id="insight-micro-table" class="table-compact">
                             <thead>
-                            <tr>
-                                <th>Nutrient</th>
-                                <th>Total (period)</th>
-                                <th>Avg / day</th>
-                                <th>Supp / day</th>
-                                <th>Ideal / day</th>
-                            </tr>
+                                <tr>
+                                    <th>Nutrient</th>
+                                    <th>Total (period)</th>
+                                    <th>Avg / day</th>
+                                    <th>Supp / day</th>
+                                    <th>Ideal / day</th>
+                                </tr>
                             </thead>
                             <tbody id="insight-micro-body"></tbody>
                         </table>
@@ -671,7 +669,7 @@
             </div>
 
             <div id="insight-preview-pattern" hidden>
-                <!-- Tune's period length row (without its symbol), starting at Tune's value; editable here. -->
+                <!-- Tune's period length row; editable here. -->
                 <div class="formula-inputs" id="insight-pattern-period">
                     <label class="formula-row" title="How many days each period averages — starts at Tune's period length">
                         <span class="formula-name">period length</span>
@@ -685,29 +683,29 @@
                     <div class="table-responsive">
                         <table id="insight-pattern-table" class="table-compact">
                             <thead>
-                            <tr>
-                                <th>Period</th>
-                                <th title="Smoothed body mass (kg) at the period's last day">m</th>
-                                <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
-                                <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
-                                <th title="Basal metabolic rate by Mifflin-St Jeor — the period's average of each day's stored BMR, kcal/day">BMR_mif</th>
-                                <th title="Basal metabolic rate by Katch-McArdle — the period's average of each day's stored BMR, kcal/day">BMR_kat</th>
-                                <th title="Calibrated basal metabolic rate — the period's average of each day's stored BMR_cal, kcal/day">BMR_cal</th>
-                                <th title="Adapted basal metabolic rate by t — the period's average of each day's stored BMR_adp, kcal/day">BMR_adp</th>
-                                <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
-                                <th title="Total energy intake, kcal/day">TEI</th>
-                                <th title="Grams/day">Protein</th>
-                                <th title="Grams/day">Dietary Fiber</th>
-                                <th title="Grams/day">Fat</th>
-                                <th title="Grams/day">Carbohydrate</th>
-                                <th title="Thermic effect of food, kcal/day">TEF</th>
-                                <th title="Activity energy expenditure, kcal/day">AEE</th>
-                                <th title="Cardio share of AEE, kcal/day">Cardio</th>
-                                <th title="NEAT share of AEE, kcal/day">NEAT</th>
-                                <th title="Strength share of AEE, kcal/day">Strength</th>
-                                <th title="Equation-implied daily balance — negative is a deficit">D</th>
-                                <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
-                            </tr>
+                                <tr>
+                                    <th>Period</th>
+                                    <th title="Smoothed body mass (kg) at the period's last day">m</th>
+                                    <th title="Change in body mass over the period (kg) — negative means lost">Δm</th>
+                                    <th title="Δm × 7700 / period length (days) — measured daily energy balance from mass change">ΔM (kcal)</th>
+                                    <th title="Basal metabolic rate by Mifflin-St Jeor — the period's average of each day's stored BMR, kcal/day">BMR_mif</th>
+                                    <th title="Basal metabolic rate by Katch-McArdle — the period's average of each day's stored BMR, kcal/day">BMR_kat</th>
+                                    <th title="Calibrated basal metabolic rate — the period's average of each day's stored BMR_cal, kcal/day">BMR_cal</th>
+                                    <th title="Adapted basal metabolic rate by t — the period's average of each day's stored BMR_adp, kcal/day">BMR_adp</th>
+                                    <th title="Sleep-deprivation energy effect, kcal/day">SD</th>
+                                    <th title="Total energy intake, kcal/day">TEI</th>
+                                    <th title="Grams/day">Protein</th>
+                                    <th title="Grams/day">Dietary Fiber</th>
+                                    <th title="Grams/day">Fat</th>
+                                    <th title="Grams/day">Carbohydrate</th>
+                                    <th title="Thermic effect of food, kcal/day">TEF</th>
+                                    <th title="Activity energy expenditure, kcal/day">AEE</th>
+                                    <th title="Cardio share of AEE, kcal/day">Cardio</th>
+                                    <th title="NEAT share of AEE, kcal/day">NEAT</th>
+                                    <th title="Strength share of AEE, kcal/day">Strength</th>
+                                    <th title="Equation-implied daily balance — negative is a deficit">D</th>
+                                    <th title="D − ΔM — how much the real burn beat the equation BMR">Offset</th>
+                                </tr>
                             </thead>
                             <tbody id="insight-pattern-body"></tbody>
                         </table>
@@ -743,7 +741,7 @@
                         <label><input type="radio" name="formula-solve-for" value="HEALTHY_MASS"> Healthy body mass</label>
                         <label><input type="radio" name="formula-solve-for" value="TAU"> Activity</label>
                         <label><input type="radio" name="formula-solve-for" value="DELTA_M" checked> Weekly fat loss</label>
-                        <!-- Here the % of body mass is fixed and both TEI and t are computed from it. -->
+                        <!-- Fixed % of body mass; TEI and t computed from it. -->
                         <label title="Hold the weekly fat loss at a percentage of your body mass. The kilograms per week, the desired calorie intake and the arrival date are all computed from it — and the date follows the proportional journey, where the kilograms shrink as you do.">
                             <input type="radio" name="formula-solve-for" value="FIXED_PCT"> Weekly fat loss %
                         </label>
@@ -840,7 +838,7 @@
                             <input type="text" id="formula-age" inputmode="decimal">
                             <span class="formula-unit">years</span>
                         </label>
-                        <!-- The U.S. Navy body-fat inputs; hip is read for women only. -->
+                        <!-- U.S. Navy body-fat inputs; hip for women only. -->
                         <label class="formula-row" title="Neck circumference, just below the larynx with the tape sloping slightly down at the front. Feeds BF%.">
                             <span class="formula-sym">C_neck</span>
                             <span class="formula-name">neck</span>
@@ -859,7 +857,7 @@
                             <input type="text" id="formula-hip" inputmode="decimal">
                             <span class="formula-unit">cm</span>
                         </label>
-                        <!-- Opens on the latest reading; a typed figure is copied into m̄. -->
+                        <!-- Latest reading; a typed figure goes into m̄. -->
                         <label class="formula-row" title="Your most recent body-mass reading, exactly as logged. Editable: a typed figure is copied into m̄ below, so the whole plan runs at that mass.">
                             <span class="formula-sym">m</span>
                             <span class="formula-name">body mass</span>
@@ -873,7 +871,7 @@
                             <input type="text" id="formula-cal-period-days" inputmode="numeric">
                             <span class="formula-unit">days</span>
                         </label>
-                        <!-- Under m and L_p, and the box that actually drives the sheet. -->
+                        <!-- The box that drives the sheet. -->
                         <label class="formula-row" title="The mean of every body-mass reading in the L_p days ending at your latest one — m̄(t) = (1/L_p) × Σ m(t−i). Water and glycogen move the scale by more than a week of fat loss does, and the decay model assumes clean mass, so every formula here reads this rather than the day's reading. Follows L_p as you type it. Editable: type a figure to see the whole plan at another mass.">
                             <span class="formula-sym">m̄</span>
                             <span class="formula-name">rolling average body mass over L_p</span>
@@ -886,14 +884,14 @@
                             <input type="text" id="formula-healthy" inputmode="decimal">
                             <span class="formula-unit">kg</span>
                         </label>
-                        <!-- m_des in BMI: type either box and the other follows. -->
+                        <!-- m_des in BMI; either box follows the other. -->
                         <label class="formula-row" title="The BMI your healthy body mass comes to at your height — BMI = m_des / (h/100)². Type a healthy mass and this follows it; type a BMI here and the healthy mass follows instead. The healthy band is 20–25, and outside it the box goes red. In Solve for → Healthy body mass both are answers, so neither is typed.">
                             <span class="formula-sym">BMI_des</span>
                             <span class="formula-name">healthy body mass index</span>
                             <input type="text" id="formula-healthy-bmi" inputmode="decimal">
                             <span class="formula-unit">kg/m²</span>
                         </label>
-                        <!-- Body-shape checks from the girths and h, beside BMI_des and BF%. -->
+                        <!-- Body-shape checks from the girths and h. -->
                         <label class="formula-row" title="Waist-to-height ratio: C_waist / h. Keeping the waist under half the height (below 0.5) is the usual rule; at or above it the box goes red. Tracks belly fat, the kind most tied to heart and metabolic risk. Not editable: derived from C_waist and h.">
                             <span class="formula-sym">WHtR</span>
                             <span class="formula-name">waist-to-height ratio</span>
@@ -931,7 +929,7 @@
                             <input type="text" id="formula-lbm" inputmode="decimal" readonly>
                             <span class="formula-unit">kg</span>
                         </label>
-                        <!-- Readonly reference figures; only the active equation feeds the sheet. -->
+                        <!-- Reference only; the active equation feeds the sheet. -->
                         <label class="formula-row" title="Basal metabolic rate at your smoothed body mass, Mifflin-St Jeor — shown regardless of which equation is active below. Not editable: derived from m̄, h, a and σ. Blank without a birth date (Mifflin needs age; Katch-McArdle doesn't).">
                             <span class="formula-sym">BMR_mif</span>
                             <span class="formula-name">basal metabolic rate by Mifflin-St Jeor</span>
@@ -958,7 +956,7 @@
                             <span class="formula-unit">kcal/day</span>
                         </label>
                         <hr class="formula-divider">
-                        <!-- The adaptation pair and what it does to BMR by the arrival date t (below). -->
+                        <!-- Adaptation pair and its effect on BMR by t. -->
                         <label class="formula-row" title="Metabolic adaptation: on a sustained deficit, BMR falls faster than the lost mass alone explains — less leptin and T3, quieter sympathetic tone, cheaper movement. Roughly 1% of BMR per week on the diet, levelling off near 10–15%. Refeeds and diet breaks push it back toward 0, which is what setting this to 0 models.">
                             <span class="formula-sym">λ</span>
                             <span class="formula-name">weekly metabolic adaptation</span>
@@ -981,7 +979,7 @@
                             <span class="formula-sym">m∞_adp</span>
                             <span class="formula-name">adapted plateau</span>
                             <input type="text" id="formula-plateau-adapt" inputmode="decimal" readonly>
-                            <!-- The unit column is a unit; the verdict is in the trace. -->
+                            <!-- Unit column; the verdict is in the trace. -->
                             <span class="formula-unit">kg</span>
                         </label>
                         <hr class="formula-divider">
@@ -1003,7 +1001,7 @@
                             <span class="formula-sym">MET</span>
                             <span class="formula-name">walking activity intensity</span>
                             <input type="text" id="formula-met" inputmode="decimal">
-                            <!-- The unit is the symbol, so the row fits one line on a phone. -->
+                            <!-- Symbol as unit, so the row fits a phone. -->
                             <span class="formula-unit">MET</span>
                         </label>
                         <label class="formula-row">
@@ -1027,7 +1025,7 @@
                         </label>
                         <!-- End of the activity block. -->
                         <hr class="formula-divider">
-                        <!-- The sleep the plan assumes; defaults to the desired sleep (no effect). -->
+                        <!-- Assumed sleep; defaults to desired (no effect). -->
                         <label class="formula-row" title="How much sleep the plan assumes you're actually getting, compared against the desired sleep in Settings. Short of it and the Sleep Efficiency Factor η below 1 means the same weekly fat-loss rate needs a bigger real deficit — see the Deprivation Effect row right below. Defaults to the desired sleep itself, which is 0 effect.">
                             <span class="formula-sym">s</span>
                             <span class="formula-name">sleep length</span>
@@ -1048,7 +1046,7 @@
                         </label>
                         <!-- End of the sleep block. -->
                         <hr class="formula-divider">
-                        <!-- The pace is set in % (the safety band's unit); either box follows the other. -->
+                        <!-- Pace in %; either box follows the other. -->
                         <label class="formula-row" title="A weekly loss of 0.5–1% of body mass is the usual sustainable range, and 1% the ceiling — above it, more of what comes off is lean mass. Type a percentage and Δm below follows it; type kilograms there and this follows instead.">
                             <span class="formula-sym">Δm%</span>
                             <span class="formula-name">weekly fat loss, as a share of body mass</span>
@@ -1067,7 +1065,7 @@
                             <span class="formula-fixed">7700</span>
                             <span class="formula-unit">kcal/kg</span>
                         </div>
-                        <!-- The deficit, derived from the rate (not AEE's "burn"). -->
+                        <!-- Deficit, derived from the rate. -->
                         <label class="formula-row" title="The daily energy shortfall your desired weekly fat loss implies: D = Δm × ρ / 7. This is what comes off maintenance to give the desired intake — not calories burned by activity, which is AEE.">
                             <span class="formula-sym">D</span>
                             <span class="formula-name">daily energy deficit</span>
@@ -1076,7 +1074,7 @@
                         </label>
                         <!-- End of the rate block. -->
                         <hr class="formula-divider">
-                        <!-- TEF is a share of TEI, so TEI is solved: (BMR + AEE − D)/(1 − f). -->
+                        <!-- TEI solved: (BMR + AEE − D)/(1 − f). -->
                         <label class="formula-row" title="The thermic effect of food: the share of what you eat that is spent digesting it — about 10% on a mixed diet, higher on protein. It is part of expenditure, so counting it RAISES the intake that produces the same deficit. Left at 0 by default, which is the arithmetic this app has always used; type 10 and save to include it.">
                             <span class="formula-sym">f</span>
                             <span class="formula-name">thermic effect of food, as a share of TEI</span>
@@ -1089,7 +1087,7 @@
                             <input type="text" id="formula-tef" inputmode="decimal" readonly>
                             <span class="formula-unit">kcal/day</span>
                         </label>
-                        <!-- Marks the end of the TEF pair (f, TEF) before M and TEI start below. -->
+                        <!-- End of the TEF pair. -->
                         <hr class="formula-divider">
                         <!-- Maintenance: BMR + AEE = M. -->
                         <label class="formula-row" title="Maintenance: BMR + the activity energy expenditure AEE that hitting τ minutes at MET produces. The intake that would hold your body mass still — the deficit D is measured down from this, and TEI is what's left.">
@@ -1104,7 +1102,7 @@
                             <input type="text" id="formula-ein" inputmode="decimal">
                             <span class="formula-unit">kcal</span>
                         </label>
-                        <!-- How hard the cut is; red past DEFICIT_VS_BMR_PCT_CEILING. -->
+                        <!-- Cut severity; red past DEFICIT_VS_BMR_PCT_CEILING. -->
                         <label class="formula-row" title="How far intake sits below resting rate: (BMR − TEI) / BMR × 100. A negative figure means TEI is above BMR — a surplus, not a deficit. Not editable: it is derived from BMR and TEI above.">
                             <span class="formula-sym">D_bmr%</span>
                             <span class="formula-name">daily deficit, as a share of BMR</span>
@@ -1128,8 +1126,7 @@
                         </label>
                         <!-- End of the journey block. -->
                         <hr class="formula-divider">
-                        <!-- Glycogen, scaled to muscle (s × LBM): why m and m̄ disagree day to day.
-                             Only s, g_musc, g_liver and the water ratio are editable. -->
+                        <!-- Glycogen (s × LBM): why m and m̄ differ; s, g_musc, g_liver, water ratio editable. -->
                         <label class="formula-row" title="Skeletal muscle, as a direct share of LBM — not of m̄, since it's a fat-free-mass ratio and m̄ still carries the fat. Skeletal muscle runs roughly 40-50% of lean body mass; the rest of LBM is water, organs, skin and bone, none of which store meaningful glycogen. Higher toward 50% for a more muscular frame, lower toward 40% otherwise.">
                             <span class="formula-sym">s</span>
                             <span class="formula-name">skeletal muscle, share of lean mass</span>
@@ -1174,7 +1171,7 @@
                         </label>
                         <!-- End of the glycogen block. -->
                         <hr class="formula-divider">
-                        <!-- The protein block: the rule applied to LBM, then the grams. -->
+                        <!-- Protein: the rule on LBM, then grams. -->
                         <!-- The only editable part of the protein band. -->
                         <label class="formula-row">
                             <span class="formula-sym">p_min</span>
@@ -1202,7 +1199,7 @@
                         </label>
                         <!-- End of the protein block. -->
                         <hr class="formula-divider">
-                        <!-- Fiber: a floor per 1,000 kcal and a ceiling per kg (b, since f is TEF's). -->
+                        <!-- Fiber: floor per 1,000 kcal, ceiling per kg (b). -->
                         <label class="formula-row">
                             <span class="formula-sym">b_min</span>
                             <span class="formula-name">dietary fiber floor per 1,000 kcal of intake</span>
@@ -1284,31 +1281,31 @@
                     </div>
                 </div>
 
-                <!-- The model's equations (FORMULA_EXPRESSION, health-tune-fields.js). -->
+                <!-- Model equations (FORMULA_EXPRESSION). -->
                 <div class="card formula-card">
                     <h3>Equations</h3>
                     <div id="formula-expression" class="formula-substituted"></div>
                 </div>
 
-                <!-- LBM, P_min and P_max trace here in every mode (renderFormulaSubstituted). -->
+                <!-- LBM, P_min, P_max trace here in every mode. -->
                 <div class="card formula-card">
                     <h3>Calculations</h3>
                     <div id="formula-substituted" class="formula-substituted"></div>
 
-                    <!-- BMR_cal's own working over Tune's n_p × L_p (health-tune-calibration.js). -->
+                    <!-- BMR_cal's working over n_p × L_p. -->
                     <h4>Periods</h4>
                     <div class="table-responsive">
                         <table>
                         <thead>
-                        <tr>
-                            <th>Period</th>
-                            <th title="Body mass (kg) — smoothed mass ending this period's last day, the mass this period's own equation BMR is evaluated at">m</th>
-                            <th title="Change in body mass over this period (this period's mass minus the previous one's) — negative means mass lost, same sign convention as the Status card's own Δm">Δm</th>
-                            <th title="Δm × 7700 / period length — this period's mass change, as a daily fat-equivalent energy rate. MEASURED, independent of the equation">ΔM (kcal)</th>
-                            <th title="Average of the Daily table's own D over this period — what the CURRENT equation BMR implies happened, not independent of it">D</th>
-                            <th title="D minus ΔM — the gap between what the equation implies and what was actually measured. 0 means the equation already agrees with reality; the per-period figures here are what the final, recency-weighted Offset is built from">Offset</th>
-                            <th title="Linear recency weight — 0.1 for the oldest period in the window, 1.0 for the newest, so months of history can be included without outvoting the most recent one">Weight</th>
-                        </tr>
+                            <tr>
+                                <th>Period</th>
+                                <th title="Body mass (kg) — smoothed mass ending this period's last day, the mass this period's own equation BMR is evaluated at">m</th>
+                                <th title="Change in body mass over this period (this period's mass minus the previous one's) — negative means mass lost, same sign convention as the Status card's own Δm">Δm</th>
+                                <th title="Δm × 7700 / period length — this period's mass change, as a daily fat-equivalent energy rate. MEASURED, independent of the equation">ΔM (kcal)</th>
+                                <th title="Average of the Daily table's own D over this period — what the CURRENT equation BMR implies happened, not independent of it">D</th>
+                                <th title="D minus ΔM — the gap between what the equation implies and what was actually measured. 0 means the equation already agrees with reality; the per-period figures here are what the final, recency-weighted Offset is built from">Offset</th>
+                                <th title="Linear recency weight — 0.1 for the oldest period in the window, 1.0 for the newest, so months of history can be included without outvoting the most recent one">Weight</th>
+                            </tr>
                         </thead>
                         <tbody id="formula-cal-weeks-body"></tbody>
                         </table>
@@ -1354,7 +1351,7 @@
                 <div class="value expense" id="expenses-value">—</div>
             </div>
 
-            <!-- Full width under the four cards: the Cumulative Net Worth line alone. -->
+            <!-- Full width: Cumulative Net Worth line. -->
             <div class="card finance-trend-card">
                 <h3>Cumulative Net Worth</h3>
                 <div class="chart-box chart-box-glance chart-box-flush">
@@ -1369,7 +1366,7 @@
             <button type="button" data-screenshot="finance-chart" class="btn btn-icon panel-header-btn" title="Screenshot the whole page: save to the phone's gallery, or download on a laptop" aria-label="Screenshot">📤</button>
         </div>
 
-        <!-- Market's range row: window for Net Worth and Expenditure Trend (finance-chart.js). -->
+        <!-- Range row for Net Worth and Expenditure Trend. -->
         <div class="panel-section card">
             <h3>Range</h3>
             <div class="pagination panel-range" id="finance-trend-range"></div>
@@ -1432,7 +1429,7 @@
             <div class="donut-legend" id="spending-trend-legend"></div>
         </div>
 
-        <!-- One donut card per spending type (renderTypeBreakdownCharts). -->
+        <!-- A donut per spending type. -->
         <div class="panel-section" id="type-breakdown-container"></div>
 
         <div class="panel-section card">
@@ -1484,16 +1481,16 @@
                 <div class="table-responsive">
                     <table id="transactions-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th><input type="checkbox" id="tx-select-all" aria-label="Select all transactions on this page"></th>
-                            <th class="sortable" data-sort="date">Date</th>
-                            <th class="sortable" data-sort="account">Account</th>
-                            <th class="sortable" data-sort="payee">Payee</th>
-                            <th class="sortable" data-sort="category">Category</th>
-                            <th class="sortable" data-sort="description">Description</th>
-                            <th class="sortable" data-sort="amount">Amount</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th><input type="checkbox" id="tx-select-all" aria-label="Select all transactions on this page"></th>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th class="sortable" data-sort="account">Account</th>
+                                <th class="sortable" data-sort="payee">Payee</th>
+                                <th class="sortable" data-sort="category">Category</th>
+                                <th class="sortable" data-sort="description">Description</th>
+                                <th class="sortable" data-sort="amount">Amount</th>
+                                <th></th>
+                            </tr>
                         </thead>
 
                         <tbody id="transactions-body"></tbody>
@@ -1523,31 +1520,31 @@
                 <div class="table-responsive">
                     <table id="accounts-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th class="sortable" data-sort="name">Account Name</th>
-                            <th class="sortable" data-sort="institution">Institution</th>
-                            <th class="sortable" data-sort="type">Type</th>
-                            <th class="sortable" data-sort="balance">Balance</th>
-                            <th class="sortable" data-sort="currentValue">Market Value</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th class="sortable" data-sort="name">Account Name</th>
+                                <th class="sortable" data-sort="institution">Institution</th>
+                                <th class="sortable" data-sort="type">Type</th>
+                                <th class="sortable" data-sort="balance">Balance</th>
+                                <th class="sortable" data-sort="currentValue">Market Value</th>
+                                <th></th>
+                            </tr>
                         </thead>
 
                         <tbody id="accounts-list-body"></tbody>
                         <tfoot>
-                        <tr id="accounts-total-row" class="accounts-total-row" hidden>
-                            <td colspan="3">Total</td>
-                            <td id="accounts-total-balance"></td>
-                            <td id="accounts-total-current-value"></td>
-                            <td></td>
-                        </tr>
+                            <tr id="accounts-total-row" class="accounts-total-row" hidden>
+                                <td colspan="3">Total</td>
+                                <td id="accounts-total-balance"></td>
+                                <td id="accounts-total-current-value"></td>
+                                <td></td>
+                            </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- The money columns are the sheet's formulas; only Category and Type are editable. -->
+        <!-- Money columns are formulas; Category and Type editable. -->
         <div class="panel" data-route="breakdown">
             <div class="panel-header">
                 <h2>Breakdown</h2>
@@ -1562,15 +1559,15 @@
                 <div class="table-responsive">
                     <table id="breakdown-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th class="sortable" data-sort="category">Category</th>
-                            <th class="sortable" data-sort="type" title="Blank on a category's own total row — the one that sums every Type under it">Type</th>
-                            <th class="sortable num" data-sort="lastMonth">Last Month</th>
-                            <th class="sortable num" data-sort="lastQuarter">Last Quarter</th>
-                            <th class="sortable num" data-sort="lastYear">Last Year</th>
-                            <th class="sortable num" data-sort="lifelong">Lifelong</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th class="sortable" data-sort="category">Category</th>
+                                <th class="sortable" data-sort="type" title="Blank on a category's own total row — the one that sums every Type under it">Type</th>
+                                <th class="sortable num" data-sort="lastMonth">Last Month</th>
+                                <th class="sortable num" data-sort="lastQuarter">Last Quarter</th>
+                                <th class="sortable num" data-sort="lastYear">Last Year</th>
+                                <th class="sortable num" data-sort="lifelong">Lifelong</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="breakdown-body"></tbody>
                     </table>
@@ -1580,7 +1577,7 @@
             </div>
         </div>
 
-        <!-- Buy/sell log at average cost (finance-portfolio.js, finance-portfolio-math.js). -->
+        <!-- Buy/sell log at average cost (finance-portfolio.js). -->
         <div class="panel" id="portfolio-panel" data-route="portfolio">
             <div class="panel-header">
                 <h2>Portfolio</h2>
@@ -1618,17 +1615,17 @@
                 <div class="table-responsive">
                     <table id="holdings-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th>Account</th>
-                            <th>Symbol</th>
-                            <th class="num">Shares</th>
-                            <th class="num" title="Average cost per share, fees included (ACB)">Avg Cost</th>
-                            <th class="num">Close</th>
-                            <th class="num">Market Value</th>
-                            <th class="num" title="Market value minus cost, in the stock's own currency">Unrealized</th>
-                            <th class="num">%</th>
-                            <th class="num" title="Gain or loss locked in by sells, in the stock's own currency">Realized</th>
-                        </tr>
+                            <tr>
+                                <th>Account</th>
+                                <th>Symbol</th>
+                                <th class="num">Shares</th>
+                                <th class="num" title="Average cost per share, fees included (ACB)">Avg Cost</th>
+                                <th class="num">Close</th>
+                                <th class="num">Market Value</th>
+                                <th class="num" title="Market value minus cost, in the stock's own currency">Unrealized</th>
+                                <th class="num">%</th>
+                                <th class="num" title="Gain or loss locked in by sells, in the stock's own currency">Realized</th>
+                            </tr>
                         </thead>
                         <tbody id="holdings-body"></tbody>
                     </table>
@@ -1640,12 +1637,12 @@
                 <div class="table-responsive">
                     <table id="portfolio-accounts-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th>Account</th>
-                            <th class="num" title="Today's value of the stocks logged under this account, in CAD">Holdings</th>
-                            <th class="num" title="The Account page's Market Value">Market Value</th>
-                            <th class="num" title="Market Value minus Holdings — usually cash">Difference</th>
-                        </tr>
+                            <tr>
+                                <th>Account</th>
+                                <th class="num" title="Today's value of the stocks logged under this account, in CAD">Holdings</th>
+                                <th class="num" title="The Account page's Market Value">Market Value</th>
+                                <th class="num" title="Market Value minus Holdings — usually cash">Difference</th>
+                            </tr>
                         </thead>
                         <tbody id="portfolio-accounts-body"></tbody>
                     </table>
@@ -1660,17 +1657,17 @@
                 <div class="table-responsive">
                     <table id="trades-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th class="sortable" data-sort="date">Date</th>
-                            <th class="sortable" data-sort="account">Account</th>
-                            <th class="sortable" data-sort="symbol">Symbol</th>
-                            <th class="sortable" data-sort="action">Action</th>
-                            <th class="num">Qty</th>
-                            <th class="num">Price</th>
-                            <th class="num">Fees</th>
-                            <th class="num" title="CAD per one unit of the trade's currency on that day">FX</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th class="sortable" data-sort="account">Account</th>
+                                <th class="sortable" data-sort="symbol">Symbol</th>
+                                <th class="sortable" data-sort="action">Action</th>
+                                <th class="num">Qty</th>
+                                <th class="num">Price</th>
+                                <th class="num">Fees</th>
+                                <th class="num" title="CAD per one unit of the trade's currency on that day">FX</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="trades-body"></tbody>
                     </table>
@@ -1681,7 +1678,7 @@
             <p class="hint">Average cost (ACB) per account and symbol, fees included; CAD figures use each trade's own FX rate. The superficial-loss rule isn't applied.</p>
         </div>
 
-        <!-- Watchlist stocks and their latest moves (finance-watchlist.js); prices load when this page opens. -->
+        <!-- Watchlist moves; prices load on open (finance-watchlist.js). -->
         <div class="panel" id="watchlist-panel" data-route="watchlist">
             <div class="panel-header">
                 <h2>Watch List</h2>
@@ -1695,16 +1692,16 @@
                 <div class="table-responsive">
                     <table id="watchlist-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th class="sortable" data-sort="symbol">Symbol</th>
-                            <th class="sortable" data-sort="name">Name</th>
-                            <th class="num">Close</th>
-                            <th class="num" title="Change since the previous close">1d</th>
-                            <th class="num" title="Change over about one month (21 trading days)">1m</th>
-                            <th class="num" title="Change over about one year (252 trading days)">1y</th>
-                            <th title="Alert rules: gray while waiting, red when met on the latest close">Alert</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th class="sortable" data-sort="symbol">Symbol</th>
+                                <th class="sortable" data-sort="name">Name</th>
+                                <th class="num">Close</th>
+                                <th class="num" title="Change since the previous close">1d</th>
+                                <th class="num" title="Change over about one month (21 trading days)">1m</th>
+                                <th class="num" title="Change over about one year (252 trading days)">1y</th>
+                                <th title="Alert rules: gray while waiting, red when met on the latest close">Alert</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="watchlist-body"></tbody>
                     </table>
@@ -1712,7 +1709,7 @@
             </div>
         </div>
 
-        <!-- One stock's chart, rule-based signals, news and AI read (finance-market.js, finance-market-math.js). -->
+        <!-- One stock: chart, signals, news, AI read (finance-market.js). -->
         <div class="panel" id="stock-analysis-panel" data-route="market" data-tile-host="financial-insight-mode-actions">
             <div class="panel-header">
                 <h2>Market</h2>
@@ -1749,12 +1746,12 @@
                 <div class="table-responsive">
                     <table id="market-signal-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th>Signal</th>
-                            <th class="num">Value</th>
-                            <th>Rule</th>
-                            <th>Read</th>
-                        </tr>
+                            <tr>
+                                <th>Signal</th>
+                                <th class="num">Value</th>
+                                <th>Rule</th>
+                                <th>Read</th>
+                            </tr>
                         </thead>
                         <tbody id="market-signal-body"></tbody>
                     </table>
@@ -1810,7 +1807,7 @@
         <div class="panel" id="financial-insight-panel" data-route="insight">
             <h2>Insight</h2>
 
-            <!-- The modes, in one card titled Insight, as a hub's tiles are. -->
+            <!-- The modes as tiles in one Insight card. -->
             <div class="card insight-mode-actions">
                 <h3>Insight</h3>
                 <div id="financial-insight-mode-actions">
@@ -1838,13 +1835,13 @@
                     <div class="table-responsive">
                         <table id="financial-insight-category-table">
                             <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th>Previous Month</th>
-                                <th>Quarter avg</th>
-                                <th>Year avg</th>
-                                <th>Lifelong avg</th>
-                            </tr>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Previous Month</th>
+                                    <th>Quarter avg</th>
+                                    <th>Year avg</th>
+                                    <th>Lifelong avg</th>
+                                </tr>
                             </thead>
                             <tbody id="financial-insight-category-body"></tbody>
                         </table>
@@ -1858,12 +1855,12 @@
                     <div class="table-responsive">
                         <table id="financial-insight-accounts-table">
                             <thead>
-                            <tr>
-                                <th>Account</th>
-                                <th>Type</th>
-                                <th>Balance</th>
-                                <th>Market Value</th>
-                            </tr>
+                                <tr>
+                                    <th>Account</th>
+                                    <th>Type</th>
+                                    <th>Balance</th>
+                                    <th>Market Value</th>
+                                </tr>
                             </thead>
                             <tbody id="financial-insight-accounts-body"></tbody>
                         </table>
@@ -1895,8 +1892,8 @@
                 <button id="add-leetcode-btn" data-route="log" class="btn btn-icon panel-header-btn" title="Log a solved problem" aria-label="Log">📝</button>
             </div>
 
-            <!-- NeetCode 250 by category, ticked from the LeetCode tab (track-leetcode.js). -->
-            <!-- As Health's Progress card: solved and left of the NeetCode 250, video hours, then time to finish. -->
+            <!-- NeetCode 250 by category (track-leetcode.js). -->
+            <!-- Like Health's Progress card: solved, left, video hours, time to finish. -->
             <div class="card body-mass-progress-meter" id="leetcode-progress-meter">
                 <h3>Progress</h3>
                 <div class="body-mass-progress-meter-track-wrap">
@@ -1916,7 +1913,7 @@
                     </span>
                 </div>
 
-                <!-- Video time: hours of the solved problems' videos out of all 250. -->
+                <!-- Solved problems' video hours out of all 250. -->
                 <div class="body-mass-progress-meter time-progress-meter" id="leetcode-minutes-meter">
                     <div class="body-mass-progress-meter-track">
                         <div class="body-mass-progress-meter-fill"></div>
@@ -1973,7 +1970,7 @@
 
                 <div id="leetcode-list"></div>
 
-                <!-- Python for the NeetCode 250, basic to advanced, two columns (track-leetcode-cheatsheet.js). -->
+                <!-- Python cheatsheet, two columns (track-leetcode-cheatsheet.js). -->
                 <div class="card" id="leetcode-cheatsheet-card">
                     <h3>Cheat Sheet</h3>
                     <div class="leetcode-cheatsheet" id="leetcode-cheatsheet"></div>
@@ -2035,17 +2032,17 @@
                 <div class="table-responsive">
                     <table id="work-time-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th>Company</th>
-                            <th class="sortable" data-sort="date">Date</th>
-                            <th>Day</th>
-                            <th>Start</th>
-                            <th>End</th>
-                            <th>Break</th>
-                            <th>Duration</th>
-                            <th>Task</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th>Day</th>
+                                <th>Company</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Break</th>
+                                <th>Duration</th>
+                                <th>Task</th>
+                                <th></th>
+                            </tr>
                         </thead>
 
                         <tbody id="work-time-body"></tbody>
@@ -2061,7 +2058,7 @@
                 <h2>Car Service</h2>
             </div>
 
-            <!-- Odometer readings from transactions ("@28902km"); track-car-service.js. -->
+            <!-- Odometer readings from transactions (track-car-service.js). -->
             <div class="donut-grid health-metrics-grid">
                 <div class="card">
                     <h3>Odometer &amp; Service</h3>
@@ -2077,12 +2074,12 @@
                 <div class="table-responsive">
                     <table id="car-service-predicted-table" class="table-compact car-service-table">
                         <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Odometer</th>
-                            <th>Service</th>
-                            <th>Basis</th>
-                        </tr>
+                            <tr>
+                                <th>Date</th>
+                                <th>Odometer</th>
+                                <th>Service</th>
+                                <th>Basis</th>
+                            </tr>
                         </thead>
                         <tbody id="car-service-predicted-body"></tbody>
                     </table>
@@ -2094,11 +2091,11 @@
                 <div class="table-responsive">
                     <table id="car-service-done-table" class="table-compact car-service-table">
                         <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Odometer</th>
-                            <th>Service</th>
-                        </tr>
+                            <tr>
+                                <th>Date</th>
+                                <th>Odometer</th>
+                                <th>Service</th>
+                            </tr>
                         </thead>
                         <tbody id="car-service-done-body"></tbody>
                     </table>
@@ -2135,16 +2132,16 @@
                 <div class="table-responsive">
                     <table id="travel-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th class="sortable" data-sort="date">Date</th>
-                            <th class="sortable" data-sort="type">Type</th>
-                            <th class="sortable" data-sort="countryCity">Country, City</th>
-                            <th class="sortable" data-sort="port">Port</th>
-                            <th>Via</th>
-                            <th>Reason</th>
-                            <th>Detail</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th class="sortable" data-sort="type">Type</th>
+                                <th class="sortable" data-sort="countryCity">Country, City</th>
+                                <th class="sortable" data-sort="port">Port</th>
+                                <th>Via</th>
+                                <th>Reason</th>
+                                <th>Detail</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="travel-body"></tbody>
                     </table>
@@ -2193,15 +2190,15 @@
                 <div class="table-responsive">
                     <table id="contacts-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th><input type="checkbox" id="contacts-select-all" aria-label="Select all contacts on this page"></th>
-                            <th class="sortable" data-sort="first">First Name</th>
-                            <th class="sortable" data-sort="last">Last Name</th>
-                            <th>Phone</th>
-                            <th>Email</th>
-                            <th>Tags</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th><input type="checkbox" id="contacts-select-all" aria-label="Select all contacts on this page"></th>
+                                <th class="sortable" data-sort="first">First Name</th>
+                                <th class="sortable" data-sort="last">Last Name</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Tags</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="contacts-body"></tbody>
                     </table>
@@ -2230,7 +2227,7 @@
 
             <div class="panel-section card">
                 <h3>Settings</h3>
-                <!-- Tabs: the Market range row's buttons, each its own address (other-settings.js). -->
+                <!-- Tabs: Market range buttons, each an address. -->
                 <div class="pagination panel-range" id="settings-tabs">
                     <button type="button" class="btn" data-route="ai" data-route-view aria-pressed="false">AI &amp; Keys</button>
                     <button type="button" class="btn" data-route="responses" data-route-view aria-pressed="false">AI Responses</button>
@@ -2241,12 +2238,12 @@
                 <div class="table-responsive">
                     <table id="settings-table" class="table-compact">
                         <thead>
-                        <tr>
-                            <th>Note</th>
-                            <th>Key</th>
-                            <th>Value</th>
-                            <th></th>
-                        </tr>
+                            <tr>
+                                <th>Note</th>
+                                <th>Key</th>
+                                <th>Value</th>
+                                <th></th>
+                            </tr>
                         </thead>
                         <tbody id="settings-body"></tbody>
                     </table>
@@ -2301,7 +2298,7 @@
                 <input type="text" id="tx-amount" placeholder="e.g. -45.50 or =-9.97-1.30 or -32/2">
             </label>
 
-            <!-- Moves the account's Balance by the signed amount (see openTransactionForm). -->
+            <!-- Moves the account Balance by the signed amount. -->
             <label class="checkbox-inline-label" id="tx-update-balance-label" title="Add this amount to the selected account's Balance on the Account tab">
                 <input type="checkbox" id="tx-update-balance" checked>
                 Update the account balance
@@ -2312,7 +2309,7 @@
             <p id="tx-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <!-- Not a submit: rewrites Amount so it can be checked before Save. -->
+                <!-- Not a submit: rewrites Amount for checking before Save. -->
                 <button type="button" id="tx-tax-btn" class="btn">Tax</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="tx-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
@@ -2452,7 +2449,7 @@
                 <input type="text" id="watchlist-notes" placeholder="Optional">
             </label>
 
-            <!-- Alerts, checked on each day's close (checkAlerts, finance-market-math.js); stored as JSON in column F. -->
+            <!-- Alerts checked at each close (checkAlerts); JSON in column F. -->
             <p class="hint" id="watchlist-alert-levels">Alerts: a red badge on Watch List and Market when a rule is met on a day's close.</p>
             <div class="form-row">
                 <label>Alert: close below
@@ -2622,7 +2619,7 @@
                     <option>PORTFOLIO_WRITE_MARKET_VALUE</option>
                 </datalist>
             </label>
-            <!-- Multi-line, since some values are long (a JSON list, an API key). -->
+            <!-- Multi-line for long values. -->
             <label>Value
                 <textarea id="setting-value" rows="4" spellcheck="false"></textarea>
             </label>
@@ -2720,7 +2717,7 @@
                 <textarea id="physique-breakdown" rows="4"></textarea>
             </label>
 
-            <!-- Totals come from the Total row below; Save sends these to G-L. -->
+            <!-- Totals from the Total row; Save sends G-L. -->
             <label hidden>Calories In
                 <input type="text" id="physique-calories-in" placeholder="e.g. 2100 (kcal)">
             </label>
@@ -2759,8 +2756,7 @@
             <p id="physique-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
-                <!-- No `capture`: on iOS the Camera app switch can reload the page and lose
-                     the change listener. -->
+                <!-- No `capture`: iOS Camera switch can reload and lose the listener. -->
                 <input type="file" id="physique-scan-input" accept="image/*" hidden>
                 <button type="button" id="physique-scan-btn" class="btn btn-icon" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption" aria-label="Scan">📷</button>
                 <button type="button" id="physique-form-micro-btn" class="btn btn-icon" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved" aria-label="Micronutrients">🧬</button>
@@ -2774,17 +2770,17 @@
                 <div class="table-responsive table-compact">
                 <table>
                     <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Amount</th>
-                        <th title="Calories">Cal</th>
-                        <th title="Protein (g)">Pro</th>
-                        <th title="Fiber (g) — this ingredient's own typed Fiber if it has one, else read from its pulled 🧬 Micronutrients">DF</th>
-                        <th title="Fat (g) — this ingredient's own typed Fat if it has one, else read from its pulled 🧬 Micronutrients">Fat</th>
-                        <th title="Carbohydrate (g) — this ingredient's own typed Carb if it has one, else read from its pulled 🧬 Micronutrients">Crb</th>
-                        <th title="Estimated Thermic Effect of Food (kcal) — this ingredient's own typed TEF if it has one, else Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default (tune under Settings: TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT)">TEF</th>
-                        <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time" aria-label="Source"></th>
-                    </tr>
+                        <tr>
+                            <th>Name</th>
+                            <th>Amount</th>
+                            <th title="Calories">Cal</th>
+                            <th title="Protein (g)">Pro</th>
+                            <th title="Fiber (g) — this ingredient's own typed Fiber if it has one, else read from its pulled 🧬 Micronutrients">DF</th>
+                            <th title="Fat (g) — this ingredient's own typed Fat if it has one, else read from its pulled 🧬 Micronutrients">Fat</th>
+                            <th title="Carbohydrate (g) — this ingredient's own typed Carb if it has one, else read from its pulled 🧬 Micronutrients">Crb</th>
+                            <th title="Estimated Thermic Effect of Food (kcal) — this ingredient's own typed TEF if it has one, else Protein 25%, Carbohydrate 7.5%, Fat 2% of that macro's own calories by default (tune under Settings: TEF_PROTEIN_PERCENT, TEF_CARB_PERCENT, TEF_FAT_PERCENT)">TEF</th>
+                            <th title="✅ means the item was found in your own Nutrition table; anything else names the estimator that priced it, followed by 💾 to bank it for next time" aria-label="Source"></th>
+                        </tr>
                     </thead>
                     <tbody id="physique-calc-breakdown-body"></tbody>
                 </table>
@@ -2795,48 +2791,48 @@
                 <div class="table-responsive table-compact">
                 <table>
                     <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Amount</th>
-                        <th title="Metabolic Equivalent of Task — the intensity this exercise is priced at">MET</th>
-                        <th title="Active time in minutes, net of rest">Dur</th>
-                        <th title="Calories">Cal</th>
-                        <th title="✅ means the exercise was found in your own Activity sheet; AI means its MET was estimated, followed by 💾 to save it and ✏️ to fix it first; Default means it was priced at the default MET" aria-label="Source"></th>
-                    </tr>
+                        <tr>
+                            <th>Name</th>
+                            <th>Amount</th>
+                            <th title="Metabolic Equivalent of Task — the intensity this exercise is priced at">MET</th>
+                            <th title="Active time in minutes, net of rest">Dur</th>
+                            <th title="Calories">Cal</th>
+                            <th title="✅ means the exercise was found in your own Activity sheet; AI means its MET was estimated, followed by 💾 to save it and ✏️ to fix it first; Default means it was priced at the default MET" aria-label="Source"></th>
+                        </tr>
                     </thead>
                     <tbody id="physique-activity-breakdown-body"></tbody>
                 </table>
                 </div>
             </div>
-            <!-- Same labels as the Status card (setStatusEnergyTile), off this form's typed fields. -->
+            <!-- Status card labels, from this form's fields. -->
             <div id="physique-derived" class="card">
                 <h3>Summary</h3>
                 <div class="table-responsive table-compact">
                     <table id="physique-derived-table">
                         <thead>
-                        <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Remain</th><th>Unit</th><th title="✅ meets the desired figure, ❌ misses it" aria-label="Status"></th></tr>
+                            <tr><th>Name</th><th>Amount</th><th>Desire</th><th>Remain</th><th>Unit</th><th title="✅ meets the desired figure, ❌ misses it" aria-label="Status"></th></tr>
                         </thead>
                         <tbody>
-                        <tr title="This day's body-mass reading; Desire is the healthy body mass ± the glycogen swing"><td>m</td><td id="physique-mass-reading"></td><td id="physique-mass-reading-desire"></td><td id="physique-mass-reading-remain"></td><td>kg</td><td></td></tr>
-                        <tr title="The L_p-day rolling average body-mass; Desire is the healthy body mass under Settings"><td>m̄</td><td id="physique-mass-mean"></td><td id="physique-mass-mean-desire"></td><td id="physique-mass-mean-remain"></td><td>kg</td><td></td></tr>
-                        <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta"></td><td id="physique-mass-delta-desire"></td><td id="physique-mass-delta-remain"></td><td>kg</td><td></td></tr>
-                        <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the healthy body mass"><td>BMI</td><td id="physique-mass-bmi"></td><td id="physique-mass-bmi-desire"></td><td id="physique-mass-bmi-remain"></td><td>kg/m²</td><td></td></tr>
-                        <tr title="Protein from the Consumption breakdown; Desire is the protein band (Settings/Tune), as the Intake Macros card shows it"><td>Pro</td><td id="physique-macro-protein"></td><td id="physique-macro-protein-desire"></td><td id="physique-macro-protein-remain"></td><td>g</td><td></td></tr>
-                        <tr title="Dietary fibre from the Consumption breakdown; Desire is the fibre band"><td>DF</td><td id="physique-macro-fiber"></td><td id="physique-macro-fiber-desire"></td><td id="physique-macro-fiber-remain"></td><td>g</td><td></td></tr>
-                        <tr title="Fat from the Consumption breakdown; Desire is the fat band"><td>Fat</td><td id="physique-macro-fat"></td><td id="physique-macro-fat-desire"></td><td id="physique-macro-fat-remain"></td><td>g</td><td></td></tr>
-                        <tr class="physique-derived-group-end" title="Carbohydrate from the Consumption breakdown; Desire is the carbohydrate band"><td>Crb</td><td id="physique-macro-carb"></td><td id="physique-macro-carb-desire"></td><td id="physique-macro-carb-remain"></td><td>g</td><td></td></tr>
-                        <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei"></td><td id="physique-tei-desire"></td><td id="physique-tei-remain"></td><td>kcal</td><td></td></tr>
-                        <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived"></td><td id="physique-tef-desire"></td><td id="physique-tef-derived-remain"></td><td>kcal</td><td></td></tr>
-                        <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee"></td><td id="physique-aee-desire"></td><td id="physique-aee-remain"></td><td>kcal</td><td></td></tr>
-                        <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation"></td><td id="physique-sleep-deprivation-desire"></td><td id="physique-sleep-deprivation-remain"></td><td>kcal</td><td></td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-mif"></td><td></td><td></td><td>kcal</td><td></td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-kat"></td><td></td><td></td><td>kcal</td><td></td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-cal"></td><td></td><td></td><td>kcal</td><td></td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-adp"></td><td></td><td></td><td>kcal</td><td></td></tr>
-                        <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-avg"></td><td></td><td></td><td>kcal</td><td></td></tr>
-                        <tr class="physique-derived-group-end" title="Maintenance: BMR + AEE, the intake that would hold body mass still; Desire is BMR + the desired AEE, as the Status card shows it"><td>M</td><td id="physique-maintenance"></td><td id="physique-maintenance-desire"></td><td id="physique-maintenance-remain"></td><td>kcal</td><td></td></tr>
-                        <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own desired deficit"><td>D</td><td id="physique-balance"></td><td id="physique-balance-desire"></td><td id="physique-balance-remain"></td><td>kcal</td><td></td></tr>
-                        <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime"></td><td id="physique-mass-delta-prime-desire"></td><td id="physique-mass-delta-prime-remain"></td><td>g</td><td></td></tr>
+                            <tr title="This day's body-mass reading; Desire is the healthy body mass ± the glycogen swing"><td>m</td><td id="physique-mass-reading"></td><td id="physique-mass-reading-desire"></td><td id="physique-mass-reading-remain"></td><td>kg</td><td></td></tr>
+                            <tr title="The L_p-day rolling average body-mass; Desire is the healthy body mass under Settings"><td>m̄</td><td id="physique-mass-mean"></td><td id="physique-mass-mean-desire"></td><td id="physique-mass-mean-remain"></td><td>kg</td><td></td></tr>
+                            <tr title="The smoothed body-mass trend's change per day; Desire is the plan's own weekly fat-loss rate as a daily rate"><td>Δm</td><td id="physique-mass-delta"></td><td id="physique-mass-delta-desire"></td><td id="physique-mass-delta-remain"></td><td>kg</td><td></td></tr>
+                            <tr class="physique-derived-group-end" title="BMI at the rolling average body-mass; Desire is BMI at the healthy body mass"><td>BMI</td><td id="physique-mass-bmi"></td><td id="physique-mass-bmi-desire"></td><td id="physique-mass-bmi-remain"></td><td>kg/m²</td><td></td></tr>
+                            <tr title="Protein from the Consumption breakdown; Desire is the protein band (Settings/Tune), as the Intake Macros card shows it"><td>Pro</td><td id="physique-macro-protein"></td><td id="physique-macro-protein-desire"></td><td id="physique-macro-protein-remain"></td><td>g</td><td></td></tr>
+                            <tr title="Dietary fibre from the Consumption breakdown; Desire is the fibre band"><td>DF</td><td id="physique-macro-fiber"></td><td id="physique-macro-fiber-desire"></td><td id="physique-macro-fiber-remain"></td><td>g</td><td></td></tr>
+                            <tr title="Fat from the Consumption breakdown; Desire is the fat band"><td>Fat</td><td id="physique-macro-fat"></td><td id="physique-macro-fat-desire"></td><td id="physique-macro-fat-remain"></td><td>g</td><td></td></tr>
+                            <tr class="physique-derived-group-end" title="Carbohydrate from the Consumption breakdown; Desire is the carbohydrate band"><td>Crb</td><td id="physique-macro-carb"></td><td id="physique-macro-carb-desire"></td><td id="physique-macro-carb-remain"></td><td>g</td><td></td></tr>
+                            <tr title="Total Energy Intake — Calories In as typed so far; Desire is the desired intake (Settings/Tune)"><td>TEI</td><td id="physique-tei"></td><td id="physique-tei-desire"></td><td id="physique-tei-remain"></td><td>kcal</td><td></td></tr>
+                            <tr title="Thermic Effect of Food — TEF as typed, else estimated off Calories In; Desire is TEF at the desired intake"><td>TEF</td><td id="physique-tef-derived"></td><td id="physique-tef-desire"></td><td id="physique-tef-derived-remain"></td><td>kcal</td><td></td></tr>
+                            <tr title="Active Energy Expenditure — Calories Out from the Workout breakdown; Desire is the desired activity (Settings)"><td>AEE</td><td id="physique-aee"></td><td id="physique-aee-desire"></td><td id="physique-aee-remain"></td><td>kcal</td><td></td></tr>
+                            <tr class="physique-derived-group-end" title="Sleep Deprivation Effect — how much a short night is costing (or adding to) this day's balance, off Bed and Wake; Desire is 0 — a full night costs nothing"><td>SD</td><td id="physique-sleep-deprivation"></td><td id="physique-sleep-deprivation-desire"></td><td id="physique-sleep-deprivation-remain"></td><td>kcal</td><td></td></tr>
+                            <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-mif"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                            <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-kat"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                            <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-cal"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                            <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-adp"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                            <tr class="physique-derived-group-end"><td>BMR</td><td id="physique-bmr-avg"></td><td></td><td></td><td>kcal</td><td></td></tr>
+                            <tr class="physique-derived-group-end" title="Maintenance: BMR + AEE, the intake that would hold body mass still; Desire is BMR + the desired AEE, as the Status card shows it"><td>M</td><td id="physique-maintenance"></td><td id="physique-maintenance-desire"></td><td id="physique-maintenance-remain"></td><td>kcal</td><td></td></tr>
+                            <tr title="This day's energy balance: TEI − maintenance − AEE − TEF + SD; Desire is the plan's own desired deficit"><td>D</td><td id="physique-balance"></td><td id="physique-balance-desire"></td><td id="physique-balance-remain"></td><td>kcal</td><td></td></tr>
+                            <tr title="The mass change Balance implies (D ÷ ~7700 kcal/kg) — not measured on the scale, that's Δm above; Desire is the plan's own weekly fat-loss rate in grams/day"><td>Δm′</td><td id="physique-mass-delta-prime"></td><td id="physique-mass-delta-prime-desire"></td><td id="physique-mass-delta-prime-remain"></td><td>g</td><td></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2852,12 +2848,12 @@
             <div class="table-responsive">
                 <table id="physique-micro-table" class="table-compact">
                     <thead>
-                    <tr>
-                        <th>Nutrient</th>
-                        <th>Amount</th>
-                        <th>Supp / day</th>
-                        <th>Ideal / day</th>
-                    </tr>
+                        <tr>
+                            <th>Nutrient</th>
+                            <th>Amount</th>
+                            <th>Supp / day</th>
+                            <th>Ideal / day</th>
+                        </tr>
                     </thead>
                     <tbody id="physique-micro-body"></tbody>
                 </table>
@@ -2870,7 +2866,7 @@
     </div>
 </div>
 
-<!-- Physique's 🧬 page: the one-day table over a range of days (health-physique.js). -->
+<!-- Physique's 🧬 page: range table (health-physique.js). -->
 <div id="physique-micro-range-modal" class="modal" role="dialog" aria-modal="true" aria-label="Micronutrients" hidden>
     <div class="modal-card">
         <div class="panel-section card">
@@ -2883,13 +2879,13 @@
             <div class="table-responsive">
                 <table id="physique-micro-range-table" class="table-compact">
                     <thead>
-                    <tr>
-                        <th>Nutrient</th>
-                        <th>Total (period)</th>
-                        <th>Avg / day</th>
-                        <th>Supp / day</th>
-                        <th>Ideal / day</th>
-                    </tr>
+                        <tr>
+                            <th>Nutrient</th>
+                            <th>Total (period)</th>
+                            <th>Avg / day</th>
+                            <th>Supp / day</th>
+                            <th>Ideal / day</th>
+                        </tr>
                     </thead>
                     <tbody id="physique-micro-range-body"></tbody>
                 </table>
@@ -2904,13 +2900,13 @@
 
 <div id="activity-instruction-modal" class="modal" role="dialog" aria-modal="true" aria-label="Instructions on the Activities" hidden>
     <div class="modal-card">
-        <!-- One tile per Group (renderInstructionList); a group's page lists its activities. -->
+        <!-- One tile per Group (renderInstructionList). -->
         <div class="card" id="instruction-groups-card">
             <h3>Workouts</h3>
             <div class="page-tiles instruction-groups" id="instruction-groups"></div>
         </div>
 
-        <!-- A copy of Indicator's Activity Rotation card, hidden on a Group's page. -->
+        <!-- Copy of Indicator's Activity Rotation; hidden on a Group page. -->
         <div class="body-mass-projection-wrap card page-rotation-card" id="instruction-rotation-card">
             <h3>Activity Rotation</h3>
 
@@ -3021,7 +3017,7 @@
             </div>
             <p class="hint" id="nutrition-usda-source" hidden></p>
 
-            <!-- Tune's row layout; a ticked row is kept as typed (health-nutrition.js). -->
+            <!-- Tune's rows; a ticked row is kept as typed. -->
             <div class="formula-inputs" id="nutrition-fields">
                 <label class="formula-row">
                     <input type="checkbox" id="nutrition-lock-calories" data-lock-name="Calories">
@@ -3350,7 +3346,7 @@
 <script src="assets/script/health-insight-protein.js"></script>
 <script src="assets/script/health-insight-plan.js"></script>
 <script src="assets/script/health-insight-pattern.js"></script>
-<!-- After the five above: INSIGHT_MODES reads their prompt constants by value. -->
+<!-- After the five above: INSIGHT_MODES reads their prompts. -->
 <script src="assets/script/health-insight.js"></script>
 <script src="assets/script/health-tune-fields.js"></script>
 <script src="assets/script/health-tune-render.js"></script>

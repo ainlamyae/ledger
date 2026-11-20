@@ -50,7 +50,7 @@ function renderHealthHeatmap(entries) {
     cell.style.gridRow = String(row + 1);
     cell.textContent = String(d.getDate());
     if (balance === null) {
-      cell.title = `${iso}: no calories logged`;
+      cell.title = `${shortYearDate(iso)}: no calories logged`;
     } else {
       const grade = energyBalanceGrade(balance, isCut, desired, weeklyAvg[i]);
       if (!hidden.has(grade.name)) {
@@ -59,7 +59,7 @@ function renderHealthHeatmap(entries) {
         cell.style.color = '#fff';
       }
       // Sign only on negatives, as every chart hover.
-      const text = `${iso}: ${Math.round(balance)} kcal · ${grade.name}`;
+      const text = `${shortYearDate(iso)}: ${Math.round(balance)} kcal · ${grade.name}`;
       cell.title = privacyMode ? maskDigits(text) : text;
     }
     grid.appendChild(cell);

@@ -1,7 +1,9 @@
 // To ZZ: past ~21 categories Statement's Saved/Cumulative columns pass Z.
 const REPORT_RANGE = sheetRange(CONFIG.SHEETS.REPORT, 'A1:ZZ149');
 const BALANCE_RANGE = sheetRange(CONFIG.SHEETS.BALANCE, 'A1:D1');
-const INSIGHT_RANGE = sheetRange(CONFIG.SHEETS.INSIGHT, 'A2:F200');
+const REPORT_TRANSACTIONS_RANGE = sheetRange(CONFIG.SHEETS.TRANSACTIONS, 'A2:F');
+// Breakdown's Category and Type names only; the amounts come from Transaction.
+const REPORT_TYPE_NAMES_RANGE = sheetRange(CONFIG.SHEETS.INSIGHT, 'A2:B');
 const SETTINGS_RANGE = sheetRange(CONFIG.SHEETS.SETTINGS, 'A2:C');
 
 const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -9,9 +11,8 @@ const CURRENCY_FORMAT = new Intl.NumberFormat('en-US', { style: 'currency', curr
 // Wide enough for the sidebar to hold the settings switches.
 const SIDEBAR_MEDIA_QUERY = '(min-width: 1180px)';
 
-// The show/hide switches' last values (0 or 1), so they work before sign-in;
-// the Settings tab replaces them once it loads. index.html's head reads this
-// key before first paint, so a hidden row doesn't flash on reload.
+// The switches' last values (0/1), so they work before sign-in; Settings replaces
+// them on load. index.html's head reads this key before first paint.
 const SWITCHES_KEY = 'ledger_switches';
 
 function readCachedSwitches() {
@@ -30,8 +31,7 @@ function cacheSwitches() {
   } catch {}
 }
 
-// Saved to the Settings tab when there's one; signed out it stays in this
-// browser. Best-effort: a missing Settings tab shouldn't block toggling.
+// Best-effort save to Settings; signed out it stays in this browser.
 function saveSwitchSetting(values) {
   cacheSwitches();
   if (!isSignedIn() || !getActiveSpreadsheetId()) return;
@@ -40,13 +40,16 @@ function saveSwitchSetting(values) {
   });
 }
 
-// Amounts show unless SHOW_AMOUNTS is 0 (for reading over someone's shoulder).
-let privacyMode = readCachedSwitches().SHOW_AMOUNTS === 0;
-
-// The widget row (SHOW_WIDGETS) and the home page's glance cards (SHOW_BULBS)
-// start off until this browser or the Settings tab says otherwise.
-let widgetsVisible = readCachedSwitches().SHOW_WIDGETS === 1;
-let bulbsVisible = readCachedSwitches().SHOW_BULBS === 1;
+// Amounts show unless SHOW_AMOUNTS is 0; widgets and bulbs start off until set to 1.
+let privacyMode;
+let widgetsVisible;
+let bulbsVisible;
+{
+  const cached = readCachedSwitches();
+  privacyMode = cached.SHOW_AMOUNTS === 0;
+  widgetsVisible = cached.SHOW_WIDGETS === 1;
+  bulbsVisible = cached.SHOW_BULBS === 1;
+}
 
 // Keeps the symbol, sign and separators: "$1,234.56" -> "$*,***.**".
 function maskDigits(str) {
@@ -103,11 +106,11 @@ function showUndoToast(message, onUndo, error = false) {
   document.getElementById('undo-toast-message').textContent = message;
 
   // A fresh button drops the previous toast's Undo listener.
-  const btn = document.getElementById('undo-toast-btn');
-  const newBtn = btn.cloneNode(true);
-  btn.replaceWith(newBtn);
-  newBtn.hidden = !onUndo;
-  newBtn.addEventListener('click', () => {
+  const oldBtn = document.getElementById('undo-toast-btn');
+  const btn = oldBtn.cloneNode(true);
+  oldBtn.replaceWith(btn);
+  btn.hidden = !onUndo;
+  btn.addEventListener('click', () => {
     clearTimeout(undoToastTimer);
     toast.hidden = true;
     onUndo();
@@ -115,9 +118,10 @@ function showUndoToast(message, onUndo, error = false) {
 
   toast.hidden = false;
   // Longer messages stay longer: 3s to 12s without Undo, errors 6s or more.
+  const minMs = error ? ERROR_TOAST_MIN_MS : TOAST_MIN_MS;
   const ms = onUndo
     ? UNDO_TOAST_MS
-    : Math.min(Math.max(TOAST_BASE_MS + message.length * TOAST_MS_PER_CHAR, error ? ERROR_TOAST_MIN_MS : TOAST_MIN_MS), TOAST_MAX_MS);
+    : Math.min(Math.max(TOAST_BASE_MS + message.length * TOAST_MS_PER_CHAR, minMs), TOAST_MAX_MS);
   undoToastTimer = setTimeout(() => { toast.hidden = true; }, ms);
 }
 
@@ -130,36 +134,7 @@ let currentReport = null;
 
 // The Account tab's D1 holds the pre-computed net worth total.
 function parseBalance(balanceRows) {
-  return (balanceRows[0] && balanceRows[0][3]) || 0;
-}
-
-// Breakdown!A2:F200: Category, Type, Last Month, Last Quarter, Last Year,
-// Lifelong. A blank-Type row holds the category's overall total.
-function parseTypeBreakdown(insightRows) {
-  const breakdown = {};
-
-  insightRows.forEach((row) => {
-    const category = cellText(row[0]);
-    if (!category) return;
-
-    const type = cellText(row[1]);
-    const stats = {
-      lastMonth: row[2] || 0,
-      lastQuarter: row[3] || 0,
-      lastYear: row[4] || 0,
-      lifelong: row[5] || 0,
-    };
-
-    if (!breakdown[category]) breakdown[category] = { types: [], total: null };
-    if (type) {
-      // A type that never had any spend (e.g. a retired one) would only clutter the donuts.
-      if (stats.lifelong) breakdown[category].types.push({ name: type, ...stats });
-    } else {
-      breakdown[category].total = stats;
-    }
-  });
-
-  return breakdown;
+  return balanceRows[0]?.[3] || 0;
 }
 
 const SHORTCUT_MODAL_IDS = ['tx-modal', 'tx-bulk-edit-modal', 'account-modal', 'breakdown-modal', 'work-time-modal', 'nutrition-modal', 'shortcuts-modal'];
@@ -351,101 +326,42 @@ function setupAccountMenu() {
 
 async function loadReport() {
   const { valueRanges } = await batchGetValues(
-    [REPORT_RANGE, BALANCE_RANGE, INSIGHT_RANGE],
+    [REPORT_RANGE, BALANCE_RANGE, REPORT_TRANSACTIONS_RANGE, REPORT_TYPE_NAMES_RANGE],
     VALUE_PARAMS
   );
-  const reportRows = valueRanges[0].values || [];
-  const balanceRows = valueRanges[1].values || [];
-  const insightRows = valueRanges[2].values || [];
+  const [reportRows, balanceRows, transactionRows, typeNameRows] = valueRanges.map((r) => r.values || []);
 
-  // Breakdown lists each category once per Type plus a total row: keep each name once, in order.
-  const categoryNames = [...new Set(insightRows.map((row) => cellText(row[0])).filter(Boolean))];
-
-  // The blank-Type totals double as each category's benchmarks.
-  const typeBreakdown = parseTypeBreakdown(insightRows);
-
-  // Statement's row 1 names its columns (Income, Expenses, one per category,
-  // Saved, Cumulative), so categories are found by name, not index.
+  // Row 1 names the columns: Income, Expenses, one per category, Saved, Cumulative.
   const monthlyHeader = reportRows[0] || [];
   const monthlyRows = reportRows.slice(1);
 
-  const monthlyCols = {};
-  monthlyHeader.forEach((name, i) => { if (name) monthlyCols[name] = i; });
-
-  // Saved and Cumulative are always the last two columns. The API trims each
-  // row to its last non-empty cell, so the widest data row gives the width.
+  // Saved is second-last; the API trims rows, so the widest row gives the width.
   const dataWidth = monthlyRows.reduce((max, row) => Math.max(max, row.length), 0);
   const savedIndex = dataWidth - 2;
-  const cumulativeIndex = dataWidth - 1;
 
   // The latest month with any income or expenses.
   const lastActive = monthlyRows.findLastIndex((row) => row[1] || row[2]);
   const activeIndex = lastActive === -1 ? monthlyRows.length - 1 : lastActive;
-
   const current = monthlyRows[activeIndex];
 
-  // A Breakdown category charts if Statement has a column for it past A-C
-  // (Month, Income, Expenses), so "Income" never counts as spending.
-  const categoryColumns = categoryNames
-    .filter((name) => monthlyCols[name] >= 3)
-    .map((name) => ({ name, monthlyIndex: monthlyCols[name] }));
+  // Spending categories: the columns between Expenses (C) and Saved.
+  const categoryNames = monthlyHeader
+    .slice(3, Math.max(3, savedIndex))
+    .map((name) => cellText(name).trim())
+    .filter(Boolean);
 
-  // Every category chart ranks by lifelong spend, each with its own hue spread around the wheel.
-  const orderedCategoryColumns = [...categoryColumns]
-    .sort((a, b) => {
-      const lifelongA = Math.abs(typeBreakdown[a.name]?.total?.lifelong || 0);
-      const lifelongB = Math.abs(typeBreakdown[b.name]?.total?.lifelong || 0);
-      return lifelongB - lifelongA;
-    })
-    .map((c, i, arr) => ({ ...c, color: seriesColor(Math.round((i * 360) / arr.length)) }));
-
-  const activeRows = monthlyRows.slice(0, activeIndex + 1);
-
-  const savingsTrend = activeRows.map((row) => ({ label: row[0], cumulative: row[cumulativeIndex] || 0 }));
-
-  // Income (column B) rides along with each month's category spend: one chart draws both.
-  const categoryTrend = activeRows.map((row) => ({
-    label: row[0],
-    income: row[1] || 0,
-    categories: orderedCategoryColumns.map((c) => ({
-      name: c.name,
-      value: Math.abs(row[c.monthlyIndex] || 0),
-      color: c.color,
-    })),
-  }));
-
-  const categoryComparison = orderedCategoryColumns.map((c) => {
-    const total = typeBreakdown[c.name]?.total || {};
-    return {
-      name: c.name,
-      color: c.color,
-      lastMonth: Math.abs(total.lastMonth || 0),
-      quarterAvg: Math.abs(total.lastQuarter || 0),
-      yearAvg: Math.abs(total.lastYear || 0),
-      lifelongAvg: Math.abs(total.lifelong || 0),
-    };
-  });
-
+  const charts = buildFinanceChartData(transactionRows, typeNameRows, categoryNames);
   const netWorth = parseBalance(balanceRows);
-
-  // Account balances vs. what the transactions add up to: non-zero means a
-  // wrong balance or a missing transaction.
-  const cumulativeSaved = Number(monthlyRows[monthlyRows.length - 1]?.[cumulativeIndex]) || 0;
-  const missingAmount = netWorth - cumulativeSaved;
 
   return {
     income: current[1] || 0,
     expenses: current[2] || 0,
     saved: current[savedIndex] || 0,
     quarterAverage: quarterAverages(monthlyRows, activeIndex),
-    savingsTrend,
-    categoryTrend,
-    categoryComparison,
-    // One Statement row per month through the active one: what Lifelong is averaged over.
-    totalMonths: activeIndex + 1,
-    typeBreakdown,
+    ...charts,
     netWorth,
-    missingAmount,
+    // Non-zero means a wrong balance or a missing transaction.
+    missingAmount: Math.round((netWorth - charts.transactionTotal) * 100) / 100,
   };
 }
 
@@ -454,16 +370,13 @@ let currentSettings = {};
 // Last good Settings read, so a failed refresh doesn't wipe it.
 let lastLoadedSettings = null;
 
-// The Setting tab is optional, so a failure never fails the dashboard: every
-// reader has its own default (getSetting). A failed read is not "no
-// settings", though: returning {} once wiped every setting in memory, so it
-// keeps the last good copy and logs why.
+// The Settings tab is optional, so a failure never fails the dashboard. A failed
+// read keeps the last good copy rather than wiping every setting in memory.
 async function loadSettings() {
   try {
     const resp = await getValues(SETTINGS_RANGE, VALUE_PARAMS);
-    const settings = parseSettings(resp.values || []);
-    lastLoadedSettings = settings;
-    return settings;
+    lastLoadedSettings = parseSettings(resp.values || []);
+    return lastLoadedSettings;
   } catch (err) {
     console.error(`Failed to read the "${CONFIG.SHEETS.SETTINGS}" tab — keeping the previously loaded settings:`, err);
     return lastLoadedSettings ?? {};
@@ -490,8 +403,7 @@ function getSettingString(key, fallback) {
   return raw !== undefined && raw !== '' ? raw : fallback;
 }
 
-// First of `keys` that's set: a renamed setting's current name, then its old
-// ones, so a row written before the rename keeps working.
+// First of `keys` that's set: a renamed setting's current name, then its old ones.
 function getSettingStringAny(keys, fallback) {
   for (const key of keys) {
     const value = getSettingString(key, null);
@@ -540,22 +452,21 @@ function renderSummaryCards(data) {
 const RECONCILED_EPSILON = 0.005;
 
 function renderReconciliationStatus(missingAmount) {
-  const isReconciled = Math.abs(missingAmount) < RECONCILED_EPSILON;
+  const gap = Math.abs(missingAmount);
+  const above = missingAmount > 0;
 
   // A>T: accounts above the transactions' total; A<T: below.
-  setAccountBadgePart('reconcile', isReconciled ? null : {
-    // Whole dollars (rounded up, so a few cents still show $1); the exact figure in its hover.
-    text: `A${missingAmount > 0 ? '>' : '<'}T ${formatCurrency(Math.ceil(Math.abs(missingAmount))).replace(/\.00$/, '')}`,
-    title: `Accounts ${missingAmount > 0 ? 'above' : 'below'} the transactions by ${formatCurrency(Math.abs(missingAmount))}`,
+  setAccountBadgePart('reconcile', gap < RECONCILED_EPSILON ? null : {
+    // Whole dollars rounded up (a few cents still show $1); the exact figure in its hover.
+    text: `A${above ? '>' : '<'}T ${formatCurrency(Math.ceil(gap)).replace(/\.00$/, '')}`,
+    title: `Accounts ${above ? 'above' : 'below'} the transactions by ${formatCurrency(gap)}`,
   });
 }
 
 async function refreshNetWorth() {
   const resp = await getValues(BALANCE_RANGE, VALUE_PARAMS);
   const netWorth = parseBalance(resp.values || []);
-
   if (currentReport) currentReport.netWorth = netWorth;
-
   document.getElementById('net-worth').textContent = formatCurrency(netWorth);
 }
 
@@ -595,11 +506,9 @@ async function loadDashboard(forceRefresh = false) {
   // When this load's data reading started, after the page and sign-in were ready.
   const dataStart = performance.now();
 
-  // Wrapped whole: nothing awaits loadDashboard with a .catch(), so a throw
-  // here would otherwise leave the placeholders up with no error shown.
+  // Wrapped whole: no caller catches, so a throw would leave placeholders up silently.
   try {
-    // Never throws (loadSettings). Runs alongside the rest; only what reads
-    // currentSettings waits on it.
+    // Never throws; only what reads currentSettings waits on it.
     const settingsPromise = loadSettings().then((settings) => {
       currentSettings = settings;
       // Each switch is on unless its setting is 0.
@@ -613,33 +522,34 @@ async function loadDashboard(forceRefresh = false) {
       renderInsightAgeBadges();
     });
 
-    // Blocks load only on a section page, which shows them; the home page
-    // reads just what its glance cards and tile badges need.
+    // Blocks load only on a section page; home reads just what its glance cards
+    // and tile badges need.
     const loadBlocks = Boolean(window.ledgerSectionPage);
     const section = window.ledgerSectionPage?.section ?? null;
     const home = section === null;
     const shows = (id) => loadBlocks && (home || section === id);
-    const needsHealth = section === null || section === 'health';
-    const needsReport = section === null || section === 'finance';
+    const needsHealth = home || section === 'health';
+    const needsReport = home || section === 'finance';
+    const done = Promise.resolve();
 
     // Activities lands BEFORE Physique, which memoizes each workout's category
     // from it. allSettled: a bad Activities tab costs that split, not Physique.
-    const activitiesPromise = needsHealth ? initActivities(forceRefresh) : Promise.resolve();
+    const activitiesPromise = needsHealth ? initActivities(forceRefresh) : done;
     const physiquePromise = needsHealth
       ? Promise.allSettled([settingsPromise, activitiesPromise]).then(() => initPhysique(forceRefresh))
-      : Promise.resolve();
+      : done;
     const reportPromise = needsReport ? loadReport().then((report) => {
       currentReport = report;
       renderSummaryCards(report);
-      renderSpendingTrendChart(report.categoryComparison, report.totalMonths);
+      renderSpendingTrendChart(report.categoryComparison, report.lifelongMonths);
       renderSpendingBreakdownCharts(report.categoryComparison);
       renderTypeBreakdownCharts(report.typeBreakdown);
       renderFinanceTrendCharts(report);
-      renderFinanceGlanceNetWorthChart(report.savingsTrend);
+      renderFinanceGlanceNetWorthChart(report.netWorthDays);
       renderReconciliationStatus(report.missingAmount);
-    }) : Promise.resolve();
+    }) : done;
 
-    const nutritionPromise = shows('health') ? initNutrition(forceRefresh) : Promise.resolve();
+    const nutritionPromise = shows('health') ? initNutrition(forceRefresh) : done;
     const detailPromises = [
       ...(shows('health') ? [
         nutritionPromise,
@@ -664,9 +574,8 @@ async function loadDashboard(forceRefresh = false) {
       ] : []),
       // Car Service (Track) is drawn from Transactions; home reads it for its tile badge.
       ...((shows('finance') || shows('track') || home) ? [initTransactions(forceRefresh)] : []),
-      ...(home && !shows('track') ? [initWorkTime(forceRefresh)] : []),
-      // LeetCode for its tile's solves-owed badge.
-      ...(home && !shows('track') ? [initLeetcode()] : []),
+      // Work Time and LeetCode (solves-owed) for their tile badges.
+      ...(home && !shows('track') ? [initWorkTime(forceRefresh), initLeetcode()] : []),
       // Accounts for the Account tile's Pay badge.
       ...(home && !shows('finance') ? [initAccountManager(forceRefresh)] : []),
       // Watchlist alerts badge the Watch List and Market tiles; the price check
@@ -686,9 +595,8 @@ async function loadDashboard(forceRefresh = false) {
         initApplications(forceRefresh),
         initLeetcode(),
       ] : []),
-      ...(shows('other') ? [initContacts(forceRefresh)] : []),
       // Other's Settings block (saving a setting from anywhere loads it on its own).
-      ...(shows('other') ? [initSettingsPanel(forceRefresh)] : []),
+      ...(shows('other') ? [initContacts(forceRefresh), initSettingsPanel(forceRefresh)] : []),
     ];
 
     const results = await Promise.allSettled([
@@ -785,9 +693,7 @@ function setupThemeToggle() {
   toggle.checked = document.documentElement.dataset.theme === 'dark';
 
   toggle.addEventListener('change', () => {
-    const dark = toggle.checked;
-
-    if (dark) {
+    if (toggle.checked) {
       document.documentElement.setAttribute('data-theme', 'dark');
       localStorage.setItem('ledger_theme', 'dark');
     } else {
@@ -856,20 +762,20 @@ function setupScrollSpy() {
   // The Ledger tab is current on the home page, a section's tab on its pages.
   document.querySelector('#main-nav .nav-home')?.classList.toggle('active', !window.ledgerSectionPage);
 
+  const setActive = (id) => {
+    navLinks.forEach((link) => link.classList.toggle('active', link.dataset.section === id));
+  };
+
   // A section page has one section, so its tab simply stays active.
   const onlySection = document.documentElement.dataset.section;
   if (onlySection) {
-    navLinks.forEach((link) => link.classList.toggle('active', link.dataset.section === onlySection));
+    setActive(onlySection);
     return;
   }
 
   const sections = navLinks
     .map((link) => document.getElementById(link.dataset.section))
     .filter(Boolean);
-
-  const setActive = (id) => {
-    navLinks.forEach((link) => link.classList.toggle('active', link.dataset.section === id));
-  };
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
@@ -907,13 +813,9 @@ const AUTH_GATED_SELECTOR = [
 // Reads but never writes: the Instruction modal is the Activities tab already in memory.
 const AUTH_GATE_EXEMPT_IDS = ['activity-instruction-btn'];
 
-// Gets a live token BEFORE a form opens, so an expired one can't fail the Save
-// with the form filled in: signed out it signs in first, near expiry it
-// refreshes silently, then the click goes through.
-//
-// One capture-phase listener sees the click before the button's own (bubble)
-// handler, stops it, awaits the token and re-dispatches it. Matching on class
-// covers rows a renderer adds later.
+// Gets a live token BEFORE a form opens, so an expired one can't fail a filled-in
+// Save. A capture-phase listener stops the click, awaits the token, then
+// re-dispatches it; matching on class covers rows rendered later.
 function setupAuthGatedActions() {
   document.addEventListener('click', (event) => {
     const btn = event.target.closest(AUTH_GATED_SELECTOR);
@@ -988,9 +890,8 @@ function bootDashboard() {
   if (typeof APP_VERSION !== 'undefined') document.getElementById('footer-version').textContent = `v${APP_VERSION}`;
 }
 
-// A section page builds this markup after its own load event, so it starts
-// the page itself once every script has arrived. Elsewhere DOMContentLoaded,
-// not load, which would also wait on images and the chart CDN.
+// A section page builds this markup after its own load, so it starts the page
+// itself. Elsewhere DOMContentLoaded, so images and the chart CDN aren't awaited.
 if (window.ledgerSectionPage) {
   window.ledgerSectionPage.onRoute(routeDashboard);
   window.ledgerSectionPage.onBoot(bootDashboard);

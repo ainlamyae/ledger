@@ -50,11 +50,7 @@ function fillFrequencyDatalist(datalistId, values) {
   datalist.innerHTML = '';
   [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .forEach(([value]) => {
-      const option = document.createElement('option');
-      option.value = value;
-      datalist.appendChild(option);
-    });
+    .forEach(([value]) => appendOption(datalist, value));
 }
 
 // --- Transactions ---
@@ -102,36 +98,36 @@ async function initTransactions(forceRefresh = false) {
   transactionsSheetId = sheetId;
   await refreshTransactions(forceRefresh);
 
-  if (!listenersAttached) {
-    listenersAttached = true;
-    document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionForm());
-    editTransaction = routedRowEdit('transaction', () => allTransactions, (t) => `${t.date} ${t.payee}`, (t) => openTransactionForm(t), {
-      duplicate: (t) => openTransactionForm(t, true),
-    });
-    // finance/transaction/bulk-edit/ while rows are ticked.
-    registerRecordRoute('transaction', (slug, sub) => {
-      if (slug !== 'bulk-edit' || sub || !selectedRows.size) return null;
-      openBulkEditForm();
-      return 'Bulk Edit';
-    });
-    document.getElementById('tx-cancel-btn').addEventListener('click', closeTransactionForm);
-    document.getElementById('tx-tax-btn').addEventListener('click', applyTaxToAmount);
-    onFormSubmit('tx-form', submitTransactionForm);
+  if (listenersAttached) return;
+  listenersAttached = true;
+  document.getElementById('add-transaction-btn').addEventListener('click', () => openTransactionForm());
+  editTransaction = routedRowEdit('transaction', () => allTransactions, (t) => `${t.date} ${t.payee}`, (t) => openTransactionForm(t), {
+    duplicate: (t) => openTransactionForm(t, true),
+  });
+  // finance/transaction/bulk-edit/ while rows are ticked.
+  registerRecordRoute('transaction', (slug, sub) => {
+    if (slug !== 'bulk-edit' || sub || !selectedRows.size) return null;
+    openBulkEditForm();
+    return 'Bulk Edit';
+  });
+  document.getElementById('tx-cancel-btn').addEventListener('click', closeTransactionForm);
+  document.getElementById('tx-tax-btn').addEventListener('click', applyTaxToAmount);
+  onFormSubmit('tx-form', submitTransactionForm);
 
-    // Whether the balance can be updated depends on the account, so re-check on change.
-    document.getElementById('tx-account').addEventListener('change', syncUpdateBalanceBox);
-    document.getElementById('tx-account').addEventListener('change', syncTxAccountBalance);
-    document.getElementById('tx-update-balance').addEventListener('change', (e) => {
-      updateBalanceWanted = e.target.checked;
-    });
+  // Balance writability depends on the account.
+  const accountSelect = document.getElementById('tx-account');
+  accountSelect.addEventListener('change', syncUpdateBalanceBox);
+  accountSelect.addEventListener('change', syncTxAccountBalance);
+  document.getElementById('tx-update-balance').addEventListener('change', (e) => {
+    updateBalanceWanted = e.target.checked;
+  });
 
-    TRANSACTION_FILTER_EVENTS.forEach(([id, type]) => {
-      document.getElementById(id).addEventListener(type, resetTransactionsPageAndRender);
-    });
+  TRANSACTION_FILTER_EVENTS.forEach(([id, type]) => {
+    document.getElementById(id).addEventListener(type, resetTransactionsPageAndRender);
+  });
 
-    makeSortableHeaders('#transactions-table', txSort, resetTransactionsPageAndRender);
-    setupBulkActions();
-  }
+  makeSortableHeaders('#transactions-table', txSort, resetTransactionsPageAndRender);
+  setupBulkActions();
 }
 
 function setupBulkActions() {
@@ -191,11 +187,11 @@ function updateTransactionStaleBadge() {
   const last = allTransactions.reduce((max, t) => (/^\d{4}-\d{2}-\d{2}/.test(t.date) && t.date > max ? t.date : max), '');
   const days = last ? Math.round((dateFromIso(isoFromDate(new Date())) - dateFromIso(last.slice(0, 10))) / MS_PER_DAY) : 0;
   setPageBadge('finance', 'transaction', days > TRANSACTION_STALE_DAYS
-    ? { text: `${days}d`, title: `Last transaction logged ${days} days ago (${last.slice(0, 10)})` }
+    ? { text: `${days}d`, title: `Last transaction logged ${days} days ago (${shortYearDate(last.slice(0, 10))})` }
     : null);
 }
 
-// Past values as suggestions, so typing (and dictation) matches the user's own history.
+// Past values as suggestions.
 function populateAutocompleteOptions() {
   fillFrequencyDatalist('tx-payee-options', allTransactions.map((t) => t.payee));
   fillFrequencyDatalist('tx-description-options', allTransactions.map((t) => t.description));
@@ -221,12 +217,8 @@ function applyTransactionOptionLists(valueRanges) {
 function populateTransactionFilter(selectId, allLabel, values) {
   const select = document.getElementById(selectId);
   select.innerHTML = '';
-  [['', allLabel], ...values.map((value) => [value, value])].forEach(([value, label]) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    select.appendChild(option);
-  });
+  appendOption(select, '', allLabel);
+  values.forEach((value) => appendOption(select, value, value));
 }
 
 function getFilteredTransactions() {
@@ -250,20 +242,25 @@ function getFilteredTransactions() {
   if (!txSort.key) return filtered.reverse();
 
   const { key, dir } = txSort;
-  return [...filtered].sort((a, b) => {
+  return filtered.sort((a, b) => {
     if (key === 'amount') return (a.amount - b.amount) * dir;
     return String(a[key]).localeCompare(String(b[key]), undefined, { sensitivity: 'base' }) * dir;
   });
 }
 
-// Any filter or sort change invalidates the current page and selection.
-function resetTransactionsPageAndRender() {
-  currentPage = 1;
+// A page change drops the selection.
+function showTransactionsPage(page) {
+  currentPage = page;
   selectedRows.clear();
   renderTransactions();
 }
 
-// Display-only truncation; the full text is in the cell's title and the form.
+// Any filter or sort change goes back to page 1.
+function resetTransactionsPageAndRender() {
+  showTransactionsPage(1);
+}
+
+// Display-only truncation; full text is in the title.
 const TRANSACTION_PAYEE_DISPLAY_MAX = 16;
 const TRANSACTION_DESCRIPTION_DISPLAY_MAX = 32;
 const TRANSACTION_TABLE_COLUMNS = 8;
@@ -331,7 +328,7 @@ function renderTransactions() {
 
     tr.append(
       checkboxCell,
-      makeCell(t.date),
+      makeCell(shortYearDate(t.date)),
       makeCell(t.account),
       makeCell(truncateTransactionText(t.payee, TRANSACTION_PAYEE_DISPLAY_MAX), t.payee),
       makeCell(t.category),
@@ -353,14 +350,14 @@ function renderTransactions() {
   renderPagination(totalPages);
 }
 
-// The amount sits in the 7th of the table's 8 columns.
+// The amount sits in the second-last column.
 function renderReceiptTotalRow(total) {
   const tr = document.createElement('tr');
   tr.className = 'tx-receipt-total';
   tr.title = 'Receipt total, shown here only, not a row in the sheet';
   const amountCell = makeCell(formatCurrency(total));
   amountCell.className = 'num';
-  tr.append(...Array.from({ length: 6 }, () => document.createElement('td')), amountCell, document.createElement('td'));
+  tr.append(...Array.from({ length: TRANSACTION_TABLE_COLUMNS - 2 },() => document.createElement('td')), amountCell, document.createElement('td'));
   return tr;
 }
 
@@ -372,15 +369,7 @@ function updateSelectAllCheckbox(pageItems) {
 }
 
 function renderPagination(totalPages) {
-  renderPager('tx-pagination', {
-    page: currentPage,
-    totalPages,
-    onChange: (p) => {
-      currentPage = p;
-      selectedRows.clear();
-      renderTransactions();
-    },
-  });
+  renderPager('tx-pagination', { page: currentPage, totalPages, onChange: showTransactionsPage });
 }
 
 // `selected` not among `options` is added first, so an edit keeps its value.
@@ -397,15 +386,14 @@ function populateSelect(select, options, selected) {
   });
 }
 
-// The Tax button's local rate (13% is Ontario's HST), read on each use so a Settings change applies at once.
+// Ontario HST; read on each use so a Settings change applies at once.
 const TAX_RATE_PCT_DEFAULT = 13;
 
 function taxRatePct() {
   return getSetting('TAX_RATE_PCT', TAX_RATE_PCT_DEFAULT);
 }
 
-// Adds tax to Amount; the sign carries through (−45.50 becomes −51.42). The box is
-// left a plain number, so a second click compounds.
+// Adds tax to Amount, keeping the sign; a second click compounds.
 function applyTaxToAmount() {
   const input = document.getElementById('tx-amount');
   const amount = input.value.trim() === '' ? null : evaluateNumberExpression(input.value);
@@ -421,8 +409,7 @@ function applyTaxToAmount() {
 // The tick box's own choice, kept across account changes; re-armed per form.
 let updateBalanceWanted = true;
 
-// Turns the box off, with the reason, for an account whose Balance can't be added to
-// (finance-account.js: accountBalanceCell). Not disabled during the read: save re-checks anyway.
+// Disables the box, with the reason, when the account's Balance can't be added to.
 async function syncUpdateBalanceBox() {
   const box = document.getElementById('tx-update-balance');
   const note = document.getElementById('tx-update-balance-note');
@@ -456,9 +443,9 @@ function openTransactionForm(transaction, duplicate = false) {
   editingOriginal = editingRow ? { account: transaction.account, amount: transaction.amount, amountText: String(transaction.amount) } : null;
 
   document.getElementById('tx-date').value = transaction ? transaction.date : isoFromDate(new Date());
-  document.getElementById('tx-payee').value = transaction ? transaction.payee : '';
-  document.getElementById('tx-description').value = transaction ? transaction.description : '';
-  document.getElementById('tx-amount').value = transaction ? transaction.amount : '';
+  ['payee', 'description', 'amount'].forEach((field) => {
+    document.getElementById(`tx-${field}`).value = transaction ? transaction[field] : '';
+  });
 
   populateSelect(document.getElementById('tx-account'), accountOptions, transaction ? transaction.account : '');
   syncTxAccountBalance();
@@ -484,17 +471,16 @@ function closeTransactionForm() {
   editingOriginal = null;
 }
 
-// Money in (an Income category, positive amount) earns the confetti. Category is
-// free text, so case and stray spaces are ignored.
+// Positive Income (case and spaces ignored) earns the confetti.
 function isIncomeTransaction(category, amount) {
   return String(category || '').trim().toLowerCase() === 'income' && amount > 0;
 }
 
 const DUPLICATE_MANY_MAX = 100;
 
-// 📋 held: appends that many copies and moves the balance by all of them, as the form would.
+// 📋 held: appends N copies and moves the balance by all of them.
 async function duplicateTransactionMany(t) {
-  const answer = prompt(`How many copies of ${t.date} ${t.payee}?`, '2');
+  const answer = prompt(`How many copies of ${shortYearDate(t.date)} ${t.payee}?`, '2');
   if (answer === null) return;
   const count = Number(answer.trim());
   if (!Number.isInteger(count) || count < 1 || count > DUPLICATE_MANY_MAX) {
@@ -525,7 +511,7 @@ async function duplicateTransactionMany(t) {
   showToast(`Duplicated ${count}×.${balanceNote}`, !!balanceNote);
 }
 
-// [account, change] pairs a save moves balances by: a new row adds its amount; an edit nets old vs new.
+// [account, change] pairs for a save; an edit nets old vs new.
 function transactionBalanceChanges(original, account, amount) {
   if (!original) return [[account, amount]];
   if (original.account === account) return [[account, roundMoneyCents(amount - original.amount)]];
@@ -560,20 +546,18 @@ async function submitTransactionForm(event) {
     description: document.getElementById('tx-description').value,
     amount,
   });
-  const values = [row];
 
   try {
     let savedRow = editingRow;
     if (editingRow) {
       // An unchanged Amount isn't rewritten, so a formula there survives.
       if (keepAmount) await updateValues(transactionRowRange(editingRow, 'E'), [row.slice(0, 5)]);
-      else await updateValues(transactionRowRange(editingRow), values);
+      else await updateValues(transactionRowRange(editingRow), [row]);
     } else {
-      savedRow = appendedRow(await appendValues(TRANSACTIONS_RANGE, values));
+      savedRow = appendedRow(await appendValues(TRANSACTIONS_RANGE, [row]));
     }
 
-    // Outside the catch below on purpose: the row is saved, so a balance problem must
-    // not read as a failed save (inviting a duplicate). Either outcome is said out loud.
+    // The row is saved, so a balance problem is reported on its own, not as a failed save.
     if (updateBalance) {
       for (const [name, change] of transactionBalanceChanges(original, account, amount)) {
         if (!change) continue;

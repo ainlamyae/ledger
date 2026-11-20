@@ -220,7 +220,7 @@ function loadInsightMode(modeKey) {
   renderInsightPromptTemplate(mode, data, ctx);
   renderSavedInsight(mode);
   setInsightModeButtons(modeKey);
-  showToast(`${mode.label} data for ${from} to ${to}.`);
+  showToast(`${mode.label} data for ${shortYearDate(from)} to ${shortYearDate(to)}.`);
   document.getElementById('insight-generate-btn').disabled = false;
 }
 
@@ -305,7 +305,7 @@ async function runInsightGeneration() {
   // Saved per mode, so a fresh load shows the last read.
   return generateInsight(HEALTH_INSIGHT_PAGE, {
     controls: [...document.querySelectorAll('#insight-range button'), textarea, ...insightModeButtons()],
-    analyzing: `Analyzing ${from} to ${to}…`,
+    analyzing: `Analyzing ${shortYearDate(from)} to ${shortYearDate(to)}…`,
     prompts: () => {
       const ctx = { from, to, question: textarea.value };
       return [insightSystemPrompt(mode, insightLoaded.data), insightUserMessage(mode, insightLoaded.data, ctx)];
@@ -368,7 +368,7 @@ function placeInsightAgeBadge(btn, stamp) {
   const badge = document.createElement('span');
   badge.className = 'page-badge';
   badge.textContent = `${days}d`;
-  badge.title = `Last generated ${days} days ago (${stamp})`;
+  badge.title = `Last generated ${days} days ago (${shortYearDate(stamp)})`;
   btn.appendChild(badge);
 }
 
@@ -386,7 +386,7 @@ function renderInsightGeneratedAt(page, timestamp) {
     return;
   }
   el.hidden = false;
-  el.textContent = `Last generated ${timestamp}`;
+  el.textContent = `Last generated ${shortYearDate(timestamp)}`;
 }
 
 // The mode's last AI result from the in-memory Settings; no sheet read.

@@ -28,8 +28,8 @@ Every Ledger doc, grouped by what you need: using a page, looking up a fact, or 
 | [Finance — Watch List](guide/finance/watchlist.md) | Followed stocks, latest moves and price alerts |
 | [Finance — Market](guide/finance/market.md) | One stock's verdict, chart, risk, news and AI read |
 | [Finance — Portfolio](guide/finance/portfolio.md) | Trade log, holdings at average cost, gain/loss in CAD |
-| [Track](guide/track.md) | LeetCode, Work Time, Car Service, Travel, Applications |
-| [Other](guide/other.md) | Contacts and Settings |
+| [Track](guide/track.md) | LeetCode, Work Time, Car Service, Travel, Applications, Contacts |
+| [Other](guide/other.md) | Settings |
 
 ## Reference
 

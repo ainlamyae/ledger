@@ -20,7 +20,7 @@ The home page (`/`) is an overview of every section: four widgets, each section'
 - **Finance:** Net Worth, Monthly Cash Flow, Monthly Income, Monthly Expenditure, then a Cumulative Net Worth line.
   - See [Finance — Overview](finance/overview.md#summary).
 - **Track:** tiles only (LeetCode, Work Time, Car Service, Travel, Application).
-- **Other:** no card here; Contact and Settings open from the account menu (see [Navigation](navigation.md)).
+- **Other:** no card here; Settings opens from the account menu (see [Navigation](navigation.md)).
 
 ### Widgets
 

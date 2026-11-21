@@ -37,7 +37,7 @@ function renderHealthHeatmap(entries) {
       col += i === 0 ? 1 : 2;
       monthStart = col;
       monthLabel = document.createElement('span');
-      monthLabel.textContent = d.toLocaleString('en', { month: 'short' });
+      monthLabel.textContent = wordDate(d, false);
       monthLabel.style.textAlign = 'center';
       months.appendChild(monthLabel);
     } else if (row === 0) {

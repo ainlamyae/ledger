@@ -34,7 +34,7 @@ How you move around Ledger: hubs and pages, the sidebar and tab bar, addresses, 
 ### Sidebar and tab bar
 
 - **Sidebar (wide screens):** **Ledger** at the top, then every section and page; the current one is white on blue.
-  - **Bottom panel:** Contact, Refresh data, Clear cache, Settings, the switches, then your account row.
+  - **Bottom panel:** Refresh data, Clear cache, Settings, the switches, then your account row.
   - **Hide it:** the button beside **Ledger**, or Ctrl+. (⌘. on a Mac); the choice is kept in this browser.
 - **Tab bar (≤1179px):** Ledger · Health · Finance · Track, pinned to the bottom; your avatar (or 🔑 sign-in) sits bottom-left.
 - **Action bar:** a page's buttons in one place and order, ❌ last; top of the page on a laptop, the bottom bar on a phone.
@@ -43,7 +43,7 @@ How you move around Ledger: hubs and pages, the sidebar and tab bar, addresses, 
 
 ### Account menu
 
-- **Items:** Contact, Refresh data, Clear cache, Settings, then Rename Ledger file, Switch spreadsheet, Open in Google Sheets, Sign out.
+- **Items:** Refresh data, Clear cache, Settings, then Rename Ledger file, Switch spreadsheet, Open in Google Sheets, Sign out.
 - **Last load:** "Updated 11:00:44" sits under your name and email.
 - **Enable notifications:** shown until answered; lets Chrome show Work Time's and Car Service's daily reminders.
 - **Clear cache:** re-downloads the app's own files and reloads, for when the browser still runs an older version.

@@ -24,7 +24,7 @@ Every tab of the Google Sheet behind Ledger, column by column.
 | `PHYSIQUE` | `Physique` | You (add tab + header) | Every Health chart, tile and Insight mode |
 | `ACTIVITIES` | `Activity` | You (add tab + header) | Health › Activity, Workouts, MET prices |
 | `NUTRITION` | `Nutrition` | You (add tab + header) | Health › Nutrition, 🧮 Calculate |
-| `CONTACTS` | `Contact` | You (add tab) | Other › Contact |
+| `CONTACTS` | `Contact` | You (add tab) | Track › Contact |
 | `SETTINGS` | `Setting` | You (optional) | Every setting key |
 | `TRAVEL` | `Travel` | Template | Track › Travel |
 | `APPLICATIONS` | `Application` | Template | Track › Application |

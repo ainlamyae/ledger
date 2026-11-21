@@ -2,43 +2,13 @@
 
 [Docs](../README.md) › Guide
 
-The Other section holds Contacts and Settings, both opened from the account menu rather than a tab or tile.
+The Other section holds Settings, opened from the account menu rather than a tab or tile.
 
 ## At a glance
 
 - **Where:** the sidebar's bottom panel on a wide screen, otherwise the account menu; there's no Other tab or home card.
-- **Contacts** (`/other/contact/`): a searchable address book with Google, phone and Outlook export, merge and bulk delete.
 - **Settings** (`/other/settings/`): every key on the Setting tab, in five tabs, with CSV exports.
 - **Changes apply live:** a saved setting takes effect without a reload.
-
-## Contacts
-
-### What it shows
-
-- **Table:** First Name, Last Name, Phone, Email, Tags; 25 rows a page, sortable by name.
-- **Privacy:** contact details are masked when the Amounts switch is off.
-
-### Actions
-
-- **➕ Add** (`/other/contact/add/`): name, prefix, tags, birthday, three phones, two emails, address, website, LinkedIn, two Telegrams, note.
-- **🔍 Search:** name, tags, phone or email.
-- **Row buttons:** ✏️ edit, 🗑️ delete.
-- **Export all:** 📱 Export for Google/Phone and 📧 Export for Outlook download a CSV.
-- **Select rows** to show the selection bar:
-
-| Button | Does |
-|---|---|
-| 📱 | Export Selected for Google/Phone |
-| 📧 | Export Selected for Outlook |
-| 🔗 | Merge Selected into one contact |
-| 🗑️ | Delete Selected |
-| ❌ | Clear selection |
-
-### Rules & calculations
-
-- **Merge:** the highest contact in the sheet is kept; its filled fields stay as they are and its blanks are filled from the others.
-  - **Lists:** phones, emails and Telegrams are combined without duplicates, up to each field's slots.
-  - **Tags and notes:** combined from all, duplicates dropped; the other rows are then deleted (no undo).
 
 ## Settings
 
@@ -77,7 +47,6 @@ The Other section holds Contacts and Settings, both opened from the account menu
 
 | Tab | Columns used |
 |---|---|
-| Contact | First, Middle, Last, Prefix, Tags, Birthday, Phone 1–3, Email 1–2, Street, City, Region, Postal, Country, Website, LinkedIn, Telegram 1–2, Note |
 | Setting | Key, Value, Notes |
 
 - **Columns in full:** see the [data model](../reference/data-model.md).
@@ -86,7 +55,6 @@ The Other section holds Contacts and Settings, both opened from the account menu
 
 | File | Role |
 |---|---|
-| `assets/script/other-contact.js` | Contacts table, form, merge and export |
 | `assets/script/other-settings.js` | Settings tabs, form, default notes and secret masking |
 | `assets/script/csv.js` | Export Transactions and Export Physique |
 

@@ -123,7 +123,7 @@ Every folder and file in the repository, one line each.
 | `track-leetcode.js` | LeetCode block: solves, progress, heatmap, roadmap, Cheat Sheet |
 | `track-leetcode-roadmap.js` | NeetCode 250 list, videos and roadmap graph (data only) |
 | `track-leetcode-cheatsheet.js` | Cheat Sheet Python constructs (data only) |
-| `other-contact.js` | Contacts block |
+| `track-contact.js` | Contacts block |
 | `other-settings.js` | Settings block, key suggestions, masking, `saveSettingValues` |
 
 ## `scripts/`

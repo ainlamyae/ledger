@@ -179,7 +179,7 @@ function renderHealthSafePaceChart(entries) {
         },
       },
       scales: {
-        x: wellnessCategoryXScale(dates),
+        x: datedCategoryXScale(dates),
         y: {
           min: yMin,
           max: yMax,

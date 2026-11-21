@@ -114,8 +114,8 @@ Every page reads the `Setting` tab first. Reads are batched (see [Data access](d
 | Home | Activity, Physique, Statement, Account, Breakdown, Transaction, eTimeSheet, LeetCode, Watchlist, Analysis (glance cards and tile badges) |
 | Health | Activity, Physique, Nutrition |
 | Finance | Statement, Account, Breakdown, Transaction, Watchlist, Analysis, Trade |
-| Track | Transaction (Car Service), eTimeSheet, Travel, Application, LeetCode |
-| Other | Contact, plus the Settings block |
+| Track | Transaction (Car Service), eTimeSheet, Travel, Application, LeetCode, Contact |
+| Other | The Settings block |
 
 - **Charts:** built lazily by `upsertChart` (`charts-base.js`) once a chart box scrolls into view.
 - **Insight:** nothing is computed on load; a mode click builds its preview, and **Send to AI** sends what is on screen.

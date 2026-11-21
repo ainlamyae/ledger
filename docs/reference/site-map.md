@@ -112,15 +112,15 @@ Every address in Ledger, with the breadcrumb step that names it.
 | Application | Page | `/track/application/` | Tile |
 | Log | Form | `/track/application/log/` | 📝 |
 | `<type>-<number>` | Row | `/track/application/<row>/` | Row ✏️ |
+| Contact | Page | `/track/contact/` | Tile |
+| Add | Form | `/track/contact/add/` | ➕ |
+| `<name>` | Row | `/track/contact/<name>/` | Row ✏️ |
 
 ## Other
 
 | Breadcrumb | Kind | Address | Opened by |
 |---|---|---|---|
 | Other | Section | `/other/` | Account menu (no tab) |
-| Contact | Page | `/other/contact/` | Tile |
-| Add | Form | `/other/contact/add/` | ➕ |
-| `<name>` | Row | `/other/contact/<name>/` | Row ✏️ |
 | Settings | Page | `/other/settings/` | Account menu; opens on AI & Keys |
 | AI & Keys | View | `/other/settings/ai/` | Tab |
 | AI Responses | View | `/other/settings/responses/` | Tab |

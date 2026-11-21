@@ -321,7 +321,7 @@ function renderLeetcodeHeatmap() {
     // A month's name over the first week it starts in.
     if (d.getDate() <= 7 && d.getDay() === 1) {
       const label = document.createElement('span');
-      label.textContent = d.toLocaleString('en', { month: 'short' });
+      label.textContent = wordDate(d, false);
       label.style.gridColumn = String(Math.floor(i / 7) + 1);
       months.appendChild(label);
     }

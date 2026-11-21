@@ -6,11 +6,12 @@ The Track section logs everything outside health and money: LeetCode practice, w
 
 ## At a glance
 
-- **Hub:** `/track/` has tiles for LeetCode, Work Time, Car Service, Travel and Application; no glance cards.
+- **Hub:** `/track/` has tiles for LeetCode, Work Time, Car Service, Travel, Application and Contact; no glance cards.
 - **LeetCode:** progress through the NeetCode 250, a daily heatmap, the roadmap and a Python cheat sheet.
 - **Work Time:** hours logged per day, with arrival, departure and overtime charts.
 - **Car Service:** service history read from Transportation transactions, and a forecast of the next services.
 - **Travel** and **Application:** a trip log with a country map, and application status cards.
+- **Contact** (`/track/contact/`): a searchable address book with Google, phone and Outlook export, merge and bulk delete.
 - **Reminders:** LeetCode, Work Time and Car Service badge their tiles; Work Time and Car Service can also notify in Chrome.
 
 ## LeetCode
@@ -145,6 +146,35 @@ The Track section logs everything outside health and money: LeetCode practice, w
 - **Ongoing:** an application with its submission or any update dated today; the rest are Closed.
 - **In the sheet:** Delay and later status rows are kept on the sheet itself, not entered here.
 
+## Contacts
+
+### What it shows
+
+- **Table:** First Name, Last Name, Phone, Email, Tags; 25 rows a page, sortable by name.
+- **Privacy:** contact details are masked when the Amounts switch is off.
+
+### Actions
+
+- **➕ Add** (`/track/contact/add/`): name, prefix, tags, birthday, three phones, two emails, address, website, LinkedIn, two Telegrams, note.
+- **🔍 Search:** name, tags, phone or email.
+- **Row buttons:** ✏️ edit, 🗑️ delete.
+- **Export all:** 📱 Export for Google/Phone and 📧 Export for Outlook download a CSV.
+- **Select rows** to show the selection bar:
+
+| Button | Does |
+|---|---|
+| 📱 | Export Selected for Google/Phone |
+| 📧 | Export Selected for Outlook |
+| 🔗 | Merge Selected into one contact |
+| 🗑️ | Delete Selected |
+| ❌ | Clear selection |
+
+### Rules & calculations
+
+- **Merge:** the highest contact in the sheet is kept; its filled fields stay as they are and its blanks are filled from the others.
+  - **Lists:** phones, emails and Telegrams are combined without duplicates, up to each field's slots.
+  - **Tags and notes:** combined from all, duplicates dropped; the other rows are then deleted (no undo).
+
 ## Data
 
 | Tab | Columns used |
@@ -154,6 +184,7 @@ The Track section logs everything outside health and money: LeetCode practice, w
 | Transaction | Transportation rows with `@<km>km` in Description (Car Service has no tab of its own) |
 | Travel | "Country, City", Port, Type, Via, Date, Time, Reason, Detail |
 | Application | Delay, Date, Action, Type, App Number |
+| Contact | First, Middle, Last, Prefix, Tags, Birthday, Phone 1–3, Email 1–2, Street, City, Region, Postal, Country, Website, LinkedIn, Telegram 1–2, Note |
 | Setting | `BIRTH_DATE` (Travel) |
 
 - **Columns in full:** see the [data model](../reference/data-model.md).
@@ -171,6 +202,7 @@ The Track section logs everything outside health and money: LeetCode practice, w
 | `assets/script/track-travel.js` | Travel table and form |
 | `assets/script/track-travel-chart.js` | Time per country and the map |
 | `assets/script/track-application.js` | Application cards and form |
+| `assets/script/track-contact.js` | Contacts table, form, merge and export |
 
 ## Related
 

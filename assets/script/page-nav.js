@@ -42,13 +42,16 @@ function onPageLinkClick(event, sectionId, panel) {
 // page it goes to the form's address.
 const QUICK_ACTIONS = {
   health: [
-    { label: 'Today', buttonId: 'today-physique-btn', href: () => `physique/${isoFromDate(new Date())}/` },
-    { label: 'Workouts', buttonId: 'activity-instruction-btn', href: () => 'activity/workouts/' },
-    // `page` moves that page's own tile to this spot.
-    { page: 'insight' },
-    // `after` places it beside that page's tile instead of last.
-    { label: 'Micronutrients', buttonId: 'physique-micro-range-btn', href: () => 'physique/micronutrients/', kind: 'chart', after: 'activity' },
+    { key: 'today', label: 'Today', buttonId: 'today-physique-btn', href: () => `physique/${isoFromDate(new Date())}/` },
+    { key: 'workouts', label: 'Workouts', buttonId: 'activity-instruction-btn', href: () => 'activity/workouts/' },
+    { key: 'micronutrients', label: 'Micronutrients', buttonId: 'physique-micro-range-btn', href: () => 'physique/micronutrients/', kind: 'chart' },
   ],
+};
+
+// A hub's tile order, by page route or quick action key; unlisted tiles go last.
+const TILE_ORDER = {
+  health: ['chart', 'micronutrients', 'insight', 'physique', 'nutrition', 'activity', 'tune', 'today', 'workouts'],
+  finance: ['chart', 'insight', 'watchlist', 'transaction', 'account', 'portfolio'],
 };
 
 // A tile's colour (styles.css's .page-tile[data-kind]) by what it opens; sheet-row
@@ -89,14 +92,10 @@ function buildQuickActions(section) {
   const grid = document.querySelector(`#${section.id} > .card > .page-tiles`);
   if (!actions || !grid) return;
   actions.forEach((action) => {
-    if (action.page) {
-      const pageTile = grid.querySelector(`.page-tile[data-route="${action.page}"]`);
-      if (pageTile) grid.appendChild(pageTile);
-      return;
-    }
     const source = document.getElementById(action.buttonId);
     const tile = createTile('page-tile quick-tile', action.label, (el) => {
       el.dataset.kind = action.kind || 'form';
+      el.dataset.quick = action.key;
       if (source?.title) el.title = source.title;
       el.href = `${section.href}${action.href()}`;
     });
@@ -106,10 +105,18 @@ function buildQuickActions(section) {
       event.preventDefault();
       source.click();
     });
-    const anchor = action.after && grid.querySelector(`.page-tile[data-route="${action.after}"]`);
-    if (anchor) anchor.after(tile);
-    else grid.appendChild(tile);
+    grid.appendChild(tile);
   });
+}
+
+function orderTiles(section) {
+  const order = TILE_ORDER[section.id];
+  const grid = document.querySelector(`#${section.id} > .card > .page-tiles`);
+  if (!order || !grid) return;
+  const tiles = [...grid.children];
+  const keyOf = (el) => el.dataset.route || el.dataset.quick;
+  const rank = (el) => (order.includes(keyOf(el)) ? order.indexOf(keyOf(el)) : order.length);
+  tiles.sort((a, b) => rank(a) - rank(b)).forEach((el) => grid.appendChild(el));
 }
 
 function buildPageTiles(section) {
@@ -374,6 +381,7 @@ function initPageNav() {
       }
       buildPageTiles(s);
       buildQuickActions(s);
+      orderTiles(s);
     });
     return;
   }
@@ -384,6 +392,7 @@ function initPageNav() {
   section.panels.forEach(liftPageActions);
   buildPageTiles(section);
   buildQuickActions(section);
+  orderTiles(section);
   buildPageCrumb(section);
   buildFormCrumb();
 }

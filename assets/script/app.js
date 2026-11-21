@@ -594,9 +594,10 @@ async function loadDashboard(forceRefresh = false) {
         settingsPromise.then(() => initTravel(forceRefresh)),
         initApplications(forceRefresh),
         initLeetcode(),
+        initContacts(forceRefresh),
       ] : []),
       // Other's Settings block (saving a setting from anywhere loads it on its own).
-      ...(shows('other') ? [initContacts(forceRefresh), initSettingsPanel(forceRefresh)] : []),
+      ...(shows('other') ? [initSettingsPanel(forceRefresh)] : []),
     ];
 
     const results = await Promise.allSettled([

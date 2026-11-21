@@ -252,7 +252,7 @@ function renderHealthProjectionChart(entries) {
       max: dayOffset(axisToDate),
       // Same tick dates as the category axes; autoSkip off so they aren't thinned.
       afterBuildTicks: (axis) => {
-        axis.ticks = wellnessTickIndices(axisDates).map((i) => ({ value: dayOffset(axisDates[i]) }));
+        axis.ticks = datedTickIndices(axisDates).map((i) => ({ value: dayOffset(axisDates[i]) }));
       },
       ticks: { maxRotation: 45, minRotation: 45, autoSkip: false, callback: offsetToDateLabel },
     },

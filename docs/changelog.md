@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](devel
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.43.0** | feat(finance): build every chart from Transaction, shorten displayed years, and refactor the touched files |
+| (this commit) | **3.44.0** | feat(nav): move Contact under Track, order hub tiles, and give every dated chart one x axis |
+| `0176165` | **3.43.0** | feat(finance): build every chart from Transaction, shorten displayed years, and refactor the touched files |
 | `067abc0` | 3.42.2 | style(physique): gray the Consumption Breakdown's Amount column so it doesn't read as calories |
 | `4c39d0f` | 3.42.1 | fix(forms): parse number fields without eval so the CSP stops rejecting every value |
 | `54b20d4` | **3.42.0** | feat(security): add a Content-Security-Policy, pin CDN libraries and rewrite the docs |

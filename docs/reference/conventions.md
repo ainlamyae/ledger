@@ -64,7 +64,8 @@ The one name, unit and format each thing uses everywhere in Ledger.
 
 - **Stored and typed:** `YYYY-MM-DD` (`2026-10-04`) in the sheet and every form field.
 - **Shown:** `YY-MM-DD` (`26-10-04`) in tables, chart axes and chart hovers, via `shortYearDate`.
-- **Month axes:** `YY-MM`; Finance trend steps read `Nov 26`, `Q4 26`.
+- **Chart x axes:** every dated chart uses `datedCategoryXScale`: eight evenly spaced `YY-MM-DD` ticks at 45°.
+- **Word dates:** heatmap month labels only, via `wordDate`: `Aug 26`.
 - **Times:** `HH:MM`, 24-hour.
 - **Home Date card:** the one exception, reading year, month and day.
 

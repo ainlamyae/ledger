@@ -305,7 +305,7 @@ function renderCarServiceChart(records, predictions, fit, today) {
       },
       scales: {
         x: {
-          ...wellnessCategoryXScale(dates),
+          ...datedCategoryXScale(dates),
           ticks: {
             maxRotation: 45,
             minRotation: 45,

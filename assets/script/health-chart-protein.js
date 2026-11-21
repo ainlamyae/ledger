@@ -150,7 +150,7 @@ function renderHealthMacroBandChart(entries, spec) {
         },
       },
       scales: {
-        x: wellnessCategoryXScale(dates),
+        x: datedCategoryXScale(dates),
         y: {
           min: 0,
           max: gMax,

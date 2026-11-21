@@ -394,18 +394,18 @@ function evenlySpacedIndices(length, maxTicks = 7) {
   return [...new Set(Array.from({ length: maxTicks }, (_, i) => Math.round((i * (length - 1)) / (maxTicks - 1))))];
 }
 
-// Dated Health charts: this many gridlines, the first and last on the window's ends.
-const HEALTH_X_GRIDLINES = 8;
+// Dated charts: this many gridlines, the first and last on the window's ends.
+const DATED_X_GRIDLINES = 8;
 
-function wellnessTickIndices(dates) {
-  return evenlySpacedIndices(dates.length, HEALTH_X_GRIDLINES);
+function datedTickIndices(dates) {
+  return evenlySpacedIndices(dates.length, DATED_X_GRIDLINES);
 }
 
-// The x scale for every dated category-axis Health chart.
-function wellnessCategoryXScale(dates) {
+// The x scale for every dated category-axis chart: angled YY-MM-DD ticks.
+function datedCategoryXScale(dates) {
   return {
     afterBuildTicks: (axis) => {
-      axis.ticks = wellnessTickIndices(dates).map((i) => ({ value: i }));
+      axis.ticks = datedTickIndices(dates).map((i) => ({ value: i }));
     },
     // First and last dates on the plot's edges; gridlines through each date.
     offset: false,

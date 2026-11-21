@@ -204,7 +204,7 @@ function renderHealthActivityChart(entries) {
         },
       },
       scales: {
-        x: { ...wellnessCategoryXScale(dates), stacked: true },
+        x: { ...datedCategoryXScale(dates), stacked: true },
         // kcal on the left with the gridlines, since Actual vs Desired Burn is read in
         // kcal; minutes on the right, labelled without the minus.
         y: {

@@ -191,7 +191,7 @@ function renderHealthSleepChart(entries) {
         },
       },
       scales: {
-        x: wellnessCategoryXScale(dates),
+        x: datedCategoryXScale(dates),
         y: {
           min: 0,
           afterFit: fixDatedYAxisWidth,

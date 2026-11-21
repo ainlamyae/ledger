@@ -39,7 +39,7 @@ async function initContacts(forceRefresh = false) {
     contactsListenersAttached = true;
 
     document.getElementById('add-contact-btn').addEventListener('click', () => openContactForm(null));
-    // other/contact/<name>/ opens that contact's Edit.
+    // track/contact/<name>/ opens that contact's Edit.
     editContact = routedRowEdit('contact', () => allContacts, contactDisplayName, openContactForm);
     document.getElementById('contact-cancel-btn').addEventListener('click', closeContactForm);
     onFormSubmit('contact-form', submitContactForm);

@@ -20,7 +20,7 @@ function spendingMonthlyAverage(totals, period, lifelongMonths) {
   return totals[period.key] / (period.months || lifelongMonths || 1);
 }
 
-// The Range row: how far back, and the step both trend charts bar and grid by.
+// The Range row: how far back, and the step the trend bars sum by.
 const FINANCE_TREND_RANGES = [
   { slug: '3m', label: '3m', months: 3, step: 'week' },
   { slug: '6m', label: '6m', months: 6, step: 'week' },
@@ -35,17 +35,14 @@ const FINANCE_TREND_STEPS = {
   week: {
     start: (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)),
     next: (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7),
-    label: (d) => d.toLocaleString('en', { month: 'short', day: 'numeric' }),
   },
   month: {
     start: (d) => new Date(d.getFullYear(), d.getMonth(), 1),
     next: (d) => new Date(d.getFullYear(), d.getMonth() + 1, 1),
-    label: (d) => d.toLocaleString('en', { month: 'short', year: '2-digit' }),
   },
   quarter: {
     start: (d) => new Date(d.getFullYear(), d.getMonth() - (d.getMonth() % 3), 1),
     next: (d) => new Date(d.getFullYear(), d.getMonth() + 3, 1),
-    label: (d) => `Q${Math.floor(d.getMonth() / 3) + 1} ${String(d.getFullYear()).slice(2)}`,
   },
 };
 
@@ -252,7 +249,7 @@ function drawFinanceDonut(canvasId, labels, values, colors) {
   });
 }
 
-// The filled blue running-total line, unsmoothed so a deposit shows as a sharp step.
+// The filled blue running-total line, smoothed; `monotone` stops overshoot.
 function netWorthLineDataset(points) {
   return {
     label: 'Cumulative Net Worth',
@@ -260,19 +257,16 @@ function netWorthLineDataset(points) {
     borderColor: chartColor('--chart-blue'),
     backgroundColor: chartColor('--chart-blue', 0.1),
     fill: true,
-    tension: 0,
+    tension: 0.3,
+    cubicInterpolationMode: 'monotone',
     pointRadius: 0,
   };
 }
 
-const netWorthTooltip = { callbacks: { label: (item) => `${item.dataset.label}: ${formatCurrency(item.raw)}` } };
+// Hover title: the date, as on the x axis.
+const datedTooltipTitle = (items) => (items.length ? formatIsoDateShort(items[0].label) : '');
 
-// Blank text on all but every nth tick so labels never overlap; grid lines stay.
-function thinnedTickLabel(scale, ordinal, count, text) {
-  const width = scale.chart.chartArea?.width || scale.chart.width || 1;
-  const every = Math.max(1, Math.ceil((count * 56) / width));
-  return ordinal % every === 0 ? text : '';
-}
+const netWorthTooltip = { callbacks: { title: datedTooltipTitle, label: (item) => `${item.dataset.label}: ${formatCurrency(item.raw)}` } };
 
 // ---------------------------------------------------------------------------
 // Trend charts (Range row)
@@ -288,39 +282,24 @@ function renderFinanceTrendCharts(report) {
   renderExpenseBreakdownTrendChart(report.trend);
 }
 
-// Cumulative Net Worth: daily points, a grid line on each step's first day.
+// Cumulative Net Worth: daily points.
 function renderSavingsTrendChart(allDays) {
   const canvasId = 'savings-trend-chart';
   if (allDays.length === 0) return clearFinanceChart(canvasId);
 
-  const { step, start } = financeTrendWindow(allDays[0].date);
-  const startIso = isoFromDate(start);
+  const startIso = isoFromDate(financeTrendWindow(allDays[0].date).start);
   const days = allDays.filter((d) => d.date >= startIso);
-  // Index -> ordinal of each step's first day, so thinning skips evenly.
-  const ticks = new Map();
-  days.forEach((d, i) => {
-    if (isoFromDate(step.start(dateFromIso(d.date))) === d.date) ticks.set(i, ticks.size);
-  });
+  const dates = days.map((d) => d.date);
 
   drawFinanceChart(canvasId, {
     type: 'line',
-    data: { labels: days.map((d) => shortYearDate(d.date)), datasets: [netWorthLineDataset(days)] },
+    data: { labels: dates, datasets: [netWorthLineDataset(days)] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: netWorthTooltip },
       scales: {
-        x: {
-          ticks: {
-            autoSkip: false,
-            maxRotation: 0,
-            // Null drops the tick and its grid line.
-            callback(_, i) {
-              if (!ticks.has(i)) return null;
-              return thinnedTickLabel(this, ticks.get(i), ticks.size, step.label(dateFromIso(days[i].date)));
-            },
-          },
-        },
+        x: datedCategoryXScale(dates),
         y: { beginAtZero: false, afterFit: fixTrendYAxisWidth, ticks: { callback: formatCurrency } },
       },
     },
@@ -344,7 +323,7 @@ function expenseTrendSteps({ categories, days }) {
       Object.entries(days[i].spend).forEach(([name, v]) => { spend[name] = (spend[name] || 0) + v; });
     }
     steps.push({
-      label: step.label(d),
+      date: isoFromDate(d),
       income: toCents(income),
       // A refund-heavy step nets below zero, which a stacked bar can't draw.
       spend: categories.map((c) => Math.max(0, toCents(spend[c.name] || 0))),
@@ -360,6 +339,7 @@ function renderExpenseBreakdownTrendChart(trend) {
   if (trend.days.length === 0 || trend.categories.length === 0) return clearFinanceChart(canvasId);
 
   const steps = expenseTrendSteps(trend);
+  const dates = steps.map((s) => s.date);
   // Same order as the datasets, so a legend index is its dataset index.
   const legendItems = [{ name: 'Income', color: desiredMarkColor() }, ...trend.categories];
 
@@ -367,7 +347,7 @@ function renderExpenseBreakdownTrendChart(trend) {
   const chart = drawFinanceChart(canvasId, {
     type: 'bar',
     data: {
-      labels: steps.map((s) => s.label),
+      labels: dates,
       datasets: [
         {
           type: 'line',
@@ -395,16 +375,9 @@ function renderExpenseBreakdownTrendChart(trend) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: datedTooltipTitle } } },
       scales: {
-        x: {
-          stacked: true,
-          ticks: {
-            autoSkip: false,
-            maxRotation: 0,
-            callback(_, i) { return thinnedTickLabel(this, i, steps.length, steps[i].label); },
-          },
-        },
+        x: { ...datedCategoryXScale(dates), stacked: true },
         y: { stacked: true, beginAtZero: true, afterFit: fixTrendYAxisWidth, ticks: { callback: formatCurrency } },
       },
     },
@@ -426,7 +399,7 @@ function renderExpenseBreakdownTrendChart(trend) {
 function renderFinanceGlanceNetWorthChart(days) {
   drawFinanceChart('finance-glance-networth-chart', {
     type: 'line',
-    data: { labels: days.map((d) => shortYearDate(d.date)), datasets: [netWorthLineDataset(days)] },
+    data: { labels: days.map((d) => d.date), datasets: [netWorthLineDataset(days)] },
     options: {
       responsive: true,
       maintainAspectRatio: false,

@@ -236,12 +236,12 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/contact/</loc>
+    <loc>https://ainlamyae.github.io/ledger/track/contact/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/contact/add/</loc>
+    <loc>https://ainlamyae.github.io/ledger/track/contact/add/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

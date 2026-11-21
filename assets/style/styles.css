@@ -2516,6 +2516,16 @@ html.home-hub .page-tiles,
     gap: var(--space-s);
 }
 
+/* Three a row on a phone, so long names fit. */
+@media (max-width: 820px) {
+    :is(#insight-mode-actions, #financial-insight-mode-actions),
+    html.section-pages[data-page="hub"] .page-tiles,
+    html.home-hub .page-tiles,
+    .page-tiles.instruction-groups {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
 :is(#insight-mode-actions, #financial-insight-mode-actions) {
     margin-bottom: 0;
 }
@@ -2531,12 +2541,6 @@ html.home-hub .page-tiles,
 :is(#insight-panel, #financial-insight-panel):not([data-insight-mode]) :is(#insight-generate-btn, #financial-insight-generate-btn),
 :is(#insight-panel, #financial-insight-panel)[data-insight-mode] > .insight-mode-actions {
     display: none;
-}
-
-@media (max-width: 820px) {
-    :is(#insight-mode-actions, #financial-insight-mode-actions) {
-        grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
-    }
 }
 
 /* Insight's prompt template. */
@@ -3216,7 +3220,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     align-items: center;
     /* The large button size. */
     min-height: 42px;
-    /* Narrow sides, so "Transaction" fits four a row. */
+    /* Narrow sides, for long names. */
     padding: var(--space-s) var(--space-xs);
     /* Liquid glass over a 15% --tile-tint wash, with a rim (::before). */
     --tile-tint: var(--color-text-muted);
@@ -3336,15 +3340,6 @@ html.section-pages .panel.page-active .panel-toggle-icon {
 .page-tile[data-kind="ai"],
 :is(#insight-mode-actions, #financial-insight-mode-actions) .page-tile {
     --tile-tint: var(--color-other);
-}
-
-/* Four a row on a phone, down to 375px. */
-@media (max-width: 820px) {
-    html.section-pages[data-page="hub"] .page-tiles,
-    html.home-hub .page-tiles,
-    .page-tiles.instruction-groups {
-        grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
-    }
 }
 
 /* The wide-screen sidebar; below 1180px the tab bar and tiles do its job. */

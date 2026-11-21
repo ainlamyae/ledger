@@ -156,6 +156,12 @@ function shortYearDate(text) {
   return String(text ?? '').replace(/^20(\d{2}-)/, '$1');
 }
 
+// Display only, where a word month fits better: "17 Aug" (day) or "Aug 26" (month).
+function wordDate(d, withDay = true) {
+  const month = d.toLocaleString('en', { month: 'short' });
+  return withDay ? `${d.getDate()} ${month}` : `${month} ${String(d.getFullYear()).slice(2)}`;
+}
+
 // A <td> with text and an optional title (e.g. for a truncated value).
 function makeCell(text, title) {
   const td = document.createElement('td');

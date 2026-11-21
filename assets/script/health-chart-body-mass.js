@@ -351,7 +351,7 @@ function renderHealthBodyMassChart(entries) {
         },
       },
       scales: {
-        x: wellnessCategoryXScale(dates),
+        x: datedCategoryXScale(dates),
         y: {
           // Not from zero: a 0 kg baseline flattens the movement the chart exists for.
           beginAtZero: false,

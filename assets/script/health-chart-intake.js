@@ -185,7 +185,7 @@ function renderHealthIntakeChart(entries) {
         },
       },
       scales: {
-        x: { ...wellnessCategoryXScale(dates), stacked: true },
+        x: { ...datedCategoryXScale(dates), stacked: true },
         // The stack's own axis, pinned to y1's kcal range so bars and dots share one scale.
         y: { ...ghostRightAxis(), stacked: true, min: axis.min, max: axis.max },
         y1: {

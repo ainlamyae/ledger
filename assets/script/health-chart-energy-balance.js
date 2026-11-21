@@ -215,7 +215,7 @@ function renderHealthEnergyBalanceChart(entries) {
         },
       },
       scales: {
-        x: wellnessCategoryXScale(labels),
+        x: datedCategoryXScale(labels),
         y: {
           min: yMin,
           max: yMax,

@@ -64,7 +64,7 @@ The Finance section tracks money: summary cards, charts, transactions, accounts,
 - **Filters:** From/To dates, Account, Payee (or `/`), Category and Description; they combine.
 - **Add Filter:** builds field rules (Account, Payee, Description, Category, Amount) joined by AND or OR.
 - **Row buttons:** ✏️ edit, 📋 duplicate (hold it to make 1–100 copies at once), 🗑️ delete with Undo.
-- **Select rows:** tick boxes to show ✏️ Edit Selected and 🗑️ Delete Selected; ❌ clears the selection.
+- **Select rows:** tick boxes to show ✏️ Edit Selected and 🗑️ Delete Selected left of the header's buttons (the bottom bar on a phone); untick to clear.
   - **Edit Selected** (`/finance/transaction/bulk-edit/`) changes only the fields you fill; Undo writes the old values back.
 - **Tax:** multiplies Amount by `TAX_RATE_PCT` (default 13) so you can check it before 💾; a second click taxes again.
 - **Confetti:** saving an Income transaction above 0 fires a burst.

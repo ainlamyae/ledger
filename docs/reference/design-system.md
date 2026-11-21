@@ -178,6 +178,7 @@ Ledger's colours, type, spacing, tables, buttons and chart rules, all defined in
 | ↩️ | Undo | 📝 | Log ticked |
 
 - **Selection bars:** 🔗 Merge, ✏️ Edit, 🗑️ Delete, 📱 and 📧 exports, ❌ Clear selection.
+  - **Placement:** the count and buttons lead the header's own (the bottom bar on a phone); the header's ❌ still closes, so untick rows to clear.
 
 ## Charts
 

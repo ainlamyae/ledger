@@ -1,5 +1,9 @@
-// A corrupt or hand-mangled cell degrades to "no breakdown" rather than
-// failing the form.
+// A text's trimmed, non-empty lines.
+function nonEmptyLines(text) {
+  return text.split('\n').map((line) => line.trim()).filter(Boolean);
+}
+
+// A corrupt cell reads as no breakdown rather than failing the form.
 function parsePhysiqueBreakdown(raw) {
   if (!raw) return [];
   try {
@@ -28,9 +32,9 @@ function syncPhysiqueTotalsFromBreakdown(breakdown, calories, protein) {
 
   const tef = estimateTefBreakdown(breakdown);
   const dayMacros = sumBreakdownMacros(breakdown);
-  if (dayMacros.fiber !== null) physiqueField('fiber').value = dayMacros.fiber;
-  if (dayMacros.fat !== null) physiqueField('fat').value = dayMacros.fat;
-  if (dayMacros.carbohydrate !== null) physiqueField('carbohydrate').value = dayMacros.carbohydrate;
+  ['fiber', 'fat', 'carbohydrate'].forEach((key) => {
+    if (dayMacros[key] !== null) physiqueField(key).value = dayMacros[key];
+  });
   if (tef) physiqueField('tef').value = tef.tefKcal;
 }
 
@@ -177,10 +181,40 @@ function hidePhysiqueActivityBreakdown() {
   document.getElementById('physique-activity-breakdown-body').innerHTML = '';
 }
 
+// `item` at `amount`, its figures `from`'s times `scale` (`macroKeys` maps from's keys to the row's).
+function scaledBreakdownRow(item, amount, from, scale, macroKeys) {
+  const row = { ...item, amount, calories: Math.round(from.calories * scale), protein: roundPlaces(from.protein * scale, 1) };
+  Object.entries(macroKeys).forEach(([fromKey, rowKey]) => {
+    delete row[rowKey];
+    if (from[fromKey] !== null && from[fromKey] !== undefined) row[rowKey] = roundPlaces(from[fromKey] * scale, 2);
+  });
+  return row;
+}
+
+const SAME_KEYS = Object.fromEntries(OPTIONAL_TOTAL_KEYS.map((key) => [key, key]));
+
+// Consumption is the reference: a saved row takes the line's grams. A Nutrition
+// row is repriced from the sheet as it is now; any other row is rescaled.
+function matchBreakdownToLine(item, line) {
+  const grams = consumptionLineGrams(line);
+  const amount = grams !== null ? `${roundPlaces(grams, 1)}g` : item.amount;
+
+  const entry = NUTRITION_TABLE_SOURCE_LABELS.includes(item.source) && findNutritionEntry(item.name);
+  if (entry) {
+    const parsed = parseBreakdownAmount(amount);
+    const scale = micronutrientScaleFactor(entry, { grams: parsed.grams || 0, count: parsed.count || 0 });
+    if (scale > 0) return scaledBreakdownRow(item, amount, entry, scale, BREAKDOWN_MACRO_KEY);
+  }
+
+  const savedGrams = parseBreakdownAmount(item.amount).grams;
+  if (grams === null || !savedGrams || Math.abs(grams - savedGrams) < 0.05) return item;
+  return scaledBreakdownRow(item, amount, item, grams / savedGrams, SAME_KEYS);
+}
+
 // Re-estimates only the Consumption lines that changed: a line matching a saved
 // item's noteLine reuses its numbers, so editing one ingredient costs one lookup.
 async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) {
-  const lines = consumption.split('\n').map((line) => line.trim()).filter(Boolean);
+  const lines = nonEmptyLines(consumption);
 
   // Each saved item backs at most one line, so a repeated line isn't double-counted.
   const pool = new Map();
@@ -197,7 +231,7 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
     !NUTRITION_TABLE_SOURCE_LABELS.includes(item.source) && findNutritionEntry(item.name);
   lines.forEach((line) => {
     const matches = pool.get(line);
-    if (matches && matches.length && !nowInNutrition(matches[0])) reused.push(matches.shift());
+    if (matches && matches.length && !nowInNutrition(matches[0])) reused.push(matchBreakdownToLine(matches.shift(), line));
     else staleLines.push(line);
   });
 
@@ -226,11 +260,9 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
 // The quantity field each parsed workout line type sums.
 const WORKOUT_QUANTITY_FIELD = { reps: 'reps', duration: 'minutes', steps: 'steps', hold: 'seconds' };
 
-// Workout's combineAndSortConsumptionText: lines for the same exercise and
-// quantity type sum ("30x" and "10min" of one exercise don't). An unparsed line
-// passes through as typed.
+// Same exercise and quantity type sum ("30x" and "10min" don't); unparsed lines stay.
 function combineWorkoutText(text) {
-  const rawLines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const rawLines = nonEmptyLines(text);
   if (!rawLines.length) return { text, combinedCount: 0 };
 
   const groups = new Map();
@@ -252,10 +284,8 @@ function combineWorkoutText(text) {
   return { text: rebuilt.join('\n'), combinedCount };
 }
 
-// Prices the Workout into the hidden Activity Duration/Calories Out fields and
-// the table, returning warnings for the caller to show. A Workout that can't be
-// priced writes nothing. reorderWorkoutField (an explicit Calculate only) also
-// rewrites the box combined and sorted; opening a day never touches its text.
+// Prices the Workout into Activity Duration/Calories Out and the table; returns
+// warnings. reorderWorkoutField (Calculate only) also combines and sorts the text.
 function runPhysiqueWorkoutCalc(reorderWorkoutField) {
   const messages = [];
   const workout = physiqueField('workout').value.trim();
@@ -312,9 +342,6 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
   return messages;
 }
 
-// Mass units only: volume units need the food's density, i.e. a USDA/AI lookup.
-const PHYSIQUE_MASS_UNIT_TO_GRAMS = { g: 1, kg: 1000, mg: 0.001, oz: 28.3495, lb: 453.592 };
-
 // A line's calories from the Nutrition table alone (by count or by mass), or
 // null (not 0) when it can't be priced locally.
 function localIngredientCalories(quantity, unit, name) {
@@ -336,16 +363,13 @@ function localIngredientCalories(quantity, unit, name) {
 // A Consumption line rebuilt as "<quantity><canonical unit> <name>".
 function consumptionLineText(quantity, unit, name) {
   const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
-  return `${Math.round(quantity * 100) / 100}${unitText} ${name}`.trim();
+  return `${roundPlaces(quantity, 2)}${unitText} ${name}`.trim();
 }
 
-// Tidies a Consumption block: lines with the same name AND unit combine (no unit
-// conversion), names are title-cased, and lines sort by calories, highest first.
-// A line with no quantity stays as typed. caloriesForName supplies the ranking
-// (Calculate passes the breakdown's, so the field sorts like the table);
-// localIngredientCalories covers any name it doesn't.
+// Same name and unit combine, names title-case, lines sort by calories (from
+// caloriesForName, else the Nutrition table). Unquantified lines stay as typed.
 function combineAndSortConsumptionText(text, caloriesForName = null) {
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = nonEmptyLines(text);
   if (!lines.length) return { text, combinedCount: 0 };
 
   const groups = new Map();
@@ -384,7 +408,7 @@ function breakdownCaloriesLookup(breakdown) {
     const key = item.name.toLowerCase();
     byName.set(key, (byName.get(key) || 0) + (item.calories || 0));
   });
-  return (name) => (byName.has(name.toLowerCase()) ? byName.get(name.toLowerCase()) : null);
+  return (name) => byName.get(name.toLowerCase()) ?? null;
 }
 
 // Per-line name suggestions for the Consumption and Workout textareas: a

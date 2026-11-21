@@ -149,7 +149,7 @@ Every tab of the Google Sheet behind Ledger, column by column.
 - **Breakdown items:** `{name, amount, calories, protein, fiber, fat, carbohydrate, tef, source, noteLine, newRow}`, in Nutrition's column order.
 - **Item amount:** grams (`"62g"`) when the food's Nutrition row gives a weight; `"×N"` only when it doesn't.
 - **Item macros:** fiber, fat, carbohydrate and tef appear only when the ingredient has a typed figure or pulled 🧬 Micronutrients.
-- **`noteLine`:** the standardised line an item came from, so a re-run of 🧮 Calculate reuses unchanged lines.
+- **`noteLine`:** the standardised line an item came from, so a re-run of 🧮 Calculate reuses unchanged lines (amount set from the line; ✅ rows repriced from Nutrition).
 - **Sleep and Deprivation backfill:** blank cells that can be computed are filled once on load in one batch.
 - **TEF fallback:** a day with blank TEF uses `TEF_PERCENT_OF_INTAKE` × TEI wherever TEF is needed.
 

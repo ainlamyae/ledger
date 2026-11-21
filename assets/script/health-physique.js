@@ -127,7 +127,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   // TEF and AEE are expenditures, so shown negative like the Status card's rows.
   show('physique-tei', day.caloriesIn);
   // Needs only intake, not the sleep times D does.
-  const tefKcal = energy ? energy.tef : day.tef ?? (day.caloriesIn !== null ? Math.round(day.caloriesIn * (1 - tefDivisor())) : null);
+  const tefKcal = energy ? energy.tef : day.tef ?? (day.caloriesIn !== null ? physiqueTefKcal(day.caloriesIn) : null);
   show('physique-tef-derived', tefKcal !== null ? -tefKcal : null);
   show('physique-aee', `${day.caloriesOut > 0 ? '-' : ''}${day.caloriesOut}`);
 
@@ -174,13 +174,14 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const healthEntries = physiqueAsHealthEntries();
   const planMassKg = planBodyMassKg(healthEntries);
   const calDesired = getCalorieDesired(healthEntries);
-  const digDesired = Math.round(calDesired.kcal * (1 - tefDivisor()));
+  const digDesired = physiqueTefKcal(calDesired.kcal);
   // At the latest reading on or before the day when it has none of its own.
   const actMassKg = day.bodyMass ?? physiqueBodyMassAsOf(day.date);
   const actDesiredKcal = actMassKg !== null ? Math.round(getActivityDesiredKcal(actMassKg)) : null;
   const weeklyFatLossKg = weeklyFatLossKgAt(planMassKg);
-  const desiredKgPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * 1000) / 1000 : null;
-  const desiredGPerDay = weeklyFatLossKg !== null ? Math.round((-weeklyFatLossKg / 7) * GRAMS_PER_KG) : null;
+  const desiredDailyKg = weeklyFatLossKg !== null ? -weeklyFatLossKg / 7 : null;
+  const desiredKgPerDay = desiredDailyKg !== null ? Math.round(desiredDailyKg * 1000) / 1000 : null;
+  const desiredGPerDay = desiredDailyKg !== null ? Math.round(desiredDailyKg * GRAMS_PER_KG) : null;
   const bmiDesired = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
 
   // The healthy mass ± glycogen swing, as the Progress meter shows it.
@@ -330,9 +331,10 @@ async function initPhysique(forceRefresh = false) {
     document.getElementById('physique-search').addEventListener('input', () => showPhysiquePage(1));
     makeSortableHeaders('#physique-table', pSort, () => showPhysiquePage(1));
 
-    document.getElementById('physique-select-all').addEventListener('change', (e) => {
+    const selectAll = document.getElementById('physique-select-all');
+    selectAll.addEventListener('change', () => {
       const { pageEntries } = getPhysiquePageEntries();
-      pageEntries.forEach((p) => (e.target.checked ? selectedPhysiqueRows.add(p.row) : selectedPhysiqueRows.delete(p.row)));
+      pageEntries.forEach((p) => (selectAll.checked ? selectedPhysiqueRows.add(p.row) : selectedPhysiqueRows.delete(p.row)));
       renderPhysiqueList();
     });
     onAsyncClick('physique-bulk-calc-btn', bulkCalculatePhysique);
@@ -710,13 +712,17 @@ function storedBmrForDate(date, basis = bmrBasis()) {
   return pickBmrForBasis(bmrFiguresForDate(date), basis);
 }
 
-// A day's energy balance off its TEI, AEE, TEF and stored BMR (the Status card's
-// dailyEnergyBalanceKcal). Null without a BMR, TEI or sleep; with sleepOptional,
-// no Bed/Wake counts as SD = 0 (the form's live table).
+// TEF estimated from intake, for a day without a calculated one.
+function physiqueTefKcal(intakeKcal) {
+  return Math.round(intakeKcal * (1 - tefDivisor()));
+}
+
+// A day's energy balance (the Status card's dailyEnergyBalanceKcal). Null without
+// BMR, TEI or sleep; sleepOptional counts no Bed/Wake as SD = 0.
 function physiqueEnergyBalance(day, sleepHours, bmrFigures, { sleepOptional = false } = {}) {
   const maintenance = pickBmrForBasis(bmrFigures);
   if (maintenance === null || day.caloriesIn === null || (sleepHours === null && !sleepOptional)) return null;
-  const tef = day.tef !== null ? day.tef : Math.round(day.caloriesIn * (1 - tefDivisor()));
+  const tef = day.tef !== null ? day.tef : physiqueTefKcal(day.caloriesIn);
   return {
     tef,
     ...dailyEnergyBalanceKcal(
@@ -783,14 +789,15 @@ function physiqueRowValues(day) {
   return { ...day, ...physiqueDerivedFigures(day) };
 }
 
-// Only the app's own columns, one cell each, so the user's columns (formulas
-// included) are never rewritten.
+// The app's column keys present on the sheet.
+function presentPhysiqueColumnKeys() {
+  return PHYSIQUE_COLUMNS.map(({ key }) => key).filter(hasPhysiqueColumn);
+}
+
+// Only the app's own columns, one cell each, so the user's columns are never rewritten.
 async function writePhysiqueRow(row, day) {
   const values = physiqueRowValues(day);
-  const data = PHYSIQUE_COLUMNS
-    .filter(({ key }) => hasPhysiqueColumn(key))
-    .map(({ key }) => physiqueCellUpdate(key, row, values[key]));
-  await batchUpdateValues(data);
+  await batchUpdateValues(presentPhysiqueColumnKeys().map((key) => physiqueCellUpdate(key, row, values[key])));
 }
 
 // A new row has nothing to keep, so the columns between the app's go blank.
@@ -798,8 +805,8 @@ async function appendPhysiqueRow(day) {
   const values = physiqueRowValues(day);
   const width = Math.max(...PHYSIQUE_COLUMNS.map(({ key }) => physiqueColumnIndex[key] ?? -1)) + 1;
   const cells = Array(width).fill('');
-  PHYSIQUE_COLUMNS.forEach(({ key }) => {
-    if (hasPhysiqueColumn(key)) cells[physiqueColumnIndex[key]] = physiqueCellValue(key, values[key]);
+  presentPhysiqueColumnKeys().forEach((key) => {
+    cells[physiqueColumnIndex[key]] = physiqueCellValue(key, values[key]);
   });
   await appendValues(sheetRange(CONFIG.SHEETS.PHYSIQUE, `A:${sheetColumnLetter(width - 1)}`), [cells]);
 }
@@ -809,12 +816,9 @@ async function appendPhysiqueRow(day) {
 const physiqueBackfilledCells = new Set();
 let physiqueBackfillSpreadsheetId = null;
 
-function physiqueCellRange(key, row) {
-  return sheetRange(CONFIG.SHEETS.PHYSIQUE, `${sheetColumnLetter(physiqueColumnIndex[key])}${row}`);
-}
-
 function physiqueCellUpdate(key, row, value) {
-  return { range: physiqueCellRange(key, row), values: [[physiqueCellValue(key, value)]] };
+  const range = sheetRange(CONFIG.SHEETS.PHYSIQUE, `${sheetColumnLetter(physiqueColumnIndex[key])}${row}`);
+  return { range, values: [[physiqueCellValue(key, value)]] };
 }
 
 // Counts row deletes sent. Background writes address rows from the last read, so
@@ -866,42 +870,37 @@ async function runPhysiqueBackfill(data, label) {
 // cells only, oldest day first. Nothing to do once all are filled.
 async function backfillPhysiqueDerivedFigures() {
   if (physiqueBatchRunning) return;
-  const has = hasPhysiqueColumn;
+  const hasBmr = hasPhysiqueColumn('bmr');
   const data = [];
   physiqueDatedAscending().forEach((p) => {
     const sleep = physiqueStoredSleepHours(p);
-    if (has('sleep') && p.sleep === null && sleep !== null) data.push(physiqueCellUpdate('sleep', p.row, sleep));
+    if (hasPhysiqueColumn('sleep') && p.sleep === null && sleep !== null) data.push(physiqueCellUpdate('sleep', p.row, sleep));
 
+    // The Derived cell to write, if any.
+    let derived = null;
     let figures = p.bmr;
-    if (has('bmr') && !figures) {
+    if (hasBmr && !figures) {
       figures = computePhysiqueBmrFigures(p.date);
-      if (Object.keys(figures).length) data.push(physiqueCellUpdate('bmr', p.row, figures));
-    } else if (has('bmr') && figures.BMR_cal === undefined) {
-      // A day that now has enough history gets its BMR_cal once, then keeps it.
+      if (Object.keys(figures).length) derived = figures;
+    } else if (hasBmr && figures.BMR_cal === undefined) {
+      // Enough history now: BMR_cal is stored once, then kept.
       const calibrated = physiqueCalibratedBmr(p.date, plainBmrOf(figures), figures);
       if (calibrated !== undefined) {
         figures = { ...figures, BMR_cal: calibrated };
-        data.push(physiqueCellUpdate('bmr', p.row, figures));
+        derived = figures;
       }
     }
-    if (has('deprivation') && p.deprivation === null) {
+    if (hasPhysiqueColumn('deprivation') && p.deprivation === null) {
       const deprivation = physiqueDeprivationKcal(p, sleep, figures || bmrFiguresForDate(p.date));
       if (deprivation !== null) data.push(physiqueCellUpdate('deprivation', p.row, deprivation));
     }
+    // Body-mass figures where missing (or m_d still in g/day).
+    if (hasBmr && (!p.mass || massChangeStoredInGrams(p.mass))) {
+      const mass = computePhysiqueMassFigures(p.date);
+      if (Object.keys(mass).length) derived = { ...(derived || p.bmr || {}), ...mass };
+    }
+    if (derived) data.push(physiqueCellUpdate('bmr', p.row, derived));
   });
-  // Body-mass figures for Derived cells without them (or with m_d still in g/day).
-  if (has('bmr')) {
-    physiqueDatedAscending().forEach((p) => {
-      if (p.mass && !massChangeStoredInGrams(p.mass)) return;
-      const figures = computePhysiqueMassFigures(p.date);
-      if (!Object.keys(figures).length) return;
-      const range = physiqueCellRange('bmr', p.row);
-      const pending = data.find((d) => d.range === range);
-      // Merged into this day's BMR write above, if any.
-      if (pending) pending.values = [[physiqueCellValue('bmr', { ...JSON.parse(pending.values[0][0] || '{}'), ...figures })]];
-      else data.push(physiqueCellUpdate('bmr', p.row, { ...(p.bmr || {}), ...figures }));
-    });
-  }
   await runPhysiqueBackfill(data, 'stored missing Sleep/BMR/Deprivation/body mass');
 }
 
@@ -927,7 +926,6 @@ async function convertPhysiqueBreakdownAmountsToGrams() {
 // the day's TEF and its Deprivation. Needs Nutrition loaded, like the above.
 async function fillPhysiqueMissingTef() {
   if (physiqueBatchRunning || !hasPhysiqueColumn('breakdown')) return;
-  const has = hasPhysiqueColumn;
   const data = [];
   allPhysiqueEntries.forEach((p) => {
     const items = parsePhysiqueBreakdown(p.breakdown);
@@ -935,8 +933,8 @@ async function fillPhysiqueMissingTef() {
     const result = estimateTefBreakdown(items);
     if (!result || !items.some((item, i) => before[i] === undefined && item.tef !== undefined)) return;
     data.push(physiqueCellUpdate('breakdown', p.row, breakdownToJson(items)));
-    if (has('tef')) data.push(physiqueCellUpdate('tef', p.row, result.tefKcal));
-    if (has('deprivation') && p.date) {
+    if (hasPhysiqueColumn('tef')) data.push(physiqueCellUpdate('tef', p.row, result.tefKcal));
+    if (hasPhysiqueColumn('deprivation') && p.date) {
       const day = { ...p, tef: result.tefKcal };
       const deprivation = physiqueDeprivationKcal(day, physiqueStoredSleepHours(p), bmrFiguresForDate(p.date));
       if (deprivation !== null) data.push(physiqueCellUpdate('deprivation', p.row, deprivation));
@@ -1101,8 +1099,8 @@ function warnBalanceShortOfDesire(derived) {
 function celebrateBodyMassProgress(date, bodyMass) {
   const today = localIso();
   if (date !== today || !bodyMass) return;
-  const previous = physiqueDatedAscending().filter((p) => p.date < today && p.bodyMass !== null).at(-1)?.bodyMass;
-  if (previous == null) return;
+  const previous = physiqueBodyMassAsOf(isoDatePlusDays(today, -1));
+  if (previous === null) return;
   const healthyKg = getSetting('BODY_MASS_HEALTHY_KG', BODY_MASS_HEALTHY_KG_DEFAULT);
   if (Math.abs(bodyMass - healthyKg) < Math.abs(previous - healthyKg)) Motion.confetti();
 }
@@ -1217,6 +1215,11 @@ function renderPhysiqueList() {
   const num = (value) => (value === null ? '—' : masked(String(value)));
   // Whole grams, floored as the day's breakdown Total shows them.
   const int = (value) => (value === null ? '—' : masked(String(Math.floor(value))));
+  // Gray, so hours, minutes and grams don't read as calories.
+  const muted = (cell) => {
+    cell.className = 'physique-muted';
+    return cell;
+  };
 
   pageEntries.forEach((p, i) => {
     const tr = document.createElement('tr');
@@ -1250,15 +1253,9 @@ function renderPhysiqueList() {
     });
     checkboxCell.appendChild(checkbox);
 
-    // Gray, so hours, minutes and grams don't read as calories.
-    const muted = (cell) => {
-      cell.className = 'physique-muted';
-      return cell;
-    };
-
     tr.append(
       checkboxCell,
-      makeCell(p.date ? shortYearDate(p.date) : '🔁 Pattern'),
+      p.date ? makeCell(shortYearDate(p.date)) : makeCell('🔁', 'Pattern'),
       makeCell(num(p.bodyMass)),
       muted(makeCell(num(sleepHours), masked(sleepTitle))),
       makeCell(num(deprivationKcal), masked(deprivationTitle)),
@@ -1486,7 +1483,7 @@ function physiqueBodyMassKg() {
 
 // The most recent day that recorded a body mass. Null if none ever has.
 function physiqueBodyMassKgFromLog() {
-  return physiqueDatedAscending().filter((p) => p.bodyMass !== null).at(-1)?.bodyMass ?? null;
+  return physiqueDatedAscending().findLast((p) => p.bodyMass !== null)?.bodyMass ?? null;
 }
 
 // A copy of a day to change and pass to writePhysiqueRow; also what an undo writes back.

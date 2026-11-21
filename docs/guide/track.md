@@ -159,7 +159,7 @@ The Track section logs everything outside health and money: LeetCode practice, w
 - **🔍 Search:** name, tags, phone or email.
 - **Row buttons:** ✏️ edit, 🗑️ delete.
 - **Export all:** 📱 Export for Google/Phone and 📧 Export for Outlook download a CSV.
-- **Select rows** to show the selection bar:
+- **Select rows** to show these left of the header's buttons (the bottom bar on a phone); untick to clear:
 
 | Button | Does |
 |---|---|
@@ -167,7 +167,6 @@ The Track section logs everything outside health and money: LeetCode practice, w
 | 📧 | Export Selected for Outlook |
 | 🔗 | Merge Selected into one contact |
 | 🗑️ | Delete Selected |
-| ❌ | Clear selection |
 
 ### Rules & calculations
 

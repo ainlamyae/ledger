@@ -39,7 +39,6 @@ textarea {
     --color-danger: #ff3b30;
     --color-danger-hover: #d70015;
     --color-muted: #64748b;
-    --color-muted-hover: #475569;
     --color-income: #34c759;
     --color-other: #7c3aed;
     --color-bg: #f2f2f7;
@@ -568,17 +567,6 @@ header .btn:hover {
     background: var(--color-primary-hover);
 }
 
-/* Opens an editor (Tune, Today, Transfer) rather than committing a change. */
-.btn-secondary {
-    background: var(--color-muted);
-    border-color: var(--color-muted);
-    color: #fff;
-}
-
-.btn-secondary:hover {
-    background: var(--color-muted-hover);
-}
-
 .btn-danger {
     background: var(--color-danger);
     border-color: var(--color-danger);
@@ -977,23 +965,12 @@ html:not(.section-pages) .panel-group + .panel-group {
     margin-top: var(--space-s);
 }
 
-/* "Hide widgets", stamped before first paint by index.html's head script. */
-html[data-widgets-pref="hidden"] .widget-cards {
-    display: none;
-}
-
-/* "Hide bulbs", set the same way; data-under-tiles bulbs hide too. */
+/* "Hide widgets"/"Hide bulbs" (set before first paint), home's blocks (tiles
+   only), and group titles (kept for routeTitle). */
+html[data-widgets-pref="hidden"] .widget-cards,
 html[data-bulbs-pref="hidden"] #dashboard .panel-group > .cards,
-html[data-bulbs-pref="hidden"] #dashboard .panel-group > [data-under-tiles] {
-    display: none;
-}
-
-/* The home page shows glance cards and tiles, never the blocks themselves. */
-html.home-hub #dashboard .panel-group > .panel[data-route] {
-    display: none;
-}
-
-/* Never shown; kept for routeTitle's page titles. */
+html[data-bulbs-pref="hidden"] #dashboard .panel-group > [data-under-tiles],
+html.home-hub #dashboard .panel-group > .panel[data-route],
 .panel-group-title {
     display: none;
 }
@@ -1253,8 +1230,7 @@ td:has(.btn) {
     margin-bottom: var(--space-s);
 }
 
-/* Cells on one line (.table-responsive scrolls): Nutrition wraps only
-   Classification, Name and Amount; Physique's breakdowns only the name. */
+/* One-line cells; Nutrition wraps Classification, Name, Amount; Physique only the name. */
 #nutrition-table th:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)),
 #nutrition-table td:not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(4)),
 .car-service-table th,
@@ -1864,11 +1840,8 @@ td .btn {
     overflow-y: auto;
 }
 
-.modal-card h2 {
-    margin-bottom: var(--space-s);
-}
-
 /* A form's hints sit just above its actions row. */
+.modal-card h2,
 .app-form .hint {
     margin-bottom: var(--space-s);
 }
@@ -2194,8 +2167,7 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: var(--space-s);
 }
 
-/* Range rows, rotation cards, Workouts, Travel's cards and any page's first card
-   or card grid: one gap below only. */
+/* Range rows, cards and card grids: one gap below only. */
 .pagination.panel-range,
 .body-mass-projection-wrap.page-rotation-card,
 #instruction-groups-card,
@@ -2398,11 +2370,8 @@ input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
     margin-top: 0;
 }
 
-.workout-day + .workout-day {
-    margin-top: var(--space-xl);
-}
-
-/* Log Workout clear of the plan, on the same rhythm (:not(.collapsed) as above). */
+/* Days apart; Log Workout clear of the plan, same rhythm. */
+.workout-day + .workout-day,
 #workout-plan-panel:not(.collapsed) .panel-actions {
     margin-top: var(--space-xl);
 }
@@ -2619,8 +2588,7 @@ html.home-hub .page-tiles,
 }
 
 @media (max-width: 1179px) {
-    /* No top bar below 1180px: the tab bar and the avatar stay, pinned to the
-       bottom; the breadcrumb's Ledger link replaces the logo. */
+    /* No top bar: tab bar and avatar pin to the bottom; the breadcrumb replaces the logo. */
     header {
         display: contents;
     }
@@ -3149,9 +3117,8 @@ html.home-hub .page-tiles,
     color: var(--color-income);
 }
 
-/* --- Hub and pages (page-nav.js, router.js's showSectionPage) ------------------
-   html[data-page]: "hub" shows glance cards and tiles, "block" one block under
-   its breadcrumb. */
+/* --- Hub and pages (page-nav.js, router.js) ---------------------------------
+   data-page "hub": cards and tiles; "block": one block. */
 /* A block page keeps only the open block and its breadcrumb (which names it). */
 .page-tiles,
 .page-crumb,
@@ -3165,6 +3132,15 @@ html.section-pages[data-page="block"] .panel.page-active > .panel-header > h2 {
 /* The block's buttons stay at the right. */
 html.section-pages[data-page="block"] .panel.page-active > .panel-header > .panel-header-actions {
     margin-left: auto;
+}
+
+/* A selection bar's buttons sit first among the header's at every width; the header's ❌ closes. */
+.panel-header-actions > .panel-actions:not([hidden]) {
+    display: contents;
+}
+
+.panel-header-actions > .panel-actions .page-action-close {
+    display: none;
 }
 
 /* One breadcrumb look for hub, page and form page. */
@@ -3504,10 +3480,7 @@ html.section-pages .panel.page-active .panel-toggle-icon {
         display: block;
     }
 
-    html[data-side-nav="closed"] .side-nav-toggle-icon {
-        display: none;
-    }
-
+    html[data-side-nav="closed"] .side-nav-toggle-icon,
     html[data-side-nav="closed"] .side-nav-toggle:hover .side-nav-toggle-logo,
     html[data-side-nav="closed"] .side-nav-toggle:focus-visible .side-nav-toggle-logo {
         display: none;
@@ -3627,8 +3600,8 @@ html.section-pages .panel.page-active .panel-toggle-icon {
     }
 }
 
-/* --- Form pages (router.js's updateFormPage) ---------------------------------
-   A routed form takes the section page's place, laid out like a block page. */
+/* --- Form pages (router.js) ----------------------------------------------------
+   A routed form replaces the section page, like a block page. */
 html.section-pages[data-form-page] #dashboard,
 html.section-pages[data-form-page] .modal.form-page-under {
     display: none;
@@ -3735,9 +3708,8 @@ html.section-pages .panel.page-active:hover {
     padding: 0;
 }
 
-/* --- One bottom bar at a time (page-nav.js's updateActionBar) -------------------
-   A page's .action-bar ends in ❌; on a phone it replaces the tab bar, in its look,
-   scrolling sideways with ❌ kept in view. */
+/* --- One bottom bar at a time (page-nav.js) -------------------------------------
+   On a phone a page's .action-bar replaces the tab bar; ❌ stays in view. */
 .panel-actions .page-action-close {
     float: none;
     margin-left: auto;
@@ -3785,7 +3757,8 @@ html.section-pages .panel.page-active:hover {
         display: none;
     }
 
-    html[data-action-bar] .action-bar > * {
+    html[data-action-bar] .action-bar > *,
+    html[data-action-bar] .action-bar > .panel-actions > * {
         flex: 0 0 auto;
     }
 
@@ -3822,7 +3795,8 @@ html.section-pages .panel.page-active:hover {
     }
 
     /* A selection bar's count. */
-    html[data-action-bar] .action-bar > span {
+    html[data-action-bar] .action-bar > span,
+    html[data-action-bar] .action-bar > .panel-actions > span {
         color: var(--glass-text);
         font-size: var(--text-small);
         white-space: nowrap;
@@ -3884,8 +3858,7 @@ html.section-pages .panel.page-active:hover {
 }
 
 /* ───────────────────────────── Print ─────────────────────────────
-   Chrome repeats fixed elements on every sheet, so the app's chrome goes and
-   the shell flattens onto paper. */
+   Fixed elements repeat per sheet, so the chrome goes. */
 @media print {
     /* Fixed bars, the sidebar, transient overlays and on-screen controls. */
     .nav,

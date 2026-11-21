@@ -164,6 +164,14 @@ const COUNT_LIKE_UNITS = new Set(
 // Fixed weight for a unit the AI can only guess: a standard 30 g/ml shot.
 const UNIT_TO_GRAMS = { shot: 30, shots: 30 };
 
+// Mass units only: volume units need the food's density, i.e. a USDA/AI lookup.
+const PHYSIQUE_MASS_UNIT_TO_GRAMS = { g: 1, kg: 1000, mg: 0.001, oz: 28.3495, lb: 453.592 };
+
+// Grams per one of a typed mass unit, any spelling; undefined otherwise.
+function massUnitGrams(unit) {
+  return PHYSIQUE_MASS_UNIT_TO_GRAMS[UNIT_CANONICAL[unit]];
+}
+
 // A leading energy amount is an anchor ("300kcal cookie"). "cal" means kcal; kJ converts.
 const KJ_PER_KCAL = 4.184;
 const ENERGY_UNIT_TO_KCAL = {
@@ -251,8 +259,8 @@ function extractIngredientName(segment) {
 }
 
 function extractIngredientQuantity(segment) {
-  const { quantity, unit, anchors } = stripLeadingIngredientTokens(segment);
-  return { quantity, unit, anchors };
+  const { rest, ...quantity } = stripLeadingIngredientTokens(segment);
+  return quantity;
 }
 
 // A typed anchor's amount for `field` (kcal already converted), or null.
@@ -263,6 +271,24 @@ function typedAnchor({ anchors }, field) {
 // Grams holding `amount` of a macro at `per100g`; a zero density keeps the AI's grams.
 function gramsForAnchor(amount, per100g, fallbackGrams) {
   return per100g > 0 ? (amount / per100g) * 100 : fallbackGrams;
+}
+
+// Whether a Nutrition Amount counts in `unit` ("5g (1cup)" names cup).
+function amountNamesUnit(amount, unit) {
+  const spellings = (unit && UNIT_SPELLINGS[UNIT_CANONICAL[unit]]) || [];
+  return spellings.some((s) => new RegExp(`\\d\\s*${s}\\b`, 'i').test(String(amount || '')));
+}
+
+// Grams a Consumption line means: its typed weight, or its count of a Nutrition
+// row's named unit; null otherwise.
+function consumptionLineGrams(line) {
+  const { quantity, unit } = extractIngredientQuantity(line);
+  if (quantity === null || !unit) return null;
+  const perGram = massUnitGrams(unit);
+  if (perGram) return quantity * perGram;
+  const entry = findNutritionEntry(extractIngredientName(line));
+  const perUnit = entry && amountNamesUnit(entry.amount, unit) ? nutritionGramsPerUnit(entry) : null;
+  return perUnit === null ? null : quantity * perUnit;
 }
 
 // The USDA food Calculate priced each new ingredient from, by lowercase name.
@@ -292,6 +318,9 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       const { quantity, unit } = segmentQuantities[i];
       if (!unit) return;
       if (UNIT_TO_GRAMS[unit]) item.grams = (quantity ?? 1) * UNIT_TO_GRAMS[unit];
+      // A typed weight is the amount eaten, not the AI's guess.
+      const perGram = massUnitGrams(unit);
+      if (perGram && quantity !== null) item.grams = quantity * perGram;
       if (COUNT_LIKE_UNITS.has(unit)) item.count = quantity ?? 1;
     });
   }
@@ -309,6 +338,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     const typed = (field) => (parsed ? typedAnchor(parsed, field) : null);
 
     // A Nutrition row always wins, scaled by count when usable, else by weight.
+    // A row with neither counts as 1.
     const tableEntry = findNutritionEntry(name);
     const tableGrams = tableEntry ? parseGramsFromAmount(tableEntry.amount) : null;
     let tableCount = null;
@@ -317,17 +347,21 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       tableCount = explicitCount !== null ? explicitCount : (tableGrams === null ? 1 : null);
     }
 
-    // An anchored line ("300kcal cookie") derives the amount from the macro. The row
-    // needs a positive figure; weight beats count. Energy, else protein, drives it.
+    // An anchored line ("300kcal cookie") derives the amount from the macro: energy,
+    // else protein. The row needs a positive figure; weight beats count.
     const energyKcal = typed('kcal');
     const proteinG = typed('protein');
     const anchored = energyKcal !== null || proteinG !== null;
     const tableAnchorUsable = !!tableEntry && (
       (energyKcal !== null && tableEntry.calories > 0) || (proteinG !== null && tableEntry.protein > 0)
     );
-    const useTableCount = !!tableEntry && tableCount !== null
+    // "1 cup" against a "5g (1cup)" row is one serving, not the AI's cup.
+    if (!anchored && tableCount !== null && amountNamesUnit(tableEntry.amount, originalUnit)) {
+      item.count = originalQuantity ?? 1;
+    }
+    const useTableCount = tableCount !== null
       && (!anchored ? item.count !== null : (tableAnchorUsable && tableGrams === null));
-    const useTableGrams = !!tableEntry && tableGrams !== null && (!anchored || tableAnchorUsable);
+    const useTableGrams = tableGrams !== null && (!anchored || tableAnchorUsable);
     const anchoredGrams = (kcalPer100g, proteinPer100g) => {
       if (energyKcal !== null) return gramsForAnchor(energyKcal, kcalPer100g, grams);
       if (proteinG !== null) return gramsForAnchor(proteinG, proteinPer100g, grams);
@@ -370,10 +404,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       kcal = (tableEntry.calories / tableGrams) * 100;
       protein = (tableEntry.protein / tableGrams) * 100;
       usedGrams = anchoredGrams(kcal, protein);
-      itemCalories = (kcal * usedGrams) / 100;
-      itemProtein = (protein * usedGrams) / 100;
       source = 'nutrition-table-grams';
-      amount = `${roundPlaces(usedGrams, 1)}g`;
     } else {
       usdaAttempts++;
       let candidates = [];
@@ -388,13 +419,10 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
       ({ kcal, protein } = picked);
       if (picked.candidate) usdaCandidateByName.set(name.toLowerCase(), picked.candidate);
       usedGrams = anchoredGrams(kcal, protein);
-      itemCalories = (kcal * usedGrams) / 100;
-      itemProtein = (protein * usedGrams) / 100;
       TYPED_MACRO_FIELDS.forEach((field) => {
         if (extras[field] === undefined && picked[field] !== null) extras[field] = (picked[field] * usedGrams) / 100;
       });
       source = lookupFailed ? 'usda-unreachable' : 'usda/ai';
-      amount = `${roundPlaces(usedGrams, 1)}g`;
 
       // Never banks an offline guess. Per 100g under the user's name, for reuse.
       if (!lookupFailed) {
@@ -404,6 +432,12 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
         });
         if (autoBank) newNutritionRows.push(newRow);
       }
+    }
+    // Both weight paths price per 100g.
+    if (!useTableCount) {
+      itemCalories = (kcal * usedGrams) / 100;
+      itemProtein = (protein * usedGrams) / 100;
+      amount = `${roundPlaces(usedGrams, 1)}g`;
     }
 
     // A typed anchor stands exactly as typed, without rounding drift.
@@ -472,7 +506,7 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
 
   const dedupedNewRows = [...new Map(newNutritionRows.map((r) => [r.name.toLowerCase(), r])).values()];
   if (dedupedNewRows.length) {
-    await Promise.all(dedupedNewRows.map(async (r) => addNutritionEntry({ ...r, micronutrients: await usdaMicronutrientsForNewRow(r) })));
+    await Promise.all(dedupedNewRows.map(bankNewNutritionRow));
     await refreshNutrition(true);
   }
 
@@ -504,6 +538,11 @@ async function usdaMicronutrientsForNewRow(newRow) {
   return nutritionColumnL(top, panel, new Set());
 }
 
+// Adds a new row to Nutrition with its USDA panel.
+async function bankNewNutritionRow(newRow) {
+  return addNutritionEntry({ ...newRow, micronutrients: await usdaMicronutrientsForNewRow(newRow) });
+}
+
 // A new row's fiber/fat/carb, null when unknown.
 function newRowOptionalMacros(newRow) {
   return { fiber: newRow.fiber ?? null, fat: newRow.fat ?? null, carb: newRow.carb ?? null };
@@ -522,7 +561,7 @@ function makeAddToNutritionButton(row, breakdown, totalCalories, totalProtein, f
     btn.disabled = true;
     btn.textContent = '⏳';
     try {
-      await addNutritionEntry({ ...row.newRow, micronutrients: await usdaMicronutrientsForNewRow(row.newRow) });
+      await bankNewNutritionRow(row.newRow);
       await refreshNutrition(true);
       const savedName = row.newRow.name;
       breakdown.forEach((r) => {
@@ -591,22 +630,15 @@ function breakdownTotals(breakdown) {
 
 // ✏️'s Save: replaces `row` with the corrected figures at this line's amount, then re-totals.
 function applyEditedRowToBreakdown(row, saved, consumedAmount, breakdown, form) {
-  const scale = scaleFactorBetweenAmounts(saved.amount, consumedAmount);
   const idx = breakdown.indexOf(row);
   if (idx === -1) return;
 
-  const updated = {
-    ...row,
-    calories: Math.round(saved.calories * scale),
-    protein: roundPlaces(saved.protein * scale, 1),
+  const scale = scaleFactorBetweenAmounts(saved.amount, consumedAmount);
+  breakdown[idx] = {
+    ...scaledBreakdownRow(row, row.amount, saved, scale, BREAKDOWN_MACRO_KEY),
     source: NUTRITION_TABLE_SOURCE_LABEL,
     newRow: null,
   };
-  Object.values(BREAKDOWN_MACRO_KEY).forEach((key) => { delete updated[key]; });
-  TYPED_MACRO_FIELDS.forEach((field) => {
-    if (saved[field] !== null) updated[BREAKDOWN_MACRO_KEY[field]] = roundPlaces(saved[field] * scale, 2);
-  });
-  breakdown[idx] = updated;
 
   const { calories: totalCalories, protein: totalProtein } = breakdownTotals(breakdown);
   // Before the render, so the drawn table and Breakdown field already match.

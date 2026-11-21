@@ -18,7 +18,7 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 
 | Column | Meaning |
 |---|---|
-| Date | The day |
+| Date | The day; 🔁 for a Pattern (hover says so) |
 | m | Body mass (kg) |
 | S | Hours slept (hover for bed and wake times) |
 | SD | Sleep Deprivation Effect (kcal) |
@@ -55,14 +55,18 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
   - **Workout:** merges lines for the same exercise and unit, sorts by burn and title-cases names.
   - **Unknown foods:** priced from USDA, else by the AI; unknown exercises get an AI-estimated MET.
 - **💾 Save:** writes the day; on a day already logged, the first Save merges that row into the form and the second commits.
-- **Bulk 🧮 Calculate:** tick rows, then recalculate those days at once; lines already priced are reused, and it is one undo.
+- **Bulk 🧮 Calculate:** tick rows and it appears left of 🧬 📍 📝 (the bottom bar on a phone); recalculates those days at once, reusing priced lines, as one undo.
 - **Search:** filters by date, consumption, breakdown or workout.
 
 ## Rules & calculations
 
 - **Scaling groups:** wrap lines in `( … )/n` or `( … )*n` to share or multiply a portion; Calculate writes back the scaled lines.
 - **Amounts in grams:** a counted food is stored by its Nutrition gram figure (`31g (1 scoop)` → `31g`).
-- **Pricing:** each line keeps its saved numbers until its text changes; a food added to Nutrition later turns ✅ on the next Calculate.
+- **Consumption is the reference:** Calculate first lines the Breakdown up with it, so each row's amount is the line's.
+  - **Typed weight:** `5g Coffee` is 5 g, never the AI's guess of a cup.
+  - **Nutrition units:** a unit the Nutrition Amount names counts servings (`2 cup Coffee` on `5g (1cup)` is 10 g).
+  - **✅ rows:** repriced from Nutrition as it is now, so an edited food updates every recalculated day.
+- **Pricing:** other lines keep their saved numbers (rescaled to the line's grams) until their text changes; a food added to Nutrition later turns ✅ on the next Calculate.
 - **Burn:** each day uses its own body mass, else the latest earlier one.
 - **Duration:** active time only; rest and transitions are left out.
 - **Patterns:** save Date, Body Mass, Bed, Wake, Workout, Duration and AEE blank, and never show in charts or Insight.

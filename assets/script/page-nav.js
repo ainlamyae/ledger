@@ -22,6 +22,17 @@ function pageHref(section, panel) {
   return `${section.href}${panel.dataset.route}/`;
 }
 
+// A tile or sidebar link to a block's page.
+function setPageLink(el, section, panel) {
+  el.href = pageHref(section, panel);
+  el.dataset.section = section.id;
+  el.dataset.route = panel.dataset.route;
+}
+
+function tileGrid(section) {
+  return document.querySelector(`#${section.id} > .card > .page-tiles`);
+}
+
 // A plain left click; a modified one (new tab, window) is left to the browser.
 function isPlainClick(event) {
   return !(event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0);
@@ -32,14 +43,13 @@ function onPageLinkClick(event, sectionId, panel) {
   if (!window.ledgerSectionPage || window.ledgerSectionPage.section !== sectionId) return;
   if (!isPlainClick(event)) return;
   event.preventDefault();
-  // On a form page (Log, Edit, Workouts…), close it first or the page stays hidden under it.
+  // Close an open form page first or the page stays hidden under it.
   if (routedForms.length) closeFormPages(panel, panel ? () => navigateSectionPage(panel) : null);
   else navigateSectionPage(panel);
 }
 
-// The most used actions as the last tiles of a section's hub and its part of the home
-// page. On the section page each clicks its block's header button; from the home
-// page it goes to the form's address.
+// Quick-action tiles: on the section page each clicks its header button; from
+// home it goes to the form's address.
 const QUICK_ACTIONS = {
   health: [
     { key: 'today', label: 'Today', buttonId: 'today-physique-btn', href: () => `physique/${isoFromDate(new Date())}/` },
@@ -54,8 +64,7 @@ const TILE_ORDER = {
   finance: ['chart', 'watchlist', 'insight', 'transaction', 'account', 'portfolio'],
 };
 
-// A tile's colour (styles.css's .page-tile[data-kind]) by what it opens; sheet-row
-// blocks stay gray. Quick actions are forms unless they set `kind`.
+// Tile colour (.page-tile[data-kind]); unlisted stay gray. Quick actions default to form.
 const TILE_KINDS = {
   'health/chart': 'chart',
   'health/insight': 'ai',
@@ -67,7 +76,6 @@ const TILE_KINDS = {
 };
 
 // Pages with no tile or sidebar link; their addresses still open.
-// Comment an entry out to bring its tile and link back.
 const PAGES_WITHOUT_TILES = [
   'finance/breakdown',
 ];
@@ -90,7 +98,7 @@ function createTile(className, label, setup) {
 
 function buildQuickActions(section) {
   const actions = QUICK_ACTIONS[section.id];
-  const grid = document.querySelector(`#${section.id} > .card > .page-tiles`);
+  const grid = tileGrid(section);
   if (!actions || !grid) return;
   actions.forEach((action) => {
     const source = document.getElementById(action.buttonId);
@@ -112,7 +120,7 @@ function buildQuickActions(section) {
 
 function orderTiles(section) {
   const order = TILE_ORDER[section.id];
-  const grid = document.querySelector(`#${section.id} > .card > .page-tiles`);
+  const grid = tileGrid(section);
   if (!order || !grid) return;
   const tiles = [...grid.children];
   const keyOf = (el) => el.dataset.route || el.dataset.quick;
@@ -127,15 +135,12 @@ function buildPageTiles(section) {
   grid.setAttribute('aria-label', `${section.label} pages`);
   section.panels.filter((panel) => pageHasTile(section, panel)).forEach((panel) => {
     const tile = createTile('page-tile', routedHeadingText(panel), (el) => {
-      el.href = pageHref(section, panel);
-      el.dataset.section = section.id;
-      el.dataset.route = panel.dataset.route;
+      setPageLink(el, section, panel);
       const kind = TILE_KINDS[`${section.id}/${panel.dataset.route}`];
       if (kind) el.dataset.kind = kind;
     });
     tile.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
-    // A block can have its tile elsewhere (data-tile-host): Market's sits among
-    // Finance Insight's mode tiles.
+    // data-tile-host puts a tile elsewhere (Market's among Insight's modes).
     const host = panel.dataset.tileHost && document.getElementById(panel.dataset.tileHost);
     (host || grid).appendChild(tile);
   });
@@ -151,9 +156,8 @@ function buildPageTiles(section) {
   renderPageBadges();
 }
 
-// --- Badges: a block's short sign ("A<T $13", "28d", "Log") ------------------------
-// On its tile's corner and after its page's breadcrumb. `badge` is { text, title,
-// record? } (record: the row it opens), or null to clear.
+// --- Badges ("A<T $13", "28d", "Log") on a tile's corner and after its breadcrumb.
+// `badge` is { text, title, record? } (record: the row it opens), or null to clear.
 const pageBadges = new Map(); // "<section id>/<block slug>" -> badge
 
 function setPageBadge(sectionId, route, badge) {
@@ -277,13 +281,11 @@ function buildSideNav(sections) {
     heading.textContent = section.label;
     heading.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
     links.appendChild(heading);
-    // A block whose tile lives on another page (data-tile-host) is reached from there.
+    // A data-tile-host block is reached from its host.
     section.panels.filter((panel) => pageHasTile(section, panel) && !panel.dataset.tileHost).forEach((panel) => {
       const link = document.createElement('a');
       link.className = 'side-nav-page';
-      link.href = pageHref(section, panel);
-      link.dataset.section = section.id;
-      link.dataset.route = panel.dataset.route;
+      setPageLink(link, section, panel);
       link.textContent = routedHeadingText(panel);
       link.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
       links.appendChild(link);
@@ -353,8 +355,9 @@ function updatePageNav(panel) {
   if (sectionId) {
     const section = navSection(sectionId);
     const view = panel && currentRouteView(panel);
-    document.querySelectorAll(`#${sectionId} > .page-crumb .page-crumb-block`).forEach((el) => { el.hidden = !view; });
-    const block = document.querySelector(`#${sectionId} > .page-crumb a.page-crumb-block`);
+    const crumb = document.querySelector(`#${sectionId} > .page-crumb`);
+    crumb.querySelectorAll('.page-crumb-block').forEach((el) => { el.hidden = !view; });
+    const block = crumb.querySelector('a.page-crumb-block');
     if (view) {
       block.textContent = routedHeadingText(panel);
       block.href = pageHref(section, panel);
@@ -393,67 +396,65 @@ function initPageNav() {
   document.documentElement.classList.add('section-pages');
   section.panels.forEach(groupHeaderActions);
   section.panels.forEach(liftPageActions);
+  section.panels.forEach(liftSelectionBar);
   buildPageTiles(section);
   buildQuickActions(section);
   orderTiles(section);
   buildPageCrumb(section);
-  buildFormCrumb();
-}
-
-// "Ledger / Health / Physique / Log" over a form page; its links close the form
-// (closeFormPages). updateFormPage moves it into whichever form is the page.
-function buildFormCrumb() {
+  // The form pages' crumb; updateFormPage moves it into the open form.
   document.body.appendChild(createCrumb('page-crumb form-crumb', 'form-crumb'));
 }
 
+// A form crumb link: a plain click runs onClick in place.
+function formCrumbLink(text, href, onClick) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.textContent = text;
+  a.addEventListener('click', (event) => {
+    if (!isPlainClick(event)) return;
+    event.preventDefault();
+    onClick();
+  });
+  return a;
+}
+
+// "Ledger / Health / Physique / Log" over a form page; its links close the form.
 function updateFormCrumb(panel, steps) {
   const crumb = document.getElementById('form-crumb');
   const section = navSection(window.ledgerSectionPage?.section);
   if (!crumb || !section) return;
   crumb.textContent = '';
-  const separator = () => crumbSeparator();
-  const link = (text, href, onClick) => {
-    const a = document.createElement('a');
-    a.href = href;
-    a.textContent = text;
-    a.addEventListener('click', (event) => {
-      if (!isPlainClick(event)) return;
-      event.preventDefault();
-      onClick();
-    });
-    return a;
-  };
-  crumb.append(crumbHomeLink(), separator(), link(section.label, section.href, () => closeFormPages(null)));
+  crumb.append(crumbHomeLink(), crumbSeparator(), formCrumbLink(section.label, section.href, () => closeFormPages(null)));
+  const blockHref = panel && pageHref(section, panel);
   if (panel) {
-    crumb.append(separator(), link(routedHeadingText(panel), pageHref(section, panel), () => closeFormPages(panel)));
+    crumb.append(crumbSeparator(), formCrumbLink(routedHeadingText(panel), blockHref, () => closeFormPages(panel)));
   }
-  // Levels between the block and the current one link too (a row's date over its 🧬 view).
+  // Levels between the block and the current one link too.
   steps.forEach((step, i) => {
     if (i < steps.length - 1 && panel) {
-      const href = `${pageHref(section, panel)}${steps.slice(0, i + 1).map((s) => `${s.slug}/`).join('')}`;
-      // A form's own top level (Workouts above one of its groups) goes back to it in place.
+      const href = `${blockHref}${steps.slice(0, i + 1).map((s) => `${s.slug}/`).join('')}`;
+      // A form's own top level (Workouts) goes back to it in place.
       const onClick = step.view
         ? () => formSubViews.get(step.slug)?.show(null)
         : () => openFormStep(panel, step);
-      crumb.append(separator(), link(step.label, href, onClick));
+      crumb.append(crumbSeparator(), formCrumbLink(step.label, href, onClick));
       return;
     }
     const current = document.createElement('span');
     current.className = 'page-crumb-current';
     current.textContent = step.label;
-    crumb.append(separator(), current);
+    crumb.append(crumbSeparator(), current);
   });
 }
 
-// --- One bottom bar at a time ---------------------------------------------------
-// A page's action row replaces the phone's tab bar (styles.css). First match wins:
-// an open form page's actions, a block's selection bar while rows are ticked, its
-// page actions, then its header buttons. Each ends in ❌.
+// --- One bottom bar, replacing the phone's tab bar. First match: an open form's
+// actions, an unlifted visible selection bar, page actions, header group.
 const SELECTION_BAR_IDS = ['physique-bulk-actions', 'nutrition-bulk-actions', 'tx-bulk-actions', 'contacts-bulk-actions'];
 const SELECTION_BAR_SELECTOR = SELECTION_BAR_IDS.map((id) => `#${id}`).join(', ');
+const VISIBLE_SELECTION_BAR_SELECTOR = SELECTION_BAR_IDS.map((id) => `#${id}:not([hidden])`).join(', ');
+const HEADER_ACTIONS_SELECTOR = ':scope > .panel-header > .panel-header-actions';
 
-// Gathers a block's header buttons into one group ending in ❌ (just ❌ when it has
-// none), wrapping a bare <h2> in a .panel-header. Moved, so listeners stay attached.
+// Groups a block's header buttons, ending in ❌; wraps a bare <h2> in a .panel-header.
 function groupHeaderActions(panel) {
   let header = panel.querySelector(':scope > .panel-header');
   if (!header) {
@@ -479,11 +480,10 @@ function groupHeaderActions(panel) {
   group.appendChild(close);
 }
 
-// A block's own action row (Tune's ♻️ 🔄 💾) joins its header group before ❌, and
-// each form's moves to the form's top. Moved, so listeners and submit stay attached.
+// A block's action row (Tune's ♻️ 🔄 💾) joins its header group before ❌.
 function liftPageActions(panel) {
   const row = panel.querySelector('.panel-actions[data-page-actions]');
-  const group = panel.querySelector(':scope > .panel-header > .panel-header-actions');
+  const group = panel.querySelector(HEADER_ACTIONS_SELECTOR);
   if (!row || !group) return;
   const close = group.querySelector('.header-action-close');
   [...row.children]
@@ -492,6 +492,14 @@ function liftPageActions(panel) {
   row.remove();
 }
 
+// A selection bar's buttons lead the header's while rows are ticked.
+function liftSelectionBar(panel) {
+  const bar = panel.querySelector(SELECTION_BAR_SELECTOR);
+  const group = panel.querySelector(HEADER_ACTIONS_SELECTOR);
+  if (bar && group) group.prepend(bar);
+}
+
+// Each form's actions move to the form's top.
 function liftFormActions() {
   document.querySelectorAll('.modal .modal-actions').forEach((bar) => {
     bar.classList.add('modal-actions-top');
@@ -505,32 +513,34 @@ function currentActionBar() {
   if (formBar) return formBar;
   const panel = document.querySelector(`#${window.ledgerSectionPage.section} > .panel.page-active`);
   if (!panel) return null;
-  const selectionBar = panel.querySelector(SELECTION_BAR_IDS.map((id) => `#${id}:not([hidden])`).join(', '));
-  if (selectionBar) return selectionBar;
+  // A selection bar lifted into the header group shows inside that group's bar.
+  const selectionBar = panel.querySelector(VISIBLE_SELECTION_BAR_SELECTOR);
+  if (selectionBar && !selectionBar.closest('.panel-header-actions')) return selectionBar;
   return panel.querySelector('.panel-actions[data-page-actions]')
-    || panel.querySelector(':scope > .panel-header > .panel-header-actions');
+    || panel.querySelector(HEADER_ACTIONS_SELECTOR);
+}
+
+// Puts className on el (if any) and off every other element.
+function markOnly(className, el) {
+  document.querySelectorAll(`.${className}`).forEach((other) => {
+    if (other !== el) other.classList.remove(className);
+  });
+  el?.classList.add(className);
 }
 
 function updateActionBar() {
   const bar = currentActionBar();
-  document.querySelectorAll('.action-bar').forEach((el) => {
-    if (el !== bar) el.classList.remove('action-bar');
-  });
-  if (bar) bar.classList.add('action-bar');
-  // A view hub (Insight before a mode is picked) shows only ❌ in its bar.
+  markOnly('action-bar', bar);
+  // A view hub (Insight before a mode is picked) shows only ❌.
   const panel = bar?.closest('.panel');
   const onHub = !!panel && !!panel.querySelector('[data-route-view]') && !currentRouteView(panel)
     && !bar.closest(SELECTION_BAR_SELECTOR);
-  document.querySelectorAll('.action-bar-hub').forEach((el) => {
-    if (el !== bar || !onHub) el.classList.remove('action-bar-hub');
-  });
-  if (onHub) bar.classList.add('action-bar-hub');
+  markOnly('action-bar-hub', onHub ? bar : null);
   if (bar) document.documentElement.dataset.actionBar = '1';
   else delete document.documentElement.dataset.actionBar;
 }
 
-// ❌ on a selection bar clears the selection; on a page's own actions it leaves
-// for the section hub, as the breadcrumb does. (A form's ❌ is its own Cancel.)
+// ❌ on a selection bar clears it; elsewhere it leaves the page. (A form's ❌ is its Cancel.)
 function onPageActionClose(event) {
   const close = event.target.closest('.page-action-close');
   if (!close) return;
@@ -542,16 +552,15 @@ function onPageActionClose(event) {
     panel.querySelectorAll('tbody input[type="checkbox"]:checked').forEach((box) => box.click());
     return;
   }
-  // A view's page (Insight's Plan) closes to its block's; a block's to the hub,
-  // or home for a solo section, which has none.
+  // A view's page closes to its block's; a block's to the hub, or home when solo.
   if (!window.ledgerSectionPage) return;
   const panel = currentRoutedPanel();
-  const target = panel && currentRouteView(panel) ? panel : null;
-  if (!target && soloPanel(window.ledgerSectionPage.section)) {
+  const blockPanel = panel && currentRouteView(panel) ? panel : null;
+  if (!blockPanel && soloPanel(window.ledgerSectionPage.section)) {
     location.href = routerRoot;
     return;
   }
-  navigateSectionPage(target);
+  navigateSectionPage(blockPanel);
 }
 
 function initActionBars() {

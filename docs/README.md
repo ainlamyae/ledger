@@ -29,7 +29,7 @@ Every Ledger doc, grouped by what you need: using a page, looking up a fact, or 
 | [Finance — Market](guide/finance/market.md) | One stock's verdict, chart, risk, news and AI read |
 | [Finance — Portfolio](guide/finance/portfolio.md) | Trade log, holdings at average cost, gain/loss in CAD |
 | [Track](guide/track.md) | LeetCode, Work Time, Car Service, Travel, Applications, Contacts |
-| [Other](guide/other.md) | Settings |
+| [Settings](guide/settings.md) | Every key on the Setting tab |
 
 ## Reference
 

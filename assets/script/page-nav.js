@@ -9,7 +9,7 @@ function pageNavSections() {
     label: link.textContent.trim(),
     href: link.getAttribute('href'),
     panels: [...document.querySelectorAll(`#${link.dataset.section} > .panel[data-route]`)],
-    // A hidden nav entry (Other) opens from the account menu, not the sidebar or tiles.
+    // A hidden nav entry (Settings) opens from the account menu, not the sidebar or tiles.
     inMenu: link.hidden,
   }));
 }
@@ -51,7 +51,7 @@ const QUICK_ACTIONS = {
 // A hub's tile order, by page route or quick action key; unlisted tiles go last.
 const TILE_ORDER = {
   health: ['chart', 'micronutrients', 'insight', 'physique', 'nutrition', 'activity', 'tune', 'today', 'workouts'],
-  finance: ['chart', 'insight', 'watchlist', 'transaction', 'account', 'portfolio'],
+  finance: ['chart', 'watchlist', 'insight', 'transaction', 'account', 'portfolio'],
 };
 
 // A tile's colour (styles.css's .page-tile[data-kind]) by what it opens; sheet-row
@@ -61,6 +61,7 @@ const TILE_KINDS = {
   'health/insight': 'ai',
   'health/tune': 'form',
   'finance/chart': 'chart',
+  'finance/watchlist': 'chart',
   'finance/market': 'ai',
   'finance/insight': 'ai',
 };
@@ -253,7 +254,9 @@ function buildPageCrumb(section) {
   blockSeparator.hidden = true;
   const current = document.createElement('span');
   current.className = 'page-crumb-current';
-  crumb.append(crumbHomeLink(), crumbSeparator(), back, crumbSeparator('page-crumb-back'), block, blockSeparator, current);
+  // A solo section's block is the section, so it isn't named twice.
+  if (group.hasAttribute('data-solo')) crumb.append(crumbHomeLink(), crumbSeparator(), block, blockSeparator, current);
+  else crumb.append(crumbHomeLink(), crumbSeparator(), back, crumbSeparator('page-crumb-back'), block, blockSeparator, current);
   group.insertBefore(crumb, group.firstChild);
 }
 
@@ -539,10 +542,16 @@ function onPageActionClose(event) {
     panel.querySelectorAll('tbody input[type="checkbox"]:checked').forEach((box) => box.click());
     return;
   }
-  // A view's page (Insight's Plan) closes to its block's; a block's to the hub.
+  // A view's page (Insight's Plan) closes to its block's; a block's to the hub,
+  // or home for a solo section, which has none.
   if (!window.ledgerSectionPage) return;
   const panel = currentRoutedPanel();
-  navigateSectionPage(panel && currentRouteView(panel) ? panel : null);
+  const target = panel && currentRouteView(panel) ? panel : null;
+  if (!target && soloPanel(window.ledgerSectionPage.section)) {
+    location.href = routerRoot;
+    return;
+  }
+  navigateSectionPage(target);
 }
 
 function initActionBars() {

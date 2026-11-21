@@ -6,7 +6,7 @@ How you move around Ledger: hubs and pages, the sidebar and tab bar, addresses, 
 
 ## At a glance
 
-- **Hubs and pages:** `/health/`, `/finance/`, `/track/` and `/other/` are hubs of glance cards and tiles; each tile opens one page.
+- **Hubs and pages:** `/health/`, `/finance/` and `/track/` are hubs of glance cards and tiles; each tile opens one page. `/setting/` has no hub: it is the Settings page itself.
 - **Breadcrumb:** the only heading, starting at **Ledger** (`Ledger / Health / Physique / Log`); every step is a link.
 - **Wide screens (≥1180px):** a left sidebar lists every section and page; **Tablet and phone:** a bottom tab bar.
 - **Forms are pages:** Log, Add, Edit and views replace the page under their own address; ❌ closes them.
@@ -92,7 +92,7 @@ How you move around Ledger: hubs and pages, the sidebar and tab bar, addresses, 
 | Kind | Example |
 |---|---|
 | Page / form | `/health/tune/`, `/health/physique/log/`, `/finance/account/transfer/`, `/track/work-time/log/` |
-| View | `/health/insight/plan/`, `/finance/insight/snapshot/`, `/other/settings/display/` |
+| View | `/health/insight/plan/`, `/finance/insight/snapshot/`, `/setting/display/` |
 | Row Edit | `/health/nutrition/chicken-breast/`, `/health/physique/2026-10-03/` |
 | Row duplicate | `/finance/transaction/2026-10-05-grocer/duplicate/` |
 | Bulk Edit | `/finance/transaction/bulk-edit/` |

@@ -141,7 +141,7 @@ function renderSeriesLegend(containerId, series, hiddenSet, onChange) {
 // Market/Analysis/Portfolio status line from a MarketDataError (or any error).
 function marketErrorText(err) {
   if (!err) return '';
-  if (err.kind === 'missing-key') return `${err.message} (Other → Settings)`;
+  if (err.kind === 'missing-key') return `${err.message} (account menu → Settings)`;
   return err.message || String(err);
 }
 

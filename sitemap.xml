@@ -21,6 +21,11 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://ainlamyae.github.io/ledger/health/activity/gym/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://ainlamyae.github.io/ledger/health/activity/workouts/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -201,6 +206,16 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://ainlamyae.github.io/ledger/track/contact/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://ainlamyae.github.io/ledger/track/contact/add/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://ainlamyae.github.io/ledger/track/leetcode/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -231,53 +246,38 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/</loc>
+    <loc>https://ainlamyae.github.io/ledger/setting/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/track/contact/</loc>
+    <loc>https://ainlamyae.github.io/ledger/setting/add/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/track/contact/add/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://ainlamyae.github.io/ledger/other/settings/</loc>
+    <loc>https://ainlamyae.github.io/ledger/setting/ai/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/settings/add/</loc>
+    <loc>https://ainlamyae.github.io/ledger/setting/all/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
+    <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/settings/ai/</loc>
+    <loc>https://ainlamyae.github.io/ledger/setting/display/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
+    <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/settings/all/</loc>
+    <loc>https://ainlamyae.github.io/ledger/setting/health/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
+    <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://ainlamyae.github.io/ledger/other/settings/display/</loc>
+    <loc>https://ainlamyae.github.io/ledger/setting/responses/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://ainlamyae.github.io/ledger/other/settings/health/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://ainlamyae.github.io/ledger/other/settings/responses/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
+    <priority>0.6</priority>
   </url>
 </urlset>

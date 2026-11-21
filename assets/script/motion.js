@@ -58,9 +58,9 @@
   const POP = spring(0.38, 0.28); // toast in
   const SINK = { duration: 260, easing: EASE_AWAY }; // toast out
 
-  // Same-rank sections, left to right: the nav's order, Other (account menu) last.
+  // Same-rank sections, left to right: the nav's order, Settings (account menu) last.
   // Listed here because a section page has no nav yet when it's revealed.
-  const SECTION_ORDER = ['health', 'finance', 'track', 'other'];
+  const SECTION_ORDER = ['health', 'finance', 'track', 'setting'];
 
   // ── 2. Stylesheet ─────────────────────────────────────────────────────────
 

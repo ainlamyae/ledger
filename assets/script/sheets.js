@@ -161,7 +161,7 @@ function batchGetValues(ranges, params = {}) {
 
 // USER_ENTERED (the default) parses a typed date or formula as the cell would.
 // Pass 'RAW' for values that must round-trip byte-for-byte (see
-// other-settings.js's saveSettingValues).
+// settings.js's saveSettingValues).
 async function appendValues(range, values, valueInputOption = 'USER_ENTERED') {
   return sheetsWrite(
     `${valuesPath(await appendStart(range))}:append?valueInputOption=${valueInputOption}&insertDataOption=INSERT_ROWS`,

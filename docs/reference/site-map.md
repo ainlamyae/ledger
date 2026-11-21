@@ -116,19 +116,20 @@ Every address in Ledger, with the breadcrumb step that names it.
 | Add | Form | `/track/contact/add/` | ➕ |
 | `<name>` | Row | `/track/contact/<name>/` | Row ✏️ |
 
-## Other
+## Settings
+
+A section with one block, so its addresses skip the block slug.
 
 | Breadcrumb | Kind | Address | Opened by |
 |---|---|---|---|
-| Other | Section | `/other/` | Account menu (no tab) |
-| Settings | Page | `/other/settings/` | Account menu; opens on AI & Keys |
-| AI & Keys | View | `/other/settings/ai/` | Tab |
-| AI Responses | View | `/other/settings/responses/` | Tab |
-| Health | View | `/other/settings/health/` | Tab |
-| Display | View | `/other/settings/display/` | Tab |
-| All | View | `/other/settings/all/` | Tab |
-| Add | Form | `/other/settings/add/` | ➕ |
-| `<key>` | Row | `/other/settings/<key>/` | Row ✏️; key in lowercase |
+| Settings | Section | `/setting/` | Account menu (no tab); opens on AI & Keys |
+| AI & Keys | View | `/setting/ai/` | Tab |
+| AI Responses | View | `/setting/responses/` | Tab |
+| Health | View | `/setting/health/` | Tab |
+| Display | View | `/setting/display/` | Tab |
+| All | View | `/setting/all/` | Tab |
+| Add | Form | `/setting/add/` | ➕ |
+| `<key>` | Row | `/setting/<key>/` | Row ✏️; key in lowercase |
 
 ## Not in the tree
 

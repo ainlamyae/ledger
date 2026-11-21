@@ -295,7 +295,7 @@ function initCsvControls() {
   if (csvListenersAttached) return;
   csvListenersAttached = true;
 
-  // Other › Settings: every row, whichever section's data is loaded already.
+  // Settings: every row, whichever section's data is loaded already.
   onAsyncClick('export-transactions-btn', exportTransactionsCSV);
   onAsyncClick('export-physique-btn', exportPhysiqueCSV);
   document.getElementById('export-add-filter-btn').addEventListener('click', addExportFilterRow);

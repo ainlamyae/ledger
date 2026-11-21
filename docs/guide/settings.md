@@ -1,13 +1,13 @@
-# Other
+# Settings
 
 [Docs](../README.md) › Guide
 
-The Other section holds Settings, opened from the account menu rather than a tab or tile.
+Settings is a section of its own at `/setting/`, opened from the account menu rather than a tab or tile.
 
 ## At a glance
 
-- **Where:** the sidebar's bottom panel on a wide screen, otherwise the account menu; there's no Other tab or home card.
-- **Settings** (`/other/settings/`): every key on the Setting tab, in five tabs, with CSV exports.
+- **Where:** the sidebar's bottom panel on a wide screen, otherwise the account menu; there's no Settings tab or home card.
+- **Settings** (`/setting/`): every key on the Setting tab, in five tabs, with CSV exports.
 - **Changes apply live:** a saved setting takes effect without a reload.
 
 ## Settings
@@ -19,17 +19,17 @@ The Other section holds Settings, opened from the account menu rather than a tab
 
 | Tab | Address | Keys |
 |---|---|---|
-| AI & Keys | `/other/settings/ai/` (also bare `/other/settings/`) | `AI_*`, `*_API_KEY`, `*_MODELS`, tokens and secrets |
-| AI Responses | `/other/settings/responses/` | `*_LAST_RESULT`, `*_LAST_GENERATED_AT` |
-| Health | `/other/settings/health/` | Every key no other tab claims: profile and Tune values |
-| Display | `/other/settings/display/` | `SHOW_*`, `WIDGET_*` |
-| All | `/other/settings/all/` | Every key |
+| AI & Keys | `/setting/ai/` (also bare `/setting/`) | `AI_*`, `*_API_KEY`, `*_MODELS`, tokens and secrets |
+| AI Responses | `/setting/responses/` | `*_LAST_RESULT`, `*_LAST_GENERATED_AT` |
+| Health | `/setting/health/` | Every key no other tab claims: profile and Tune values |
+| Display | `/setting/display/` | `SHOW_*`, `WIDGET_*` |
+| All | `/setting/all/` | Every key |
 
 - **Secrets:** keys ending in `API_KEY`, `_TOKEN` or `_SECRET` are hidden; 👁️ reveals one for this session, 🙈 hides it.
 
 ### Actions
 
-- **➕ Add** a setting; ✏️ edits a row (`/other/settings/<key>/`), 🗑️ deletes it.
+- **➕ Add** a setting; ✏️ edits a row (`/setting/<key>/`), 🗑️ deletes it.
 - **Value:** a multi-line box, trimmed on save.
 - **Export Transactions** and **Export Physique:** download every row of that tab as CSV, whatever the filters.
 
@@ -55,7 +55,7 @@ The Other section holds Settings, opened from the account menu rather than a tab
 
 | File | Role |
 |---|---|
-| `assets/script/other-settings.js` | Settings tabs, form, default notes and secret masking |
+| `assets/script/settings.js` | Settings tabs, form, default notes and secret masking |
 | `assets/script/csv.js` | Export Transactions and Export Physique |
 
 ## Related

@@ -956,7 +956,7 @@ const PHYSIQUE_BMR_SETTING_KEYS = ['HEIGHT_CM', 'BIRTH_DATE', 'SEX', BMR_FORMULA
 async function recomputeStoredPhysiqueBmr(changedKeys, { force = false } = {}) {
   if (physiqueBatchRunning) return 0;
   if (!force && !changedKeys.some((key) => PHYSIQUE_BMR_SETTING_KEYS.includes(key))) return 0;
-  // A page without Physique (e.g. Other's Settings) never loaded it, but must still rewrite it.
+  // A page without Physique (e.g. Settings) never loaded it, but must still rewrite it.
   if (!physiqueDataLoaded) {
     await initActivities();
     await initPhysique();

@@ -6,17 +6,18 @@ Every commit, newest first, with the version it produced (see [Versioning](devel
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.44.0** | feat(nav): move Contact under Track, order hub tiles, and give every dated chart one x axis |
-| `0176165` | **3.43.0** | feat(finance): build every chart from Transaction, shorten displayed years, and refactor the touched files |
-| `067abc0` | 3.42.2 | style(physique): gray the Consumption Breakdown's Amount column so it doesn't read as calories |
-| `4c39d0f` | 3.42.1 | fix(forms): parse number fields without eval so the CSP stops rejecting every value |
-| `54b20d4` | **3.42.0** | feat(security): add a Content-Security-Policy, pin CDN libraries and rewrite the docs |
-| `9eb7e22` | 3.41.2 | fix(sheets): make every Google Sheets read and write safe and consistent |
-| `a3efdc9` | 3.41.1 | refactor: tidy every script, the stylesheet and index.html, and fix eleven bugs |
-| `ac60ac9` | **3.41.0** | feat(health): seed Tune's τ/s/f from logged history, unify the healthy BMI band, and consolidate the intake charts |
-| `e6a3310` | **3.40.0** | feat(health): add body-shape checks to tune and stop unasked sign-in popups |
-| `3da8d61` | **3.39.0** | feat(health): add safe pace chart, daily supplements and micronutrient gaps |
-| `89c2002` | **3.38.0** | feat(physique): multiply consumption groups and add quick bulk duplicate |
+| (this commit) | **3.45.0** | feat(nav): replace Other with a Settings section at /setting/ and colour Watch List as a chart |
+| `a6478d6` | **3.44.0** | feat(nav): move Contact under Track, order hub tiles, and give every dated chart one x axis |
+| `c4dfda4` | **3.43.0** | feat(finance): build every chart from Transaction, shorten displayed years, and refactor the touched files |
+| `b0e22ba` | 3.42.2 | style(physique): gray the Consumption Breakdown's Amount column so it doesn't read as calories |
+| `0f1200f` | 3.42.1 | fix(forms): parse number fields without eval so the CSP stops rejecting every value |
+| `0fe0a3e` | **3.42.0** | feat(security): add a Content-Security-Policy, pin CDN libraries and rewrite the docs |
+| `d02f0ff` | 3.41.2 | fix(sheets): make every Google Sheets read and write safe and consistent |
+| `51aaeed` | 3.41.1 | refactor: tidy every script, the stylesheet and index.html, and fix eleven bugs |
+| `b4b0c8f` | **3.41.0** | feat(health): seed Tune's τ/s/f from logged history, unify the healthy BMI band, and consolidate the intake charts |
+| `a649c61` | **3.40.0** | feat(health): add body-shape checks to tune and stop unasked sign-in popups |
+| `f5ecb39` | **3.39.0** | feat(health): add safe pace chart, daily supplements and micronutrient gaps |
+| `0062da2` | **3.38.0** | feat(physique): multiply consumption groups and add quick bulk duplicate |
 | `1076b97` | 3.37.1 | fix(physique): give USDA and AI-priced breakdown rows a TEF |
 | `6fbf2c1` | **3.37.0** | feat(physique): add a micronutrients page and site map |
 | `d61fd9b` | **3.36.0** | feat(motion): reduce navigation to vertical and sideways slides |

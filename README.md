@@ -18,7 +18,7 @@ A private, serverless dashboard for health, money, work, travel, applications, L
 | **Health** | Daily log, ingredient catalogue, activity plan, charts, plan tuning and AI insight |
 | **Finance** | Transactions, accounts, spending breakdown, watch list, market analysis and portfolio |
 | **Track** | LeetCode progress, work time, car service, travel, applications and contacts |
-| **Other** | Settings |
+| **Settings** | Every preference and API key, from the account menu |
 
 ## Quick start
 

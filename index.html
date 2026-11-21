@@ -78,9 +78,9 @@
         <a href="track/" data-section="track">
             <span class="nav-label">Track</span>
         </a>
-        <!-- Hidden; kept so /other/ resolves. -->
-        <a href="other/" data-section="other" hidden>
-            <span class="nav-label">Other</span>
+        <!-- Hidden: opened from the account menu. -->
+        <a href="setting/" data-section="setting" hidden>
+            <span class="nav-label">Settings</span>
         </a>
     </nav>
     <div class="header-actions">
@@ -108,7 +108,7 @@
                 <div id="settings-switches" class="settings-switches">
                     <button id="refresh-btn" class="account-menu-item" hidden>Refresh data</button>
                     <button id="clear-cache-btn" class="account-menu-item" title="Re-download the app's own files and reload — for when the browser is still running an older version">Clear cache</button>
-                    <a href="other/settings/" class="account-menu-item">Settings</a>
+                    <a href="setting/" class="account-menu-item">Settings</a>
                     <label class="switch-row"><span>Dark mode</span><input type="checkbox" role="switch" id="theme-toggle" class="switch"></label>
                     <label class="switch-row" id="privacy-toggle-row"><span>Amounts</span><input type="checkbox" role="switch" id="privacy-toggle" class="switch"></label>
                     <label class="switch-row" id="widgets-toggle-row" title="The Time/Date/Azan/Weather row"><span>Widgets</span><input type="checkbox" role="switch" id="widgets-toggle" class="switch"></label>
@@ -2213,8 +2213,9 @@
         </div>
     </section>
 
-    <section id="other" class="panel-group">
-        <h2 class="panel-group-title"><a href="other/">Other</a></h2>
+    <!-- data-solo: its one block is the section's page, at /setting/ (router.js). -->
+    <section id="setting" class="panel-group" data-solo>
+        <h2 class="panel-group-title"><a href="setting/">Settings</a></h2>
 
         <div class="panel" data-route="settings">
             <div class="panel-header">
@@ -3332,7 +3333,7 @@
 <script src="assets/script/health-activity.js"></script>
 <script src="assets/script/health-activity-estimator.js"></script>
 <script src="assets/script/track-contact.js"></script>
-<script src="assets/script/other-settings.js"></script>
+<script src="assets/script/settings.js"></script>
 <script src="assets/script/track-travel.js"></script>
 <script src="assets/script/track-application.js"></script>
 <script src="assets/script/track-leetcode-roadmap.js"></script>

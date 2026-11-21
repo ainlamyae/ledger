@@ -596,8 +596,8 @@ async function loadDashboard(forceRefresh = false) {
         initLeetcode(),
         initContacts(forceRefresh),
       ] : []),
-      // Other's Settings block (saving a setting from anywhere loads it on its own).
-      ...(shows('other') ? [initSettingsPanel(forceRefresh)] : []),
+      // Settings (saving a setting from anywhere loads it on its own).
+      ...(shows('setting') ? [initSettingsPanel(forceRefresh)] : []),
     ];
 
     const results = await Promise.allSettled([

@@ -7,7 +7,7 @@ Every place Ledger reads configuration from: `config.js`, the `Setting` tab, and
 ## At a glance
 
 - **`config.js`:** the OAuth Client ID, the template spreadsheet, the Picker key and every tab name; none are secrets.
-- **`Setting` tab:** per-user keys and preferences, edited in Other → Settings; API keys live only here.
+- **`Setting` tab:** per-user keys and preferences, edited in Settings; API keys live only here.
 - **Browser storage:** sign-in, the chosen spreadsheet and view preferences; never sheet data.
 - **Stock prices:** the one data cache, in IndexedDB, cleared on sign-out.
 
@@ -43,7 +43,7 @@ Every place Ledger reads configuration from: `config.js`, the `Setting` tab, and
 
 ## Setting keys for developers
 
-The `Setting` tab holds every personal preference; the full list is in [Other](../guide/other.md). These are the ones that switch services on.
+The `Setting` tab holds every personal preference; the full list is in [Settings](../guide/settings.md). These are the ones that switch services on.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -93,4 +93,4 @@ The `Setting` tab holds every personal preference; the full list is in [Other](.
 - [Data access](data-access.md): Sheets read/write rules, batching, quota, caching.
 - [Security](security.md): scopes, secrets, what leaves the browser, CSP, pinned libraries.
 - [Data model](../reference/data-model.md): every sheet tab, column by column.
-- [Other](../guide/other.md): contacts and Settings.
+- [Settings](../guide/settings.md): every key, by tab.

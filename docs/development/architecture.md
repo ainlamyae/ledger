@@ -59,7 +59,7 @@ flowchart TD
 
 ## Section pages
 
-- **Addresses:** `/health/`, `/finance/`, `/track/`, `/other/`, and blocks or buttons below them such as `/health/physique/log/`.
+- **Addresses:** `/health/`, `/finance/`, `/track/`, `/setting/`, and blocks or buttons below them such as `/health/physique/log/`; Settings, a one-block section (`data-solo`), skips the block: `/setting/ai/`.
 - **Stubs:** each address is a folder with a small `index.html` (CSP, `<base>`, title, `theme-boot.js`, `motion.js`, `section-page.js`); only `<base>` and `<title>` differ.
 - **Loader:** `section-page.js` fetches `index.html`, replays its head, body and scripts into the stub, and hides every group but the one named.
 - **Sections come from the nav:** the first path segment is matched against `index.html`'s `<nav>` links, so a new group needs a nav link, a `<section>` and stubs.
@@ -115,7 +115,7 @@ Every page reads the `Setting` tab first. Reads are batched (see [Data access](d
 | Health | Activity, Physique, Nutrition |
 | Finance | Statement, Account, Breakdown, Transaction, Watchlist, Analysis, Trade |
 | Track | Transaction (Car Service), eTimeSheet, Travel, Application, LeetCode, Contact |
-| Other | The Settings block |
+| Settings | Setting |
 
 - **Charts:** built lazily by `upsertChart` (`charts-base.js`) once a chart box scrolls into view.
 - **Insight:** nothing is computed on load; a mode click builds its preview, and **Send to AI** sends what is on screen.

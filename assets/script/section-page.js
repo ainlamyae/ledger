@@ -1,4 +1,4 @@
-// Turns /health/, /finance/, /track/ and /other/ into pages of their own: each
+// Turns /health/, /finance/, /track/ and /setting/ into pages of their own: each
 // stub loads this file, which fetches index.html (the only copy of the markup),
 // rebuilds it here and hides every wrapper but the one the address names. The
 // section is matched against index.html's <nav> hrefs, the one list of sections.

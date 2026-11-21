@@ -5,6 +5,7 @@
 //
 // A row's Edit is <wrapper>/<block>/<record>/[<view>/]: no stub, so 404.html loads
 // the section page and the block's registerRecordRoute opens the row.
+// A data-solo section (Settings) is its one block: <wrapper>/<button>/, no block slug.
 // Forms can stack; history.state.depth counts the ones open at each step.
 
 const routerRoot = new URL('.', document.baseURI).href;
@@ -141,11 +142,18 @@ function routedSectionId(panel) {
   return panel ? panel.closest('.panel-group').id : window.ledgerSectionPage.section;
 }
 
+// A data-solo section's one block, or null.
+function soloPanel(sectionId) {
+  return document.querySelector(`#${sectionId}[data-solo] > .panel[data-route]`);
+}
+
 function routeUrl(panel = null, steps = []) {
+  const sectionId = routedSectionId(panel);
   const wrapper = document
-    .querySelector(`#main-nav a[data-section="${routedSectionId(panel)}"]`)
+    .querySelector(`#main-nav a[data-section="${sectionId}"]`)
     .getAttribute('href');
-  const parts = [panel?.dataset.route, ...steps.map((step) => step.slug)]
+  const blockSlug = soloPanel(sectionId) ? null : panel?.dataset.route;
+  const parts = [blockSlug, ...steps.map((step) => step.slug)]
     .filter(Boolean).map((slug) => `${slug}/`).join('');
   return `${routerRoot}${wrapper}${parts}`;
 }
@@ -160,8 +168,10 @@ function routedHeadingText(panel) {
 
 // "Health — Physique — Log — Ledger": the same trail as the address.
 function routeTitle(panel = null, steps = []) {
-  const wrapper = document.querySelector(`#${routedSectionId(panel)} .panel-group-title`);
-  return [wrapper?.textContent.trim(), panel && routedHeadingText(panel), ...steps.map((step) => step.label), 'Ledger']
+  const sectionId = routedSectionId(panel);
+  const wrapper = document.querySelector(`#${sectionId} .panel-group-title`);
+  const block = panel && !soloPanel(sectionId) ? routedHeadingText(panel) : null;
+  return [wrapper?.textContent.trim(), block, ...steps.map((step) => step.label), 'Ledger']
     .filter(Boolean)
     .join(' — ');
 }
@@ -420,8 +430,12 @@ function openRoutedForm(panel, button) {
 }
 
 function routeFromLocation() {
-  const [, blockSlug, buttonSlug, subSlug] = location.href.slice(routerRoot.length).split(/[?#]/)[0].split('/');
-  const panel = blockSlug ? routedPanel(blockSlug) : null;
+  const parts = location.href.slice(routerRoot.length).split(/[?#]/)[0].split('/');
+  const solo = soloPanel(routedSectionId(null));
+  // A solo section's address has no block slug: its block is implied.
+  if (solo) parts.splice(1, 0, solo.dataset.route);
+  const [, blockSlug, buttonSlug, subSlug] = parts;
+  const panel = solo || (blockSlug ? routedPanel(blockSlug) : null);
   const button = panel && buttonSlug ? panel.querySelector(`button[data-route="${buttonSlug}"]`) : null;
   // Any other slug under a block is one of its rows, optionally with a view below it;
   // under a form's button, one of that form's own pages (registerFormSubView).

@@ -110,7 +110,7 @@ Every folder and file in the repository, one line each.
 | `finance-portfolio.js` | Portfolio block: trades, holdings, gain charts, Market Value write |
 | `finance-market.js` | Market block: chart, signals, news, AI read, Analysis history |
 
-## Track and Other scripts
+## Track and Settings scripts
 
 | File | Role |
 |---|---|
@@ -124,7 +124,7 @@ Every folder and file in the repository, one line each.
 | `track-leetcode-roadmap.js` | NeetCode 250 list, videos and roadmap graph (data only) |
 | `track-leetcode-cheatsheet.js` | Cheat Sheet Python constructs (data only) |
 | `track-contact.js` | Contacts block |
-| `other-settings.js` | Settings block, key suggestions, masking, `saveSettingValues` |
+| `settings.js` | Settings block, key suggestions, masking, `saveSettingValues` |
 
 ## `scripts/`
 

@@ -9,7 +9,7 @@ Every tab of the Google Sheet behind Ledger, column by column.
 - **One sheet per user:** cloned from the template; tab names live only in `CONFIG.SHEETS` (`config.js`).
 - **Finance:** Transaction, Account, Statement, Breakdown, Watchlist, Trade, Analysis.
 - **Health:** Physique (one row per day), Nutrition (ingredients), Activity (exercise catalogue).
-- **Track and Other:** eTimeSheet, Travel, Application, LeetCode, Contact, Setting.
+- **Track and Settings:** eTimeSheet, Travel, Application, LeetCode, Contact, Setting.
 - **Read and write rules:** typed text stays as typed, columns found by header, appends after the last data row; see [Data access](../development/data-access.md).
 
 ## Tab index

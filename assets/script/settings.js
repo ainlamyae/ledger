@@ -85,7 +85,7 @@ function showSettingTab(slug) {
   renderSettingsList();
 }
 
-// Each tab is at /other/settings/<tab>/; the bare address is the first tab.
+// Each tab is at /setting/<tab>/; the bare address is the first tab.
 function initSettingTabs() {
   if (settingTabsAttached) return;
   settingTabsAttached = true;

@@ -34,7 +34,7 @@ How to set up your own copy of Ledger once: the template sheet, Google Cloud cre
 
 ## API keys
 
-Each key is added as a row in **Other → Settings → ➕**; a key ending `_API_KEY` is masked in the table.
+Each key is added as a row in **Settings → ➕**; a key ending `_API_KEY` is masked in the table.
 
 | Setting key | Service | Used for | Free limits |
 |---|---|---|---|

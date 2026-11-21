@@ -9,7 +9,7 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 - **Address:** `/health/physique/`; a day opens at `/health/physique/<date>/`.
 - **One row per day:** saving onto a day already logged merges into it instead of adding a second row.
 - **🧮 Calculate:** prices Consumption and Workout into calories, macros, TEF, duration and burn.
-- **Patterns:** dateless template rows you can duplicate into a real day.
+- **Patterns:** dateless template rows; 🔁 and 📅 switch a row between day and Pattern, 📋 Duplicate copies one into a real day.
 - **Stored, not recalculated:** Sleep, Deprivation and the day's BMR and body-mass figures are worked out once and saved.
 
 ## What it shows
@@ -29,7 +29,7 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 | AEE | Activity Energy Expenditure (kcal) |
 
 - **Today's row:** tinted green.
-- **Log form:** a **Pattern** tick, then three dropdowns (open by default only on today's form).
+- **Log form:** three dropdowns (open by default only on today's form); a Pattern shows only Consumption.
   - **Day:** Date, Body Mass, Bed, Wake; the sleep duration updates live as you type.
   - **Consumption:** one food per line, with ingredient names suggested from Nutrition as you type.
   - **Workout:** one exercise per line, with names suggested from the Activity tab, keeping the amount (`36x row` → `36x Seated Row machine`).
@@ -54,7 +54,10 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
   - **Consumption:** merges duplicate lines, sorts by calories (highest first) and capitalizes names.
   - **Workout:** merges lines for the same exercise and unit, sorts by burn and title-cases names.
   - **Unknown foods:** priced from USDA, else by the AI; unknown exercises get an AI-estimated MET.
-- **💾 Save:** writes the day; on a day already logged, the first Save merges that row into the form and the second commits.
+- **🔁 Make Pattern:** beside 💾 on a day; hides Date, Body Mass, Sleep and Workout. It saves nothing: 💾 then writes the same row as a Pattern.
+- **📅 Make Day:** beside 💾 on a Pattern; brings them back (Date today). It saves nothing: 💾 then writes the same row as a day.
+  - **❌ without saving** leaves the row as it was; to keep both, 📋 Duplicate first.
+- **💾 Save:** writes the day (or the open Pattern); on a day already logged, the first Save merges that row into the form and the second commits.
 - **Bulk 🧮 Calculate:** tick rows and it appears left of 🧬 📍 📝 (the bottom bar on a phone); recalculates those days at once, reusing priced lines, as one undo.
 - **Search:** filters by date, consumption, breakdown or workout.
 

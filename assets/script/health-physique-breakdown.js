@@ -79,7 +79,7 @@ function renderPhysiqueActivityBreakdown(perLine, minutes, calories, bodyMassKg)
     ]);
   }
 
-  document.getElementById('physique-activity-breakdown').hidden = document.getElementById('physique-is-pattern').checked;
+  document.getElementById('physique-activity-breakdown').hidden = physiquePatternMode;
 }
 
 // Last column, as Consumption's sourceCell: ✅ on the Activity sheet; AI for an

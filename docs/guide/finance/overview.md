@@ -110,7 +110,9 @@ The Finance section tracks money: summary cards, charts, transactions, accounts,
 
 ### Actions
 
-- **Pay off To account's full balance:** fills Amount with what brings the To account to 0, and locks it.
+- **Pay Off:** a button beside 💾, like Tax; fills Amount with what brings the To account to 0, still editable.
+  - **After changing To:** click it again; the figure isn't kept in step.
+  - **Nothing owed:** says the To account has no balance to pay off and leaves Amount as is.
 - **💾:** writes both Balances; Amount clears so you can send another.
 
 ### Rules & calculations

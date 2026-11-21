@@ -58,8 +58,9 @@ The Track section logs everything outside health and money: LeetCode practice, w
 
 ### Actions
 
-- **📝 Log** (`/track/work-time/log/`): Company, Date, Holiday / day off, Start, End, Break (h and m), Task.
-  - **Log Time:** a live duration preview under the times.
+- **📝 Log** (`/track/work-time/log/`): Company, Date, Start, End, Break (h and m), Task.
+  - **Log Time:** a live duration preview under the times; `🏖 Holiday` when there are no times but a Task.
+  - **Day Off:** a button beside 💾; blanks Start, End and Break, sets Task to `Day off` if empty, and saves.
 - **✏️:** edits a day; saving a date that already exists updates that row.
 - **From / To:** the table's date range, by default the last 7 days through today.
 - **Next holiday:** the first weekday holiday after today is pinned as the top row, above a line, when the range doesn't already show it.

@@ -54,6 +54,8 @@ let pSort = { key: 'date', dir: -1 };
 let pCurrentPage = 1;
 let physiqueSheetId = null;
 let editingPhysiqueRow = null;
+// The open form is a Pattern (dateless template), set when one is opened.
+let physiquePatternMode = false;
 let selectedPhysiqueRows = new Set();
 
 // Time cells arrive in the column's own format ("23:30", "23:30:00", "11:30:00 PM").
@@ -114,7 +116,7 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
     caloriesOut: physiqueFieldNumber('calories-out') || 0,
     tef: physiqueFieldNumber('tef') || null,
   };
-  const isPattern = document.getElementById('physique-is-pattern').checked;
+  const isPattern = physiquePatternMode;
   // A pattern has no date, so no BMR.
   const bmr = isPattern ? {} : physiqueBmrForSave(day.date, day.bodyMass);
   // No Bed/Wake yet: SD = 0, so D and Δm′ still show.
@@ -322,10 +324,10 @@ async function initPhysique(forceRefresh = false) {
     setupConsumptionAutocomplete();
     setupWorkoutAutocomplete();
     document.getElementById('physique-form-micro-btn').addEventListener('click', openPhysiqueMicronutrientsFromForm);
-    document.getElementById('physique-is-pattern').addEventListener('change', syncPhysiquePatternMode);
+    document.getElementById('physique-pattern-btn').addEventListener('click', () => setPhysiquePatternMode(true));
+    document.getElementById('physique-make-day-btn').addEventListener('click', () => setPhysiquePatternMode(false));
     // Date and body mass move the BMR line too.
     ['bedtime', 'wake-time', 'date', 'body-mass'].forEach((id) => physiqueField(id).addEventListener('input', updatePhysiqueSleepDuration));
-    document.getElementById('physique-is-pattern').addEventListener('change', updatePhysiqueSleepDuration);
     onFormSubmit('physique-form', submitPhysiqueForm);
 
     document.getElementById('physique-search').addEventListener('input', () => showPhysiquePage(1));
@@ -1412,10 +1414,12 @@ function physiqueFieldNumber(id) {
   return evaluateNumberExpression(physiqueField(id).value.trim());
 }
 
-// A pattern has no date, body mass, sleep or workout, so those sections hide and the
-// date is disabled. Save blanks them; unticking Pattern brings back what was typed.
+// A Pattern has no date, body mass, sleep or workout, so those sections hide and the
+// date is disabled; 🔁 shows only on a dated day, 📅 only on a Pattern.
 function syncPhysiquePatternMode() {
-  const isPattern = document.getElementById('physique-is-pattern').checked;
+  const isPattern = physiquePatternMode;
+  document.getElementById('physique-pattern-btn').hidden = isPattern;
+  document.getElementById('physique-make-day-btn').hidden = !isPattern;
   ['physique-day-details', 'physique-derived', 'physique-workout-details'].forEach((id) => {
     document.getElementById(id).hidden = isPattern;
   });
@@ -1426,6 +1430,16 @@ function syncPhysiquePatternMode() {
   dateInput.required = !isPattern;
   if (isPattern) dateInput.value = '';
   else if (!dateInput.value) dateInput.value = localIso();
+}
+
+// 🔁 / 📅: the open form becomes a Pattern / a dated day (today) in place; 💾 writes
+// the same row, ❌ keeps it as it was.
+function setPhysiquePatternMode(isPattern) {
+  physiquePatternMode = isPattern;
+  syncPhysiquePatternMode();
+  document.getElementById(isPattern ? 'physique-consumption-details' : 'physique-day-details').open = true;
+  refreshPhysiqueActivityBreakdown();
+  updatePhysiqueSleepDuration();
 }
 
 // What Save will do ("Add to Today's Workout"), on Save's hover. openPhysiqueForm clears it.
@@ -1443,13 +1457,13 @@ function openPhysiqueForm(entry, duplicate = false) {
   });
 
   // A duplicate is always a real day, dated today.
-  document.getElementById('physique-is-pattern').checked = entry ? (!entry.date && !duplicate) : false;
+  physiquePatternMode = entry ? (!entry.date && !duplicate) : false;
   if (duplicate) physiqueField('date').value = localIso();
   syncPhysiquePatternMode();
 
   // Day, Consumption and Workout start collapsed on any day but today; a Pattern opens Consumption too.
   const isToday = physiqueField('date').value === localIso();
-  const isPattern = document.getElementById('physique-is-pattern').checked;
+  const isPattern = physiquePatternMode;
   document.getElementById('physique-day-details').open = isToday;
   document.getElementById('physique-consumption-details').open = isToday || isPattern;
   document.getElementById('physique-workout-details').open = isToday;
@@ -1555,7 +1569,7 @@ const PHYSIQUE_PATTERN_BLANK_FIELDS = new Set(['date', 'body-mass', 'bedtime', '
 async function submitPhysiqueForm(event) {
   event.preventDefault();
 
-  const isPattern = document.getElementById('physique-is-pattern').checked;
+  const isPattern = physiquePatternMode;
 
   const day = {};
   for (const { id, key, numeric } of PHYSIQUE_FIELDS) {

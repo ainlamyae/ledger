@@ -37,9 +37,10 @@ async function initAccountManager(forceRefresh = false) {
 
     document.getElementById('transfer-funds-btn').addEventListener('click', openTransferForm);
     document.getElementById('transfer-cancel-btn').addEventListener('click', closeTransferForm);
-    ['transfer-from', 'transfer-to', 'transfer-payoff'].forEach((id) => {
-      document.getElementById(id).addEventListener('change', syncTransferPayoff);
+    ['transfer-from', 'transfer-to'].forEach((id) => {
+      document.getElementById(id).addEventListener('change', syncTransferBalances);
     });
+    document.getElementById('transfer-payoff-btn').addEventListener('click', fillTransferPayoff);
     onFormSubmit('transfer-form', submitTransferForm);
   }
 }
@@ -432,8 +433,6 @@ function openTransferForm() {
   populateSelect(document.getElementById('transfer-from'), names);
   populateSelect(document.getElementById('transfer-to'), names);
   document.getElementById('transfer-amount').value = '';
-  document.getElementById('transfer-amount').disabled = false;
-  document.getElementById('transfer-payoff').checked = false;
   syncTransferBalances();
   clearFieldError('transfer-form-error');
   document.getElementById('transfer-modal').hidden = false;
@@ -462,22 +461,15 @@ function closeTransferForm() {
   document.getElementById('transfer-modal').hidden = true;
 }
 
-// Payoff ticked: Amount holds the payoff figure for the current To, locked. Unticked:
-// back to manual entry. Re-run on From/To changes so the figure never goes stale.
-function syncTransferPayoff() {
-  syncTransferBalances();
-
-  const amountBox = document.getElementById('transfer-amount');
-  const checked = document.getElementById('transfer-payoff').checked;
-
-  if (!checked) {
-    amountBox.disabled = false;
+// Pay Off: Amount becomes the To account's payoff figure, still editable.
+function fillTransferPayoff() {
+  const amount = transferPayoffAmount(document.getElementById('transfer-to').value);
+  if (amount === null || amount <= 0) {
+    showFieldError('transfer-form-error', 'The To account has no balance to pay off.');
     return;
   }
-
-  const amount = transferPayoffAmount(document.getElementById('transfer-to').value);
-  amountBox.disabled = true;
-  amountBox.value = amount === null ? '' : amount.toFixed(2);
+  clearFieldError('transfer-form-error');
+  document.getElementById('transfer-amount').value = amount.toFixed(2);
 }
 
 async function submitTransferForm(event) {
@@ -494,13 +486,9 @@ async function submitTransferForm(event) {
     return;
   }
 
-  const payoff = document.getElementById('transfer-payoff').checked;
-  const amount = payoff
-    ? transferPayoffAmount(to)
-    : evaluateNumberExpression(document.getElementById('transfer-amount').value);
-
+  const amount = evaluateNumberExpression(document.getElementById('transfer-amount').value);
   if (amount === null || amount <= 0) {
-    showFieldError('transfer-form-error', 'Amount must be a positive number — check the To account actually has a balance to pay off.');
+    showFieldError('transfer-form-error', 'Amount must be a positive number.');
     return;
   }
 
@@ -531,7 +519,6 @@ async function submitTransferForm(event) {
   }
   // The amount clears either way, so a second 💾 can't repeat the transfer.
   document.getElementById('transfer-amount').value = '';
-  document.getElementById('transfer-payoff').checked = false;
 
   try {
     await refreshAccountsList(true);

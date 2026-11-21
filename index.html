@@ -2559,14 +2559,11 @@
                 <input type="text" id="transfer-amount" placeholder="e.g. 500 or =1234.56-34.56">
             </label>
 
-            <label class="checkbox-inline-label" id="transfer-payoff-label" title="Sets Amount to whatever brings the To account's balance to zero">
-                <input type="checkbox" id="transfer-payoff">
-                Pay off To account's full balance
-            </label>
-
             <p id="transfer-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
+                <!-- Not a submit: fills Amount for checking before Save. -->
+                <button type="button" id="transfer-payoff-btn" class="btn" title="Set Amount to whatever brings the To account's balance to zero">Pay Off</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="transfer-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
@@ -2647,10 +2644,6 @@
             <label>Date
                 <input type="date" id="work-time-date">
             </label>
-            <label class="checkbox-inline-label">
-                <input type="checkbox" id="work-time-holiday">
-                Holiday / day off
-            </label>
             <label>Start
                 <input type="time" id="work-time-start">
             </label>
@@ -2671,6 +2664,7 @@
             <p id="work-time-form-error" class="status" hidden></p>
 
             <div class="modal-actions">
+                <button type="submit" id="work-time-day-off-btn" class="btn" title="Save this date as a holiday or day off: no Start, End or Break, Task 'Day off' if empty">Day Off</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="work-time-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>
@@ -2681,11 +2675,7 @@
 <div id="physique-modal" class="modal" role="dialog" aria-modal="true" aria-label="Log a Physique" hidden>
     <div class="modal-card">
         <form id="physique-form" class="app-form">
-            <label class="checkbox-inline-label" title="Reusable pattern: no date — always listed at the top, excluded from every chart and Insight mode">
-                <input type="checkbox" id="physique-is-pattern">
-                Pattern
-            </label>
-            <!-- Hidden while Pattern is ticked; open on today only. -->
+            <!-- Hidden on a Pattern; open on today only. -->
             <details id="physique-day-details">
                 <summary>Day</summary>
                 <div class="form-row" id="physique-date-row">
@@ -2761,6 +2751,9 @@
                 <button type="button" id="physique-scan-btn" class="btn btn-icon" title="Take a photo of your meal — AI identifies foods and estimates portions, then pre-fills Consumption" aria-label="Scan">📷</button>
                 <button type="button" id="physique-form-micro-btn" class="btn btn-icon" title="Show this day's real, measured nutrient totals from its pulled 🧬 Micronutrients — needs the day already saved" aria-label="Micronutrients">🧬</button>
                 <button type="button" id="physique-calc-btn" class="btn btn-icon" title="Calculate" aria-label="Calculate">🧮</button>
+                <!-- 🔁 / 📅 flip the form between day and Pattern in place; 💾 writes the same row. -->
+                <button type="button" id="physique-make-day-btn" class="btn btn-icon" title="Make this Pattern a regular day — brings back Date (today), Body Mass, Sleep and Workout; 💾 saves it over this Pattern" aria-label="Make Day" hidden>📅</button>
+                <button type="button" id="physique-pattern-btn" class="btn btn-icon" title="Make this day a Pattern — no date, always listed at the top, excluded from every chart and Insight mode; 💾 saves it over this day" aria-label="Make Pattern">🔁</button>
                 <button type="submit" class="btn btn-icon" title="Save" aria-label="Save">💾</button>
                 <button type="button" id="physique-cancel-btn" class="btn modal-close" title="Close" aria-label="Close">❌</button>
             </div>

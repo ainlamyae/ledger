@@ -3,8 +3,10 @@ const TS_PAGE_SIZE = 28;
 const WORK_TIME_TASK_DISPLAY_MAX = 30;
 // The table's default range: this many days back, through today.
 const WORK_TIME_DEFAULT_DAYS_BACK = 7;
-// The form fields a holiday blanks and disables (suffixes of work-time-*).
+// The form's shift fields (suffixes of work-time-*); Day Off blanks them.
 const WORK_TIME_SHIFT_FIELDS = ['start', 'end', 'break-h', 'break-m'];
+// Day Off's Task when none is typed, since a holiday needs one.
+const WORK_TIME_DAY_OFF_TASK = 'Day off';
 
 let allTimeEntries = [];
 let workTimeListenersAttached = false;
@@ -150,11 +152,7 @@ async function initWorkTime(forceRefresh = false) {
     });
     workTimeField('cancel-btn').addEventListener('click', closeWorkTimeForm);
     onFormSubmit('work-time-form', submitWorkTimeForm);
-    workTimeField('holiday').addEventListener('change', () => {
-      toggleWorkTimeHolidayFields();
-      updateWorkTimeLiveDuration();
-    });
-    WORK_TIME_SHIFT_FIELDS.forEach((name) => workTimeField(name).addEventListener('input', updateWorkTimeLiveDuration));
+    [...WORK_TIME_SHIFT_FIELDS, 'task'].forEach((name) => workTimeField(name).addEventListener('input', updateWorkTimeLiveDuration));
     ['date-from', 'date-to'].forEach((name) => workTimeField(name).addEventListener('input', rerenderFromFirstPage));
     makeSortableHeaders('#work-time-table', tsSort, rerenderFromFirstPage);
   }
@@ -361,13 +359,18 @@ function workTimeRow(e, todayIso) {
   return tr;
 }
 
-function toggleWorkTimeHolidayFields() {
-  const holiday = workTimeField('holiday').checked;
+// Day Off: no times, Break 0, and a Task so the day reads as a holiday.
+function fillWorkTimeDayOff() {
   WORK_TIME_SHIFT_FIELDS.forEach((name) => {
-    const el = workTimeField(name);
-    el.disabled = holiday;
-    if (holiday) el.value = name.startsWith('break') ? '0' : '';
+    workTimeField(name).value = name.startsWith('break') ? '0' : '';
   });
+  const task = workTimeField('task');
+  if (!task.value.trim()) task.value = WORK_TIME_DAY_OFF_TASK;
+}
+
+// The form as typed reads as a holiday (isHolidayEntry's rule).
+function workTimeFormIsHoliday() {
+  return isHolidayEntry({ start: workTimeField('start').value, end: workTimeField('end').value, task: workTimeField('task').value.trim() });
 }
 
 function workTimeBreakMinutesFromInputs() {
@@ -378,7 +381,7 @@ function workTimeBreakMinutesFromInputs() {
 
 function updateWorkTimeLiveDuration() {
   const liveDuration = workTimeField('live-duration');
-  if (workTimeField('holiday').checked) {
+  if (workTimeFormIsHoliday()) {
     liveDuration.textContent = '🏖 Holiday';
     return;
   }
@@ -399,8 +402,6 @@ function openWorkTimeForm(dateStr) {
   workTimeField('break-m').value = breakM;
   workTimeField('task').value = existing?.task || '';
 
-  workTimeField('holiday').checked = isHolidayEntry(existing);
-  toggleWorkTimeHolidayFields();
   updateWorkTimeLiveDuration();
 
   clearFieldError('work-time-form-error');
@@ -435,16 +436,20 @@ async function backfillMissingDates(untilDate) {
 async function submitWorkTimeForm(event) {
   event.preventDefault();
 
+  if (event.submitter?.id === 'work-time-day-off-btn') {
+    fillWorkTimeDayOff();
+    updateWorkTimeLiveDuration();
+  }
+
   const company = workTimeField('company').value.trim();
   const date = workTimeField('date').value;
-  const holiday = workTimeField('holiday').checked;
-  const start = holiday ? '' : workTimeField('start').value;
-  const end = holiday ? '' : workTimeField('end').value;
+  const start = workTimeField('start').value;
+  const end = workTimeField('end').value;
   // "HH:MM": a duration-formatted Break cell would read a bare 15 as 15 days.
-  const breakValue = minutesToTimeInput(holiday ? 0 : workTimeBreakMinutesFromInputs());
+  const breakValue = minutesToTimeInput(workTimeBreakMinutesFromInputs());
   const task = workTimeField('task').value;
 
-  if (!holiday && start && end && timeToMinutes(end) <= timeToMinutes(start)) {
+  if (start && end && timeToMinutes(end) <= timeToMinutes(start)) {
     showFieldError('work-time-form-error', 'End time must be after Start time.');
     return;
   }

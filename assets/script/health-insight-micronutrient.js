@@ -336,6 +336,11 @@ function estimateTefBreakdown(breakdown) {
     }
 
     const { macros, tefRaw } = scaledNutritionMacros(entry, scale);
+    // Macros typed on the Consumption line ("5fat") beat the Nutrition row's.
+    const typed = item.noteLine ? stripLeadingIngredientTokens(item.noteLine).anchors : {};
+    [['fiber', 'fiber'], ['fat', 'fat'], ['carb', 'carbohydrate']].forEach(([field, key]) => {
+      if (typed[field] !== undefined) macros[key] = typed[field];
+    });
     if (tefRaw !== null) totalTefRaw += tefRaw;
     breakdown[i] = orderedBreakdownItem(item, macros);
     matched = true;

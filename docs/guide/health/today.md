@@ -28,7 +28,7 @@ The Today cards show the day's energy budget, macros, activity, sleep and progre
 | BMR_… | The one BMR picked in Tune, named by its key (`BMR_mif`, `BMR_kat`, `BMR_cal`, `BMR_adp` or `BMR_avg`) | `-1648 kcal` |
 | M | Maintenance (BMR + AEE): today's, then with the desired AEE | `-1648 / -2003 kcal` |
 | D | The day's net energy balance against the desired balance | `-1058 / -852 kcal` |
-| Δm′ | Calculated change: D as fat mass (D ÷ 7700 kcal/kg), against the planned daily loss | `-137 / 100 g` |
+| Δm′ | Calculated change: D as fat mass (D ÷ 7700 kcal/kg), against the desired D converted the same way | `-137 / -111 g` |
 | ETA | Days to the healthy body mass and the arrival date, as on the Progress card | `102 days (2027-01-27)` |
 
 - **Not logged yet:** an empty day reads as 0 against its desired figure (`0 / 2100 kcal`), not `—`.

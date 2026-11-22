@@ -40,6 +40,7 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 - **Desire row:** on today's form only, under each Total, the day's desired figures.
 - **Summary:** the Status card's rows worked out from the open form: m, m̄, Δm, BMI, Pro, DF, Fat, Crb, TEI, TEF, AEE, SD, BMR, M, D, Δm′.
   - **Columns:** Name, Amount, Desire, Remain (Desire − Amount, blank once met), Unit and a ✅/❌ mark.
+  - **Δm′:** both Amount and Desire are D's in grams (÷ 7700 kcal/kg), so the row always reads as D does.
 - **🧬 Micronutrients:** a day's real nutrient totals: Nutrient, Amount, Supp / day, Ideal / day.
 
 ## Actions
@@ -51,14 +52,18 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 - **📷 Scan:** pick a meal photo; the AI lists the foods with portions, appends them to Consumption and runs Calculate.
 - **🧬 (form):** the day's Micronutrients view; the day must be saved first.
 - **🧮 Calculate:** prices both text boxes and tidies them.
-  - **Consumption:** merges duplicate lines, sorts by calories (highest first) and capitalizes names.
-  - **Workout:** merges lines for the same exercise and unit, sorts by burn and title-cases names.
+  - **One click:** it repeats until the text stops changing, so a second click changes nothing.
+  - **Consumption:** merges duplicate lines, sorts by calories (highest first) and capitalizes names; uncombined lines stay as written.
+  - **Workout:** merges lines for the same exercise and unit, sorts by burn and title-cases names; a line it can't read stays as typed and is named in the toast.
   - **Unknown foods:** priced from USDA, else by the AI; unknown exercises get an AI-estimated MET.
-- **🔁 Make Pattern:** beside 💾 on a day; hides Date, Body Mass, Sleep and Workout. It saves nothing: 💾 then writes the same row as a Pattern.
-- **📅 Make Day:** beside 💾 on a Pattern; brings them back (Date today). It saves nothing: 💾 then writes the same row as a day.
+  - **Emptied Consumption:** clears the Breakdown and the totals it wrote; totals typed without a Breakdown stay.
+- **Form buttons:** 📷 🔁 🧬 🧮 💾 ❌ (📅 in 🔁's place on a Pattern).
+- **🔁 Make Pattern:** beside 📷 on a day; hides Date, Body Mass, Sleep and Workout. It saves nothing: 💾 then writes the same row as a Pattern.
+- **📅 Make Day:** in 🔁's place on a Pattern; brings them back (Date today). It saves nothing: 💾 then writes the same row as a day.
   - **❌ without saving** leaves the row as it was; to keep both, 📋 Duplicate first.
 - **💾 Save:** writes the day (or the open Pattern); on a day already logged, the first Save merges that row into the form and the second commits.
 - **Bulk 🧮 Calculate:** tick rows and it appears left of 🧬 📍 📝 (the bottom bar on a phone); recalculates those days at once, reusing priced lines, as one undo.
+  - **Same as the form:** same settled result, one AI call for every unknown exercise, and workouts skipped until the Activity catalogue has loaded.
 - **Search:** filters by date, consumption, breakdown or workout.
 
 ## Rules & calculations
@@ -66,10 +71,14 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 - **Scaling groups:** wrap lines in `( … )/n` or `( … )*n` to share or multiply a portion; Calculate writes back the scaled lines.
 - **Amounts in grams:** a counted food is stored by its Nutrition gram figure (`31g (1 scoop)` → `31g`).
 - **Consumption is the reference:** Calculate first lines the Breakdown up with it, so each row's amount is the line's.
-  - **Typed weight:** `5g Coffee` is 5 g, never the AI's guess of a cup.
+  - **Typed weight:** `5g Coffee` is 5 g, never the AI's guess of a cup, nor 5 servings of a counted row (`200g Egg` on `50g (1x)` is 200 g).
   - **Nutrition units:** a unit the Nutrition Amount names counts servings (`2 cup Coffee` on `5g (1cup)` is 10 g).
-  - **✅ rows:** repriced from Nutrition as it is now, so an edited food updates every recalculated day.
+  - **Bare number:** on a counted row it is that many (`3 eggs` → `3x Eggs`), whatever the AI counted.
+  - **Typed macros:** `100kcal 5p Bar` stays as typed; those numbers stand on every re-run, and beat the Nutrition row's fiber, fat and carbs.
+  - **✅ rows:** repriced from Nutrition as it is now, so an edited food updates every recalculated day; an anchored line keeps its kcal and gets new grams.
 - **Pricing:** other lines keep their saved numbers (rescaled to the line's grams) until their text changes; a food added to Nutrition later turns ✅ on the next Calculate.
+- **AI pairing:** each AI food is matched to your line by name, not by position, so a reordered reply can't swap amounts.
+- **Total:** Calories In is the sum of the rows shown, so it never shifts by 1 on a re-run.
 - **Burn:** each day uses its own body mass, else the latest earlier one.
 - **Duration:** active time only; rest and transitions are left out.
 - **Patterns:** save Date, Body Mass, Bed, Wake, Workout, Duration and AEE blank, and never show in charts or Insight.

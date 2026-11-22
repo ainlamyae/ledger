@@ -14,12 +14,14 @@ function workoutRepSec() {
 // One pattern per note-line shape. The gap is `\s+` so older two-space lines
 // still parse; `×` is still read because older notes carry it. The legacy
 // "3x10 Name" form is folded into the same total reps (30).
-const REPS_NOTE_LINE_PATTERN = /^(\d+)[x×]\s+(.+)$/;
-const LEGACY_SETS_REPS_NOTE_LINE_PATTERN = /^(\d+)[x×](\d+)\s+(.+)$/;
-const DURATION_NOTE_LINE_PATTERN = /^(\d+)min\s+(.+)$/;
-const STEPS_NOTE_LINE_PATTERN = /^(\d+)step\s+(.+)$/;
+// Any case, a space before the unit, and its plural read too ("30 Mins Walk").
+// A name can't start with a digit, so "3 x 10 Squat" falls to the sets form.
+const REPS_NOTE_LINE_PATTERN = /^(\d+)\s*[x×]\s+(?!\d)(.+)$/i;
+const LEGACY_SETS_REPS_NOTE_LINE_PATTERN = /^(\d+)\s*[x×]\s*(\d+)\s+(.+)$/i;
+const DURATION_NOTE_LINE_PATTERN = /^(\d+(?:\.\d+)?)\s*(?:min|mins|minutes?)\s+(.+)$/i;
+const STEPS_NOTE_LINE_PATTERN = /^(\d+)\s*steps?\s+(.+)$/i;
 // Seconds, not minutes: a hold is usually well under a minute per set.
-const HOLD_NOTE_LINE_PATTERN = /^(\d+)sec\s+(.+)$/;
+const HOLD_NOTE_LINE_PATTERN = /^(\d+)\s*(?:sec|secs|seconds?)\s+(.+)$/i;
 
 // Tried in order; the first match wins.
 const NOTE_LINE_PARSERS = [
@@ -43,6 +45,11 @@ function parseWorkoutNoteLines(notes) {
       return null;
     })
     .filter(Boolean);
+}
+
+// Lines no shape reads, kept by Calculate's rewrite instead of dropped.
+function unparsedWorkoutLines(notes) {
+  return notes.split('\n').map((line) => line.trim()).filter((line) => line && !parseWorkoutNoteLines(line).length);
 }
 
 // A parsed line's active seconds, net of rest. Shared by Log Workout's prefill

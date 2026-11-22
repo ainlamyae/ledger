@@ -117,6 +117,34 @@ function pickPlausibleMacros(candidates, kcalFallback, proteinFallback) {
   };
 }
 
+// A name's words, lowercase with a trailing "s" folded ("Apples" -> apple).
+function ingredientNameWords(name) {
+  return new Set(String(name || '').toLowerCase().split(/[^\p{L}\d]+/u).filter(Boolean).map(foldTrailingS));
+}
+
+// The AI's items in their segments' order: each segment takes the free item sharing
+// the most name words, ties by position; ones sharing none keep the order left.
+function pairItemsToSegments(items, segments) {
+  const segmentWords = segments.map((s) => ingredientNameWords(extractIngredientName(s)));
+  const itemWords = items.map((item) => ingredientNameWords(item.query));
+  const pairs = [];
+  segmentWords.forEach((sw, s) => itemWords.forEach((iw, i) => {
+    const score = [...sw].filter((w) => iw.has(w)).length;
+    if (score > 0) pairs.push({ s, i, score });
+  }));
+  pairs.sort((a, b) => b.score - a.score || Math.abs(a.s - a.i) - Math.abs(b.s - b.i));
+
+  const paired = new Array(segments.length).fill(null);
+  const taken = new Set();
+  pairs.forEach(({ s, i }) => {
+    if (paired[s] !== null || taken.has(i)) return;
+    paired[s] = items[i];
+    taken.add(i);
+  });
+  const rest = items.filter((_, i) => !taken.has(i));
+  return paired.map((item) => item ?? rest.shift());
+}
+
 // Comma/newline only: " and " would split "macaroni and cheese".
 function splitNotesIntoSegments(notes) {
   return notes.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
@@ -268,6 +296,14 @@ function typedAnchor({ anchors }, field) {
   return (anchors && anchors[field] !== undefined) ? Math.max(0, anchors[field]) : null;
 }
 
+// Typed anchors as canonical note text ("100kcal 5p"), '' when none. kJ reads back as kcal.
+const ANCHOR_NOTE_WORD = { kcal: 'kcal', protein: 'p', fiber: 'fiber', fat: 'fat', carb: 'carb' };
+function anchorNoteText(anchors) {
+  return Object.entries(anchors || {})
+    .map(([field, value]) => `${roundPlaces(value, 2)}${ANCHOR_NOTE_WORD[field]}`)
+    .join(' ');
+}
+
 // Grams holding `amount` of a macro at `per100g`; a zero density keeps the AI's grams.
 function gramsForAnchor(amount, per100g, fallbackGrams) {
   return per100g > 0 ? (amount / per100g) * 100 : fallbackGrams;
@@ -275,6 +311,8 @@ function gramsForAnchor(amount, per100g, fallbackGrams) {
 
 // Whether a Nutrition Amount counts in `unit` ("5g (1cup)" names cup).
 function amountNamesUnit(amount, unit) {
+  // A weight is never a serving: "200g" on a "50g (1x)" row is 200 g, not 200 eggs.
+  if (massUnitGrams(unit)) return false;
   const spellings = (unit && UNIT_SPELLINGS[UNIT_CANONICAL[unit]]) || [];
   return spellings.some((s) => new RegExp(`\\d\\s*${s}\\b`, 'i').test(String(amount || '')));
 }
@@ -307,6 +345,8 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
   // Names come from the user's text, paired by position; else the AI's "query".
   const segments = splitNotesIntoSegments(notes);
   const pairingReliable = segments.length === items.length;
+  // The AI may list them in another order: reordered to their lines by name.
+  if (pairingReliable) items.splice(0, items.length, ...pairItemsToSegments(items, segments));
   const segmentQuantities = pairingReliable ? segments.map(extractIngredientQuantity) : [];
   const resolvedNames = items.map((item, i) =>
     pairingReliable ? extractIngredientName(segments[i]) : item.query
@@ -359,6 +399,8 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     if (!anchored && tableCount !== null && amountNamesUnit(tableEntry.amount, originalUnit)) {
       item.count = originalQuantity ?? 1;
     }
+    // A bare number ("3 eggs") on a counted row is that many, whatever the AI counted.
+    if (!anchored && tableCount !== null && !originalUnit && originalQuantity !== null) item.count = originalQuantity;
     const useTableCount = tableCount !== null
       && (!anchored ? item.count !== null : (tableAnchorUsable && tableGrams === null));
     const useTableGrams = tableGrams !== null && (!anchored || tableAnchorUsable);
@@ -444,10 +486,13 @@ async function estimateCaloriesAndProtein(notesText, { autoBank = true } = {}) {
     if (energyKcal !== null) itemCalories = energyKcal;
     if (proteinG !== null) itemProtein = proteinG;
 
-    // Tidied note line: a typed unit stays (canonical, glued: "50g"); a bare count
-    // or an anchor becomes what Calculate resolved.
+    // Tidied note line: typed anchors and units stay (canonical, glued: "100kcal 5p",
+    // "50g"); a bare count becomes what Calculate resolved.
+    const anchorText = parsed ? anchorNoteText(parsed.anchors) : '';
     let noteQuantity;
-    if (originalUnit && !anchored) {
+    if (anchorText) {
+      noteQuantity = anchorText;
+    } else if (originalUnit && !anchored) {
       noteQuantity = `${originalQuantity ?? 1}${UNIT_CANONICAL[originalUnit] || originalUnit}`;
     } else if (source === 'nutrition-table-count') {
       noteQuantity = `${usedCount ?? originalQuantity ?? 1}x`;

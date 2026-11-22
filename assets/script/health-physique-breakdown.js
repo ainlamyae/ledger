@@ -196,6 +196,9 @@ const SAME_KEYS = Object.fromEntries(OPTIONAL_TOTAL_KEYS.map((key) => [key, key]
 // Consumption is the reference: a saved row takes the line's grams. A Nutrition
 // row is repriced from the sheet as it is now; any other row is rescaled.
 function matchBreakdownToLine(item, line) {
+  const { anchors } = stripLeadingIngredientTokens(line);
+  if (Object.keys(anchors).length) return matchAnchoredRow(item, anchors);
+
   const grams = consumptionLineGrams(line);
   const amount = grams !== null ? `${roundPlaces(grams, 1)}g` : item.amount;
 
@@ -209,6 +212,25 @@ function matchBreakdownToLine(item, line) {
   const savedGrams = parseBreakdownAmount(item.amount).grams;
   if (grams === null || !savedGrams || Math.abs(grams - savedGrams) < 0.05) return item;
   return scaledBreakdownRow(item, amount, item, grams / savedGrams, SAME_KEYS);
+}
+
+// Typed anchors are the reference: their numbers stand, and a Nutrition row by weight
+// re-derives the grams (and other macros) at its current density.
+function matchAnchoredRow(item, anchors) {
+  const entry = NUTRITION_TABLE_SOURCE_LABELS.includes(item.source) && findNutritionEntry(item.name);
+  const tableGrams = entry ? parseGramsFromAmount(entry.amount) : null;
+  let ref = null;
+  if (anchors.kcal !== undefined && entry?.calories > 0) ref = anchors.kcal / entry.calories;
+  else if (anchors.protein !== undefined && entry?.protein > 0) ref = anchors.protein / entry.protein;
+  if (ref === null || !tableGrams) return item;
+
+  const row = scaledBreakdownRow(item, `${roundPlaces(ref * tableGrams, 1)}g`, entry, ref, BREAKDOWN_MACRO_KEY);
+  if (anchors.kcal !== undefined) row.calories = Math.round(anchors.kcal);
+  if (anchors.protein !== undefined) row.protein = roundPlaces(anchors.protein, 1);
+  Object.entries(BREAKDOWN_MACRO_KEY).forEach(([field, key]) => {
+    if (anchors[field] !== undefined) row[key] = roundPlaces(anchors[field], 2);
+  });
+  return row;
 }
 
 // Re-estimates only the Consumption lines that changed: a line matching a saved
@@ -239,12 +261,7 @@ async function estimateConsumptionIncrementally(consumption, savedBreakdownRaw) 
     ? await estimateCaloriesAndProtein(staleLines.join('\n'), { autoBank: false })
     : { calories: 0, protein: 0, breakdown: [], usdaUnreachable: false };
 
-  // Nothing reused: pass the full run's own totals through. A mixed run re-sums
-  // the already-rounded items.
-  if (!reused.length) {
-    return { ...fresh, reusedCount: 0, estimatedCount: fresh.breakdown.length };
-  }
-
+  // Always the rows' own sum: a fresh run's unrounded total would shift by 1 once its rows are reused.
   const breakdown = [...reused, ...fresh.breakdown].sort((a, b) => b.calories - a.calories);
   const { calories, protein } = breakdownTotals(breakdown);
   return {
@@ -276,12 +293,19 @@ function combineWorkoutText(text) {
       return;
     }
     const field = WORKOUT_QUANTITY_FIELD[parsed.type];
-    existing.parsed[field] += parsed[field];
+    // Rounded: decimal minutes would add to "0.30000000000000004min".
+    existing.parsed[field] = roundPlaces(existing.parsed[field] + parsed[field], 2);
   });
   const combinedCount = rawLines.length - groups.size;
 
   const rebuilt = [...groups.values()].map((g) => (g.parsed ? `${workoutNoteQuantityForLine(g.parsed)} ${g.parsed.name}` : g.raw));
   return { text: rebuilt.join('\n'), combinedCount };
+}
+
+// The Workout rewritten as priced lines ("30x Push Up"), then any unread line as typed.
+function rebuiltWorkoutText(sortedPerLine, typedWorkout) {
+  const priced = sortedPerLine.map((line) => `${line.quantity} ${titleCaseIngredientName(line.name)}`);
+  return [...priced, ...unparsedWorkoutLines(typedWorkout)].join('\n');
 }
 
 // Prices the Workout into Activity Duration/Calories Out and the table; returns
@@ -325,10 +349,11 @@ function runPhysiqueWorkoutCalc(reorderWorkoutField) {
     // Highest burn first, as Consumption sorts by calories.
     const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
     if (reorderWorkoutField) {
-      // Rebuilt in the token shape parsing expects, names title-cased.
-      physiqueField('workout').value = sortedPerLine.map((line) => `${line.quantity} ${titleCaseIngredientName(line.name)}`).join('\n');
+      physiqueField('workout').value = rebuiltWorkoutText(sortedPerLine, workout);
       if (combinedCount > 0) messages.push(`🔗 ${combinedCount} workout lines combined.`);
     }
+    const unread = unparsedWorkoutLines(workout);
+    if (unread.length) messages.push(`⚠️ Not read, not counted: ${unread.map((l) => `"${l}"`).join(', ')}.`);
     physiqueField('activity-duration').value = minutes;
     physiqueField('calories-out').value = calories;
     renderPhysiqueActivityBreakdown(sortedPerLine, minutes, calories, bodyMassKg);
@@ -379,13 +404,16 @@ function combineAndSortConsumptionText(text, caloriesForName = null) {
     const name = extractIngredientName(line);
     const key = quantity === null ? `unmergeable-${unmergeable++}` : `${name.toLowerCase()}|${unit || ''}`;
     const existing = groups.get(key);
-    if (existing) existing.quantity += quantity;
-    else groups.set(key, { quantity, unit, name, raw: line });
+    if (existing) {
+      existing.quantity += quantity;
+      existing.merged = true;
+    } else groups.set(key, { quantity, unit, name, raw: line });
   });
   const combinedCount = lines.length - groups.size;
 
+  // An uncombined line stays as is, so it still matches its row's noteLine next pass.
   const rebuilt = [...groups.values()].map((g) => (
-    g.quantity === null ? g.raw : consumptionLineText(g.quantity, g.unit, titleCaseIngredientName(g.name))
+    g.merged ? consumptionLineText(g.quantity, g.unit, titleCaseIngredientName(g.name)) : g.raw
   ));
 
   const scored = rebuilt.map((line) => {
@@ -680,6 +708,65 @@ function applyConsumptionScaling(text) {
   return found ? scaled : null;
 }
 
+// Cap on Calculate's passes, in case a line never settles.
+const PHYSIQUE_CALC_MAX_PASSES = 5;
+
+// Calculate's Consumption side, shared by the form and Bulk Calculate; no DOM.
+// Repeats until the tidied text stops changing, so one run applies every change.
+async function settleConsumption(consumption, savedBreakdownRaw) {
+  let text = (applyConsumptionScaling(consumption) ?? consumption).trim();
+  let breakdownRaw = savedBreakdownRaw;
+  let combinedCount = 0;
+  let estimatedCount = 0;
+  let usdaUnreachable = false;
+  let reusedCount = 0;
+  let result;
+  for (let i = 0; i < PHYSIQUE_CALC_MAX_PASSES; i++) {
+    let pass;
+    try {
+      pass = await estimateConsumptionIncrementally(text, breakdownRaw);
+    } catch (err) {
+      // A later pass failing keeps the earlier pass's result.
+      if (!result) throw err;
+      break;
+    }
+    result = pass;
+    // Only the first pass's reuse came from the saved day.
+    if (i === 0) reusedCount = result.reusedCount;
+    usdaUnreachable = usdaUnreachable || result.usdaUnreachable;
+
+    // Title-cased, noteLine too, so the next pass's reuse still matches.
+    result.breakdown.forEach((item) => {
+      const titleCased = titleCaseIngredientName(item.name);
+      if (titleCased === item.name) return;
+      if (item.noteLine) item.noteLine = item.noteLine.replace(item.name, titleCased);
+      item.name = titleCased;
+    });
+
+    // Rebuilt from the whole breakdown, then combined and sorted.
+    const rebuilt = result.breakdown.map((item) => item.noteLine || `${item.amount} ${item.name}`).join('\n');
+    const tidied = combineAndSortConsumptionText(rebuilt, breakdownCaloriesLookup(result.breakdown));
+    combinedCount += tidied.combinedCount;
+    estimatedCount += result.estimatedCount;
+    breakdownRaw = breakdownToJson(result.breakdown);
+    const settled = tidied.text.trim() === text;
+    text = tidied.text.trim();
+    if (settled) break;
+  }
+  return { ...result, text, combinedCount, estimatedCount, reusedCount, usdaUnreachable };
+}
+
+// Consumption emptied: the Breakdown and the totals it wrote go too. Typed totals
+// with no Breakdown behind them stay. True when anything was cleared.
+function clearConsumptionDerivedFields() {
+  if (!physiqueField('breakdown').value) return false;
+  ['breakdown', 'calories-in', 'protein-in', 'fiber', 'fat', 'carbohydrate', 'tef'].forEach((id) => {
+    physiqueField(id).value = '';
+  });
+  hideCalcBreakdown('physique');
+  return true;
+}
+
 // Both estimators: Consumption fills Breakdown/Calories In/Protein In, Workout
 // fills Activity Duration/Calories Out. An empty side is skipped, and neither
 // side's failure stops the other.
@@ -693,63 +780,49 @@ async function calculatePhysiqueDay() {
   const workout = physiqueField('workout').value.trim();
   const btn = document.getElementById('physique-calc-btn');
 
+  const cleared = !consumption && clearConsumptionDerivedFields();
   if (!consumption && !workout) {
-    showFieldError('physique-form-error', 'Fill in Consumption, Workout, or both first.');
+    if (cleared) updatePhysiqueSleepDuration();
+    else showFieldError('physique-form-error', 'Fill in Consumption, Workout, or both first.');
     return;
   }
 
   btn.disabled = true;
   Motion.iconBusy(btn);
   clearFieldError('physique-form-error');
+  const messages = [];
+  try {
+    await calculatePhysiqueSides(consumption, workout, messages);
+  } finally {
+    btn.disabled = false;
+    Motion.iconSettle(btn);
+  }
+  if (messages.length) showToast(messages.join(' '));
+}
 
+// calculatePhysiqueDay's work, pushing its warnings onto `messages`.
+async function calculatePhysiqueSides(consumption, workout, messages) {
   // New exercise names go to the AI first, so the pass below prices them.
   const workoutAiMessages = (workout && activitiesDataLoaded) ? await guessUnknownActivities(workout) : [];
-  const messages = [...workoutAiMessages, ...runPhysiqueWorkoutCalc(true)];
+  messages.push(...workoutAiMessages, ...runPhysiqueWorkoutCalc(true));
 
   if (consumption) {
     try {
-      const { calories, protein, breakdown, usdaUnreachable, reusedCount, estimatedCount } =
-        await estimateConsumptionIncrementally(consumption, physiqueField('breakdown').value);
-
-      // Title-cased like the Consumption lines below; noteLine too, so the next
-      // Calculate's reuse still matches.
-      breakdown.forEach((item) => {
-        const titleCased = titleCaseIngredientName(item.name);
-        if (titleCased === item.name) return;
-        if (item.noteLine) item.noteLine = item.noteLine.replace(item.name, titleCased);
-        item.name = titleCased;
-      });
-
-      // Rebuilt from the whole breakdown (the fresh run's notes cover only the
-      // re-estimated lines), then combined, sorted and capitalised.
-      const rebuiltConsumption = breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n');
-      const { text: sortedConsumption, combinedCount } =
-        combineAndSortConsumptionText(rebuiltConsumption, breakdownCaloriesLookup(breakdown));
-      physiqueField('consumption').value = sortedConsumption;
-      if (combinedCount > 0) messages.push(`🔗 ${combinedCount} combined.`);
-      // Annotates the rows with fiber/fat/carbohydrate/TEF before the table draws.
+      const settled = await settleConsumption(consumption, physiqueField('breakdown').value);
+      const { breakdown, calories, protein } = settled;
+      physiqueField('consumption').value = settled.text;
+      // Adds fiber/fat/carb/TEF, then writes the Breakdown JSON and table.
       syncPhysiqueTotalsFromBreakdown(breakdown, calories, protein);
-      // Writes the Breakdown field's JSON as well as drawing the table.
       renderPhysiqueBreakdown(breakdown, calories, protein);
 
-      if (reusedCount) {
-        messages.push(`♻️ ${reusedCount} reused, ${estimatedCount} new.`);
-      }
-      if (usdaUnreachable) {
-        messages.push('⚠️ No DB — AI only.');
-      }
-      if (calories > PHYSIQUE_DAY_CALORIE_CEILING) {
-        messages.push(`⚠️ ${calories} kcal, check.`);
-      }
+      if (settled.combinedCount > 0) messages.push(`🔗 ${settled.combinedCount} combined.`);
+      if (settled.reusedCount) messages.push(`♻️ ${settled.reusedCount} reused, ${settled.estimatedCount} new.`);
+      if (settled.usdaUnreachable) messages.push('⚠️ No DB — AI only.');
+      if (calories > PHYSIQUE_DAY_CALORIE_CEILING) messages.push(`⚠️ ${calories} kcal, check.`);
     } catch (err) {
       messages.push(`⚠️ Consumption: ${err.message}`);
     }
   }
 
   updatePhysiqueSleepDuration();
-
-  btn.disabled = false;
-  Motion.iconSettle(btn);
-
-  if (messages.length) showToast(messages.join(' '));
 }

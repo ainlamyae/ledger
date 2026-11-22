@@ -183,7 +183,6 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   const weeklyFatLossKg = weeklyFatLossKgAt(planMassKg);
   const desiredDailyKg = weeklyFatLossKg !== null ? -weeklyFatLossKg / 7 : null;
   const desiredKgPerDay = desiredDailyKg !== null ? Math.round(desiredDailyKg * 1000) / 1000 : null;
-  const desiredGPerDay = desiredDailyKg !== null ? Math.round(desiredDailyKg * GRAMS_PER_KG) : null;
   const bmiDesired = heightCm !== null ? computeBmi(healthyMassKg, heightCm) : null;
 
   // The healthy mass ± glycogen swing, as the Progress meter shows it.
@@ -207,6 +206,8 @@ function updatePhysiqueSleepDeprivation(sleepHours) {
   show('physique-maintenance-desire', mDesired);
   const balanceDesired = desiredBalanceKcal(planMassKg);
   show('physique-balance-desire', balanceDesired);
+  // D's desire in grams, converted as the Amount is.
+  const desiredGPerDay = balanceDesired !== null ? Math.round((balanceDesired / GENERIC_KCAL_PER_KG_FAT) * GRAMS_PER_KG) : null;
   show('physique-mass-delta-prime-desire', desiredGPerDay);
 
   // Remain = Desire − Amount (a band's floor for macros); blank once Amount is past Desire.
@@ -1636,26 +1637,23 @@ async function recalculatePhysiqueDay(p, bodyMassKg) {
   const day = physiqueDayCopy(p);
 
   if (p.consumption.trim()) {
-    const { calories, protein, breakdown } =
-      await estimateConsumptionIncrementally(p.consumption, p.breakdown);
+    // The form's Calculate, run to the same settled result.
+    const { calories, protein, breakdown, text } = await settleConsumption(p.consumption, p.breakdown);
     // Annotated before the JSON is written, so Breakdown carries the macros and TEF too.
     Object.assign(day, breakdownDayFigures(breakdown));
-    // Tidied as the form's Calculate does: combined, sorted by real calories, capitalized.
-    day.consumption = combineAndSortConsumptionText(
-      breakdown.map((i) => i.noteLine || `${i.amount} ${i.name}`).join('\n'),
-      breakdownCaloriesLookup(breakdown),
-    ).text;
+    day.consumption = text;
     day.breakdown = breakdownToJson(breakdown);
     day.caloriesIn = calories;
     day.proteinIn = protein;
   }
 
-  if (p.workout.trim() && bodyMassKg !== null) {
+  // Without the catalogue every line would price at the default MET, as the form guards.
+  if (p.workout.trim() && bodyMassKg !== null && activitiesDataLoaded) {
     // Combined and sorted highest burn first, as the form's Calculate does.
     const { text: combinedWorkout } = combineWorkoutText(p.workout);
     const { minutes, calories, perLine } = estimateWorkoutActivity(combinedWorkout, bodyMassKg);
     const sortedPerLine = [...perLine].sort((a, b) => b.calories - a.calories);
-    day.workout = sortedPerLine.map((line) => `${line.quantity} ${line.name}`).join('\n');
+    day.workout = rebuiltWorkoutText(sortedPerLine, p.workout);
     day.duration = minutes;
     day.caloriesOut = calories;
   }
@@ -1679,6 +1677,10 @@ async function bulkCalculatePhysique() {
 
   const snapshots = eligible.map((p) => ({ row: p.row, values: physiqueDayCopy(p) }));
 
+  // New exercise names go to the AI once for every day, as the form's Calculate does.
+  const workouts = eligible.map((p) => p.workout.trim()).filter(Boolean).join('\n');
+  const workoutWarnings = workouts && activitiesDataLoaded ? await guessUnknownActivities(workouts) : [];
+
   let done = 0;
   const succeeded = [];
   const results = await Promise.allSettled(eligible.map(async (p, i) => {
@@ -1699,8 +1701,9 @@ async function bulkCalculatePhysique() {
   const parts = [`${succeeded.length} day${succeeded.length === 1 ? '' : 's'} recalculated`];
   if (skipped) parts.push(`${skipped} skipped (nothing to calculate)`);
   if (failed) parts.push(`${failed} failed`);
+  if (workouts && !activitiesDataLoaded) parts.push('workouts skipped (loading catalogue)');
 
-  showUndoToast(`${parts.join(', ')}.`, () => restorePhysiqueSnapshots(succeeded));
+  showUndoToast([`${parts.join(', ')}.`, ...workoutWarnings].join(' '), () => restorePhysiqueSnapshots(succeeded));
 }
 
 // Undo: one write per row (each still exists). `values` is the day as it was.

@@ -306,10 +306,12 @@ function setStatusEnergyTile(entries, caloriesToday, activityKcalToday, tefKcalT
     balanceGood,
   );
 
-  // Δm today's Balance implies (fat-equivalent kcal/kg), against the desired daily change.
-  const dmActual = balanceKcal !== null ? Math.round((balanceKcal / GENERIC_KCAL_PER_KG_FAT) * 1000) : null;
+  // Δm′: today's Balance and its desire, both converted at the same kcal/kg.
+  const toGrams = (kcal) => Math.round((kcal / GENERIC_KCAL_PER_KG_FAT) * 1000);
+  const dmActual = balanceKcal !== null ? toGrams(balanceKcal) : null;
+  const dmDesired = balanceDesiredKcal !== null ? toGrams(balanceDesiredKcal) : null;
   setMaskedText('today-status-deltam-value', dmActual !== null
-    ? `${dmActual}${desiredGPerDay !== null ? ` / ${desiredGPerDay}` : ''} g`
+    ? `${dmActual}${dmDesired !== null ? ` / ${dmDesired}` : ''} g`
     : '—');
 
   // ETA: the plan's forecast (calcProjection), as on the Progress card.

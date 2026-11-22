@@ -335,6 +335,7 @@ Every formula the Health section computes, with its constants, defaults and sour
 - **Active time only:** rest, warm-up and moving between machines don't count.
 - **Tunable:** `WORKOUT_REP_SEC` (tempo) and `WORKOUT_STEPS_PER_MIN`; holds and minutes carry their own time.
 - **Note lines:** `30x Name` (30 reps), `3x10 Name` (30 reps), `135sec Name`, `30min Name`, `6000step Name`.
+  - **Also read:** any case, a space before the unit, plurals and decimal minutes (`30X Name`, `3 x 10 Name`, `1.5 mins Name`, `6000 steps Name`).
 
 | Line type | Active seconds |
 |---|---|
@@ -348,11 +349,11 @@ Every formula the Health section computes, with its constants, defaults and sour
 ## Food logging
 
 - **Precedence:** your Nutrition row (by count, then by weight), then USDA, then the AI estimate.
-- **Count vs weight:** count wins normally; weight wins on an anchored line.
+- **Count vs weight:** count wins normally; weight wins on an anchored line; a typed weight (`g`, `kg`, `oz`, `lb`) is never a count.
 - **Banking:** a new Nutrition row is always stored per 100 g.
 - **Division:** `200/5g` or `1/2cup` is resolved before any lookup; a range like `2-3` is left alone.
-- **Anchors:** `300kcal cookie` and `20p chicken` mean the energy or protein eaten; Consumption is rewritten with the weight.
-- **Several anchors:** `100kcal 5p 4fiber 5fat 8carb bar` keeps each as typed; USDA fills only the missing ones.
+- **Anchors:** `300kcal cookie` and `20p chicken` mean the energy or protein eaten; the line stays as typed and the row holds the weight.
+- **Several anchors:** `100kcal 5p 4fiber 5fat 8carb bar` keeps each as typed, even over a Nutrition row; USDA fills only the missing ones.
 - **Aliases:** `pro`, `df` and `carbs` parse as protein, fiber and carbohydrate anchors.
 
 | Path | Formula |

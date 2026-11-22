@@ -233,10 +233,12 @@ const DIVISION_QUANTITY_PATTERN = new RegExp(
   `(^|[,\\n]\\s*)([\\d.]+)\\s*/\\s*([\\d.]+)\\s*(${INGREDIENT_UNIT_WORDS})\\b`, 'gi'
 );
 function resolveDivisionQuantities(notes) {
-  return notes.replace(DIVISION_QUANTITY_PATTERN, (full, lead, num, denom, unit) => {
+  return notes.replace(DIVISION_QUANTITY_PATTERN, (full, lead, num, denom, unit, offset, text) => {
     const denomNum = parseFloat(denom);
     if (!denomNum) return full;
-    return `${lead}${roundPlaces(parseFloat(num) / denomNum, 2)}${unit}`;
+    // Rounded by the food's density; the name is the rest of its line.
+    const name = extractIngredientName(text.slice(offset + full.length).split(/[,\n]/)[0]);
+    return `${lead}${roundConsumptionQuantity(parseFloat(num) / denomNum, unit, name)}${unit}`;
   });
 }
 

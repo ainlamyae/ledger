@@ -6,7 +6,7 @@ The Finance section tracks money: summary cards, charts, transactions, accounts,
 
 ## At a glance
 
-- **Hub:** `/finance/` shows the summary cards, then tiles for Chart, Transaction, Account, Portfolio, Watch List and Insight.
+- **Hub:** `/finance/` shows the summary cards, then tiles for Chart, Watch List, Insight, Transaction, Account and Portfolio.
 - **Transactions drive everything:** each row is one money movement; the sheet's own formulas turn them into monthly figures.
 - **Accounts hold balances:** a transaction can move its account's Balance as it saves; 🔀 moves money between two accounts.
 - **Checks on the tiles:** red badges flag a stale log, a balance that doesn't match the transactions, and a missed payment.

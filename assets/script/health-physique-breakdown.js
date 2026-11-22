@@ -385,10 +385,30 @@ function localIngredientCalories(quantity, unit, name) {
   return tableGrams ? (entry.calories / tableGrams) * (quantity * gramsPerUnit) : null;
 }
 
+// Most kcal one rounding step of a split quantity may hide.
+const CONSUMPTION_ROUNDING_KCAL = 2;
+
+// Decimals a split quantity keeps: 0 for light foods (1g onion), more for dense
+// ones (1.5g oil); 1 when the Nutrition table can't price it.
+function consumptionQuantityPlaces(unit, name) {
+  const kcalPerUnit = localIngredientCalories(1, unit, name);
+  if (kcalPerUnit === null) return 1;
+  let places = 0;
+  while (places < 2 && kcalPerUnit / 10 ** places > CONSUMPTION_ROUNDING_KCAL) places++;
+  return places;
+}
+
+// Never rounds a split down to 0 (0.33g onion stays 0.3g, not 0g).
+function roundConsumptionQuantity(quantity, unit, name) {
+  let places = consumptionQuantityPlaces(unit, name);
+  while (places < 2 && quantity > 0 && roundPlaces(quantity, places) === 0) places++;
+  return roundPlaces(quantity, places);
+}
+
 // A Consumption line rebuilt as "<quantity><canonical unit> <name>".
 function consumptionLineText(quantity, unit, name) {
   const unitText = unit ? (UNIT_CANONICAL[unit] || unit) : '';
-  return `${roundPlaces(quantity, 2)}${unitText} ${name}`.trim();
+  return `${roundConsumptionQuantity(quantity, unit, name)}${unitText} ${name}`.trim();
 }
 
 // Same name and unit combine, names title-case, lines sort by calories (from
@@ -731,8 +751,11 @@ async function settleConsumption(consumption, savedBreakdownRaw) {
       break;
     }
     result = pass;
-    // Only the first pass's reuse came from the saved day.
-    if (i === 0) reusedCount = result.reusedCount;
+    // Only the first pass counts: later passes re-price lines Calculate itself combined.
+    if (i === 0) {
+      reusedCount = result.reusedCount;
+      estimatedCount = result.estimatedCount;
+    }
     usdaUnreachable = usdaUnreachable || result.usdaUnreachable;
 
     // Title-cased, noteLine too, so the next pass's reuse still matches.
@@ -747,13 +770,64 @@ async function settleConsumption(consumption, savedBreakdownRaw) {
     const rebuilt = result.breakdown.map((item) => item.noteLine || `${item.amount} ${item.name}`).join('\n');
     const tidied = combineAndSortConsumptionText(rebuilt, breakdownCaloriesLookup(result.breakdown));
     combinedCount += tidied.combinedCount;
-    estimatedCount += result.estimatedCount;
-    breakdownRaw = breakdownToJson(result.breakdown);
+    // Combined lines keep their priced rows, summed, so the next pass reuses them.
+    breakdownRaw = breakdownToJson(mergeCombinedBreakdownRows(result.breakdown, tidied.text));
     const settled = tidied.text.trim() === text;
     text = tidied.text.trim();
     if (settled) break;
   }
   return { ...result, text, combinedCount, estimatedCount, reusedCount, usdaUnreachable };
+}
+
+// combineAndSortConsumptionText's grouping key, or null for an unquantified line.
+function consumptionLineKey(line) {
+  const { quantity, unit } = extractIngredientQuantity(line);
+  return quantity === null ? null : `${extractIngredientName(line).toLowerCase()}|${unit || ''}`;
+}
+
+// Rows summed into one, backing `line`.
+function sumBreakdownRows(rows, line) {
+  const amounts = rows.map((row) => parseBreakdownAmount(row.amount));
+  const sum = (key) => amounts.reduce((total, a) => total + (a[key] || 0), 0);
+  let amount = rows[0].amount;
+  if (amounts.every((a) => a.grams !== null)) amount = `${roundPlaces(sum('grams'), 1)}g`;
+  else if (amounts.every((a) => a.count !== null)) amount = `×${roundPlaces(sum('count'), 2)}`;
+  const merged = {
+    ...rows[0],
+    amount,
+    calories: rows.reduce((total, row) => total + (row.calories || 0), 0),
+    protein: roundPlaces(rows.reduce((total, row) => total + (row.protein || 0), 0), 1),
+    source: [...new Set(rows.map((row) => row.source))].join(' + '),
+    noteLine: line,
+    newRow: rows.find((row) => row.newRow)?.newRow || null,
+  };
+  OPTIONAL_TOTAL_KEYS.forEach((key) => {
+    const value = rows.reduce((total, row) => sumOptional(total, row[key]), undefined);
+    if (value === undefined) delete merged[key];
+    else merged[key] = value;
+  });
+  return merged;
+}
+
+// The breakdown lined up with the tidied text: a line Calculate combined gets its
+// source rows summed instead of a fresh lookup.
+function mergeCombinedBreakdownRows(breakdown, text) {
+  const lines = nonEmptyLines(text);
+  const kept = breakdown.filter((item) => lines.includes(item.noteLine));
+  const groups = new Map();
+  breakdown.filter((item) => !kept.includes(item)).forEach((item) => {
+    const key = item.noteLine ? consumptionLineKey(item.noteLine) : null;
+    if (key === null) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  const merged = [];
+  lines.forEach((line) => {
+    if (kept.some((item) => item.noteLine === line)) return;
+    const rows = groups.get(consumptionLineKey(line));
+    if (rows?.length) merged.push(sumBreakdownRows(rows, line));
+  });
+  return [...kept, ...merged];
 }
 
 // Consumption emptied: the Breakdown and the totals it wrote go too. Typed totals
@@ -797,7 +871,13 @@ async function calculatePhysiqueDay() {
     btn.disabled = false;
     Motion.iconSettle(btn);
   }
-  if (messages.length) showToast(messages.join(' '));
+  if (messages.length) showToast(orderCalcMessages(messages).join(' '));
+}
+
+// Warnings first, then the rest, then ♻️ reused last.
+function orderCalcMessages(messages) {
+  const rank = (m) => (m.startsWith('⚠️') ? 0 : m.startsWith('♻️') ? 2 : 1);
+  return [...messages].sort((a, b) => rank(a) - rank(b));
 }
 
 // calculatePhysiqueDay's work, pushing its warnings onto `messages`.
@@ -816,7 +896,11 @@ async function calculatePhysiqueSides(consumption, workout, messages) {
       renderPhysiqueBreakdown(breakdown, calories, protein);
 
       if (settled.combinedCount > 0) messages.push(`🔗 ${settled.combinedCount} combined.`);
-      if (settled.reusedCount) messages.push(`♻️ ${settled.reusedCount} reused, ${settled.estimatedCount} new.`);
+      // "M new" sits with the regular messages; "♻️ N reused" comes last.
+      if (settled.reusedCount) {
+        if (settled.estimatedCount) messages.push(`${settled.estimatedCount} new.`);
+        messages.push(`♻️ ${settled.reusedCount} reused.`);
+      }
       if (settled.usdaUnreachable) messages.push('⚠️ No DB — AI only.');
       if (calories > PHYSIQUE_DAY_CALORIE_CEILING) messages.push(`⚠️ ${calories} kcal, check.`);
     } catch (err) {

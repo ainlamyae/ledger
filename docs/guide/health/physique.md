@@ -54,9 +54,11 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 - **🧮 Calculate:** prices both text boxes and tidies them.
   - **One click:** it repeats until the text stops changing, so a second click changes nothing.
   - **Consumption:** merges duplicate lines, sorts by calories (highest first) and capitalizes names; uncombined lines stay as written.
+  - **Merged lines:** their priced rows are summed, never looked up again (`50g Rice` twice → one `100g Rice` row at both rows' kcal).
   - **Workout:** merges lines for the same exercise and unit, sorts by burn and title-cases names; a line it can't read stays as typed and is named in the toast.
   - **Unknown foods:** priced from USDA, else by the AI; unknown exercises get an AI-estimated MET.
   - **Emptied Consumption:** clears the Breakdown and the totals it wrote; totals typed without a Breakdown stay.
+  - **Toast:** one line, ⚠️ warnings first, then the rest (`🔗 1 combined.`, `2 new.`), and `♻️ 4 reused.` last.
 - **Form buttons:** 📷 🔁 🧬 🧮 💾 ❌ (📅 in 🔁's place on a Pattern).
 - **🔁 Make Pattern:** beside 📷 on a day; hides Date, Body Mass, Sleep and Workout. It saves nothing: 💾 then writes the same row as a Pattern.
 - **📅 Make Day:** in 🔁's place on a Pattern; brings them back (Date today). It saves nothing: 💾 then writes the same row as a day.
@@ -69,6 +71,7 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 ## Rules & calculations
 
 - **Scaling groups:** wrap lines in `( … )/n` or `( … )*n` to share or multiply a portion; Calculate writes back the scaled lines.
+- **Split amounts** (`4/3g Onion` or a group): rounded so one step hides at most 2 kcal (`CONSUMPTION_ROUNDING_KCAL`): `1g Onion`, `1.5g Oil`, `0.33x Egg`; 1 decimal for a food not in Nutrition, and never down to 0.
 - **Amounts in grams:** a counted food is stored by its Nutrition gram figure (`31g (1 scoop)` → `31g`).
 - **Consumption is the reference:** Calculate first lines the Breakdown up with it, so each row's amount is the line's.
   - **Typed weight:** `5g Coffee` is 5 g, never the AI's guess of a cup, nor 5 servings of a counted row (`200g Egg` on `50g (1x)` is 200 g).

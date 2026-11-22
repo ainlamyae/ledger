@@ -60,7 +60,7 @@ const QUICK_ACTIONS = {
 
 // A hub's tile order, by page route or quick action key; unlisted tiles go last.
 const TILE_ORDER = {
-  health: ['chart', 'micronutrients', 'insight', 'physique', 'nutrition', 'activity', 'tune', 'today', 'workouts'],
+  health: ['chart', 'micronutrients', 'insight', 'nutrition', 'physique', 'activity', 'tune', 'today', 'workouts'],
   finance: ['chart', 'watchlist', 'insight', 'transaction', 'account', 'portfolio'],
 };
 
@@ -96,36 +96,35 @@ function createTile(className, label, setup) {
   return tile;
 }
 
-function buildQuickActions(section) {
-  const actions = QUICK_ACTIONS[section.id];
-  const grid = tileGrid(section);
-  if (!actions || !grid) return;
-  actions.forEach((action) => {
-    const source = document.getElementById(action.buttonId);
-    const tile = createTile('page-tile quick-tile', action.label, (el) => {
-      el.dataset.kind = action.kind || 'form';
-      el.dataset.quick = action.key;
-      if (source?.title) el.title = source.title;
-      el.href = `${section.href}${action.href()}`;
-    });
-    tile.addEventListener('click', (event) => {
-      if (window.ledgerSectionPage?.section !== section.id || !source) return;
-      if (!isPlainClick(event)) return;
-      event.preventDefault();
-      source.click();
-    });
-    grid.appendChild(tile);
-  });
+// A section's tiles and sidebar links alike: pages and quick actions, in TILE_ORDER.
+function sectionEntries(section) {
+  const pages = section.panels
+    .filter((panel) => pageHasTile(section, panel) && !panel.dataset.tileHost)
+    .map((panel) => ({ key: panel.dataset.route, label: routedHeadingText(panel), panel }));
+  const quick = (QUICK_ACTIONS[section.id] || []).map((action) => ({ key: action.key, label: action.label, action }));
+  const order = TILE_ORDER[section.id] || [];
+  const rank = (e) => (order.includes(e.key) ? order.indexOf(e.key) : order.length);
+  return [...pages, ...quick].sort((a, b) => rank(a) - rank(b));
 }
 
-function orderTiles(section) {
-  const order = TILE_ORDER[section.id];
-  const grid = tileGrid(section);
-  if (!order || !grid) return;
-  const tiles = [...grid.children];
-  const keyOf = (el) => el.dataset.route || el.dataset.quick;
-  const rank = (el) => (order.includes(keyOf(el)) ? order.indexOf(keyOf(el)) : order.length);
-  tiles.sort((a, b) => rank(a) - rank(b)).forEach((el) => grid.appendChild(el));
+// Sets an entry's link attributes and click handling on `el`.
+function setEntryLink(el, section, entry) {
+  if (entry.panel) {
+    setPageLink(el, section, entry.panel);
+    el.addEventListener('click', (event) => onPageLinkClick(event, section.id, entry.panel));
+    return;
+  }
+  // A quick action clicks its header button on its own section page.
+  const source = document.getElementById(entry.action.buttonId);
+  el.dataset.quick = entry.key;
+  if (source?.title) el.title = source.title;
+  el.href = `${section.href}${entry.action.href()}`;
+  el.addEventListener('click', (event) => {
+    if (window.ledgerSectionPage?.section !== section.id || !source) return;
+    if (!isPlainClick(event)) return;
+    event.preventDefault();
+    source.click();
+  });
 }
 
 function buildPageTiles(section) {
@@ -133,16 +132,24 @@ function buildPageTiles(section) {
   const grid = document.createElement('nav');
   grid.className = 'page-tiles';
   grid.setAttribute('aria-label', `${section.label} pages`);
-  section.panels.filter((panel) => pageHasTile(section, panel)).forEach((panel) => {
+  sectionEntries(section).forEach((entry) => {
+    const tile = createTile(entry.panel ? 'page-tile' : 'page-tile quick-tile', entry.label, (el) => {
+      const kind = entry.panel ? TILE_KINDS[`${section.id}/${entry.key}`] : (entry.action.kind || 'form');
+      if (kind) el.dataset.kind = kind;
+    });
+    setEntryLink(tile, section, entry);
+    grid.appendChild(tile);
+  });
+  // data-tile-host puts a tile elsewhere (Market's among Insight's modes).
+  section.panels.filter((panel) => pageHasTile(section, panel) && panel.dataset.tileHost).forEach((panel) => {
+    const host = document.getElementById(panel.dataset.tileHost);
+    if (!host) return;
     const tile = createTile('page-tile', routedHeadingText(panel), (el) => {
-      setPageLink(el, section, panel);
       const kind = TILE_KINDS[`${section.id}/${panel.dataset.route}`];
       if (kind) el.dataset.kind = kind;
     });
-    tile.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
-    // data-tile-host puts a tile elsewhere (Market's among Insight's modes).
-    const host = panel.dataset.tileHost && document.getElementById(panel.dataset.tileHost);
-    (host || grid).appendChild(tile);
+    setEntryLink(tile, section, { key: panel.dataset.route, panel });
+    host.appendChild(tile);
   });
   // One card titled with the section's name, on the home page and the hub alike.
   const card = document.createElement('div');
@@ -281,13 +288,12 @@ function buildSideNav(sections) {
     heading.textContent = section.label;
     heading.addEventListener('click', (event) => onPageLinkClick(event, section.id, null));
     links.appendChild(heading);
-    // A data-tile-host block is reached from its host.
-    section.panels.filter((panel) => pageHasTile(section, panel) && !panel.dataset.tileHost).forEach((panel) => {
+    // Same entries and order as the section's tiles.
+    sectionEntries(section).forEach((entry) => {
       const link = document.createElement('a');
       link.className = 'side-nav-page';
-      setPageLink(link, section, panel);
-      link.textContent = routedHeadingText(panel);
-      link.addEventListener('click', (event) => onPageLinkClick(event, section.id, panel));
+      setEntryLink(link, section, entry);
+      link.textContent = entry.label;
       links.appendChild(link);
     });
   });
@@ -386,8 +392,6 @@ function initPageNav() {
         return;
       }
       buildPageTiles(s);
-      buildQuickActions(s);
-      orderTiles(s);
     });
     return;
   }
@@ -398,8 +402,6 @@ function initPageNav() {
   section.panels.forEach(liftPageActions);
   section.panels.forEach(liftSelectionBar);
   buildPageTiles(section);
-  buildQuickActions(section);
-  orderTiles(section);
   buildPageCrumb(section);
   // The form pages' crumb; updateFormPage moves it into the open form.
   document.body.appendChild(createCrumb('page-crumb form-crumb', 'form-crumb'));

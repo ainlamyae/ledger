@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](devel
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | 3.46.1 | fix(physique): make Calculate settle in one click, stop weights counting as servings, and match Δm′ to D |
+| (this commit) | **3.47.0** | feat(nav): mirror hub tiles in the sidebar and fix Calculate's merging, rounding and toast |
+| `0af7adf` | 3.46.1 | fix(physique): make Calculate settle in one click, stop weights counting as servings, and match Δm′ to D |
 | `e789d6b` | **3.46.0** | feat(forms): turn Transfer's Pay Off, Work Time's Holiday and Physique's Pattern ticks into buttons |
 | `6458fc7` | 3.45.1 | fix(physique): make Consumption the reference for Calculate, put selection buttons beside the header's, and refactor the touched files Calculate: - A typed weight ("5g Coffee") is the amount eaten, never the AI's guess. - A unit the Nutrition Amount names counts servings ("2 cup Coffee" on   "5g (1cup)" is 10 g, not 480 g). - Reused Breakdown rows take the Consumption line's amount; rows from   Nutrition are repriced from the sheet as it is now, so an edited food   (Coffee 0 -> 2 kcal) updates every recalculated day. |
 | `e81068c` | **3.45.0** | feat(nav): replace Other with a Settings section at /setting/ and colour Watch List as a chart |

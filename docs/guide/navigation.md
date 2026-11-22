@@ -21,19 +21,20 @@ How you move around Ledger: hubs and pages, the sidebar and tab bar, addresses, 
 
 | Colour | Opens | Tiles |
 |---|---|---|
-| Gray | A sheet's rows | Physique, Nutrition, Activity, Transaction, Account, Portfolio, Watch List, LeetCode, Work Time, Car Service, Travel, Application |
+| Gray | A sheet's rows | Nutrition, Physique, Activity, Transaction, Account, Portfolio, Watch List, LeetCode, Work Time, Car Service, Travel, Application |
 | Green | A form | Tune, Today, Workouts |
 | Orange | Charts | Chart (Health and Finance), Micronutrients |
 | Purple | An AI read | Insight (Health and Finance), Market, and Insight's mode tiles |
 
 - **Quick actions:** the Health hub adds **Today**, **Workouts** and **Micronutrients** tiles that open their form or view directly.
+- **Order:** Health: Chart, Micronutrients, Insight, Nutrition, Physique, Activity, Tune, Today, Workouts; Finance: Chart, Watch List, Insight, Transaction, Account, Portfolio (`TILE_ORDER`).
 - **Tiles elsewhere:** Market's tile sits on Finance Insight's page beside Snapshot; Breakdown has no tile but `/finance/breakdown/` opens.
 - **Badges:** a small red pill on a tile's corner and after its breadcrumb, e.g. `5d`, `Log`, `A<T $13`, `AC.TO<20.16`.
   - Each badge is explained on its page's guide; a `Log` or Work Time badge opens today's day.
 
 ### Sidebar and tab bar
 
-- **Sidebar (wide screens):** **Ledger** at the top, then every section and page; the current one is white on blue.
+- **Sidebar (wide screens):** **Ledger** at the top, then each section with the same entries, names and order as its tile card, quick actions included; the current one is white on blue.
   - **Bottom panel:** Refresh data, Clear cache, Settings, the switches, then your account row.
   - **Hide it:** the button beside **Ledger**, or Ctrl+. (⌘. on a Mac); the choice is kept in this browser.
 - **Tab bar (≤1179px):** Ledger · Health · Finance · Track, pinned to the bottom; your avatar (or 🔑 sign-in) sits bottom-left.

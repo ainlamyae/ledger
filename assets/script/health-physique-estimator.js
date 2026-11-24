@@ -768,6 +768,9 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
     totalGrams ? `${roundPlaces(totalGrams, 1)}g` : '',
     totalCount ? `×${roundPlaces(totalCount, 1)}` : '',
   ].filter(Boolean).join(' + ');
+  // TEF's total is rounded once from the day's raw digestion cost (physiqueField),
+  // not re-summed from rows already rounded for display — else the two drift apart.
+  const physiqueTef = form === 'physique' ? physiqueFieldNumber('tef') : null;
   appendTableRow(tbody, 'calc-breakdown-total', [
     makeCell('Total'),
     amountCell(totalAmount),
@@ -776,7 +779,7 @@ function renderCalcBreakdown(breakdown, totalCalories, totalProtein, form = 'phy
     totalCell(totals.fiber),
     totalCell(totals.fat),
     totalCell(totals.carbohydrate),
-    macroCell(totals.tef, 0),
+    macroCell(physiqueTef ?? totals.tef, 0),
     makeCell(''),
   ]);
 

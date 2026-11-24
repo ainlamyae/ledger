@@ -17,7 +17,7 @@ Every folder and file in the repository, one line each.
 | Path | What it is |
 |---|---|
 | `index.html` | The page shell: every block, form and modal, the CSP and the script order |
-| `health/`, `finance/`, `track/`, `other/` | Section pages; every sub-folder is a block, button or view address holding a stub `index.html` |
+| `health/`, `finance/`, `track/`, `setting/` | Section pages; every sub-folder is a block, button or view address holding a stub `index.html` |
 | `404.html` | Serves row addresses (`/health/nutrition/<name>/`); one inline script, allowed by hash |
 | `sw.js` | Retired service worker: clears old caches and unregisters itself |
 | `favicon.svg`, `manifest.json`, `robots.txt`, `sitemap.xml` | Icon, web app manifest, crawler rules, address list |

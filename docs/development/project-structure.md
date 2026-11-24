@@ -61,7 +61,7 @@ Every folder and file in the repository, one line each.
 | `health-nutrition.js` | Nutrition block: table, Group, USDA lookup, merge, Pull Micronutrients |
 | `health-physique-estimator.js` | Calculate for food: split, table-first lookup, USDA fallback |
 | `health-physique.js` | Physique block: one row per day, form, and the entries every chart reads |
-| `health-physique-breakdown.js` | Physique's Calculate, Combine & Sort (merged rows summed), split rounding, toast order, Consumption autocomplete |
+| `health-physique-breakdown.js` | Physique's Calculate, Combine & Sort (merged rows summed), line sums (`300-100g`), split rounding, toast order, Consumption autocomplete |
 | `health-activity-catalogue.js` | `Activity` tab catalogue: plan tables, Instruction modal, MET and muscle lookups |
 | `health-activity.js` | Activity block: logged-today ticks, Log a Workout |
 | `health-activity-estimator.js` | Workout note parsing and MET-based burn |

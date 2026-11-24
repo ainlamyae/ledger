@@ -6,7 +6,8 @@ Every commit, newest first, with the version it produced (see [Versioning](devel
 
 | Commit | Version | Changes |
 |---|---|---|
-| (this commit) | **3.48.0** | feat(physique): resolve + - * / sums in Consumption lines on Calculate |
+| (this commit) | 3.48.1 | docs(structure): list Consumption line sums under health-physique-breakdown.js |
+| `6e6fcbf` | **3.48.0** | feat(physique): resolve + - * / sums in Consumption lines on Calculate |
 | `86a25c4` | 3.47.1 | fix(physique): make the breakdown table's TEF total match the Summary |
 | `38696fd` | **3.47.0** | feat(nav): mirror hub tiles in the sidebar and fix Calculate's merging, rounding and toast |
 | `0af7adf` | 3.46.1 | fix(physique): make Calculate settle in one click, stop weights counting as servings, and match Δm′ to D |

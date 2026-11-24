@@ -71,6 +71,7 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 ## Rules & calculations
 
 - **Scaling groups:** wrap lines in `( … )/n` or `( … )*n` to share or multiply a portion; Calculate writes back the scaled lines.
+- **Line sums:** `+ - * /` (or `×`) on one food's line work out first: `300-100g Chicken` and `300g Chicken - 100g Chicken` both become `200g Chicken`; mixed weights add in grams. A result of 0 or less, or two different foods, stays as typed.
 - **Split amounts** (`4/3g Onion` or a group): rounded so one step hides at most 2 kcal (`CONSUMPTION_ROUNDING_KCAL`): `1g Onion`, `1.5g Oil`, `0.33x Egg`; 1 decimal for a food not in Nutrition, and never down to 0.
 - **Amounts in grams:** a counted food is stored by its Nutrition gram figure (`31g (1 scoop)` → `31g`).
 - **Consumption is the reference:** Calculate first lines the Breakdown up with it, so each row's amount is the line's.

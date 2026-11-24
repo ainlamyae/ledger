@@ -728,13 +728,61 @@ function applyConsumptionScaling(text) {
   return found ? scaled : null;
 }
 
+// A + - * / × between quantities, when a digit follows ("low-fat" isn't one).
+const CONSUMPTION_OPERATOR_RE = /\s*([-+*/×])\s*(?=[\d.])/;
+// A scaling group's "(" opener and ")/n" closer, kept around a line's sum.
+const CONSUMPTION_GROUP_EDGES_RE = /^(\(?)(.*?)(\)[ \t]*[/*×x][ \t]*[\d.]+[ \t]*)?$/;
+
+// "300-100g chicken" or "300g chicken - 100g chicken" -> "200g chicken". Terms
+// share one name; mixed mass units sum in grams. Null when not a sum, or <= 0
+// (so a range like "2-3 eggs" stays).
+function consumptionLineArithmetic(line) {
+  const parts = line.trim().split(CONSUMPTION_OPERATOR_RE);
+  if (parts.length < 3) return null;
+  const terms = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const { quantity, unit } = extractIngredientQuantity(parts[i]);
+    if (quantity === null) return null;
+    terms.push({ quantity, unit: unit && (UNIT_CANONICAL[unit] || unit), name: extractIngredientName(parts[i]) });
+  }
+  const names = new Set(terms.map((t) => t.name.toLowerCase()).filter(Boolean));
+  const units = new Set(terms.map((t) => t.unit).filter(Boolean));
+  if (names.size !== 1) return null;
+  const inGrams = units.size > 1;
+  if (inGrams && ![...units].every(massUnitGrams)) return null;
+  const values = terms.map((t) => (inGrams && t.unit ? t.quantity * massUnitGrams(t.unit) : t.quantity));
+
+  // × and / bind first, then + and -.
+  const sums = [values[0]];
+  for (let i = 1; i < parts.length; i += 2) {
+    const op = parts[i];
+    const value = values[(i + 1) / 2];
+    if (op === '*' || op === '×') sums[sums.length - 1] *= value;
+    else if (op === '/') sums[sums.length - 1] = value ? sums[sums.length - 1] / value : NaN;
+    else sums.push(op === '-' ? -value : value);
+  }
+  const total = sums.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return null;
+  return consumptionLineText(total, inGrams ? 'g' : [...units][0] || null, terms.find((t) => t.name).name);
+}
+
+// Each line's sum resolved; group edges stay so scaling still applies.
+function applyConsumptionArithmetic(text) {
+  return text.split('\n').map((line) => {
+    const [, open, body, close = ''] = line.match(CONSUMPTION_GROUP_EDGES_RE);
+    const resolved = consumptionLineArithmetic(body);
+    return resolved === null ? line : `${open}${resolved}${close}`;
+  }).join('\n');
+}
+
 // Cap on Calculate's passes, in case a line never settles.
 const PHYSIQUE_CALC_MAX_PASSES = 5;
 
 // Calculate's Consumption side, shared by the form and Bulk Calculate; no DOM.
 // Repeats until the tidied text stops changing, so one run applies every change.
 async function settleConsumption(consumption, savedBreakdownRaw) {
-  let text = (applyConsumptionScaling(consumption) ?? consumption).trim();
+  const resolved = applyConsumptionArithmetic(consumption);
+  let text = (applyConsumptionScaling(resolved) ?? resolved).trim();
   let breakdownRaw = savedBreakdownRaw;
   let combinedCount = 0;
   let estimatedCount = 0;

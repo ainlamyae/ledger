@@ -41,13 +41,13 @@ Physique is the daily log: one row per day holding body mass, sleep, food and wo
 - **Summary:** the Status card's rows worked out from the open form: m, m̄, Δm, BMI, Pro, DF, Fat, Crb, TEI, TEF, AEE, SD, BMR, M, D, Δm′.
   - **Columns:** Name, Amount, Desire, Remain (Desire − Amount, blank once met), Unit and a ✅/❌ mark.
   - **Δm′:** both Amount and Desire are D's in grams (÷ 7700 kcal/kg), so the row always reads as D does.
-- **🧬 Micronutrients:** a day's real nutrient totals: Nutrient, Amount, Supp / day, Ideal / day.
+- **🧬 Micronutrients:** a day's real nutrient totals: Nutrient, Amount, Supp / day, Ideal / day, then the unit once.
 
 ## Actions
 
 - **📝 Log:** opens a blank day form.
 - **📍 Today:** opens today's row, or a new form dated today.
-- **🧬 (header):** nutrient totals over a range (1d, 1w default, 1m, 3m, 6m, 1y, All), with Total (period), Avg / day, Supp / day and Ideal / day.
+- **🧬 (header):** nutrient totals over a range (1d, 1w default, 1m, 3m, 6m, 1y, All), with Total (period), Avg / day, Supp / day, Ideal / day and the unit once at the end.
 - **Row actions:** ✏️ Edit, 📋 Duplicate, 🧬 Micronutrients, 🗑️ Delete.
 - **📷 Scan:** pick a meal photo; the AI lists the foods with portions, appends them to Consumption and runs Calculate.
 - **🧬 (form):** the day's Micronutrients view; the day must be saved first.

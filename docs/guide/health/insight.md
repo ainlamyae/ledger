@@ -57,6 +57,7 @@ Insight sends a chosen slice of your Health data to an AI model and shows its re
 - **Protein:** uses the same figures as Protein Source Rotation, largest shortfall first.
 - **Pattern:** periods with no logged day are greyed out and left out of the prompt.
 - **Ideal / day:** mostly the FDA Daily Values, for a general adult; Tune's Save copies each macro band's minimum in.
+- **Units:** shown once, in each row's last column; numbers keep at most 4 significant digits (1000+ whole), an Ideal in another unit is converted, and a missing value is a blank cell.
 - **Safe output:** the answer is shown as plain text, never as HTML.
 
 ## Data

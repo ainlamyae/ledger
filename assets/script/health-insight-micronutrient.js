@@ -384,8 +384,29 @@ function formatMicronutrientCoverageLine(data) {
   return `Based on ${data.contributing.length} ingredient${data.contributing.length === 1 ? '' : 's'} with pulled micronutrient data, over ${data.daysLogged} day${data.daysLogged === 1 ? '' : 's'} logged.`;
 }
 
-const MICRONUTRIENT_TABLE_COLUMN_COUNT = 5;
-const amountWithUnit = (value, unit) => (value !== null ? `${value} ${unit}` : '—');
+const MICRONUTRIENT_TABLE_COLUMN_COUNT = 6;
+
+// At most 4 significant digits; 1000+ rounds to a whole number.
+const formatNutrientAmount = (value) => (Math.abs(value) >= 1000 ? Math.round(value) : Number(value.toPrecision(4)));
+const nutrientAmountText = (value) => (value !== null ? String(formatNutrientAmount(value)) : '');
+
+// A nutrient row's amount cells, then its unit once at the end. An Ideal in
+// another unit converts; one that can't keeps its own unit.
+function nutrientAmountCells(n, withPerDay) {
+  const idealConverted = n.ideal !== null && n.idealUnit !== n.unit
+    ? convertNutrientAmount(n.name, n.ideal, n.idealUnit, n.unit)
+    : n.ideal;
+  const idealText = n.ideal !== null && idealConverted === null
+    ? `${formatNutrientAmount(n.ideal)} ${n.idealUnit}`
+    : nutrientAmountText(idealConverted);
+  return [
+    makeCell(nutrientAmountText(n.total)),
+    ...(withPerDay ? [makeCell(nutrientAmountText(n.perDay))] : []),
+    makeCell(nutrientAmountText(n.supplementPerDay)),
+    makeCell(idealText),
+    makeCell(n.unit),
+  ];
+}
 
 function renderMicronutrientInsightPreview(data) {
   renderInsightLines(document.getElementById('insight-micro-profile'), [
@@ -405,13 +426,7 @@ function renderMicronutrientInsightPreview(data) {
     const tr = document.createElement('tr');
     if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
     if (nutrientSectionEnd(data.nutrients, i)) tr.classList.add('nutrient-facts-end');
-    tr.append(
-      nutrientNameCell(n),
-      makeCell(amountWithUnit(n.total, n.unit)),
-      makeCell(amountWithUnit(n.perDay, n.unit)),
-      makeCell(amountWithUnit(n.supplementPerDay, n.unit)),
-      makeCell(amountWithUnit(n.ideal, n.idealUnit)),
-    );
+    tr.append(nutrientNameCell(n), ...nutrientAmountCells(n, true));
     tbody.appendChild(tr);
   });
 }

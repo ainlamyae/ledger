@@ -86,7 +86,7 @@ Every folder and file in the repository, one line each.
 | `health-tune-calibration.js` | BMR calibration from logged data |
 | `health-insight-wellness.js` | Insight shared helpers and Wellness mode |
 | `health-insight-food.js` | Insight Food mode |
-| `health-insight-micronutrient.js` | Insight Micronutrient mode |
+| `health-insight-micronutrient.js` | Insight Micronutrient mode; the unit-column amount cells all three Micronutrients tables share |
 | `health-insight-activity.js` | Insight Activity mode |
 | `health-insight-protein.js` | Insight Protein mode |
 | `health-insight-plan.js` | Insight Plan mode |

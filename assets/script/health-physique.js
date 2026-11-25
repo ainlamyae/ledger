@@ -1325,17 +1325,10 @@ function updatePhysiqueBulkActionsUI() {
 // One nutrient's table row; `withPerDay` adds the per-day average column.
 function physiqueNutrientRow(nutrients, i, withPerDay) {
   const n = nutrients[i];
-  const amount = (value, unit) => (value !== null ? `${value} ${unit}` : '—');
   const tr = document.createElement('tr');
   if (n.severity === 'severe' || n.severity === 'mild') tr.classList.add('nutrient-gap');
   if (nutrientSectionEnd(nutrients, i)) tr.classList.add('nutrient-facts-end');
-  tr.append(
-    nutrientNameCell(n),
-    makeCell(`${n.total} ${n.unit}`),
-    ...(withPerDay ? [makeCell(amount(n.perDay, n.unit))] : []),
-    makeCell(amount(n.supplementPerDay, n.unit)),
-    makeCell(amount(n.ideal, n.idealUnit)),
-  );
+  tr.append(nutrientNameCell(n), ...nutrientAmountCells(n, withPerDay));
   return tr;
 }
 
@@ -1360,7 +1353,7 @@ function openPhysiqueMicronutrients(p, routed = false) {
     ? aggregateMicronutrientIntake(p.date, p.date)
     : aggregateMicronutrientIntake(null, null, [parsePhysiqueBreakdown(p.breakdown)]);
 
-  renderPhysiqueNutrientRows('physique-micro-body', data.nutrients, false, 4, 'Nothing to show — see the coverage note above.');
+  renderPhysiqueNutrientRows('physique-micro-body', data.nutrients, false, 5, 'Nothing to show — see the coverage note above.');
   document.getElementById('physique-micro-modal').hidden = false;
 }
 
@@ -1384,7 +1377,7 @@ function renderPhysiqueMicronutrientsRange() {
     ? { from: localIso(), to: localIso() }
     : healthRangeDates(physiqueMicroRangeSlug);
   const { nutrients } = aggregateMicronutrientIntake(from, to);
-  renderPhysiqueNutrientRows('physique-micro-range-body', nutrients, true, 5, 'No day in this range has 🧬 Micronutrients pulled.');
+  renderPhysiqueNutrientRows('physique-micro-range-body', nutrients, true, 6, 'No day in this range has 🧬 Micronutrients pulled.');
 }
 
 // Form field id suffix → entry property (sheet placement is PHYSIQUE_COLUMNS' job).
